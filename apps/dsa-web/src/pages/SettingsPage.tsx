@@ -14,7 +14,15 @@ import {
   GenerationBackendStatusPanel,
   IntelligentImport,
   LLMChannelEditor,
+  NotificationChannelsPanel,
   NotificationTestPanel,
+  isNotificationChannelKey,
+  NOTIFICATION_FIELD_GROUP_ORDER,
+  getNotificationFieldGroupId,
+  getNotificationFieldOrder,
+  getCategoryFieldGroupOrder,
+  getCategoryFieldGroupId,
+  getCategoryFieldOrder,
   SettingsCategoryNav,
   SettingsAlert,
   SettingsField,
@@ -425,6 +433,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
     <SettingsSectionCard
       title={t('settings.setupGuideTitle')}
       description={t('settings.setupGuideDescription')}
+      contentBordered
     >
       <div data-testid="first-run-setup-card" className="space-y-4">
         <div className="flex flex-col gap-3 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-start md:justify-between">
@@ -678,9 +687,10 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     <SettingsSectionCard
       title={t('settings.schedulerTitle')}
       description={t('settings.schedulerDescription')}
+      contentBordered
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+        <div className="grid grid-cols-1 gap-3">
           <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
                 <label className="flex items-start gap-3">
                   <input
@@ -1373,18 +1383,83 @@ const SettingsPage: React.FC = () => {
       description={activeCategoryDescription || t('settings.activePanelDescription')}
     >
       {visibleActiveItems.length ? (
-        <div className="divide-y divide-[var(--settings-border-soft)] overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-          {visibleActiveItems.map((item) => (
-            <SettingsField
-              key={item.key}
-              item={item}
-              value={item.value}
+        activeCategory === 'notification' ? (
+          <div className="space-y-4">
+            <NotificationChannelsPanel
+              items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
               disabled={isSaving}
               onChange={setDraftValue}
-              issues={issueByKey[item.key] || []}
+              issueByKey={issueByKey}
             />
-          ))}
-        </div>
+            {NOTIFICATION_FIELD_GROUP_ORDER.map((group) => {
+              const groupItems = visibleActiveItems
+                .filter((item) => !isNotificationChannelKey(item.key)
+                  && getNotificationFieldGroupId(item.key) === group.id)
+                .sort((a, b) => getNotificationFieldOrder(a.key) - getNotificationFieldOrder(b.key));
+              if (!groupItems.length) {
+                return null;
+              }
+              return (
+                <div key={group.id} className="space-y-2">
+                  <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
+                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                    {groupItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : getCategoryFieldGroupOrder(activeCategory) ? (
+          <div className="space-y-4">
+            {(getCategoryFieldGroupOrder(activeCategory) ?? []).map((group) => {
+              const groupItems = visibleActiveItems
+                .filter((item) => getCategoryFieldGroupId(activeCategory, item.key) === group.id)
+                .sort((a, b) => getCategoryFieldOrder(activeCategory, a.key) - getCategoryFieldOrder(activeCategory, b.key));
+              if (!groupItems.length) {
+                return null;
+              }
+              return (
+                <div key={group.id} className="space-y-2">
+                  <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
+                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                    {groupItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+            {visibleActiveItems.map((item) => (
+              <SettingsField
+                key={item.key}
+                item={item}
+                value={item.value}
+                disabled={isSaving}
+                onChange={setDraftValue}
+                issues={issueByKey[item.key] || []}
+              />
+            ))}
+          </div>
+        )
       ) : null}
       {promptCacheAdvancedItems.length ? (
         <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
@@ -1399,7 +1474,7 @@ const SettingsPage: React.FC = () => {
             </div>
             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
           </summary>
-          <div className="divide-y divide-[var(--settings-border-soft)] border-t border-[var(--settings-border-soft)]">
+          <div className="border-t border-[var(--settings-border-soft)]">
             {promptCacheAdvancedItems.map((item) => (
               <SettingsField
                 key={item.key}
@@ -1424,7 +1499,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
-      <div className="mb-4 rounded-lg border settings-border bg-card/90 px-4 py-4 shadow-soft-card backdrop-blur-sm">
+      <div className="mb-4 px-1 py-1">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">{t('settings.pageTitle')}</h1>
@@ -1581,6 +1656,7 @@ const SettingsPage: React.FC = () => {
               <SettingsSectionCard
                 title={t('settings.versionInfo')}
                 description={t('settings.versionInfoDescription')}
+                contentBordered
               >
                 <div
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
@@ -1676,7 +1752,7 @@ const SettingsPage: React.FC = () => {
                 title={t('settings.configBackup')}
                 description={t('settings.configBackupDescription')}
               >
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-xl border settings-border p-4">
                   {!isEnvBackupAllowed ? (
                     <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
                       {t('settings.disabledAuthBackupWarning')}
@@ -1736,6 +1812,7 @@ const SettingsPage: React.FC = () => {
               <SettingsSectionCard
                 title={t('settings.intelligentImport')}
                 description={t('settings.intelligentImportDescription')}
+                contentBordered
               >
                 <IntelligentImport
                   stockListValue={
@@ -1755,6 +1832,7 @@ const SettingsPage: React.FC = () => {
               <SettingsSectionCard
                 title={t('settings.llmAccess')}
                 description={t('settings.llmAccessDescription')}
+                contentBordered
               >
                 <GenerationBackendStatusPanel
                   items={generationBackendDraftItems}

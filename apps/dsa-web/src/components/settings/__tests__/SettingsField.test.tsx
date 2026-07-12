@@ -39,7 +39,7 @@ describe('SettingsField', () => {
   });
 
   it('localizes TickFlow field descriptions instead of falling back to backend English schema', () => {
-    render(
+    const { container } = render(
       <SettingsField
         item={{
           key: 'TICKFLOW_PRIORITY',
@@ -68,11 +68,12 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText('TickFlow 日 K 优先级')).toBeInTheDocument();
+    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
     expect(screen.getByText(/控制 TickFlow 在 A 股日 K 数据源回退链中的尝试顺序/)).toBeInTheDocument();
     expect(screen.queryByText(/Priority for TickFlow daily K-line fetcher/)).not.toBeInTheDocument();
   });
   it('uses schema key for TickFlow localization when the runtime item key differs', () => {
-    render(
+    const { container } = render(
       <SettingsField
         item={{
           key: 'runtime.tickflow.priority',
@@ -101,6 +102,7 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText(getFieldTitleZh('TICKFLOW_PRIORITY', ''))).toBeInTheDocument();
+    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
     expect(screen.getByText(getFieldDescriptionZh('TICKFLOW_PRIORITY', ''))).toBeInTheDocument();
     expect(screen.queryByLabelText('TickFlow Priority')).not.toBeInTheDocument();
     expect(screen.queryByText(/Priority for TickFlow daily K-line fetcher/)).not.toBeInTheDocument();
@@ -141,7 +143,6 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getByText('敏感')).toBeInTheDocument();
     expect(screen.getByText('API Key 必填')).toBeInTheDocument();
 
     const input = screen.getByLabelText('OpenAI API Key');
@@ -406,7 +407,7 @@ describe('SettingsField', () => {
   it('renders blank-value preset guidance for context compression numeric fields', () => {
     const onChange = vi.fn();
 
-    render(
+    const { container } = render(
       <>
         <SettingsField
           item={{
@@ -457,14 +458,19 @@ describe('SettingsField', () => {
 
     expect(screen.getByLabelText('压缩触发阈值（tokens）')).toBeInTheDocument();
     expect(screen.getByLabelText('原文保护轮次')).toBeInTheDocument();
+
+    const infoIcons = container.querySelectorAll('.cursor-help');
+    expect(infoIcons).toHaveLength(2);
+    fireEvent.mouseEnter(infoIcons[0].parentElement!);
     expect(screen.getByText(/估算历史 token 超过该值时触发摘要/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
+    fireEvent.mouseEnter(infoIcons[1].parentElement!);
     expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
   it('renders localized custom webhook body template guidance', () => {
     const onChange = vi.fn();
 
-    render(
+    const { container } = render(
       <SettingsField
         item={{
           key: 'CUSTOM_WEBHOOK_BODY_TEMPLATE',
@@ -490,6 +496,7 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText('自定义 Webhook Body 模板')).toBeInTheDocument();
+    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
     expect(screen.getByText(/会先于 Bark、Slack、Discord 等自动 payload 生效/)).toBeInTheDocument();
     expect(screen.getByText(/裸 \$content \/ \$title 不做 JSON 转义/)).toBeInTheDocument();
   });

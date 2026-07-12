@@ -206,6 +206,20 @@ const ChatPage: React.FC = () => {
   const followUpContextRef = useRef<ChatFollowUpContext | null>(null);
   const shouldStickToBottomRef = useRef(true);
   const pendingScrollBehaviorRef = useRef<ScrollBehavior>('auto');
+  const skillPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobileSkillPickerOpen) {
+      return undefined;
+    }
+    const handlePointerDown = (event: MouseEvent) => {
+      if (skillPickerRef.current && !skillPickerRef.current.contains(event.target as Node)) {
+        setMobileSkillPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [mobileSkillPickerOpen]);
 
   // Get localized text (default to Chinese)
   const text = getReportText('zh');
@@ -914,7 +928,7 @@ const ChatPage: React.FC = () => {
   return (
     <div
       data-testid="chat-workspace"
-      className="flex h-[calc(100vh-5rem)] w-full min-w-0 gap-4 overflow-hidden sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="flex h-[calc(100vh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
     >
       {/* Desktop sidebar */}
       <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-card/82 shadow-soft-card md:flex">
@@ -1296,31 +1310,37 @@ const ChatPage: React.FC = () => {
                 />
               ) : null}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
-                <label
-                  className={cn(
-                    'inline-flex items-center gap-2 text-sm',
-                    contextCompressionLoaded && !contextCompressionSaving
-                      ? 'cursor-pointer text-foreground'
-                      : 'cursor-not-allowed text-muted-text',
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={contextCompressionEnabled}
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">上下文压缩</span>
+                  <span className="ml-2 text-xs text-muted-text">节省长会话 token</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {contextCompressionSaving ? (
+                    <span className="text-xs text-muted-text">保存中...</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={contextCompressionEnabled}
+                    aria-label="上下文压缩"
                     disabled={!contextCompressionLoaded || contextCompressionSaving}
-                    onChange={(event) => void updateContextCompressionEnabled(event.target.checked)}
-                    className="chat-skill-checkbox"
-                  />
-                  <span className="font-medium">上下文压缩</span>
-                  <span className="text-xs text-muted-text">节省长会话 token</span>
-                </label>
-                <span className="text-xs text-muted-text">
-                  {contextCompressionSaving
-                    ? '保存中...'
-                    : contextCompressionEnabled
-                      ? '已启用'
-                      : '未启用'}
-                </span>
+                    onClick={() => void updateContextCompressionEnabled(!contextCompressionEnabled)}
+                    className={cn(
+                      'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+                      contextCompressionEnabled ? 'border-transparent bg-primary' : 'border-border bg-muted',
+                      !contextCompressionLoaded || contextCompressionSaving
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'cursor-pointer',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+                        contextCompressionEnabled ? 'translate-x-4' : 'translate-x-0.5',
+                      )}
+                    />
+                  </button>
+                </div>
               </div>
               {contextCompressionError ? (
                 <InlineAlert
@@ -1331,10 +1351,10 @@ const ChatPage: React.FC = () => {
                 />
               ) : null}
               {skills.length > 0 && (
-                <div className="space-y-2">
+                <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-10 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm text-foreground md:hidden"
+                    className="home-surface-button flex h-10 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm text-foreground"
                     aria-label={mobileSkillPickerOpen ? '收起策略选择' : '展开策略选择'}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"
@@ -1358,13 +1378,10 @@ const ChatPage: React.FC = () => {
                     data-testid="chat-skill-picker-panel"
                     className={cn(
                       mobileSkillPickerOpen ? 'flex' : 'hidden',
-                      'max-h-40 flex-wrap items-start gap-x-5 gap-y-2 overflow-y-auto rounded-xl border border-white/6 bg-surface/25 px-3 py-2 md:flex md:max-h-none md:overflow-visible md:border-0 md:bg-transparent md:p-0',
+                      'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
                     )}
                   >
-                    <span className="text-xs text-muted-text font-medium uppercase tracking-wider flex-shrink-0 mt-1">
-                      策略
-                    </span>
-                    <label className="flex items-center gap-1.5 text-sm cursor-pointer group mt-0.5">
+                    <label className="flex items-center gap-1.5 text-sm cursor-pointer group">
                       <input
                         type="checkbox"
                         name="general-analysis"
@@ -1385,7 +1402,7 @@ const ChatPage: React.FC = () => {
                       return (
                         <label
                           key={s.id}
-                          className={`flex items-center gap-1.5 cursor-pointer group relative mt-0.5 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`flex items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                           onMouseEnter={() => setShowSkillDesc(s.id)}
                           onMouseLeave={() => setShowSkillDesc(null)}
                         >

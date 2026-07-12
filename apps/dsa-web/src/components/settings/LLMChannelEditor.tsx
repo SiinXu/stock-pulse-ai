@@ -520,7 +520,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 shrink-0 px-2 text-xs text-muted-text hover:text-rose-300"
+              className="h-8 shrink-0 px-2 text-xs text-muted-text hover:text-danger"
               disabled={busy}
               onClick={(e) => {
                 e.stopPropagation();

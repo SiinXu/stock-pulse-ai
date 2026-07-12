@@ -88,3 +88,10 @@ static/
 /apps/dsa-desktop/dist/
 /apps/dsa-desktop/node_modules/
 docs/specs/
+
+# ignore root-level node modules and Playwright MCP artifacts
+/node_modules/
+.playwright-mcp/
+
+# ignore local screenshots / one-off visual evidence
+/*.png

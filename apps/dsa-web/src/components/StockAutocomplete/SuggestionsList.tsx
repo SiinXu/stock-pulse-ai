@@ -37,9 +37,9 @@ export function SuggestionsList({
       className="z-[100] border-x border-b rounded-b-lg rounded-t-none max-h-60 overflow-auto"
       style={{
         ...style,
-        backgroundColor: 'hsl(var(--card) / 0.85)',
-        borderColor: 'var(--border-accent)',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3), -4px 0 15px -3px rgba(0, 0, 0, 0.2), 4px 0 15px -3px rgba(0, 0, 0, 0.2)',
+        backgroundColor: 'hsl(var(--card))',
+        borderColor: 'hsl(var(--border))',
+        boxShadow: '0 12px 28px -12px rgba(0, 0, 0, 0.18)',
       }}
       role="listbox"
     >
@@ -49,9 +49,9 @@ export function SuggestionsList({
           role="option"
           aria-selected={index === highlightedIndex}
           className={cn(
-            'px-4 py-1 cursor-pointer flex items-center justify-between',
-            'hover:bg-[var(--autocomplete-hover-bg)]/25',
-            index === highlightedIndex && 'bg-[var(--autocomplete-hover-bg)]/25',
+            'px-4 py-2 cursor-pointer flex items-center justify-between',
+            'hover:bg-muted',
+            index === highlightedIndex && 'bg-muted',
           )}
           onClick={() => onSelect(suggestion)}
           onMouseEnter={() => onMouseEnter(index)}

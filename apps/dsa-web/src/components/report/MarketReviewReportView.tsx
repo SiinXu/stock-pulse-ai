@@ -548,7 +548,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       </Card>
 
       {summary ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insightCards.map(({ icon: Icon, label, value }) => (
             <Card key={label} variant="bordered" padding="sm" className="home-panel-card text-left">
               <div className="flex items-start gap-3">

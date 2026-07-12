@@ -438,7 +438,7 @@ const BacktestPage: React.FC = () => {
     <div className="min-h-full flex flex-col rounded-[1.5rem] bg-transparent">
       {/* Header */}
       <header className="flex-shrink-0 border-b border-white/5 px-3 py-3 sm:px-4">
-        <div className="flex max-w-5xl flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-[1_1_220px]">
             <input
               type="text"
@@ -458,7 +458,7 @@ const BacktestPage: React.FC = () => {
           >
             {text.filter}
           </button>
-          <div className="flex items-center gap-2 whitespace-nowrap lg:w-40 lg:justify-between">
+          <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.evalWindow}</span>
             <input
               type="number"
@@ -471,7 +471,7 @@ const BacktestPage: React.FC = () => {
               className={`${BACKTEST_COMPACT_INPUT_CLASS} w-24 text-center tabular-nums`}
             />
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.phase}</span>
             <select
               value={phaseFilter}
@@ -484,7 +484,7 @@ const BacktestPage: React.FC = () => {
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.startDate}</span>
             <input
               type="date"
@@ -496,7 +496,7 @@ const BacktestPage: React.FC = () => {
               className={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 text-center tabular-nums`}
             />
           </div>
-          <div className="flex items-center gap-2 whitespace-nowrap">
+          <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.endDate}</span>
             <input
               type="date"

@@ -47,6 +47,7 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
     expect(screen.getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
@@ -89,6 +90,7 @@ describe('NotificationTestPanel', () => {
       </UiLanguageProvider>
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
     const titleInput = screen.getByLabelText('标题');
     const contentInput = screen.getByLabelText('正文');
 
@@ -136,6 +138,7 @@ describe('NotificationTestPanel', () => {
       </UiLanguageProvider>
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
     const titleInput = screen.getByLabelText('标题');
     const contentInput = screen.getByLabelText('正文');
 
@@ -188,6 +191,7 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
     fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
     fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
 
@@ -229,6 +233,7 @@ describe('NotificationTestPanel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
     fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
 
     expect(await screen.findByText('测试失败')).toBeInTheDocument();

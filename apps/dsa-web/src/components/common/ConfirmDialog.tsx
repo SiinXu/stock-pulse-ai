@@ -57,7 +57,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="rounded-lg border border-border/70 px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelText ?? t('common.cancel')}
           </button>
@@ -65,10 +65,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-foreground transition-colors ${
+            className={`rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
               isDanger
-                ? 'bg-red-500/80 hover:bg-red-500 shadow-lg shadow-red-500/20'
-                : 'bg-cyan/80 hover:bg-cyan shadow-lg shadow-cyan/20'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-foreground text-background'
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
             {confirmText ?? t('common.confirm')}

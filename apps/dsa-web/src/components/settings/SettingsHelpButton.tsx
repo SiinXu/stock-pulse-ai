@@ -218,7 +218,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
                   'sm:max-w-2xl sm:rounded-2xl',
                 )}
               >
-                <div className="h-1 w-full bg-gradient-to-r from-cyan/80 via-primary/70 to-purple/70" />
+                <div className="h-1 w-full bg-gradient-to-r from-primary/70 via-primary/40 to-transparent" />
                 <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
                   <div className="min-w-0">
                     {showFieldKey ? (

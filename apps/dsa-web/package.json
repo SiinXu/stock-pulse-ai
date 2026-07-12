@@ -16,6 +16,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/geist": "^5.2.9",
     "@remixicon/react": "^4.9.0",
     "axios": "^1.13.4",
     "camelcase-keys": "^10.0.2",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@loupe/dev-annotator": "file:../../../loupe/packages/dev-annotator",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/jest-dom": "^6.9.1",

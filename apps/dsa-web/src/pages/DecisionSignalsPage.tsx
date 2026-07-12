@@ -12,6 +12,7 @@ import {
   Drawer,
   EmptyState,
   InlineAlert,
+  Modal,
   PageHeader,
   Pagination,
 } from '../components/common';
@@ -362,6 +363,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<ParsedApiError | null>(null);
   const [stockDraft, setStockDraft] = useState('');
+  const [stockContextModalOpen, setStockContextModalOpen] = useState(false);
   const [activeStockContext, setActiveStockContext] = useState<StockContext | null>(null);
   const [historyCandidates, setHistoryCandidates] = useState<StockCandidate[]>([]);
   const [historyCandidatesLoaded, setHistoryCandidatesLoaded] = useState(false);
@@ -970,7 +972,7 @@ const DecisionSignalsPage: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <AppPage>
+    <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
           eyebrow={t('decisionSignals.activeOnly')}
@@ -992,12 +994,31 @@ const DecisionSignalsPage: React.FC = () => {
           )}
         />
 
-        <Card title={t('decisionSignals.stockContextTitle')} subtitle={t('decisionSignals.stockContextDescription')} padding="md">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center gap-2"
+            onClick={() => setStockContextModalOpen(true)}
+          >
+            <Search className="h-4 w-4" />
+            {activeStockLabel
+              ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
+              : t('decisionSignals.stockContextTitle')}
+          </button>
+        </div>
+
+        <Modal
+          isOpen={stockContextModalOpen}
+          onClose={() => setStockContextModalOpen(false)}
+          title={t('decisionSignals.stockContextTitle')}
+        >
+          <p className="mb-3 text-sm text-muted-text">{t('decisionSignals.stockContextDescription')}</p>
           <form
             className="flex flex-col gap-3 md:flex-row"
             onSubmit={(event) => {
               event.preventDefault();
               handleStockFormSubmit(stockDraft);
+              setStockContextModalOpen(false);
             }}
           >
             <div className="min-w-0 flex-1">
@@ -1048,7 +1069,10 @@ const DecisionSignalsPage: React.FC = () => {
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
                     className="rounded-full border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
-                    onClick={() => handleCandidateSelect(candidate)}
+                    onClick={() => {
+                      handleCandidateSelect(candidate);
+                      setStockContextModalOpen(false);
+                    }}
                   >
                     <span className="font-mono">{candidate.displayCode ?? candidate.code}</span>
                     {candidate.name ? <span className="ml-1 text-secondary-text">{candidate.name}</span> : null}
@@ -1060,81 +1084,102 @@ const DecisionSignalsPage: React.FC = () => {
           ) : historyCandidatesLoaded ? (
             <p className="mt-4 text-sm text-secondary-text">{t('decisionSignals.stockContextNoCandidates')}</p>
           ) : null}
-        </Card>
+        </Modal>
 
         <Card padding="md">
-          <form className="grid gap-3 md:grid-cols-3 xl:grid-cols-7" onSubmit={handleApplyFilters}>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.market}
-              onChange={(event) => setFilters((current) => ({ ...current, market: event.target.value as ListFilters['market'] }))}
-              aria-label={t('decisionSignals.market')}
-            >
-              <option value="">{t('decisionSignals.allMarkets')}</option>
-              {MARKET_OPTIONS.map((market) => (
-                <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
-              ))}
-            </select>
-            <input
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.stockCode}
-              onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
-              placeholder={t('decisionSignals.stockCode')}
-              aria-label={t('decisionSignals.stockCode')}
-            />
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.action}
-              onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value as ListFilters['action'] }))}
-              aria-label={t('decisionSignals.action')}
-            >
-              <option value="">{t('decisionSignals.allActions')}</option>
-              {ACTION_OPTIONS.map((action) => (
-                <option key={action} value={action}>{actionLabels[action]}</option>
-              ))}
-            </select>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.marketPhase}
-              onChange={(event) => setFilters((current) => ({ ...current, marketPhase: event.target.value as ListFilters['marketPhase'] }))}
-              aria-label={t('decisionSignals.marketPhase')}
-            >
-              <option value="">{t('decisionSignals.allPhases')}</option>
-              {PHASE_OPTIONS.map((phase) => (
-                <option key={phase} value={phase}>{getDecisionSignalMarketPhaseLabel(phase, t)}</option>
-              ))}
-            </select>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.sourceType}
-              onChange={(event) => setFilters((current) => ({ ...current, sourceType: event.target.value as ListFilters['sourceType'] }))}
-              aria-label={t('decisionSignals.source')}
-            >
-              <option value="">{t('decisionSignals.allSources')}</option>
-              {SOURCE_OPTIONS.map((source) => (
-                <option key={source} value={source}>{getDecisionSignalSourceTypeLabel(source, t)}</option>
-              ))}
-            </select>
-            <input
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.sourceReportId}
-              onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
-              placeholder={t('decisionSignals.sourceReportId')}
-              aria-label={t('decisionSignals.sourceReportId')}
-              inputMode="numeric"
-              min={1}
-              step={1}
-              type="number"
-            />
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={filters.status}
-              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ListFilters['status'] }))}
-              aria-label={t('decisionSignals.status')}
-            >
-              <option value="">{t('decisionSignals.allStatuses')}</option>
-              {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{t(STATUS_LABEL_KEYS[status])}</option>)}
-            </select>
+          <form className="grid items-end gap-3 md:grid-cols-3 xl:grid-cols-8 [&>*]:min-w-0" onSubmit={handleApplyFilters}>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.market')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.market}
+                onChange={(event) => setFilters((current) => ({ ...current, market: event.target.value as ListFilters['market'] }))}
+                aria-label={t('decisionSignals.market')}
+              >
+                <option value="">{t('decisionSignals.allMarkets')}</option>
+                {MARKET_OPTIONS.map((market) => (
+                  <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
+              <input
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.stockCode}
+                onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
+                placeholder={t('decisionSignals.stockCode')}
+                aria-label={t('decisionSignals.stockCode')}
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.action')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.action}
+                onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value as ListFilters['action'] }))}
+                aria-label={t('decisionSignals.action')}
+              >
+                <option value="">{t('decisionSignals.allActions')}</option>
+                {ACTION_OPTIONS.map((action) => (
+                  <option key={action} value={action}>{actionLabels[action]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.marketPhase')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.marketPhase}
+                onChange={(event) => setFilters((current) => ({ ...current, marketPhase: event.target.value as ListFilters['marketPhase'] }))}
+                aria-label={t('decisionSignals.marketPhase')}
+              >
+                <option value="">{t('decisionSignals.allPhases')}</option>
+                {PHASE_OPTIONS.map((phase) => (
+                  <option key={phase} value={phase}>{getDecisionSignalMarketPhaseLabel(phase, t)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.source')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.sourceType}
+                onChange={(event) => setFilters((current) => ({ ...current, sourceType: event.target.value as ListFilters['sourceType'] }))}
+                aria-label={t('decisionSignals.source')}
+              >
+                <option value="">{t('decisionSignals.allSources')}</option>
+                {SOURCE_OPTIONS.map((source) => (
+                  <option key={source} value={source}>{getDecisionSignalSourceTypeLabel(source, t)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
+              <input
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.sourceReportId}
+                onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
+                placeholder={t('decisionSignals.sourceReportId')}
+                aria-label={t('decisionSignals.sourceReportId')}
+                inputMode="numeric"
+                min={1}
+                step={1}
+                type="number"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.status')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={filters.status}
+                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ListFilters['status'] }))}
+                aria-label={t('decisionSignals.status')}
+              >
+                <option value="">{t('decisionSignals.allStatuses')}</option>
+                {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{t(STATUS_LABEL_KEYS[status])}</option>)}
+              </select>
+            </label>
             <button type="submit" className="btn-primary inline-flex h-11 items-center justify-center gap-2">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
@@ -1225,58 +1270,70 @@ const DecisionSignalsPage: React.FC = () => {
         </Card>
 
         <Card title={t('decisionSignals.timelineTitle')} subtitle={t('decisionSignals.timelineDescription')} padding="md">
-          <form className="grid gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={timelineFilters.market}
-              onChange={(event) => {
-                const market = event.target.value as TimelineFilters['market'];
-                timelineMarketSourceRef.current = market ? 'user' : null;
-                setTimelineFilters((current) => ({ ...current, market }));
-              }}
-              aria-label={t('decisionSignals.timelineMarket')}
-            >
-              <option value="">{t('decisionSignals.allMarkets')}</option>
-              {MARKET_OPTIONS.map((market) => (
-                <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
-              ))}
-            </select>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={timelineFilters.range}
-              onChange={(event) => setTimelineFilters((current) => ({ ...current, range: event.target.value as TimelineRange }))}
-              aria-label={t('decisionSignals.timelineRange')}
-            >
-              <option value="30d">{t('decisionSignals.timelineRange.30d')}</option>
-              <option value="90d">{t('decisionSignals.timelineRange.90d')}</option>
-              <option value="180d">{t('decisionSignals.timelineRange.180d')}</option>
-            </select>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={timelineFilters.status}
-              onChange={(event) => setTimelineFilters((current) => ({ ...current, status: event.target.value as TimelineStatusFilter }))}
-              aria-label={t('decisionSignals.timelineStatus')}
-            >
-              <option value="all">{t('decisionSignals.timelineStatus.all')}</option>
-              <option value="active">{t('decisionSignals.timelineStatus.active')}</option>
-            </select>
-            <select
-              className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-              value={timelineFilters.decisionProfile}
-              onChange={(event) => setTimelineFilters((current) => ({
-                ...current,
-                decisionProfile: event.target.value as TimelineFilters['decisionProfile'],
-              }))}
-              aria-label={t('decisionSignals.timelineProfile')}
-            >
-              <option value="">{t('decisionSignals.allProfiles')}</option>
-              {REASSESS_PROFILES.map((profile) => (
-                <option key={profile} value={profile}>
-                  {t(`decisionSignals.profile.${profile}` as UiTextKey)}
-                </option>
-              ))}
-              <option value="unknown">{t('decisionSignals.profile.unknown')}</option>
-            </select>
+          <form className="grid items-end gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.timelineMarket')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={timelineFilters.market}
+                onChange={(event) => {
+                  const market = event.target.value as TimelineFilters['market'];
+                  timelineMarketSourceRef.current = market ? 'user' : null;
+                  setTimelineFilters((current) => ({ ...current, market }));
+                }}
+                aria-label={t('decisionSignals.timelineMarket')}
+              >
+                <option value="">{t('decisionSignals.allMarkets')}</option>
+                {MARKET_OPTIONS.map((market) => (
+                  <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.timelineRange')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={timelineFilters.range}
+                onChange={(event) => setTimelineFilters((current) => ({ ...current, range: event.target.value as TimelineRange }))}
+                aria-label={t('decisionSignals.timelineRange')}
+              >
+                <option value="30d">{t('decisionSignals.timelineRange.30d')}</option>
+                <option value="90d">{t('decisionSignals.timelineRange.90d')}</option>
+                <option value="180d">{t('decisionSignals.timelineRange.180d')}</option>
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.timelineStatus')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={timelineFilters.status}
+                onChange={(event) => setTimelineFilters((current) => ({ ...current, status: event.target.value as TimelineStatusFilter }))}
+                aria-label={t('decisionSignals.timelineStatus')}
+              >
+                <option value="all">{t('decisionSignals.timelineStatus.all')}</option>
+                <option value="active">{t('decisionSignals.timelineStatus.active')}</option>
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="text-xs text-muted-text">{t('decisionSignals.timelineProfile')}</span>
+              <select
+                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                value={timelineFilters.decisionProfile}
+                onChange={(event) => setTimelineFilters((current) => ({
+                  ...current,
+                  decisionProfile: event.target.value as TimelineFilters['decisionProfile'],
+                }))}
+                aria-label={t('decisionSignals.timelineProfile')}
+              >
+                <option value="">{t('decisionSignals.allProfiles')}</option>
+                {REASSESS_PROFILES.map((profile) => (
+                  <option key={profile} value={profile}>
+                    {t(`decisionSignals.profile.${profile}` as UiTextKey)}
+                  </option>
+                ))}
+                <option value="unknown">{t('decisionSignals.profile.unknown')}</option>
+              </select>
+            </label>
             <button
               type="submit"
               className="btn-secondary inline-flex h-11 items-center justify-center gap-2"

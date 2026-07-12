@@ -21,7 +21,7 @@ const variantMap: Record<NonNullable<SettingsAlertProps['variant']>, 'danger' | 
 const toastHighlightStyle = [
   'relative overflow-hidden bg-card/95 text-foreground shadow-soft-card-strong backdrop-blur-sm',
   'before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-1.5',
-  'before:bg-gradient-to-r before:from-cyan/80 before:via-primary/70 before:to-purple/70',
+  'before:bg-gradient-to-r before:from-primary/70 before:via-primary/40 before:to-transparent',
 ].join(' ');
 
 const toastVariantStyles: Record<NonNullable<SettingsAlertProps['variant']>, string> = {

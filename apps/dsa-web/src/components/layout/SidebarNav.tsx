@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, Search, Settings2 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, PanelLeft, PanelRight, Search, Settings2 } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { ALPHASIFT_CONFIG_CHANGED_EVENT, SYSTEM_CONFIG_CHANGED_EVENT, alphasiftApi } from '../../api/alphasift';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
@@ -15,6 +15,7 @@ import { ThemeToggle } from '../theme/ThemeToggle';
 type SidebarNavProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
+  onToggleCollapse?: () => void;
   variant?: 'default' | 'rail';
 };
 
@@ -39,9 +40,15 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
 ];
 
-export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, variant = 'default' }) => {
+export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, onToggleCollapse, variant = 'default' }) => {
   const { authEnabled, logout } = useAuth();
   const { t } = useUiLanguage();
+  const navigate = useNavigate();
+
+  const openSearch = () => {
+    navigate('/');
+    onNavigate?.();
+  };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAlphaSiftNav, setShowAlphaSiftNav] = useState(false);
@@ -76,7 +83,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const navItems = showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening');
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-2xl border border-transparent text-sm leading-none text-secondary-text transition-all',
+    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-lg border border-transparent text-sm leading-none text-secondary-text transition-all',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
@@ -87,33 +94,76 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
     itemBaseClass,
     'hover:bg-[var(--nav-hover-bg)] hover:text-foreground'
   );
-  const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-[hsl(var(--primary))]';
-  const itemIconClass = cn(isRail ? 'h-[18px] w-[18px]' : 'h-5 w-5', 'shrink-0');
+  const itemActiveClass = 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground shadow-[0_1px_2px_var(--nav-active-shadow)]';
+  const itemIconClass = cn('h-5 w-5', 'shrink-0');
   const itemLabelClass = cn('truncate', isRail ? 'text-center' : '');
 
   return (
-    <div className="flex h-full flex-col">
-      <div
-        className={cn(
-          'flex items-center',
-          isRail ? 'mb-5 justify-center gap-2 pt-1' : 'mb-4 gap-2 px-1',
-          collapsed || isRail ? 'justify-center' : ''
-        )}
-      >
-        <div
-          className={cn(
-            'flex items-center justify-center bg-primary-gradient text-[hsl(var(--primary-foreground))] shadow-[0_12px_28px_var(--nav-brand-shadow)]',
-            isRail ? 'h-9 w-9 rounded-[1rem]' : 'h-10 w-10 rounded-2xl'
-          )}
-        >
-          <BarChart3 className={cn(isRail ? 'h-[19px] w-[19px]' : 'h-5 w-5')} />
+    <>
+      {collapsed ? (
+        <div className="mb-4 flex justify-center">
+          <div className="group relative h-8 w-8">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[0.625rem] bg-[linear-gradient(140deg,#c8f050_0%,#8ecb4e_100%)] text-[#151514] transition-opacity group-hover:opacity-0">
+              <BarChart3 className="h-[18px] w-[18px]" />
+            </div>
+            {onToggleCollapse ? (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                aria-label={t('layout.expandSidebar')}
+                className="absolute inset-0 flex items-center justify-center rounded-[0.625rem] border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+              >
+                <PanelRight className="h-[18px] w-[18px]" />
+              </button>
+            ) : null}
+          </div>
         </div>
-        {!collapsed ? (
-          <p className={cn('min-w-0 truncate font-semibold text-foreground', isRail ? 'text-[0.95rem] leading-none' : 'text-sm')}>DSA</p>
-        ) : null}
-      </div>
+      ) : (
+        <div className="mb-4 flex items-center gap-2 px-1">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[0.625rem] bg-[linear-gradient(140deg,#c8f050_0%,#8ecb4e_100%)] text-[#151514]">
+            <BarChart3 className="h-[18px] w-[18px]" />
+          </div>
+          <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">DSA</p>
+          {onToggleCollapse ? (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label={t('layout.collapseSidebar')}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
+            >
+              <PanelLeft className="h-[18px] w-[18px]" />
+            </button>
+          ) : null}
+        </div>
+      )}
 
-      <nav className={cn('flex flex-col gap-1.5', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
+      {collapsed ? (
+        <button
+          type="button"
+          onClick={openSearch}
+          aria-label={t('layout.search')}
+          className="mb-3 flex h-9 w-9 items-center justify-center self-center rounded-[0.625rem] border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={openSearch}
+            className="mb-3 flex w-full items-center justify-between rounded-[0.625rem] border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
+          >
+            <span className="flex items-center gap-2 text-xs text-muted-text">
+              <Search className="h-4 w-4" />
+              {t('layout.search')}
+            </span>
+            <kbd className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[11px] font-medium text-secondary-text">/</kbd>
+          </button>
+          <div className="mb-3 border-t border-dashed border-border" />
+        </>
+      )}
+
+      <nav className={cn('flex flex-col gap-1', isRail ? '' : 'flex-1')} aria-label={t('layout.mainNav')}>
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
           return (
@@ -151,25 +201,26 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         );
         })}
 
+      </nav>
+
+      <div className={cn('mt-2 flex gap-1', collapsed ? 'flex-col items-center' : 'items-center')}>
         <ThemeToggle
-          variant={isRail ? 'rail' : 'nav'}
-          collapsed={collapsed}
-          wrapperClassName="w-full"
-          triggerClassName={itemInteractiveClass}
+          variant="nav"
+          collapsed
+          wrapperClassName={collapsed ? '' : 'flex-1'}
+          triggerClassName={cn('inline-flex h-9 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-9' : 'w-full')}
           triggerActiveClassName={itemActiveClass}
-          iconClassName={itemIconClass}
-          labelClassName={itemLabelClass}
+          iconClassName="h-[18px] w-[18px] shrink-0"
         />
         <UiLanguageToggle
-          variant={isRail ? 'rail' : 'nav'}
-          collapsed={collapsed}
-          wrapperClassName="w-full"
-          triggerClassName={itemInteractiveClass}
+          variant="nav"
+          collapsed
+          wrapperClassName={collapsed ? '' : 'flex-1'}
+          triggerClassName={cn('inline-flex h-9 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-9' : 'w-full')}
           triggerActiveClassName={itemActiveClass}
-          iconClassName={itemIconClass}
-          labelClassName={itemLabelClass}
+          iconClassName="h-[18px] w-[18px] shrink-0"
         />
-      </nav>
+      </div>
 
       {authEnabled ? (
         <button
@@ -199,6 +250,6 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         }}
         onCancel={() => setShowLogoutConfirm(false)}
       />
-    </div>
+    </>
   );
 };

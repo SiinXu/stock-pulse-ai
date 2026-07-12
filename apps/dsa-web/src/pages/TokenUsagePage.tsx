@@ -142,7 +142,7 @@ const TokenUsagePage: React.FC = () => {
   }, [dashboard]);
 
   return (
-    <AppPage>
+    <AppPage className="max-w-none">
       <div className="space-y-5">
         <PageHeader
           eyebrow={t('usage.eyebrow')}

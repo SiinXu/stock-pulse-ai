@@ -115,9 +115,9 @@ const LoginPage: React.FC = () => {
             }}
             className="pointer-events-none absolute -top-[20vh] -z-10 opacity-80"
           >
-            <div className="relative flex h-[120vh] w-[120vh] items-center justify-center rounded-full border border-[var(--login-accent-soft)] bg-gradient-to-br from-[var(--login-accent-soft)] to-[hsl(214_100%_20%_/_0.18)] shadow-[inset_0_0_200px_var(--login-accent-glow)] blur-[4px]">
-              <Cpu className="h-[70vh] w-[70vh] text-[hsl(200_80%_22%_/_0.4)] brightness-50" />
-              <TrendingUp className="absolute h-[25vh] w-[25vh] translate-x-[15vh] translate-y-[15vh] text-emerald-900/30 brightness-50" />
+            <div className="relative flex h-[120vh] w-[120vh] items-center justify-center rounded-full border border-[var(--login-accent-soft)] bg-gradient-to-br from-[var(--login-accent-soft)] to-[hsl(var(--foreground)/0.1)] shadow-[inset_0_0_200px_var(--login-accent-glow)] blur-[4px]">
+              <Cpu className="h-[70vh] w-[70vh] text-[hsl(var(--foreground)/0.22)] brightness-50" />
+              <TrendingUp className="absolute h-[25vh] w-[25vh] translate-x-[15vh] translate-y-[15vh] text-[hsl(var(--primary)/0.3)] brightness-50" />
             </div>
           </motion.div>
 
@@ -149,12 +149,12 @@ const LoginPage: React.FC = () => {
           className="relative group z-20 pointer-events-auto"
         >
           {/* Card Border Glow */}
-          <div className="pointer-events-none absolute -inset-0.5 rounded-3xl bg-gradient-to-b from-[var(--login-accent-glow)] to-[hsl(214_100%_56%_/_0.18)] opacity-50 blur-sm transition duration-1000 group-hover:opacity-100 group-hover:duration-200" />
+          <div className="pointer-events-none absolute -inset-0.5 rounded-3xl bg-gradient-to-b from-[var(--login-accent-glow)] to-[hsl(var(--primary)/0.18)] opacity-50 blur-sm transition duration-1000 group-hover:opacity-100 group-hover:duration-200" />
 
           <div className="pointer-events-auto relative flex flex-col overflow-hidden rounded-3xl border border-[var(--login-border-card)] bg-[var(--login-bg-card)]/80 p-8 shadow-2xl backdrop-blur-xl">
             {/* Inner corner glow */}
             <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-[var(--login-accent-soft)] blur-[50px]" />
-            <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-blue-600/10 blur-[50px]" />
+            <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-[hsl(var(--primary)/0.08)] blur-[50px]" />
 
             <div className="mb-8">
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--login-text-primary)]">
@@ -230,7 +230,7 @@ const LoginPage: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="group/btn relative h-12 w-full overflow-hidden rounded-xl border-0 bg-gradient-to-r from-[var(--login-brand-button-start)] to-[var(--login-brand-button-end)] font-medium text-[var(--login-button-text)] shadow-lg shadow-[0_18px_36px_hsl(214_100%_8%_/_0.24)] hover:from-[var(--login-brand-button-start-hover)] hover:to-[var(--login-brand-button-end-hover)]"
+                className="group/btn relative h-12 w-full overflow-hidden rounded-full border-0 bg-gradient-to-r from-[var(--login-brand-button-start)] to-[var(--login-brand-button-end)] font-medium text-[var(--login-button-text)] shadow-lg shadow-[0_18px_36px_hsl(0_0%_0%_/_0.2)] hover:from-[var(--login-brand-button-start-hover)] hover:to-[var(--login-brand-button-end-hover)]"
                 disabled={isSubmitting}
               >
                 <div className="relative z-10 flex items-center justify-center gap-2">

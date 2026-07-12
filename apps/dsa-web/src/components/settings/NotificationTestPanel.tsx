@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { Send } from 'lucide-react';
+import { Send, Settings } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -9,7 +9,7 @@ import type {
   TestNotificationChannelResponse,
   SystemConfigUpdateItem,
 } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Select } from '../common';
+import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
 function getChannelOptions(language: 'zh' | 'en'): Array<{ value: NotificationTestChannel; label: string }> {
@@ -57,6 +57,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [isTitleEdited, setIsTitleEdited] = useState(false);
   const [isContentEdited, setIsContentEdited] = useState(false);
+  const [testModalOpen, setTestModalOpen] = useState(false);
 
   const normalizedItems = useMemo(
     () => items.map((item) => ({ key: item.key, value: String(item.value ?? '') })),
@@ -94,24 +95,31 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
   };
 
   return (
-    <SettingsSectionCard
-      title={t('settings.notificationTest')}
-      description={t('settings.notificationTestDescription')}
-      actions={(
-        <Button
-          type="button"
-          variant="settings-primary"
-          size="sm"
-          onClick={() => void runTest()}
-          disabled={disabled || isTesting}
-          isLoading={isTesting}
-          loadingText={t('settings.notificationTesting')}
-        >
-          <Send className="h-4 w-4" />
-          {t('settings.notificationTestSend')}
-        </Button>
-      )}
-    >
+    <>
+      <SettingsSectionCard
+        title={t('settings.notificationTest')}
+        description={t('settings.notificationTestDescription')}
+        actions={(
+          <Button
+            type="button"
+            variant="settings-secondary"
+            size="sm"
+            onClick={() => setTestModalOpen(true)}
+          >
+            <Settings className="h-4 w-4" />
+            {t('settings.notificationTestConfigure')}
+          </Button>
+        )}
+      >
+        {null}
+      </SettingsSectionCard>
+
+      <Modal
+        isOpen={testModalOpen}
+        onClose={() => setTestModalOpen(false)}
+        title={t('settings.notificationTest')}
+      >
+        <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_120px]">
         <Select
           label={t('settings.notificationTestChannel')}
@@ -143,7 +151,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
       </div>
 
       <label className="block">
-        <span className="mb-2 block text-sm font-medium text-foreground">{t('settings.notificationTestBody')}</span>
+        <span className="mb-2 block text-sm font-normal text-foreground">{t('settings.notificationTestBody')}</span>
         <textarea
           value={content}
           maxLength={1000}
@@ -213,6 +221,21 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
           ) : null}
         </div>
       ) : null}
-    </SettingsSectionCard>
+
+          <Button
+            type="button"
+            variant="settings-primary"
+            onClick={() => void runTest()}
+            disabled={disabled || isTesting}
+            isLoading={isTesting}
+            loadingText={t('settings.notificationTesting')}
+            className="w-full justify-center"
+          >
+            <Send className="h-4 w-4" />
+            {t('settings.notificationTestSend')}
+          </Button>
+        </div>
+      </Modal>
+    </>
   );
 };

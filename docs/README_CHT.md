@@ -1,6 +1,6 @@
 <div align="center">
 
-# 股票智能分析系統
+# 📈 StockPulse · 智能股票分析系統
 
 [![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
 [![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
@@ -22,6 +22,9 @@
 繁體中文 | [English](README_EN.md) | [简体中文](../README.md)
 
 </div>
+
+> [!NOTE]
+> **StockPulse** 基於開源專案 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis)(MIT License)二次開發與客製化,在此向原作者致謝。原始版權與授權條款見 [LICENSE](../LICENSE)。
 
 ## 💖 贊助商 (Sponsors)
 

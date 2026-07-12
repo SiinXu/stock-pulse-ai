@@ -13,10 +13,27 @@ type ShellProps = {
   children?: React.ReactNode;
 };
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'dsa-sidebar-collapsed';
+
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const collapsed = false;
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+  });
   const { t } = useUiLanguage();
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, next ? '1' : '0');
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!mobileOpen) {
@@ -52,19 +69,22 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         </div>
       </div>
 
-      <div className="mx-auto flex min-h-screen w-full max-w-[1680px] px-3 py-3 sm:px-4 sm:py-4 lg:px-5">
+      <div className="mx-auto flex h-screen w-full overflow-hidden">
         <aside
           className={cn(
-            'sticky top-3 z-40 hidden shrink-0 overflow-visible rounded-[1.5rem] border border-[var(--shell-sidebar-border)] bg-card/72 p-2.5 shadow-soft-card backdrop-blur-sm transition-[width] duration-200 lg:flex',
-            'max-h-[calc(100vh-1.5rem)] self-start sm:top-4 sm:max-h-[calc(100vh-2rem)]',
-            collapsed ? 'w-[64px]' : 'w-[136px]'
+            'sticky top-0 z-40 hidden h-screen shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
+            collapsed ? 'w-[76px]' : 'w-[228px]'
           )}
           aria-label={t('layout.desktopSidebar')}
         >
-          <SidebarNav collapsed={collapsed} variant="rail" onNavigate={() => setMobileOpen(false)} />
+          <SidebarNav
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapsed}
+            onNavigate={() => setMobileOpen(false)}
+          />
         </aside>
 
-        <main className="min-h-0 min-w-0 flex-1 pt-14 lg:pl-3 lg:pt-0 touch-pan-y">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-border bg-card shadow-soft-card mt-14 mx-3 mb-3 lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4 touch-pan-y">
           {children ?? <Outlet />}
         </main>
       </div>
@@ -77,7 +97,9 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         zIndex={90}
         side="left"
       >
-        <SidebarNav onNavigate={() => setMobileOpen(false)} />
+        <div className="flex h-full flex-col">
+          <SidebarNav onNavigate={() => setMobileOpen(false)} />
+        </div>
       </Drawer>
     </div>
   );

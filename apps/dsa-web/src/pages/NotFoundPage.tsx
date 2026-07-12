@@ -14,10 +14,10 @@ const NotFoundPage: React.FC = () => {
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
       {/* 404 */}
       <div className="relative mb-8">
-        <span 
+        <span
           className="text-8xl font-bold text-transparent bg-clip-text"
           style={{
-            backgroundImage: 'linear-gradient(135deg, #00d4ff 0%, #a855f7 100%)',
+            backgroundImage: 'linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--primary)) 100%)',
           }}
         >
           404

@@ -47,23 +47,22 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
       type="button"
       onClick={() => onClick(item.id)}
       aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
-      className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
+      className={`home-history-item w-full min-w-0 flex-1 text-left p-2 group/item ${
         isViewing ? 'home-history-item-selected' : ''
       }`}
     >
-      <div className="relative z-10 flex items-center gap-2.5">
+      <div className="relative z-10 flex items-center gap-2">
         {isMarketReview ? (
-          <div className="w-1 h-8 rounded-full flex-shrink-0 bg-amber-400" style={{ boxShadow: '0 0 10px rgba(251,191,36,0.4)' }} />
+          <div className="w-1 h-7 rounded-full flex-shrink-0 bg-amber-400" />
         ) : sentimentColor ? (
           <div
-            className="w-1 h-8 rounded-full flex-shrink-0"
+            className="w-1 h-7 rounded-full flex-shrink-0"
             style={{
               backgroundColor: sentimentColor,
-              boxShadow: `0 0 10px ${sentimentColor}40`,
             }}
           />
         ) : (
-          <div className="w-1 h-8 rounded-full flex-shrink-0 bg-subtle" />
+          <div className="w-1 h-7 rounded-full flex-shrink-0 bg-subtle" />
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
@@ -119,33 +118,21 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
               )}
             </div>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2" data-testid="history-card-meta">
-            <span className="text-[11px] text-secondary-text font-mono">
-              {item.stockCode}
-            </span>
+          <div className="mt-1 flex items-center gap-2" data-testid="history-card-meta">
             {item.lastAnalysisTime && (
-              <>
-                <span className="w-1 h-1 rounded-full bg-subtle-hover" />
-                <span className="text-[11px] text-muted-text">
-                  {formatDateTime(item.lastAnalysisTime)}
-                </span>
-              </>
+              <span className="text-[11px] text-muted-text">
+                {formatDateTime(item.lastAnalysisTime)}
+              </span>
             )}
             {item.analysisCount > 1 && (
-              <>
-                <span className="w-1 h-1 rounded-full bg-subtle-hover" />
-                <span className="text-[10px] text-muted-text">
-                  {t('history.analysisCount', { count: item.analysisCount })}
-                </span>
-              </>
+              <span className="text-[10px] text-muted-text">
+                {t('history.analysisCount', { count: item.analysisCount })}
+              </span>
             )}
             {phaseLabel ? (
-              <>
-                <span className="w-1 h-1 rounded-full bg-subtle-hover" />
-                <Badge variant="default" size="sm" className="shrink-0 shadow-none text-[10px] leading-none">
-                  {phaseLabel}
-                </Badge>
-              </>
+              <Badge variant="default" size="sm" className="shrink-0 shadow-none text-[10px] leading-none">
+                {phaseLabel}
+              </Badge>
             ) : null}
           </div>
         </div>

@@ -184,6 +184,7 @@ describe('AlertsPage', () => {
     render(<AlertsPage />);
 
     await screen.findByText('茅台价格突破');
+    fireEvent.click(screen.getByRole('button', { name: '创建告警规则' }));
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
@@ -203,6 +204,7 @@ describe('AlertsPage', () => {
     render(<AlertsPage />);
 
     await screen.findByText('茅台价格突破');
+    fireEvent.click(screen.getByRole('button', { name: '创建告警规则' }));
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: 'aapl' } });
     fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));

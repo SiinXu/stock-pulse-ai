@@ -96,6 +96,14 @@ export default defineConfig({
     __APP_PACKAGE_VERSION__: JSON.stringify(packageJson.version ?? '0.0.0'),
     __APP_BUILD_TIME__: JSON.stringify(buildTime),
   },
+  // Ensure the symlinked @loupe/dev-annotator resolves the app's single React copy
+  // instead of a second one from the linked package's own node_modules.
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['@loupe/dev-annotator'],
+  },
   plugins: [
     tailwindcss(),
     react({

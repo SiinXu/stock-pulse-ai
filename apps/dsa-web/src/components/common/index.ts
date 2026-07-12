@@ -25,6 +25,7 @@ export * from './StatusDot';
 export * from './Tooltip';
 export * from './Pagination';
 export * from './ConfirmDialog';
+export * from './Modal';
 export * from '../layout/Shell';
 export * from '../layout/SidebarNav';
 export * from '../layout/ShellHeader';

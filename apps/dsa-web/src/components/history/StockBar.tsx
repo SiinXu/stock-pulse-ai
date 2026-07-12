@@ -104,7 +104,7 @@ export const StockBar: React.FC<StockBarProps> = ({
           {items.length > 0 && onDeleteStock && (
             <div className="flex items-center gap-2">
               <label
-                className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
+                className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg py-1"
                 htmlFor={selectAllId}
               >
                 <input
@@ -115,7 +115,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                   onChange={toggleSelectAll}
                   disabled={isDeleting}
                   aria-label={t('history.selectAllStockAria')}
-                  className="h-3.5 w-3.5 cursor-pointer bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
+                  className="chat-skill-checkbox cursor-pointer"
                 />
                 <span className="text-[11px] text-muted-text select-none">{t('common.selectAllCurrent')}</span>
               </label>
@@ -166,7 +166,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                         checked={isChecked}
                         onChange={() => toggleCode(code)}
                         disabled={isDeleting}
-                        className="h-3.5 w-3.5 cursor-pointer rounded border-subtle-hover bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
+                        className="chat-skill-checkbox cursor-pointer"
                       />
                     </div>
                   )}

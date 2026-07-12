@@ -42,7 +42,7 @@ export const Select: React.FC<SelectProps> = ({
 
   return (
     <div className={cn('flex flex-col', className)}>
-      {label ? <label htmlFor={resolvedId} className="mb-2 text-sm font-medium text-foreground">{label}</label> : null}
+      {label ? <label htmlFor={resolvedId} className="mb-1.5 text-xs font-medium text-secondary-text">{label}</label> : null}
       <div className="relative">
         <select
           id={resolvedId}
@@ -50,7 +50,7 @@ export const Select: React.FC<SelectProps> = ({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           className={cn(
-            'input-surface input-focus-glow h-11 w-full appearance-none rounded-xl border bg-transparent px-4 py-2.5 pr-10 text-sm text-foreground',
+            'input-surface input-focus-glow h-10 w-full appearance-none rounded-xl border bg-transparent px-4 py-2 pr-10 text-xs text-foreground',
             'transition-all duration-200 focus:outline-none',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           )}

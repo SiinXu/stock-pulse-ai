@@ -1,6 +1,6 @@
 <div align="center">
 
-# AI Stock Analysis System
+# 📈 StockPulse · AI Stock Analysis System
 
 [![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
 [![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
@@ -22,6 +22,9 @@ Analyze your watchlist daily -> generate a decision dashboard -> push to Telegra
 English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
 </div>
+
+> [!NOTE]
+> **StockPulse** is a customized derivative of the open-source project [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) (MIT License). Many thanks to the original author. See [LICENSE](../LICENSE) for the original copyright and terms.
 
 ## 💖 Sponsors
 

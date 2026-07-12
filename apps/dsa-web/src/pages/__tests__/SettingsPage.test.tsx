@@ -116,7 +116,17 @@ vi.mock('../../utils/constants', async () => {
   };
 });
 
-vi.mock('../../components/settings', () => ({
+vi.mock('../../components/settings', async () => ({
+  ...(await import('../../components/settings/notificationFieldGroups')),
+  ...(await import('../../components/settings/categoryFieldGroups')),
+  isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
+  NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
+    <div>
+      {items.map((item) => (
+        <div key={item.key}>{item.key}</div>
+      ))}
+    </div>
+  ),
   AuthSettingsCard: () => <div>认证与登录保护</div>,
   ChangePasswordCard: () => <div>修改密码</div>,
   IntelligentImport: ({ onMerged }: { onMerged: (value: string) => void }) => (

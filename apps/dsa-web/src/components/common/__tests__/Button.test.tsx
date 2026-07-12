@@ -32,7 +32,7 @@ describe('Button', () => {
 
     const button = screen.getByRole('button', { name: 'Bulk Delete' });
     expect(button).toHaveAttribute('data-variant', 'danger-subtle');
-    expect(button.className).toContain('border-danger/60');
+    expect(button.className).toContain('border-danger/50');
     expect(button.className).toContain('bg-danger/10');
   });
 

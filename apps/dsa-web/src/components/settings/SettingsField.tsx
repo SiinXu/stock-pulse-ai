@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
-import { Badge, Button, Select, Input } from '../common';
+import { Info, Trash2 } from 'lucide-react';
+import { Badge, Button, Select, Input, Tooltip } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -80,7 +81,7 @@ function renderFieldControl(
   t: (key: UiTextKey) => string,
 ) {
   const schema = item.schema;
-  const commonClass = 'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+  const commonClass = 'input-surface input-focus-glow h-10 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
 
@@ -111,17 +112,30 @@ function renderFieldControl(
 
   if (controlType === 'switch') {
     const checked = value.trim().toLowerCase() === 'true';
+    const isDisabled = disabled || !schema?.isEditable;
     return (
-      <label className="inline-flex cursor-pointer items-center gap-3">
-        <input
+      <div className="flex items-center gap-2 md:w-full md:justify-end">
+        <button
           id={controlId}
-          type="checkbox"
-          checked={checked}
-          disabled={disabled || !schema?.isEditable}
-          onChange={(event) => onChange(event.target.checked ? 'true' : 'false')}
-        />
-        <span className="text-sm text-secondary-text">{checked ? t('common.enabled') : t('common.disabled')}</span>
-      </label>
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          disabled={isDisabled}
+          onClick={() => onChange(checked ? 'false' : 'true')}
+          className={cn(
+            'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+            checked ? 'border-transparent bg-primary' : 'border-border bg-muted',
+            isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+          )}
+        >
+          <span
+            className={cn(
+              'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+              checked ? 'translate-x-4' : 'translate-x-0.5',
+            )}
+          />
+        </button>
+      </div>
     );
   }
 
@@ -156,14 +170,15 @@ function renderFieldControl(
                 type="button"
                 variant="settings-secondary"
                 size="lg"
-                className="px-3 text-xs text-muted-text shadow-none hover:text-danger"
+                className="px-3 text-muted-text shadow-none hover:text-danger"
+                aria-label={t('settings.fieldDelete')}
                 disabled={disabled || !schema?.isEditable || values.length <= 1}
                 onClick={() => {
                   const nextValues = values.filter((_, rowIndex) => rowIndex !== index);
                   onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
                 }}
               >
-                {t('settings.fieldDelete')}
+                <Trash2 aria-hidden="true" className="h-4 w-4" />
               </Button>
             </div>
           ))}
@@ -222,7 +237,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
-  const isMultiValue = isMultiValueField(item);
+  const isTextarea = schema?.uiControl === 'textarea';
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
   const localizationKey = schema?.key ?? item.key;
   const fallbackTitle = schema?.title ?? item.key;
@@ -240,41 +255,38 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   return (
     <div
       className={cn(
-        'grid gap-3 px-4 py-4 transition-colors duration-200 md:grid-cols-[minmax(0,250px)_minmax(0,1fr)] md:gap-6',
-        hasError ? 'bg-danger/5' : 'hover:bg-[var(--settings-surface-hover)]',
+        'grid gap-3 px-3 py-2.5 transition-colors duration-200',
+        isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:gap-6',
+        hasError ? 'bg-danger/5' : '',
       )}
     >
       <div className="min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-sm font-semibold text-foreground" htmlFor={controlId}>
+          <label className="text-sm font-normal text-foreground" htmlFor={controlId}>
             {title}
           </label>
+          {description ? (
+            <Tooltip content={description}>
+              <span className="inline-flex cursor-help text-muted-text">
+                <Info aria-hidden="true" className="h-3.5 w-3.5" />
+              </span>
+            </Tooltip>
+          ) : null}
           <SettingsHelpButton
             fieldKey={localizationKey}
             title={title}
             schema={schema}
             description={description}
           />
-          {schema?.isSensitive ? (
-            <Badge variant="history" size="sm">
-              {t('common.sensitive')}
-            </Badge>
-          ) : null}
           {!schema?.isEditable ? (
             <Badge variant="default" size="sm">
               {t('common.readOnly')}
             </Badge>
           ) : null}
         </div>
-
-        {description ? (
-          <p className="text-xs leading-5 text-muted-text">
-            {description}
-          </p>
-        ) : null}
       </div>
 
-      <div className="min-w-0">
+      <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>
         {renderFieldControl(
           item,
           displayValue,
@@ -286,13 +298,6 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           language,
           t,
         )}
-
-        {schema?.isSensitive ? (
-          <p className="mt-2 text-[11px] leading-5 text-secondary-text">
-            {t('settings.fieldSensitiveHint')}
-            {isMultiValue ? t('settings.fieldSensitiveMultiHint') : ''}
-          </p>
-        ) : null}
 
         {issues.length ? (
           <div className="mt-2 space-y-1">

@@ -113,7 +113,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           role="menu"
           aria-label={t('theme.menu')}
           className={cn(
-            'z-[100] min-w-[8rem] overflow-hidden rounded-2xl border border-border/70 bg-elevated p-1.5 shadow-[0_24px_48px_rgba(3,8,20,0.32)] backdrop-blur-xl',
+            'z-[100] min-w-[8rem] overflow-hidden rounded-2xl border border-border/70 bg-elevated p-1.5 shadow-[0_24px_48px_rgba(0,0,0,0.28)] backdrop-blur-xl',
             isNavVariant || isRailVariant
               ? 'absolute bottom-full left-0 mb-2 w-max min-w-[9rem]'
               : 'absolute right-0 mt-2'

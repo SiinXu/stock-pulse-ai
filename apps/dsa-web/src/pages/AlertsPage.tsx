@@ -12,7 +12,7 @@ import {
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../components/alerts/AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Card, EmptyState, InlineAlert, Loading, PageHeader } from '../components/common';
+import { ApiErrorAlert, AppPage, Card, EmptyState, InlineAlert, Loading, Modal, PageHeader } from '../components/common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -102,6 +102,7 @@ const AlertsPage: React.FC = () => {
     document.title = '告警中心 - DSA';
   }, []);
 
+  const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
   const [rules, setRules] = useState<AlertRuleItem[]>([]);
   const [rulesTotal, setRulesTotal] = useState(0);
   const [rulesPage, setRulesPage] = useState(1);
@@ -259,11 +260,20 @@ const AlertsPage: React.FC = () => {
   };
 
   return (
-    <AppPage className="space-y-5">
+    <AppPage className="max-w-none space-y-5">
       <PageHeader
         eyebrow="Alert Center"
         title="告警中心"
         description="管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。"
+        actions={(
+          <button
+            type="button"
+            className="btn-primary inline-flex items-center gap-2"
+            onClick={() => setCreateRuleModalOpen(true)}
+          >
+            创建告警规则
+          </button>
+        )}
       />
 
       {createError ? <ApiErrorAlert error={createError} onDismiss={() => setCreateError(null)} /> : null}
@@ -281,9 +291,20 @@ const AlertsPage: React.FC = () => {
       ) : null}
       {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <AlertRuleForm onSubmit={handleCreateRule} isSubmitting={createLoading} />
-        <div className="flex h-full min-h-0 flex-col gap-4">
+      <Modal isOpen={createRuleModalOpen} onClose={() => setCreateRuleModalOpen(false)} title="创建告警规则">
+        <AlertRuleForm
+          onSubmit={async (payload) => {
+            const ok = await handleCreateRule(payload);
+            if (ok) {
+              setCreateRuleModalOpen(false);
+            }
+            return ok;
+          }}
+          isSubmitting={createLoading}
+        />
+      </Modal>
+
+      <div className="flex h-full min-h-0 flex-col gap-4">
           <AlertRuleList
             className="flex h-full min-h-0 flex-col"
             rules={rules}
@@ -315,7 +336,6 @@ const AlertsPage: React.FC = () => {
             />
           ) : null}
         </div>
-      </div>
 
       {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
       <AlertTriggerHistory triggers={triggers} isLoading={triggersLoading} />

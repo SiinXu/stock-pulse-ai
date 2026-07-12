@@ -29,7 +29,7 @@ import {
   ALERT_THRESHOLD_DIRECTION_OPTIONS,
 } from '../../locales/featureText';
 import { validateStockCode } from '../../utils/validation';
-import { Button, Card, Checkbox, Input, Select } from '../common';
+import { Button, Checkbox, Input, Select } from '../common';
 
 const SYMBOL_ALERT_TYPE_OPTIONS = [
   { value: 'price_cross', label: '价格突破' },
@@ -469,8 +469,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
   };
 
   return (
-    <Card title={text.cardTitle} subtitle={text.cardSubtitle} variant="bordered" padding="md">
-      <form className="space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
+    <form className="space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
         <div className="grid gap-4 md:grid-cols-2">
           <Input
             label={text.ruleName}
@@ -781,7 +780,6 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
           </Button>
         </div>
         {formError ? <p role="alert" className="text-sm text-danger">{formError}</p> : null}
-      </form>
-    </Card>
+    </form>
   );
 };

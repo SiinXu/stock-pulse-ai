@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { SettingsField } from '../src/components/settings/SettingsField';
 
 describe('SettingsField description fallback', () => {
   it('uses schema.description when i18n map has no description for key', () => {
-    const html = renderToStaticMarkup(
+    const { container } = render(
       <SettingsField
         item={{
           key: 'UNMAPPED_FALLBACK_FIELD',
@@ -32,6 +32,10 @@ describe('SettingsField description fallback', () => {
       />
     );
 
-    expect(html).toContain('schema fallback description');
+    const tooltipTrigger = container.querySelector('.cursor-help')?.parentElement;
+    expect(tooltipTrigger).toBeTruthy();
+    fireEvent.mouseEnter(tooltipTrigger as HTMLElement);
+
+    expect(screen.getByText('schema fallback description')).toBeTruthy();
   });
 });

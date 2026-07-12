@@ -99,22 +99,22 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   // Light theme uses a restrained glow; dark theme keeps the stronger terminal-style glow.
   const sentimentConfig = {
     greed: {
-      color: '#00d4ff',       // Cyan
-      glowFilter: 'rgba(0, 212, 255, 0.66)',
-      lightColor: '#22d3ee',  // Lighter cyan
-      lightEndColor: '#0891b2', // Darker cyan
+      color: '#41B83D',       // Brand green
+      glowFilter: 'rgba(65, 184, 61, 0.4)',
+      lightColor: '#5CC957',  // Lighter green
+      lightEndColor: '#2E9A2B', // Darker green
     },
     neutral: {
-      color: '#a855f7',       // Purple
-      glowFilter: 'rgba(168, 85, 247, 0.66)',
-      lightColor: '#c084fc',  // Lighter purple
-      lightEndColor: '#9333ea', // Darker purple
+      color: '#878980',       // Neutral gray
+      glowFilter: 'rgba(135, 137, 128, 0.35)',
+      lightColor: '#9CA096',  // Lighter gray
+      lightEndColor: '#6E7268', // Darker gray
     },
     fear: {
-      color: '#ff4466',       // Red
-      glowFilter: 'rgba(255, 68, 102, 0.66)',
-      lightColor: '#fb7185',  // Lighter rose
-      lightEndColor: '#e11d48', // Darker rose
+      color: '#E9415D',       // Error red
+      glowFilter: 'rgba(233, 65, 93, 0.4)',
+      lightColor: '#F8778D',  // Lighter rose
+      lightEndColor: '#C42B44', // Darker rose
     },
   };
 
@@ -190,7 +190,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
             cy={width / 2}
             r={radius}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.05)"
+            stroke="hsl(var(--foreground) / 0.08)"
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${arcLength} ${circumference}`}

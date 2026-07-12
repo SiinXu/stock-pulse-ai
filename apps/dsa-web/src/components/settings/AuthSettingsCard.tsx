@@ -97,6 +97,7 @@ export const AuthSettingsCard: React.FC = () => {
     <SettingsSectionCard
       title={t('settings.authTitle')}
       description={t('settings.authDescription')}
+      contentBordered
       actions={
         <Badge
           variant={authEnabled ? 'success' : 'default'}

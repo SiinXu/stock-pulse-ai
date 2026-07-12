@@ -267,7 +267,7 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
       <div className="flex flex-wrap gap-3 text-xs text-secondary-text">
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />{t('decisionSignals.timelineFamilyBullish')}</span>
         <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#dc2626]" />{t('decisionSignals.timelineFamilyDefensive')}</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#0891b2]" />{t('decisionSignals.timelineFamilyNeutral')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#878980]" />{t('decisionSignals.timelineFamilyNeutral')}</span>
         <span>{t('decisionSignals.timelineAlertShape')}</span>
         {selectedIndex !== null ? <span>{t('decisionSignals.timelineSelected', { index: selectedIndex + 1 })}</span> : null}
       </div>

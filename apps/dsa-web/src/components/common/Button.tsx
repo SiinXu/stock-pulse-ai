@@ -12,26 +12,26 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BUTTON_SIZE_STYLES = {
-  xsm: 'h-6 rounded-lg px-2 text-sm',
-  sm: 'h-9 rounded-lg px-3 text-sm',
-  md: 'h-10 rounded-xl px-4 text-sm',
-  lg: 'h-11 rounded-xl px-5 text-sm',
-  xl: 'h-12 rounded-xl px-6 text-sm',
+  xsm: 'h-6 rounded-full px-2.5 text-sm',
+  sm: 'h-9 rounded-full px-4 text-sm',
+  md: 'h-10 rounded-full px-5 text-sm',
+  lg: 'h-11 rounded-full px-6 text-sm',
+  xl: 'h-12 rounded-full px-7 text-sm',
 } as const;
 
 const ACTION_AI_STYLES = 'bg-[var(--home-action-ai-bg)] border border-[var(--home-action-ai-border)] text-[var(--home-action-ai-text)] hover:bg-[var(--home-action-ai-hover-bg)]';
 const ACTION_REPORT_STYLES = 'bg-[var(--home-action-report-bg)] border border-[var(--home-action-report-border)] text-[var(--home-action-report-text)] hover:bg-[var(--home-action-report-hover-bg)]';
 
 const BUTTON_VARIANT_STYLES = {
-  primary: 'border border-cyan/30 bg-primary-gradient text-primary-foreground shadow-lg shadow-cyan/20 hover:brightness-105',
-  secondary: 'border border-border/70 bg-card text-foreground shadow-soft-card hover:bg-hover',
-  'settings-primary': 'border settings-button-primary hover:brightness-105 hover:shadow-xl',
+  primary: 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110',
+  secondary: 'border border-border bg-card text-foreground shadow-soft-card hover:bg-hover',
+  'settings-primary': 'border settings-button-primary hover:brightness-110 hover:shadow-xl',
   'settings-secondary': 'border settings-button-secondary hover:translate-y-[-1px]',
-  outline: 'border border-cyan/25 bg-transparent text-cyan hover:bg-cyan/10',
+  outline: 'border border-border bg-transparent text-foreground hover:bg-hover',
   ghost: 'border border-transparent bg-transparent text-secondary-text hover:bg-hover hover:text-foreground',
-  gradient: 'border border-cyan/20 bg-gradient-to-r from-cyan to-purple text-primary-foreground shadow-lg shadow-cyan/20 hover:brightness-105',
-  danger: 'border border-danger/40 bg-danger text-destructive-foreground shadow-lg shadow-danger/20 hover:brightness-105',
-  'danger-subtle': 'border border-danger/60 bg-danger/10 text-danger hover:bg-danger/15',
+  gradient: 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110',
+  danger: 'border border-transparent bg-danger text-destructive-foreground shadow-soft-card hover:brightness-105',
+  'danger-subtle': 'border border-danger/50 bg-danger/10 text-danger hover:bg-danger/15',
   'action-primary': ACTION_AI_STYLES,
   'action-secondary': ACTION_REPORT_STYLES,
   'home-action-ai': ACTION_AI_STYLES,
@@ -63,7 +63,7 @@ export const Button: React.FC<ButtonProps> = ({
       data-variant={variant}
       className={cn(
         'inline-flex cursor-pointer items-center justify-center gap-2 font-medium transition-all duration-200',
-        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15 focus-visible:ring-offset-0',
+        'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 focus-visible:ring-offset-0',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none',
         BUTTON_SIZE_STYLES[size],
         BUTTON_VARIANT_STYLES[variant],
