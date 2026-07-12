@@ -3,7 +3,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
-import type { AnalysisReport, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
+import type { AnalysisReport, AnalyzeAsyncResponse, HistoryItem, HistoryListResponse, ReportLanguage, StockBarItem, StockHistoryFilters, StockHistoryRange, TaskInfo } from '../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
@@ -73,6 +73,12 @@ export interface StockPoolState {
   marketReviewHistoryHasMore: boolean;
   marketReviewHistoryPage: number;
   selectedReport: AnalysisReport | null;
+  // The record the user currently intends to view. Tracked independently of
+  // selectedReport so the selection (and its failure state) survives a failed
+  // load instead of falling back to the previously displayed report.
+  selectedRecordId: number | null;
+  // The record whose report is currently being fetched, or null when idle.
+  pendingRecordId: number | null;
   isLoadingReport: boolean;
   isHistoryTrendOpen: boolean;
   stockHistoryItems: HistoryItem[];
@@ -104,6 +110,7 @@ export interface StockPoolState {
   refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
   loadMoreMarketReviewHistory: () => Promise<void>;
   selectHistoryItem: (recordId: number, isUserInitiated?: boolean) => Promise<void>;
+  retrySelectedRecord: () => Promise<void>;
   clearSelectedReportForStock: (stockCode: string) => void;
   toggleHistorySelection: (recordId: number) => void;
   toggleSelectAllVisible: () => void;
@@ -146,6 +153,8 @@ const initialState = {
   marketReviewHistoryHasMore: false,
   marketReviewHistoryPage: 1,
   selectedReport: null as AnalysisReport | null,
+  selectedRecordId: null as number | null,
+  pendingRecordId: null as number | null,
   isLoadingReport: false,
   isHistoryTrendOpen: false,
   stockHistoryItems: [] as HistoryItem[],
@@ -702,7 +711,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       ? selectedReport.meta.reportType === 'market_review'
       : selectedReport.meta.stockCode === stockCode;
     if (matchesDeletedStock) {
-      set({ selectedReport: null });
+      set({ selectedReport: null, selectedRecordId: null, pendingRecordId: null });
     }
   },
 
@@ -712,11 +721,18 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       manualSelectionRequestSeq += 1;
       manualSelectionRequestId = requestId;
     }
-    const shouldShowInitialLoading = !get().selectedReport;
+    // A user-initiated switch immediately enters a loading state so the panel
+    // shows "loading the selected record" instead of the previous report.
+    // Background refreshes keep the current report visible until the new one
+    // is ready to avoid flicker.
+    const shouldShowLoading = isUserInitiated || !get().selectedReport;
 
-    if (shouldShowInitialLoading) {
-      set({ isLoadingReport: true });
-    }
+    set({
+      selectedRecordId: recordId,
+      pendingRecordId: recordId,
+      error: null,
+      ...(shouldShowLoading ? { isLoadingReport: true } : {}),
+    });
 
     try {
       const report = normalizeSelectedReport(await historyApi.getDetail(recordId));
@@ -728,6 +744,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         selectedReport: report,
         error: null,
         isLoadingReport: false,
+        pendingRecordId: null,
       });
 
       if (!report.meta.stockCode) {
@@ -748,12 +765,24 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       set({
         error: getParsedApiError(error),
         isLoadingReport: false,
+        pendingRecordId: null,
+        // Drop the stale report on a failed user switch so the page shows the
+        // failure for the selected record rather than the previous report.
+        ...(isUserInitiated ? { selectedReport: null } : {}),
       });
     } finally {
       if (isUserInitiated && manualSelectionRequestId === requestId) {
         manualSelectionRequestId = 0;
       }
     }
+  },
+
+  retrySelectedRecord: async () => {
+    const { selectedRecordId, pendingRecordId } = get();
+    if (selectedRecordId === null || pendingRecordId !== null) {
+      return;
+    }
+    await get().selectHistoryItem(selectedRecordId, true);
   },
 
   toggleHistorySelection: (recordId) => {
@@ -809,6 +838,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
           set({
             isHistoryTrendOpen: false,
             selectedReport: null,
+            selectedRecordId: null,
+            pendingRecordId: null,
           });
         }
       }
@@ -868,7 +899,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         if (nextItem) {
           await get().selectHistoryItem(nextItem.id, false);
         } else {
-          set({ selectedReport: null });
+          set({ selectedReport: null, selectedRecordId: null, pendingRecordId: null });
         }
       }
     } catch (error) {
@@ -918,7 +949,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
     const requestId = ++analyzeRequestSeq;
     try {
-      await analysisApi.analyzeAsync({
+      const response = await analysisApi.analyzeAsync({
         stockCode: normalizedStockCode,
         reportType: 'detailed',
         stockName,
@@ -932,6 +963,41 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
       if (requestId !== analyzeRequestSeq) {
         return;
+      }
+
+      // Immediately reflect the accepted task(s) locally so the task panel shows
+      // the submission without waiting for the SSE task_created event, which may
+      // be delayed, lost, or race a very short task. syncTaskCreated dedupes by
+      // taskId, so the later SSE event won't create a visual duplicate.
+      const createdAt = new Date().toISOString();
+      const registerTask = (
+        taskId: string,
+        taskStockCode: string,
+        status: TaskInfo['status'],
+        analysisPhase?: TaskInfo['analysisPhase'],
+      ) => {
+        get().syncTaskCreated({
+          taskId,
+          stockCode: taskStockCode,
+          stockName,
+          status,
+          progress: 0,
+          reportType: 'detailed',
+          createdAt,
+          originalQuery: originalQuery || stockCodeInput,
+          selectionSource,
+          ...(analysisPhase !== undefined ? { analysisPhase } : {}),
+          ...(skills && skills.length ? { skills } : {}),
+        });
+      };
+
+      const accepted: AnalyzeAsyncResponse | undefined = response;
+      if (accepted && 'taskId' in accepted) {
+        registerTask(accepted.taskId, normalizedStockCode, accepted.status, accepted.analysisPhase);
+      } else if (accepted && 'accepted' in accepted) {
+        for (const item of accepted.accepted) {
+          registerTask(item.taskId, item.stockCode, item.status, item.analysisPhase);
+        }
       }
 
       set({

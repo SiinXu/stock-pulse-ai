@@ -1190,4 +1190,114 @@ describe('stockPoolStore', () => {
       forceRefresh: true,
     }));
   });
+
+  it('tracks pendingRecordId while a user switch loads and clears it on success', async () => {
+    const deferred = createDeferred<AnalysisReport>();
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(deferred.promise as never);
+
+    const promise = useStockPoolStore.getState().selectHistoryItem(2);
+    const mid = useStockPoolStore.getState();
+    expect(mid.pendingRecordId).toBe(2);
+    expect(mid.selectedRecordId).toBe(2);
+    expect(mid.isLoadingReport).toBe(true);
+
+    deferred.resolve({
+      ...historyReport,
+      meta: { ...historyReport.meta, id: 2, stockCode: 'AAPL' },
+    } as AnalysisReport);
+    await promise;
+
+    const state = useStockPoolStore.getState();
+    expect(state.pendingRecordId).toBeNull();
+    expect(state.isLoadingReport).toBe(false);
+    expect(state.selectedReport?.meta.id).toBe(2);
+  });
+
+  it('drops the stale report and keeps a retryable failure when a user switch fails', async () => {
+    useStockPoolStore.setState({ selectedReport: historyReport as AnalysisReport, selectedRecordId: 1 });
+    vi.mocked(historyApi.getDetail).mockRejectedValue(new Error('boom'));
+
+    await useStockPoolStore.getState().selectHistoryItem(2);
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedReport).toBeNull();
+    expect(state.selectedRecordId).toBe(2);
+    expect(state.pendingRecordId).toBeNull();
+    expect(state.isLoadingReport).toBe(false);
+    expect(state.error).not.toBeNull();
+  });
+
+  it('keeps the current report when a background reselect fails', async () => {
+    useStockPoolStore.setState({ selectedReport: historyReport as AnalysisReport, selectedRecordId: 1 });
+    vi.mocked(historyApi.getDetail).mockRejectedValue(new Error('boom'));
+
+    await useStockPoolStore.getState().selectHistoryItem(2, false);
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedReport?.meta.id).toBe(1);
+    expect(state.error).not.toBeNull();
+  });
+
+  it('retries the selected record after a failed load', async () => {
+    useStockPoolStore.setState({ selectedReport: historyReport as AnalysisReport, selectedRecordId: 1 });
+    vi.mocked(historyApi.getDetail).mockRejectedValueOnce(new Error('boom'));
+    await useStockPoolStore.getState().selectHistoryItem(2);
+    expect(useStockPoolStore.getState().selectedReport).toBeNull();
+
+    vi.mocked(historyApi.getDetail).mockResolvedValueOnce({
+      ...historyReport,
+      meta: { ...historyReport.meta, id: 2, stockCode: 'AAPL' },
+    } as AnalysisReport);
+    await useStockPoolStore.getState().retrySelectedRecord();
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedReport?.meta.id).toBe(2);
+    expect(state.error).toBeNull();
+  });
+
+  it('registers the accepted task locally so the panel shows it without SSE', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-immediate-1',
+      status: 'pending',
+    } as never);
+
+    await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+      stockName: '贵州茅台',
+      selectionSource: 'autocomplete',
+    });
+
+    const task = useStockPoolStore.getState().activeTasks.find((item) => item.taskId === 'task-immediate-1');
+    expect(task).toBeDefined();
+    expect(task?.stockCode).toBe('600519');
+    expect(task?.status).toBe('pending');
+    expect(task?.progress).toBe(0);
+  });
+
+  it('does not duplicate a task when the SSE created event arrives after submit', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'task-immediate-2',
+      status: 'pending',
+    } as never);
+
+    await useStockPoolStore.getState().submitAnalysis({
+      stockCode: '600519',
+      selectionSource: 'autocomplete',
+    });
+
+    // A later SSE task_created for the same id must not create a visual duplicate.
+    useStockPoolStore.getState().syncTaskCreated({
+      taskId: 'task-immediate-2',
+      stockCode: '600519',
+      status: 'processing',
+      progress: 10,
+      reportType: 'detailed',
+      createdAt: '2026-03-18T08:00:00Z',
+    });
+
+    const matches = useStockPoolStore
+      .getState()
+      .activeTasks.filter((item) => item.taskId === 'task-immediate-2');
+    expect(matches).toHaveLength(1);
+  });
 });

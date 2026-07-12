@@ -60,6 +60,7 @@ const HomePage: React.FC = () => {
   const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
   const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
+  const marketReviewPollGeneration = useRef(0);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -67,8 +68,11 @@ const HomePage: React.FC = () => {
   const strategyInitialFocusIndexRef = useRef<number | null>(null);
 
   const stopMarketReviewPolling = useCallback(() => {
+    // Bump the generation so any in-flight poll from the previous run is
+    // discarded when it resolves, and cancel the next scheduled tick.
+    marketReviewPollGeneration.current += 1;
     if (marketReviewPollTimer.current !== null) {
-      window.clearInterval(marketReviewPollTimer.current);
+      window.clearTimeout(marketReviewPollTimer.current);
       marketReviewPollTimer.current = null;
     }
   }, []);
@@ -97,6 +101,7 @@ const HomePage: React.FC = () => {
     error,
     isAnalyzing,
     selectedReport,
+    selectedRecordId,
     isLoadingReport,
     isHistoryTrendOpen,
     marketReviewHistoryItems,
@@ -117,6 +122,7 @@ const HomePage: React.FC = () => {
     loadMarketReviewHistory,
     refreshMarketReviewHistory,
     selectHistoryItem,
+    retrySelectedRecord,
     clearSelectedReportForStock,
     submitAnalysis,
     notify,
@@ -236,6 +242,9 @@ const HomePage: React.FC = () => {
   const liveMarketReviewLanguage = normalizeReportLanguage(marketReviewPayload?.language);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
+  // A selected record failed to load: keep the failure (with retry) in view
+  // instead of the stale previous report or the generic empty state.
+  const isReportLoadFailure = Boolean(error) && selectedRecordId !== null && !selectedReport;
 
   useEffect(() => {
     if (!isHistoryTrendUnavailable || !isHistoryTrendOpen) {
@@ -491,6 +500,10 @@ const HomePage: React.FC = () => {
   const pollMarketReviewStatus = useCallback(
     async (taskId: string) => {
       stopMarketReviewPolling();
+      // Capture this run's generation after stop bumped it; results are only
+      // applied while this stays the current generation (single-flight).
+      const generation = marketReviewPollGeneration.current;
+      const isCurrent = () => generation === marketReviewPollGeneration.current;
 
       const maxAttempts = 120;
       const intervalMs = 2000;
@@ -498,7 +511,6 @@ const HomePage: React.FC = () => {
 
       const poll = async (): Promise<boolean> => {
         if (attempts >= maxAttempts) {
-          stopMarketReviewPolling();
           setMarketReviewReport(null);
           setMarketReviewPayload(null);
           setMarketReviewNotice({
@@ -514,6 +526,10 @@ const HomePage: React.FC = () => {
 
         try {
           const status = await analysisApi.getStatus(taskId);
+          // Discard results from a superseded run (page left or a newer review).
+          if (!isCurrent()) {
+            return false;
+          }
           if (status.status === 'pending' || status.status === 'processing') {
             setMarketReviewReport(null);
             setMarketReviewPayload(null);
@@ -529,7 +545,6 @@ const HomePage: React.FC = () => {
           }
 
           if (status.status === 'completed') {
-            stopMarketReviewPolling();
             const marketReviewText = typeof status.marketReviewReport === 'string'
               ? status.marketReviewReport
               : '';
@@ -547,7 +562,6 @@ const HomePage: React.FC = () => {
           }
 
           if (status.status === 'failed') {
-            stopMarketReviewPolling();
             setMarketReviewReport(null);
             setMarketReviewPayload(null);
             setMarketReviewError(
@@ -566,7 +580,6 @@ const HomePage: React.FC = () => {
             return false;
           }
 
-          stopMarketReviewPolling();
           setMarketReviewReport(null);
           setMarketReviewPayload(null);
           setMarketReviewNotice({
@@ -577,9 +590,11 @@ const HomePage: React.FC = () => {
           scrollMarketReviewFeedbackIntoView();
           return false;
         } catch (err: unknown) {
+          if (!isCurrent()) {
+            return false;
+          }
           const parsed = getParsedApiError(err);
           if (attempts >= maxAttempts) {
-            stopMarketReviewPolling();
             setMarketReviewReport(null);
             setMarketReviewPayload(null);
             setMarketReviewError(parsed);
@@ -589,19 +604,21 @@ const HomePage: React.FC = () => {
           }
           return true;
         }
-
-        return true;
       };
 
-      if (await poll()) {
-        marketReviewPollTimer.current = window.setInterval(() => {
-          void poll().then((shouldContinue) => {
-            if (!shouldContinue) {
-              stopMarketReviewPolling();
-            }
-          });
+      // Single-flight recursive scheduler: the next tick is only scheduled
+      // after the current poll settles, so slow requests never overlap.
+      const runPoll = async (): Promise<void> => {
+        const shouldContinue = await poll();
+        if (!isCurrent() || !shouldContinue) {
+          return;
+        }
+        marketReviewPollTimer.current = window.setTimeout(() => {
+          void runPoll();
         }, intervalMs);
-      }
+      };
+
+      await runPoll();
     },
     [refreshMarketReviewHistory, scrollMarketReviewFeedbackIntoView, stopMarketReviewPolling, t],
   );
@@ -669,7 +686,7 @@ const HomePage: React.FC = () => {
           items={mergedStockBarItems}
           isLoading={isLoadingStockBar}
           selectedStockCode={selectedReport?.meta.stockCode}
-          selectedRecordId={selectedReport?.meta.id}
+          selectedRecordId={selectedRecordId ?? selectedReport?.meta.id}
           onItemClick={handleHistoryItemClick}
           onDeleteStock={handleDeleteStock}
           isDeleting={isDeletingStock}
@@ -685,6 +702,7 @@ const HomePage: React.FC = () => {
       handleDeleteStock,
       isDeletingStock,
       openTaskRunFlow,
+      selectedRecordId,
       selectedReport?.meta.stockCode,
       selectedReport?.meta.id,
     ],
@@ -929,6 +947,8 @@ const HomePage: React.FC = () => {
               <ApiErrorAlert
                 error={error}
                 className="mb-3"
+                actionLabel={isReportLoadFailure ? t('common.retry') : undefined}
+                onAction={isReportLoadFailure ? () => void retrySelectedRecord() : undefined}
                 onDismiss={clearError}
               />
             ) : null}
@@ -1036,7 +1056,7 @@ const HomePage: React.FC = () => {
                   />
                 )}
               </div>
-            ) : !marketReviewReport ? (
+            ) : !marketReviewReport && !isReportLoadFailure ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   title={t('home.startAnalysisTitle')}
