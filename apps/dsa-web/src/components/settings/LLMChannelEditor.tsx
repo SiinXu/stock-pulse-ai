@@ -4,7 +4,7 @@ import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LLMCapabilityCheck, LLMCapabilityCheckResult } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
+import { ApiErrorAlert, Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import {
   LLM_PROVIDER_CAPABILITY_LABELS,
@@ -430,14 +430,10 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
     (model) => !discoveredModels.some((discoveredModel) => areModelsEquivalent(model, discoveredModel, channel.protocol)),
   );
   const modelCount = selectedModels.length;
-  const hasKey = channel.apiKey.length > 0;
-  const statusVariant = testState?.status === 'success'
-    ? 'success'
-    : testState?.status === 'error'
-      ? 'danger'
-      : testState?.status === 'loading'
-        ? 'warning'
-        : 'default';
+  const nameIssues = getChannelNameIssues(channel);
+  const completenessIssues = getChannelCompletenessIssues(channel);
+  const isComplete = nameIssues.length === 0 && completenessIssues.length === 0;
+  const missingIssues = [...nameIssues, ...completenessIssues];
   const selectedCapabilities = capabilityState?.selected || [];
   const capabilityResults = capabilityState?.results || {};
   const capabilityBusy = capabilityState?.status === 'loading';
@@ -449,70 +445,83 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
 
   return (
     <div className="mb-2 overflow-hidden rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-soft-card transition-[background-color,border-color,box-shadow] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]">
-      <div
-        className="flex cursor-pointer select-none items-center gap-2.5 px-4 py-3 transition-colors"
-        onClick={() => onToggleExpand(index)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggleExpand(index);
-          }
-        }}
-        role="button"
-        tabIndex={0}
-      >
-        <span className={`w-4 shrink-0 text-[11px] text-muted-text transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
-
+      <div className="flex select-none items-center gap-2.5 px-4 py-3">
         <input
           type="checkbox"
           checked={channel.enabled}
           disabled={busy}
+          aria-label={`启用渠道 ${displayName}`}
           className="settings-input-checkbox h-4 w-4 shrink-0 rounded border-border/70 bg-base"
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onUpdate(index, 'enabled', e.target.checked)}
+          onChange={(e) => {
+            // Enabling requires a complete channel; keep it disabled and reveal
+            // the missing fields instead of silently accepting an unusable one.
+            if (e.target.checked && !isComplete) {
+              if (!expanded) {
+                onToggleExpand(index);
+              }
+              return;
+            }
+            onUpdate(index, 'enabled', e.target.checked);
+          }}
         />
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
-            <Badge variant="info" className="hidden sm:inline-flex">
-              {channel.protocol}
-            </Badge>
-          </div>
-          <p className="mt-0.5 truncate text-[11px] text-secondary-text">
-            {modelCount > 0 ? `${modelCount} 个模型已配置` : '未配置模型'}
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => onToggleExpand(index)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left transition-colors"
+        >
+          <span aria-hidden="true" className={`w-4 shrink-0 text-[11px] text-muted-text transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
 
-        <span className="flex shrink-0 items-center gap-2">
-          {testState?.status === 'success' ? (
-            <Tooltip content="连接正常">
-              <span className="inline-flex">
-                <StatusDot tone="success" />
-              </span>
-            </Tooltip>
-          ) : null}
-          {testState?.status === 'error' ? (
-            <Tooltip content="连接失败">
-              <span className="inline-flex">
-                <StatusDot tone="danger" />
-              </span>
-            </Tooltip>
-          ) : null}
-          {testState?.status === 'loading' ? (
-            <Tooltip content="测试中">
-              <span className="inline-flex">
-                <StatusDot tone="warning" pulse />
-              </span>
-            </Tooltip>
-          ) : null}
-          {!hasKey && channel.protocol !== 'ollama' ? <Badge variant="warning">未填 Key</Badge> : null}
-          {testState?.status !== 'idle' ? (
-            <Badge variant={statusVariant}>
-              {testState?.status === 'success' ? '连接正常' : testState?.status === 'error' ? '连接失败' : '测试中'}
-            </Badge>
-          ) : null}
-        </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
+              <Badge variant="info" className="hidden sm:inline-flex">
+                {channel.protocol}
+              </Badge>
+            </div>
+            <p className="mt-0.5 truncate text-[11px] text-secondary-text">
+              {modelCount > 0 ? `${modelCount} 个模型已配置` : '未配置模型'}
+            </p>
+          </div>
+
+          <span className="flex shrink-0 items-center gap-2">
+            {testState?.status === 'success' ? (
+              <Tooltip content="连接正常">
+                <span className="inline-flex">
+                  <StatusDot tone="success" />
+                </span>
+              </Tooltip>
+            ) : null}
+            {testState?.status === 'error' ? (
+              <Tooltip content="连接失败">
+                <span className="inline-flex">
+                  <StatusDot tone="danger" />
+                </span>
+              </Tooltip>
+            ) : null}
+            {testState?.status === 'loading' ? (
+              <Tooltip content="测试中">
+                <span className="inline-flex">
+                  <StatusDot tone="warning" pulse />
+                </span>
+              </Tooltip>
+            ) : null}
+            {!isComplete ? (
+              <Badge variant="warning">草稿 · 未完成</Badge>
+            ) : testState?.status === 'success' ? (
+              <Badge variant="success">测试通过</Badge>
+            ) : testState?.status === 'error' ? (
+              <Badge variant="danger">测试失败</Badge>
+            ) : testState?.status === 'loading' ? (
+              <Badge variant="warning">测试中</Badge>
+            ) : channel.enabled ? (
+              <Badge variant="info">已启用 · 未测试</Badge>
+            ) : (
+              <Badge variant="default">结构校验通过 · 未测试</Badge>
+            )}
+          </span>
+        </button>
 
         <Tooltip content="删除渠道">
           <span className="inline-flex">
@@ -522,10 +531,8 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
               size="sm"
               className="h-8 shrink-0 px-2 text-xs text-muted-text hover:text-danger"
               disabled={busy}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(index);
-              }}
+              aria-label="删除渠道"
+              onClick={() => onRemove(index)}
             >
               ✕
             </Button>
@@ -535,6 +542,20 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
 
       {expanded ? (
         <div className="settings-surface-overlay-soft space-y-4 px-4 py-4">
+          {missingIssues.length > 0 ? (
+            <InlineAlert
+              variant="warning"
+              title={channel.enabled ? '启用渠道前需补齐以下字段' : '草稿未完成（不会进入运行时路由，需补齐后才能启用）'}
+              message={(
+                <ul className="ml-4 list-disc space-y-0.5">
+                  {missingIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              )}
+              className="rounded-lg px-3 py-2 text-xs shadow-none"
+            />
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <HelpLabel
@@ -1445,6 +1466,51 @@ function channelNamesAreSafe(channels: ChannelConfig[]): boolean {
   return channels.every((channel) => /^[a-z0-9_]+$/.test(channel.name.trim()));
 }
 
+// Structural completeness contract (Slice 1). Name/protocol must be valid for
+// any channel; credential / base URL / models are required only when the
+// channel is enabled. Connectivity testing is intentionally NOT a gate here.
+function getChannelNameIssues(channel: ChannelConfig): string[] {
+  const name = channel.name.trim();
+  if (!name) {
+    return ['渠道名称必填'];
+  }
+  if (!/^[a-z0-9_]+$/.test(name)) {
+    return ['渠道名称仅限小写字母、数字或下划线'];
+  }
+  return [];
+}
+
+// Fields required to run the channel; surfaced as "未完成" while missing.
+function getChannelCompletenessIssues(channel: ChannelConfig): string[] {
+  const issues: string[] = [];
+  if (channel.protocol !== 'ollama' && !channel.apiKey.trim()) {
+    issues.push('缺少 API Key');
+  }
+  // Known provider templates ship a default Base URL, and ollama/local endpoints
+  // have a runtime default, so only custom remote endpoints must supply one.
+  if (
+    !isKnownProviderTemplate(channel.name)
+    && channel.protocol !== 'ollama'
+    && !channel.baseUrl.trim()
+  ) {
+    issues.push('缺少 Base URL');
+  }
+  if (splitModels(channel.models).length === 0) {
+    issues.push('至少配置一个模型');
+  }
+  return issues;
+}
+
+// Issues that block saving: names must always be valid; enabled channels must
+// additionally be complete. Disabled channels may be saved as drafts.
+function getChannelSaveIssues(channel: ChannelConfig): string[] {
+  const nameIssues = getChannelNameIssues(channel);
+  if (nameIssues.length > 0) {
+    return nameIssues;
+  }
+  return channel.enabled ? getChannelCompletenessIssues(channel) : [];
+}
+
 function buildFilteredChannelUpdateItems({
   channels,
   initialChannels,
@@ -1594,6 +1660,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [addPreset, setAddPreset] = useState('aihubmix');
+  const [pendingRemove, setPendingRemove] = useState<{ index: number; name: string; referencedBy: string[] } | null>(null);
   const addChannelIdRef = useRef(0);
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onDraftItemsChangeRef = useRef(onDraftItemsChange);
@@ -1690,6 +1757,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }
     return channels.some((channel, index) => !channelsAreEqual(channel, initialChannels[index]));
   }, [channels, initialChannels, initialRuntimeConfig, runtimeConfig]);
+
+  // Structural gate: names must be valid for every channel and every enabled
+  // channel must be complete before the draft can be saved.
+  const blockingChannels = useMemo(
+    () => channels
+      .map((channel, index) => ({ channel, index, issues: getChannelSaveIssues(channel) }))
+      .filter((entry) => entry.issues.length > 0),
+    [channels],
+  );
+  const draftValid = blockingChannels.length === 0;
 
   const draftItems = useMemo(() => buildChannelDraftItems({
     hasChanges,
@@ -1823,6 +1900,32 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       delete capabilityNonceRef.current[removedChannelId];
     }
     setExpandedRows({});
+  };
+
+  // Deleting a channel drops its draft immediately, so confirm first and warn
+  // when the channel still backs a selected runtime model / fallback.
+  const requestRemoveChannel = (index: number) => {
+    const channel = channels[index];
+    if (!channel) {
+      return;
+    }
+    const referencedBy: string[] = [];
+    if (managesRuntimeConfig) {
+      const routes = new Set(resolveChannelRouteModels(channel));
+      if (runtimeConfig.primaryModel && routes.has(runtimeConfig.primaryModel)) {
+        referencedBy.push('主模型');
+      }
+      if (runtimeConfig.agentPrimaryModel && routes.has(runtimeConfig.agentPrimaryModel)) {
+        referencedBy.push('Agent 主模型');
+      }
+      if (runtimeConfig.visionModel && routes.has(runtimeConfig.visionModel)) {
+        referencedBy.push('Vision 模型');
+      }
+      if (runtimeConfig.fallbackModels.some((model) => routes.has(model))) {
+        referencedBy.push('模型回退');
+      }
+    }
+    setPendingRemove({ index, name: channel.name.trim() || `#${index + 1}`, referencedBy });
   };
 
   const addChannel = () => {
@@ -2289,7 +2392,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                 discoveryState={discoveryStates[channel.id]}
                 capabilityState={capabilityStates[channel.id]}
                 onUpdate={updateChannel}
-                onRemove={removeChannel}
+                onRemove={requestRemoveChannel}
                 onToggleExpand={toggleExpand}
                 onToggleKeyVisibility={toggleKeyVisibility}
                 onTest={(ch, idx) => void handleTest(ch, idx)}
@@ -2446,12 +2549,29 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             />
           )}
 
+          {!draftValid ? (
+            <InlineAlert
+              variant="warning"
+              title="有渠道未完成，无法保存"
+              message={(
+                <ul className="ml-4 list-disc space-y-0.5">
+                  {blockingChannels.map(({ channel, index, issues }) => (
+                    <li key={channel.id || index}>
+                      {`${channel.name.trim() || `渠道 #${index + 1}`}：${issues.join('、')}`}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              className="rounded-lg px-3 py-2 text-xs shadow-none"
+            />
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <Button
               type="button"
               variant="settings-primary"
               glow
-              disabled={busy || !hasChanges}
+              disabled={busy || !hasChanges || !draftValid}
               onClick={() => void handleSave()}
             >
               {isSaving ? '保存中...' : managesRuntimeConfig ? '保存 AI 配置' : '保存渠道配置'}
@@ -2493,6 +2613,24 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           {saveMessage?.type === 'error' ? <ApiErrorAlert error={saveMessage.error} /> : null}
         </div>
       ) : null}
+      <ConfirmDialog
+        isOpen={pendingRemove !== null}
+        title="删除渠道？"
+        message={pendingRemove
+          ? (pendingRemove.referencedBy.length > 0
+            ? `渠道「${pendingRemove.name}」正被${pendingRemove.referencedBy.join('、')}引用，删除后这些选择会失效并需重新指定。删除仅作用于当前草稿，保存后才生效。`
+            : `将从当前草稿中移除渠道「${pendingRemove.name}」，保存后才生效。`)
+          : ''}
+        confirmText="删除渠道"
+        cancelText="取消"
+        onConfirm={() => {
+          if (pendingRemove) {
+            removeChannel(pendingRemove.index);
+          }
+          setPendingRemove(null);
+        }}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   );
 };

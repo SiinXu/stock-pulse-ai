@@ -119,6 +119,20 @@ describe('GenerationBackendStatusPanel', () => {
     expect(getGenerationBackendStatus).not.toHaveBeenCalled();
   });
 
+  it('labels saved runtime vs unsaved draft preview', async () => {
+    const { rerender } = render(<GenerationBackendStatusPanel items={[]} maskToken="******" />);
+    expect(await screen.findByText('当前运行配置')).toBeInTheDocument();
+
+    rerender(
+      <GenerationBackendStatusPanel
+        items={[{ key: 'GENERATION_BACKEND', value: 'opencode_cli' }]}
+        maskToken="******"
+      />,
+    );
+    expect(await screen.findByText('草稿预览（未保存）')).toBeInTheDocument();
+    expect(screen.queryByText('当前运行配置')).not.toBeInTheDocument();
+  });
+
   it('runs JSON smoke test with current draft items', async () => {
     render(
       <GenerationBackendStatusPanel

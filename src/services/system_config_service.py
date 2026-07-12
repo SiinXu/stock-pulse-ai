@@ -106,6 +106,18 @@ class ConfigImportError(Exception):
         self.message = message
 
 
+# LLM provider channel names that ship a built-in default Base URL (mirrors the
+# frontend LLM_PROVIDER_TEMPLATES channelIds in
+# apps/dsa-web/src/components/settings/llmProviderTemplates.ts). Enabled channels
+# whose name is not listed here are treated as custom endpoints and must supply
+# their own Base URL.
+KNOWN_LLM_PROVIDER_CHANNEL_NAMES = frozenset({
+    "aihubmix", "anspire", "deepseek", "dashscope", "zhipu", "moonshot",
+    "minimax", "volcengine", "siliconflow", "openrouter", "gemini",
+    "anthropic", "openai", "ollama",
+})
+
+
 @dataclass(frozen=True)
 class _LLMDiagnostic:
     """Internal structured diagnosis for LLM test and discovery failures."""
@@ -3544,6 +3556,7 @@ class SystemConfigService:
         non_hermes_routes = set(self._collect_non_hermes_channel_models_from_map(effective_map))
         if not agent_model_raw:
             if generation_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
+                local_cli_display = resolve_local_cli_preset(generation_backend).display_name
                 litellm_model, _source = self._resolve_setup_primary_model(effective_map)
                 if litellm_model:
                     if litellm_model in hermes_routes and litellm_model not in non_hermes_routes:
@@ -3553,7 +3566,7 @@ class SystemConfigService:
                             "agent",
                             True,
                             "needs_action",
-                            "普通分析使用 Codex CLI；但当前 LiteLLM Agent 路径继承的是 Hermes-only 模型，"
+                            f"普通分析使用 {local_cli_display}；但当前 LiteLLM Agent 路径继承的是 Hermes-only 模型，"
                             "Hermes Phase 3 不支持 Agent 工具调用。",
                             "如需使用 Ask-Stock Agent，请配置非 Hermes 的 AGENT_LITELLM_MODEL，"
                             "或配置包含非 Hermes deployment 的 mixed Agent route。",
@@ -3564,7 +3577,7 @@ class SystemConfigService:
                         "agent",
                         True,
                         "configured",
-                        f"普通分析使用 Codex CLI；Agent 工具调用仍使用 LiteLLM 主模型: {litellm_model}",
+                        f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用 LiteLLM 主模型: {litellm_model}",
                     )
                 if agent_backend == LITELLM_BACKEND_ID:
                     return self._setup_check(
@@ -3631,9 +3644,10 @@ class SystemConfigService:
                 "请选择非 Hermes Agent 模型，或配置 mixed route 中的非 Hermes deployment。",
             )
         configured_agent_message = f"已配置 Agent 主模型: {agent_model}"
-        if generation_backend == CODEX_CLI_BACKEND_ID:
+        if generation_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            local_cli_display = resolve_local_cli_preset(generation_backend).display_name
             configured_agent_message = (
-                f"普通分析使用 Codex CLI；Agent 工具调用仍使用 LiteLLM 主模型: {agent_model}"
+                f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用 LiteLLM 主模型: {agent_model}"
             )
         if _uses_direct_env_provider(agent_model):
             return self._setup_check(
@@ -4481,8 +4495,15 @@ class SystemConfigService:
             seen_names.add(normalized_upper)
             normalized_names.append(name)
 
+        # Strict completeness gating applies only to channels this update
+        # actually touches (or a changed channel list); historical incomplete
+        # channels must not block saving unrelated settings.
+        llm_channels_touched = "LLM_CHANNELS" in updated_keys
         for name in normalized_names:
             prefix = f"LLM_{name.upper()}"
+            touched = llm_channels_touched or any(
+                updated_key.startswith(f"{prefix}_") for updated_key in updated_keys
+            )
             protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
             if name.lower() == "anspire" and not protocol_value:
                 protocol_value = "openai"
@@ -4515,27 +4536,42 @@ class SystemConfigService:
                 enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
             enabled = parse_env_bool(enabled_raw, default=True)
             if is_reserved_hermes_name(name):
-                result = parse_hermes_channel(
-                    enabled=enabled,
-                    protocol=protocol_value or HERMES_DEFAULT_PROTOCOL,
-                    base_url=base_url_value or HERMES_DEFAULT_BASE_URL,
-                    api_key=(effective_map.get(f"{prefix}_API_KEY") or "").strip(),
-                    api_keys_raw=(effective_map.get(f"{prefix}_API_KEYS") or "").strip(),
-                    extra_headers_raw=(effective_map.get(f"{prefix}_EXTRA_HEADERS") or "").strip(),
-                    models=models_value or [HERMES_DEFAULT_MODEL],
-                )
-                for issue in result.issues:
-                    issues.append(
-                        {
-                            "key": issue.field,
-                            "code": issue.code,
-                            "message": issue.message,
-                            "severity": issue.severity,
-                            "expected": "valid reserved Hermes channel",
-                            "actual": "",
-                        }
+                if touched:
+                    result = parse_hermes_channel(
+                        enabled=enabled,
+                        protocol=protocol_value or HERMES_DEFAULT_PROTOCOL,
+                        base_url=base_url_value or HERMES_DEFAULT_BASE_URL,
+                        api_key=(effective_map.get(f"{prefix}_API_KEY") or "").strip(),
+                        api_keys_raw=(effective_map.get(f"{prefix}_API_KEYS") or "").strip(),
+                        extra_headers_raw=(effective_map.get(f"{prefix}_EXTRA_HEADERS") or "").strip(),
+                        models=models_value or [HERMES_DEFAULT_MODEL],
                     )
+                    for issue in result.issues:
+                        issues.append(
+                            {
+                                "key": issue.field,
+                                "code": issue.code,
+                                "message": issue.message,
+                                "severity": issue.severity,
+                                "expected": "valid reserved Hermes channel",
+                                "actual": "",
+                            }
+                        )
                 continue
+            # Custom endpoints (names outside the known provider templates) must
+            # supply a Base URL, except when the endpoint has a runtime default
+            # (ollama / localhost), which also allows an empty API key.
+            resolved_gate_protocol = resolve_llm_channel_protocol(
+                protocol_value,
+                base_url=base_url_value,
+                models=models_value or None,
+                channel_name=name,
+            )
+            is_custom_endpoint = name.lower() not in KNOWN_LLM_PROVIDER_CHANNEL_NAMES
+            require_base_url = is_custom_endpoint and not channel_allows_empty_api_key(
+                resolved_gate_protocol,
+                base_url_value,
+            )
             issues.extend(
                 SystemConfigService._validate_llm_channel_definition(
                     channel_name=name,
@@ -4545,7 +4581,8 @@ class SystemConfigService:
                     model_values=models_value,
                     enabled=enabled,
                     field_prefix=prefix,
-                    require_complete=enabled,
+                    require_complete=enabled and touched,
+                    require_base_url=require_base_url,
                 )
             )
 
@@ -5082,6 +5119,7 @@ class SystemConfigService:
         enabled: bool,
         field_prefix: str,
         require_complete: bool,
+        require_base_url: bool = False,
     ) -> List[Dict[str, Any]]:
         """Validate one normalized LLM channel definition."""
         if not require_complete:
@@ -5094,7 +5132,7 @@ class SystemConfigService:
             api_key_value=api_key_value,
             model_values=model_values,
             field_prefix=field_prefix,
-            require_base_url=False,
+            require_base_url=require_base_url,
         )
         models_key = f"{field_prefix}_MODELS" if field_prefix != "test_channel" else "models"
 

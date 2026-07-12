@@ -94,6 +94,7 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
   const [error, setError] = useState<ParsedApiError | null>(null);
   const refreshRequestIdRef = useRef(0);
   const smokeRequestIdRef = useRef(0);
+  const didInitialRefreshRef = useRef(false);
   const hasDraft = items.length > 0;
   const requestItems = useMemo(() => items.map((item) => ({ key: item.key, value: item.value })), [items]);
   const requestItemsFingerprint = useMemo(() => JSON.stringify(requestItems), [requestItems]);
@@ -135,7 +136,18 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
   }, [hasDraft, maskToken, requestItems]);
 
   useEffect(() => {
-    void refresh();
+    // Refresh the saved status immediately on mount, but debounce subsequent
+    // draft-driven previews so typing in the editor doesn't fire a preview
+    // request per keystroke.
+    if (!didInitialRefreshRef.current) {
+      didInitialRefreshRef.current = true;
+      void refresh();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void refresh();
+    }, 500);
+    return () => window.clearTimeout(timer);
   }, [refresh]);
 
   const runSmoke = useCallback(async () => {
@@ -183,7 +195,12 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
     <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border settings-border bg-card/70 p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-sm font-semibold text-foreground">{t('settings.generationBackendStatus')}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">{t('settings.generationBackendStatus')}</p>
+            <Badge variant={hasDraft ? 'warning' : 'history'} size="sm">
+              {hasDraft ? t('settings.generationBackendDraftPreview') : t('settings.generationBackendSavedRuntime')}
+            </Badge>
+          </div>
           <p className="mt-1 text-xs leading-5 text-muted-text">
             {t('settings.generationBackendStatusDescription')}
           </p>

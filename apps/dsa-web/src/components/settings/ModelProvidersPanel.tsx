@@ -57,7 +57,9 @@ export const ModelProvidersPanel: React.FC<ModelProvidersPanelProps> = ({
           if (providerItems.length === 0) {
             return null;
           }
-          const configured = isProviderConfigured(providerItems);
+          const configured = isProviderConfigured(
+            providerItems.filter((item) => provider.configuredKeys.includes(item.key)),
+          );
           return (
             <button
               key={provider.id}

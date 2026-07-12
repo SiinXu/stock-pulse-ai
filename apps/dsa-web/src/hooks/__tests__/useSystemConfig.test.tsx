@@ -436,6 +436,32 @@ describe('useSystemConfig', () => {
     vi.useRealTimers();
   });
 
+  it('does not autosave non-sensitive model provider fields, deferring them to Save', async () => {
+    getConfig.mockResolvedValue(sampleLlmConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      // Base URL is not sensitive, but pairs with a secret API key, so it must
+      // save transactionally rather than autosave+reload on its own.
+      result.current.setDraftValue('OPENAI_BASE_URL', 'https://api.example.org/v1');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(validate).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(result.current.hasDirty).toBe(true);
+    expect(result.current.autosaveStatus).toBe('idle');
+    vi.useRealTimers();
+  });
+
   it('marks autosave failed and preserves the draft on validation error', async () => {
     getConfig.mockResolvedValue(sampleLlmConfig);
     validate.mockResolvedValueOnce({ valid: false, issues: [{ key: 'LITELLM_MODEL', message: 'bad' }] });

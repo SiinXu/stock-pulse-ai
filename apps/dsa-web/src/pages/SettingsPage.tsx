@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker } from 'react-router-dom';
+import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, CircleAlert, CircleDashed, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth, useSystemConfig } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -871,6 +871,7 @@ const SettingsPage: React.FC = () => {
   const [isUpdatingAlphaSift, setIsUpdatingAlphaSift] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [pendingTabSwitch, setPendingTabSwitch] = useState<{ category: string; subCategory: string | null } | null>(null);
   const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
@@ -897,6 +898,13 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     document.title = t('settings.pageTitleDocument');
   }, [t]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Seed the active tab from the URL once so deep links / refresh restore it.
+  const [initialTab] = useState(() => {
+    const category = searchParams.get('category');
+    return category ? { category, subCategory: searchParams.get('sub') } : undefined;
+  });
 
   const {
     categories,
@@ -926,11 +934,32 @@ const SettingsPage: React.FC = () => {
     refreshAfterExternalSave,
     configVersion,
     maskToken,
-  } = useSystemConfig();
+  } = useSystemConfig(initialTab);
+
+  // Mirror the active tab into the URL (replace, so tab hops don't spam history)
+  // for shareable deep links and refresh restoration.
+  useEffect(() => {
+    setSearchParams((prev) => {
+      if (prev.get('category') === activeCategory && (prev.get('sub') ?? null) === (activeSubCategory ?? null)) {
+        return prev;
+      }
+      const next = new URLSearchParams(prev);
+      next.set('category', activeCategory);
+      if (activeSubCategory) {
+        next.set('sub', activeSubCategory);
+      } else {
+        next.delete('sub');
+      }
+      return next;
+    }, { replace: true });
+  }, [activeCategory, activeSubCategory, setSearchParams]);
 
   const currentChangedItems = getChangedItems();
   const currentChangedItemsFingerprint = JSON.stringify(currentChangedItems);
   const llmChannelDraftItemsFingerprint = JSON.stringify(llmChannelDraftItems);
+  // The LLM channel editor keeps its own local draft; switching settings tabs
+  // unmounts it and drops that draft, so it needs explicit leave protection.
+  const hasLlmChannelDraft = llmChannelDraftItems.length > 0;
   const generationBackendDraftItems = useMemo(
     () => mergeGenerationBackendDraftItems(currentChangedItems, llmChannelDraftItems),
     // Fingerprints keep the status panel from refreshing when parent renders do not change draft content.
@@ -940,6 +969,17 @@ const SettingsPage: React.FC = () => {
   const handleLlmChannelDraftItemsChange = useCallback((items: Array<{ key: string; value: string }>) => {
     setLlmChannelDraftItems(items);
   }, []);
+
+  // The LLM channel editor only lives on the ai_model/model tab; leaving it
+  // unmounts the editor and drops its unsaved draft, so confirm before switching.
+  const requestSelectTab = useCallback((category: string, subCategory: string | null) => {
+    const leavesModelEditor = !(category === 'ai_model' && subCategory === 'model');
+    if (hasLlmChannelDraft && leavesModelEditor) {
+      setPendingTabSwitch({ category, subCategory });
+      return;
+    }
+    selectTab(category, subCategory);
+  }, [hasLlmChannelDraft, selectTab]);
 
   const refreshSetupStatus = useCallback(async () => {
     const requestId = setupStatusRequestIdRef.current + 1;
@@ -1048,9 +1088,13 @@ const SettingsPage: React.FC = () => {
     && !currentChangedItems.some((item) => item.key === 'SCHEDULE_ENABLED');
   const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft;
   const effectiveDirtyCount = dirtyCount + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0);
-  // Guard leaving while edits are unsaved, an autosave is in flight, or a prior
-  // autosave failed (dirty drafts already imply this, but keep it explicit).
-  const shouldGuardLeave = effectiveHasDirty || autosaveStatus === 'saving' || autosaveStatus === 'error';
+  // The global Save button only persists useSystemConfig drafts, so the LLM
+  // channel draft is excluded from effectiveDirtyCount; count it only for the
+  // leave-protection prompt.
+  const leaveGuardCount = effectiveDirtyCount + llmChannelDraftItems.length;
+  // Guard leaving while edits are unsaved (including the LLM channel draft), an
+  // autosave is in flight, or a prior autosave failed.
+  const shouldGuardLeave = effectiveHasDirty || hasLlmChannelDraft || autosaveStatus === 'saving' || autosaveStatus === 'error';
 
   // Warn before leaving/refreshing/closing the tab while there are unsaved config edits.
   useEffect(() => {
@@ -1089,31 +1133,15 @@ const SettingsPage: React.FC = () => {
   // LLM keys from generic fields when channel mode is active. This does not
   // alter save/refresh payloads or config migration/rollback behavior.
   const LLM_CHANNEL_KEY_RE = /^LLM_[A-Z0-9_]+_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
+  // Legacy LiteLLM keys decluttered from the "model" sub-tab once channels are
+  // configured. Provider API-key fields are intentionally excluded so the
+  // "providers" sub-tab always lists every provider.
   const AI_MODEL_HIDDEN_KEYS = new Set([
     'LLM_CHANNELS',
     'LLM_TEMPERATURE',
     'LITELLM_MODEL',
     'AGENT_LITELLM_MODEL',
     'LITELLM_FALLBACK_MODELS',
-    'AIHUBMIX_KEY',
-    'DEEPSEEK_API_KEY',
-    'DEEPSEEK_API_KEYS',
-    'GEMINI_API_KEY',
-    'GEMINI_API_KEYS',
-    'GEMINI_MODEL',
-    'GEMINI_MODEL_FALLBACK',
-    'GEMINI_TEMPERATURE',
-    'ANTHROPIC_API_KEY',
-    'ANTHROPIC_API_KEYS',
-    'ANTHROPIC_MODEL',
-    'ANTHROPIC_TEMPERATURE',
-    'ANTHROPIC_MAX_TOKENS',
-    'OPENAI_API_KEY',
-    'OPENAI_API_KEYS',
-    'OPENAI_BASE_URL',
-    'OPENAI_MODEL',
-    'OPENAI_VISION_MODEL',
-    'OPENAI_TEMPERATURE',
     'VISION_MODEL',
   ]);
   const SYSTEM_HIDDEN_KEYS = new Set([
@@ -1645,7 +1673,7 @@ const SettingsPage: React.FC = () => {
               activeCategory={activeCategory}
               activeSubCategory={activeSubCategory}
               dirtyKeys={dirtyKeys}
-              onSelectTab={selectTab}
+              onSelectTab={requestSelectTab}
             />
           </aside>
 
@@ -2004,7 +2032,7 @@ const SettingsPage: React.FC = () => {
       <ConfirmDialog
         isOpen={leaveBlocker.state === 'blocked'}
         title={t('settings.leaveConfirmTitle')}
-        message={t('settings.leaveConfirmMessage', { count: effectiveDirtyCount })}
+        message={t('settings.leaveConfirmMessage', { count: leaveGuardCount })}
         confirmText={t('settings.leaveConfirmContinue')}
         cancelText={t('common.cancel')}
         onConfirm={() => {
@@ -2012,6 +2040,23 @@ const SettingsPage: React.FC = () => {
         }}
         onCancel={() => {
           leaveBlocker.reset?.();
+        }}
+      />
+      <ConfirmDialog
+        isOpen={pendingTabSwitch !== null}
+        title={t('settings.llmDraftLeaveTitle')}
+        message={t('settings.llmDraftLeaveMessage')}
+        confirmText={t('settings.llmDraftLeaveContinue')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => {
+          const target = pendingTabSwitch;
+          setPendingTabSwitch(null);
+          if (target) {
+            selectTab(target.category, target.subCategory);
+          }
+        }}
+        onCancel={() => {
+          setPendingTabSwitch(null);
         }}
       />
     </div>

@@ -99,6 +99,33 @@ describe('LLMChannelEditor', () => {
     expect(onDraftItemsChange).toHaveBeenCalledTimes(1);
   });
 
+  it('confirms before deleting a channel and removes it only on confirm', async () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={openAiItems}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /OpenAI 官方/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '删除渠道' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '删除渠道？' });
+    // The channel stays until the deletion is confirmed.
+    expect(screen.getByRole('button', { name: /OpenAI 官方/i })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '删除渠道' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /OpenAI 官方/i })).not.toBeInTheDocument();
+    });
+  });
+
   it('reports unsaved channel edits as generation backend draft items', async () => {
     const onDraftItemsChange = vi.fn();
     render(
@@ -629,6 +656,8 @@ describe('LLMChannelEditor', () => {
     chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
+    // An enabled channel must be complete (credential + models) before saving.
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
     fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
@@ -644,6 +673,104 @@ describe('LLMChannelEditor', () => {
         expect.objectContaining({ key: 'LLM_MINIMAX_MODELS', value: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed' }),
       ]),
     );
+  });
+
+  it('blocks saving an enabled but incomplete channel and enables it once completed', async () => {
+    update.mockResolvedValue({ success: true, configVersion: 'v2', appliedCount: 1, skippedMaskedCount: 0, reloadTriggered: true, updatedKeys: [], warnings: [] });
+    render(<LLMChannelEditor items={[]} configVersion="v1" maskToken="******" onSaved={() => {}} />);
+
+    chooseOption(screen.getByRole('combobox'), 'minimax');
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+    await screen.findByRole('button', { name: /MiniMax 官方/i });
+
+    // Enabled + missing credential -> save blocked with the missing item shown.
+    expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeDisabled();
+    expect(screen.getAllByText(/缺少 API Key/).length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeEnabled();
+    });
+  });
+
+  it('saves an incomplete channel as a draft once it is disabled', async () => {
+    update.mockResolvedValue({ success: true, configVersion: 'v2', appliedCount: 1, skippedMaskedCount: 0, reloadTriggered: true, updatedKeys: [], warnings: [] });
+    render(<LLMChannelEditor items={[]} configVersion="v1" maskToken="******" onSaved={() => {}} />);
+
+    chooseOption(screen.getByRole('combobox'), 'minimax');
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+    await screen.findByRole('button', { name: /MiniMax 官方/i });
+    expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeDisabled();
+
+    // Disabling the incomplete channel makes it a saveable draft.
+    fireEvent.click(screen.getByRole('checkbox', { name: /启用渠道/ }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+  });
+
+  it('treats an enabled ollama channel as complete without an API key', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'ollama' },
+          { key: 'LLM_OLLAMA_PROTOCOL', value: 'ollama' },
+          { key: 'LLM_OLLAMA_BASE_URL', value: 'http://localhost:11434/v1' },
+          { key: 'LLM_OLLAMA_ENABLED', value: 'true' },
+          { key: 'LLM_OLLAMA_MODELS', value: 'llama3' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少 API Key/)).not.toBeInTheDocument();
+  });
+
+  it('treats an enabled custom ollama channel as complete without a base URL', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'mylocal' },
+          { key: 'LLM_MYLOCAL_PROTOCOL', value: 'ollama' },
+          { key: 'LLM_MYLOCAL_ENABLED', value: 'true' },
+          { key: 'LLM_MYLOCAL_MODELS', value: 'llama3' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少 Base URL/)).not.toBeInTheDocument();
+  });
+
+  it('treats a known provider with a blank base URL as complete (official default)', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'openai' },
+          { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' },
+          { key: 'LLM_OPENAI_BASE_URL', value: '' },
+          { key: 'LLM_OPENAI_ENABLED', value: 'true' },
+          { key: 'LLM_OPENAI_API_KEY', value: 'sk-openai' },
+          { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
+        ]}
+        configVersion="v1"
+        maskToken="******"
+        onSaved={() => {}}
+      />
+    );
+
+    expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少 Base URL/)).not.toBeInTheDocument();
   });
 
   it('clears active Hermes unsupported multi-key and extra-header env keys on save', async () => {

@@ -1253,6 +1253,27 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             checks["llm_agent"]["message"],
         )
 
+    def test_get_setup_status_claude_cli_primary_agent_inherited_model_uses_display_name(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=claude_code_cli",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LITELLM_MODEL=openai/gpt-5.5",
+            "OPENAI_API_KEY=secret-key-value",
+            "STOCK_LIST=600519",
+        )
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch("src.services.system_config_service.shutil.which", return_value="/usr/bin/claude"):
+            status = self.service.get_setup_status()
+
+        checks = {check["key"]: check for check in status["checks"]}
+        self.assertEqual(checks["llm_agent"]["status"], "configured")
+        self.assertIn(
+            "普通分析使用 Claude Code CLI；Agent 工具调用仍使用 LiteLLM 主模型: openai/gpt-5.5",
+            checks["llm_agent"]["message"],
+        )
+        self.assertNotIn("Codex CLI", checks["llm_agent"]["message"])
+
     def test_get_setup_status_codex_primary_hermes_only_agent_inheritance_needs_action(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
@@ -2076,6 +2097,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             items=[
                 {"key": "LLM_CHANNELS", "value": "primary"},
                 {"key": "LLM_PRIMARY_PROTOCOL", "value": "openai"},
+                {"key": "LLM_PRIMARY_BASE_URL", "value": "https://api.openai.com/v1"},
                 {"key": "LLM_PRIMARY_API_KEY", "value": "sk-test-value"},
                 {"key": "LLM_PRIMARY_MODELS", "value": "gpt-4o-mini"},
                 {"key": "AGENT_LITELLM_MODEL", "value": "gpt-4o-mini"},
@@ -2084,6 +2106,155 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertTrue(validation["valid"])
         self.assertEqual(validation["issues"], [])
+
+    # --- Slice 3A: backend LLM channel completeness contract ---
+
+    def test_update_rejects_incomplete_enabled_channel(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519")
+        with self.assertRaises(ConfigValidationError):
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "mychan"},
+                    {"key": "LLM_MYCHAN_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_MYCHAN_BASE_URL", "value": "https://api.example.com/v1"},
+                    {"key": "LLM_MYCHAN_ENABLED", "value": "true"},
+                ],
+            )
+
+    def test_validate_allows_incomplete_disabled_channel_draft(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "draft1"},
+                {"key": "LLM_DRAFT1_PROTOCOL", "value": "openai"},
+                {"key": "LLM_DRAFT1_ENABLED", "value": "false"},
+            ]
+        )
+        self.assertTrue(validation["valid"], validation["issues"])
+
+    def test_validate_allows_enabled_ollama_channel_without_api_key(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "ollama"},
+                {"key": "LLM_OLLAMA_PROTOCOL", "value": "ollama"},
+                {"key": "LLM_OLLAMA_BASE_URL", "value": "http://localhost:11434/v1"},
+                {"key": "LLM_OLLAMA_ENABLED", "value": "true"},
+                {"key": "LLM_OLLAMA_MODELS", "value": "llama3"},
+            ]
+        )
+        self.assertTrue(validation["valid"], validation["issues"])
+
+    def test_validate_allows_official_provider_without_base_url(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "openai"},
+                {"key": "LLM_OPENAI_PROTOCOL", "value": "openai"},
+                {"key": "LLM_OPENAI_ENABLED", "value": "true"},
+                {"key": "LLM_OPENAI_API_KEY", "value": "sk-official"},
+                {"key": "LLM_OPENAI_MODELS", "value": "gpt-4o-mini"},
+            ]
+        )
+        self.assertTrue(validation["valid"], validation["issues"])
+
+    def test_validate_rejects_custom_channel_missing_base_url(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "LLM_CHANNELS", "value": "mycustom"},
+                {"key": "LLM_MYCUSTOM_PROTOCOL", "value": "openai"},
+                {"key": "LLM_MYCUSTOM_ENABLED", "value": "true"},
+                {"key": "LLM_MYCUSTOM_API_KEY", "value": "sk-x"},
+                {"key": "LLM_MYCUSTOM_MODELS", "value": "gpt-4o-mini"},
+            ]
+        )
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "LLM_MYCUSTOM_BASE_URL" and issue["code"] == "missing_base_url"
+                for issue in validation["issues"]
+            ),
+            validation["issues"],
+        )
+
+    def test_validate_recognizes_existing_saved_channel_key(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519",
+            "LLM_CHANNELS=aihubmix",
+            "LLM_AIHUBMIX_PROTOCOL=openai",
+            "LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1",
+            "LLM_AIHUBMIX_ENABLED=true",
+            "LLM_AIHUBMIX_API_KEY=sk-saved-secret",
+            "LLM_AIHUBMIX_MODELS=gpt-5.5",
+        )
+        # Editing models re-validates the channel; the saved key must not be
+        # misread as missing.
+        validation = self.service.validate(
+            items=[{"key": "LLM_AIHUBMIX_MODELS", "value": "gpt-5.5,claude-sonnet-4-6"}]
+        )
+        self.assertTrue(validation["valid"], validation["issues"])
+
+    def test_update_rejects_all_channels_when_one_incomplete(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519")
+        with self.assertRaises(ConfigValidationError):
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "good,bad"},
+                    {"key": "LLM_GOOD_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_GOOD_BASE_URL", "value": "https://api.example.com/v1"},
+                    {"key": "LLM_GOOD_ENABLED", "value": "true"},
+                    {"key": "LLM_GOOD_API_KEY", "value": "sk-good"},
+                    {"key": "LLM_GOOD_MODELS", "value": "gpt-4o"},
+                    {"key": "LLM_BAD_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_BAD_BASE_URL", "value": "https://api.example.com/v1"},
+                    {"key": "LLM_BAD_ENABLED", "value": "true"},
+                ],
+            )
+        saved = self.manager.read_config_map()
+        self.assertNotIn("LLM_CHANNELS", saved)
+        self.assertNotIn("LLM_GOOD_API_KEY", saved)
+
+    def test_validate_ignores_untouched_incomplete_channel(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519",
+            "LLM_CHANNELS=legacy",
+            "LLM_LEGACY_PROTOCOL=openai",
+            "LLM_LEGACY_BASE_URL=https://api.example.com/v1",
+            "LLM_LEGACY_ENABLED=true",
+        )
+        validation = self.service.validate(items=[{"key": "LOG_LEVEL", "value": "DEBUG"}])
+        self.assertTrue(validation["valid"], validation["issues"])
+
+    def test_validate_rejects_clearing_key_on_enabled_channel(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519",
+            "LLM_CHANNELS=aihubmix",
+            "LLM_AIHUBMIX_PROTOCOL=openai",
+            "LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1",
+            "LLM_AIHUBMIX_ENABLED=true",
+            "LLM_AIHUBMIX_API_KEY=sk-saved",
+            "LLM_AIHUBMIX_MODELS=gpt-5.5",
+        )
+        validation = self.service.validate(items=[{"key": "LLM_AIHUBMIX_API_KEY", "value": ""}])
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(issue["code"] == "missing_api_key" for issue in validation["issues"]),
+            validation["issues"],
+        )
+
+    def test_validate_revalidates_channel_flipped_to_enabled(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519",
+            "LLM_CHANNELS=aihubmix",
+            "LLM_AIHUBMIX_PROTOCOL=openai",
+            "LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1",
+            "LLM_AIHUBMIX_ENABLED=false",
+        )
+        validation = self.service.validate(items=[{"key": "LLM_AIHUBMIX_ENABLED", "value": "true"}])
+        self.assertFalse(validation["valid"])
+        self.assertTrue(
+            any(issue["code"] in ("missing_api_key", "missing_models") for issue in validation["issues"]),
+            validation["issues"],
+        )
 
     def test_validate_rejects_explicit_hermes_only_agent_model(self) -> None:
         validation = self.service.validate(

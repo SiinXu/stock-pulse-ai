@@ -8,7 +8,7 @@ import type {
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
-import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
+import { getDefaultSubCategory, getSubCategories, getSubCategoryOfKey } from '../components/settings/settingsSubCategories';
 
 type ToastState = {
   type: 'success';
@@ -42,7 +42,17 @@ function isAutosaveEligible(
   if (AUTOSAVE_EXCLUDED_KEYS.has(key)) {
     return false;
   }
-  return !serverItemByKey[key]?.schema?.isSensitive;
+  const schema = serverItemByKey[key]?.schema;
+  if (schema?.isSensitive) {
+    return false;
+  }
+  // A model provider couples a secret API key with non-secret Base URL / model
+  // fields; autosaving the non-secret half while the key is still a draft leaves
+  // a half-applied provider, so persist the whole provider via the explicit Save.
+  if (schema?.category === 'ai_model' && getSubCategoryOfKey('ai_model', key) === 'providers') {
+    return false;
+  }
+  return true;
 }
 
 const CATEGORY_DISPLAY_ORDER: Record<string, number> = {
@@ -88,18 +98,19 @@ function normalizeFieldValue(value: string, schema: SystemConfigItem['schema'] |
     .join(',');
 }
 
-export function useSystemConfig() {
+export function useSystemConfig(initialTab?: { category: string; subCategory: string | null }) {
   // Server state
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
   const [serverItems, setServerItems] = useState<SystemConfigItem[]>([]);
 
-  // UI state
+  // UI state. The active tab may be seeded from the URL so deep links / refresh
+  // restore the same category; applyServerPayload keeps it if the category loads.
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const [activeCategory, setActiveCategory] = useState<string>('base');
-  const [activeSubCategory, setActiveSubCategory] = useState<string | null>(null);
-  const activeCategoryRef = useRef<string>('base');
-  const activeSubCategoryRef = useRef<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>(initialTab?.category ?? 'base');
+  const [activeSubCategory, setActiveSubCategory] = useState<string | null>(initialTab?.subCategory ?? null);
+  const activeCategoryRef = useRef<string>(initialTab?.category ?? 'base');
+  const activeSubCategoryRef = useRef<string | null>(initialTab?.subCategory ?? null);
   const [validationIssues, setValidationIssues] = useState<ConfigValidationIssue[]>([]);
   const [toast, setToast] = useState<ToastState>(null);
 

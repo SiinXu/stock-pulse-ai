@@ -94,12 +94,18 @@ const routerBlockerMock = vi.hoisted(() => ({
   shouldBlock: null as null | ((args: unknown) => boolean),
 }));
 
+const routerSearchParamsMock = vi.hoisted(() => {
+  const params = new URLSearchParams();
+  const setParams = () => {};
+  return { params, setParams };
+});
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react-router-dom')>()),
   useBlocker: (shouldBlock: (args: unknown) => boolean) => {
     routerBlockerMock.shouldBlock = shouldBlock;
     return routerBlockerMock;
   },
+  useSearchParams: () => [routerSearchParamsMock.params, routerSearchParamsMock.setParams] as const,
 }));
 
 vi.mock('../../api/systemConfig', () => ({

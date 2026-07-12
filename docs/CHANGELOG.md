@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] 后端配置校验对 LLM 渠道增加与前端一致的结构完整性权威门禁：启用渠道必须具备凭据（Ollama/本地端点免）、Base URL（官方 provider 免、自定义端点必填）和至少一个模型，直接调用配置 API 也无法绕过；仅对本次更新涉及、或由停用切为启用的渠道执行严格校验，历史不完整渠道不会阻断无关设置保存；校验失败时整个更新事务失败、不部分落库；已保存并被 mask 的密钥不会被误判为缺失；YAML 模式仍豁免。
+- [改进] Web 设置页 LLM 渠道新增结构完整性门禁：启用渠道必须具备合法名称、凭据（Ollama 免）、Base URL（官方端点用内置默认值免填、自定义必填）和至少一个模型；存在"已启用但不完整"的渠道时禁用"保存 AI 配置"并就地列出缺失项，启用开关在渠道未完成时不生效；未启用渠道可作为"草稿·未完成"保存但不进入模型列表/任务路由/运行时配置。连通性测试暂不作为保存或启用的硬门禁，仅明确展示"未测试"。
+- [改进] Web 设置页 LLM 渠道行改进可访问性：启用开关、展开按钮、删除按钮不再互相嵌套在同一个 `role=button` 内；删除渠道改为先弹确认，并在该渠道仍被主模型/Agent 主模型/Vision/回退引用时提示联动影响，避免误删草稿。
+- [改进] Web 设置页生成后端状态面板：草稿驱动的预览请求改为 debounce（首次立即、后续防抖），避免输入 Base URL/Key/模型名时频繁 loading；并在面板上明确标注“草稿预览（未保存）/当前运行配置”，避免把未保存草稿误读为真实运行态。
+- [改进] Web 设置页当前分类/子标签同步到 URL（`?category=&sub=`），支持深链直达具体设置入口，并在刷新、分享链接后恢复到同一位置。
+- [修复] Web 设置页模型供应商字段（Base URL / 模型名等）不再单独自动保存并热重载，改为与配对的 API Key 一起经统一“保存配置”事务提交，避免出现半应用的中间态。
+- [修复] Web 设置页“模型供应商”子页在启用 LLM 渠道后不再只显示 Anspire 一家，恢复展示 OpenAI/Anthropic/Gemini/DeepSeek/Anspire/AIHubmix 全部供应商。
+- [修复] Web 设置页 AI 模型渠道编辑器存在未保存草稿时，切换设置分类会先弹确认，避免草稿被静默丢弃；离开设置页/刷新的保护也纳入该草稿计数。
+- [修复] 首次设置检查在主生成 Backend 为 Claude Code CLI / OpenCode CLI 时不再固定显示“Codex CLI”，改用对应本地 CLI 的显示名。
+- [修复] Web 设置页模型供应商“已配置”徽章改为按各家凭据判断，默认模型名/Base URL 或 Anspire 网关默认值不再被误判为已配置。
 - [改进] 为 multi-agent DecisionAgent 增加内部低敏分歧摘要输入管线，作为 #1904 P1 解释输出的前置 plumbing；不改变 public API、dashboard schema 或最终解释字段。
 - [改进] GitHub Actions 每日分析工作流补齐 TickFlow 数据源环境变量映射，并收敛 README 数据源稳定性说明到完整指南。
 - [修复] WebUI 启动时显式 `--host` / `--port` 不再被 `.env` 中的 `WEBUI_HOST` / `WEBUI_PORT` 覆盖，未传 CLI 参数时统一使用解析后的运行时配置。
