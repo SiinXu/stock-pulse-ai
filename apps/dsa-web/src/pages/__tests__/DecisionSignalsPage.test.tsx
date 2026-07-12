@@ -300,7 +300,10 @@ function deferredPromise<T>() {
 }
 
 function openStockContextModal() {
-  if (screen.queryByLabelText('当前股票')) {
+  // The modal title and the input share the label "当前股票"; the modal's
+  // aria-labelledby means a screen-level query matches both, so count matches
+  // (0 = closed) instead of asserting a single element.
+  if (screen.queryAllByLabelText('当前股票').length > 0) {
     return;
   }
   fireEvent.click(screen.getByRole('button', { name: /^(当前股票$|当前查看：)/ }));
@@ -314,13 +317,19 @@ function getStockContextModal() {
   return modal;
 }
 
+// Scoped to the modal body so it returns only the input, not the dialog itself
+// (which now carries an aria-labelledby with the same "当前股票" name).
+function getStockContextInput() {
+  return within(getStockContextModal()).getByLabelText('当前股票');
+}
+
 function closeStockContextModal() {
   fireEvent.click(within(getStockContextModal()).getByRole('button', { name: '关闭抽屉' }));
 }
 
 function submitCurrentStock(value: string) {
   openStockContextModal();
-  fireEvent.change(screen.getByLabelText('当前股票'), { target: { value } });
+  fireEvent.change(getStockContextInput(), { target: { value } });
   fireEvent.click(screen.getByRole('button', { name: '查看股票' }));
 }
 
@@ -649,7 +658,7 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByText('当前查看：AAPL')).toBeInTheDocument();
 
     openStockContextModal();
-    fireEvent.change(screen.getByLabelText('当前股票'), { target: { value: 'MSFT' } });
+    fireEvent.change(getStockContextInput(), { target: { value: 'MSFT' } });
 
     expect(screen.getAllByText('当前查看：AAPL').length).toBeGreaterThan(0);
     expect(decisionSignalsApi.getLatest).toHaveBeenCalledTimes(1);
@@ -661,7 +670,7 @@ describe('DecisionSignalsPage', () => {
     await screen.findByText('贵州茅台');
 
     openStockContextModal();
-    fireEvent.change(screen.getByLabelText('当前股票'), { target: { value: '6005' } });
+    fireEvent.change(getStockContextInput(), { target: { value: '6005' } });
     const listbox = await screen.findByRole('listbox');
     fireEvent.click(within(listbox).getByRole('option', { name: /贵州茅台.*600519/ }));
 
@@ -672,7 +681,7 @@ describe('DecisionSignalsPage', () => {
       });
     });
     expect(screen.getAllByText('当前查看：600519 / 贵州茅台 / cn').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText('当前股票')).toHaveValue('600519');
+    expect(getStockContextInput()).toHaveValue('600519');
   });
 
   it('shows recent history candidates and passes normalized market when a candidate is selected', async () => {
@@ -705,7 +714,7 @@ describe('DecisionSignalsPage', () => {
       });
     });
     openStockContextModal();
-    expect(screen.getByLabelText('当前股票')).toHaveValue('600519');
+    expect(getStockContextInput()).toHaveValue('600519');
 
     fireEvent.click(screen.getByRole('button', { name: '查看股票' }));
 
@@ -1122,7 +1131,7 @@ describe('DecisionSignalsPage', () => {
     openStockContextModal();
     fireEvent.click(screen.getByRole('button', { name: '清空当前股票' }));
 
-    expect(screen.getByLabelText('当前股票')).toHaveValue('');
+    expect(getStockContextInput()).toHaveValue('');
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
     closeStockContextModal();

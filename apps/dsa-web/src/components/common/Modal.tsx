@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
@@ -20,6 +20,7 @@ interface ModalProps {
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className = '' }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useDialogA11y({ isOpen, containerRef: dialogRef, onEscape: onClose });
 
@@ -37,6 +38,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
           'flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl focus:outline-none',
@@ -45,7 +47,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+          <h2 id={titleId} className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
           <button
             type="button"
             onClick={onClose}
