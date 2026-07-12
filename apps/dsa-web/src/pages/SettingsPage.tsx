@@ -916,6 +916,7 @@ const SettingsPage: React.FC = () => {
     loadError,
     saveError,
     retryAction,
+    autosaveStatus,
     load,
     retry,
     save,
@@ -1047,10 +1048,13 @@ const SettingsPage: React.FC = () => {
     && !currentChangedItems.some((item) => item.key === 'SCHEDULE_ENABLED');
   const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft;
   const effectiveDirtyCount = dirtyCount + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0);
+  // Guard leaving while edits are unsaved, an autosave is in flight, or a prior
+  // autosave failed (dirty drafts already imply this, but keep it explicit).
+  const shouldGuardLeave = effectiveHasDirty || autosaveStatus === 'saving' || autosaveStatus === 'error';
 
   // Warn before leaving/refreshing/closing the tab while there are unsaved config edits.
   useEffect(() => {
-    if (!effectiveHasDirty) {
+    if (!shouldGuardLeave) {
       return;
     }
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1059,7 +1063,7 @@ const SettingsPage: React.FC = () => {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [effectiveHasDirty]);
+  }, [shouldGuardLeave]);
 
   // beforeunload only covers full page unloads; SPA route changes would
   // silently drop draft edits, so block them behind a confirm dialog.
@@ -1068,8 +1072,8 @@ const SettingsPage: React.FC = () => {
       ({ currentLocation, nextLocation }: {
         currentLocation: { pathname: string };
         nextLocation: { pathname: string };
-      }) => effectiveHasDirty && currentLocation.pathname !== nextLocation.pathname,
-      [effectiveHasDirty],
+      }) => shouldGuardLeave && currentLocation.pathname !== nextLocation.pathname,
+      [shouldGuardLeave],
     ),
   );
 
@@ -1562,6 +1566,18 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {autosaveStatus && autosaveStatus !== 'idle' ? (
+              <span
+                role="status"
+                className={`text-xs ${autosaveStatus === 'error' ? 'text-danger' : 'text-muted-text'}`}
+              >
+                {autosaveStatus === 'saving'
+                  ? t('settings.autosaveSaving')
+                  : autosaveStatus === 'saved'
+                    ? t('settings.autosaveSaved')
+                    : t('settings.autosaveFailed')}
+              </span>
+            ) : null}
             <Button
               type="button"
               variant="settings-secondary"

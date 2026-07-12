@@ -133,10 +133,36 @@ const sampleLlmConfig = {
 describe('useSystemConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     getConfig.mockResolvedValue(sampleConfig);
     validate.mockResolvedValue({ valid: true, issues: [] });
     update.mockResolvedValue({ warnings: [] });
   });
+
+  const sensitiveConfig = {
+    ...sampleConfig,
+    items: [
+      ...sampleConfig.items,
+      {
+        key: 'OPENAI_API_KEY',
+        value: '',
+        rawValueExists: false,
+        isMasked: false,
+        schema: {
+          key: 'OPENAI_API_KEY',
+          category: 'ai_model',
+          dataType: 'string',
+          uiControl: 'password',
+          isSensitive: true,
+          isRequired: false,
+          isEditable: true,
+          options: [],
+          validation: {},
+          displayOrder: 5,
+        },
+      },
+    ],
+  };
 
   it('keeps load callback stable after a successful load', async () => {
     const { result } = renderHook(() => useSystemConfig());
@@ -348,5 +374,89 @@ describe('useSystemConfig', () => {
     expect(result.current.serverItems.find((item) => item.key === 'OPENAI_VISION_MODEL')?.value).toBe('gpt-4o-vision');
     expect(result.current.hasDirty).toBe(false);
     expect(result.current.dirtyCount).toBe(0);
+  });
+
+  it('autosaves an eligible field once the debounce settles', async () => {
+    const savedConfig = {
+      ...sampleLlmConfig,
+      items: sampleLlmConfig.items.map((item) => (
+        item.key === 'LITELLM_MODEL' ? { ...item, value: 'qwen/qwen2.5' } : item
+      )),
+    };
+    getConfig.mockResolvedValueOnce(sampleLlmConfig);
+    getConfig.mockResolvedValueOnce(savedConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setDraftValue('LITELLM_MODEL', 'qwen/qwen2.5');
+    });
+    // Nothing persists until the debounce elapses.
+    expect(validate).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+
+    expect(validate).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ key: 'LITELLM_MODEL', value: 'qwen/qwen2.5' }],
+    }));
+    expect(result.current.autosaveStatus).toBe('saved');
+    expect(result.current.hasDirty).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('does not autosave sensitive fields', async () => {
+    getConfig.mockResolvedValue(sensitiveConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setDraftValue('OPENAI_API_KEY', 'sk-secret-value');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(validate).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    // The secret stays a pending draft that the explicit Save must persist.
+    expect(result.current.hasDirty).toBe(true);
+    expect(result.current.autosaveStatus).toBe('idle');
+    vi.useRealTimers();
+  });
+
+  it('marks autosave failed and preserves the draft on validation error', async () => {
+    getConfig.mockResolvedValue(sampleLlmConfig);
+    validate.mockResolvedValueOnce({ valid: false, issues: [{ key: 'LITELLM_MODEL', message: 'bad' }] });
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setDraftValue('LITELLM_MODEL', 'broken value');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+
+    expect(result.current.autosaveStatus).toBe('error');
+    expect(update).not.toHaveBeenCalled();
+    expect(result.current.hasDirty).toBe(true);
+    vi.useRealTimers();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { systemConfigApi, SystemConfigConflictError, SystemConfigValidationError } from '../api/systemConfig';
 import type {
@@ -25,6 +25,25 @@ type SaveResult = {
   message?: string;
   issues?: ConfigValidationIssue[];
 };
+
+type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+const AUTOSAVE_DEBOUNCE_MS = 800;
+// Keys whose persistence needs cross-field coordination handled by the manual
+// save flow (scheduler runtime sync) are excluded from autosave. Sensitive
+// fields are also excluded so a debounce firing mid-edit never persists (and
+// hot-reloads) a partial secret; they save via the explicit Save button.
+const AUTOSAVE_EXCLUDED_KEYS = new Set(['SCHEDULE_ENABLED']);
+
+function isAutosaveEligible(
+  key: string,
+  serverItemByKey: Record<string, SystemConfigItem>,
+): boolean {
+  if (AUTOSAVE_EXCLUDED_KEYS.has(key)) {
+    return false;
+  }
+  return !serverItemByKey[key]?.schema?.isSensitive;
+}
 
 const CATEGORY_DISPLAY_ORDER: Record<string, number> = {
   base: 10,
@@ -333,17 +352,25 @@ export function useSystemConfig() {
       });
   }, [dirtyKeys, draftValues, serverItemByKey]);
 
-  const save = useCallback(async (changedItems?: SystemConfigUpdateItem[]): Promise<SaveResult> => {
+  const save = useCallback(async (
+    changedItems?: SystemConfigUpdateItem[],
+    options?: { silent?: boolean },
+  ): Promise<SaveResult> => {
+    const silent = options?.silent ?? false;
     const explicitItems = changedItems ?? [];
     const resolvedChangedItems = explicitItems.length > 0 ? explicitItems : getChangedItems();
 
     if (!explicitItems.length && !hasDirty) {
-      setToast({ type: 'success', message: '当前没有可保存的修改。' });
+      if (!silent) {
+        setToast({ type: 'success', message: '当前没有可保存的修改。' });
+      }
       return { success: true, message: '当前没有可保存的修改' };
     }
 
     if (!resolvedChangedItems.length) {
-      setToast({ type: 'success', message: '当前没有可保存的修改。' });
+      if (!silent) {
+        setToast({ type: 'success', message: '当前没有可保存的修改。' });
+      }
       return { success: true, message: '当前没有可保存的修改' };
     }
 
@@ -378,12 +405,20 @@ export function useSystemConfig() {
       });
 
       const refreshed = await systemConfigApi.getConfig(true);
-      applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken);
+      // Only clear drafts for the keys we just committed; preserve any other
+      // pending edits (e.g. sensitive/excluded keys saved manually, or fields
+      // edited while a partial autosave was in flight).
+      applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken, {
+        preserveDirty: true,
+        committedKeys: resolvedChangedItems.map((item) => item.key),
+      });
 
       const warningText = updateResult.warnings?.length
         ? `；警告：${updateResult.warnings.join('；')}`
         : '';
-      setToast({ type: 'success', message: `配置已更新${warningText}` });
+      if (!silent) {
+        setToast({ type: 'success', message: `配置已更新${warningText}` });
+      }
       return { success: true };
     } catch (error: unknown) {
       if (error instanceof SystemConfigValidationError) {
@@ -401,7 +436,9 @@ export function useSystemConfig() {
         setSaveError(getParsedApiError(error));
       }
 
-      setToast({ type: 'error', error: getParsedApiError(error) });
+      if (!silent) {
+        setToast({ type: 'error', error: getParsedApiError(error) });
+      }
       setRetryAction('save');
       return { success: false, message: '保存失败' };
     } finally {
@@ -414,6 +451,45 @@ export function useSystemConfig() {
     hasDirty,
     maskToken,
   ]);
+
+  // Debounced batched autosave: after edits to autosave-eligible fields settle,
+  // persist all pending eligible keys in one validate+update (single hot reload)
+  // rather than on every keystroke. Sensitive and coordination keys are excluded
+  // and still save via the explicit Save button.
+  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+
+  const autosaveDirtyKeys = useMemo(
+    () => dirtyKeys.filter((key) => isAutosaveEligible(key, serverItemByKey)),
+    [dirtyKeys, serverItemByKey],
+  );
+
+  const runAutosave = useCallback(async () => {
+    const items = getChangedItems().filter((item) => isAutosaveEligible(item.key, serverItemByKey));
+    if (items.length === 0) {
+      return;
+    }
+    setAutosaveStatus('saving');
+    const result = await save(items, { silent: true });
+    setAutosaveStatus(result.success ? 'saved' : 'error');
+  }, [getChangedItems, save, serverItemByKey]);
+
+  useEffect(() => {
+    if (autosaveDirtyKeys.length === 0) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      void runAutosave();
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [autosaveDirtyKeys, draftValues, runAutosave]);
+
+  useEffect(() => {
+    if (autosaveStatus !== 'saved') {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setAutosaveStatus('idle'), 2000);
+    return () => window.clearTimeout(timer);
+  }, [autosaveStatus]);
 
   const retry = useCallback(async () => {
     if (retryAction === 'load') {
@@ -456,6 +532,7 @@ export function useSystemConfig() {
     loadError,
     saveError,
     retryAction,
+    autosaveStatus,
 
     // Actions
     load,
