@@ -241,7 +241,7 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const phaseSelect = screen.getByLabelText('阶段');
+    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
     expect(phaseSelect).toHaveTextContent('全部阶段');
     const fromInput = screen.getByLabelText('分析开始日期');
     const toInput = screen.getByLabelText('分析结束日期');
@@ -249,12 +249,17 @@ describe('BacktestPage', () => {
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
     fireEvent.change(windowInput, { target: { value: '20' } });
     chooseOption(phaseSelect, 'intraday');
+    // Phase applies immediately; wait for that fetch to settle so the Filter
+    // button (disabled while results load) re-enables before we click it.
+    await waitFor(() =>
+      expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({ analysisPhase: 'intraday' })),
+    );
     fireEvent.change(fromInput, { target: { value: '2026-03-01' } });
     fireEvent.change(toInput, { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
     await waitFor(() => {
-      expect(mockGetResults).toHaveBeenLastCalledWith({
+      expect(mockGetResults).toHaveBeenCalledWith({
         code: 'AAPL',
         evalWindowDays: 20,
         analysisDateFrom: '2026-03-01',
@@ -263,13 +268,38 @@ describe('BacktestPage', () => {
         page: 1,
         limit: 20,
       });
-      expect(mockGetStockPerformance).toHaveBeenLastCalledWith('AAPL', {
+      expect(mockGetStockPerformance).toHaveBeenCalledWith('AAPL', {
         evalWindowDays: 20,
         analysisDateFrom: '2026-03-01',
         analysisDateTo: '2026-03-31',
         analysisPhase: 'intraday',
       });
     });
+  });
+
+  it('applies the phase filter immediately without waiting for Filter or Run', async () => {
+    render(<BacktestPage />);
+
+    const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    fireEvent.change(filterInput, { target: { value: 'aapl' } });
+    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
+
+    mockGetResults.mockClear();
+    mockGetStockPerformance.mockClear();
+    mockRun.mockClear();
+    chooseOption(phaseSelect, 'intraday');
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'AAPL', analysisPhase: 'intraday', page: 1 }),
+      );
+      expect(mockGetStockPerformance).toHaveBeenCalledWith(
+        'AAPL',
+        expect.objectContaining({ analysisPhase: 'intraday' }),
+      );
+    });
+    // The phase filter must never be sent to the run endpoint.
+    expect(mockRun).not.toHaveBeenCalled();
   });
 
   it('runs a backtest and refreshes results using the shared filter values', async () => {

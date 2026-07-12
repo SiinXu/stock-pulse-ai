@@ -404,6 +404,17 @@ const BacktestPage: React.FC = () => {
     }
   };
 
+  // Phase is a result-only filter (backtestApi.run never receives it), so apply
+  // it immediately to the fetched results/performance rather than on Run.
+  const handlePhaseChange = (value: BacktestPhaseFilter) => {
+    setPhaseFilter(value);
+    const code = normalizeBacktestCode(codeFilter);
+    const windowDays = parseEvalWindowDays(evalDays);
+    setCurrentPage(1);
+    fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, value);
+    fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, value);
+  };
+
   // Filter by code
   const handleFilter = () => {
     const code = normalizeBacktestCode(codeFilter);
@@ -471,14 +482,6 @@ const BacktestPage: React.FC = () => {
               className={`${BACKTEST_COMPACT_INPUT_CLASS} w-24 text-center tabular-nums`}
             />
           </div>
-          <Select
-            label={text.phase}
-            value={phaseFilter}
-            onChange={(value) => setPhaseFilter(value as BacktestPhaseFilter)}
-            disabled={isRunning}
-            className="w-28 whitespace-nowrap"
-            options={phaseFilterOptions.map((option) => ({ value: option.value, label: option.label }))}
-          />
           <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.startDate}</span>
             <input
@@ -580,6 +583,17 @@ const BacktestPage: React.FC = () => {
 
         {/* Right content - Results table */}
         <section className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mb-3 flex flex-wrap items-end gap-2">
+            <Select
+              label={`${text.resultFilters} · ${text.phase}`}
+              value={phaseFilter}
+              onChange={(value) => handlePhaseChange(value as BacktestPhaseFilter)}
+              disabled={isRunning}
+              className="w-40"
+              options={phaseFilterOptions.map((option) => ({ value: option.value, label: option.label }))}
+            />
+            <span className="pb-1.5 text-xs text-muted-text">{text.resultPhaseHint}</span>
+          </div>
           {pageError ? (
             <ApiErrorAlert error={pageError} className="mb-3" />
           ) : null}
