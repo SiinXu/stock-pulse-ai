@@ -141,7 +141,7 @@ describe('useDashboardLifecycle', () => {
     expect(defaultMocks.refreshMarketReviewHistory).toHaveBeenCalledWith(true);
 
     act(() => {
-      vi.advanceTimersByTime(2_000);
+      vi.advanceTimersByTime(6_000);
     });
 
     expect(removeTask).toHaveBeenCalledWith(completedTask.taskId);
@@ -209,7 +209,7 @@ describe('useDashboardLifecycle', () => {
     expect(syncTaskFailed).toHaveBeenCalledWith(failedTask);
 
     act(() => {
-      vi.advanceTimersByTime(5_000);
+      vi.advanceTimersByTime(8_000);
     });
 
     expect(removeTask).toHaveBeenCalledWith(failedTask.taskId);

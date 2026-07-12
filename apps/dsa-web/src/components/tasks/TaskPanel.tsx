@@ -1,5 +1,5 @@
 import type React from 'react';
-import { ChevronDown, RefreshCw, Workflow } from 'lucide-react';
+import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
 import { Badge, Button, Card, StatusDot, Tooltip } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
@@ -12,24 +12,40 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 interface TaskItemProps {
   task: TaskInfo;
   onOpenRunFlow?: (task: TaskInfo) => void;
+  onDismiss?: (taskId: string) => void;
 }
 
 /**
  * 单个任务项
  */
-const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) => {
   const { language, t } = useUiLanguage();
   const isPending = task.status === 'pending';
   const isProcessing = task.status === 'processing';
   const isCancelRequested = task.status === 'cancel_requested';
   const isCancelled = task.status === 'cancelled';
-  const statusLabel = isCancelRequested
-    ? t('taskPanel.cancelRequested')
-    : isCancelled
-      ? t('taskPanel.cancelled')
-      : isProcessing ? t('taskPanel.processing') : t('taskPanel.pending');
-  const statusVariant = isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
-  const statusTone = isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
+  const isCompleted = task.status === 'completed';
+  const isFailed = task.status === 'failed';
+  const isTerminal = isCompleted || isFailed || isCancelled;
+  const statusLabel = isCompleted
+    ? t('taskPanel.completed')
+    : isFailed
+      ? t('taskPanel.failed')
+      : isCancelRequested
+        ? t('taskPanel.cancelRequested')
+        : isCancelled
+          ? t('taskPanel.cancelled')
+          : isProcessing ? t('taskPanel.processing') : t('taskPanel.pending');
+  const statusVariant = isCompleted
+    ? 'success'
+    : isFailed
+      ? 'danger'
+      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
+  const statusTone = isCompleted
+    ? 'success'
+    : isFailed
+      ? 'danger'
+      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
   const progress = Math.max(0, Math.min(100, task.progress || 0));
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
@@ -91,6 +107,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow }) => {
             <StatusDot tone={statusTone} pulse={isProcessing || isCancelRequested} className="h-1.5 w-1.5 shrink-0" />
             <span className="min-w-0 truncate">{statusLabel}</span>
           </Badge>
+          {onDismiss && isTerminal ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xsm"
+              className="h-8 w-8 px-0"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDismiss(task.taskId);
+              }}
+              aria-label={t('taskPanel.dismissAria', { stock: task.stockName || task.stockCode })}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -108,17 +139,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow }) => {
         </div>
       ) : null}
 
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
-          <div
-            className="h-full rounded-full bg-cyan transition-[width] duration-300 ease-out"
-            style={{ width: `${progress}%` }}
-          />
+      {!isTerminal ? (
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
+            <div
+              className="h-full rounded-full bg-cyan transition-[width] duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className="shrink-0 text-[11px] text-muted-text tabular-nums">
+            {progress}%
+          </span>
         </div>
-        <span className="shrink-0 text-[11px] text-muted-text tabular-nums">
-          {progress}%
-        </span>
-      </div>
+      ) : null}
 
       {traceId ? (
         <details className="group/task text-xs">
@@ -158,6 +191,8 @@ interface TaskPanelProps {
   className?: string;
   /** 打开运行流面板 */
   onOpenRunFlow?: (task: TaskInfo) => void;
+  /** 关闭（移除）一个已结束的任务 */
+  onDismiss?: (taskId: string) => void;
 }
 
 /**
@@ -170,15 +205,21 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
   title,
   className = '',
   onOpenRunFlow,
+  onDismiss,
 }) => {
   const { t } = useUiLanguage();
-  // 筛选活跃任务（pending / processing / cancel requested）
+  // 活跃任务（pending / processing / cancel requested）在前，最近结束的任务
+  // （completed / failed / cancelled，仍在宽限期内）在后，便于用户看到结果并关闭。
   const activeTasks = tasks.filter(
     (t) => t.status === 'pending' || t.status === 'processing' || t.status === 'cancel_requested'
   );
+  const terminalTasks = tasks.filter(
+    (t) => t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled'
+  );
+  const orderedTasks = [...activeTasks, ...terminalTasks];
 
   // 无任务或不可见时不渲染
-  if (!visible || activeTasks.length === 0) {
+  if (!visible || orderedTasks.length === 0) {
     return null;
   }
 
@@ -221,8 +262,8 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
 
       <div className="max-h-64 overflow-y-auto p-2">
         <div className="space-y-2">
-          {activeTasks.map((task) => (
-            <TaskItem key={task.taskId} task={task} onOpenRunFlow={onOpenRunFlow} />
+          {orderedTasks.map((task) => (
+            <TaskItem key={task.taskId} task={task} onOpenRunFlow={onOpenRunFlow} onDismiss={onDismiss} />
           ))}
         </div>
       </div>

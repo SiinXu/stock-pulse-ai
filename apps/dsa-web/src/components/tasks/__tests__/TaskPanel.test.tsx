@@ -136,23 +136,9 @@ describe('TaskPanel', () => {
     expect(screen.queryByText('失败')).not.toBeInTheDocument();
   });
 
-  it('does not keep cancelled terminal tasks in the active task panel', () => {
-    const { container } = render(
-      <TaskPanel
-        tasks={[
-          {
-            ...baseTask,
-            status: 'cancelled',
-          },
-        ]}
-      />,
-    );
-
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('does not render when there are no active tasks', () => {
-    const { container } = render(
+  it('briefly retains a completed terminal task and dismisses it on close', () => {
+    const onDismiss = vi.fn();
+    render(
       <TaskPanel
         tasks={[
           {
@@ -160,9 +146,35 @@ describe('TaskPanel', () => {
             status: 'completed',
           },
         ]}
+        onDismiss={onDismiss}
       />,
     );
 
+    expect(screen.getByText('贵州茅台')).toBeInTheDocument();
+    expect(screen.getByLabelText('任务状态：已完成')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭 贵州茅台 任务' }));
+    expect(onDismiss).toHaveBeenCalledWith('task-1');
+  });
+
+  it('renders a failed terminal task with a failure status', () => {
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            status: 'failed',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('贵州茅台')).toBeInTheDocument();
+    expect(screen.getByLabelText('任务状态：失败')).toBeInTheDocument();
+  });
+
+  it('does not render when there are no tasks at all', () => {
+    const { container } = render(<TaskPanel tasks={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

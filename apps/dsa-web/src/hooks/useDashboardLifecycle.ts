@@ -111,11 +111,13 @@ export function useDashboardLifecycle({
       }
       void refreshStockBar();
       void refreshMarketReviewHistory?.(true);
-      scheduleTaskRemoval(task.taskId, 2_000);
+      // Keep the terminal task visible long enough for the user to see the
+      // completion and dismiss it; the panel now renders terminal tasks.
+      scheduleTaskRemoval(task.taskId, 6_000);
     },
     onTaskFailed: (task) => {
       syncTaskFailed(task);
-      scheduleTaskRemoval(task.taskId, 5_000);
+      scheduleTaskRemoval(task.taskId, 8_000);
     },
     onError: () => {
       console.warn('SSE connection disconnected, reconnecting...');
