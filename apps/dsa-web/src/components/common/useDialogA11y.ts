@@ -57,6 +57,13 @@ export function useDialogA11y({
     const handleKeyDown = (event: KeyboardEvent) => {
       const container = containerRef.current;
       if (event.key === 'Escape') {
+        // An open popup widget (Select / autocomplete) keeps focus on its
+        // trigger with aria-expanded="true"; let it consume Escape to close
+        // the popup instead of dismissing the whole dialog.
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (target?.closest('[aria-haspopup][aria-expanded="true"]')) {
+          return;
+        }
         if (closeOnEscape && onEscape) {
           event.stopPropagation();
           onEscape();

@@ -3,6 +3,7 @@ import { getCategoryFieldGroupId, getCategoryFieldOrder } from './categoryFieldG
 import { getNotificationFieldOrder } from './notificationFieldGroups';
 import { isNotificationChannelKey } from './notificationChannels';
 import { MODEL_PROVIDER_GROUP_IDS } from './modelProviders';
+import { isDataProviderKey } from './dataProviders';
 
 export interface SettingsSubCategory {
   id: string;
@@ -15,12 +16,17 @@ type ItemsByCategory = Record<string, ReadonlyArray<{ key: string }>>;
 // the nav even when their raw field count is zero.
 export const ALWAYS_VISIBLE_SUB_CATEGORIES = new Set<string>(['channels', 'providers']);
 
-// Coarse first-level tabs are flat (no accordion). Only ai_model and
-// notification are split into a couple of tabs; every other category is a
-// single tab (returns null → no sub-navigation).
+// Coarse first-level tabs are flat (no accordion). Only ai_model,
+// data_source and notification are split into a couple of tabs; every other
+// category is a single tab (returns null → no sub-navigation).
 const AI_MODEL_SUBS: SettingsSubCategory[] = [
   { id: 'model', titleKey: 'settings.aiTabModel' },
   { id: 'providers', titleKey: 'settings.aiGroupProviders' },
+];
+
+const DATA_SOURCE_SUBS: SettingsSubCategory[] = [
+  { id: 'source', titleKey: 'settings.dataTabSource' },
+  { id: 'providers', titleKey: 'settings.dataTabProviders' },
 ];
 
 const NOTIFICATION_SUBS: SettingsSubCategory[] = [
@@ -36,6 +42,9 @@ export function getSubCategories(category: string): SettingsSubCategory[] | null
   if (category === 'ai_model') {
     return AI_MODEL_SUBS;
   }
+  if (category === 'data_source') {
+    return DATA_SOURCE_SUBS;
+  }
   if (category === 'notification') {
     return NOTIFICATION_SUBS;
   }
@@ -48,6 +57,9 @@ export function getSubCategoryOfKey(category: string, key: string): string {
   }
   if (category === 'ai_model') {
     return MODEL_PROVIDER_GROUP_IDS.has(getCategoryFieldGroupId('ai_model', key)) ? 'providers' : 'model';
+  }
+  if (category === 'data_source') {
+    return isDataProviderKey(key) ? 'providers' : 'source';
   }
   return getCategoryFieldGroupId(category, key);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NOTIFICATION_CHANNELS } from '../notificationChannels';
+import { DATA_PROVIDERS } from '../dataProviders';
 import {
   getDefaultSubCategory,
   getSubCategories,
@@ -12,7 +13,6 @@ describe('settingsSubCategories', () => {
   it('returns null for single-tab categories', () => {
     expect(getSubCategories('base')).toBeNull();
     expect(getSubCategories('backtest')).toBeNull();
-    expect(getSubCategories('data_source')).toBeNull();
     expect(getSubCategories('system')).toBeNull();
     expect(getSubCategories('agent')).toBeNull();
   });
@@ -20,6 +20,11 @@ describe('settingsSubCategories', () => {
   it('splits ai_model into model + providers tabs', () => {
     const subs = getSubCategories('ai_model')?.map((sub) => sub.id);
     expect(subs).toEqual(['model', 'providers']);
+  });
+
+  it('splits data_source into source + providers tabs', () => {
+    const subs = getSubCategories('data_source')?.map((sub) => sub.id);
+    expect(subs).toEqual(['source', 'providers']);
   });
 
   it('splits notification into channels + rules tabs', () => {
@@ -37,6 +42,28 @@ describe('settingsSubCategories', () => {
     expect(getSubCategoryOfKey('ai_model', 'GENERATION_BACKEND')).toBe('model');
     expect(getSubCategoryOfKey('ai_model', 'LLM_CHANNELS')).toBe('model');
     expect(getSubCategoryOfKey('ai_model', 'LLM_PROMPT_CACHE_HINTS_ENABLED')).toBe('model');
+  });
+
+  it('routes every data provider key to the merged providers tab', () => {
+    const seen = new Set<string>();
+    for (const provider of DATA_PROVIDERS) {
+      for (const key of provider.keys) {
+        expect(seen.has(key), `duplicate provider key: ${key}`).toBe(false);
+        seen.add(key);
+        expect(getSubCategoryOfKey('data_source', key), key).toBe('providers');
+      }
+      for (const key of provider.configuredKeys) {
+        expect(provider.keys).toContain(key);
+      }
+    }
+  });
+
+  it('routes general + news data_source keys to the source tab', () => {
+    expect(getSubCategoryOfKey('data_source', 'REALTIME_SOURCE_PRIORITY')).toBe('source');
+    expect(getSubCategoryOfKey('data_source', 'ENABLE_REALTIME_QUOTE')).toBe('source');
+    expect(getSubCategoryOfKey('data_source', 'STOCK_INDEX_REMOTE_UPDATE_ENABLED')).toBe('source');
+    expect(getSubCategoryOfKey('data_source', 'NEWS_MAX_AGE_DAYS')).toBe('source');
+    expect(getSubCategoryOfKey('data_source', 'BIAS_THRESHOLD')).toBe('source');
   });
 
   it('routes notification keys to channels or rules', () => {
@@ -68,12 +95,16 @@ describe('settingsSubCategories', () => {
 
     const ai = getVisibleSubCategories('ai_model', { ai_model: [{ key: 'GENERATION_BACKEND' }] }).map((s) => s.id);
     expect(ai).toContain('providers');
+
+    const data = getVisibleSubCategories('data_source', { data_source: [{ key: 'NEWS_MAX_AGE_DAYS' }] }).map((s) => s.id);
+    expect(data).toEqual(['source', 'providers']);
   });
 
   it('defaults to the first visible tab', () => {
     expect(getDefaultSubCategory('base')).toBeNull();
     expect(getDefaultSubCategory('system')).toBeNull();
     expect(getDefaultSubCategory('ai_model')).toBe('model');
+    expect(getDefaultSubCategory('data_source')).toBe('source');
     expect(getDefaultSubCategory('notification')).toBe('channels');
   });
 });

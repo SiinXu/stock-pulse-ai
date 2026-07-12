@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Bell, Bot, Database, Layers3, LineChart, MessagesSquare, Settings2, SlidersHorizontal } from 'lucide-react';
+import { Bell, Bot, Database, Layers3, LineChart, MessagesSquare, Plug, Settings2, SlidersHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -28,10 +28,12 @@ const categoryIconMap: Partial<Record<SystemConfigCategory, LucideIcon>> = {
   backtest: LineChart,
 };
 
-// Distinct icons for categories split into multiple flat tabs.
+// Distinct icons for categories split into multiple flat tabs, keyed by
+// `${category}:${subId}`.
 const subIconMap: Record<string, LucideIcon> = {
-  providers: Layers3,
-  channels: MessagesSquare,
+  'ai_model:providers': Layers3,
+  'data_source:providers': Plug,
+  'notification:channels': MessagesSquare,
 };
 
 const CATEGORY_GROUP_ORDER: Array<{ id: string; titleKey: UiTextKey; categories: SystemConfigCategory[] }> = [
@@ -115,7 +117,7 @@ export const SettingsCategoryNav: React.FC<SettingsCategoryNavProps> = ({
                 subCategory: sub.id,
                 title: t(sub.titleKey),
                 count: getSubCategoryCount(category.category, sub.id, itemsByCategory),
-                icon: subIconMap[sub.id] ?? categoryIconMap[category.category] ?? Layers3,
+                icon: subIconMap[`${category.category}:${sub.id}`] ?? categoryIconMap[category.category] ?? Layers3,
                 isActive: category.category === activeCategory && sub.id === activeSubCategory,
                 isDirty: isTabDirty(category.category, sub.id),
               });

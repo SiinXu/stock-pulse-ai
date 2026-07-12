@@ -1,5 +1,5 @@
 import type React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
 import type { SetupStatusResponse } from '../../types/systemConfig';
@@ -85,6 +85,23 @@ vi.mock('../../hooks', () => ({
   useSystemConfig: () => useSystemConfigMock(),
 }));
 
+type BlockerArgs = { currentLocation: { pathname: string }; nextLocation: { pathname: string } };
+
+const routerBlockerMock = vi.hoisted(() => ({
+  state: 'unblocked' as 'unblocked' | 'blocked',
+  proceed: vi.fn(),
+  reset: vi.fn(),
+  shouldBlock: null as null | ((args: unknown) => boolean),
+}));
+
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useBlocker: (shouldBlock: (args: unknown) => boolean) => {
+    routerBlockerMock.shouldBlock = shouldBlock;
+    return routerBlockerMock;
+  },
+}));
+
 vi.mock('../../api/systemConfig', () => ({
   systemConfigApi: {
     exportEnv: (...args: unknown[]) => exportEnv(...args),
@@ -126,6 +143,13 @@ vi.mock('../../components/settings', async () => ({
   isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
+      {items.map((item) => (
+        <div key={item.key}>{item.key}</div>
+      ))}
+    </div>
+  ),
+  DataProvidersPanel: ({ items }: { items: Array<{ key: string }> }) => (
+    <div data-testid="data-providers-panel">
       {items.map((item) => (
         <div key={item.key}>{item.key}</div>
       ))}
@@ -479,6 +503,8 @@ describe('SettingsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    routerBlockerMock.state = 'unblocked';
+    routerBlockerMock.shouldBlock = null;
     Object.assign(webBuildInfoMock, {
       version: '3.11.0',
       rawVersion: '3.11.0',
@@ -955,6 +981,49 @@ describe('SettingsPage', () => {
     expect(load).not.toHaveBeenCalled();
   });
 
+  it('blocks in-app navigation only when there are unsaved changes', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+
+    render(<SettingsPage />);
+
+    const args: BlockerArgs = {
+      currentLocation: { pathname: '/settings' },
+      nextLocation: { pathname: '/' },
+    };
+    expect(routerBlockerMock.shouldBlock?.(args)).toBe(true);
+    expect(routerBlockerMock.shouldBlock?.({
+      currentLocation: { pathname: '/settings' },
+      nextLocation: { pathname: '/settings' },
+    } satisfies BlockerArgs)).toBe(false);
+  });
+
+  it('does not block navigation without unsaved changes', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: false, dirtyCount: 0 }));
+
+    render(<SettingsPage />);
+
+    expect(routerBlockerMock.shouldBlock?.({
+      currentLocation: { pathname: '/settings' },
+      nextLocation: { pathname: '/' },
+    } satisfies BlockerArgs)).toBe(false);
+  });
+
+  it('confirms or cancels leaving settings with unsaved changes', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+    routerBlockerMock.state = 'blocked';
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText('离开设置页？')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(routerBlockerMock.reset).toHaveBeenCalledTimes(1);
+    expect(routerBlockerMock.proceed).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '离开' }));
+    expect(routerBlockerMock.proceed).toHaveBeenCalledTimes(1);
+  });
+
   it('shows deep research and event monitor fields in the agent category when available', () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'agent',
@@ -1333,6 +1402,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'data_source',
+      activeSubCategory: 'providers',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [
@@ -1391,6 +1461,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'data_source',
+      activeSubCategory: 'providers',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [
@@ -1445,6 +1516,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'data_source',
+      activeSubCategory: 'providers',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [
@@ -1492,7 +1564,9 @@ describe('SettingsPage', () => {
 
     expect(screen.getByRole('button', { name: '开启选股' })).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-ALPHASIFT_ENABLED')).not.toBeInTheDocument();
-    expect(screen.getByTestId('settings-field-ALPHASIFT_INSTALL_SPEC')).toBeInTheDocument();
+    const providersPanel = screen.getByTestId('data-providers-panel');
+    expect(within(providersPanel).getByText('ALPHASIFT_INSTALL_SPEC')).toBeInTheDocument();
+    expect(within(providersPanel).queryByText('ALPHASIFT_ENABLED')).not.toBeInTheDocument();
   });
 
   it('scopes setup and AlphaSift helper cards to their related categories', async () => {
@@ -1514,6 +1588,24 @@ describe('SettingsPage', () => {
           options: [],
           validation: {},
           displayOrder: 16,
+        },
+      },
+      {
+        key: 'NEWS_MAX_AGE_DAYS',
+        value: '3',
+        rawValueExists: true,
+        isMasked: false,
+        schema: {
+          key: 'NEWS_MAX_AGE_DAYS',
+          category: 'data_source',
+          dataType: 'integer',
+          uiControl: 'number',
+          isSensitive: false,
+          isRequired: false,
+          isEditable: true,
+          options: [],
+          validation: {},
+          displayOrder: 1,
         },
       },
     ];
@@ -1545,6 +1637,20 @@ describe('SettingsPage', () => {
 
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'data_source',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        data_source: dataSourceItems,
+      },
+    }));
+    rerender(<SettingsPage />);
+
+    // The default data_source tab is the source tab; the AlphaSift card
+    // lives on the providers tab only.
+    expect(screen.queryByRole('heading', { name: 'AlphaSift 选股' })).not.toBeInTheDocument();
+
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'data_source',
+      activeSubCategory: 'providers',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: dataSourceItems,
@@ -2169,6 +2275,7 @@ describe('SettingsPage', () => {
     alphasiftEnable.mockRejectedValueOnce(new Error('config update failed'));
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'data_source',
+      activeSubCategory: 'providers',
       itemsByCategory: {
         ...configState.itemsByCategory,
         data_source: [

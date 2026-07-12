@@ -1,6 +1,12 @@
 import type React from 'react';
-import { lazy, useEffect } from 'react';
-import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { lazy, useEffect, useState } from 'react';
+import {
+  createBrowserRouter,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  useLocation,
+} from 'react-router-dom';
 import { ApiErrorAlert, Shell } from './components/common';
 import {
   PageLoadingFallback,
@@ -24,7 +30,7 @@ const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const TokenUsagePage = lazy(() => import('./pages/TokenUsagePage'));
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 
-const AppContent: React.FC = () => {
+const AppLayout: React.FC = () => {
   const location = useLocation();
   const { authEnabled, loggedIn, isLoading, loadError, refreshStatus } = useAuth();
   const { t } = useUiLanguage();
@@ -54,54 +60,72 @@ const AppContent: React.FC = () => {
     );
   }
 
+  const isLoginRoute = location.pathname === '/login';
+
   if (authEnabled && !loggedIn) {
-    if (location.pathname === '/login') {
-      return (
-        <StandaloneRouteBoundary>
-          <LoginPage />
-        </StandaloneRouteBoundary>
-      );
+    if (isLoginRoute) {
+      return <Outlet />;
     }
     const redirect = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
-  if (location.pathname === '/login') {
+  if (isLoginRoute) {
     return <Navigate to="/" replace />;
   }
 
-  return (
-    <Routes>
-      <Route
-        element={(
+  return <Outlet />;
+};
+
+// Data router (instead of declarative <BrowserRouter>) so pages can use
+// useBlocker to guard in-app navigation (e.g. unsaved settings drafts).
+const routes = [
+  {
+    element: (
+      <AuthProvider>
+        <AppLayout />
+      </AuthProvider>
+    ),
+    children: [
+      {
+        path: '/login',
+        element: (
+          <StandaloneRouteBoundary>
+            <LoginPage />
+          </StandaloneRouteBoundary>
+        ),
+      },
+      {
+        element: (
           <Shell>
             <RouteOutletBoundary />
           </Shell>
-        )}
-      >
-        <Route path="/" element={<HomePage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/portfolio" element={<PortfolioPage />} />
-        <Route path="/decision-signals" element={<DecisionSignalsPage />} />
-        <Route path="/screening" element={<StockScreeningPage />} />
-        <Route path="/backtest" element={<BacktestPage />} />
-        <Route path="/alerts" element={<AlertsPage />} />
-        <Route path="/usage" element={<TokenUsagePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
-  );
-};
+        ),
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/chat', element: <ChatPage /> },
+          { path: '/portfolio', element: <PortfolioPage /> },
+          { path: '/decision-signals', element: <DecisionSignalsPage /> },
+          { path: '/screening', element: <StockScreeningPage /> },
+          { path: '/backtest', element: <BacktestPage /> },
+          { path: '/alerts', element: <AlertsPage /> },
+          { path: '/usage', element: <TokenUsagePage /> },
+          { path: '/settings', element: <SettingsPage /> },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
+  },
+];
 
 const App: React.FC = () => {
+  // Created on mount (not at module scope) so each mount picks up the current
+  // window.location — tests push a URL right before rendering <App />.
+  const [router] = useState(() => createBrowserRouter(routes));
+
   return (
     <UiLanguageProvider>
-      <Router>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </Router>
+      <RouterProvider router={router} />
     </UiLanguageProvider>
   );
 };

@@ -6,6 +6,8 @@ export * from './NotificationTestPanel';
 export * from './NotificationChannelsPanel';
 export * from './ModelProvidersPanel';
 export * from './modelProviders';
+export * from './DataProvidersPanel';
+export * from './dataProviders';
 export * from './notificationChannels';
 export * from './notificationFieldGroups';
 export * from './categoryFieldGroups';

@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, CircleAlert, CircleDashed, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth, useSystemConfig } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -16,6 +17,7 @@ import {
   LLMChannelEditor,
   NotificationChannelsPanel,
   ModelProvidersPanel,
+  DataProvidersPanel,
   NotificationTestPanel,
   isNotificationChannelKey,
   NOTIFICATION_FIELD_GROUP_ORDER,
@@ -1033,7 +1035,8 @@ const SettingsPage: React.FC = () => {
   const alphasiftItem = (itemsByCategory.data_source || []).find((item) => item.key === 'ALPHASIFT_ENABLED');
   const alphasiftEnabled = String(alphasiftItem?.value ?? '').trim().toLowerCase() === 'true';
   const shouldShowFirstRunSetup = activeCategory === 'base';
-  const shouldShowAlphaSiftSettings = activeCategory === 'data_source' && Boolean(alphasiftItem);
+  const shouldShowAlphaSiftSettings =
+    activeCategory === 'data_source' && activeSubCategory === 'providers' && Boolean(alphasiftItem);
   const hasConfiguredChannels = Boolean((rawActiveItemMap.get('LLM_CHANNELS') || '').trim());
   const hasLitellmConfig = Boolean((rawActiveItemMap.get('LITELLM_CONFIG') || '').trim());
   const hasRuntimeSchedulerMismatch =
@@ -1057,6 +1060,18 @@ const SettingsPage: React.FC = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [effectiveHasDirty]);
+
+  // beforeunload only covers full page unloads; SPA route changes would
+  // silently drop draft edits, so block them behind a confirm dialog.
+  const leaveBlocker = useBlocker(
+    useCallback(
+      ({ currentLocation, nextLocation }: {
+        currentLocation: { pathname: string };
+        nextLocation: { pathname: string };
+      }) => effectiveHasDirty && currentLocation.pathname !== nextLocation.pathname,
+      [effectiveHasDirty],
+    ),
+  );
 
   const handleSchedulerRuntimeStateChange = useCallback(({ runtimeEnabled, overrideEnabled }: {
     runtimeEnabled: boolean | null;
@@ -1141,12 +1156,17 @@ const SettingsPage: React.FC = () => {
     activeCategory === 'ai_model' && activeSubCategory === 'model' ? promptCacheAdvancedItems : [];
   const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
   const isModelProvidersSub = activeCategory === 'ai_model' && activeSubCategory === 'providers';
+  const isDataProvidersSub = activeCategory === 'data_source' && activeSubCategory === 'providers';
   const activeSubTitle = hasSubNav && activeSubCategory
     ? t((activeSubCategoriesList?.find((sub) => sub.id === activeSubCategory)?.titleKey) ?? 'settings.activePanelTitle')
     : '';
   // Whether the field panel (SettingsSectionCard with fields) has any content for the active tab.
   const hasSubFieldContent =
-    isNotificationChannelsSub || isModelProvidersSub || subFilteredItems.length > 0 || activeSubPromptCacheItems.length > 0;
+    isNotificationChannelsSub ||
+    isModelProvidersSub ||
+    isDataProvidersSub ||
+    subFilteredItems.length > 0 ||
+    activeSubPromptCacheItems.length > 0;
   const isEnvBackupAllowed = isDesktopRuntime || authEnabled;
   const envBackupActionDisabled = isLoading || isSaving || isExportingEnv || isImportingEnv || !isEnvBackupAllowed;
 
@@ -1444,6 +1464,14 @@ const SettingsPage: React.FC = () => {
           onChange={setDraftValue}
           issueByKey={issueByKey}
         />
+      ) : isDataProvidersSub ? (
+        <DataProvidersPanel
+          items={subFilteredItems}
+          disabled={isSaving}
+          onChange={setDraftValue}
+          issueByKey={issueByKey}
+          configuredOverrides={{ alphasift: alphasiftEnabled }}
+        />
       ) : activeFieldGroupOrder ? (
         <div className="space-y-4">
           {activeFieldGroupOrder.map((group) => {
@@ -1644,7 +1672,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-secondary"
-                      onClick={() => selectCategory('data_source')}
+                      onClick={() => selectTab('data_source', 'providers')}
                     >
                       {t('settings.viewConfigItems')}
                     </Button>
@@ -1955,6 +1983,19 @@ const SettingsPage: React.FC = () => {
         }}
         onCancel={() => {
           setShowResetConfirm(false);
+        }}
+      />
+      <ConfirmDialog
+        isOpen={leaveBlocker.state === 'blocked'}
+        title={t('settings.leaveConfirmTitle')}
+        message={t('settings.leaveConfirmMessage', { count: effectiveDirtyCount })}
+        confirmText={t('settings.leaveConfirmContinue')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => {
+          leaveBlocker.proceed?.();
+        }}
+        onCancel={() => {
+          leaveBlocker.reset?.();
         }}
       />
     </div>
