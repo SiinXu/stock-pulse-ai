@@ -8,6 +8,7 @@ import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
+import { OVERLAY_Z } from '../components/common/overlayZ';
 import { useDialogA11y } from '../components/common/useDialogA11y';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
@@ -1101,7 +1102,7 @@ const HomePage: React.FC = () => {
           onClose={closeRunFlowDrawer}
           title={t('runFlow.drawerTitle')}
           width="max-w-[96vw]"
-          zIndex={80}
+          zIndex={OVERLAY_Z.runFlowDrawer}
         >
           <RunFlowPanel
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}

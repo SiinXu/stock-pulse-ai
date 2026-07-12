@@ -2,6 +2,7 @@ import type React from 'react';
 import { useRef } from 'react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { OVERLAY_Z } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
 interface DrawerProps {
@@ -24,7 +25,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   title,
   children,
   width = 'max-w-2xl',
-  zIndex = 50,
+  zIndex = OVERLAY_Z.drawer,
   side = 'right',
   backdropClassName,
 }) => {

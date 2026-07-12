@@ -2,6 +2,7 @@ import type React from 'react';
 import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { OVERLAY_Z } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
 interface ConfirmDialogProps {
@@ -49,9 +50,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const dialog = (
     <div
-      // z-[90] keeps confirmations above drawers (default 50, run-flow 80) and
-      // modals (50) so a confirm opened from inside a drawer is never hidden.
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
+      // Confirmations sit above drawers/modals so a confirm opened from inside a
+      // drawer is never hidden (see OVERLAY_Z).
+      style={{ zIndex: OVERLAY_Z.confirm }}
+      className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
       onClick={() => {
         if (!cancelDisabled) {
           onCancel();
