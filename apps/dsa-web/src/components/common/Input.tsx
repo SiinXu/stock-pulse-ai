@@ -106,7 +106,6 @@ export const Input = ({
         onPasswordVisibleChange?.(nextVisible);
       }}
       aria-label={visible ? t('common.hideContent') : t('common.showContent')}
-      tabIndex={-1}
     >
       <EyeToggleIcon visible={visible} />
     </button>

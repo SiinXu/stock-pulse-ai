@@ -26,6 +26,9 @@ const zh = {
   'common.success': '成功',
   'common.copy': '复制',
   'common.copied': '已复制!',
+  'common.pageNav': '分页导航',
+  'common.prevPage': '上一页',
+  'common.nextPage': '下一页',
 
   'language.current': '中文',
   'language.english': 'English',
@@ -876,6 +879,9 @@ const en: Record<UiTextKey, string> = {
   'common.success': 'Success',
   'common.copy': 'Copy',
   'common.copied': 'Copied!',
+  'common.pageNav': 'Pagination',
+  'common.prevPage': 'Previous page',
+  'common.nextPage': 'Next page',
 
   'language.current': 'English',
   'language.english': 'English',

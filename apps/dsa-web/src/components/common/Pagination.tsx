@@ -1,19 +1,21 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
 interface PageButtonProps {
   page: number | string;
   isActive?: boolean;
   disabled?: boolean;
   onClick?: () => void;
+  ariaLabel?: string;
   children?: React.ReactNode;
 }
 
-const PageButton: React.FC<PageButtonProps> = ({ page, isActive, disabled, onClick, children }) => {
+const PageButton: React.FC<PageButtonProps> = ({ page, isActive, disabled, onClick, ariaLabel, children }) => {
   const isEllipsis = page === '...';
 
   if (isEllipsis) {
-    return <span className="px-3 py-2 text-muted-text">...</span>;
+    return <span className="px-3 py-2 text-muted-text" aria-hidden="true">...</span>;
   }
 
   return (
@@ -21,6 +23,8 @@ const PageButton: React.FC<PageButtonProps> = ({ page, isActive, disabled, onCli
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
+      aria-current={isActive ? 'page' : undefined}
       className={cn(
         'inline-flex h-10 min-w-[2.5rem] items-center justify-center rounded-full border px-3 text-sm font-medium transition-all duration-200',
         isActive
@@ -50,6 +54,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   className = '',
 }) => {
+  const { t } = useUiLanguage();
   if (totalPages <= 1) return null;
 
   // Build the page list with ellipsis placeholders.
@@ -73,14 +78,18 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <div className={cn('flex items-center justify-center gap-2', className)}>
+    <nav
+      className={cn('flex items-center justify-center gap-2', className)}
+      aria-label={t('common.pageNav')}
+    >
       {/* Previous page */}
       <PageButton
         page="prev"
         disabled={currentPage === 1}
         onClick={() => onPageChange(currentPage - 1)}
+        ariaLabel={t('common.prevPage')}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
       </PageButton>
@@ -100,11 +109,12 @@ export const Pagination: React.FC<PaginationProps> = ({
         page="next"
         disabled={currentPage === totalPages}
         onClick={() => onPageChange(currentPage + 1)}
+        ariaLabel={t('common.nextPage')}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </PageButton>
-    </div>
+    </nav>
   );
 };

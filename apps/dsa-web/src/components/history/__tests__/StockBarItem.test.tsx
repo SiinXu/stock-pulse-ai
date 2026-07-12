@@ -33,16 +33,35 @@ describe('StockBarItemComponent', () => {
     const meta = screen.getByTestId('history-card-meta');
 
     expect(within(actions).getByText('观望 62')).toBeInTheDocument();
-    expect(within(actions).getByRole('button', { name: /删除 贵州茅台股票股份有限公司 历史记录/ })).toBeInTheDocument();
+    // The delete control is a sibling of the open button, not nested inside it.
+    expect(within(actions).queryByRole('button')).not.toBeInTheDocument();
     expect(within(actions).queryByText('CN · 非交易日')).not.toBeInTheDocument();
     expect(within(meta).getByText('CN · 非交易日')).toBeVisible();
 
     expect(screen.getByText('贵州茅台股票股份.')).toBeVisible();
-    expect(
-      screen.getByRole('button', {
-        name: /^贵州茅台股票股份有限公司 600519 历史记录$/,
-      }),
-    ).toBeInTheDocument();
+
+    const openButton = screen.getByRole('button', {
+      name: /^贵州茅台股票股份有限公司 600519 历史记录$/,
+    });
+    expect(openButton).toBeInTheDocument();
+    // No button nesting: the delete button must not be a descendant of the open button.
+    expect(within(openButton).queryByRole('button')).not.toBeInTheDocument();
+
+    const deleteButton = screen.getByRole('button', { name: /删除 贵州茅台股票股份有限公司 历史记录/ });
+    expect(deleteButton).toBeInTheDocument();
+    expect(openButton).not.toContainElement(deleteButton);
+  });
+
+  it('omits the delete control when no onDelete handler is provided', () => {
+    render(
+      <StockBarItemComponent
+        item={issue1600Item}
+        isViewing={false}
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /删除/ })).not.toBeInTheDocument();
   });
 
   it('uses structured action before legacy operation advice', () => {
