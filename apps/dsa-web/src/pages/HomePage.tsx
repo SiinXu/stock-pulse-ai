@@ -8,6 +8,7 @@ import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
+import { useDialogA11y } from '../components/common/useDialogA11y';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer, StockBar } from '../components/history';
@@ -61,6 +62,9 @@ const HomePage: React.FC = () => {
   const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
   const marketReviewPollGeneration = useRef(0);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  useDialogA11y({ isOpen: sidebarOpen, containerRef: sidebarRef, onEscape: closeSidebar });
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -897,10 +901,15 @@ const HomePage: React.FC = () => {
           </div>
 
           {sidebarOpen ? (
-            <div className="fixed inset-0 z-40 md:hidden" onClick={() => setSidebarOpen(false)}>
+            <div className="fixed inset-0 z-40 md:hidden" onClick={closeSidebar} role="presentation">
               <div className="page-drawer-overlay absolute inset-0" />
               <div
-                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col overflow-hidden !rounded-none !rounded-r-xl p-3 shadow-2xl"
+                ref={sidebarRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={t('home.historyButton')}
+                tabIndex={-1}
+                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col overflow-hidden !rounded-none !rounded-r-xl p-3 shadow-2xl focus:outline-none"
                 onClick={(event) => event.stopPropagation()}
               >
                 {sidebarContent}

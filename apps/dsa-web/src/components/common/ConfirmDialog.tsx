@@ -49,7 +49,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const dialog = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
+      // z-[90] keeps confirmations above drawers (default 50, run-flow 80) and
+      // modals (50) so a confirm opened from inside a drawer is never hidden.
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
       onClick={() => {
         if (!cancelDisabled) {
           onCancel();

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { ConfirmDialog } from '../ConfirmDialog';
 import { Modal } from '../Modal';
 import { Select } from '../Select';
 
@@ -49,5 +50,32 @@ describe('Modal escape behavior', () => {
     fireEvent.keyDown(trigger, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes only the topmost surface when dialogs are stacked', () => {
+    const onClose = vi.fn();
+    const onCancel = vi.fn();
+    const renderTree = (confirmOpen: boolean) => (
+      <UiLanguageProvider>
+        <Modal isOpen onClose={onClose} title="外层弹窗">
+          <ConfirmDialog
+            isOpen={confirmOpen}
+            title="确认操作"
+            message="确定吗？"
+            onConfirm={vi.fn()}
+            onCancel={onCancel}
+          />
+        </Modal>
+      </UiLanguageProvider>
+    );
+    // The confirm opens after the modal (as it does in real usage), so it
+    // becomes the topmost surface on the shared dialog stack.
+    const { rerender } = render(renderTree(false));
+    rerender(renderTree(true));
+
+    // Escape must close the topmost dialog (the confirm) only, not the modal.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
