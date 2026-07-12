@@ -182,6 +182,23 @@ function getInitialFilters(search = typeof window === 'undefined' ? '' : window.
   };
 }
 
+function getInitialStockCode(search = typeof window === 'undefined' ? '' : window.location.search): string {
+  return new URLSearchParams(search).get('stock')?.trim() ?? '';
+}
+
+// Reflect the current-stock scope in the URL (without a new history entry) so
+// the page can be shared/refreshed and restore the same stock.
+function syncStockSearchParam(code: string | null): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (code) {
+    url.searchParams.set('stock', code);
+  } else {
+    url.searchParams.delete('stock');
+  }
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 function toListParams(filters: ListFilters, page: number): DecisionSignalListParams {
   const sourceReportId = parseSourceReportId(filters.sourceReportId);
   if (sourceReportId !== undefined) {
@@ -725,6 +742,7 @@ const DecisionSignalsPage: React.FC = () => {
     setActiveStockContext(nextContext);
     setStockDraft(nextContext.displayCode ?? nextContext.code);
     setTimelineFilters(nextTimeline.filters);
+    syncStockSearchParam(nextContext.code);
     void loadLatestForContext(nextContext);
     void loadTimelineForContext(nextContext, nextTimeline.filters);
   }, [activeStockContext, loadLatestForContext, loadTimelineForContext, timelineFilters]);
@@ -762,9 +780,22 @@ const DecisionSignalsPage: React.FC = () => {
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
     setTimelineFilters((current) => ({ ...current, market: '' }));
+    syncStockSearchParam(null);
     resetLatestView();
     resetTimelineView();
   }, [resetLatestView, resetTimelineView]);
+
+  // Restore the current-stock scope from the URL once on mount so a shared or
+  // refreshed link reopens the same stock context.
+  const didRestoreStockFromUrlRef = useRef(false);
+  useEffect(() => {
+    if (didRestoreStockFromUrlRef.current) return;
+    didRestoreStockFromUrlRef.current = true;
+    const urlStock = getInitialStockCode();
+    if (urlStock) {
+      handleStockSubmit(urlStock);
+    }
+  }, [handleStockSubmit]);
 
   const handleTimelineSearch = useCallback((event: React.FormEvent) => {
     event.preventDefault();

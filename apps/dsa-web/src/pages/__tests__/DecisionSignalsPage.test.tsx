@@ -1523,4 +1523,30 @@ describe('DecisionSignalsPage', () => {
       expect(decisionSignalsApi.updateStatus).toHaveBeenCalledWith(7, { status });
     });
   });
+
+  it('restores the current stock from the ?stock URL param on load', async () => {
+    window.history.pushState({}, '', '/decision-signals?stock=600519');
+    renderPage();
+
+    await waitFor(() => {
+      expect(decisionSignalsApi.getLatest).toHaveBeenCalledWith('600519', expect.anything());
+    });
+  });
+
+  it('writes the current stock to the URL and removes it on clear', async () => {
+    renderPage();
+    await screen.findByText('贵州茅台');
+
+    submitCurrentStock('600519');
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('stock')).toBe('600519');
+    });
+
+    // The clear control lives inside the modal, which submit closed.
+    openStockContextModal();
+    fireEvent.click(screen.getByRole('button', { name: '清空当前股票' }));
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('stock')).toBeNull();
+    });
+  });
 });
