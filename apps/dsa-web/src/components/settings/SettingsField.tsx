@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type React from 'react';
-import { Info, Trash2 } from 'lucide-react';
+import { ExternalLink, Info, Trash2 } from 'lucide-react';
 import { Badge, Button, Select, Input, Tooltip } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -288,6 +288,29 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             </Badge>
           ) : null}
         </div>
+        {schema?.docs?.length ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {schema.docs
+              .filter((doc) => /^https?:\/\//i.test(doc.href))
+              .map((doc) => (
+                <a
+                  key={doc.href}
+                  href={doc.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                  {doc.label}
+                </a>
+              ))}
+          </div>
+        ) : null}
+        {schema?.examples?.length ? (
+          <p className="text-xs text-muted-text">
+            {t('settings.fieldExamples')}: {schema.examples.join(language === 'zh' ? '、' : ', ')}
+          </p>
+        ) : null}
       </div>
 
       <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>

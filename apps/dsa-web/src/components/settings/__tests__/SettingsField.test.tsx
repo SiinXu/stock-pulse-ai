@@ -551,11 +551,14 @@ describe('SettingsField', () => {
       />
     );
 
+    // The field itself now renders the doc link + examples inline, so scope
+    // the help-dialog assertions to the dialog to avoid ambiguity.
     fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
 
-    expect(screen.getByRole('dialog', { name: '自选股列表' })).toBeInTheDocument();
-    expect(screen.getByText('STOCK_LIST=600519,300750,002594')).toBeInTheDocument();
-    const docLink = screen.getByRole('link', { name: /完整指南/ });
+    const helpDialog = screen.getByRole('dialog', { name: '自选股列表' });
+    expect(helpDialog).toBeInTheDocument();
+    expect(within(helpDialog).getByText('STOCK_LIST=600519,300750,002594')).toBeInTheDocument();
+    const docLink = within(helpDialog).getByRole('link', { name: /完整指南/ });
     expect(docLink).toHaveAttribute('href', 'https://example.com/full-guide');
 
     const closeButtons = screen.getAllByRole('button', { name: '关闭配置说明' });
@@ -572,6 +575,46 @@ describe('SettingsField', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: '自选股列表' })).not.toBeInTheDocument();
+  });
+
+  it('renders inline provider doc links and examples, filtering unsafe hrefs', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'OPENAI_API_KEY',
+          value: '',
+          rawValueExists: false,
+          isMasked: false,
+          schema: {
+            key: 'OPENAI_API_KEY',
+            category: 'ai_model',
+            dataType: 'string',
+            uiControl: 'password',
+            isSensitive: true,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            examples: ['sk-example-token'],
+            docs: [
+              { label: '获取 API Key', href: 'https://platform.openai.com/api-keys' },
+              { label: 'unsafe', href: 'javascript:alert(1)' },
+            ],
+          },
+        }}
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: '获取 API Key' });
+    expect(link).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    // Non-http(s) hrefs are filtered out for safety.
+    expect(screen.queryByRole('link', { name: 'unsafe' })).not.toBeInTheDocument();
+    expect(screen.getByText(/sk-example-token/)).toBeInTheDocument();
   });
 
   it('keeps generation channel help user-facing without env key or examples', () => {
