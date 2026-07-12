@@ -7,6 +7,7 @@ import { historyApi } from '../api/history';
 import {
   ApiErrorAlert,
   AppPage,
+  Badge,
   Card,
   ConfirmDialog,
   Drawer,
@@ -1168,7 +1169,12 @@ const DecisionSignalsPage: React.FC = () => {
           </Card>
         ) : null}
 
-        <Card title={t('decisionSignals.statsTitle')} subtitle={t('decisionSignals.statsDescription')} padding="md">
+        <Card
+          title={t('decisionSignals.statsTitle')}
+          subtitle={t('decisionSignals.statsDescription')}
+          padding="md"
+          headerRight={<Badge variant="default" size="sm">{t('decisionSignals.scopeGlobal')}</Badge>}
+        >
           <p className="mb-3 text-sm text-secondary-text">{t('decisionSignals.statsGlobalScope')}</p>
           {statsError ? (
             <ApiErrorAlert
@@ -1211,7 +1217,14 @@ const DecisionSignalsPage: React.FC = () => {
           )}
         </Card>
 
-        <Card title={t('decisionSignals.latestTitle')} subtitle={t('decisionSignals.latestDescription')} padding="md">
+        <Card
+          title={t('decisionSignals.latestTitle')}
+          subtitle={t('decisionSignals.latestDescription')}
+          padding="md"
+          headerRight={activeStockContext ? (
+            <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>
+          ) : undefined}
+        >
           {!activeStockContext ? (
             <EmptyState
               className="border-none bg-transparent py-6 shadow-none"
@@ -1244,7 +1257,14 @@ const DecisionSignalsPage: React.FC = () => {
           ) : null}
         </Card>
 
-        <Card title={t('decisionSignals.timelineTitle')} subtitle={t('decisionSignals.timelineDescription')} padding="md">
+        <Card
+          title={t('decisionSignals.timelineTitle')}
+          subtitle={t('decisionSignals.timelineDescription')}
+          padding="md"
+          headerRight={activeStockContext ? (
+            <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>
+          ) : undefined}
+        >
           <form className="grid items-end gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
             <Select
               label={t('decisionSignals.timelineMarket')}
@@ -1333,7 +1353,14 @@ const DecisionSignalsPage: React.FC = () => {
         ) : null}
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-secondary-text">{t('decisionSignals.total', { total })}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-secondary-text">{t('decisionSignals.total', { total })}</p>
+            <Badge variant="default" size="sm">
+              {appliedSourceReportId
+                ? t('decisionSignals.scopeFromReport', { reportId: appliedSourceReportId })
+                : t('decisionSignals.scopeAllSignals')}
+            </Badge>
+          </div>
           {loading ? <span className="text-xs text-secondary-text">{t('common.loading')}...</span> : null}
         </div>
 

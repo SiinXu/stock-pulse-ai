@@ -4,6 +4,8 @@ import { cn } from '../../utils/cn';
 interface CardProps {
   title?: string;
   subtitle?: string;
+  /** Optional content aligned to the right of the header (e.g. a scope badge). */
+  headerRight?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
@@ -18,6 +20,7 @@ interface CardProps {
 export const Card: React.FC<CardProps> = ({
   title,
   subtitle,
+  headerRight,
   children,
   className = '',
   style,
@@ -25,6 +28,15 @@ export const Card: React.FC<CardProps> = ({
   hoverable = false,
   padding = 'md',
 }) => {
+  const header = (title || subtitle || headerRight) ? (
+    <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        {subtitle ? <span className="label-uppercase">{subtitle}</span> : null}
+        {title ? <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3> : null}
+      </div>
+      {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
+    </div>
+  ) : null;
   const paddingStyles = {
     none: '',
     sm: 'p-4',
@@ -44,12 +56,7 @@ export const Card: React.FC<CardProps> = ({
     return (
       <div className={cn(variantStyles.gradient, className)} style={style}>
         <div className={cn('gradient-border-card-inner', paddingStyles[padding])}>
-          {(title || subtitle) && (
-            <div className="mb-3">
-              {subtitle ? <span className="label-uppercase">{subtitle}</span> : null}
-              {title ? <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3> : null}
-            </div>
-          )}
+          {header}
           {children}
         </div>
       </div>
@@ -61,12 +68,7 @@ export const Card: React.FC<CardProps> = ({
       style={style}
       className={cn('rounded-2xl', variantStyles[variant], hoverStyles, paddingStyles[padding], className)}
     >
-      {(title || subtitle) && (
-        <div className="mb-3">
-          {subtitle ? <span className="label-uppercase">{subtitle}</span> : null}
-          {title ? <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3> : null}
-        </div>
-      )}
+      {header}
       {children}
     </div>
   );

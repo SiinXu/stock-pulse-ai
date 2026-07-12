@@ -371,6 +371,9 @@ describe('DecisionSignalsPage', () => {
     expect(screen.getByText('放量下跌风险')).toBeInTheDocument();
     expect(screen.getByText(formattedCreatedAt)).toBeInTheDocument();
     expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
+    // Scope badges make each module's data range explicit.
+    expect(screen.getByText('全局')).toBeInTheDocument();
+    expect(screen.getByText('全部信号')).toBeInTheDocument();
   });
 
   it('shows a zero-sample outcome stats state instead of misleading zero metrics', async () => {
@@ -624,6 +627,10 @@ describe('DecisionSignalsPage', () => {
         market: undefined,
         limit: 5,
       });
+    });
+    // Latest + timeline cards carry a current-stock scope badge.
+    await waitFor(() => {
+      expect(screen.getAllByText('当前股票 · 600519').length).toBeGreaterThan(0);
     });
   });
 
