@@ -15,6 +15,7 @@ import {
   IntelligentImport,
   LLMChannelEditor,
   NotificationChannelsPanel,
+  ModelProvidersPanel,
   NotificationTestPanel,
   isNotificationChannelKey,
   NOTIFICATION_FIELD_GROUP_ORDER,
@@ -23,6 +24,9 @@ import {
   getCategoryFieldGroupOrder,
   getCategoryFieldGroupId,
   getCategoryFieldOrder,
+  getSubCategories,
+  getSubCategoryOfKey,
+  getSubCategoryFieldOrder,
   SettingsCategoryNav,
   SettingsAlert,
   SettingsField,
@@ -864,6 +868,7 @@ const SettingsPage: React.FC = () => {
   const [isImportingEnv, setIsImportingEnv] = useState(false);
   const [isUpdatingAlphaSift, setIsUpdatingAlphaSift] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
@@ -896,8 +901,11 @@ const SettingsPage: React.FC = () => {
     itemsByCategory,
     issueByKey,
     activeCategory,
-    setActiveCategory,
+    activeSubCategory,
+    selectCategory,
+    selectTab,
     hasDirty,
+    dirtyKeys,
     dirtyCount,
     toast,
     clearToast,
@@ -1037,6 +1045,19 @@ const SettingsPage: React.FC = () => {
   const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft;
   const effectiveDirtyCount = dirtyCount + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0);
 
+  // Warn before leaving/refreshing/closing the tab while there are unsaved config edits.
+  useEffect(() => {
+    if (!effectiveHasDirty) {
+      return;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [effectiveHasDirty]);
+
   const handleSchedulerRuntimeStateChange = useCallback(({ runtimeEnabled, overrideEnabled }: {
     runtimeEnabled: boolean | null;
     overrideEnabled: boolean | null;
@@ -1109,6 +1130,23 @@ const SettingsPage: React.FC = () => {
     ? activeItems.filter((item) => !isPromptCacheAdvancedSetting(item))
     : activeItems;
   const hasActiveConfigItems = visibleActiveItems.length > 0 || promptCacheAdvancedItems.length > 0;
+  const activeSubCategoriesList = getSubCategories(activeCategory);
+  const hasSubNav = activeSubCategoriesList != null;
+  const subFilteredItems = hasSubNav
+    ? visibleActiveItems
+      .filter((item) => getSubCategoryOfKey(activeCategory, item.key) === activeSubCategory)
+      .sort((a, b) => getSubCategoryFieldOrder(activeCategory, a.key) - getSubCategoryFieldOrder(activeCategory, b.key))
+    : visibleActiveItems;
+  const activeSubPromptCacheItems =
+    activeCategory === 'ai_model' && activeSubCategory === 'model' ? promptCacheAdvancedItems : [];
+  const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
+  const isModelProvidersSub = activeCategory === 'ai_model' && activeSubCategory === 'providers';
+  const activeSubTitle = hasSubNav && activeSubCategory
+    ? t((activeSubCategoriesList?.find((sub) => sub.id === activeSubCategory)?.titleKey) ?? 'settings.activePanelTitle')
+    : '';
+  // Whether the field panel (SettingsSectionCard with fields) has any content for the active tab.
+  const hasSubFieldContent =
+    isNotificationChannelsSub || isModelProvidersSub || subFilteredItems.length > 0 || activeSubPromptCacheItems.length > 0;
   const isEnvBackupAllowed = isDesktopRuntime || authEnabled;
   const envBackupActionDisabled = isLoading || isSaving || isExportingEnv || isImportingEnv || !isEnvBackupAllowed;
 
@@ -1375,93 +1413,80 @@ const SettingsPage: React.FC = () => {
       ? <>Check and provide the desktop log <code>desktop.log</code>, plus the release version, Windows version, and trigger path.</>
       : <>请查看并提供桌面端日志 <code>desktop.log</code>，同时补充 release 版本、Windows 版本和触发入口。</>
     : t('settings.diagnosticHintWeb');
+  const isNotificationCategory = activeCategory === 'notification';
+  const activeFieldGroupOrder = isNotificationCategory
+    ? NOTIFICATION_FIELD_GROUP_ORDER
+    : getCategoryFieldGroupOrder(activeCategory);
+  const fieldGroupIdOf = (key: string) =>
+    isNotificationCategory ? getNotificationFieldGroupId(key) : getCategoryFieldGroupId(activeCategory, key);
+  const fieldGroupOrderOf = (key: string) =>
+    isNotificationCategory ? getNotificationFieldOrder(key) : getCategoryFieldOrder(activeCategory, key);
   const activeCategoryTitle = getCategoryTitle(activeCategory as SystemConfigCategory, t('settings.activePanelTitle'), uiLanguage);
   const activeCategoryDescription = getCategoryDescription(activeCategory as SystemConfigCategory, '', uiLanguage);
-  const activeConfigPanel = hasActiveConfigItems ? (
+  const activeConfigPanelTitle = hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle;
+  const shouldRenderFieldPanel = hasSubNav ? hasSubFieldContent : hasActiveConfigItems;
+  const activeConfigPanel = shouldRenderFieldPanel ? (
     <SettingsSectionCard
-      title={activeCategoryTitle}
+      title={activeConfigPanelTitle}
       description={activeCategoryDescription || t('settings.activePanelDescription')}
     >
-      {visibleActiveItems.length ? (
-        activeCategory === 'notification' ? (
-          <div className="space-y-4">
-            <NotificationChannelsPanel
-              items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
+      {isNotificationChannelsSub ? (
+        <NotificationChannelsPanel
+          items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
+          disabled={isSaving}
+          onChange={setDraftValue}
+          issueByKey={issueByKey}
+        />
+      ) : isModelProvidersSub ? (
+        <ModelProvidersPanel
+          items={subFilteredItems}
+          disabled={isSaving}
+          onChange={setDraftValue}
+          issueByKey={issueByKey}
+        />
+      ) : activeFieldGroupOrder ? (
+        <div className="space-y-4">
+          {activeFieldGroupOrder.map((group) => {
+            const groupItems = subFilteredItems
+              .filter((item) => fieldGroupIdOf(item.key) === group.id)
+              .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
+            if (!groupItems.length) {
+              return null;
+            }
+            return (
+              <div key={group.id} className="space-y-2">
+                <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
+                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                  {groupItems.map((item) => (
+                    <SettingsField
+                      key={item.key}
+                      item={item}
+                      value={item.value}
+                      disabled={isSaving}
+                      onChange={setDraftValue}
+                      issues={issueByKey[item.key] || []}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : subFilteredItems.length ? (
+        <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+          {subFilteredItems.map((item) => (
+            <SettingsField
+              key={item.key}
+              item={item}
+              value={item.value}
               disabled={isSaving}
               onChange={setDraftValue}
-              issueByKey={issueByKey}
+              issues={issueByKey[item.key] || []}
             />
-            {NOTIFICATION_FIELD_GROUP_ORDER.map((group) => {
-              const groupItems = visibleActiveItems
-                .filter((item) => !isNotificationChannelKey(item.key)
-                  && getNotificationFieldGroupId(item.key) === group.id)
-                .sort((a, b) => getNotificationFieldOrder(a.key) - getNotificationFieldOrder(b.key));
-              if (!groupItems.length) {
-                return null;
-              }
-              return (
-                <div key={group.id} className="space-y-2">
-                  <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                    {groupItems.map((item) => (
-                      <SettingsField
-                        key={item.key}
-                        item={item}
-                        value={item.value}
-                        disabled={isSaving}
-                        onChange={setDraftValue}
-                        issues={issueByKey[item.key] || []}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : getCategoryFieldGroupOrder(activeCategory) ? (
-          <div className="space-y-4">
-            {(getCategoryFieldGroupOrder(activeCategory) ?? []).map((group) => {
-              const groupItems = visibleActiveItems
-                .filter((item) => getCategoryFieldGroupId(activeCategory, item.key) === group.id)
-                .sort((a, b) => getCategoryFieldOrder(activeCategory, a.key) - getCategoryFieldOrder(activeCategory, b.key));
-              if (!groupItems.length) {
-                return null;
-              }
-              return (
-                <div key={group.id} className="space-y-2">
-                  <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                    {groupItems.map((item) => (
-                      <SettingsField
-                        key={item.key}
-                        item={item}
-                        value={item.value}
-                        disabled={isSaving}
-                        onChange={setDraftValue}
-                        issues={issueByKey[item.key] || []}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-            {visibleActiveItems.map((item) => (
-              <SettingsField
-                key={item.key}
-                item={item}
-                value={item.value}
-                disabled={isSaving}
-                onChange={setDraftValue}
-                issues={issueByKey[item.key] || []}
-              />
-            ))}
-          </div>
-        )
+          ))}
+        </div>
       ) : null}
-      {promptCacheAdvancedItems.length ? (
+      {activeSubPromptCacheItems.length ? (
         <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
           <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
             <div className="min-w-0 space-y-1">
@@ -1475,7 +1500,7 @@ const SettingsPage: React.FC = () => {
             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
           </summary>
           <div className="border-t border-[var(--settings-border-soft)]">
-            {promptCacheAdvancedItems.map((item) => (
+            {activeSubPromptCacheItems.map((item) => (
               <SettingsField
                 key={item.key}
                 item={item}
@@ -1489,7 +1514,7 @@ const SettingsPage: React.FC = () => {
         </details>
       ) : null}
     </SettingsSectionCard>
-  ) : (
+  ) : hasSubNav || hasActiveConfigItems ? null : (
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
@@ -1514,7 +1539,13 @@ const SettingsPage: React.FC = () => {
               variant="settings-secondary"
               size="sm"
               className="px-2.5"
-              onClick={resetDraft}
+              onClick={() => {
+                if (effectiveHasDirty) {
+                  setShowResetConfirm(true);
+                } else {
+                  resetDraft();
+                }
+              }}
               disabled={isLoading || isSaving}
             >
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
@@ -1568,7 +1599,9 @@ const SettingsPage: React.FC = () => {
               categories={categories}
               itemsByCategory={itemsByCategory}
               activeCategory={activeCategory}
-              onSelect={setActiveCategory}
+              activeSubCategory={activeSubCategory}
+              dirtyKeys={dirtyKeys}
+              onSelectTab={selectTab}
             />
           </aside>
 
@@ -1584,7 +1617,7 @@ const SettingsPage: React.FC = () => {
                 smokeError={setupSmokeError}
                 smokeSuccess={setupSmokeSuccess}
                 onRefresh={refreshSetupStatus}
-                onSelectCategory={setActiveCategory}
+                onSelectCategory={selectCategory}
                 onRunSmoke={handleRunSetupSmoke}
                 listSeparator={uiLanguage === 'en' ? ', ' : '、'}
                 t={t}
@@ -1611,7 +1644,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-secondary"
-                      onClick={() => setActiveCategory('data_source')}
+                      onClick={() => selectCategory('data_source')}
                     >
                       {t('settings.viewConfigItems')}
                     </Button>
@@ -1828,7 +1861,7 @@ const SettingsPage: React.FC = () => {
                 />
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'ai_model' ? (
+            {activeCategory === 'ai_model' && activeSubCategory === 'model' ? (
               <SettingsSectionCard
                 title={t('settings.llmAccess')}
                 description={t('settings.llmAccessDescription')}
@@ -1856,7 +1889,7 @@ const SettingsPage: React.FC = () => {
             {activeCategory === 'system' && passwordChangeable ? (
               <ChangePasswordCard />
             ) : null}
-            {activeCategory === 'notification' ? (
+            {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
               <SettingsPanelErrorBoundary
                 title={t('settings.notificationTest')}
                 resetKey={`notification-test:${configVersion}`}
@@ -1872,7 +1905,7 @@ const SettingsPage: React.FC = () => {
             {shouldGuardActiveConfigPanel && hasActiveConfigItems ? (
               <SettingsPanelErrorBoundary
                 title={activeConfigPanelErrorTitle}
-                resetKey={`${activeCategory}:${configVersion}`}
+                resetKey={`${activeCategory}:${activeSubCategory ?? ''}:${configVersion}`}
                 diagnosticHint={settingsPanelDiagnosticHint}
               >
                 {activeConfigPanel}
@@ -1908,6 +1941,20 @@ const SettingsPage: React.FC = () => {
         }}
         onCancel={() => {
           setShowImportConfirm(false);
+        }}
+      />
+      <ConfirmDialog
+        isOpen={showResetConfirm}
+        title={t('settings.resetConfirmTitle')}
+        message={t('settings.resetConfirmMessage', { count: effectiveDirtyCount })}
+        confirmText={t('settings.resetConfirmContinue')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => {
+          setShowResetConfirm(false);
+          resetDraft();
+        }}
+        onCancel={() => {
+          setShowResetConfirm(false);
         }}
       />
     </div>

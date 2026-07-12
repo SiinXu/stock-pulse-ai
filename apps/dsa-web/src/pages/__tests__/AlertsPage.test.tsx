@@ -1,6 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  fireEvent.click(trigger);
+  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
 
 const {
   listRules,
@@ -254,7 +268,7 @@ describe('AlertsPage', () => {
 
     render(<AlertsPage />);
 
-    fireEvent.change(screen.getByLabelText('启停状态'), { target: { value: 'disabled' } });
+    chooseOption(screen.getByLabelText('启停状态'), 'disabled');
     await waitFor(() => expect(listRules).toHaveBeenCalledTimes(2));
 
     filteredRequest.resolve({ items: [filteredRule], total: 1, page: 1, pageSize: 20 });

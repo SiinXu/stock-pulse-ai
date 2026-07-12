@@ -1,9 +1,8 @@
 import type React from 'react';
-import { useEffect, useCallback } from 'react';
+import { useRef } from 'react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
-
-let activeDrawerCount = 0;
+import { useDialogA11y } from './useDialogA11y';
 
 interface DrawerProps {
   isOpen: boolean;
@@ -30,33 +29,9 @@ export const Drawer: React.FC<DrawerProps> = ({
   backdropClassName,
 }) => {
   const { t } = useUiLanguage();
-  // Close the drawer when Escape is pressed.
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose]
-  );
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      activeDrawerCount++;
-      if (activeDrawerCount === 1) {
-        document.body.style.overflow = 'hidden';
-      }
-
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        activeDrawerCount--;
-        if (activeDrawerCount === 0) {
-          document.body.style.overflow = '';
-        }
-      };
-    }
-  }, [isOpen, handleKeyDown]);
+  useDialogA11y({ isOpen, containerRef: dialogRef, onEscape: onClose });
 
   if (!isOpen) return null;
 
@@ -77,11 +52,13 @@ export const Drawer: React.FC<DrawerProps> = ({
 
       <div className={cn('absolute inset-y-0 flex w-full', sidePositionClass, width)}>
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
+          tabIndex={-1}
           className={cn(
-            'relative flex w-full flex-col bg-card',
+            'relative flex w-full flex-col bg-card focus:outline-none',
             borderClass,
             side === 'right' ? 'border-border/80' : 'border-border/70 shadow-2xl',
             side === 'left' ? 'animate-slide-in-left' : 'animate-slide-in-right'

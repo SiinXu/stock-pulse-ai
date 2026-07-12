@@ -4,6 +4,20 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
 
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  fireEvent.click(trigger);
+  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
+
 const {
   mockGetResults,
   mockGetOverallPerformance,
@@ -106,10 +120,10 @@ describe('BacktestPage', () => {
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
 
-    expect(filterInput).toHaveClass('input-surface');
-    expect(filterInput).toHaveClass('input-focus-glow');
-    expect(windowInput).toHaveClass('input-surface');
-    expect(windowInput).toHaveClass('input-focus-glow');
+    expect(filterInput).toHaveClass('h-8');
+    expect(filterInput).toHaveClass('rounded-[10px]');
+    expect(windowInput).toHaveClass('h-8');
+    expect(windowInput).toHaveClass('rounded-[10px]');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -227,13 +241,14 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
-    const phaseSelect = screen.getByDisplayValue('全部阶段');
+    const phaseSelect = screen.getByLabelText('阶段');
+    expect(phaseSelect).toHaveTextContent('全部阶段');
     const fromInput = screen.getByLabelText('分析开始日期');
     const toInput = screen.getByLabelText('分析结束日期');
 
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
     fireEvent.change(windowInput, { target: { value: '20' } });
-    fireEvent.change(phaseSelect, { target: { value: 'intraday' } });
+    chooseOption(phaseSelect, 'intraday');
     fireEvent.change(fromInput, { target: { value: '2026-03-01' } });
     fireEvent.change(toInput, { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));

@@ -15,6 +15,7 @@ import {
   Modal,
   PageHeader,
   Pagination,
+  Select,
 } from '../components/common';
 import {
   DecisionSignalCard,
@@ -854,19 +855,16 @@ const DecisionSignalsPage: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              className="input-surface input-focus-glow h-10 rounded-xl border bg-transparent px-3 text-sm"
+            <Select
               value={reassessProfile}
-              onChange={(event) => setReassessProfile(event.target.value as DecisionProfile)}
-              aria-label={t('decisionSignals.reassessProfile')}
+              onChange={(value) => setReassessProfile(value as DecisionProfile)}
+              ariaLabel={t('decisionSignals.reassessProfile')}
               disabled={!reassessSourceReportId || reassessLoading}
-            >
-              {REASSESS_PROFILES.map((profile) => (
-                <option key={profile} value={profile}>
-                  {t(`decisionSignals.profile.${profile}` as UiTextKey)}
-                </option>
-              ))}
-            </select>
+              options={REASSESS_PROFILES.map((profile) => ({
+                value: profile,
+                label: t(`decisionSignals.profile.${profile}` as UiTextKey),
+              }))}
+            />
             <button
               type="button"
               className="btn-secondary inline-flex h-10 items-center justify-center gap-2"
@@ -1088,76 +1086,56 @@ const DecisionSignalsPage: React.FC = () => {
 
         <Card padding="md">
           <form className="grid items-end gap-3 md:grid-cols-3 xl:grid-cols-8 [&>*]:min-w-0" onSubmit={handleApplyFilters}>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.market')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={filters.market}
-                onChange={(event) => setFilters((current) => ({ ...current, market: event.target.value as ListFilters['market'] }))}
-                aria-label={t('decisionSignals.market')}
-              >
-                <option value="">{t('decisionSignals.allMarkets')}</option>
-                {MARKET_OPTIONS.map((market) => (
-                  <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
-                ))}
-              </select>
-            </label>
+            <Select
+              label={t('decisionSignals.market')}
+              value={filters.market}
+              onChange={(value) => setFilters((current) => ({ ...current, market: value as ListFilters['market'] }))}
+              options={[
+                { value: '', label: t('decisionSignals.allMarkets') },
+                ...MARKET_OPTIONS.map((market) => ({ value: market, label: getDecisionSignalMarketLabel(market, t) })),
+              ]}
+            />
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
               <input
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.stockCode}
                 onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
                 placeholder={t('decisionSignals.stockCode')}
                 aria-label={t('decisionSignals.stockCode')}
               />
             </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.action')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={filters.action}
-                onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value as ListFilters['action'] }))}
-                aria-label={t('decisionSignals.action')}
-              >
-                <option value="">{t('decisionSignals.allActions')}</option>
-                {ACTION_OPTIONS.map((action) => (
-                  <option key={action} value={action}>{actionLabels[action]}</option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.marketPhase')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={filters.marketPhase}
-                onChange={(event) => setFilters((current) => ({ ...current, marketPhase: event.target.value as ListFilters['marketPhase'] }))}
-                aria-label={t('decisionSignals.marketPhase')}
-              >
-                <option value="">{t('decisionSignals.allPhases')}</option>
-                {PHASE_OPTIONS.map((phase) => (
-                  <option key={phase} value={phase}>{getDecisionSignalMarketPhaseLabel(phase, t)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.source')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={filters.sourceType}
-                onChange={(event) => setFilters((current) => ({ ...current, sourceType: event.target.value as ListFilters['sourceType'] }))}
-                aria-label={t('decisionSignals.source')}
-              >
-                <option value="">{t('decisionSignals.allSources')}</option>
-                {SOURCE_OPTIONS.map((source) => (
-                  <option key={source} value={source}>{getDecisionSignalSourceTypeLabel(source, t)}</option>
-                ))}
-              </select>
-            </label>
+            <Select
+              label={t('decisionSignals.action')}
+              value={filters.action}
+              onChange={(value) => setFilters((current) => ({ ...current, action: value as ListFilters['action'] }))}
+              options={[
+                { value: '', label: t('decisionSignals.allActions') },
+                ...ACTION_OPTIONS.map((action) => ({ value: action, label: actionLabels[action] })),
+              ]}
+            />
+            <Select
+              label={t('decisionSignals.marketPhase')}
+              value={filters.marketPhase}
+              onChange={(value) => setFilters((current) => ({ ...current, marketPhase: value as ListFilters['marketPhase'] }))}
+              options={[
+                { value: '', label: t('decisionSignals.allPhases') },
+                ...PHASE_OPTIONS.map((phase) => ({ value: phase, label: getDecisionSignalMarketPhaseLabel(phase, t) })),
+              ]}
+            />
+            <Select
+              label={t('decisionSignals.source')}
+              value={filters.sourceType}
+              onChange={(value) => setFilters((current) => ({ ...current, sourceType: value as ListFilters['sourceType'] }))}
+              options={[
+                { value: '', label: t('decisionSignals.allSources') },
+                ...SOURCE_OPTIONS.map((source) => ({ value: source, label: getDecisionSignalSourceTypeLabel(source, t) })),
+              ]}
+            />
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
               <input
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
+                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.sourceReportId}
                 onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
                 placeholder={t('decisionSignals.sourceReportId')}
@@ -1168,18 +1146,15 @@ const DecisionSignalsPage: React.FC = () => {
                 type="number"
               />
             </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.status')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={filters.status}
-                onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ListFilters['status'] }))}
-                aria-label={t('decisionSignals.status')}
-              >
-                <option value="">{t('decisionSignals.allStatuses')}</option>
-                {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{t(STATUS_LABEL_KEYS[status])}</option>)}
-              </select>
-            </label>
+            <Select
+              label={t('decisionSignals.status')}
+              value={filters.status}
+              onChange={(value) => setFilters((current) => ({ ...current, status: value as ListFilters['status'] }))}
+              options={[
+                { value: '', label: t('decisionSignals.allStatuses') },
+                ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
+              ]}
+            />
             <button type="submit" className="btn-primary inline-flex h-11 items-center justify-center gap-2">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
@@ -1271,69 +1246,54 @@ const DecisionSignalsPage: React.FC = () => {
 
         <Card title={t('decisionSignals.timelineTitle')} subtitle={t('decisionSignals.timelineDescription')} padding="md">
           <form className="grid items-end gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.timelineMarket')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={timelineFilters.market}
-                onChange={(event) => {
-                  const market = event.target.value as TimelineFilters['market'];
-                  timelineMarketSourceRef.current = market ? 'user' : null;
-                  setTimelineFilters((current) => ({ ...current, market }));
-                }}
-                aria-label={t('decisionSignals.timelineMarket')}
-              >
-                <option value="">{t('decisionSignals.allMarkets')}</option>
-                {MARKET_OPTIONS.map((market) => (
-                  <option key={market} value={market}>{getDecisionSignalMarketLabel(market, t)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.timelineRange')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={timelineFilters.range}
-                onChange={(event) => setTimelineFilters((current) => ({ ...current, range: event.target.value as TimelineRange }))}
-                aria-label={t('decisionSignals.timelineRange')}
-              >
-                <option value="30d">{t('decisionSignals.timelineRange.30d')}</option>
-                <option value="90d">{t('decisionSignals.timelineRange.90d')}</option>
-                <option value="180d">{t('decisionSignals.timelineRange.180d')}</option>
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.timelineStatus')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={timelineFilters.status}
-                onChange={(event) => setTimelineFilters((current) => ({ ...current, status: event.target.value as TimelineStatusFilter }))}
-                aria-label={t('decisionSignals.timelineStatus')}
-              >
-                <option value="all">{t('decisionSignals.timelineStatus.all')}</option>
-                <option value="active">{t('decisionSignals.timelineStatus.active')}</option>
-              </select>
-            </label>
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.timelineProfile')}</span>
-              <select
-                className="input-surface input-focus-glow h-11 rounded-xl border bg-transparent px-3 text-sm"
-                value={timelineFilters.decisionProfile}
-                onChange={(event) => setTimelineFilters((current) => ({
-                  ...current,
-                  decisionProfile: event.target.value as TimelineFilters['decisionProfile'],
-                }))}
-                aria-label={t('decisionSignals.timelineProfile')}
-              >
-                <option value="">{t('decisionSignals.allProfiles')}</option>
-                {REASSESS_PROFILES.map((profile) => (
-                  <option key={profile} value={profile}>
-                    {t(`decisionSignals.profile.${profile}` as UiTextKey)}
-                  </option>
-                ))}
-                <option value="unknown">{t('decisionSignals.profile.unknown')}</option>
-              </select>
-            </label>
+            <Select
+              label={t('decisionSignals.timelineMarket')}
+              value={timelineFilters.market}
+              onChange={(value) => {
+                const market = value as TimelineFilters['market'];
+                timelineMarketSourceRef.current = market ? 'user' : null;
+                setTimelineFilters((current) => ({ ...current, market }));
+              }}
+              options={[
+                { value: '', label: t('decisionSignals.allMarkets') },
+                ...MARKET_OPTIONS.map((market) => ({ value: market, label: getDecisionSignalMarketLabel(market, t) })),
+              ]}
+            />
+            <Select
+              label={t('decisionSignals.timelineRange')}
+              value={timelineFilters.range}
+              onChange={(value) => setTimelineFilters((current) => ({ ...current, range: value as TimelineRange }))}
+              options={[
+                { value: '30d', label: t('decisionSignals.timelineRange.30d') },
+                { value: '90d', label: t('decisionSignals.timelineRange.90d') },
+                { value: '180d', label: t('decisionSignals.timelineRange.180d') },
+              ]}
+            />
+            <Select
+              label={t('decisionSignals.timelineStatus')}
+              value={timelineFilters.status}
+              onChange={(value) => setTimelineFilters((current) => ({ ...current, status: value as TimelineStatusFilter }))}
+              options={[
+                { value: 'all', label: t('decisionSignals.timelineStatus.all') },
+                { value: 'active', label: t('decisionSignals.timelineStatus.active') },
+              ]}
+            />
+            <Select
+              label={t('decisionSignals.timelineProfile')}
+              value={timelineFilters.decisionProfile}
+              onChange={(value) => setTimelineFilters((current) => ({
+                ...current,
+                decisionProfile: value as TimelineFilters['decisionProfile'],
+              }))}
+              options={[
+                { value: '', label: t('decisionSignals.allProfiles') },
+                ...REASSESS_PROFILES.map((profile) => ({
+                  value: profile,
+                  label: t(`decisionSignals.profile.${profile}` as UiTextKey),
+                })),
+                { value: 'unknown', label: t('decisionSignals.profile.unknown') },
+              ]}
+            />
             <button
               type="submit"
               className="btn-secondary inline-flex h-11 items-center justify-center gap-2"

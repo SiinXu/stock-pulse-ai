@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
@@ -450,6 +450,12 @@ describe('HomePage', () => {
     expect(await screen.findByRole('button', { name: /MARKET/ })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '删除 大盘复盘 历史记录' }));
+
+    const dialogTitle = await screen.findByText('删除历史记录');
+    expect(historyApi.deleteByCode).not.toHaveBeenCalled();
+
+    const dialogCard = dialogTitle.parentElement as HTMLElement;
+    fireEvent.click(within(dialogCard).getByRole('button', { name: '删除' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /MARKET/ })).not.toBeInTheDocument();

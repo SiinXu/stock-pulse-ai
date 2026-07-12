@@ -8,6 +8,20 @@ import type { DecisionSignalItem } from '../../types/decisionSignals';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import PortfolioPage from '../PortfolioPage';
 
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  fireEvent.click(trigger);
+  const listbox = document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
+
 const {
   getAccounts,
   getSnapshot,
@@ -485,7 +499,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     const accountSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accountSelect, { target: { value: '1' } });
+    chooseOption(accountSelect, '1');
 
     await waitFor(() => {
       expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false });
@@ -655,7 +669,7 @@ describe('PortfolioPage FX refresh', () => {
     const signalCallsBeforeSwitch = getLatestDecisionSignals.mock.calls.length;
 
     const accountSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accountSelect, { target: { value: '2' } });
+    chooseOption(accountSelect, '2');
 
     await waitFor(() => {
       expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 2, costMethod: 'fifo', includeRealtime: false });
@@ -719,7 +733,7 @@ describe('PortfolioPage FX refresh', () => {
     expect(await screen.findByText('600519')).toBeInTheDocument();
 
     const accountSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accountSelect, { target: { value: '2' } });
+    chooseOption(accountSelect, '2');
 
     expect(await screen.findByText('新账号信号')).toBeInTheDocument();
 
@@ -1009,13 +1023,13 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     const accountSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accountSelect, { target: { value: '1' } });
+    chooseOption(accountSelect, '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
 
     fireEvent.click(screen.getByRole('button', { name: '刷新汇率' }));
     expect(await screen.findByRole('button', { name: '刷新中...' })).toBeDisabled();
 
-    fireEvent.change(accountSelect, { target: { value: '2' } });
+    chooseOption(accountSelect, '2');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 2, costMethod: 'fifo', includeRealtime: false }));
     await waitFor(() => expect(screen.getByRole('button', { name: '刷新汇率' })).not.toBeDisabled());
 
@@ -1059,7 +1073,7 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '刷新汇率' }));
     expect(await screen.findByRole('button', { name: '刷新中...' })).toBeDisabled();
 
-    fireEvent.change(costMethodSelect, { target: { value: 'avg' } });
+    chooseOption(costMethodSelect, 'avg');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: undefined, costMethod: 'avg', includeRealtime: false }));
     await waitFor(() => expect(screen.getByRole('button', { name: '刷新汇率' })).not.toBeDisabled());
 
@@ -1093,7 +1107,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     const accountSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accountSelect, { target: { value: '1' } });
+    chooseOption(accountSelect, '1');
 
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '删除账户' }));
@@ -1107,6 +1121,9 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(deleteAccount).toHaveBeenCalledWith(1));
     await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText('Main (#1)')).not.toBeInTheDocument());
-    expect(screen.getByRole('option', { name: 'Alt (#2)' })).toBeInTheDocument();
+    fireEvent.click(accountSelect);
+    const accountListbox = document.getElementById(accountSelect.getAttribute('aria-controls')!)!;
+    expect(within(accountListbox).getByRole('option', { name: 'Alt (#2)' })).toBeInTheDocument();
+    expect(within(accountListbox).queryByRole('option', { name: 'Main (#1)' })).not.toBeInTheDocument();
   });
 });

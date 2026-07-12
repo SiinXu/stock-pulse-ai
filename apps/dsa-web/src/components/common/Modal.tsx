@@ -1,8 +1,9 @@
 import type React from 'react';
-import { useEffect } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { useDialogA11y } from './useDialogA11y';
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,28 +14,14 @@ interface ModalProps {
 }
 
 /**
- * Centered modal dialog with backdrop, Escape-to-close and body scroll lock.
+ * Centered modal dialog with backdrop, focus management, Escape-to-close and
+ * body scroll lock (see useDialogA11y).
  */
 export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, className = '' }) => {
   const { t } = useUiLanguage();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen, onClose]);
+  useDialogA11y({ isOpen, containerRef: dialogRef, onEscape: onClose });
 
   if (!isOpen) {
     return null;
@@ -47,10 +34,12 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
       role="presentation"
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
         className={cn(
-          'flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl',
+          'flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl focus:outline-none',
           className,
         )}
         onClick={(event) => event.stopPropagation()}

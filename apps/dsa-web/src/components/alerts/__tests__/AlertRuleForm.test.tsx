@@ -1,8 +1,30 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { AlertRuleForm } from '../AlertRuleForm';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function openListbox(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+
+function closeListbox(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  const listbox = openListbox(trigger);
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
 
 const { getAccounts } = vi.hoisted(() => ({
   getAccounts: vi.fn(),
@@ -59,10 +81,10 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: 'aapl' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'price_change_percent' } });
-    fireEvent.change(screen.getByLabelText('方向'), { target: { value: 'down' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'price_change_percent');
+    chooseOption(screen.getByLabelText('方向'), 'down');
     fireEvent.change(screen.getByLabelText('涨跌幅阈值（%）'), { target: { value: '3.5' } });
-    fireEvent.change(screen.getByLabelText('严重级别'), { target: { value: 'critical' } });
+    chooseOption(screen.getByLabelText('严重级别'), 'critical');
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     await waitFor(() => {
@@ -79,7 +101,7 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: 'msft' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'volume_spike' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'volume_spike');
     fireEvent.change(screen.getByLabelText('成交量放大倍数'), { target: { value: '2.5' } });
     fireEvent.click(screen.getByLabelText('创建后立即启用'));
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
@@ -98,8 +120,8 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'macd_cross' } });
-    fireEvent.change(screen.getByLabelText('交叉方向'), { target: { value: 'bearish_cross' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'macd_cross');
+    chooseOption(screen.getByLabelText('交叉方向'), 'bearish_cross');
     fireEvent.change(screen.getByLabelText('快线周期'), { target: { value: '6' } });
     fireEvent.change(screen.getByLabelText('慢线周期'), { target: { value: '13' } });
     fireEvent.change(screen.getByLabelText('信号周期'), { target: { value: '5' } });
@@ -123,7 +145,7 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'rsi_threshold' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'rsi_threshold');
     fireEvent.change(screen.getByLabelText('RSI 阈值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
@@ -135,7 +157,7 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'macd_cross' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'macd_cross');
     fireEvent.change(screen.getByLabelText('快线周期'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('慢线周期'), { target: { value: '250' } });
     fireEvent.change(screen.getByLabelText('信号周期'), { target: { value: '250' } });
@@ -149,13 +171,13 @@ describe('AlertRuleForm', () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
     fireEvent.change(screen.getByLabelText('标的代码'), { target: { value: '600519' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'rsi_threshold' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'rsi_threshold');
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('RSI 阈值不能为空');
     expect(onSubmit).not.toHaveBeenCalled();
 
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'cci_threshold' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'cci_threshold');
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('CCI 阈值不能为空');
@@ -187,8 +209,11 @@ describe('AlertRuleForm', () => {
   it('filters alert types and submits a watchlist rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('目标范围'), { target: { value: 'watchlist' } });
-    expect(screen.queryByText('组合止损')).not.toBeInTheDocument();
+    chooseOption(screen.getByLabelText('目标范围'), 'watchlist');
+    const ruleTypeSelect = screen.getByLabelText('规则类型');
+    const ruleTypeListbox = openListbox(ruleTypeSelect);
+    expect(within(ruleTypeListbox).queryByText('组合止损')).not.toBeInTheDocument();
+    closeListbox(ruleTypeSelect);
     fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
@@ -205,11 +230,14 @@ describe('AlertRuleForm', () => {
   it('loads accounts and submits portfolio stop-loss mode', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('目标范围'), { target: { value: 'portfolio_account' } });
+    chooseOption(screen.getByLabelText('目标范围'), 'portfolio_account');
     await waitFor(() => expect(getAccounts).toHaveBeenCalledWith(false));
-    expect(screen.queryByText('价格突破')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('账户'), { target: { value: '9' } });
-    fireEvent.change(screen.getByLabelText('止损模式'), { target: { value: 'breach' } });
+    const ruleTypeSelect = screen.getByLabelText('规则类型');
+    const ruleTypeListbox = openListbox(ruleTypeSelect);
+    expect(within(ruleTypeListbox).queryByText('价格突破')).not.toBeInTheDocument();
+    closeListbox(ruleTypeSelect);
+    chooseOption(screen.getByLabelText('账户'), '9');
+    chooseOption(screen.getByLabelText('止损模式'), 'breach');
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     await waitFor(() => {
@@ -225,25 +253,34 @@ describe('AlertRuleForm', () => {
   it('renders portfolio alert type options in English UI mode', async () => {
     renderEnglishForm();
 
-    fireEvent.change(screen.getByLabelText('Target scope'), { target: { value: 'portfolio_account' } });
+    chooseOption(screen.getByLabelText('Target scope'), 'portfolio_account');
 
     await waitFor(() => expect(getAccounts).toHaveBeenCalledWith(false));
-    expect(screen.getByRole('option', { name: 'Portfolio drawdown' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Portfolio stop loss' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Info' })).toBeInTheDocument();
+    const ruleTypeSelect = screen.getByLabelText('Rule type');
+    const ruleTypeListbox = openListbox(ruleTypeSelect);
+    expect(within(ruleTypeListbox).getByRole('option', { name: 'Portfolio drawdown' })).toBeInTheDocument();
+    expect(within(ruleTypeListbox).getByRole('option', { name: 'Portfolio stop loss' })).toBeInTheDocument();
+    expect(within(ruleTypeListbox).queryByText('组合回撤')).not.toBeInTheDocument();
+    closeListbox(ruleTypeSelect);
+    const severitySelect = screen.getByLabelText('Severity');
+    const severityListbox = openListbox(severitySelect);
+    expect(within(severityListbox).getByRole('option', { name: 'Info' })).toBeInTheDocument();
+    closeListbox(severitySelect);
     expect(screen.queryByText('组合回撤')).not.toBeInTheDocument();
   });
 
   it('submits a market light status rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('目标范围'), { target: { value: 'market' } });
-    expect(screen.getByRole('option', { name: 'A 股（cn）' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '港股（hk）' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '美股（us）' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: '日股（jp）' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: '韩股（kr）' })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('市场区域'), { target: { value: 'hk' } });
+    chooseOption(screen.getByLabelText('目标范围'), 'market');
+    const regionSelect = screen.getByLabelText('市场区域');
+    const regionListbox = openListbox(regionSelect);
+    expect(within(regionListbox).getByRole('option', { name: 'A 股（cn）' })).toBeInTheDocument();
+    expect(within(regionListbox).getByRole('option', { name: '港股（hk）' })).toBeInTheDocument();
+    expect(within(regionListbox).getByRole('option', { name: '美股（us）' })).toBeInTheDocument();
+    expect(within(regionListbox).queryByRole('option', { name: '日股（jp）' })).not.toBeInTheDocument();
+    expect(within(regionListbox).queryByRole('option', { name: '韩股（kr）' })).not.toBeInTheDocument();
+    fireEvent.click(within(regionListbox).getByRole('option', { name: '港股（hk）' }));
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
     await waitFor(() => {
@@ -259,21 +296,24 @@ describe('AlertRuleForm', () => {
   it('keeps JP/KR out of market light options in English UI mode', () => {
     renderEnglishForm();
 
-    fireEvent.change(screen.getByLabelText('Target scope'), { target: { value: 'market' } });
+    chooseOption(screen.getByLabelText('Target scope'), 'market');
 
-    expect(screen.getByRole('option', { name: 'A-shares (cn)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Hong Kong (hk)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'US (us)' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Japan (jp)' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Korea (kr)' })).not.toBeInTheDocument();
+    const regionSelect = screen.getByLabelText('Market region');
+    const regionListbox = openListbox(regionSelect);
+    expect(within(regionListbox).getByRole('option', { name: 'A-shares (cn)' })).toBeInTheDocument();
+    expect(within(regionListbox).getByRole('option', { name: 'Hong Kong (hk)' })).toBeInTheDocument();
+    expect(within(regionListbox).getByRole('option', { name: 'US (us)' })).toBeInTheDocument();
+    expect(within(regionListbox).queryByRole('option', { name: 'Japan (jp)' })).not.toBeInTheDocument();
+    expect(within(regionListbox).queryByRole('option', { name: 'Korea (kr)' })).not.toBeInTheDocument();
+    closeListbox(regionSelect);
   });
 
   it('submits a market light score-drop rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('目标范围'), { target: { value: 'market' } });
-    fireEvent.change(screen.getByLabelText('市场区域'), { target: { value: 'us' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'market_light_score_drop' } });
+    chooseOption(screen.getByLabelText('目标范围'), 'market');
+    chooseOption(screen.getByLabelText('市场区域'), 'us');
+    chooseOption(screen.getByLabelText('规则类型'), 'market_light_score_drop');
     fireEvent.change(screen.getByLabelText('Score 下降阈值'), { target: { value: '12' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
@@ -291,9 +331,9 @@ describe('AlertRuleForm', () => {
     getAccounts.mockRejectedValueOnce(new Error('boom'));
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
-    fireEvent.change(screen.getByLabelText('目标范围'), { target: { value: 'portfolio_holdings' } });
+    chooseOption(screen.getByLabelText('目标范围'), 'portfolio_holdings');
     expect(await screen.findByRole('alert')).toHaveTextContent('boom');
-    expect(screen.getByLabelText('账户')).toHaveValue('all');
+    expect(screen.getByLabelText('账户')).toHaveAttribute('data-value', 'all');
   });
 
   it('keeps form values when submit reports failure', async () => {

@@ -117,6 +117,7 @@ const HomePage: React.FC = () => {
     loadMarketReviewHistory,
     refreshMarketReviewHistory,
     selectHistoryItem,
+    clearSelectedReportForStock,
     submitAnalysis,
     notify,
     setNotify,
@@ -394,17 +395,18 @@ const HomePage: React.FC = () => {
     setIsDeletingStock(true);
     try {
       await historyApi.deleteByCode(stockCode);
+      // Drop the open report if it belonged to the stock we just deleted,
+      // so the viewer doesn't keep showing a now-deleted record.
+      clearSelectedReportForStock(stockCode);
       await refreshStockBar();
       await refreshHistory(true);
       if (stockCode === 'MARKET') {
         await refreshMarketReviewHistory(false);
       }
-    } catch {
-      // error silently ignored
     } finally {
       setIsDeletingStock(false);
     }
-  }, [isDeletingStock, refreshMarketReviewHistory, refreshStockBar, refreshHistory]);
+  }, [isDeletingStock, clearSelectedReportForStock, refreshMarketReviewHistory, refreshStockBar, refreshHistory]);
 
   const handleSubmitAnalysis = useCallback(
     (

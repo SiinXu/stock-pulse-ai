@@ -8,6 +8,7 @@ import type {
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
+import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
 
 type ToastState = {
   type: 'success';
@@ -77,6 +78,9 @@ export function useSystemConfig() {
   // UI state
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [activeCategory, setActiveCategory] = useState<string>('base');
+  const [activeSubCategory, setActiveSubCategory] = useState<string | null>(null);
+  const activeCategoryRef = useRef<string>('base');
+  const activeSubCategoryRef = useRef<string | null>(null);
   const [validationIssues, setValidationIssues] = useState<ConfigValidationIssue[]>([]);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -210,10 +214,26 @@ export function useSystemConfig() {
       });
 
       const defaultCategory = sorted[0]?.schema?.category || 'base';
-      setActiveCategory((current) => {
-        const exists = sorted.some((item) => item.schema?.category === current);
-        return exists ? current : defaultCategory;
-      });
+      const currentCategory = activeCategoryRef.current;
+      const categoryExists = sorted.some((item) => item.schema?.category === currentCategory);
+      const resolvedCategory = categoryExists ? currentCategory : defaultCategory;
+
+      const subs = getSubCategories(resolvedCategory);
+      let resolvedSub = activeSubCategoryRef.current;
+      if (!subs) {
+        resolvedSub = null;
+      } else if (
+        resolvedCategory !== currentCategory ||
+        !resolvedSub ||
+        !subs.some((sub) => sub.id === resolvedSub)
+      ) {
+        resolvedSub = subs[0]?.id ?? null;
+      }
+
+      activeCategoryRef.current = resolvedCategory;
+      activeSubCategoryRef.current = resolvedSub;
+      setActiveCategory(resolvedCategory);
+      setActiveSubCategory(resolvedSub);
       setValidationIssues([]);
     },
     [],
@@ -274,6 +294,26 @@ export function useSystemConfig() {
       ...previous,
       [key]: value,
     }));
+  }, []);
+
+  const selectCategory = useCallback((category: string) => {
+    const sub = getDefaultSubCategory(category);
+    activeCategoryRef.current = category;
+    activeSubCategoryRef.current = sub;
+    setActiveCategory(category);
+    setActiveSubCategory(sub);
+  }, []);
+
+  const selectSubCategory = useCallback((sub: string) => {
+    activeSubCategoryRef.current = sub;
+    setActiveSubCategory(sub);
+  }, []);
+
+  const selectTab = useCallback((category: string, sub: string | null) => {
+    activeCategoryRef.current = category;
+    activeSubCategoryRef.current = sub;
+    setActiveCategory(category);
+    setActiveSubCategory(sub);
   }, []);
 
   const getChangedItems = useCallback((): SystemConfigUpdateItem[] => {
@@ -400,8 +440,12 @@ export function useSystemConfig() {
 
     // UI state
     activeCategory,
-    setActiveCategory,
+    activeSubCategory,
+    selectCategory,
+    selectSubCategory,
+    selectTab,
     hasDirty,
+    dirtyKeys,
     dirtyCount: dirtyKeys.length,
     toast,
     clearToast,

@@ -4,7 +4,7 @@ import { Check, Minus, X } from 'lucide-react';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Card, Badge, EmptyState, Pagination, StatusDot, Tooltip } from '../components/common';
+import { ApiErrorAlert, Card, Badge, EmptyState, Pagination, Select, StatusDot, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -26,9 +26,9 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/de
 import { getMarketPhaseSummaryLabel } from '../utils/marketPhase';
 
 const BACKTEST_INPUT_CLASS =
-  'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const BACKTEST_COMPACT_INPUT_CLASS =
-  'input-surface input-focus-glow h-10 rounded-xl border bg-transparent px-3 py-2 text-xs transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
 // ============ Helpers ============
@@ -471,19 +471,14 @@ const BacktestPage: React.FC = () => {
               className={`${BACKTEST_COMPACT_INPUT_CLASS} w-24 text-center tabular-nums`}
             />
           </div>
-          <div className="flex flex-col gap-1 whitespace-nowrap">
-            <span className="text-xs text-muted-text">{text.phase}</span>
-            <select
-              value={phaseFilter}
-              onChange={(e) => setPhaseFilter(e.target.value as BacktestPhaseFilter)}
-              disabled={isRunning}
-              className={`${BACKTEST_COMPACT_INPUT_CLASS} w-28`}
-            >
-              {phaseFilterOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label={text.phase}
+            value={phaseFilter}
+            onChange={(value) => setPhaseFilter(value as BacktestPhaseFilter)}
+            disabled={isRunning}
+            className="w-28 whitespace-nowrap"
+            options={phaseFilterOptions.map((option) => ({ value: option.value, label: option.label }))}
+          />
           <div className="flex flex-col gap-1 whitespace-nowrap">
             <span className="text-xs text-muted-text">{text.startDate}</span>
             <input

@@ -21,6 +21,11 @@ vi.mock('../../../api/systemConfig', () => ({
   },
 }));
 
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
 describe('LLMChannelEditor', () => {
   beforeEach(() => {
     update.mockReset();
@@ -28,9 +33,27 @@ describe('LLMChannelEditor', () => {
     discoverLLMChannelModels.mockReset();
   });
 
+  function openListbox(trigger: HTMLElement) {
+    fireEvent.click(trigger);
+    return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+  }
+
+  function chooseOption(trigger: HTMLElement, value: string) {
+    const listbox = openListbox(trigger);
+    const option = within(listbox)
+      .getAllByRole('option')
+      .find((item) => item.getAttribute('data-value') === value)!;
+    fireEvent.click(option);
+  }
+
   function selectOptionValues(label: string): string[] {
-    const select = screen.getByLabelText(label) as HTMLSelectElement;
-    return Array.from(select.options).map((option) => option.value);
+    const trigger = screen.getByLabelText(label);
+    const listbox = openListbox(trigger);
+    const values = within(listbox)
+      .getAllByRole('option')
+      .map((option) => option.getAttribute('data-value') ?? '');
+    fireEvent.click(trigger);
+    return values;
   }
 
   const openAiItems = [
@@ -395,13 +418,12 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    const primaryModelSelect = screen.getByRole('combobox', { name: '主模型' });
-    const agentModelSelect = screen.getByRole('combobox', { name: 'Agent 主模型' });
-    const visionModelSelect = screen.getByRole('combobox', { name: 'Vision 模型' });
-
-    expect(within(primaryModelSelect).getByRole('option', { name: 'minimax/MiniMax-M1' })).toBeInTheDocument();
-    expect(within(agentModelSelect).getByRole('option', { name: 'minimax/MiniMax-M1' })).toBeInTheDocument();
-    expect(within(visionModelSelect).getByRole('option', { name: 'minimax/MiniMax-M1' })).toBeInTheDocument();
+    for (const label of ['主模型', 'Agent 主模型', 'Vision 模型']) {
+      const trigger = screen.getByLabelText(label);
+      const listbox = openListbox(trigger);
+      expect(within(listbox).getByRole('option', { name: 'minimax/MiniMax-M1' })).toBeInTheDocument();
+      fireEvent.click(trigger);
+    }
   });
 
   it('uses DeepSeek V4 defaults when adding the official preset', async () => {
@@ -414,7 +436,7 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'deepseek' } });
+    chooseOption(screen.getByRole('combobox'), 'deepseek');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
 
     await screen.findByRole('button', { name: /DeepSeek 官方/i });
@@ -435,12 +457,12 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: preset } });
+    chooseOption(screen.getByRole('combobox'), preset);
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
 
     await screen.findByRole('button', { name: buttonName });
     expect(screen.getAllByRole('combobox').some((select) => (
-      select instanceof HTMLSelectElement && select.value === 'openai'
+      select.getAttribute('data-value') === 'openai'
     ))).toBe(true);
     expect(screen.getByLabelText('Base URL')).toHaveValue(baseUrl);
     expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue(models);
@@ -534,7 +556,7 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'deepseek' } });
+    chooseOption(screen.getByRole('combobox'), 'deepseek');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
 
     await screen.findByRole('button', { name: /DeepSeek 官方/i });
@@ -563,7 +585,7 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'minimax' } });
+    chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
@@ -604,7 +626,7 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'minimax' } });
+    chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
     fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
@@ -1367,9 +1389,9 @@ describe('LLMChannelEditor', () => {
     });
 
     await waitFor(() => {
-      expect(primaryModelSelect).toHaveValue('deepseek/deepseek-chat');
-      expect(agentModelSelect).toHaveValue('deepseek/deepseek-reasoner');
-      expect(visionModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+      expect(primaryModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-chat');
+      expect(agentModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-reasoner');
+      expect(visionModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-reasoner');
     });
 
     fireEvent.change(modelInput, {
@@ -1377,9 +1399,9 @@ describe('LLMChannelEditor', () => {
     });
 
     await waitFor(() => {
-      expect(primaryModelSelect).toHaveValue('deepseek/deepseek-chat');
-      expect(agentModelSelect).toHaveValue('deepseek/deepseek-reasoner');
-      expect(visionModelSelect).toHaveValue('deepseek/deepseek-reasoner');
+      expect(primaryModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-chat');
+      expect(agentModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-reasoner');
+      expect(visionModelSelect).toHaveAttribute('data-value', 'deepseek/deepseek-reasoner');
       expect(screen.getByLabelText('deepseek/deepseek-v4-pro')).toBeChecked();
     });
   });

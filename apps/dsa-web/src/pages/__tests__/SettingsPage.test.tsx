@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
 import type { SetupStatusResponse } from '../../types/systemConfig';
+import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import SettingsPage from '../SettingsPage';
 
 const {
@@ -25,6 +26,7 @@ const {
   load,
   clearToast,
   setActiveCategory,
+  selectTab,
   save,
   resetDraft,
   setDraftValue,
@@ -56,6 +58,7 @@ const {
   load: vi.fn(),
   clearToast: vi.fn(),
   setActiveCategory: vi.fn(),
+  selectTab: vi.fn(),
   save: vi.fn(),
   resetDraft: vi.fn(),
   setDraftValue: vi.fn(),
@@ -119,6 +122,7 @@ vi.mock('../../utils/constants', async () => {
 vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
+  ...(await import('../../components/settings/settingsSubCategories')),
   isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
@@ -194,11 +198,12 @@ vi.mock('../../components/settings', async () => ({
   SettingsCategoryNav: ({
     categories,
     activeCategory,
-    onSelect,
+    onSelectTab,
   }: {
     categories: Array<{ category: string; title: string }>;
     activeCategory: string;
-    onSelect: (value: string) => void;
+    activeSubCategory: string | null;
+    onSelectTab: (category: string, sub: string | null) => void;
   }) => (
     <nav>
       {categories.map((category) => (
@@ -206,7 +211,7 @@ vi.mock('../../components/settings', async () => ({
           key={category.category}
           type="button"
           aria-pressed={activeCategory === category.category}
-          onClick={() => onSelect(category.category)}
+          onClick={() => onSelectTab(category.category, null)}
         >
           {category.title}
         </button>
@@ -294,7 +299,9 @@ type ConfigState = {
   itemsByCategory: Record<string, Array<Record<string, unknown>>>;
   issueByKey: Record<string, unknown[]>;
   activeCategory: string;
-  setActiveCategory: typeof setActiveCategory;
+  activeSubCategory: string | null;
+  selectCategory: typeof setActiveCategory;
+  selectTab: typeof selectTab;
   hasDirty: boolean;
   dirtyCount: number;
   toast: null;
@@ -318,10 +325,7 @@ type ConfigState = {
 
 type ConfigOverride = Partial<ConfigState>;
 
-function buildSystemConfigState(overrides: ConfigOverride = {}) {
-  return {
-    categories: baseCategories,
-    itemsByCategory: {
+const defaultItemsByCategory: Record<string, Array<Record<string, unknown>>> = {
       system: [
         {
           key: 'ADMIN_AUTH_ENABLED',
@@ -422,10 +426,22 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
           },
         },
       ],
-    },
+};
+
+function buildSystemConfigState(overrides: ConfigOverride = {}) {
+  const activeCategory = overrides.activeCategory ?? 'system';
+  const itemsByCategory = overrides.itemsByCategory ?? defaultItemsByCategory;
+  const activeSubCategory = overrides.activeSubCategory !== undefined
+    ? overrides.activeSubCategory
+    : getDefaultSubCategory(activeCategory, itemsByCategory as Record<string, Array<{ key: string }>>);
+  return {
+    categories: baseCategories,
+    itemsByCategory,
     issueByKey: {},
-    activeCategory: 'system',
-    setActiveCategory,
+    activeCategory,
+    activeSubCategory,
+    selectCategory: setActiveCategory,
+    selectTab,
     hasDirty: false,
     dirtyCount: 0,
     toast: null,
@@ -930,7 +946,9 @@ describe('SettingsPage', () => {
     // Clear the initial load call from useEffect
     vi.clearAllMocks();
 
+    // Reset now asks for confirmation before discarding dirty drafts.
     fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
     // Reset should call resetDraft and NOT call load
     expect(resetDraft).toHaveBeenCalledTimes(1);
@@ -1106,8 +1124,9 @@ describe('SettingsPage', () => {
     // Clear initial useEffect load call
     vi.clearAllMocks();
 
-    // Click reset button
+    // Click reset button, then confirm discarding drafts.
     fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
     // Verify semantic: reset should only discard local changes
     // It should NOT trigger a network load
@@ -1206,6 +1225,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'ai_model',
+      activeSubCategory: 'model',
       itemsByCategory: {
         ...configState.itemsByCategory,
         ai_model: [

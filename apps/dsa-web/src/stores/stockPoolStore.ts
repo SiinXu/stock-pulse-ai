@@ -104,6 +104,7 @@ export interface StockPoolState {
   refreshMarketReviewHistory: (silent?: boolean) => Promise<void>;
   loadMoreMarketReviewHistory: () => Promise<void>;
   selectHistoryItem: (recordId: number, isUserInitiated?: boolean) => Promise<void>;
+  clearSelectedReportForStock: (stockCode: string) => void;
   toggleHistorySelection: (recordId: number) => void;
   toggleSelectAllVisible: () => void;
   deleteSelectedHistory: () => Promise<void>;
@@ -690,6 +691,19 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       return;
     }
     await fetchMarketReviewHistory(get, set, { reset: false });
+  },
+
+  clearSelectedReportForStock: (stockCode) => {
+    const { selectedReport } = get();
+    if (!selectedReport) {
+      return;
+    }
+    const matchesDeletedStock = stockCode === 'MARKET'
+      ? selectedReport.meta.reportType === 'market_review'
+      : selectedReport.meta.stockCode === stockCode;
+    if (matchesDeletedStock) {
+      set({ selectedReport: null });
+    }
   },
 
   selectHistoryItem: async (recordId, isUserInitiated = true) => {

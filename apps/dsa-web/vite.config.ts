@@ -1,8 +1,21 @@
 import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+
+// The Loupe dev annotator is an optional local tool (optionalDependencies).
+// Only wire it into dev optimizeDeps when it actually resolves, so a clean
+// checkout without the sibling clone still runs dev/build.
+const isLoupeAvailable = (() => {
+  try {
+    createRequire(import.meta.url).resolve('@loupe/dev-annotator')
+    return true
+  } catch {
+    return false
+  }
+})()
 
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -100,9 +113,14 @@ export default defineConfig({
   // instead of a second one from the linked package's own node_modules.
   resolve: {
     dedupe: ['react', 'react-dom'],
+    // When the optional Loupe package is absent, alias it to a local no-op stub
+    // so dev/build resolve cleanly instead of failing on a missing module.
+    alias: isLoupeAvailable
+      ? {}
+      : { '@loupe/dev-annotator': path.resolve(__dirname, 'src/dev/loupeStub.ts') },
   },
   optimizeDeps: {
-    include: ['@loupe/dev-annotator'],
+    include: isLoupeAvailable ? ['@loupe/dev-annotator'] : [],
   },
   plugins: [
     tailwindcss(),

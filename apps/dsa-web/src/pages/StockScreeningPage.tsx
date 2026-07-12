@@ -38,7 +38,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, InlineAlert } from '../components/common';
+import { AppPage, Button, InlineAlert, Select } from '../components/common';
 
 const MARKETS = [{ id: 'cn', label: 'A 股' }];
 const SCREEN_TASK_STORAGE_KEY = 'dsa.alphasift.activeScreenTask.v1';
@@ -1183,21 +1183,13 @@ const StockScreeningPage: React.FC = () => {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr_180px_auto] lg:items-end">
-          <label className="space-y-2 text-xs font-medium text-secondary-text">
-            市场
-            <select
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-cyan"
-              value={market}
-              disabled={loading}
-              onChange={(event) => handleMarketChange(event.target.value)}
-            >
-              {MARKETS.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            label="市场"
+            value={market}
+            disabled={loading}
+            onChange={handleMarketChange}
+            options={MARKETS.map((item) => ({ value: item.id, label: item.label }))}
+          />
 
           <label className="space-y-2 text-xs font-medium text-secondary-text">
             策略参数

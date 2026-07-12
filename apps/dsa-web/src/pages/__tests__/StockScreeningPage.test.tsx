@@ -1,6 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StockScreeningPage from '../StockScreeningPage';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
 
 const {
   enableAlphaSift,
@@ -752,8 +757,13 @@ describe('StockScreeningPage', () => {
 
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
 
-    const marketSelect = screen.getByLabelText('市场') as HTMLSelectElement;
-    expect(Array.from(marketSelect.options).map((option) => option.value)).toEqual(['cn']);
+    const marketSelect = screen.getByLabelText('市场');
+    fireEvent.click(marketSelect);
+    const marketListbox = document.getElementById(marketSelect.getAttribute('aria-controls')!)!;
+    expect(
+      within(marketListbox).getAllByRole('option').map((option) => option.getAttribute('data-value')),
+    ).toEqual(['cn']);
+    fireEvent.click(marketSelect);
 
     [
       ['平衡选股', 'balanced_alpha'],

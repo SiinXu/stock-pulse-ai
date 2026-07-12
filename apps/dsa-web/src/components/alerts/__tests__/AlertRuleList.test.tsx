@@ -1,7 +1,25 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertRuleList } from '../AlertRuleList';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function openListbox(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  const listbox = openListbox(trigger);
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { AlertRuleItem } from '../../../types/alerts';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
@@ -120,8 +138,8 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('KDJ(9,3,3) 死叉')).toBeInTheDocument();
     expect(screen.getByText('冷却中')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('启停状态'), { target: { value: 'enabled' } });
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'price_cross' } });
+    chooseOption(screen.getByLabelText('启停状态'), 'enabled');
+    chooseOption(screen.getByLabelText('规则类型'), 'price_cross');
     fireEvent.click(screen.getByRole('button', { name: '2' }));
 
     expect(onEnabledFilterChange).toHaveBeenCalledWith('enabled');
@@ -199,7 +217,10 @@ describe('AlertRuleList', () => {
     });
 
     expect(screen.getByText('Alert rules')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'All statuses' })).toBeInTheDocument();
+    const statusSelect = screen.getByLabelText('Status');
+    const statusListbox = openListbox(statusSelect);
+    expect(within(statusListbox).getByRole('option', { name: 'All statuses' })).toBeInTheDocument();
+    fireEvent.click(statusSelect);
     expect(screen.getAllByText('Portfolio drawdown').length).toBeGreaterThan(0);
     expect(screen.getByText('Portfolio account')).toBeInTheDocument();
     expect(screen.getAllByText('Enabled').length).toBeGreaterThan(0);
@@ -244,7 +265,7 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('红灯 / 黄灯')).toBeInTheDocument();
     expect(screen.getByText('Score 下降 >= 15')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('规则类型'), { target: { value: 'market_light_score_drop' } });
+    chooseOption(screen.getByLabelText('规则类型'), 'market_light_score_drop');
 
     expect(onAlertTypeFilterChange).toHaveBeenCalledWith('market_light_score_drop');
   });

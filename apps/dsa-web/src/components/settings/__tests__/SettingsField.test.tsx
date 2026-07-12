@@ -1,10 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { getFieldDescriptionZh, getFieldTitleZh } from '../../../utils/systemConfigI18n';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { SettingsField } from '../SettingsField';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function openListbox(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
 
 describe('SettingsField', () => {
   it('prefers localized Chinese field titles over backend schema titles', () => {
@@ -222,10 +232,11 @@ describe('SettingsField', () => {
     );
 
     const select = screen.getByLabelText('最小通知级别');
-    expect(screen.getByRole('option', { name: '未设置' })).not.toBeDisabled();
-    expect(screen.queryByRole('option', { name: '请选择' })).not.toBeInTheDocument();
+    const listbox = openListbox(select);
+    expect(within(listbox).getByRole('option', { name: '未设置' })).toBeInTheDocument();
+    expect(within(listbox).queryByRole('option', { name: '请选择' })).not.toBeInTheDocument();
 
-    fireEvent.change(select, { target: { value: '' } });
+    fireEvent.click(within(listbox).getByRole('option', { name: '未设置' }));
 
     expect(onChange).toHaveBeenCalledWith('NOTIFICATION_MIN_SEVERITY', '');
   });
@@ -260,7 +271,7 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getByLabelText('分析生成方式')).toHaveValue('litellm');
+    expect(screen.getByLabelText('分析生成方式')).toHaveAttribute('data-value', 'litellm');
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -313,12 +324,14 @@ describe('SettingsField', () => {
         />
       );
 
+      const listbox = openListbox(screen.getByRole('combobox'));
+
       expectedLabels.forEach((label) => {
-        expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
+        expect(within(listbox).getByRole('option', { name: label })).toBeInTheDocument();
       });
 
       options.forEach((rawOption) => {
-        expect(screen.queryByRole('option', { name: rawOption })).not.toBeInTheDocument();
+        expect(within(listbox).queryByRole('option', { name: rawOption })).not.toBeInTheDocument();
       });
 
       unmount();
@@ -398,10 +411,12 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getByLabelText('上下文压缩策略')).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '成本优先' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '均衡推荐' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '长上下文原文优先' })).toBeInTheDocument();
+    const profileSelect = screen.getByLabelText('上下文压缩策略');
+    expect(profileSelect).toBeInTheDocument();
+    const listbox = openListbox(profileSelect);
+    expect(within(listbox).getByRole('option', { name: '成本优先' })).toBeInTheDocument();
+    expect(within(listbox).getByRole('option', { name: '均衡推荐' })).toBeInTheDocument();
+    expect(within(listbox).getByRole('option', { name: '长上下文原文优先' })).toBeInTheDocument();
   });
 
   it('renders blank-value preset guidance for context compression numeric fields', () => {

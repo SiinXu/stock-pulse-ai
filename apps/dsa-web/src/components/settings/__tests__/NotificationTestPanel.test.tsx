@@ -1,9 +1,27 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { useUiLanguage, UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { NotificationTestPanel } from '../NotificationTestPanel';
+
+// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
+
+function openListbox(trigger: HTMLElement) {
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+
+function chooseOption(trigger: HTMLElement, value: string) {
+  const listbox = openListbox(trigger);
+  const option = within(listbox)
+    .getAllByRole('option')
+    .find((item) => item.getAttribute('data-value') === value)!;
+  fireEvent.click(option);
+}
 
 const testNotificationChannel = vi.hoisted(() => vi.fn());
 
@@ -48,9 +66,12 @@ describe('NotificationTestPanel', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '配置' }));
-    expect(screen.getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
+    const channelSelect = screen.getByLabelText('渠道');
+    const channelListbox = openListbox(channelSelect);
+    expect(within(channelListbox).getByRole('option', { name: 'ntfy' })).toBeInTheDocument();
+    expect(within(channelListbox).getByRole('option', { name: 'Gotify' })).toBeInTheDocument();
+    fireEvent.click(channelSelect);
+    chooseOption(channelSelect, 'custom');
     fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
 
     await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledWith(expect.objectContaining({
@@ -192,7 +213,7 @@ describe('NotificationTestPanel', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '配置' }));
-    fireEvent.change(screen.getByLabelText('渠道'), { target: { value: 'custom' } });
+    chooseOption(screen.getByLabelText('渠道'), 'custom');
     fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
 
     expect(await screen.findByText('测试成功')).toBeInTheDocument();

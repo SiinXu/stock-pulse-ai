@@ -81,7 +81,7 @@ function renderFieldControl(
   t: (key: UiTextKey) => string,
 ) {
   const schema = item.schema;
-  const commonClass = 'input-surface input-focus-glow h-10 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+  const commonClass = 'w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
 
@@ -89,7 +89,7 @@ function renderFieldControl(
     return (
       <textarea
         id={controlId}
-        className={`${commonClass} min-h-[92px] resize-y py-3`}
+        className={`${commonClass} min-h-[92px] resize-y py-2`}
         value={value}
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}
@@ -106,6 +106,8 @@ function renderFieldControl(
           options={normalizeSelectOptions(item.key, schema.options, language)}
           disabled={disabled || !schema.isEditable}
           placeholder={t('common.selectPlaceholder')}
+          className="md:ml-auto"
+          menuAlign="end"
         />
       );
   }
@@ -123,15 +125,17 @@ function renderFieldControl(
           disabled={isDisabled}
           onClick={() => onChange(checked ? 'false' : 'true')}
           className={cn(
-            'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
-            checked ? 'border-transparent bg-primary' : 'border-border bg-muted',
+            'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+            checked
+              ? 'bg-[linear-gradient(211.26deg,#ffff7f_0%,#7fff7f_101.17%)]'
+              : 'bg-border',
             isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           )}
         >
           <span
             className={cn(
-              'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-              checked ? 'translate-x-4' : 'translate-x-0.5',
+              'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+              checked ? 'translate-x-[18px]' : 'translate-x-0.5',
             )}
           />
         </button>
@@ -220,7 +224,7 @@ function renderFieldControl(
     <input
       id={controlId}
       type={inputType}
-      className={commonClass}
+      className={cn(commonClass, 'block h-8 md:ml-auto md:w-44')}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}

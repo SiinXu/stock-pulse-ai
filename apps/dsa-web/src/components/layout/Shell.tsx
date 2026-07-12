@@ -53,7 +53,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   }, [mobileOpen]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-dvh overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex items-start justify-between px-3 lg:hidden">
         <button
           type="button"
@@ -69,10 +69,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         </div>
       </div>
 
-      <div className="mx-auto flex h-screen w-full overflow-hidden">
+      <div className="mx-auto flex h-dvh w-full overflow-hidden">
         <aside
           className={cn(
-            'sticky top-0 z-40 hidden h-screen shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
+            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
             collapsed ? 'w-[76px]' : 'w-[228px]'
           )}
           aria-label={t('layout.desktopSidebar')}

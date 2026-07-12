@@ -1,6 +1,8 @@
 import type React from 'react';
+import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { useDialogA11y } from './useDialogA11y';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -32,6 +34,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
 }) => {
   const { t } = useUiLanguage();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const messageId = useId();
+
+  useDialogA11y({
+    isOpen,
+    containerRef: dialogRef,
+    onEscape: onCancel,
+    closeOnEscape: !cancelDisabled,
+  });
 
   if (!isOpen) return null;
 
@@ -43,13 +55,20 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           onCancel();
         }
       }}
+      role="presentation"
     >
       <div
-        className="mx-4 w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+        tabIndex={-1}
+        className="mx-4 w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200 focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="mb-2 text-lg font-medium text-foreground">{title}</h3>
-        <p className="text-sm text-secondary-text mb-6 leading-relaxed">
+        <h3 id={titleId} className="mb-2 text-lg font-medium text-foreground">{title}</h3>
+        <p id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
           {message}
         </p>
         <div className="flex justify-end gap-3">

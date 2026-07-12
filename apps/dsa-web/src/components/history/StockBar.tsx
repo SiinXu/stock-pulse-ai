@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
-import { Badge, Button, ScrollArea } from '../common';
+import { Trash2 } from 'lucide-react';
+import { Badge, Button, ConfirmDialog, InlineAlert, ScrollArea } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBarItemComponent } from './StockBarItem';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
@@ -64,14 +65,46 @@ export const StockBar: React.FC<StockBarProps> = ({
     });
   }, [deletableItems]);
 
-  const handleDeleteSelected = useCallback(async () => {
-    if (!onDeleteStock || selectedCodes.size === 0) return;
-    const codesToDelete = [...selectedCodes];
-    for (const code of codesToDelete) {
-      await onDeleteStock(code);
+  const [confirmCodes, setConfirmCodes] = useState<string[] | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const requestDeleteSingle = useCallback((code: string) => {
+    setDeleteError(null);
+    setConfirmCodes([code]);
+  }, []);
+
+  const requestDeleteSelected = useCallback(() => {
+    if (selectedCodes.size === 0) return;
+    setDeleteError(null);
+    setConfirmCodes([...selectedCodes]);
+  }, [selectedCodes]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!onDeleteStock || !confirmCodes) return;
+    const codes = confirmCodes;
+    setConfirmCodes(null);
+    try {
+      for (const code of codes) {
+        await onDeleteStock(code);
+      }
+      setSelectedCodes((prev) => {
+        const next = new Set(prev);
+        for (const code of codes) next.delete(code);
+        return next;
+      });
+    } catch {
+      setDeleteError(t('history.deleteFailed'));
     }
-    setSelectedCodes(new Set());
-  }, [onDeleteStock, selectedCodes]);
+  }, [onDeleteStock, confirmCodes, t]);
+
+  const confirmMessage = (() => {
+    if (!confirmCodes) return '';
+    if (confirmCodes.length === 1) {
+      const target = items.find((item) => item.stockCode === confirmCodes[0]);
+      return t('history.deleteConfirmSingle', { name: target?.stockName || confirmCodes[0] });
+    }
+    return t('history.deleteConfirmBatch', { count: confirmCodes.length });
+  })();
 
   return (
     <aside className={`glass-card overflow-hidden flex flex-col ${className}`}>
@@ -122,14 +155,20 @@ export const StockBar: React.FC<StockBarProps> = ({
               <Button
                 variant="danger-subtle"
                 size="xsm"
-                onClick={() => void handleDeleteSelected()}
+                onClick={requestDeleteSelected}
                 disabled={selectedCount === 0 || isDeleting}
                 isLoading={isDeleting}
+                loadingText=""
+                aria-label={t('common.delete')}
                 className="disabled:!border-transparent disabled:!bg-transparent"
               >
-                {isDeleting ? t('common.deleting') : t('common.delete')}
+                <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
               </Button>
             </div>
+          )}
+
+          {deleteError && (
+            <InlineAlert variant="danger" message={deleteError} />
           )}
         </div>
 
@@ -174,7 +213,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                     item={item}
                     isViewing={isSelected}
                     onClick={onItemClick}
-                    onDelete={onDeleteStock}
+                    onDelete={requestDeleteSingle}
                     isDeleting={isDeleting}
                     isMarketReview={isMarket}
                   />
@@ -184,6 +223,16 @@ export const StockBar: React.FC<StockBarProps> = ({
           </div>
         )}
       </ScrollArea>
+
+      <ConfirmDialog
+        isOpen={confirmCodes !== null}
+        title={t('history.deleteConfirmTitle')}
+        message={confirmMessage}
+        confirmText={t('common.delete')}
+        isDanger
+        onConfirm={() => void handleConfirmDelete()}
+        onCancel={() => setConfirmCodes(null)}
+      />
     </aside>
   );
 };

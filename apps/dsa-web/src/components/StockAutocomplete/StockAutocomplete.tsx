@@ -16,7 +16,7 @@ import { cn } from '../../utils/cn';
 import type { Market } from '../../types/stockIndex';
 
 const AUTOCOMPLETE_INPUT_CLASS =
-  'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
+  'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 
 export interface StockAutocompleteProps {
   /** Input value */

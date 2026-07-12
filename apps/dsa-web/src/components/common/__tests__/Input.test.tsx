@@ -37,7 +37,7 @@ describe('Input', () => {
     const { container } = render(<Input label="API Key" iconType="key" />);
 
     expect(container.querySelector('svg')).not.toBeNull();
-    expect(screen.getByLabelText('API Key')).toHaveClass('pl-10');
+    expect(screen.getByLabelText('API Key')).toHaveClass('pl-9');
   });
 
   it('toggles password visibility in uncontrolled mode', () => {
