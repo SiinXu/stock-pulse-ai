@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { systemConfigApi, SystemConfigConflictError, SystemConfigValidationError } from '../api/systemConfig';
 import type {
+  ConfigConflictField,
+  ConfigConflictState,
   ConfigValidationIssue,
   SystemConfigCategorySchema,
   SystemConfigItem,
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
-import { getDefaultSubCategory, getSubCategories, getSubCategoryOfKey } from '../components/settings/settingsSubCategories';
+import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
 
 type ToastState = {
   type: 'success';
@@ -25,35 +27,6 @@ type SaveResult = {
   message?: string;
   issues?: ConfigValidationIssue[];
 };
-
-type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-
-const AUTOSAVE_DEBOUNCE_MS = 800;
-// Keys whose persistence needs cross-field coordination handled by the manual
-// save flow (scheduler runtime sync) are excluded from autosave. Sensitive
-// fields are also excluded so a debounce firing mid-edit never persists (and
-// hot-reloads) a partial secret; they save via the explicit Save button.
-const AUTOSAVE_EXCLUDED_KEYS = new Set(['SCHEDULE_ENABLED']);
-
-function isAutosaveEligible(
-  key: string,
-  serverItemByKey: Record<string, SystemConfigItem>,
-): boolean {
-  if (AUTOSAVE_EXCLUDED_KEYS.has(key)) {
-    return false;
-  }
-  const schema = serverItemByKey[key]?.schema;
-  if (schema?.isSensitive) {
-    return false;
-  }
-  // A model provider couples a secret API key with non-secret Base URL / model
-  // fields; autosaving the non-secret half while the key is still a draft leaves
-  // a half-applied provider, so persist the whole provider via the explicit Save.
-  if (schema?.category === 'ai_model' && getSubCategoryOfKey('ai_model', key) === 'providers') {
-    return false;
-  }
-  return true;
-}
 
 const CATEGORY_DISPLAY_ORDER: Record<string, number> = {
   base: 10,
@@ -121,6 +94,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   const [saveError, setSaveError] = useState<ParsedApiError | null>(null);
   const [retryAction, setRetryAction] = useState<RetryAction>(null);
   const serverItemByKeyRef = useRef<Record<string, SystemConfigItem>>({});
+  // Serializes config writes: a re-entrant save() reuses the in-flight promise
+  // instead of submitting a second, stale-version transaction concurrently.
+  const savePromiseRef = useRef<Promise<SaveResult> | null>(null);
+  // Set when a save is rejected with a 409; carries the field-level three-way
+  // diff (base/server/local) so the UI can resolve conflicts without clobbering.
+  const [conflictState, setConflictState] = useState<ConfigConflictState | null>(null);
 
   const mergedItems = useMemo(() => {
     return sortItemsByOrder(
@@ -211,11 +190,16 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       items: SystemConfigItem[],
       version: string,
       token: string,
-      options?: { preserveDirty?: boolean; committedKeys?: string[] },
+      options?: {
+        preserveDirty?: boolean;
+        committedKeys?: string[];
+        committedValues?: Record<string, string>;
+      },
     ) => {
       const sorted = sortItemsByOrder(items);
       const previousServerMap = serverItemByKeyRef.current;
       const committedKeys = new Set(options?.committedKeys ?? []);
+      const committedValues = options?.committedValues;
       const preserveDirty = options?.preserveDirty ?? false;
 
       setServerItems(sorted);
@@ -226,7 +210,15 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         const nextDraft: Record<string, string> = {};
         for (const item of sorted) {
           if (committedKeys.has(item.key)) {
-            nextDraft[item.key] = item.value;
+            // A key we just committed. If the user re-edited it while the save
+            // was in flight, keep the newer edit; otherwise sync to the server.
+            const submitted = committedValues?.[item.key];
+            const currentDraft = prevDraft[item.key];
+            if (submitted !== undefined && currentDraft !== undefined && currentDraft !== submitted) {
+              nextDraft[item.key] = currentDraft;
+            } else {
+              nextDraft[item.key] = item.value;
+            }
             continue;
           }
 
@@ -277,6 +269,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     try {
       const config = await systemConfigApi.getConfig(true);
       applyServerPayload(config.items, config.configVersion, config.maskToken);
+      setConflictState(null);
       setToast(null);
       return true;
     } catch (error: unknown) {
@@ -296,6 +289,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setDraftValues(next);
     setValidationIssues([]);
     setSaveError(null);
+    setConflictState(null);
   }, [serverItems]);
 
   const applyPartialUpdate = useCallback((updatedItems: Array<{ key: string; value: string }>) => {
@@ -363,7 +357,50 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       });
   }, [dirtyKeys, draftValues, serverItemByKey]);
 
-  const save = useCallback(async (
+  // On a 409, re-fetch the latest snapshot and compute a field-level three-way
+  // diff for the keys we tried to save. Keys the server left unchanged (or that
+  // already converged) are not conflicts and can be replayed; the rest surface
+  // to the UI so neither side is clobbered by default.
+  const buildConflictState = useCallback(
+    async (submittedItems: SystemConfigUpdateItem[]): Promise<ConfigConflictState> => {
+      const baseByKey = serverItemByKeyRef.current;
+      const latest = await systemConfigApi.getConfig(true);
+      const latestByKey = new Map(latest.items.map((item) => [item.key, item]));
+      const conflictFields: ConfigConflictField[] = [];
+      for (const submitted of submittedItems) {
+        const baseItem = baseByKey[submitted.key];
+        const base = baseItem?.value ?? '';
+        const serverItem = latestByKey.get(submitted.key);
+        const server = serverItem?.value ?? '';
+        const local = submitted.value;
+        if (server === base) {
+          continue; // server did not touch this key -> safe to replay
+        }
+        if (local === server) {
+          continue; // both sides converged on the same value
+        }
+        const schema = serverItem?.schema ?? baseItem?.schema;
+        conflictFields.push({
+          key: submitted.key,
+          base,
+          server,
+          local,
+          isSensitive: Boolean(serverItem?.isMasked || baseItem?.isMasked || schema?.isSensitive),
+          title: schema?.title,
+          category: schema?.category,
+        });
+      }
+      // Adopt the latest snapshot as the new base while preserving pending local
+      // drafts (dirty keys stay editable; server-only changes are absorbed).
+      applyServerPayload(latest.items, latest.configVersion, latest.maskToken, {
+        preserveDirty: true,
+      });
+      return { fields: conflictFields, serverVersion: latest.configVersion };
+    },
+    [applyServerPayload],
+  );
+
+  const runSave = useCallback(async (
     changedItems?: SystemConfigUpdateItem[],
     options?: { silent?: boolean },
   ): Promise<SaveResult> => {
@@ -388,6 +425,11 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setIsSaving(true);
     setSaveError(null);
     setRetryAction(null);
+
+    const committedValues: Record<string, string> = {};
+    for (const item of resolvedChangedItems) {
+      committedValues[item.key] = item.value;
+    }
 
     try {
       const validateResult = await systemConfigApi.validate({ items: resolvedChangedItems });
@@ -418,11 +460,13 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       const refreshed = await systemConfigApi.getConfig(true);
       // Only clear drafts for the keys we just committed; preserve any other
       // pending edits (e.g. sensitive/excluded keys saved manually, or fields
-      // edited while a partial autosave was in flight).
+      // edited while this save was in flight — see committedValues).
       applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken, {
         preserveDirty: true,
         committedKeys: resolvedChangedItems.map((item) => item.key),
+        committedValues,
       });
+      setConflictState(null);
 
       const warningText = updateResult.warnings?.length
         ? `；警告：${updateResult.warnings.join('；')}`
@@ -435,18 +479,63 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       if (error instanceof SystemConfigValidationError) {
         setValidationIssues(error.issues);
         setSaveError(error.parsedError);
-      } else if (error instanceof SystemConfigConflictError) {
+        if (!silent) {
+          setToast({ type: 'error', error: getParsedApiError(error) });
+        }
+        setRetryAction('save');
+        return { success: false, message: '保存失败' };
+      }
+
+      if (error instanceof SystemConfigConflictError) {
+        try {
+          const nextConflict = await buildConflictState(resolvedChangedItems);
+          if (nextConflict.fields.length === 0) {
+            // The server changed only unrelated fields. Replay this exact
+            // transaction once against the newly adopted version instead of
+            // forcing the user through a conflict panel with no conflicts.
+            const rebasedResult = await systemConfigApi.update({
+              configVersion: nextConflict.serverVersion,
+              maskToken,
+              reloadNow: true,
+              items: resolvedChangedItems,
+            });
+            const refreshed = await systemConfigApi.getConfig(true);
+            applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken, {
+              preserveDirty: true,
+              committedKeys: resolvedChangedItems.map((item) => item.key),
+              committedValues,
+            });
+            setConflictState(null);
+            const warningText = rebasedResult.warnings?.length
+              ? `；警告：${rebasedResult.warnings.join('；')}`
+              : '';
+            if (!silent) {
+              setToast({ type: 'success', message: `配置已更新${warningText}` });
+            }
+            return { success: true };
+          }
+          setConflictState(nextConflict);
+        } catch {
+          // If the refresh fails we cannot compute a diff; leave the draft intact
+          // and surface a plain conflict error so the user can reload manually.
+          setConflictState(null);
+        }
         setSaveError(createParsedApiError({
           title: '配置版本冲突',
-          message: `${error.message}，请先重新加载配置。`,
+          message: '配置在你编辑期间被其他会话更新，请在下方逐项选择“采用服务器值”或“保留本地值”后再保存。',
           rawMessage: error.parsedError.rawMessage,
           status: error.parsedError.status,
           category: error.parsedError.category,
         }));
-      } else {
-        setSaveError(getParsedApiError(error));
+        // Do not offer a blind retry; the user must resolve conflicts first.
+        setRetryAction(null);
+        if (!silent) {
+          setToast({ type: 'error', error: getParsedApiError(error) });
+        }
+        return { success: false, message: '配置版本冲突' };
       }
 
+      setSaveError(getParsedApiError(error));
       if (!silent) {
         setToast({ type: 'error', error: getParsedApiError(error) });
       }
@@ -457,50 +546,69 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     }
   }, [
     applyServerPayload,
+    buildConflictState,
     configVersion,
     getChangedItems,
     hasDirty,
     maskToken,
   ]);
 
-  // Debounced batched autosave: after edits to autosave-eligible fields settle,
-  // persist all pending eligible keys in one validate+update (single hot reload)
-  // rather than on every keystroke. Sensitive and coordination keys are excluded
-  // and still save via the explicit Save button.
-  const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  // Serialize writes: a second save() while one is in flight reuses the pending
+  // promise instead of firing a concurrent, stale-version transaction.
+  const save = useCallback((
+    changedItems?: SystemConfigUpdateItem[],
+    options?: { silent?: boolean },
+  ): Promise<SaveResult> => {
+    if (savePromiseRef.current) {
+      return savePromiseRef.current;
+    }
+    const promise = runSave(changedItems, options);
+    savePromiseRef.current = promise;
+    void promise.finally(() => {
+      savePromiseRef.current = null;
+    });
+    return promise;
+  }, [runSave]);
 
-  const autosaveDirtyKeys = useMemo(
-    () => dirtyKeys.filter((key) => isAutosaveEligible(key, serverItemByKey)),
-    [dirtyKeys, serverItemByKey],
-  );
-
-  const runAutosave = useCallback(async () => {
-    const items = getChangedItems().filter((item) => isAutosaveEligible(item.key, serverItemByKey));
-    if (items.length === 0) {
+  // Resolve one conflicting field: "server" adopts the server value into the
+  // draft (dropping the local edit); "local" keeps the pending edit so the next
+  // save applies it over the now-current base.
+  const resolveConflictField = useCallback((key: string, choice: 'server' | 'local') => {
+    const field = conflictState?.fields.find((entry) => entry.key === key);
+    if (!field || !conflictState) {
       return;
     }
-    setAutosaveStatus('saving');
-    const result = await save(items, { silent: true });
-    setAutosaveStatus(result.success ? 'saved' : 'error');
-  }, [getChangedItems, save, serverItemByKey]);
-
-  useEffect(() => {
-    if (autosaveDirtyKeys.length === 0) {
-      return undefined;
+    if (choice === 'server') {
+      setDraftValues((prev) => ({ ...prev, [key]: field.server }));
     }
-    const timer = window.setTimeout(() => {
-      void runAutosave();
-    }, AUTOSAVE_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [autosaveDirtyKeys, draftValues, runAutosave]);
-
-  useEffect(() => {
-    if (autosaveStatus !== 'saved') {
-      return undefined;
+    const remaining = conflictState.fields.filter((entry) => entry.key !== key);
+    setConflictState(remaining.length > 0 ? { ...conflictState, fields: remaining } : null);
+    if (remaining.length === 0) {
+      setSaveError(null);
     }
-    const timer = window.setTimeout(() => setAutosaveStatus('idle'), 2000);
-    return () => window.clearTimeout(timer);
-  }, [autosaveStatus]);
+  }, [conflictState]);
+
+  const resolveAllConflicts = useCallback((choice: 'server' | 'local') => {
+    if (choice === 'server' && conflictState) {
+      setDraftValues((prev) => {
+        const next = { ...prev };
+        for (const field of conflictState.fields) {
+          next[field.key] = field.server;
+        }
+        return next;
+      });
+    }
+    setConflictState(null);
+    setSaveError(null);
+  }, [conflictState]);
+
+  const dismissConflicts = useCallback(() => {
+    setConflictState(null);
+    setSaveError(null);
+  }, []);
+
+  // Editing a field only updates the local draft; nothing persists until the
+  // user runs an explicit Save & Apply. There is no config autosave.
 
   const retry = useCallback(async () => {
     if (retryAction === 'load') {
@@ -543,7 +651,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     loadError,
     saveError,
     retryAction,
-    autosaveStatus,
+
+    // Conflict state (409 three-way)
+    conflictState,
+    resolveConflictField,
+    resolveAllConflicts,
+    dismissConflicts,
 
     // Actions
     load,

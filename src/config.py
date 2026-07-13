@@ -759,6 +759,9 @@ class Config:
     # --- Multi-channel LLM config (new) ---
     # LITELLM_CONFIG: path to a standard litellm_config.yaml file (most powerful)
     litellm_config_path: Optional[str] = None
+    # LLM_CONFIG_MODE: auto|channels|yaml|legacy. "auto" keeps the historical
+    # YAML > Channels > legacy precedence; the others force a single source.
+    llm_config_mode: str = "auto"
     # Internal metadata: which config layer actually produced llm_model_list
     llm_models_source: str = "legacy_env"
     # LLM_CHANNELS: list of channel dicts, each with name/base_url/api_keys/models
@@ -1355,6 +1358,11 @@ class Config:
 
         # === LLM Channels + YAML config ===
         litellm_config_path = os.getenv('LITELLM_CONFIG', '').strip() or None
+        # Explicit config mode makes the source of LiteLLM models unambiguous.
+        # "auto" preserves the historical YAML > Channels > legacy precedence.
+        llm_config_mode = (os.getenv('LLM_CONFIG_MODE', '') or '').strip().lower() or 'auto'
+        if llm_config_mode not in ('auto', 'channels', 'yaml', 'legacy'):
+            llm_config_mode = 'auto'
         llm_models_source = "legacy_env"
         llm_channels: List[Dict[str, Any]] = []
         llm_channel_names: List[str] = []
@@ -1364,13 +1372,13 @@ class Config:
         llm_model_list: List[Dict[str, Any]] = []
 
         # Priority 1: LITELLM_CONFIG (standard LiteLLM YAML config file)
-        if litellm_config_path:
+        if litellm_config_path and llm_config_mode in ('auto', 'yaml'):
             llm_model_list = cls._parse_litellm_yaml(litellm_config_path)
             if llm_model_list:
                 llm_models_source = "litellm_config"
 
         # Priority 2: LLM_CHANNELS (env var based channel config)
-        if not llm_model_list:
+        if not llm_model_list and llm_config_mode in ('auto', 'channels'):
             _channels_str = os.getenv('LLM_CHANNELS', '').strip()
             if _channels_str:
                 llm_channel_names = [
@@ -1402,7 +1410,11 @@ class Config:
 
         # Priority 3: Legacy env vars → auto-build model_list (backward compatible).
         # This is skipped when an explicit invalid Hermes channel blocks legacy fallback.
-        if not llm_model_list and not llm_blocks_legacy_fallback:
+        if (
+            not llm_model_list
+            and not llm_blocks_legacy_fallback
+            and llm_config_mode in ('auto', 'legacy')
+        ):
             llm_model_list = cls._legacy_keys_to_model_list(
                 gemini_api_keys, anthropic_api_keys, openai_api_keys,
                 openai_base_url,
@@ -1647,6 +1659,7 @@ class Config:
             litellm_fallback_models=litellm_fallback_models,
             llm_temperature=resolve_unified_llm_temperature(litellm_model),
             litellm_config_path=litellm_config_path,
+            llm_config_mode=llm_config_mode,
             llm_models_source=llm_models_source,
             llm_channels=llm_channels,
             llm_channel_names=llm_channel_names,

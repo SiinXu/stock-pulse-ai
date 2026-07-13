@@ -72,6 +72,7 @@ const AI_MODEL_GROUPS: CategoryFieldGroup[] = [
     id: 'primary',
     titleKey: 'settings.aiGroupPrimary',
     keys: [
+      'LLM_CONFIG_MODE',
       'LITELLM_MODEL',
       'AGENT_LITELLM_MODEL',
       'LITELLM_FALLBACK_MODELS',

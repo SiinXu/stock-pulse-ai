@@ -113,6 +113,13 @@ vi.mock('../../api/systemConfig', () => ({
     exportEnv: (...args: unknown[]) => exportEnv(...args),
     getSchedulerStatus: (...args: unknown[]) => getSchedulerStatus(...args),
     getSetupStatus: (...args: unknown[]) => getSetupStatus(...args),
+    getLlmConfigModeStatus: () => Promise.resolve({
+      requestedMode: 'auto',
+      effectiveMode: 'channels',
+      detectedSources: ['channels'],
+      overriddenSources: [],
+      issues: [],
+    }),
     importEnv: (...args: unknown[]) => importEnv(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
     update: (...args: unknown[]) => updateSystemConfig(...args),
@@ -170,12 +177,12 @@ vi.mock('../../components/settings', async () => ({
   ),
   LLMChannelEditor: ({
     items,
-    onSaved,
     onDraftItemsChange,
+    onValidityChange,
   }: {
     items: Array<{ key: string; value: string }>;
-    onSaved: (items: Array<{ key: string; value: string }>) => void;
     onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
+    onValidityChange?: (valid: boolean) => void;
   }) => (
     <div>
       <div data-testid="llm-channel-editor-items">{items.map((item) => item.key).join(',')}</div>
@@ -189,17 +196,19 @@ vi.mock('../../components/settings', async () => ({
       >
         emit llm draft
       </button>
-      <button
-        type="button"
-        onClick={() => onSaved([{ key: 'LLM_CHANNELS', value: 'primary,backup' }])}
-      >
-        save llm channels
+      <button type="button" onClick={() => onValidityChange?.(false)}>
+        mark llm draft invalid
       </button>
     </div>
   ),
   GenerationBackendStatusPanel: ({ items }: { items: Array<{ key: string; value: string }> }) => (
     <div data-testid="generation-backend-status-items">
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
+    </div>
+  ),
+  LLMConfigModeBanner: ({ onMigrated }: { onMigrated?: () => void }) => (
+    <div data-testid="llm-config-mode-banner">
+      <button type="button" onClick={() => onMigrated?.()}>trigger migration</button>
     </div>
   ),
   NotificationTestPanel: ({ items }: { items: Array<{ key: string; value: string }> }) => (
@@ -224,29 +233,6 @@ vi.mock('../../components/settings', async () => ({
         </button>
       ) : null}
     </div>
-  ),
-  SettingsCategoryNav: ({
-    categories,
-    activeCategory,
-    onSelectTab,
-  }: {
-    categories: Array<{ category: string; title: string }>;
-    activeCategory: string;
-    activeSubCategory: string | null;
-    onSelectTab: (category: string, sub: string | null) => void;
-  }) => (
-    <nav>
-      {categories.map((category) => (
-        <button
-          key={category.category}
-          type="button"
-          aria-pressed={activeCategory === category.category}
-          onClick={() => onSelectTab(category.category, null)}
-        >
-          {category.title}
-        </button>
-      ))}
-    </nav>
   ),
   SettingsField: ({
     item,
@@ -1221,15 +1207,22 @@ describe('SettingsPage', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it('refreshes server state after llm channel editor saves', async () => {
+  it('commits the llm channel draft through the unified save', async () => {
+    save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'save llm channels' }));
+    fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
+    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
 
-    expect(refreshAfterExternalSave).toHaveBeenCalledWith(['LLM_CHANNELS']);
-    expect(load).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    const payload = save.mock.calls[0][0];
+    expect(payload).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'LLM_CHANNELS', value: 'draft,backup' }),
+      expect.objectContaining({ key: 'LITELLM_MODEL', value: 'openai/draft-model' }),
+      expect.objectContaining({ key: 'GENERATION_BACKEND', value: 'codex_cli' }),
+    ]));
   });
 
   it('passes merged generation backend draft items to the backend status panel', async () => {
@@ -1262,7 +1255,8 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('clears llm channel draft items after llm channel editor saves', async () => {
+  it('clears llm channel draft items after the unified save succeeds', async () => {
+    save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
     render(<SettingsPage />);
@@ -1270,12 +1264,46 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
 
-    fireEvent.click(screen.getByRole('button', { name: 'save llm channels' }));
+    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
 
     await waitFor(() => {
       expect(screen.getByTestId('generation-backend-status-items')).not.toHaveTextContent('LLM_CHANNELS=draft,backup');
     });
-    expect(refreshAfterExternalSave).toHaveBeenCalledWith(['LLM_CHANNELS']);
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  });
+
+  it('runs the unified post-save effects after a legacy migration applies', async () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+
+    // Ignore the effects fired during initial mount.
+    load.mockClear();
+    notifySystemConfigChanged.mockClear();
+    getSetupStatus.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger migration' }));
+
+    // Migration must reload config and then run the same post-save flow as Save.
+    await waitFor(() => expect(load).toHaveBeenCalled());
+    await waitFor(() => expect(notifySystemConfigChanged).toHaveBeenCalled());
+    await waitFor(() => expect(getSetupStatus).toHaveBeenCalled());
+  });
+
+  it('renders the two-level IA navigation and routes section clicks through selectTab', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model', activeSubCategory: 'model' }));
+
+    render(<SettingsPage />);
+
+    // The AI & Models section is active and its second-level view tabs render.
+    expect(screen.getByRole('button', { name: /AI 与模型/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('tab', { name: '连接' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '任务路由' })).toBeInTheDocument();
+
+    // Clicking another first-level section routes through selectTab with the
+    // legacy (category, sub) the section maps to.
+    fireEvent.click(screen.getByRole('button', { name: /系统与安全/ }));
+    expect(selectTab).toHaveBeenCalledWith('system', null);
   });
 
   it('keeps prompt cache settings collapsed and expandable at the bottom of AI model settings', () => {

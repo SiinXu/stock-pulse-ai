@@ -817,5 +817,38 @@ class TestMarketReviewFieldsRegistered(unittest.TestCase):
         self.assertIn("MARKET_REVIEW_REGION", field_keys)
 
 
+class TestConfigConditions(unittest.TestCase):
+    def test_evaluate_config_conditions_and_operators(self) -> None:
+        from src.core.config_registry import evaluate_config_conditions
+
+        self.assertEqual(evaluate_config_conditions(None, {}), "met")
+        cond = [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}]
+        self.assertEqual(evaluate_config_conditions(cond, {"GENERATION_BACKEND": "opencode_cli"}), "met")
+        self.assertEqual(evaluate_config_conditions(cond, {"GENERATION_BACKEND": "litellm"}), "not_met")
+        self.assertEqual(
+            evaluate_config_conditions([{"key": "AGENT_MODE", "operator": "in", "value": ["single", "multi"]}], {"AGENT_MODE": "multi"}),
+            "met",
+        )
+        self.assertEqual(
+            evaluate_config_conditions([{"key": "X", "operator": "notEmpty"}], {"X": ""}),
+            "not_met",
+        )
+
+    def test_evaluate_config_conditions_unknown_operator_fail_safe(self) -> None:
+        from src.core.config_registry import evaluate_config_conditions
+
+        self.assertEqual(evaluate_config_conditions([{"key": "X", "operator": "regex"}], {"X": "y"}), "unknown")
+
+    def test_opencode_cli_model_has_visible_when_contract(self) -> None:
+        from src.core.config_registry import get_field_definition
+
+        contract = get_field_definition("OPENCODE_CLI_MODEL").get("contract")
+        self.assertIsNotNone(contract)
+        self.assertEqual(
+            contract["visible_when"],
+            [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

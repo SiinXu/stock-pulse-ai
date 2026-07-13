@@ -52,7 +52,9 @@ from src.llm.hermes import (
 from src.core.config_manager import ConfigManager
 from src.core.config_registry import (
     build_schema_response,
+    evaluate_config_conditions,
     get_category_definitions,
+    get_contract_field_definitions,
     get_field_definition,
     get_registered_field_keys,
 )
@@ -617,6 +619,118 @@ class SystemConfigService:
             "next_step_key": required_missing[0] if required_missing else None,
             "checks": checks,
         }
+
+    def get_llm_config_mode_status(self) -> Dict[str, Any]:
+        """Return which model config source is requested vs effective."""
+        saved_config_map = self._build_display_config_map(self._manager.read_config_map())
+        runtime_config_map = self._build_runtime_display_config_map(saved_config_map)
+        effective_map = {**runtime_config_map, **saved_config_map}
+        return self._resolve_llm_config_mode_status(effective_map)
+
+    _LEGACY_LLM_PROVIDER_KEYS = (
+        "OPENAI_API_KEY", "OPENAI_API_KEYS", "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEYS",
+        "GEMINI_API_KEY", "GEMINI_API_KEYS", "DEEPSEEK_API_KEY", "DEEPSEEK_API_KEYS",
+        "AIHUBMIX_KEY",
+    )
+
+    @classmethod
+    def _resolve_llm_config_mode_status(cls, effective_map: Dict[str, str]) -> Dict[str, Any]:
+        requested = (effective_map.get("LLM_CONFIG_MODE") or "").strip().lower() or "auto"
+        if requested not in ("auto", "channels", "yaml", "legacy"):
+            requested = "auto"
+        has_yaml = bool((effective_map.get("LITELLM_CONFIG") or "").strip())
+        has_channels = bool((effective_map.get("LLM_CHANNELS") or "").strip())
+        has_legacy = any((effective_map.get(k) or "").strip() for k in cls._LEGACY_LLM_PROVIDER_KEYS)
+        detected = [
+            name for name, present in (("yaml", has_yaml), ("channels", has_channels), ("legacy", has_legacy))
+            if present
+        ]
+
+        issues: List[Dict[str, Any]] = []
+        if requested == "auto":
+            effective = next((cand for cand in ("yaml", "channels", "legacy") if cand in detected), None)
+        else:
+            effective = requested
+            if requested not in detected:
+                issues.append({
+                    "key": "LLM_CONFIG_MODE",
+                    "code": "forced_mode_no_config",
+                    "severity": "warning",
+                    "message": f"LLM_CONFIG_MODE={requested} is active but no {requested} configuration was found.",
+                    "expected": f"configured {requested} source",
+                    "actual": ",".join(detected) or "none",
+                })
+
+        overridden = [source for source in detected if source != effective]
+        return {
+            "requested_mode": requested,
+            "effective_mode": effective,
+            "detected_sources": detected,
+            "overridden_sources": overridden,
+            "issues": issues,
+        }
+
+    # (channel, protocol, base_url_key, api_key_fields, model_field, default_base_url, default_model)
+    _LEGACY_CHANNEL_SPECS = (
+        ("openai", "openai", "OPENAI_BASE_URL", ("OPENAI_API_KEYS", "OPENAI_API_KEY"), "OPENAI_MODEL", "", "gpt-5.5"),
+        ("anthropic", "anthropic", None, ("ANTHROPIC_API_KEYS", "ANTHROPIC_API_KEY"), "ANTHROPIC_MODEL", "", "claude-sonnet-4-6"),
+        ("gemini", "gemini", None, ("GEMINI_API_KEYS", "GEMINI_API_KEY"), "GEMINI_MODEL", "", "gemini-3.1-pro-preview"),
+        ("deepseek", "deepseek", None, ("DEEPSEEK_API_KEYS", "DEEPSEEK_API_KEY"), None, "", "deepseek-chat"),
+        ("aihubmix", "openai", None, ("AIHUBMIX_KEY",), None, "https://aihubmix.com/v1", "gpt-5.5"),
+    )
+
+    @classmethod
+    def _build_legacy_channels_migration(
+        cls, raw_map: Dict[str, str]
+    ) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+        """Turn detected legacy provider keys into channel update items."""
+        items: List[Dict[str, str]] = []
+        channels: List[Dict[str, str]] = []
+        for name, protocol, base_url_key, api_key_fields, model_field, default_base_url, default_model in cls._LEGACY_CHANNEL_SPECS:
+            api_key = ""
+            for field_name in api_key_fields:
+                api_key = (raw_map.get(field_name) or "").strip()
+                if api_key:
+                    break
+            if not api_key:
+                continue
+            prefix = f"LLM_{name.upper()}"
+            base_url = ((raw_map.get(base_url_key) if base_url_key else "") or "").strip() or default_base_url
+            model = ((raw_map.get(model_field) if model_field else "") or "").strip() or default_model
+            items.append({"key": f"{prefix}_PROTOCOL", "value": protocol})
+            if base_url:
+                items.append({"key": f"{prefix}_BASE_URL", "value": base_url})
+            items.append({"key": f"{prefix}_API_KEY", "value": api_key})
+            items.append({"key": f"{prefix}_MODELS", "value": model})
+            items.append({"key": f"{prefix}_ENABLED", "value": "true"})
+            channels.append({"name": name, "protocol": protocol, "base_url": base_url, "model": model})
+        if channels:
+            items.insert(0, {"key": "LLM_CHANNELS", "value": ",".join(entry["name"] for entry in channels)})
+            items.append({"key": "LLM_CONFIG_MODE", "value": "channels"})
+        return items, channels
+
+    def preview_legacy_channels_migration(self) -> Dict[str, Any]:
+        """Return a redacted preview of the Legacy -> Channels migration."""
+        raw_map = {str(key).upper(): value for key, value in self._manager.read_config_map().items()}
+        _items, channels = self._build_legacy_channels_migration(raw_map)
+        return {"channels": channels}
+
+    def apply_legacy_channels_migration(
+        self, config_version: str, mask_token: str = "******"
+    ) -> Dict[str, Any]:
+        """Copy detected legacy provider config into channels and switch mode."""
+        raw_map = {str(key).upper(): value for key, value in self._manager.read_config_map().items()}
+        items, channels = self._build_legacy_channels_migration(raw_map)
+        if not channels:
+            raise ConfigValidationError(issues=[{
+                "key": "LLM_CHANNELS",
+                "code": "no_legacy_config",
+                "severity": "error",
+                "message": "No legacy provider configuration was found to migrate.",
+                "expected": "at least one legacy provider key",
+                "actual": "none",
+            }])
+        return self.update(config_version=config_version, items=items, mask_token=mask_token)
 
     def get_generation_backend_status(self) -> Dict[str, Any]:
         """Return cheap generation backend status for saved/runtime config only."""
@@ -2355,6 +2469,33 @@ class SystemConfigService:
             issues.extend(self._validate_value(key=key, value=value, field_schema=field_schema))
 
         issues.extend(self._validate_cross_field(effective_map=effective_map, updated_keys=set(updated_map.keys())))
+        issues.extend(self._validate_field_contracts(effective_map))
+        return issues
+
+    @staticmethod
+    def _validate_field_contracts(effective_map: Dict[str, str]) -> List[Dict[str, Any]]:
+        """Authoritative required/conditionally-required schema contract checks.
+
+        Hidden fields (visibleWhen not met) are excluded; a field is required when
+        requirement=required or its requiredWhen conditions are met.
+        """
+        issues: List[Dict[str, Any]] = []
+        for key, contract in get_contract_field_definitions().items():
+            if evaluate_config_conditions(contract.get("visible_when"), effective_map) == "not_met":
+                continue
+            required = contract.get("requirement") == "required"
+            required_when = contract.get("required_when")
+            if required_when and evaluate_config_conditions(required_when, effective_map) == "met":
+                required = True
+            if required and not str(effective_map.get(key, "") or "").strip():
+                issues.append({
+                    "key": key,
+                    "code": "field_required",
+                    "severity": "error",
+                    "message": f"{key} is required by the current configuration.",
+                    "expected": "non-empty value",
+                    "actual": "",
+                })
         return issues
 
     @classmethod

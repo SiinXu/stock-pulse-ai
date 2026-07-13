@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LLMCapabilityCheck, LLMCapabilityCheckResult } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
+import { Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import {
   LLM_PROVIDER_CAPABILITY_LABELS,
@@ -156,11 +155,17 @@ interface RuntimeConfig {
 
 interface LLMChannelEditorProps {
   items: Array<{ key: string; value: string; rawValueExists?: boolean }>;
-  configVersion: string;
   maskToken: string;
-  onSaved: (updatedItems: Array<{ key: string; value: string }>) => void | Promise<void>;
+  /** Parent-held channel draft, used to rehydrate after a tab-switch remount. */
+  persistedDraftItems?: Array<{ key: string; value: string }>;
   onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
+  /** Reports whether the current draft passes the structural completeness gate. */
+  onValidityChange?: (valid: boolean) => void;
+  /** Bumped by the parent to discard the local draft back to the saved snapshot. */
+  resetSignal?: number;
   disabled?: boolean;
+  /** When a non-channels config source is effective, the editor is read-only. */
+  overriddenByMode?: 'yaml' | 'legacy' | null;
 }
 
 interface ChannelRowProps {
@@ -1227,90 +1232,6 @@ function getFirstCapabilityHint(
   return undefined;
 }
 
-const MANAGED_PROVIDERS = new Set(['gemini', 'vertex_ai', 'anthropic', 'openai', 'deepseek']);
-const LEGACY_PROVIDER_KEYS: Record<string, string[]> = {
-  gemini: ['GEMINI_API_KEYS', 'GEMINI_API_KEY'],
-  vertex_ai: ['GEMINI_API_KEYS', 'GEMINI_API_KEY'],
-  anthropic: ['ANTHROPIC_API_KEYS', 'ANTHROPIC_API_KEY'],
-  openai: ['OPENAI_API_KEYS', 'AIHUBMIX_KEY', 'OPENAI_API_KEY'],
-  deepseek: ['DEEPSEEK_API_KEYS', 'DEEPSEEK_API_KEY'],
-};
-
-function getRuntimeProvider(model: string): string {
-  if (!model) return '';
-  if (!model.includes('/')) return 'openai';
-  return model.split('/', 1)[0].trim().toLowerCase();
-}
-
-function usesDirectEnvProvider(model: string): boolean {
-  const provider = getRuntimeProvider(model);
-  return Boolean(provider) && !MANAGED_PROVIDERS.has(provider);
-}
-
-function hasLegacyRuntimeSource(model: string, itemMap: Map<string, string>): boolean {
-  const provider = PROTOCOL_ALIASES[getRuntimeProvider(model)] || getRuntimeProvider(model);
-  if (!provider || !MANAGED_PROVIDERS.has(provider)) {
-    return false;
-  }
-  return (LEGACY_PROVIDER_KEYS[provider] || []).some((key) => (itemMap.get(key) || '').trim().length > 0);
-}
-
-function isRuntimeModelAvailable(model: string, availableModels: string[], itemMap: Map<string, string>): boolean {
-  const normalizedModel = model.trim();
-  const matchesAvailableModel = normalizedModel.length > 0 && availableModels.includes(normalizedModel);
-  return matchesAvailableModel
-    || usesDirectEnvProvider(model)
-    || (availableModels.length === 0 && hasLegacyRuntimeSource(model, itemMap));
-}
-
-function hasCanonicalRouteAliasMismatch(model: string, availableModels: string[]): boolean {
-  const normalizedModel = model.trim();
-  if (!normalizedModel || availableModels.includes(normalizedModel) || usesDirectEnvProvider(normalizedModel)) {
-    return false;
-  }
-  for (const candidate of routeIdentityCandidates(normalizedModel)) {
-    if (candidate !== normalizedModel && availableModels.includes(candidate)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function sanitizeRuntimeConfigForSave(
-  runtimeConfig: RuntimeConfig,
-  generationModels: string[],
-  agentSafeModels: string[],
-  visionSafeModels: string[],
-  itemMap: Map<string, string>,
-): RuntimeConfig {
-  const primaryModel = runtimeConfig.primaryModel && !isRuntimeModelAvailable(runtimeConfig.primaryModel, generationModels, itemMap)
-    ? ''
-    : runtimeConfig.primaryModel;
-  const agentPrimaryModel = runtimeConfig.agentPrimaryModel && !isRuntimeModelAvailable(runtimeConfig.agentPrimaryModel, agentSafeModels, itemMap)
-    ? ''
-    : runtimeConfig.agentPrimaryModel;
-  const visionModel = runtimeConfig.visionModel && !isRuntimeModelAvailable(runtimeConfig.visionModel, visionSafeModels, itemMap)
-    ? ''
-    : runtimeConfig.visionModel;
-  const fallbackModels = runtimeConfig.fallbackModels.filter((model) => isRuntimeModelAvailable(model, generationModels, itemMap));
-
-  return {
-    ...runtimeConfig,
-    primaryModel,
-    agentPrimaryModel,
-    fallbackModels,
-    visionModel,
-  };
-}
-
-function runtimeConfigsAreEqual(left: RuntimeConfig, right: RuntimeConfig): boolean {
-  return left.primaryModel === right.primaryModel
-    && left.agentPrimaryModel === right.agentPrimaryModel
-    && left.visionModel === right.visionModel
-    && left.temperature === right.temperature
-    && left.fallbackModels.join(',') === right.fallbackModels.join(',');
-}
-
 function runtimeConfigChangedKeys(left: RuntimeConfig, right: RuntimeConfig): Set<string> {
   const changed = new Set<string>();
   if (left.primaryModel !== right.primaryModel) {
@@ -1594,36 +1515,68 @@ function channelsAreEqual(left: ChannelConfig, right: ChannelConfig): boolean {
   );
 }
 
+function buildItemSourceByKey(
+  items: Array<{ key: string; value: string; rawValueExists?: boolean }>,
+): Map<string, boolean> {
+  const sourceByKey = new Map<string, boolean>();
+  for (const item of items) {
+    sourceByKey.set(item.key.toUpperCase(), item.rawValueExists !== false);
+  }
+  for (const [key, hasSource] of sourceByKey) {
+    if (hasSource) {
+      continue;
+    }
+    const match = CHANNEL_FIELD_KEY_PATTERN.exec(key);
+    if (!match) {
+      continue;
+    }
+    const channelName = match[1];
+    for (const channelKey of parseChannelFieldKeysFromName(channelName)) {
+      if (!sourceByKey.has(channelKey)) {
+        sourceByKey.set(channelKey, false);
+      }
+    }
+  }
+  return sourceByKey;
+}
+
+// Layer the parent-held channel draft on top of the saved items so a remounted
+// editor (after switching settings tabs) rehydrates the in-progress draft
+// instead of dropping it. Draft entries win and are treated as user-provided.
+function applyChannelDraftItems(
+  items: Array<{ key: string; value: string; rawValueExists?: boolean }>,
+  draftItems: Array<{ key: string; value: string }> | undefined,
+): Array<{ key: string; value: string; rawValueExists?: boolean }> {
+  if (!draftItems || draftItems.length === 0) {
+    return items;
+  }
+  const byKey = new Map<string, { key: string; value: string; rawValueExists?: boolean }>();
+  for (const item of items) {
+    byKey.set(item.key.toUpperCase(), { ...item });
+  }
+  for (const draftItem of draftItems) {
+    const upperKey = draftItem.key.toUpperCase();
+    const existing = byKey.get(upperKey);
+    byKey.set(upperKey, {
+      key: existing?.key ?? draftItem.key,
+      value: draftItem.value,
+      rawValueExists: true,
+    });
+  }
+  return Array.from(byKey.values());
+}
+
 export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   items,
-  configVersion,
   maskToken,
-  onSaved,
+  persistedDraftItems,
   onDraftItemsChange,
+  onValidityChange,
+  resetSignal = 0,
   disabled = false,
+  overriddenByMode = null,
 }) => {
-  const initialItemSourceByKey = useMemo(() => {
-    const sourceByKey = new Map<string, boolean>();
-    for (const item of items) {
-      sourceByKey.set(item.key.toUpperCase(), item.rawValueExists !== false);
-    }
-    for (const [key, hasSource] of sourceByKey) {
-      if (hasSource) {
-        continue;
-      }
-      const match = CHANNEL_FIELD_KEY_PATTERN.exec(key);
-      if (!match) {
-        continue;
-      }
-      const channelName = match[1];
-      for (const channelKey of parseChannelFieldKeysFromName(channelName)) {
-        if (!sourceByKey.has(channelKey)) {
-          sourceByKey.set(channelKey, false);
-        }
-      }
-    }
-    return sourceByKey;
-  }, [items]);
+  const initialItemSourceByKey = useMemo(() => buildItemSourceByKey(items), [items]);
   const initialChannels = useMemo(
     () => parseChannelsFromItems(items, initialItemSourceByKey),
     [items, initialItemSourceByKey],
@@ -1643,16 +1596,21 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const channelsFingerprint = useMemo(() => JSON.stringify(initialChannels), [initialChannels]);
   const runtimeFingerprint = useMemo(() => JSON.stringify(initialRuntimeConfig), [initialRuntimeConfig]);
 
-  const [channels, setChannels] = useState<ChannelConfig[]>(initialChannels);
-  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(initialRuntimeConfig);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<
-    | { type: 'success'; text: string }
-    | { type: 'error'; error: ParsedApiError }
-    | { type: 'local-error'; text: string }
-    | null
-  >(null);
-  const [saveWarnings, setSaveWarnings] = useState<string[]>([]);
+  const hydratedItems = useMemo(
+    () => applyChannelDraftItems(items, persistedDraftItems),
+    [items, persistedDraftItems],
+  );
+  const hydratedChannels = useMemo(
+    () => parseChannelsFromItems(hydratedItems, buildItemSourceByKey(hydratedItems)),
+    [hydratedItems],
+  );
+  const hydratedRuntimeConfig = useMemo(
+    () => parseRuntimeConfigFromItems(hydratedItems),
+    [hydratedItems],
+  );
+
+  const [channels, setChannels] = useState<ChannelConfig[]>(hydratedChannels);
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(hydratedRuntimeConfig);
   const [visibleKeys, setVisibleKeys] = useState<Record<number, boolean>>({});
   const [testStates, setTestStates] = useState<Record<number, ChannelTestState>>({});
   const [discoveryStates, setDiscoveryStates] = useState<Record<string, ChannelDiscoveryState>>({});
@@ -1663,41 +1621,37 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const [pendingRemove, setPendingRemove] = useState<{ index: number; name: string; referencedBy: string[] } | null>(null);
   const addChannelIdRef = useRef(0);
   const lastDraftFingerprintRef = useRef<string | null>(null);
-  const onDraftItemsChangeRef = useRef(onDraftItemsChange);
-
-  const prevChannelsRef = useRef(channelsFingerprint);
-  const prevRuntimeRef = useRef(runtimeFingerprint);
-  const pendingSaveFeedbackFingerprintRef = useRef<{ channels: string; runtime: string } | null>(null);
+  const onValidityChangeRef = useRef(onValidityChange);
   const discoveryNonceRef = useRef<Record<string, number>>({});
   const discoveryRequestIdRef = useRef(0);
   const capabilityNonceRef = useRef<Record<string, number>>({});
   const capabilityRequestIdRef = useRef(0);
 
-  useEffect(() => {
-    if (prevChannelsRef.current === channelsFingerprint && prevRuntimeRef.current === runtimeFingerprint) {
-      return;
-    }
-    prevChannelsRef.current = channelsFingerprint;
-    prevRuntimeRef.current = runtimeFingerprint;
-    const pendingSaveFeedbackFingerprint = pendingSaveFeedbackFingerprintRef.current;
-    const preserveSaveFeedback = pendingSaveFeedbackFingerprint?.channels === channelsFingerprint
-      && pendingSaveFeedbackFingerprint.runtime === runtimeFingerprint;
-    pendingSaveFeedbackFingerprintRef.current = null;
-    setChannels(initialChannels);
-    setRuntimeConfig(initialRuntimeConfig);
+  // Re-sync local state to the saved snapshot when it actually changes. Two
+  // triggers: the saved config reloaded (typically after a successful Save &
+  // Apply) so channelsFingerprint/runtimeFingerprint change, or the parent
+  // bumped resetSignal on Discard. This uses React's sanctioned "adjust state
+  // during render" reset-on-prop-change pattern with prev-state, not an effect.
+  const resetKey = `${channelsFingerprint}::${runtimeFingerprint}::${resetSignal}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setChannels(hydratedChannels);
+    setRuntimeConfig(hydratedRuntimeConfig);
     setVisibleKeys({});
     setTestStates({});
     setDiscoveryStates({});
     setCapabilityStates({});
     setExpandedRows({});
+    setIsCollapsed(false);
+  }
+
+  // Nonce refs are diagnostic-only; clearing them alongside a reset is done in
+  // an effect so render stays free of ref mutations.
+  useEffect(() => {
     discoveryNonceRef.current = {};
     capabilityNonceRef.current = {};
-    if (!preserveSaveFeedback) {
-      setSaveMessage(null);
-      setSaveWarnings([]);
-    }
-    setIsCollapsed(false);
-  }, [channelsFingerprint, runtimeFingerprint, initialChannels, initialRuntimeConfig]);
+  }, [resetKey]);
 
   const routeProvenanceMap = useMemo(() => {
     if (!managesRuntimeConfig) {
@@ -1792,10 +1746,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const draftFingerprint = useMemo(() => JSON.stringify(draftItems), [draftItems]);
 
   useEffect(() => {
-    onDraftItemsChangeRef.current = onDraftItemsChange;
-  }, [onDraftItemsChange]);
-
-  useEffect(() => {
     if (!onDraftItemsChange || lastDraftFingerprintRef.current === draftFingerprint) {
       return;
     }
@@ -1803,11 +1753,27 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     onDraftItemsChange(draftItems);
   }, [draftFingerprint, draftItems, onDraftItemsChange]);
 
+  // NOTE: the draft is intentionally NOT cleared on unmount. The parent owns the
+  // unified draft and rehydrates it via persistedDraftItems when the editor
+  // remounts (e.g. after a settings tab switch), so it must survive unmount.
+
+  useEffect(() => {
+    onValidityChangeRef.current = onValidityChange;
+  }, [onValidityChange]);
+
+  // Report the structural completeness gate up so the unified Save & Apply stays
+  // blocked while an enabled channel is incomplete.
+  useEffect(() => {
+    onValidityChangeRef.current?.(draftValid);
+  }, [draftValid]);
+
+  // On unmount, clear any stale invalid state so a tab switch never leaves the
+  // parent Save button blocked by an editor that is no longer mounted.
   useEffect(() => () => {
-    onDraftItemsChangeRef.current?.([]);
+    onValidityChangeRef.current?.(true);
   }, []);
 
-  const busy = disabled || isSaving;
+  const busy = disabled || Boolean(overriddenByMode);
 
   const updateChannel = (index: number, field: keyof ChannelConfig, value: string | boolean) => {
     const currentChannel = channels[index];
@@ -1963,113 +1929,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     capabilityNonceRef.current = {};
     setExpandedRows((prev) => ({ ...prev, [channels.length]: true }));
     setIsCollapsed(false);
-  };
-
-  const handleSave = async () => {
-    const hasEmptyName = channels.some((channel) => !channel.name.trim());
-    if (hasEmptyName) {
-      setSaveMessage({ type: 'local-error', text: '渠道名称不能为空，且只能包含字母、数字或下划线。' });
-      return;
-    }
-
-    if (managesRuntimeConfig) {
-      const mixedPrimary = runtimeConfig.primaryModel
-        && getRouteProvenance(routeProvenanceMap, runtimeConfig.primaryModel)?.hasHermes
-        && getRouteProvenance(routeProvenanceMap, runtimeConfig.primaryModel)?.hasNonHermes;
-      const mixedFallback = runtimeConfig.fallbackModels.find((model) => {
-        const origin = getRouteProvenance(routeProvenanceMap, model);
-        return origin?.hasHermes && origin.hasNonHermes;
-      });
-      if (mixedPrimary || mixedFallback) {
-        setSaveMessage({ type: 'local-error', text: 'Mixed Hermes/non-Hermes route 暂不支持作为主生成或备选模型，请选择纯 Hermes 或纯非 Hermes route。' });
-        return;
-      }
-
-      const nonCanonicalRouteAlias = (
-        hasCanonicalRouteAliasMismatch(runtimeConfig.primaryModel, availableModels)
-        || hasCanonicalRouteAliasMismatch(runtimeConfig.agentPrimaryModel, agentSafeModels)
-        || hasCanonicalRouteAliasMismatch(runtimeConfig.visionModel, visionSafeModels)
-        || runtimeConfig.fallbackModels.some((model) => hasCanonicalRouteAliasMismatch(model, availableModels))
-      );
-      if (nonCanonicalRouteAlias) {
-        setSaveMessage({ type: 'local-error', text: '当前运行时模型使用非规范 route alias，请从下拉框重新选择规范模型。' });
-        return;
-      }
-    }
-
-    const runtimeConfigForSave = managesRuntimeConfig
-      ? sanitizeRuntimeConfigForSave(runtimeConfig, availableModels, agentSafeModels, visionSafeModels, savedItemMap)
-      : runtimeConfig;
-    if (!runtimeConfigsAreEqual(runtimeConfigForSave, runtimeConfig)) {
-      setRuntimeConfig(runtimeConfigForSave);
-    }
-
-    if (managesRuntimeConfig) {
-      const invalidPrimaryModel = runtimeConfigForSave.primaryModel
-        && !isRuntimeModelAvailable(runtimeConfigForSave.primaryModel, availableModels, savedItemMap);
-      if (invalidPrimaryModel) {
-        setSaveMessage({ type: 'local-error', text: '当前主模型不在已启用渠道的模型列表中，请重新选择。' });
-        return;
-      }
-
-      const invalidAgentPrimaryModel = runtimeConfigForSave.agentPrimaryModel
-        && !isRuntimeModelAvailable(runtimeConfigForSave.agentPrimaryModel, agentSafeModels, savedItemMap);
-      if (invalidAgentPrimaryModel) {
-        setSaveMessage({ type: 'local-error', text: '当前 Agent 主模型没有 Agent-safe 非 Hermes deployment，请重新选择。' });
-        return;
-      }
-
-      const invalidFallbackModel = runtimeConfigForSave.fallbackModels.some(
-        (model) => !isRuntimeModelAvailable(model, availableModels, savedItemMap),
-      );
-      if (invalidFallbackModel) {
-        setSaveMessage({ type: 'local-error', text: '存在无效的备选模型，请重新选择。' });
-        return;
-      }
-
-      const invalidVisionModel = runtimeConfigForSave.visionModel
-        && !isRuntimeModelAvailable(runtimeConfigForSave.visionModel, visionSafeModels, savedItemMap);
-      if (invalidVisionModel) {
-        setSaveMessage({ type: 'local-error', text: '当前 Vision 模型不能包含 Hermes deployment，请重新选择纯非 Hermes route。' });
-        return;
-      }
-    }
-
-    setIsSaving(true);
-    setSaveMessage(null);
-    setSaveWarnings([]);
-
-    try {
-      const updateItems = buildFilteredChannelUpdateItems({
-        channels,
-        initialChannels,
-        initialNames,
-        initialItemSourceByKey,
-        savedItemMap,
-        runtimeConfig: runtimeConfigForSave,
-        initialRuntimeConfig,
-        managesRuntimeConfig,
-      });
-      const response = await systemConfigApi.update({
-        configVersion,
-        maskToken,
-        reloadNow: true,
-        items: updateItems,
-      });
-      const responseWarnings = response.warnings || [];
-      await onSaved(updateItems);
-      pendingSaveFeedbackFingerprintRef.current = {
-        channels: JSON.stringify(parseChannelsFromItems(updateItems)),
-        runtime: JSON.stringify(parseRuntimeConfigFromItems(updateItems)),
-      };
-      setSaveWarnings(responseWarnings);
-      setSaveMessage({ type: 'success', text: managesRuntimeConfig ? 'AI 配置已保存' : '渠道配置已保存' });
-    } catch (error: unknown) {
-      setSaveWarnings([]);
-      setSaveMessage({ type: 'error', error: getParsedApiError(error) });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleTest = async (channel: ChannelConfig, index: number) => {
@@ -2322,6 +2181,18 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      {overriddenByMode ? (
+        <InlineAlert
+          variant="warning"
+          title="渠道配置当前只读"
+          message={
+            overriddenByMode === 'yaml'
+              ? '当前生效模式为 YAML（LITELLM_CONFIG），渠道配置不生效，暂为只读。要用渠道配置，请把 LLM_CONFIG_MODE 改为 channels 或 auto。'
+              : '当前生效模式为 Legacy Provider keys，渠道配置不生效，暂为只读。要用渠道配置，请把 LLM_CONFIG_MODE 改为 channels 或 auto。'
+          }
+          className="rounded-[1.35rem] px-4 py-3 text-xs shadow-none"
+        />
+      ) : null}
       <button
         type="button"
         className="flex w-full items-center justify-between rounded-[1.35rem] border border-[var(--settings-border)] bg-[var(--settings-surface)] px-5 py-4 text-left shadow-soft-card transition-[background-color,border-color,box-shadow] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]"
@@ -2554,63 +2425,20 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               variant="warning"
               title="有渠道未完成，无法保存"
               message={(
-                <ul className="ml-4 list-disc space-y-0.5">
-                  {blockingChannels.map(({ channel, index, issues }) => (
-                    <li key={channel.id || index}>
-                      {`${channel.name.trim() || `渠道 #${index + 1}`}：${issues.join('、')}`}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="mb-1">以下渠道需补全后才能保存（点击顶部“保存并应用”统一提交）：</p>
+                  <ul className="ml-4 list-disc space-y-0.5">
+                    {blockingChannels.map(({ channel, index, issues }) => (
+                      <li key={channel.id || index}>
+                        {`${channel.name.trim() || `渠道 #${index + 1}`}：${issues.join('、')}`}
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
               className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ) : null}
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              variant="settings-primary"
-              glow
-              disabled={busy || !hasChanges || !draftValid}
-              onClick={() => void handleSave()}
-            >
-              {isSaving ? '保存中...' : managesRuntimeConfig ? '保存 AI 配置' : '保存渠道配置'}
-            </Button>
-            {!hasChanges ? <span className="text-xs text-muted-text">当前没有未保存的改动</span> : null}
-          </div>
-
-          {saveMessage?.type === 'success' ? (
-            <InlineAlert
-              variant="success"
-              message={saveMessage.text}
-              className="rounded-lg px-3 py-2 text-sm shadow-none"
-            />
-          ) : null}
-
-          {saveWarnings.length > 0 ? (
-            <InlineAlert
-              variant="warning"
-              title="保存后提示"
-              message={(
-                <div className="space-y-1">
-                  {saveWarnings.map((warning) => (
-                    <p key={warning}>{warning}</p>
-                  ))}
-                </div>
-              )}
-              className="rounded-lg px-3 py-2 text-sm shadow-none"
-            />
-          ) : null}
-
-          {saveMessage?.type === 'local-error' ? (
-            <InlineAlert
-              variant="danger"
-              message={saveMessage.text}
-              className="rounded-lg px-3 py-2 text-sm shadow-none"
-            />
-          ) : null}
-
-          {saveMessage?.type === 'error' ? <ApiErrorAlert error={saveMessage.error} /> : null}
         </div>
       ) : null}
       <ConfirmDialog

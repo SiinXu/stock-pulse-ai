@@ -2,10 +2,19 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSystemConfig } from '../useSystemConfig';
 
-const { getConfig, validate, update } = vi.hoisted(() => ({
+const { getConfig, validate, update, ConflictError } = vi.hoisted(() => ({
   getConfig: vi.fn(),
   validate: vi.fn(),
   update: vi.fn(),
+  ConflictError: class extends Error {
+    parsedError = {
+      title: 'conflict',
+      message: 'conflict',
+      rawMessage: 'conflict',
+      status: 409,
+      category: 'http_error' as const,
+    };
+  },
 }));
 
 vi.mock('../../api/systemConfig', () => ({
@@ -14,7 +23,7 @@ vi.mock('../../api/systemConfig', () => ({
     validate,
     update,
   },
-  SystemConfigConflictError: class extends Error {},
+  SystemConfigConflictError: ConflictError,
   SystemConfigValidationError: class extends Error {
     issues: unknown[] = [];
     parsedError = {
@@ -376,7 +385,52 @@ describe('useSystemConfig', () => {
     expect(result.current.dirtyCount).toBe(0);
   });
 
-  it('autosaves an eligible field once the debounce settles', async () => {
+  it('does not persist edits without an explicit save (no autosave)', async () => {
+    getConfig.mockResolvedValue(sampleLlmConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setDraftValue('LITELLM_MODEL', 'qwen/qwen2.5');
+      result.current.setDraftValue('OPENAI_BASE_URL', 'https://api.example.org/v1');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    vi.useRealTimers();
+
+    // Editing only changes local dirty state; nothing is validated or persisted.
+    expect(validate).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(result.current.hasDirty).toBe(true);
+  });
+
+  it('keeps sensitive fields as draft until an explicit save', async () => {
+    getConfig.mockResolvedValue(sensitiveConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => {
+      await result.current.load();
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      result.current.setDraftValue('OPENAI_API_KEY', 'sk-secret-value');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    vi.useRealTimers();
+
+    expect(update).not.toHaveBeenCalled();
+    expect(result.current.hasDirty).toBe(true);
+  });
+
+  it('persists all dirty fields on an explicit save', async () => {
     const savedConfig = {
       ...sampleLlmConfig,
       items: sampleLlmConfig.items.map((item) => (
@@ -391,98 +445,215 @@ describe('useSystemConfig', () => {
       await result.current.load();
     });
 
-    vi.useFakeTimers();
     act(() => {
       result.current.setDraftValue('LITELLM_MODEL', 'qwen/qwen2.5');
     });
-    // Nothing persists until the debounce elapses.
-    expect(validate).not.toHaveBeenCalled();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(800);
+      await result.current.save();
     });
 
-    expect(validate).toHaveBeenCalledTimes(1);
+    expect(validate).toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith(expect.objectContaining({
       items: [{ key: 'LITELLM_MODEL', value: 'qwen/qwen2.5' }],
     }));
-    expect(result.current.autosaveStatus).toBe('saved');
     expect(result.current.hasDirty).toBe(false);
-    vi.useRealTimers();
   });
 
-  it('does not autosave sensitive fields', async () => {
-    getConfig.mockResolvedValue(sensitiveConfig);
+  it('serializes duplicate save calls onto one in-flight transaction', async () => {
+    let resolveUpdate: ((value: { warnings: string[] }) => void) | undefined;
+    const pendingUpdate = new Promise<{ warnings: string[] }>((resolve) => {
+      resolveUpdate = resolve;
+    });
+    const savedConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600000,SH600519' })),
+    };
+    getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
+    update.mockReturnValueOnce(pendingUpdate);
 
     const { result } = renderHook(() => useSystemConfig());
-    await act(async () => {
-      await result.current.load();
-    });
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
 
-    vi.useFakeTimers();
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
     act(() => {
-      result.current.setDraftValue('OPENAI_API_KEY', 'sk-secret-value');
+      first = result.current.save();
+      second = result.current.save();
     });
+    expect(first).toBe(second);
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-
-    expect(validate).not.toHaveBeenCalled();
-    expect(update).not.toHaveBeenCalled();
-    // The secret stays a pending draft that the explicit Save must persist.
-    expect(result.current.hasDirty).toBe(true);
-    expect(result.current.autosaveStatus).toBe('idle');
-    vi.useRealTimers();
+    resolveUpdate?.({ warnings: [] });
+    await act(async () => { await first; });
+    expect(update).toHaveBeenCalledTimes(1);
   });
 
-  it('does not autosave non-sensitive model provider fields, deferring them to Save', async () => {
-    getConfig.mockResolvedValue(sampleLlmConfig);
+  it('preserves a newer edit made while the submitted value is saving', async () => {
+    let resolveUpdate: ((value: { warnings: string[] }) => void) | undefined;
+    const pendingUpdate = new Promise<{ warnings: string[] }>((resolve) => {
+      resolveUpdate = resolve;
+    });
+    const savedConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600000,SH600519' })),
+    };
+    getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
+    update.mockReturnValueOnce(pendingUpdate);
 
     const { result } = renderHook(() => useSystemConfig());
-    await act(async () => {
-      await result.current.load();
-    });
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
+    let saving!: Promise<unknown>;
+    act(() => { saving = result.current.save(); });
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
 
-    vi.useFakeTimers();
-    act(() => {
-      // Base URL is not sensitive, but pairs with a secret API key, so it must
-      // save transactionally rather than autosave+reload on its own.
-      result.current.setDraftValue('OPENAI_BASE_URL', 'https://api.example.org/v1');
-    });
+    act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519,AAPL'));
+    resolveUpdate?.({ warnings: [] });
+    await act(async () => { await saving; });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
-    });
-
-    expect(validate).not.toHaveBeenCalled();
-    expect(update).not.toHaveBeenCalled();
+    expect(result.current.itemsByCategory.base[0]?.value).toBe('SH600000,SH600519,AAPL');
     expect(result.current.hasDirty).toBe(true);
-    expect(result.current.autosaveStatus).toBe('idle');
-    vi.useRealTimers();
   });
 
-  it('marks autosave failed and preserves the draft on validation error', async () => {
-    getConfig.mockResolvedValue(sampleLlmConfig);
-    validate.mockResolvedValueOnce({ valid: false, issues: [{ key: 'LITELLM_MODEL', message: 'bad' }] });
+  it('automatically rebases once when the server changed only unrelated fields', async () => {
+    const latestConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+    };
+    const savedConfig = {
+      ...sampleConfig,
+      configVersion: 'v3',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600000,SH600519' })),
+    };
+    getConfig
+      .mockResolvedValueOnce(sampleConfig)
+      .mockResolvedValueOnce(latestConfig)
+      .mockResolvedValueOnce(savedConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict')).mockResolvedValueOnce({ warnings: [] });
 
     const { result } = renderHook(() => useSystemConfig());
-    await act(async () => {
-      await result.current.load();
-    });
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
+    await act(async () => { await result.current.save(); });
 
-    vi.useFakeTimers();
-    act(() => {
-      result.current.setDraftValue('LITELLM_MODEL', 'broken value');
-    });
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(update.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ configVersion: 'v2' }));
+    expect(result.current.conflictState).toBeNull();
+    expect(result.current.hasDirty).toBe(false);
+  });
 
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(800);
-    });
+  it('surfaces a three-way conflict and adopts the selected server value', async () => {
+    const latestConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600000,AAPL' })),
+    };
+    getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(latestConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict'));
 
-    expect(result.current.autosaveStatus).toBe('error');
-    expect(update).not.toHaveBeenCalled();
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
+    await act(async () => { await result.current.save(); });
+
+    expect(result.current.conflictState?.fields).toEqual([
+      expect.objectContaining({
+        key: 'STOCK_LIST',
+        base: 'SH600000',
+        server: 'SH600000,AAPL',
+        local: 'SH600000,SH600519',
+        isSensitive: false,
+      }),
+    ]);
+    act(() => result.current.resolveConflictField('STOCK_LIST', 'server'));
+    expect(result.current.conflictState).toBeNull();
+    expect(result.current.itemsByCategory.base[0]?.value).toBe('SH600000,AAPL');
+    expect(result.current.hasDirty).toBe(false);
+  });
+
+  it('marks secret conflicts as sensitive without requiring UI plaintext', async () => {
+    const latestConfig = {
+      ...sensitiveConfig,
+      configVersion: 'v2',
+      items: sensitiveConfig.items.map((item) => (
+        item.key === 'OPENAI_API_KEY'
+          ? { ...item, value: '******', rawValueExists: true, isMasked: true }
+          : item
+      )),
+    };
+    getConfig.mockResolvedValueOnce(sensitiveConfig).mockResolvedValueOnce(latestConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict'));
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('OPENAI_API_KEY', 'sk-local-secret'));
+    await act(async () => { await result.current.save(); });
+
+    expect(result.current.conflictState?.fields[0]).toEqual(expect.objectContaining({
+      key: 'OPENAI_API_KEY',
+      isSensitive: true,
+    }));
+  });
+
+  it('includes channel dynamic keys in the three-way conflict', async () => {
+    const channelKey = 'LLM_PRIMARY_MODELS';
+    const withChannel = {
+      ...sampleLlmConfig,
+      items: [
+        ...sampleLlmConfig.items,
+        {
+          key: channelKey,
+          value: 'gpt-4o-mini',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: channelKey,
+            category: 'ai_model',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 40,
+          },
+        },
+      ],
+    };
+    const latestConfig = {
+      ...withChannel,
+      configVersion: 'v2',
+      items: withChannel.items.map((item) => (
+        item.key === channelKey ? { ...item, value: 'gpt-4o' } : item
+      )),
+    };
+    getConfig.mockResolvedValueOnce(withChannel).mockResolvedValueOnce(latestConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict'));
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue(channelKey, 'gpt-4o-mini,custom'));
+    await act(async () => { await result.current.save(); });
+
+    expect(result.current.conflictState?.fields).toEqual([
+      expect.objectContaining({
+        key: channelKey,
+        base: 'gpt-4o-mini',
+        server: 'gpt-4o',
+        local: 'gpt-4o-mini,custom',
+      }),
+    ]);
+
+    // Keeping the local value preserves the pending draft over the new base.
+    act(() => result.current.resolveConflictField(channelKey, 'local'));
+    expect(result.current.conflictState).toBeNull();
+    const item = result.current.itemsByCategory.ai_model.find((entry) => entry.key === channelKey);
+    expect(item?.value).toBe('gpt-4o-mini,custom');
     expect(result.current.hasDirty).toBe(true);
-    vi.useRealTimers();
   });
 });

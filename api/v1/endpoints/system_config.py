@@ -219,6 +219,91 @@ def get_generation_backend_status(
         )
 
 
+@router.get(
+    "/config/llm/mode-status",
+    responses={
+        200: {"description": "LLM config mode status loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get LLM config mode status",
+    description=(
+        "Report the requested vs effective model configuration source "
+        "(auto/channels/yaml/legacy), detected and overridden sources."
+    ),
+)
+def get_llm_config_mode_status(
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> dict:
+    """Return the model config source mode status without writing config."""
+    try:
+        return service.get_llm_config_mode_status()
+    except Exception as exc:
+        logger.error("Failed to load LLM config mode status: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "internal_error",
+                "message": "Failed to load LLM config mode status",
+            },
+        )
+
+
+@router.get(
+    "/config/llm/legacy-migration/preview",
+    responses={
+        200: {"description": "Legacy migration preview loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Preview Legacy -> Channels migration",
+    description="Return a redacted preview of the channels that would be created from legacy provider keys.",
+)
+def preview_legacy_channels_migration(
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> dict:
+    """Return a redacted Legacy -> Channels migration preview."""
+    try:
+        return service.preview_legacy_channels_migration()
+    except Exception as exc:
+        logger.error("Failed to preview legacy channel migration: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Failed to preview legacy channel migration"},
+        )
+
+
+@router.post(
+    "/config/llm/legacy-migration/apply",
+    responses={
+        200: {"description": "Legacy migration applied"},
+        400: {"description": "Validation error", "model": SystemConfigValidationErrorResponse},
+        409: {"description": "Config version conflict", "model": SystemConfigConflictResponse},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Apply Legacy -> Channels migration",
+    description="Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels.",
+)
+def apply_legacy_channels_migration(
+    payload: UpdateSystemConfigRequest,
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> dict:
+    """Apply the Legacy -> Channels migration atomically."""
+    try:
+        return service.apply_legacy_channels_migration(config_version=payload.config_version)
+    except ConfigValidationError as exc:
+        raise HTTPException(status_code=400, detail={"error": "validation_error", "issues": exc.issues})
+    except ConfigConflictError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "config_conflict", "current_config_version": exc.current_version},
+        )
+    except Exception as exc:
+        logger.error("Failed to apply legacy channel migration: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Failed to apply legacy channel migration"},
+        )
+
+
 @router.post(
     "/config/generation-backends/status/preview",
     response_model=GenerationBackendStatusResponse,

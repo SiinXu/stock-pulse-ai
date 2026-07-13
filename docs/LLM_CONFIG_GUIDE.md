@@ -25,6 +25,19 @@
 
 ---
 
+## 配置来源模式：`LLM_CONFIG_MODE`
+
+三种模型配置来源（YAML / Channels / Legacy provider keys）默认按优先级 `YAML > Channels > Legacy` 生效。若你想让"当前生效的是哪一层"明确无歧义，可显式设置 `LLM_CONFIG_MODE`：
+
+- `auto`（默认）：保持历史优先级，升级兼容，不改变现有行为。
+- `channels`：只使用 `LLM_CHANNELS` 渠道配置。
+- `yaml`：只使用 `LITELLM_CONFIG` YAML；缺少有效 YAML 时不会有可用模型。
+- `legacy`：只使用旧版 provider keys（`OPENAI_API_KEY` 等）。
+
+非 `auto` 模式**不会删除**其它来源的配置，只是让它们不生效，因此随时可以把 `LLM_CONFIG_MODE` 改回 `auto` 或其它值来回滚。Web 设置页 → AI models 顶部会显示"当前生效模型配置来源"及被覆盖的来源。未知取值会 fail-safe 回退到 `auto`。
+
+---
+
 ## Generation Backend（Phase 4）
 
 Generation backend 是普通分析、大盘复盘和 `generate_text()` 的外层运行时选择。默认仍是 `litellm`，零配置路径与历史行为保持一致；`codex_cli` / `claude_code_cli` / `opencode_cli` 是显式 opt-in 的本地 CLI backend，当前标记为 **experimental/limited**。

@@ -36,6 +36,23 @@ export interface SystemConfigDocLink {
   href: string;
 }
 
+export type ConfigConditionOperator = 'equals' | 'notEquals' | 'in' | 'notEmpty';
+
+export interface ConfigCondition {
+  key: string;
+  operator: ConfigConditionOperator;
+  value?: string | string[];
+}
+
+export interface ConfigFieldContract {
+  requirement?: 'required' | 'optional' | 'inherited';
+  requiredWhen?: ConfigCondition[];
+  visibleWhen?: ConfigCondition[];
+  enabledWhen?: ConfigCondition[];
+  requiresConnectionTest?: boolean;
+  restartRequired?: boolean;
+}
+
 export interface SystemConfigFieldSchema {
   key: string;
   title?: string;
@@ -54,6 +71,7 @@ export interface SystemConfigFieldSchema {
   examples?: string[];
   docs?: SystemConfigDocLink[];
   warningCodes?: string[];
+  contract?: ConfigFieldContract;
 }
 
 export interface SystemConfigCategorySchema {
@@ -131,6 +149,33 @@ export interface GenerationBackendStatusResponse {
   backends: GenerationBackendStatus[];
 }
 
+export type LLMConfigMode = 'auto' | 'channels' | 'yaml' | 'legacy';
+export type LLMConfigModeSource = 'yaml' | 'channels' | 'legacy';
+
+export interface LLMConfigModeStatus {
+  requestedMode: LLMConfigMode;
+  effectiveMode: LLMConfigModeSource | null;
+  detectedSources: LLMConfigModeSource[];
+  overriddenSources: LLMConfigModeSource[];
+  issues: Array<{
+    key: string;
+    code: string;
+    severity: string;
+    message: string;
+    expected?: string;
+    actual?: string;
+  }>;
+}
+
+export interface LegacyChannelsMigrationPreview {
+  channels: Array<{
+    name: string;
+    protocol: string;
+    baseUrl: string;
+    model: string;
+  }>;
+}
+
 export interface ExportSystemConfigResponse {
   content: string;
   configVersion: string;
@@ -140,6 +185,27 @@ export interface ExportSystemConfigResponse {
 export interface SystemConfigUpdateItem {
   key: string;
   value: string;
+}
+
+/**
+ * One field's three-way state after a save was rejected with a config-version
+ * conflict (409): the value we submitted against (`base`), the newer value the
+ * server now holds (`server`), and the user's still-pending edit (`local`).
+ * Sensitive fields never carry displayable plaintext to the UI beyond status.
+ */
+export interface ConfigConflictField {
+  key: string;
+  base: string;
+  server: string;
+  local: string;
+  isSensitive: boolean;
+  title?: string;
+  category?: string;
+}
+
+export interface ConfigConflictState {
+  fields: ConfigConflictField[];
+  serverVersion: string;
 }
 
 export interface GenerationBackendStatusPreviewRequest {

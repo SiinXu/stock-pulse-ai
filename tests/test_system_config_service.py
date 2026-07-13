@@ -2256,6 +2256,85 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             validation["issues"],
         )
 
+    def test_llm_config_mode_status_auto_channels_over_legacy(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519",
+            "LLM_CONFIG_MODE=auto",
+            "LLM_CHANNELS=aihubmix",
+            "LLM_AIHUBMIX_PROTOCOL=openai",
+            "LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1",
+            "LLM_AIHUBMIX_API_KEY=sk-x",
+            "LLM_AIHUBMIX_MODELS=gpt-5.5",
+            "OPENAI_API_KEY=sk-legacy",
+        )
+        status = self.service.get_llm_config_mode_status()
+        self.assertEqual(status["requested_mode"], "auto")
+        self.assertEqual(status["effective_mode"], "channels")
+        self.assertIn("channels", status["detected_sources"])
+        self.assertIn("legacy", status["overridden_sources"])
+
+    def test_llm_config_mode_status_forced_yaml_without_config_warns(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519", "LLM_CONFIG_MODE=yaml")
+        status = self.service.get_llm_config_mode_status()
+        self.assertEqual(status["requested_mode"], "yaml")
+        self.assertEqual(status["effective_mode"], "yaml")
+        self.assertTrue(
+            any(issue["code"] == "forced_mode_no_config" for issue in status["issues"]),
+            status["issues"],
+        )
+
+    def test_preview_legacy_channels_migration_lists_channels_redacted(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519", "OPENAI_API_KEY=sk-openai-secret", "OPENAI_MODEL=gpt-x")
+        preview = self.service.preview_legacy_channels_migration()
+        names = [channel["name"] for channel in preview["channels"]]
+        self.assertIn("openai", names)
+        self.assertNotIn("sk-openai-secret", str(preview))
+
+    def test_apply_legacy_channels_migration_switches_mode_and_copies_keys(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519", "OPENAI_API_KEY=sk-openai-secret", "OPENAI_MODEL=gpt-x")
+        # apply() reloads runtime config via setup_env(override=True); patch.dict
+        # restores os.environ afterwards so migrated keys don't leak to other tests.
+        with patch.dict(os.environ, {}, clear=False):
+            self.service.apply_legacy_channels_migration(config_version=self.manager.get_config_version())
+        saved = self.manager.read_config_map()
+        self.assertEqual(saved.get("LLM_CONFIG_MODE"), "channels")
+        self.assertIn("openai", saved.get("LLM_CHANNELS") or "")
+        self.assertEqual(saved.get("LLM_OPENAI_API_KEY"), "sk-openai-secret")
+
+    def test_apply_legacy_channels_migration_without_legacy_config_raises(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519")
+        with self.assertRaises(ConfigValidationError):
+            self.service.apply_legacy_channels_migration(config_version=self.manager.get_config_version())
+
+    def test_field_contract_required_when_enforced_and_scoped(self) -> None:
+        fake_contracts = {
+            "MY_CONDITIONAL_FIELD": {
+                "requirement": "optional",
+                "required_when": [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}],
+            },
+        }
+        with patch("src.services.system_config_service.get_contract_field_definitions", return_value=fake_contracts):
+            invalid = self.service.validate(items=[{"key": "GENERATION_BACKEND", "value": "opencode_cli"}])
+            self.assertFalse(invalid["valid"])
+            self.assertTrue(
+                any(issue["code"] == "field_required" and issue["key"] == "MY_CONDITIONAL_FIELD" for issue in invalid["issues"]),
+                invalid["issues"],
+            )
+            valid = self.service.validate(items=[{"key": "GENERATION_BACKEND", "value": "litellm"}])
+            self.assertTrue(valid["valid"], valid["issues"])
+
+    def test_field_contract_hidden_field_not_required(self) -> None:
+        fake_contracts = {
+            "MY_HIDDEN_FIELD": {
+                "requirement": "required",
+                "visible_when": [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}],
+            },
+        }
+        with patch("src.services.system_config_service.get_contract_field_definitions", return_value=fake_contracts):
+            # backend != opencode_cli -> field hidden -> not required -> save allowed.
+            result = self.service.validate(items=[{"key": "GENERATION_BACKEND", "value": "litellm"}])
+            self.assertTrue(result["valid"], result["issues"])
+
     def test_validate_rejects_explicit_hermes_only_agent_model(self) -> None:
         validation = self.service.validate(
             items=[

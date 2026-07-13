@@ -1,4 +1,5 @@
 export * from './LLMChannelEditor';
+export * from './LLMConfigModeBanner';
 export * from './SettingsAlert';
 export * from './ChangePasswordCard';
 export * from './IntelligentImport';
@@ -17,6 +18,5 @@ export * from './SettingsHelpButton';
 export * from './SettingsLoading';
 export * from './SettingsPanelErrorBoundary';
 export * from './SettingsSectionCard';
-export * from './SettingsCategoryNav';
 export * from './AuthSettingsCard';
 export * from './GenerationBackendStatusPanel';

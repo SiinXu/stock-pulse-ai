@@ -163,6 +163,12 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "",
         "placeholder": "optional provider/model override",
         "validation": {"pattern": r"^$|^[^\s|<>;`$]+$"},
+        "contract": {
+            "requirement": "optional",
+            "visible_when": [
+                {"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"},
+            ],
+        },
         "display_order": 1,
         "help_key": "settings.ai_model.OPENCODE_CLI_MODEL",
         "examples": [
@@ -412,6 +418,37 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     # ------------------------------------------------------------------
     # AI Model – Multi-channel LLM configuration
     # ------------------------------------------------------------------
+    "LLM_CONFIG_MODE": {
+        "title": "Model config mode",
+        "description": "Which model configuration source is active. 'auto' keeps the historical precedence (YAML > Channels > legacy keys); 'channels'/'yaml'/'legacy' force a single source so the active configuration is unambiguous.",
+        "category": "ai_model",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "auto",
+        "options": [
+            {"label": "Auto (compatible)", "value": "auto"},
+            {"label": "Web Channels (recommended)", "value": "channels"},
+            {"label": "YAML (advanced)", "value": "yaml"},
+            {"label": "Legacy provider keys (compatibility)", "value": "legacy"},
+        ],
+        "validation": {"enum": ["auto", "channels", "yaml", "legacy"]},
+        "display_order": 2,
+        "help_key": "settings.ai_model.LLM_CONFIG_MODE",
+        "examples": [
+            "LLM_CONFIG_MODE=auto",
+            "LLM_CONFIG_MODE=channels",
+        ],
+        "docs": [
+            {
+                "label": "LLM 配置指南",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/LLM_CONFIG_GUIDE.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "LITELLM_CONFIG": {
         "title": "Advanced Model Routing Config",
         "description": "Path to an advanced model routing YAML file (expert use). When valid/parseable and yields a model_list, it takes priority over channels and legacy keys; otherwise channels/legacy are used as fallback.",
@@ -4886,6 +4923,46 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
         "display_order": 9000,
     }
     return field
+
+
+def get_contract_field_definitions() -> Dict[str, Dict[str, Any]]:
+    """Return {KEY: contract} for registered fields that declare a schema contract."""
+    return {
+        key: deepcopy(field["contract"])
+        for key, field in _FIELD_DEFINITIONS.items()
+        if field.get("contract")
+    }
+
+
+def evaluate_config_conditions(
+    conditions: Optional[List[Dict[str, Any]]],
+    config_map: Dict[str, str],
+) -> str:
+    """Evaluate an AND-list of field conditions against a config map.
+
+    Returns 'met', 'not_met', or 'unknown'. An unknown operator yields 'unknown'
+    so callers can fail-safe (keep the field visible and still validated).
+    """
+    if not conditions:
+        return "met"
+    for condition in conditions:
+        key = str(condition.get("key", "")).upper()
+        operator = condition.get("operator")
+        expected = condition.get("value")
+        actual = str(config_map.get(key, "") or "")
+        if operator == "equals":
+            met = actual == str(expected)
+        elif operator == "notEquals":
+            met = actual != str(expected)
+        elif operator == "in":
+            met = actual in [str(value) for value in (expected or [])]
+        elif operator == "notEmpty":
+            met = bool(actual.strip())
+        else:
+            return "unknown"
+        if not met:
+            return "not_met"
+    return "met"
 
 
 def build_schema_response() -> Dict[str, Any]:

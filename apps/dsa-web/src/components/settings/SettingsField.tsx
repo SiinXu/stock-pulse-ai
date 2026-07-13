@@ -67,6 +67,10 @@ interface SettingsFieldProps {
   disabled?: boolean;
   onChange: (key: string, value: string) => void;
   issues?: ConfigValidationIssue[];
+  /** Effective requirement from the field's schema contract. */
+  requirement?: 'required' | 'optional' | 'inherited' | null;
+  /** True when the field's enabledWhen conditions are not met (read-only). */
+  dependencyLocked?: boolean;
 }
 
 function renderFieldControl(
@@ -238,6 +242,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   disabled = false,
   onChange,
   issues = [],
+  requirement = null,
+  dependencyLocked = false,
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
@@ -287,6 +293,16 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
               {t('common.readOnly')}
             </Badge>
           ) : null}
+          {requirement === 'required' ? (
+            <Badge variant="warning" size="sm">{t('settings.fieldRequired')}</Badge>
+          ) : requirement === 'inherited' ? (
+            <Badge variant="default" size="sm">{t('settings.fieldInherited')}</Badge>
+          ) : requirement === 'optional' ? (
+            <Badge variant="default" size="sm">{t('settings.fieldOptional')}</Badge>
+          ) : null}
+          {dependencyLocked ? (
+            <Badge variant="default" size="sm">{t('settings.fieldDependencyLocked')}</Badge>
+          ) : null}
         </div>
         {schema?.docs?.length ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -317,7 +333,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
         {renderFieldControl(
           item,
           displayValue,
-          disabled,
+          disabled || dependencyLocked,
           (nextValue) => onChange(item.key, nextValue),
           isPasswordEditable,
           () => setIsPasswordEditable(true),

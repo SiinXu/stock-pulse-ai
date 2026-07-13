@@ -997,6 +997,44 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         self.assertEqual(stocks, ["600519", "HK01810"])
         self.assertEqual(emails, ["user@example.com"])
 
+    def _channels_and_legacy_env(self, mode: str) -> dict:
+        return {
+            "STOCK_LIST": "600519",
+            "LLM_CONFIG_MODE": mode,
+            "LLM_CHANNELS": "openai",
+            "LLM_OPENAI_PROTOCOL": "openai",
+            "LLM_OPENAI_BASE_URL": "https://api.openai.com/v1",
+            "LLM_OPENAI_API_KEY": "sk-channel",
+            "LLM_OPENAI_MODELS": "gpt-4o",
+            "OPENAI_API_KEY": "sk-legacy",
+            "OPENAI_MODEL": "gpt-4o",
+        }
+
+    def test_llm_config_mode_auto_keeps_channels_precedence(self):
+        with patch.dict(os.environ, self._channels_and_legacy_env("auto"), clear=True):
+            config = Config._load_from_env()
+        self.assertEqual(config.llm_config_mode, "auto")
+        self.assertEqual(config.llm_models_source, "llm_channels")
+
+    def test_llm_config_mode_channels_ignores_legacy_keys(self):
+        with patch.dict(os.environ, self._channels_and_legacy_env("channels"), clear=True):
+            config = Config._load_from_env()
+        self.assertEqual(config.llm_config_mode, "channels")
+        self.assertEqual(config.llm_models_source, "llm_channels")
+
+    def test_llm_config_mode_legacy_ignores_channels(self):
+        with patch.dict(os.environ, self._channels_and_legacy_env("legacy"), clear=True):
+            config = Config._load_from_env()
+        self.assertEqual(config.llm_config_mode, "legacy")
+        self.assertEqual(config.llm_models_source, "legacy_env")
+
+    def test_llm_config_mode_invalid_falls_back_to_auto(self):
+        env = {"STOCK_LIST": "600519", "LLM_CONFIG_MODE": "bogus", "OPENAI_API_KEY": "sk-x", "OPENAI_MODEL": "gpt-4o"}
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+        # Unknown mode fails safe to auto (historical precedence preserved).
+        self.assertEqual(config.llm_config_mode, "auto")
+
 
 if __name__ == "__main__":
     unittest.main()

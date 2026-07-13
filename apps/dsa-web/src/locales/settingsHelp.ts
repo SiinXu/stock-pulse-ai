@@ -167,6 +167,14 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响模型选择、路由、fallback 和可用模型声明。'],
     notes: ['如果 YAML 配置失效，系统会回退到渠道或 legacy 配置路径。'],
   },
+  'settings.ai_model.LLM_CONFIG_MODE': {
+    title: '模型配置来源模式',
+    summary: '选择当前生效的模型配置来源。',
+    usage: 'auto 保持历史优先级（YAML > Channels > legacy）；channels/yaml/legacy 只强制单一来源。',
+    valueNotes: ['非 auto 模式不会删除其它来源的配置，只是不生效，可随时切回。'],
+    impact: ['决定由哪个来源生成运行时模型列表。'],
+    notes: ['yaml 模式需要有效的 LITELLM_CONFIG，否则不会配置任何模型。'],
+  },
   'settings.ai_model.LLM_TEMPERATURE': {
     title: 'Temperature',
     summary: '控制模型输出随机性。',
@@ -1330,6 +1338,14 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['A valid model_list has higher priority than channels and legacy keys.', 'The Web channel editor does not edit the YAML file.'],
     impact: ['Affects model routing, fallbacks, and available model declarations.'],
     notes: ['If the YAML cannot be parsed, the system falls back to channels or legacy configuration.'],
+  },
+  'settings.ai_model.LLM_CONFIG_MODE': {
+    title: 'Model config mode',
+    summary: 'Selects which model configuration source is active.',
+    usage: 'auto keeps the historical YAML > Channels > legacy precedence; channels/yaml/legacy force a single source.',
+    valueNotes: ['Non-auto modes do not delete the other sources; they are just inactive, so you can switch back anytime.'],
+    impact: ['Determines which source produces the runtime model list.'],
+    notes: ['yaml mode requires a valid LITELLM_CONFIG; otherwise no models are configured.'],
   },
   'settings.ai_model.LLM_TEMPERATURE': {
     title: 'Temperature',

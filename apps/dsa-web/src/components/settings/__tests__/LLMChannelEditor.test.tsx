@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LLMChannelEditor } from '../LLMChannelEditor';
@@ -76,9 +75,7 @@ describe('LLMChannelEditor', () => {
     const { rerender } = render(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -89,9 +86,7 @@ describe('LLMChannelEditor', () => {
     rerender(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -104,9 +99,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -131,9 +124,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -162,9 +153,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -189,9 +178,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
         onDraftItemsChange={onDraftItemsChange}
       />
     );
@@ -216,9 +203,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -242,9 +227,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
           { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -280,9 +263,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -303,9 +284,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_API_KEY', value: '******' },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -335,9 +314,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_PURE_API_KEY', value: 'sk-pure' },
           { key: 'LLM_PURE_MODELS', value: 'pure-route' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -345,36 +322,6 @@ describe('LLMChannelEditor', () => {
     expect(selectOptionValues('主模型')).toContain('openai/pure-route');
     expect(selectOptionValues('Agent 主模型')).toContain('openai/shared-route');
     expect(selectOptionValues('Vision 模型')).not.toContain('openai/shared-route');
-  });
-
-  it('rejects bare mixed Hermes route before saving runtime generation config', async () => {
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'hermes,remote' },
-          { key: 'LITELLM_MODEL', value: 'shared-route' },
-          { key: 'LLM_HERMES_PROTOCOL', value: 'openai' },
-          { key: 'LLM_HERMES_BASE_URL', value: 'http://127.0.0.1:8642/v1' },
-          { key: 'LLM_HERMES_ENABLED', value: 'true' },
-          { key: 'LLM_HERMES_API_KEY', value: 'sk-hermes' },
-          { key: 'LLM_HERMES_MODELS', value: 'shared-route' },
-          { key: 'LLM_REMOTE_PROTOCOL', value: 'openai' },
-          { key: 'LLM_REMOTE_BASE_URL', value: 'https://api.example.com/v1' },
-          { key: 'LLM_REMOTE_ENABLED', value: 'true' },
-          { key: 'LLM_REMOTE_API_KEY', value: 'sk-remote' },
-          { key: 'LLM_REMOTE_MODELS', value: 'shared-route' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />
-    );
-
-    fireEvent.change(screen.getByRole('slider'), { target: { value: '0.2' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    expect(await screen.findByText(/Mixed Hermes\/non-Hermes route 暂不支持作为主生成或备选模型/i)).toBeInTheDocument();
-    expect(update).not.toHaveBeenCalled();
   });
 
   it('does not test runtime-only masked Hermes secrets from the settings UI', async () => {
@@ -388,9 +335,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_API_KEY', value: '******', rawValueExists: false },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -417,9 +362,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_REMOTE_API_KEY', value: 'sk-remote' },
           { key: 'LLM_REMOTE_MODELS', value: 'gpt-4o-mini' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -439,9 +382,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'minimax/MiniMax-M1' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -457,9 +398,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -478,9 +417,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -506,9 +443,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENROUTER_API_KEY', value: 'sk-or-test' },
           { key: 'LLM_OPENROUTER_MODELS', value: '~anthropic/claude-sonnet-latest' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -537,9 +472,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_SILICONFLOW_API_KEY', value: 'sk-test' },
           { key: 'LLM_SILICONFLOW_MODELS', value: 'deepseek-ai/DeepSeek-V3.2' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -560,9 +493,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEY', value: 'sk-test' },
           { key: 'LLM_MY_PROXY_MODELS', value: 'custom-model' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -577,9 +508,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -606,9 +535,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -633,23 +560,13 @@ describe('LLMChannelEditor', () => {
     expect(screen.getAllByRole('link', { name: 'MiniMax OpenAI API' })).toHaveLength(1);
   });
 
-  it('saves the MiniMax preset into LLM channel env keys', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_CHANNELS', 'LLM_MINIMAX_PROTOCOL', 'LLM_MINIMAX_BASE_URL', 'LLM_MINIMAX_MODELS'],
-      warnings: [],
-    });
-
+  it('reports the MiniMax preset as channel draft env keys', async () => {
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />
     );
 
@@ -658,59 +575,65 @@ describe('LLMChannelEditor', () => {
     await screen.findByRole('button', { name: /MiniMax 官方/i });
     // An enabled channel must be complete (credential + models) before saving.
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      expect(lastDraftCall(onDraftItemsChange)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: 'LLM_CHANNELS', value: 'minimax' }),
+          expect.objectContaining({ key: 'LLM_MINIMAX_PROTOCOL', value: 'openai' }),
+          expect.objectContaining({ key: 'LLM_MINIMAX_BASE_URL', value: 'https://api.minimax.io/v1' }),
+          expect.objectContaining({ key: 'LLM_MINIMAX_MODELS', value: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed' }),
+        ]),
+      );
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LLM_CHANNELS', value: 'minimax' }),
-        expect.objectContaining({ key: 'LLM_MINIMAX_PROTOCOL', value: 'openai' }),
-        expect.objectContaining({ key: 'LLM_MINIMAX_BASE_URL', value: 'https://api.minimax.io/v1' }),
-        expect.objectContaining({ key: 'LLM_MINIMAX_MODELS', value: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed' }),
-      ]),
-    );
+    expect(update).not.toHaveBeenCalled();
   });
 
-  it('blocks saving an enabled but incomplete channel and enables it once completed', async () => {
-    update.mockResolvedValue({ success: true, configVersion: 'v2', appliedCount: 1, skippedMaskedCount: 0, reloadTriggered: true, updatedKeys: [], warnings: [] });
-    render(<LLMChannelEditor items={[]} configVersion="v1" maskToken="******" onSaved={() => {}} />);
+  it('reports an enabled but incomplete channel as invalid until it is completed', async () => {
+    const onValidityChange = vi.fn();
+    render(<LLMChannelEditor items={[]} maskToken="******" onValidityChange={onValidityChange} />);
 
     chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
 
-    // Enabled + missing credential -> save blocked with the missing item shown.
-    expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeDisabled();
+    // Enabled + missing credential -> draft reported invalid with the missing item shown.
+    await waitFor(() => {
+      expect(onValidityChange).toHaveBeenLastCalledWith(false);
+    });
     expect(screen.getAllByText(/缺少 API Key/).length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeEnabled();
+      expect(onValidityChange).toHaveBeenLastCalledWith(true);
     });
   });
 
-  it('saves an incomplete channel as a draft once it is disabled', async () => {
-    update.mockResolvedValue({ success: true, configVersion: 'v2', appliedCount: 1, skippedMaskedCount: 0, reloadTriggered: true, updatedKeys: [], warnings: [] });
-    render(<LLMChannelEditor items={[]} configVersion="v1" maskToken="******" onSaved={() => {}} />);
+  it('reports an incomplete channel as a valid draft once it is disabled', async () => {
+    const onValidityChange = vi.fn();
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={[]}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+        onDraftItemsChange={onDraftItemsChange}
+      />
+    );
 
     chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
-    expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeDisabled();
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
 
     // Disabling the incomplete channel makes it a saveable draft.
     fireEvent.click(screen.getByRole('checkbox', { name: /启用渠道/ }));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '保存 AI 配置' })).toBeEnabled();
+      expect(onValidityChange).toHaveBeenLastCalledWith(true);
     });
-
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(lastDraftCall(onDraftItemsChange).length).toBeGreaterThan(0);
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('treats an enabled ollama channel as complete without an API key', async () => {
@@ -723,14 +646,25 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OLLAMA_ENABLED', value: 'true' },
           { key: 'LLM_OLLAMA_MODELS', value: 'llama3' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
     expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
     expect(screen.queryByText(/缺少 API Key/)).not.toBeInTheDocument();
+  });
+
+  it('renders read-only when a non-channels config mode is effective', async () => {
+    render(
+      <LLMChannelEditor
+        items={openAiItems}
+        maskToken="******"
+        overriddenByMode="legacy"
+      />
+    );
+
+    expect(await screen.findByText('渠道配置当前只读')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ 添加渠道' })).toBeDisabled();
   });
 
   it('treats an enabled custom ollama channel as complete without a base URL', async () => {
@@ -742,9 +676,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MYLOCAL_ENABLED', value: 'true' },
           { key: 'LLM_MYLOCAL_MODELS', value: 'llama3' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -763,9 +695,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'sk-openai' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -773,19 +703,8 @@ describe('LLMChannelEditor', () => {
     expect(screen.queryByText(/缺少 Base URL/)).not.toBeInTheDocument();
   });
 
-  it('clears active Hermes unsupported multi-key and extra-header env keys on save', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_HERMES_API_KEYS', 'LLM_HERMES_EXTRA_HEADERS'],
-      warnings: [
-        '检测到已清理 Hermes Phase 3 不支持的配置项：LLM_HERMES_API_KEYS, LLM_HERMES_EXTRA_HEADERS。Hermes reserved channel 只支持单个 LLM_HERMES_API_KEY，不支持多 Key 或额外 Header；如需恢复旧值，请从 .env 备份、Git 历史或桌面端导出备份手动还原，但非空 LLM_HERMES_API_KEYS / LLM_HERMES_EXTRA_HEADERS 仍会被后端校验拒绝。',
-      ],
-    });
-
+  it('reports cleared Hermes unsupported multi-key and extra-header env keys in the draft', async () => {
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[
@@ -798,41 +717,25 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_EXTRA_HEADERS', value: '{"X":"Y"}' },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Hermes/i }));
     fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), { target: { value: 'hermes-agent,hermes-agent-2' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      const draftMap = new Map(lastDraftCall(onDraftItemsChange).map((item: { key: string; value: string }) => [item.key, item.value]));
+      expect(draftMap.get('LLM_HERMES_API_KEY')).toBe('sk-hermes-test-value');
+      expect(draftMap.get('LLM_HERMES_API_KEYS')).toBe('');
+      expect(draftMap.get('LLM_HERMES_EXTRA_HEADERS')).toBe('');
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    const updateItemMap = new Map(updatePayload.items.map((item: { key: string; value: string }) => [item.key, item.value]));
-
-    expect(updateItemMap.get('LLM_HERMES_API_KEY')).toBe('sk-hermes-test-value');
-    expect(updateItemMap.get('LLM_HERMES_API_KEYS')).toBe('');
-    expect(updateItemMap.get('LLM_HERMES_EXTRA_HEADERS')).toBe('');
-    expect(await screen.findByText(/已清理 Hermes Phase 3 不支持的配置项/i)).toBeInTheDocument();
-    expect(screen.getByText(/如需恢复旧值，请从 \.env 备份/i)).toBeInTheDocument();
+    expect(update).not.toHaveBeenCalled();
   });
 
-  it('only persists edited values for runtime-only channel keys', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_CHANNELS', 'LLM_MY_PROXY_MODELS'],
-      warnings: [],
-    });
-
+  it('only reports edited values for runtime-only channel keys in the draft', async () => {
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[
@@ -844,42 +747,27 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
     fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), { target: { value: 'gpt-4o-mini,gpt-4o' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      const draftMap = new Map(lastDraftCall(onDraftItemsChange).map((item: { key: string; value: string }) => [item.key, item.value]));
+      expect(draftMap.get('LLM_MY_PROXY_MODELS')).toBe('gpt-4o-mini,gpt-4o');
+      expect(draftMap.has('LITELLM_MODEL')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_PROTOCOL')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_BASE_URL')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_API_KEY')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    const updateItemMap = new Map(updatePayload.items.map((item: { key: string; value: string }) => [item.key, item.value]));
-
-    expect(updateItemMap.get('LLM_MY_PROXY_MODELS')).toBe('gpt-4o-mini,gpt-4o');
-    expect(updateItemMap.has('LITELLM_MODEL')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_PROTOCOL')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_BASE_URL')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_API_KEY')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
   });
 
-  it('renames a mixed raw/runtime channel and clears persisted API key field', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_MY_PROXY_API_KEY', 'LLM_MY_PROXY2_API_KEY', 'LLM_MY_PROXY2_BASE_URL', 'LLM_MY_PROXY2_MODELS'],
-      warnings: [],
-    });
-
+  it('renames a mixed raw/runtime channel and clears persisted API key field in the draft', async () => {
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[
@@ -890,31 +778,25 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEY', value: 'sk-saved' },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
     fireEvent.change(screen.getByLabelText('渠道名称'), { target: { value: 'my_proxy2' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      const draftMap = new Map(lastDraftCall(onDraftItemsChange).map((item: { key: string; value: string }) => [item.key, item.value]));
+      expect(draftMap.get('LLM_MY_PROXY_API_KEY')).toBe('');
+      expect(draftMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_PROTOCOL')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_BASE_URL')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_MODELS')).toBe(false);
+      expect(draftMap.get('LLM_MY_PROXY2_API_KEY')).toBe('sk-saved');
+      expect(draftMap.get('LLM_MY_PROXY2_BASE_URL')).toBe('https://proxy.example.com/v1');
+      expect(draftMap.get('LLM_MY_PROXY2_MODELS')).toBe('gpt-4o-mini');
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    const updateItemMap = new Map(updatePayload.items.map((item: { key: string; value: string }) => [item.key, item.value]));
-
-    expect(updateItemMap.get('LLM_MY_PROXY_API_KEY')).toBe('');
-    expect(updateItemMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_PROTOCOL')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_BASE_URL')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_MODELS')).toBe(false);
-    expect(updateItemMap.get('LLM_MY_PROXY2_API_KEY')).toBe('sk-saved');
-    expect(updateItemMap.get('LLM_MY_PROXY2_BASE_URL')).toBe('https://proxy.example.com/v1');
-    expect(updateItemMap.get('LLM_MY_PROXY2_MODELS')).toBe('gpt-4o-mini');
   });
 
   it('uses runtime API_KEYS when both API_KEY and API_KEYS coexist', async () => {
@@ -929,9 +811,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />,
     );
 
@@ -940,16 +820,7 @@ describe('LLMChannelEditor', () => {
   });
 
   it('does not migrate conflicted API key data as API_KEY when renaming a channel', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_CHANNELS', 'LLM_MY_PROXY_API_KEY', 'LLM_MY_PROXY2_PROTOCOL', 'LLM_MY_PROXY2_BASE_URL', 'LLM_MY_PROXY2_MODELS'],
-      warnings: [],
-    });
-
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[
@@ -961,44 +832,30 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
     fireEvent.change(screen.getByLabelText('渠道名称'), { target: { value: 'my_proxy2' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      const draftItems = lastDraftCall(onDraftItemsChange);
+      const draftMap = new Map(draftItems.map((item: { key: string; value: string }) => [item.key, item.value]));
+      expect(draftMap.get('LLM_CHANNELS')).toBe('my_proxy2');
+      expect(draftMap.has('LLM_MY_PROXY2_API_KEY')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY2_API_KEYS')).toBe(false);
+      expect(draftItems.map((item: { value: string }) => item.value)).not.toContain('sk-runtime-only');
+      expect(draftItems.map((item: { value: string }) => item.value)).not.toContain('sk-saved');
+      expect(draftMap.get('LLM_MY_PROXY_API_KEY')).toBe('');
+      expect(draftMap.get('LLM_MY_PROXY2_BASE_URL')).toBe('https://proxy.example.com/v1');
+      expect(draftMap.get('LLM_MY_PROXY2_MODELS')).toBe('gpt-4o-mini');
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    const updateItemMap = new Map(updatePayload.items.map((item: { key: string; value: string }) => [item.key, item.value]));
-
-    expect(updateItemMap.get('LLM_CHANNELS')).toBe('my_proxy2');
-    expect(updateItemMap.has('LLM_MY_PROXY2_API_KEY')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY2_API_KEYS')).toBe(false);
-    expect([...updateItemMap.values()]).not.toContain('sk-runtime-only');
-    expect([...updateItemMap.values()]).not.toContain('sk-saved');
-    expect(updateItemMap.get('LLM_MY_PROXY_API_KEY')).toBe('');
-    expect(updateItemMap.get('LLM_MY_PROXY2_BASE_URL')).toBe('https://proxy.example.com/v1');
-    expect(updateItemMap.get('LLM_MY_PROXY2_MODELS')).toBe('gpt-4o-mini');
   });
 
   it('does not migrate runtime-only API keys when renaming a startup-env channel', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_CHANNELS', 'LLM_MY_PROXY2_BASE_URL', 'LLM_MY_PROXY2_MODELS'],
-      warnings: [],
-    });
-
+    const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[
@@ -1009,479 +866,24 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
     fireEvent.change(screen.getByLabelText('渠道名称'), { target: { value: 'my_proxy2' } });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
 
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      const draftItems = lastDraftCall(onDraftItemsChange);
+      const draftMap = new Map(draftItems.map((item: { key: string; value: string }) => [item.key, item.value]));
+      expect(draftMap.get('LLM_CHANNELS')).toBe('my_proxy2');
+      expect(draftMap.has('LLM_MY_PROXY_API_KEY')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY2_API_KEY')).toBe(false);
+      expect(draftMap.has('LLM_MY_PROXY2_API_KEYS')).toBe(false);
+      expect(draftItems.map((item: { value: string }) => item.value)).not.toContain('sk-runtime-only');
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    const updateItemMap = new Map(updatePayload.items.map((item: { key: string; value: string }) => [item.key, item.value]));
-
-    expect(updateItemMap.get('LLM_CHANNELS')).toBe('my_proxy2');
-    expect(updateItemMap.has('LLM_MY_PROXY_API_KEY')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY_API_KEYS')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY2_API_KEY')).toBe(false);
-    expect(updateItemMap.has('LLM_MY_PROXY2_API_KEYS')).toBe(false);
-    expect([...updateItemMap.values()]).not.toContain('sk-runtime-only');
-  });
-
-  it('sanitizes stale runtime models before saving DeepSeek V4 channel changes', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_MODELS', 'LITELLM_MODEL'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
-          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
-          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-reasoner' },
-          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-          { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-reasoner' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro,deepseek/deepseek-chat,cohere/command-r-plus' },
-          { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
-      target: { value: 'deepseek-v4-flash,deepseek-v4-pro' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_MODEL', value: '' }),
-        expect.objectContaining({ key: 'AGENT_LITELLM_MODEL', value: '' }),
-        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro,cohere/command-r-plus' }),
-        expect.objectContaining({ key: 'VISION_MODEL', value: '' }),
-        expect.objectContaining({ key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash,deepseek-v4-pro' }),
-      ]),
-    );
-  });
-
-  it('prompts when bare runtime models loosely match canonical OpenAI route aliases', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_PRIMARY_BASE_URL', 'LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'primary' },
-          { key: 'LLM_PRIMARY_PROTOCOL', value: 'openai' },
-          { key: 'LLM_PRIMARY_BASE_URL', value: 'https://api.example.com/v1' },
-          { key: 'LLM_PRIMARY_ENABLED', value: 'true' },
-          { key: 'LLM_PRIMARY_API_KEY', value: 'sk-test' },
-          { key: 'LLM_PRIMARY_MODELS', value: 'gpt-4o-mini' },
-          { key: 'LITELLM_MODEL', value: 'gpt-4o-mini' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'gpt-4o-mini' },
-          { key: 'AGENT_LITELLM_MODEL', value: '' },
-          { key: 'VISION_MODEL', value: '' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /primary/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.example.com/compatible/v1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(screen.getByText('当前运行时模型使用非规范 route alias，请从下拉框重新选择规范模型。')).toBeInTheDocument();
-    });
-
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it('does not treat direct-env provider models as non-canonical route aliases', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_PRIMARY_BASE_URL', 'LITELLM_MODEL'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'primary' },
-          { key: 'LLM_PRIMARY_PROTOCOL', value: 'openai' },
-          { key: 'LLM_PRIMARY_BASE_URL', value: 'https://api.example.com/v1' },
-          { key: 'LLM_PRIMARY_ENABLED', value: 'true' },
-          { key: 'LLM_PRIMARY_API_KEY', value: 'sk-test' },
-          { key: 'LLM_PRIMARY_MODELS', value: 'cohere/command-r-plus' },
-          { key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' },
-          { key: 'AGENT_LITELLM_MODEL', value: '' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: '' },
-          { key: 'VISION_MODEL', value: '' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /primary/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.example.com/compatible/v1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' }),
-      ]),
-    );
-  });
-
-  it('sanitizes stale runtime models when enabled channels have no available models', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_BASE_URL', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS', 'VISION_MODEL'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
-          { key: 'LLM_DEEPSEEK_ENABLED', value: 'false' },
-          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-v4-pro' },
-          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-          { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro' },
-          { key: 'VISION_MODEL', value: 'deepseek/deepseek-chat' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.deepseek.com/v1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_MODEL', value: '' }),
-        expect.objectContaining({ key: 'AGENT_LITELLM_MODEL', value: '' }),
-        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: '' }),
-        expect.objectContaining({ key: 'VISION_MODEL', value: '' }),
-      ]),
-    );
-  });
-
-  it('keeps legacy-key-backed runtime models when enabled channels have no available models', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_PRIMARY_BASE_URL', 'LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'primary' },
-          { key: 'LLM_PRIMARY_PROTOCOL', value: 'openai' },
-          { key: 'LLM_PRIMARY_BASE_URL', value: 'https://api.example.com/v1' },
-          { key: 'LLM_PRIMARY_ENABLED', value: 'false' },
-          { key: 'LLM_PRIMARY_API_KEY', value: 'sk-test' },
-          { key: 'LLM_PRIMARY_MODELS', value: 'gpt-4o-mini' },
-          { key: 'OPENAI_API_KEY', value: 'sk-legacy-value' },
-          { key: 'LITELLM_MODEL', value: 'openai/gpt-4o-mini' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'openai/gpt-4o' },
-          { key: 'AGENT_LITELLM_MODEL', value: '' },
-          { key: 'VISION_MODEL', value: '' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /primary/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.example.com/compatible/v1' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_MODEL', value: 'openai/gpt-4o-mini' }),
-        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'openai/gpt-4o' }),
-      ]),
-    );
-  });
-
-  it('shows cleanup warning and restore path after stale runtime models are removed on save', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_MODELS', 'LITELLM_MODEL'],
-      warnings: [
-        '检测到已同步清理失效的运行时模型引用：主模型 / Agent 主模型 / Vision 模型 / 备选模型中的失效项。如需恢复，请先补回对应渠道模型列表后重新选择；也可用桌面端导出备份或手动 .env 还原之前的 LLM_* / LITELLM_MODEL / AGENT_LITELLM_MODEL / VISION_MODEL / LLM_TEMPERATURE。',
-      ],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
-          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
-          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-reasoner' },
-          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-          { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-reasoner' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro,deepseek/deepseek-chat' },
-          { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
-      target: { value: 'deepseek-v4-flash,deepseek-v4-pro' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    expect(await screen.findByText('保存后提示')).toBeInTheDocument();
-    expect(screen.getByText(/已同步清理失效的运行时模型引用/i)).toBeInTheDocument();
-    expect(screen.getByText(/桌面端导出备份或手动 \.env 还原/i)).toBeInTheDocument();
-  });
-
-  it('keeps save warnings visible after onSaved-driven refresh', async () => {
-    const warningMessage = '检测到已同步清理失效的运行时模型引用：主模型 / Agent 主模型 / Vision 模型 / 备选模型中的失效项。';
-    const initialItems = [
-      { key: 'LLM_CHANNELS', value: 'deepseek' },
-      { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-      { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
-      { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
-      { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-      { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat,deepseek-reasoner' },
-      { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-      { key: 'AGENT_LITELLM_MODEL', value: 'deepseek/deepseek-reasoner' },
-      { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro,cohere/command-r-plus' },
-      { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
-    ];
-    const Component = () => {
-      const [items, setItems] = useState(initialItems);
-
-      return (
-        <LLMChannelEditor
-          items={items}
-          configVersion="v1"
-          maskToken="******"
-          onSaved={async (updatedItems) => {
-            setItems(updatedItems);
-          }}
-        />
-      );
-    };
-
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_MODELS', 'LITELLM_MODEL'],
-      warnings: [warningMessage],
-    });
-
-    render(<Component />);
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
-      target: { value: 'deepseek-v4-flash,deepseek-v4-pro' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    expect(await screen.findByText('保存后提示')).toBeInTheDocument();
-    expect(screen.getByText(warningMessage)).toBeInTheDocument();
-  });
-
-  it('clears failed-save feedback after saved props refresh', async () => {
-    const initialItems = [
-      { key: 'LLM_CHANNELS', value: 'openai' },
-      { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' },
-      { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' },
-      { key: 'LLM_OPENAI_ENABLED', value: 'true' },
-      { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
-      { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
-    ];
-    const onSaved = vi.fn(async () => {
-      throw new Error('refresh failed');
-    });
-
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_OPENAI_BASE_URL'],
-      warnings: [],
-    });
-
-    const renderResult = render(
-      <LLMChannelEditor
-        items={initialItems}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={onSaved}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.openai.com/v1/test' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    expect(await screen.findByText('refresh failed')).toBeInTheDocument();
-
-    const savedItems = update.mock.calls[0][0].items;
-    renderResult.rerender(
-      <LLMChannelEditor
-        items={savedItems}
-        configVersion="v2"
-        maskToken="******"
-        onSaved={onSaved}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByText('refresh failed')).not.toBeInTheDocument();
-    });
-  });
-
-  it('keeps stale runtime fallback model available when user restores it in channel models', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_MODELS', 'LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com' },
-          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
-          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-chat' },
-          { key: 'LITELLM_MODEL', value: 'deepseek/deepseek-chat' },
-          { key: 'AGENT_LITELLM_MODEL', value: '' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-old' },
-          { key: 'VISION_MODEL', value: '' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
-      target: { value: 'deepseek-chat,deepseek-old' },
-    });
-
-    expect(await screen.findByLabelText('deepseek/deepseek-old')).toBeChecked();
-
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-old' }),
-      ]),
-    );
   });
 
   it('keeps runtime selections while channel models are edited temporarily', async () => {
@@ -1499,9 +901,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro' },
           { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1533,58 +933,6 @@ describe('LLMChannelEditor', () => {
     });
   });
 
-  it('keeps direct-env provider runtime models (cohere / google / xai) while saving channel changes', async () => {
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DEEPSEEK_BASE_URL', 'LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'LITELLM_FALLBACK_MODELS', 'VISION_MODEL'],
-      warnings: [],
-    });
-
-    render(
-      <LLMChannelEditor
-        items={[
-          { key: 'LLM_CHANNELS', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_PROTOCOL', value: 'deepseek' },
-          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://api.deepseek.com/v1' },
-          { key: 'LLM_DEEPSEEK_ENABLED', value: 'true' },
-          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
-          { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash' },
-          { key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' },
-          { key: 'AGENT_LITELLM_MODEL', value: 'google/gemini-2.5-flash' },
-          { key: 'LITELLM_FALLBACK_MODELS', value: 'cohere/command-r-plus,google/gemini-2.5-flash,xai/grok-beta' },
-          { key: 'VISION_MODEL', value: 'xai/grok-vision-beta' },
-        ]}
-        configVersion="v1"
-        maskToken="******"
-        onSaved={() => {}}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.change(screen.getByLabelText('Base URL'), {
-      target: { value: 'https://api.deepseek.com' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
-    await waitFor(() => {
-      expect(update).toHaveBeenCalled();
-    });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LITELLM_MODEL', value: 'cohere/command-r-plus' }),
-        expect.objectContaining({ key: 'AGENT_LITELLM_MODEL', value: 'google/gemini-2.5-flash' }),
-        expect.objectContaining({ key: 'LITELLM_FALLBACK_MODELS', value: 'cohere/command-r-plus,google/gemini-2.5-flash,xai/grok-beta' }),
-        expect.objectContaining({ key: 'VISION_MODEL', value: 'xai/grok-vision-beta' }),
-      ]),
-    );
-  });
-
   it('checks protocol-prefixed selected model when discovery returns bare id', async () => {
     discoverLLMChannelModels.mockResolvedValue({
       success: true,
@@ -1605,9 +953,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'openai/MiniMax-M1' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1643,9 +989,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'minimax/MiniMax-M1' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1657,7 +1001,8 @@ describe('LLMChannelEditor', () => {
     expect(screen.getByLabelText('手动模型（逗号分隔）')).toHaveValue('minimax/MiniMax-M1');
   });
 
-  it('discovers models and writes selected values back to channel config', async () => {
+  it('discovers models and writes selected values into the channel draft', async () => {
+    const onDraftItemsChange = vi.fn();
     discoverLLMChannelModels.mockResolvedValue({
       success: true,
       message: 'LLM channel model discovery succeeded',
@@ -1665,15 +1010,6 @@ describe('LLMChannelEditor', () => {
       resolvedProtocol: 'openai',
       models: ['qwen-plus', 'qwen-turbo'],
       latencyMs: 88,
-    });
-    update.mockResolvedValue({
-      success: true,
-      configVersion: 'v2',
-      appliedCount: 1,
-      skippedMaskedCount: 0,
-      reloadTriggered: true,
-      updatedKeys: ['LLM_DASHSCOPE_MODELS'],
-      warnings: [],
     });
 
     render(
@@ -1686,9 +1022,8 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
+        onDraftItemsChange={onDraftItemsChange}
       />
     );
 
@@ -1712,18 +1047,15 @@ describe('LLMChannelEditor', () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '保存 AI 配置' }));
-
+    // Discovery only updates the local draft; it never triggers a save request.
     await waitFor(() => {
-      expect(update).toHaveBeenCalled();
+      expect(lastDraftCall(onDraftItemsChange)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old,qwen-plus' }),
+        ]),
+      );
     });
-
-    const updatePayload = update.mock.calls[0][0];
-    expect(updatePayload.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old,qwen-plus' }),
-      ]),
-    );
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('shows structured troubleshooting hint when channel auth fails', async () => {
@@ -1732,9 +1064,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1770,9 +1100,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_SILICONFLOW_API_KEY', value: 'secret-key' },
           { key: 'LLM_SILICONFLOW_MODELS', value: 'deepseek-ai/DeepSeek-V3,Qwen/Qwen3-Coder' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1815,9 +1143,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_PROXY_API_KEY', value: 'secret-key' },
           { key: 'LLM_PROXY_MODELS', value: 'gpt-5.5,gpt-4o-mini' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1848,9 +1174,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1878,9 +1202,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1909,9 +1231,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -1957,9 +1277,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -2002,9 +1320,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'bad-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -2042,9 +1358,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_GEMINI_API_KEY', value: 'sk-test' },
           { key: 'LLM_GEMINI_MODELS', value: '' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -2083,9 +1397,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: '' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -2120,9 +1432,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: '' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />
     );
 
@@ -2166,9 +1476,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'dash-old' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />,
     );
 
@@ -2185,9 +1493,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'dash-old' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />,
     );
 
@@ -2232,9 +1538,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old' },
         ]}
-        configVersion="v1"
         maskToken="******"
-        onSaved={() => {}}
       />,
     );
 

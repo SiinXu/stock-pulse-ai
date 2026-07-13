@@ -8,6 +8,8 @@ import type {
   GenerationBackendStatusPreviewRequest,
   GenerationBackendStatusResponse,
   ImportSystemConfigRequest,
+  LegacyChannelsMigrationPreview,
+  LLMConfigModeStatus,
   SchedulerRunNowResponse,
   SchedulerStatusResponse,
   SetupStatusResponse,
@@ -197,6 +199,28 @@ export const systemConfigApi = {
       '/api/v1/system/config/generation-backends/status',
     );
     return toCamelCase<GenerationBackendStatusResponse>(response.data);
+  },
+
+  async getLlmConfigModeStatus(): Promise<LLMConfigModeStatus> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      '/api/v1/system/config/llm/mode-status',
+    );
+    return toCamelCase<LLMConfigModeStatus>(response.data);
+  },
+
+  async previewLegacyChannelsMigration(): Promise<LegacyChannelsMigrationPreview> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      '/api/v1/system/config/llm/legacy-migration/preview',
+    );
+    return toCamelCase<LegacyChannelsMigrationPreview>(response.data);
+  },
+
+  async applyLegacyChannelsMigration(configVersion: string): Promise<UpdateSystemConfigResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/system/config/llm/legacy-migration/apply',
+      { config_version: configVersion },
+    );
+    return toCamelCase<UpdateSystemConfigResponse>(response.data);
   },
 
   async previewGenerationBackendStatus(

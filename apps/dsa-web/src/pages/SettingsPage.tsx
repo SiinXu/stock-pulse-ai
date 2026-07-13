@@ -15,6 +15,7 @@ import {
   GenerationBackendStatusPanel,
   IntelligentImport,
   LLMChannelEditor,
+  LLMConfigModeBanner,
   NotificationChannelsPanel,
   ModelProvidersPanel,
   DataProvidersPanel,
@@ -29,18 +30,29 @@ import {
   getSubCategories,
   getSubCategoryOfKey,
   getSubCategoryFieldOrder,
-  SettingsCategoryNav,
   SettingsAlert,
   SettingsField,
   SettingsLoading,
   SettingsPanelErrorBoundary,
   SettingsSectionCard,
 } from '../components/settings';
+import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
+import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
+import {
+  getDefaultView,
+  getSectionViews,
+  legacyToSectionView,
+  sectionViewToLegacy,
+  type SettingsSectionId,
+} from '../components/settings/settingsInformationArchitecture';
+import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
+import { isFieldVisibleByContract, isFieldEnabledByContract, resolveFieldRequirement } from '../utils/configConditions';
 import type {
   ConfigValidationIssue,
+  LLMConfigModeStatus,
   SchedulerStatusResponse,
   SetupStatusCheck,
   SetupStatusResponse,
@@ -871,7 +883,6 @@ const SettingsPage: React.FC = () => {
   const [isUpdatingAlphaSift, setIsUpdatingAlphaSift] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [pendingTabSwitch, setPendingTabSwitch] = useState<{ category: string; subCategory: string | null } | null>(null);
   const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
@@ -884,6 +895,11 @@ const SettingsPage: React.FC = () => {
   const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
   const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
+  // Structural completeness gate reported by the LLM channel editor; blocks the
+  // unified Save & Apply while an enabled channel is incomplete.
+  const [llmChannelDraftValid, setLlmChannelDraftValid] = useState(true);
+  // Bumped to tell the mounted channel editor to discard its draft on Reset.
+  const [llmChannelResetSignal, setLlmChannelResetSignal] = useState(0);
   const envBackupImportRef = useRef<HTMLInputElement | null>(null);
   const setupStatusRequestIdRef = useRef(0);
   const desktopRuntimeApi = getDesktopRuntimeApi();
@@ -901,13 +917,19 @@ const SettingsPage: React.FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Seed the active tab from the URL once so deep links / refresh restore it.
+  // Prefer the new section/view scheme; fall back to (and migrate from) the
+  // legacy category/sub params below.
   const [initialTab] = useState(() => {
+    const section = searchParams.get('section');
+    if (section) {
+      const legacy = sectionViewToLegacy(section, searchParams.get('view'));
+      return { category: legacy.category, subCategory: legacy.sub };
+    }
     const category = searchParams.get('category');
     return category ? { category, subCategory: searchParams.get('sub') } : undefined;
   });
 
   const {
-    categories,
     itemsByCategory,
     issueByKey,
     activeCategory,
@@ -924,7 +946,9 @@ const SettingsPage: React.FC = () => {
     loadError,
     saveError,
     retryAction,
-    autosaveStatus,
+    conflictState,
+    resolveConflictField,
+    resolveAllConflicts,
     load,
     retry,
     save,
@@ -936,29 +960,90 @@ const SettingsPage: React.FC = () => {
     maskToken,
   } = useSystemConfig(initialTab);
 
-  // Mirror the active tab into the URL (replace, so tab hops don't spam history)
-  // for shareable deep links and refresh restoration.
+  // The active tab is tracked internally as (category, sub). The first-level
+  // section derives from it, but several AI & Models views share the same
+  // (category, sub), so the second-level view is tracked as its own state.
+  const activeSection = legacyToSectionView(activeCategory, activeSubCategory).section;
+  const [activeView, setActiveView] = useState<string>(() => {
+    const section = searchParams.get('section');
+    const view = searchParams.get('view');
+    if (section) {
+      return getSectionViews(section as SettingsSectionId).some((entry) => entry.id === view)
+        ? (view as string)
+        : getDefaultView(section as SettingsSectionId);
+    }
+    const seeded = legacyToSectionView(initialTab?.category ?? 'base', initialTab?.subCategory ?? null);
+    return seeded.view;
+  });
+
+  // Keep the active view valid for the current section (e.g. after the section
+  // changes via a section click, a legacy URL migration, or setup navigation).
+  useEffect(() => {
+    if (!getSectionViews(activeSection).some((entry) => entry.id === activeView)) {
+      setActiveView(getDefaultView(activeSection));
+    }
+  }, [activeSection, activeView]);
+
+  // Mirror the active section/view into the URL (replace, so tab hops don't spam
+  // history) for shareable deep links and refresh restoration, and migrate any
+  // legacy category/sub params to the new scheme.
   useEffect(() => {
     setSearchParams((prev) => {
-      if (prev.get('category') === activeCategory && (prev.get('sub') ?? null) === (activeSubCategory ?? null)) {
+      const hasLegacy = prev.has('category') || prev.has('sub');
+      if (
+        !hasLegacy
+        && prev.get('section') === activeSection
+        && (prev.get('view') ?? null) === (activeView ?? null)
+      ) {
         return prev;
       }
       const next = new URLSearchParams(prev);
-      next.set('category', activeCategory);
-      if (activeSubCategory) {
-        next.set('sub', activeSubCategory);
+      next.delete('category');
+      next.delete('sub');
+      next.set('section', activeSection);
+      if (activeView) {
+        next.set('view', activeView);
       } else {
-        next.delete('sub');
+        next.delete('view');
       }
       return next;
     }, { replace: true });
-  }, [activeCategory, activeSubCategory, setSearchParams]);
+  }, [activeSection, activeView, setSearchParams]);
+
+  const selectSectionView = useCallback((section: SettingsSectionId, view: string) => {
+    setActiveView(view);
+    const legacy = sectionViewToLegacy(section, view);
+    selectTab(legacy.category, legacy.sub);
+  }, [selectTab]);
+
+  // Per-section badge state for the first-level nav (error / unsaved only).
+  const settingsSectionStatus = useMemo(
+    () => computeSectionStatus(itemsByCategory, dirtyKeys ?? [], Object.keys(issueByKey)),
+    [itemsByCategory, dirtyKeys, issueByKey],
+  );
+
+  // Which model config source (channels/yaml/legacy) is actually effective.
+  const [llmModeStatus, setLlmModeStatus] = useState<LLMConfigModeStatus | null>(null);
+  useEffect(() => {
+    let alive = true;
+    systemConfigApi
+      .getLlmConfigModeStatus()
+      .then((next) => { if (alive) setLlmModeStatus(next); })
+      .catch(() => { /* advisory status; ignore load failures */ });
+    return () => { alive = false; };
+  }, [configVersion]);
+  // The channel editor is read-only when a non-channels source is effective, so
+  // the active configuration source is unambiguous (MC-02 mutual exclusion).
+  const channelsOverriddenByMode =
+    llmModeStatus?.effectiveMode && llmModeStatus.effectiveMode !== 'channels'
+      ? llmModeStatus.effectiveMode
+      : null;
 
   const currentChangedItems = getChangedItems();
   const currentChangedItemsFingerprint = JSON.stringify(currentChangedItems);
   const llmChannelDraftItemsFingerprint = JSON.stringify(llmChannelDraftItems);
-  // The LLM channel editor keeps its own local draft; switching settings tabs
-  // unmounts it and drops that draft, so it needs explicit leave protection.
+  // The LLM channel draft feeds the same unified Save & Apply as normal fields;
+  // switching tabs keeps it in this parent state and rehydrates on remount.
   const hasLlmChannelDraft = llmChannelDraftItems.length > 0;
   const generationBackendDraftItems = useMemo(
     () => mergeGenerationBackendDraftItems(currentChangedItems, llmChannelDraftItems),
@@ -969,17 +1054,34 @@ const SettingsPage: React.FC = () => {
   const handleLlmChannelDraftItemsChange = useCallback((items: Array<{ key: string; value: string }>) => {
     setLlmChannelDraftItems(items);
   }, []);
+  const handleLlmChannelValidityChange = useCallback((valid: boolean) => {
+    setLlmChannelDraftValid(valid);
+  }, []);
+  // Discard reverts both the useSystemConfig draft and the LLM channel draft; the
+  // reset signal tells a mounted channel editor to re-sync to the saved snapshot.
+  const discardDraft = useCallback(() => {
+    resetDraft();
+    setLlmChannelDraftItems([]);
+    setLlmChannelDraftValid(true);
+    setLlmChannelResetSignal((current) => current + 1);
+  }, [resetDraft]);
 
-  // The LLM channel editor only lives on the ai_model/model tab; leaving it
-  // unmounts the editor and drops its unsaved draft, so confirm before switching.
-  const requestSelectTab = useCallback((category: string, subCategory: string | null) => {
-    const leavesModelEditor = !(category === 'ai_model' && subCategory === 'model');
-    if (hasLlmChannelDraft && leavesModelEditor) {
-      setPendingTabSwitch({ category, subCategory });
-      return;
+  const resolveSettingsConflict = useCallback((key: string, choice: 'server' | 'local') => {
+    if (choice === 'server' && llmChannelDraftItems.some((item) => item.key === key)) {
+      setLlmChannelDraftItems((current) => current.filter((item) => item.key !== key));
+      setLlmChannelResetSignal((current) => current + 1);
     }
-    selectTab(category, subCategory);
-  }, [hasLlmChannelDraft, selectTab]);
+    resolveConflictField(key, choice);
+  }, [llmChannelDraftItems, resolveConflictField]);
+
+  const resolveAllSettingsConflicts = useCallback((choice: 'server' | 'local') => {
+    if (choice === 'server' && conflictState) {
+      const conflictKeys = new Set(conflictState.fields.map((field) => field.key));
+      setLlmChannelDraftItems((current) => current.filter((item) => !conflictKeys.has(item.key)));
+      setLlmChannelResetSignal((current) => current + 1);
+    }
+    resolveAllConflicts(choice);
+  }, [conflictState, resolveAllConflicts]);
 
   const refreshSetupStatus = useCallback(async () => {
     const requestId = setupStatusRequestIdRef.current + 1;
@@ -1003,6 +1105,18 @@ const SettingsPage: React.FC = () => {
       }
     }
   }, []);
+
+  // Unified post-save side effects. Every successful config transaction — the
+  // Save button, a save retry, and the Legacy→Channels migration — runs this
+  // exact flow so status panels never drift from the persisted config. Config
+  // snapshot/version reload, validationIssues clearing and the success toast are
+  // handled inside useSystemConfig.save()/load(); the generation-backend panel
+  // and config-mode banner re-fetch off the reloaded config/version.
+  const applyPostSaveEffects = useCallback(() => {
+    notifySystemConfigChanged();
+    setSchedulerStatusRefreshToken((current) => current + 1);
+    void refreshSetupStatus();
+  }, [refreshSetupStatus]);
 
   useEffect(() => {
     void load();
@@ -1086,15 +1200,18 @@ const SettingsPage: React.FC = () => {
     && schedulerOverrideFromUi !== schedulerRuntimeEnabled;
   const hasRuntimeSchedulerMismatchInDraft = hasRuntimeSchedulerMismatch
     && !currentChangedItems.some((item) => item.key === 'SCHEDULE_ENABLED');
-  const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft;
-  const effectiveDirtyCount = dirtyCount + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0);
-  // The global Save button only persists useSystemConfig drafts, so the LLM
-  // channel draft is excluded from effectiveDirtyCount; count it only for the
-  // leave-protection prompt.
-  const leaveGuardCount = effectiveDirtyCount + llmChannelDraftItems.length;
-  // Guard leaving while edits are unsaved (including the LLM channel draft), an
-  // autosave is in flight, or a prior autosave failed.
-  const shouldGuardLeave = effectiveHasDirty || hasLlmChannelDraft || autosaveStatus === 'saving' || autosaveStatus === 'error';
+  // The LLM channel draft is committed by the same Save & Apply, so it counts
+  // toward dirty state; an enabled-incomplete channel keeps Save disabled.
+  const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft || hasLlmChannelDraft;
+  const canSaveConfig = effectiveHasDirty
+    && (!hasLlmChannelDraft || llmChannelDraftValid)
+    && !conflictState;
+  const effectiveDirtyCount = dirtyCount
+    + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0)
+    + llmChannelDraftItems.length;
+  const leaveGuardCount = effectiveDirtyCount;
+  // Guard leaving while there are unsaved edits (including the LLM channel draft).
+  const shouldGuardLeave = effectiveHasDirty;
 
   // Warn before leaving/refreshing/closing the tab while there are unsaved config edits.
   useEffect(() => {
@@ -1170,12 +1287,56 @@ const SettingsPage: React.FC = () => {
       : activeCategory === 'agent'
         ? rawActiveItems.filter((item) => !AGENT_HIDDEN_KEYS.has(item.key))
       : rawActiveItems;
+  // Current (draft-applied) value of every field, for evaluating cross-field
+  // schema contract conditions (visibleWhen / enabledWhen).
+  const allValuesByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const categoryItems of Object.values(itemsByCategory)) {
+      for (const item of categoryItems) {
+        map[item.key.toUpperCase()] = String(item.value ?? '');
+      }
+    }
+    return map;
+  }, [itemsByCategory]);
+  // The AI & Models Overview view shows a task-routing matrix instead of raw
+  // fields / the channel editor.
+  const isAiOverview = activeSection === 'ai_models' && activeView === 'overview';
+  // Task Routing view: the single place to edit which model each task uses.
+  const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
+  const aiModelItemByKey = useMemo(
+    () => new Map((itemsByCategory.ai_model || []).map((item) => [item.key, item])),
+    [itemsByCategory],
+  );
+  const pickAiModelItems = useCallback(
+    (keys: string[]) => keys
+      .map((key) => aiModelItemByKey.get(key))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    [aiModelItemByKey],
+  );
+  const taskRoutingItems = useMemo(
+    () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LITELLM_FALLBACK_MODELS']),
+    [pickAiModelItems],
+  );
+  // Reliability view: two distinct mechanisms — execution-backend failover and
+  // in-LiteLLM model fallback order (MC-05, must not both read "Fallback").
+  const isAiReliability = activeSection === 'ai_models' && activeView === 'reliability';
+  const executionFailoverItems = useMemo(
+    () => pickAiModelItems(['GENERATION_BACKEND', 'GENERATION_FALLBACK_BACKEND']),
+    [pickAiModelItems],
+  );
+  const modelFallbackItems = useMemo(
+    () => pickAiModelItems(['LITELLM_FALLBACK_MODELS']),
+    [pickAiModelItems],
+  );
+  const contractVisibleItems = activeItems.filter((item) =>
+    isFieldVisibleByContract(item.schema?.contract, allValuesByKey),
+  );
   const promptCacheAdvancedItems = activeCategory === 'ai_model'
-    ? activeItems.filter(isPromptCacheAdvancedSetting)
+    ? contractVisibleItems.filter(isPromptCacheAdvancedSetting)
     : [];
   const visibleActiveItems = activeCategory === 'ai_model'
-    ? activeItems.filter((item) => !isPromptCacheAdvancedSetting(item))
-    : activeItems;
+    ? contractVisibleItems.filter((item) => !isPromptCacheAdvancedSetting(item))
+    : contractVisibleItems;
   const hasActiveConfigItems = visibleActiveItems.length > 0 || promptCacheAdvancedItems.length > 0;
   const activeSubCategoriesList = getSubCategories(activeCategory);
   const hasSubNav = activeSubCategoriesList != null;
@@ -1340,18 +1501,33 @@ const SettingsPage: React.FC = () => {
     const schedulerSyncItem: SystemConfigUpdateItem[] = syncRuntimeSchedulerState
       ? [{ key: 'SCHEDULE_ENABLED', value: schedulerOverrideFromUi ? 'true' : 'false' }]
       : [];
-    const changedItemsToSave = [...changedItems, ...schedulerSyncItem];
+    // Commit the LLM channel draft through the same transaction so channel and
+    // normal field edits are persisted atomically. Channel entries win on key
+    // collisions since the editor owns those keys.
+    const mergedByKey = new Map<string, SystemConfigUpdateItem>();
+    for (const item of [...changedItems, ...schedulerSyncItem]) {
+      mergedByKey.set(item.key.toUpperCase(), item);
+    }
+    for (const item of llmChannelDraftItems) {
+      mergedByKey.set(item.key.toUpperCase(), item);
+    }
+    const changedItemsToSave = Array.from(mergedByKey.values());
     const changedAlphaSiftItem = changedItems.find((item) => item.key === 'ALPHASIFT_ENABLED');
-    const changedSchedulerSettings = changedItemsToSave.some((item) => SCHEDULER_SETTING_KEYS.has(item.key));
     const result = await save(changedItemsToSave);
     if (!result.success) {
       return;
     }
-    notifySystemConfigChanged();
-    if (changedSchedulerSettings) {
-      setSchedulerStatusRefreshToken((current) => current + 1);
-    }
-    void refreshSetupStatus();
+    const submittedLlmValues = new Map(
+      llmChannelDraftItems.map((item) => [item.key.toUpperCase(), item.value]),
+    );
+    // Clear only the exact channel values included in this transaction. If the
+    // user edited a channel again while Save was in flight, keep that newer
+    // draft for the next transaction.
+    setLlmChannelDraftItems((current) => current.filter((item) => (
+      submittedLlmValues.get(item.key.toUpperCase()) !== item.value
+    )));
+    setLlmChannelDraftValid(true);
+    applyPostSaveEffects();
     if (!changedAlphaSiftItem) {
       return;
     }
@@ -1476,7 +1652,10 @@ const SettingsPage: React.FC = () => {
   const activeCategoryTitle = getCategoryTitle(activeCategory as SystemConfigCategory, t('settings.activePanelTitle'), uiLanguage);
   const activeCategoryDescription = getCategoryDescription(activeCategory as SystemConfigCategory, '', uiLanguage);
   const activeConfigPanelTitle = hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle;
-  const shouldRenderFieldPanel = hasSubNav ? hasSubFieldContent : hasActiveConfigItems;
+  const shouldRenderFieldPanel = (hasSubNav ? hasSubFieldContent : hasActiveConfigItems)
+    && !isAiOverview
+    && !isAiTaskRouting
+    && !isAiReliability;
   const activeConfigPanel = shouldRenderFieldPanel ? (
     <SettingsSectionCard
       title={activeConfigPanelTitle}
@@ -1525,6 +1704,8 @@ const SettingsPage: React.FC = () => {
                       disabled={isSaving}
                       onChange={setDraftValue}
                       issues={issueByKey[item.key] || []}
+                      requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                     />
                   ))}
                 </div>
@@ -1594,18 +1775,6 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {autosaveStatus && autosaveStatus !== 'idle' ? (
-              <span
-                role="status"
-                className={`text-xs ${autosaveStatus === 'error' ? 'text-danger' : 'text-muted-text'}`}
-              >
-                {autosaveStatus === 'saving'
-                  ? t('settings.autosaveSaving')
-                  : autosaveStatus === 'saved'
-                    ? t('settings.autosaveSaved')
-                    : t('settings.autosaveFailed')}
-              </span>
-            ) : null}
             <Button
               type="button"
               variant="settings-secondary"
@@ -1615,7 +1784,7 @@ const SettingsPage: React.FC = () => {
                 if (effectiveHasDirty) {
                   setShowResetConfirm(true);
                 } else {
-                  resetDraft();
+                  discardDraft();
                 }
               }}
               disabled={isLoading || isSaving}
@@ -1629,7 +1798,7 @@ const SettingsPage: React.FC = () => {
               size="sm"
               className="px-2.5"
               onClick={() => void handleSaveConfig()}
-              disabled={!effectiveHasDirty || isSaving || isLoading}
+              disabled={!canSaveConfig || isSaving || isLoading}
               isLoading={isSaving}
               loadingText={t('settings.saving')}
             >
@@ -1648,8 +1817,89 @@ const SettingsPage: React.FC = () => {
             className="mt-3"
             error={saveError}
             actionLabel={retryAction === 'save' ? t('settings.saveRetry') : undefined}
-            onAction={retryAction === 'save' ? () => void retry() : undefined}
+            onAction={retryAction === 'save' ? () => void handleSaveConfig() : undefined}
           />
+        ) : null}
+
+        {conflictState ? (
+          <section
+            className="mt-3 space-y-3 rounded-xl border border-warning/40 bg-warning/5 p-4"
+            aria-labelledby="settings-conflict-title"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h2 id="settings-conflict-title" className="text-sm font-semibold text-foreground">
+                  配置同时被其他会话修改
+                </h2>
+                <p className="text-xs leading-5 text-secondary-text">
+                  逐项选择采用服务器值或保留本地草稿。未选择前不会覆盖任何一方，也不能继续保存。
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="settings-secondary"
+                  size="xsm"
+                  onClick={() => resolveAllSettingsConflicts('server')}
+                >
+                  全部采用服务器值
+                </Button>
+                <Button
+                  type="button"
+                  variant="settings-secondary"
+                  size="xsm"
+                  onClick={() => resolveAllSettingsConflicts('local')}
+                >
+                  全部保留本地草稿
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {conflictState.fields.map((field) => (
+                <div key={field.key} className="rounded-lg border border-[var(--settings-border)] bg-background/70 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{field.title || field.key}</p>
+                      <p className="text-[11px] text-muted-text">{field.key}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="settings-secondary"
+                        size="xsm"
+                        onClick={() => resolveSettingsConflict(field.key, 'server')}
+                      >
+                        采用服务器值
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="settings-primary"
+                        size="xsm"
+                        onClick={() => resolveSettingsConflict(field.key, 'local')}
+                      >
+                        保留本地草稿
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
+                      <p className="text-[11px] font-medium text-muted-text">服务器当前值</p>
+                      <p className="mt-1 break-all text-xs text-secondary-text">
+                        {field.isSensitive ? '敏感值已更新（内容隐藏）' : field.server || '（空）'}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
+                      <p className="text-[11px] font-medium text-muted-text">你的本地草稿</p>
+                      <p className="mt-1 break-all text-xs text-secondary-text">
+                        {field.isSensitive ? '本地敏感值已修改（内容隐藏）' : field.local || '（空）'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
       </div>
 
@@ -1667,17 +1917,23 @@ const SettingsPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-4 lg:self-start">
-            <SettingsCategoryNav
-              categories={categories}
-              itemsByCategory={itemsByCategory}
-              activeCategory={activeCategory}
-              activeSubCategory={activeSubCategory}
-              dirtyKeys={dirtyKeys}
-              onSelectTab={requestSelectTab}
+            <SettingsSectionNav
+              activeSection={activeSection}
+              onSelectSection={(section) => selectSectionView(section, getDefaultView(section))}
+              sectionStatus={settingsSectionStatus}
+              language={uiLanguage}
+              navLabel={t('settings.categoryNavTitle')}
             />
           </aside>
 
           <section className="space-y-4">
+            <SettingsViewTabs
+              section={activeSection}
+              activeView={activeView}
+              onSelectView={(view) => selectSectionView(activeSection, view)}
+              language={uiLanguage}
+              tabsLabel={t('settings.categoryNavTitle')}
+            />
             {shouldShowFirstRunSetup ? (
               <FirstRunSetupCard
                 status={setupStatus}
@@ -1927,18 +2183,136 @@ const SettingsPage: React.FC = () => {
                   maskToken={maskToken}
                   onMerged={async () => {
                     await refreshAfterExternalSave(['STOCK_LIST']);
-                    void refreshSetupStatus();
+                    applyPostSaveEffects();
                   }}
                   disabled={isSaving || isLoading}
                 />
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'ai_model' && activeSubCategory === 'model' ? (
+            {isAiOverview ? (
               <SettingsSectionCard
                 title={t('settings.llmAccess')}
                 description={t('settings.llmAccessDescription')}
                 contentBordered
               >
+                <AiOverviewMatrix
+                  getValue={(key) => allValuesByKey[key.toUpperCase()] ?? ''}
+                  language={uiLanguage}
+                  onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
+                />
+              </SettingsSectionCard>
+            ) : null}
+            {isAiTaskRouting ? (
+              <SettingsSectionCard
+                title={uiLanguage === 'en' ? 'Task routing' : '任务路由'}
+                description={uiLanguage === 'en'
+                  ? 'Choose the model for each task. Market review inherits the report model unless overridden.'
+                  : '为每个任务选择模型。大盘复盘默认继承报告主模型，除非在此覆盖。'}
+              >
+                {taskRoutingItems.length > 0 ? (
+                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                    {taskRoutingItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-text">
+                    {uiLanguage === 'en' ? 'No routing fields available.' : '暂无可配置的任务路由字段。'}
+                  </p>
+                )}
+              </SettingsSectionCard>
+            ) : null}
+            {isAiReliability ? (
+              <div className="space-y-4">
+                <SettingsSectionCard
+                  title={uiLanguage === 'en' ? 'Execution failover' : '执行后端故障切换'}
+                  description={uiLanguage === 'en'
+                    ? 'When the primary execution backend fails, requests switch to the failover backend. This is separate from model fallback.'
+                    : '主执行后端失败时切换到备用执行后端。这与模型备选顺序是两个独立机制。'}
+                >
+                  <p className="mb-3 text-xs text-secondary-text">
+                    {uiLanguage === 'en' ? 'Current path: ' : '当前路径：'}
+                    <span className="font-medium text-foreground">{allValuesByKey.GENERATION_BACKEND || 'litellm'}</span>
+                    {' → '}
+                    <span className="font-medium text-foreground">
+                      {allValuesByKey.GENERATION_FALLBACK_BACKEND
+                        || (uiLanguage === 'en' ? 'none (no failover)' : '无（未配置切换）')}
+                    </span>
+                  </p>
+                  {executionFailoverItems.length > 0 ? (
+                    <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                      {executionFailoverItems.map((item) => (
+                        <SettingsField
+                          key={item.key}
+                          item={item}
+                          value={item.value}
+                          disabled={isSaving}
+                          onChange={setDraftValue}
+                          issues={issueByKey[item.key] || []}
+                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </SettingsSectionCard>
+                <SettingsSectionCard
+                  title={uiLanguage === 'en' ? 'Model fallback order' : '模型备选顺序'}
+                  description={uiLanguage === 'en'
+                    ? 'Within LiteLLM, when the primary model call fails these models are tried in order. This is separate from execution failover.'
+                    : '在 LiteLLM 内，主模型调用失败时按顺序尝试这些备选模型。这与执行后端切换是两个独立机制。'}
+                >
+                  <p className="mb-3 text-xs text-secondary-text">
+                    {uiLanguage === 'en' ? 'Current order: ' : '当前顺序：'}
+                    <span className="font-medium text-foreground">
+                      {allValuesByKey.LITELLM_FALLBACK_MODELS
+                        || (uiLanguage === 'en' ? 'none set' : '未设置')}
+                    </span>
+                  </p>
+                  {modelFallbackItems.length > 0 ? (
+                    <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                      {modelFallbackItems.map((item) => (
+                        <SettingsField
+                          key={item.key}
+                          item={item}
+                          value={item.value}
+                          disabled={isSaving}
+                          onChange={setDraftValue}
+                          issues={issueByKey[item.key] || []}
+                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </SettingsSectionCard>
+              </div>
+            ) : null}
+            {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
+              <SettingsSectionCard
+                title={t('settings.llmAccess')}
+                description={t('settings.llmAccessDescription')}
+                contentBordered
+              >
+                <LLMConfigModeBanner
+                  status={llmModeStatus}
+                  configVersion={configVersion}
+                  onMigrated={() => {
+                    void (async () => {
+                      await load();
+                      applyPostSaveEffects();
+                    })();
+                  }}
+                />
                 <GenerationBackendStatusPanel
                   items={generationBackendDraftItems}
                   maskToken={maskToken}
@@ -1946,15 +2320,13 @@ const SettingsPage: React.FC = () => {
                 />
                 <LLMChannelEditor
                   items={rawActiveItems}
-                  configVersion={configVersion}
                   maskToken={maskToken}
+                  persistedDraftItems={llmChannelDraftItems}
                   onDraftItemsChange={handleLlmChannelDraftItemsChange}
-                  onSaved={async (updatedItems) => {
-                    setLlmChannelDraftItems([]);
-                    await refreshAfterExternalSave(updatedItems.map((item) => item.key));
-                    void refreshSetupStatus();
-                  }}
+                  onValidityChange={handleLlmChannelValidityChange}
+                  resetSignal={llmChannelResetSignal}
                   disabled={isSaving || isLoading}
+                  overriddenByMode={channelsOverriddenByMode}
                 />
               </SettingsSectionCard>
             ) : null}
@@ -2023,7 +2395,7 @@ const SettingsPage: React.FC = () => {
         cancelText={t('common.cancel')}
         onConfirm={() => {
           setShowResetConfirm(false);
-          resetDraft();
+          discardDraft();
         }}
         onCancel={() => {
           setShowResetConfirm(false);
@@ -2040,23 +2412,6 @@ const SettingsPage: React.FC = () => {
         }}
         onCancel={() => {
           leaveBlocker.reset?.();
-        }}
-      />
-      <ConfirmDialog
-        isOpen={pendingTabSwitch !== null}
-        title={t('settings.llmDraftLeaveTitle')}
-        message={t('settings.llmDraftLeaveMessage')}
-        confirmText={t('settings.llmDraftLeaveContinue')}
-        cancelText={t('common.cancel')}
-        onConfirm={() => {
-          const target = pendingTabSwitch;
-          setPendingTabSwitch(null);
-          if (target) {
-            selectTab(target.category, target.subCategory);
-          }
-        }}
-        onCancel={() => {
-          setPendingTabSwitch(null);
         }}
       />
     </div>
