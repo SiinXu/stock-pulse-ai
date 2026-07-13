@@ -394,6 +394,39 @@ describe('LLMChannelEditor', () => {
     }
   });
 
+  it('hides the runtime routing block and never emits runtime keys when showRuntimeConfig is false', () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={openAiItems}
+        maskToken="******"
+        showRuntimeConfig={false}
+        onDraftItemsChange={onDraftItemsChange}
+      />
+    );
+
+    // Runtime routing controls belong to Task Routing / Reliability now.
+    for (const label of ['主模型', 'Agent 主模型', 'Vision 模型']) {
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('运行时参数')).not.toBeInTheDocument();
+
+    // Editing a channel still produces a channel draft, but it must not carry
+    // any runtime routing keys (LITELLM_MODEL etc.) since this view no longer
+    // owns them.
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    fireEvent.change(screen.getByLabelText('模型（逗号分隔）'), {
+      target: { value: 'gpt-4o-mini,gpt-4o' },
+    });
+    const draftKeys = new Set(
+      lastDraftCall(onDraftItemsChange).map((item: { key: string }) => item.key.toUpperCase()),
+    );
+    expect(draftKeys.has('LLM_OPENAI_MODELS')).toBe(true);
+    for (const runtimeKey of ['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LITELLM_FALLBACK_MODELS', 'LLM_TEMPERATURE']) {
+      expect(draftKeys.has(runtimeKey)).toBe(false);
+    }
+  });
+
   it('uses DeepSeek V4 defaults when adding the official preset', async () => {
     render(
       <LLMChannelEditor

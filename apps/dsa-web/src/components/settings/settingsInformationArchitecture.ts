@@ -77,8 +77,11 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'data_sources',
     label: { zh: '数据源', en: 'Data Sources' },
-    views: [{ id: 'providers', label: { zh: '数据提供方', en: 'Providers' } }],
-    defaultView: 'providers',
+    views: [
+      { id: 'sources', label: { zh: '行情与资讯', en: 'Sources' } },
+      { id: 'providers', label: { zh: '数据提供方', en: 'Providers' } },
+    ],
+    defaultView: 'sources',
   },
   {
     id: 'agent_behavior',
@@ -181,7 +184,7 @@ export function legacyToSectionView(category: string, sub: string | null): Secti
       }
       return { section: 'ai_models', view: 'connections' };
     case 'data_source':
-      return { section: 'data_sources', view: 'providers' };
+      return { section: 'data_sources', view: sub === 'providers' ? 'providers' : 'sources' };
     case 'notification':
       if (sub === 'rules') {
         return { section: 'alerts', view: 'rules' };
@@ -209,7 +212,7 @@ export function sectionViewToLegacy(section: string, view: string | null): Legac
     case 'ai_models':
       return { category: 'ai_model', sub: view === 'advanced' ? 'providers' : 'model' };
     case 'data_sources':
-      return { category: 'data_source', sub: 'providers' };
+      return { category: 'data_source', sub: view === 'providers' ? 'providers' : 'source' };
     case 'agent_behavior':
       return { category: 'agent', sub: null };
     case 'conversation':

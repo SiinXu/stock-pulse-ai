@@ -18,5 +18,7 @@ export * from './SettingsHelpButton';
 export * from './SettingsLoading';
 export * from './SettingsPanelErrorBoundary';
 export * from './SettingsSectionCard';
+export * from './SettingsErrorSummary';
+export * from './FirstRunWizard';
 export * from './AuthSettingsCard';
 export * from './GenerationBackendStatusPanel';

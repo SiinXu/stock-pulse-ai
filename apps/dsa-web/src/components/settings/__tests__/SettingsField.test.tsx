@@ -48,6 +48,63 @@ describe('SettingsField', () => {
     expect(screen.queryByLabelText('Stock List')).not.toBeInTheDocument();
   });
 
+  it('flags a field that only takes effect after a restart', () => {
+    const { rerender } = render(
+      <SettingsField
+        item={{
+          key: 'WEBUI_PORT',
+          value: '8000',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'WEBUI_PORT',
+            category: 'system',
+            dataType: 'integer',
+            uiControl: 'number',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            warningCodes: ['port_mapping_required', 'restart_required'],
+          },
+        }}
+        value="8000"
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByText('重启生效')).toBeInTheDocument();
+
+    // A field without the restart warning code shows no badge.
+    rerender(
+      <SettingsField
+        item={{
+          key: 'LOG_LEVEL',
+          value: 'INFO',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'LOG_LEVEL',
+            category: 'system',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            warningCodes: [],
+          },
+        }}
+        value="INFO"
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('重启生效')).not.toBeInTheDocument();
+  });
+
   it('localizes TickFlow field descriptions instead of falling back to backend English schema', () => {
     const { container } = render(
       <SettingsField

@@ -1,5 +1,5 @@
-import { legacyToSectionView, type SettingsSectionId } from './settingsInformationArchitecture';
-import { getSubCategoryOfKey } from './settingsSubCategories';
+import { type SettingsSectionId } from './settingsInformationArchitecture';
+import { placementForKey } from './settingsFieldPlacement';
 import type { SectionStatus } from './SettingsNavigation';
 
 interface StatusItem {
@@ -11,9 +11,10 @@ interface StatusItem {
  * IA navigation. Badges convey state only (error / unsaved / needs-action),
  * never field counts, so we collapse everything to boolean flags per section.
  *
- * A key is mapped to its section via its backend category + sub (so, e.g., a
- * dirty notification-rule key lights up "Alerts & Automation" while a channel
- * key lights up "Notifications").
+ * A key is mapped to its section via the field-level placement map, so keys
+ * that share a backend category still light up distinct sections (e.g. a dirty
+ * report-output key lights up "Reports" while a delivery-rule key lights up
+ * "Alerts & Automation", even though both live under `notification`).
  */
 export function computeSectionStatus(
   itemsByCategory: Record<string, ReadonlyArray<StatusItem>>,
@@ -34,8 +35,7 @@ export function computeSectionStatus(
       if (!isDirty && !hasError) {
         continue;
       }
-      const sub = getSubCategoryOfKey(category, item.key);
-      const { section } = legacyToSectionView(category, sub);
+      const { section } = placementForKey(category, item.key);
       const entry = result[section] ?? {};
       if (isDirty) {
         entry.isDirty = true;

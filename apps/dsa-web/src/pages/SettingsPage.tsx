@@ -35,20 +35,28 @@ import {
   SettingsLoading,
   SettingsPanelErrorBoundary,
   SettingsSectionCard,
+  SettingsErrorSummary,
+  type ErrorSummaryEntry,
+  FirstRunWizard,
+  type WizardDraftItem,
 } from '../components/settings';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
+  SETTINGS_SECTIONS,
   getDefaultView,
   getSectionViews,
+  isSettingsSectionId,
   legacyToSectionView,
+  sectionLabel,
   sectionViewToLegacy,
   type SettingsSectionId,
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
+import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { parseStockListValue } from '../utils/stockList';
-import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
+import { getCategoryDescription, getCategoryTitle, getFieldTitleZh } from '../utils/systemConfigI18n';
 import { isFieldVisibleByContract, isFieldEnabledByContract, resolveFieldRequirement } from '../utils/configConditions';
 import type {
   ConfigValidationIssue,
@@ -889,6 +897,7 @@ const SettingsPage: React.FC = () => {
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [isRunningSetupSmoke, setIsRunningSetupSmoke] = useState(false);
@@ -932,9 +941,6 @@ const SettingsPage: React.FC = () => {
   const {
     itemsByCategory,
     issueByKey,
-    activeCategory,
-    activeSubCategory,
-    selectCategory,
     selectTab,
     hasDirty,
     dirtyKeys,
@@ -960,61 +966,96 @@ const SettingsPage: React.FC = () => {
     maskToken,
   } = useSystemConfig(initialTab);
 
-  // The active tab is tracked internally as (category, sub). The first-level
-  // section derives from it, but several AI & Models views share the same
-  // (category, sub), so the second-level view is tracked as its own state.
-  const activeSection = legacyToSectionView(activeCategory, activeSubCategory).section;
-  const [activeView, setActiveView] = useState<string>(() => {
+  // section/view is the single source of truth for navigation, driven by the
+  // URL so Back/Forward/refresh/deep-links all work. Legacy category/sub only
+  // seeds the initial state and is migrated away; it never decides the section
+  // (which is why Reports vs Alerts, or Conversation vs Agent, no longer jump).
+  const activeSection = useMemo<SettingsSectionId>(() => {
     const section = searchParams.get('section');
+    if (section && isSettingsSectionId(section)) {
+      return section;
+    }
+    const category = searchParams.get('category');
+    if (category) {
+      return legacyToSectionView(category, searchParams.get('sub')).section;
+    }
+    return SETTINGS_SECTIONS[0].id;
+  }, [searchParams]);
+  const activeView = useMemo<string>(() => {
     const view = searchParams.get('view');
-    if (section) {
-      return getSectionViews(section as SettingsSectionId).some((entry) => entry.id === view)
-        ? (view as string)
-        : getDefaultView(section as SettingsSectionId);
+    if (getSectionViews(activeSection).some((entry) => entry.id === view)) {
+      return view as string;
     }
-    const seeded = legacyToSectionView(initialTab?.category ?? 'base', initialTab?.subCategory ?? null);
-    return seeded.view;
-  });
-
-  // Keep the active view valid for the current section (e.g. after the section
-  // changes via a section click, a legacy URL migration, or setup navigation).
-  useEffect(() => {
-    if (!getSectionViews(activeSection).some((entry) => entry.id === activeView)) {
-      setActiveView(getDefaultView(activeSection));
+    const category = searchParams.get('category');
+    if (category && !searchParams.get('section')) {
+      const legacy = legacyToSectionView(category, searchParams.get('sub'));
+      if (legacy.section === activeSection) {
+        return legacy.view;
+      }
     }
-  }, [activeSection, activeView]);
+    return getDefaultView(activeSection);
+  }, [searchParams, activeSection]);
 
-  // Mirror the active section/view into the URL (replace, so tab hops don't spam
-  // history) for shareable deep links and refresh restoration, and migrate any
-  // legacy category/sub params to the new scheme.
-  useEffect(() => {
-    setSearchParams((prev) => {
-      const hasLegacy = prev.has('category') || prev.has('sub');
-      if (
-        !hasLegacy
-        && prev.get('section') === activeSection
-        && (prev.get('view') ?? null) === (activeView ?? null)
-      ) {
-        return prev;
-      }
-      const next = new URLSearchParams(prev);
-      next.delete('category');
-      next.delete('sub');
-      next.set('section', activeSection);
-      if (activeView) {
-        next.set('view', activeView);
-      } else {
-        next.delete('view');
-      }
-      return next;
-    }, { replace: true });
-  }, [activeSection, activeView, setSearchParams]);
+  // Rendering still works off backend (category, sub); derive it from the
+  // canonical section/view. All existing activeCategory/activeSubCategory reads
+  // consume these, so section/view stays the single source of truth.
+  const { category: activeCategory, sub: activeSubCategory } = sectionViewToLegacy(activeSection, activeView);
 
   const selectSectionView = useCallback((section: SettingsSectionId, view: string) => {
-    setActiveView(view);
-    const legacy = sectionViewToLegacy(section, view);
-    selectTab(legacy.category, legacy.sub);
-  }, [selectTab]);
+    const next = new URLSearchParams(searchParams);
+    next.delete('category');
+    next.delete('sub');
+    next.set('section', section);
+    const resolvedView = getSectionViews(section).some((entry) => entry.id === view)
+      ? view
+      : getDefaultView(section);
+    if (resolvedView) {
+      next.set('view', resolvedView);
+    } else {
+      next.delete('view');
+    }
+    // Normal navigation pushes a history entry so Back/Forward return here.
+    setSearchParams(next, { replace: false });
+  }, [searchParams, setSearchParams]);
+
+  // On small screens the section selector is above the content, so after a
+  // selection move focus into the content region for screen readers and to
+  // scroll the newly selected section into view (desktop clicks are unaffected).
+  const contentRegionRef = useRef<HTMLElement | null>(null);
+  const selectSectionFromMobile = useCallback((section: SettingsSectionId) => {
+    selectSectionView(section, getDefaultView(section));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      contentRegionRef.current?.focus();
+    }));
+  }, [selectSectionView]);
+
+  // Migrate legacy category/sub URLs and normalize non-canonical params to the
+  // canonical section/view URL. This is the ONLY place that uses replace.
+  useEffect(() => {
+    const hasLegacy = searchParams.has('category') || searchParams.has('sub');
+    const canonical = !hasLegacy
+      && searchParams.get('section') === activeSection
+      && searchParams.get('view') === activeView;
+    if (canonical) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('category');
+    next.delete('sub');
+    next.set('section', activeSection);
+    if (activeView) {
+      next.set('view', activeView);
+    } else {
+      next.delete('view');
+    }
+    setSearchParams(next, { replace: true });
+  }, [searchParams, activeSection, activeView, setSearchParams]);
+
+  // Keep useSystemConfig's internal tab in sync so config reloads preserve the
+  // right category; rendering itself reads the derived activeCategory above.
+  useEffect(() => {
+    selectTab(activeCategory, activeSubCategory);
+  }, [activeCategory, activeSubCategory, selectTab]);
 
   // Per-section badge state for the first-level nav (error / unsaved only).
   const settingsSectionStatus = useMemo(
@@ -1298,6 +1339,66 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  // Backend category for every key, so a validation error can be routed to the
+  // section/view that owns the field via the placement map.
+  const categoryByKey = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+      for (const item of categoryItems) {
+        map[item.key] = category;
+      }
+    }
+    return map;
+  }, [itemsByCategory]);
+  // Page-level validation summary: every errored field, routed to its owning
+  // section/view via the placement map so errors on a non-open section are
+  // still reachable in one click (SR-19).
+  const errorSummaryEntries = useMemo<ErrorSummaryEntry[]>(() => {
+    const entries: ErrorSummaryEntry[] = [];
+    for (const [key, issues] of Object.entries(issueByKey)) {
+      const firstError = issues.find((issue) => issue.severity === 'error');
+      if (!firstError) {
+        continue;
+      }
+      const { section, view } = placementForKey(categoryByKey[key] ?? '', key);
+      entries.push({
+        key,
+        label: uiLanguage === 'en' ? key : getFieldTitleZh(key, key),
+        message: firstError.message,
+        section,
+        view,
+      });
+    }
+    return entries;
+  }, [issueByKey, categoryByKey, uiLanguage]);
+  const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
+    selectSectionView(entry.section as SettingsSectionId, entry.view);
+    // Focus + reveal the field once the target section commits (two frames).
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = document.getElementById(`setting-${entry.key}`);
+      if (el) {
+        el.focus();
+        el.scrollIntoView({ block: 'center' });
+      }
+    }));
+  }, [selectSectionView]);
+  // Some settings (e.g. WEBUI host/port, log dir) only take effect after a
+  // restart. Surface a page-level notice when any *changed* field is one of
+  // them so the user knows a save alone won't apply them.
+  const hasDirtyRestartRequired = useMemo(() => {
+    const dirtySet = new Set(dirtyKeys ?? []);
+    if (dirtySet.size === 0) {
+      return false;
+    }
+    for (const categoryItems of Object.values(itemsByCategory)) {
+      for (const item of categoryItems) {
+        if (dirtySet.has(item.key) && item.schema?.warningCodes?.includes('restart_required')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [dirtyKeys, itemsByCategory]);
   // The AI & Models Overview view shows a task-routing matrix instead of raw
   // fields / the channel editor.
   const isAiOverview = activeSection === 'ai_models' && activeView === 'overview';
@@ -1313,8 +1414,11 @@ const SettingsPage: React.FC = () => {
       .filter((item): item is NonNullable<typeof item> => Boolean(item)),
     [aiModelItemByKey],
   );
+  // Task Routing is the single canonical editor for per-task models and the
+  // generation temperature. Fallback order is edited under Reliability only, so
+  // here it is a read-only summary with a jump link (no duplicate editor).
   const taskRoutingItems = useMemo(
-    () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LITELLM_FALLBACK_MODELS']),
+    () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE']),
     [pickAiModelItems],
   );
   // Reliability view: two distinct mechanisms — execution-backend failover and
@@ -1328,6 +1432,30 @@ const SettingsPage: React.FC = () => {
     () => pickAiModelItems(['LITELLM_FALLBACK_MODELS']),
     [pickAiModelItems],
   );
+  // Event Monitor lives under the agent backend category but belongs to the
+  // Alerts section (see the placement map). Render it there via a dedicated
+  // card so it doesn't leak into Agent Behavior.
+  const eventMonitorItems = useMemo(
+    () => (itemsByCategory.agent || [])
+      .filter((item) => item.key.toUpperCase().startsWith('AGENT_EVENT_'))
+      .filter((item) => isFieldVisibleByContract(item.schema?.contract, allValuesByKey))
+      .sort((a, b) => (a.schema?.displayOrder ?? 0) - (b.schema?.displayOrder ?? 0)),
+    [itemsByCategory, allValuesByKey],
+  );
+  const isAlertsSection = activeSection === 'alerts';
+  // Top-level Advanced section aggregates internal/low-level keys across backend
+  // categories via the placement map (e.g. HMAC usage secrets), instead of the
+  // legacy Model Providers panel (which stays under the AI & Models → Advanced
+  // view). This keeps everyday views uncluttered (MC-18).
+  const isTopLevelAdvanced = activeSection === 'advanced';
+  const advancedSectionItems = useMemo(
+    () => Object.entries(itemsByCategory)
+      .flatMap(([category, categoryItems]) =>
+        categoryItems.filter((item) => placementForKey(category, item.key).section === 'advanced'))
+      .filter((item) => isFieldVisibleByContract(item.schema?.contract, allValuesByKey))
+      .sort((a, b) => (a.schema?.displayOrder ?? 0) - (b.schema?.displayOrder ?? 0)),
+    [itemsByCategory, allValuesByKey],
+  );
   const contractVisibleItems = activeItems.filter((item) =>
     isFieldVisibleByContract(item.schema?.contract, allValuesByKey),
   );
@@ -1340,11 +1468,17 @@ const SettingsPage: React.FC = () => {
   const hasActiveConfigItems = visibleActiveItems.length > 0 || promptCacheAdvancedItems.length > 0;
   const activeSubCategoriesList = getSubCategories(activeCategory);
   const hasSubNav = activeSubCategoriesList != null;
-  const subFilteredItems = hasSubNav
+  // Field-level placement splits sections that share one backend category:
+  // Reports vs Alerts (both `notification`) and Conversation vs Agent Behavior
+  // (both `agent`). For every other section this is a no-op (the placement
+  // delegates back to the category's own section).
+  const belongsToActiveSection = (key: string) => keyBelongsToSection(activeCategory, key, activeSection);
+  const subFilteredItems = (hasSubNav
     ? visibleActiveItems
       .filter((item) => getSubCategoryOfKey(activeCategory, item.key) === activeSubCategory)
       .sort((a, b) => getSubCategoryFieldOrder(activeCategory, a.key) - getSubCategoryFieldOrder(activeCategory, b.key))
-    : visibleActiveItems;
+    : visibleActiveItems
+  ).filter((item) => belongsToActiveSection(item.key));
   const activeSubPromptCacheItems =
     activeCategory === 'ai_model' && activeSubCategory === 'model' ? promptCacheAdvancedItems : [];
   const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
@@ -1551,6 +1685,18 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  // First-run wizard commits its minimal config through the same save
+  // transaction (validate + update + apply server payload), so channel keys are
+  // persisted atomically and the normal post-save effects run.
+  const handleWizardComplete = async (items: WizardDraftItem[]) => {
+    const result = await save(items);
+    if (!result.success) {
+      return;
+    }
+    applyPostSaveEffects();
+    setIsWizardOpen(false);
+  };
+
   const openDesktopReleasePage = async () => {
     if (!desktopRuntimeApi?.openReleasePage) {
       return;
@@ -1651,15 +1797,40 @@ const SettingsPage: React.FC = () => {
     isNotificationCategory ? getNotificationFieldOrder(key) : getCategoryFieldOrder(activeCategory, key);
   const activeCategoryTitle = getCategoryTitle(activeCategory as SystemConfigCategory, t('settings.activePanelTitle'), uiLanguage);
   const activeCategoryDescription = getCategoryDescription(activeCategory as SystemConfigCategory, '', uiLanguage);
-  const activeConfigPanelTitle = hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle;
-  const shouldRenderFieldPanel = (hasSubNav ? hasSubFieldContent : hasActiveConfigItems)
+  // Sections split out of a shared backend category get their own title/copy so
+  // the panel doesn't reuse the sibling category's heading (e.g. Reports must
+  // not read "通知规则", Conversation must not read the Agent heading).
+  const splitSectionCopy: Partial<Record<SettingsSectionId, { title: string; description: string }>> = {
+    reports: {
+      title: sectionLabel('reports', uiLanguage),
+      description: uiLanguage === 'en'
+        ? 'Report output format, language, templates and rendering.'
+        : '报告输出的格式、语言、模板与渲染。',
+    },
+    conversation: {
+      title: sectionLabel('conversation', uiLanguage),
+      description: uiLanguage === 'en'
+        ? 'Conversation context handling and compression.'
+        : '对话上下文的处理与压缩策略。',
+    },
+  };
+  const sectionScopedCopy = splitSectionCopy[activeSection];
+  const activeConfigPanelTitle = sectionScopedCopy?.title
+    ?? (hasSubNav && activeSubTitle ? activeSubTitle : activeCategoryTitle);
+  const activeConfigPanelDescription = sectionScopedCopy?.description ?? activeCategoryDescription;
+  // For single-tab categories that a section split can narrow (agent →
+  // Conversation / Agent Behavior), gate on the section-filtered content so an
+  // empty section never renders a bare card.
+  const hasSectionFieldContent = subFilteredItems.length > 0 || activeSubPromptCacheItems.length > 0;
+  const shouldRenderFieldPanel = (hasSubNav ? hasSubFieldContent : hasSectionFieldContent)
     && !isAiOverview
     && !isAiTaskRouting
-    && !isAiReliability;
+    && !isAiReliability
+    && !isTopLevelAdvanced;
   const activeConfigPanel = shouldRenderFieldPanel ? (
     <SettingsSectionCard
       title={activeConfigPanelTitle}
-      description={activeCategoryDescription || t('settings.activePanelDescription')}
+      description={activeConfigPanelDescription || t('settings.activePanelDescription')}
     >
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
@@ -1920,13 +2091,14 @@ const SettingsPage: React.FC = () => {
             <SettingsSectionNav
               activeSection={activeSection}
               onSelectSection={(section) => selectSectionView(section, getDefaultView(section))}
+              onMobileSelectSection={selectSectionFromMobile}
               sectionStatus={settingsSectionStatus}
               language={uiLanguage}
               navLabel={t('settings.categoryNavTitle')}
             />
           </aside>
 
-          <section className="space-y-4">
+          <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
             <SettingsViewTabs
               section={activeSection}
               activeView={activeView}
@@ -1934,6 +2106,41 @@ const SettingsPage: React.FC = () => {
               language={uiLanguage}
               tabsLabel={t('settings.categoryNavTitle')}
             />
+            <SettingsErrorSummary
+              entries={errorSummaryEntries}
+              onJump={jumpToErrorField}
+              language={uiLanguage}
+            />
+            {hasDirtyRestartRequired ? (
+              <SettingsAlert
+                variant="warning"
+                title={t('settings.fieldRestartRequired')}
+                message={t('settings.restartRequiredNotice')}
+              />
+            ) : null}
+            {shouldShowFirstRunSetup ? (
+              <div className="flex flex-col gap-2 rounded-2xl border settings-border bg-card/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {uiLanguage === 'en' ? 'Quick setup' : '快速配置'}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-text">
+                    {uiLanguage === 'en'
+                      ? 'Get a runnable model config in a few guided steps.'
+                      : '几步引导，快速得到一个可运行的模型配置。'}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="settings-primary"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => setIsWizardOpen(true)}
+                >
+                  {uiLanguage === 'en' ? 'Start wizard' : '启动向导'}
+                </Button>
+              </div>
+            ) : null}
             {shouldShowFirstRunSetup ? (
               <FirstRunSetupCard
                 status={setupStatus}
@@ -1945,7 +2152,10 @@ const SettingsPage: React.FC = () => {
                 smokeError={setupSmokeError}
                 smokeSuccess={setupSmokeSuccess}
                 onRefresh={refreshSetupStatus}
-                onSelectCategory={selectCategory}
+                onSelectCategory={(category) => {
+                  const target = legacyToSectionView(category, null);
+                  selectSectionView(target.section, target.view);
+                }}
                 onRunSmoke={handleRunSetupSmoke}
                 listSeparator={uiLanguage === 'en' ? ', ' : '、'}
                 t={t}
@@ -1972,7 +2182,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-secondary"
-                      onClick={() => selectTab('data_source', 'providers')}
+                      onClick={() => selectSectionView('data_sources', 'providers')}
                     >
                       {t('settings.viewConfigItems')}
                     </Button>
@@ -2229,6 +2439,20 @@ const SettingsPage: React.FC = () => {
                     {uiLanguage === 'en' ? 'No routing fields available.' : '暂无可配置的任务路由字段。'}
                   </p>
                 )}
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-text">
+                  <span>{uiLanguage === 'en' ? 'Fallback order: ' : '备选顺序：'}</span>
+                  <span className="font-medium text-foreground">
+                    {allValuesByKey.LITELLM_FALLBACK_MODELS
+                      || (uiLanguage === 'en' ? 'none set' : '未设置')}
+                  </span>
+                  <button
+                    type="button"
+                    className="settings-accent-text underline-offset-2 hover:underline"
+                    onClick={() => selectSectionView('ai_models', 'reliability')}
+                  >
+                    {uiLanguage === 'en' ? 'Edit in Reliability →' : '前往可靠性设置 →'}
+                  </button>
+                </div>
               </SettingsSectionCard>
             ) : null}
             {isAiReliability ? (
@@ -2297,6 +2521,35 @@ const SettingsPage: React.FC = () => {
                 </SettingsSectionCard>
               </div>
             ) : null}
+            {isTopLevelAdvanced ? (
+              <SettingsSectionCard
+                title={sectionLabel('advanced', uiLanguage)}
+                description={uiLanguage === 'en'
+                  ? 'Internal, low-level settings such as usage-signing secrets. Most users never need to change these.'
+                  : '内部与底层配置，例如用量签名密钥。大多数用户无需改动。'}
+              >
+                {advancedSectionItems.length > 0 ? (
+                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                    {advancedSectionItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-text">
+                    {uiLanguage === 'en' ? 'No advanced settings to configure.' : '暂无需要配置的高级项。'}
+                  </p>
+                )}
+              </SettingsSectionCard>
+            ) : null}
             {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
               <SettingsSectionCard
                 title={t('settings.llmAccess')}
@@ -2327,6 +2580,7 @@ const SettingsPage: React.FC = () => {
                   resetSignal={llmChannelResetSignal}
                   disabled={isSaving || isLoading}
                   overriddenByMode={channelsOverriddenByMode}
+                  showRuntimeConfig={false}
                 />
               </SettingsSectionCard>
             ) : null}
@@ -2355,6 +2609,29 @@ const SettingsPage: React.FC = () => {
                 {activeConfigPanel}
               </SettingsPanelErrorBoundary>
             ) : activeConfigPanel}
+            {isAlertsSection && eventMonitorItems.length > 0 ? (
+              <SettingsSectionCard
+                title={uiLanguage === 'en' ? 'Event Monitor' : '事件监控'}
+                description={uiLanguage === 'en'
+                  ? 'Poll for market events on a schedule and route alerts by rule. Lives here with the other alerting settings.'
+                  : '按计划轮询市场事件并按规则触发告警。与其他告警设置一起集中在此。'}
+              >
+                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                  {eventMonitorItems.map((item) => (
+                    <SettingsField
+                      key={item.key}
+                      item={item}
+                      value={item.value}
+                      disabled={isSaving}
+                      onChange={setDraftValue}
+                      issues={issueByKey[item.key] || []}
+                      requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                    />
+                  ))}
+                </div>
+              </SettingsSectionCard>
+            ) : null}
           </section>
         </div>
       )}
@@ -2414,6 +2691,14 @@ const SettingsPage: React.FC = () => {
           leaveBlocker.reset?.();
         }}
       />
+      {isWizardOpen ? (
+        <FirstRunWizard
+          onComplete={handleWizardComplete}
+          onClose={() => setIsWizardOpen(false)}
+          isSaving={isSaving}
+          language={uiLanguage}
+        />
+      ) : null}
     </div>
   );
 };

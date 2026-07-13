@@ -166,6 +166,13 @@ interface LLMChannelEditorProps {
   disabled?: boolean;
   /** When a non-channels config source is effective, the editor is read-only. */
   overriddenByMode?: 'yaml' | 'legacy' | null;
+  /**
+   * Whether this editor also owns the runtime routing block (primary / agent /
+   * vision / fallback / temperature). Defaults to true for standalone use; the
+   * settings Connections view passes false so Task Routing and Reliability are
+   * the single canonical editors for those keys.
+   */
+  showRuntimeConfig?: boolean;
 }
 
 interface ChannelRowProps {
@@ -1575,6 +1582,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   resetSignal = 0,
   disabled = false,
   overriddenByMode = null,
+  showRuntimeConfig = true,
 }) => {
   const initialItemSourceByKey = useMemo(() => buildItemSourceByKey(items), [items]);
   const initialChannels = useMemo(
@@ -1592,6 +1600,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     [items],
   );
   const managesRuntimeConfig = !hasLitellmConfig;
+  // Only this editor emits the runtime routing keys when it also renders that
+  // block. In the Connections view (showRuntimeConfig=false) Task Routing and
+  // Reliability own those keys, so the channel draft must not touch them.
+  const emitsRuntimeConfig = managesRuntimeConfig && showRuntimeConfig;
 
   const channelsFingerprint = useMemo(() => JSON.stringify(initialChannels), [initialChannels]);
   const runtimeFingerprint = useMemo(() => JSON.stringify(initialRuntimeConfig), [initialRuntimeConfig]);
@@ -1698,7 +1710,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   }, [routeProvenanceMap, runtimeConfig.visionModel, visionSafeModels]);
 
   const hasChanges = useMemo(() => {
-    const runtimeChanged = (
+    const runtimeChanged = emitsRuntimeConfig && (
       runtimeConfig.primaryModel !== initialRuntimeConfig.primaryModel
       || runtimeConfig.agentPrimaryModel !== initialRuntimeConfig.agentPrimaryModel
       || runtimeConfig.visionModel !== initialRuntimeConfig.visionModel
@@ -1710,7 +1722,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       return true;
     }
     return channels.some((channel, index) => !channelsAreEqual(channel, initialChannels[index]));
-  }, [channels, initialChannels, initialRuntimeConfig, runtimeConfig]);
+  }, [channels, emitsRuntimeConfig, initialChannels, initialRuntimeConfig, runtimeConfig]);
 
   // Structural gate: names must be valid for every channel and every enabled
   // channel must be complete before the draft can be saved.
@@ -1731,15 +1743,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     savedItemMap,
     runtimeConfig,
     initialRuntimeConfig,
-    managesRuntimeConfig,
+    managesRuntimeConfig: emitsRuntimeConfig,
   }), [
     channels,
+    emitsRuntimeConfig,
     hasChanges,
     initialChannels,
     initialItemSourceByKey,
     initialNames,
     initialRuntimeConfig,
-    managesRuntimeConfig,
     runtimeConfig,
     savedItemMap,
   ]);
@@ -2274,7 +2286,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             ))}
           </div>
 
-          {managesRuntimeConfig ? (
+          {showRuntimeConfig && managesRuntimeConfig ? (
             <div className="rounded-[1.35rem] border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card">
               <div className="mb-4 flex items-center justify-between">
                 <div>
@@ -2412,13 +2424,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                 </div>
               )}
             </div>
-          ) : (
+          ) : showRuntimeConfig ? (
             <InlineAlert
               variant="warning"
               message="检测到已配置高级模型路由 YAML：此处仅管理渠道条目和基础连接信息。运行时主模型 / 备选模型 / Vision / Temperature 仍由下方通用字段决定；若 YAML 解析成功，则以其中的路由与可用模型声明为准，本配置不会覆盖 YAML 文件本身。"
               className="rounded-[1.35rem] px-4 py-3 text-xs shadow-none"
             />
-          )}
+          ) : null}
 
           {!draftValid ? (
             <InlineAlert

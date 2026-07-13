@@ -56,7 +56,8 @@ describe('settingsInformationArchitecture', () => {
     expect(legacyToSectionView('ai_model', 'providers')).toEqual({ section: 'ai_models', view: 'advanced' });
     expect(legacyToSectionView('notification', 'channels')).toEqual({ section: 'notifications', view: 'channels' });
     expect(legacyToSectionView('notification', 'rules')).toEqual({ section: 'alerts', view: 'rules' });
-    expect(legacyToSectionView('data_source', 'source')).toEqual({ section: 'data_sources', view: 'providers' });
+    expect(legacyToSectionView('data_source', 'source')).toEqual({ section: 'data_sources', view: 'sources' });
+    expect(legacyToSectionView('data_source', 'providers')).toEqual({ section: 'data_sources', view: 'providers' });
     expect(legacyToSectionView('agent', null)).toEqual({ section: 'agent_behavior', view: 'execution' });
     expect(legacyToSectionView('backtest', null)).toEqual({ section: 'backtesting', view: 'engine' });
     expect(legacyToSectionView('system', null)).toEqual({ section: 'system_security', view: 'runtime' });
@@ -71,6 +72,7 @@ describe('settingsInformationArchitecture', () => {
     expect(sectionViewToLegacy('notifications', 'channels')).toEqual({ category: 'notification', sub: 'channels' });
     expect(sectionViewToLegacy('alerts', 'rules')).toEqual({ category: 'notification', sub: 'rules' });
     expect(sectionViewToLegacy('data_sources', 'providers')).toEqual({ category: 'data_source', sub: 'providers' });
+    expect(sectionViewToLegacy('data_sources', 'sources')).toEqual({ category: 'data_source', sub: 'source' });
     expect(sectionViewToLegacy('system_security', 'runtime')).toEqual({ category: 'system', sub: null });
     expect(sectionViewToLegacy('backtesting', 'engine')).toEqual({ category: 'backtest', sub: null });
   });

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
 import type { SetupStatusResponse } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
+import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
 import SettingsPage from '../SettingsPage';
 
 const {
@@ -96,7 +97,7 @@ const routerBlockerMock = vi.hoisted(() => ({
 
 const routerSearchParamsMock = vi.hoisted(() => {
   const params = new URLSearchParams();
-  const setParams = () => {};
+  const setParams = vi.fn();
   return { params, setParams };
 });
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -288,6 +289,49 @@ vi.mock('../../components/settings', async () => ({
       {children}
     </section>
   ),
+  FirstRunWizard: ({
+    onComplete,
+    onClose,
+  }: {
+    onComplete: (items: Array<{ key: string; value: string }>) => void;
+    onClose: () => void;
+  }) => (
+    <div role="dialog" aria-label="first-run-wizard">
+      <button
+        type="button"
+        onClick={() => onComplete([
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-wizard' },
+        ])}
+      >
+        wizard apply
+      </button>
+      <button type="button" onClick={onClose}>wizard close</button>
+    </div>
+  ),
+  SettingsErrorSummary: ({
+    entries,
+    onJump,
+  }: {
+    entries: Array<{ key: string; label: string; message: string; section: string; view: string }>;
+    onJump: (entry: { key: string; label: string; message: string; section: string; view: string }) => void;
+  }) => (
+    entries.length ? (
+      <div role="alert">
+        <p>{`有 ${entries.length} 项配置需要修正`}</p>
+        <ul>
+          {entries.map((entry) => (
+            <li key={entry.key}>
+              <button type="button" aria-label={`前往修正: ${entry.label}`} onClick={() => onJump(entry)}>
+                <span>{entry.label}</span>
+                <span>{entry.message}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null
+  ),
 }));
 
 function createDesktopRuntime(overrides: Record<string, unknown> = {}) {
@@ -320,6 +364,7 @@ type ConfigState = {
   selectTab: typeof selectTab;
   hasDirty: boolean;
   dirtyCount: number;
+  dirtyKeys: string[];
   toast: null;
   clearToast: typeof clearToast;
   isLoading: boolean;
@@ -450,6 +495,11 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
   const activeSubCategory = overrides.activeSubCategory !== undefined
     ? overrides.activeSubCategory
     : getDefaultSubCategory(activeCategory, itemsByCategory as Record<string, Array<{ key: string }>>);
+  // SettingsPage now reads the active tab from the section/view URL. Drive the
+  // mocked router params from the requested (category, sub) so tests keep
+  // selecting the intended tab via the useSystemConfig override.
+  const target = legacyToSectionView(activeCategory, activeSubCategory);
+  routerSearchParamsMock.params = new URLSearchParams({ section: target.section, view: target.view });
   return {
     categories: baseCategories,
     itemsByCategory,
@@ -495,6 +545,9 @@ describe('SettingsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
+    // Reset the mocked router params so section/view state does not leak between
+    // tests (buildSystemConfigState sets it per render from the tab override).
+    routerSearchParamsMock.params = new URLSearchParams();
     routerBlockerMock.state = 'unblocked';
     routerBlockerMock.shouldBlock = null;
     Object.assign(webBuildInfoMock, {
@@ -630,13 +683,14 @@ describe('SettingsPage', () => {
     expect(screen.getByText('自选股')).toBeInTheDocument();
     expect(screen.getAllByText('已配置')).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: '配置模型' }));
-    fireEvent.click(screen.getByRole('button', { name: '维护自选股' }));
-    fireEvent.click(screen.getByRole('button', { name: '配置通知' }));
+    const lastSection = () => routerSearchParamsMock.setParams.mock.calls.at(-1)?.[0].get('section');
 
-    expect(setActiveCategory).toHaveBeenNthCalledWith(1, 'ai_model');
-    expect(setActiveCategory).toHaveBeenNthCalledWith(2, 'base');
-    expect(setActiveCategory).toHaveBeenNthCalledWith(3, 'notification');
+    fireEvent.click(screen.getByRole('button', { name: '配置模型' }));
+    expect(lastSection()).toBe('ai_models');
+    fireEvent.click(screen.getByRole('button', { name: '维护自选股' }));
+    expect(lastSection()).toBe('overview');
+    fireEvent.click(screen.getByRole('button', { name: '配置通知' }));
+    expect(lastSection()).toBe('notifications');
   });
 
   it('keeps first-run setup summary neutral while setup status is loading', async () => {
@@ -1016,8 +1070,8 @@ describe('SettingsPage', () => {
     expect(routerBlockerMock.proceed).toHaveBeenCalledTimes(1);
   });
 
-  it('shows deep research and event monitor fields in the agent category when available', () => {
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+  it('keeps agent execution fields on Agent Behavior but moves Event Monitor to the Alerts section', () => {
+    const agentItems = () => buildSystemConfigState({
       activeCategory: 'agent',
       itemsByCategory: {
         ...buildSystemConfigState().itemsByCategory,
@@ -1078,17 +1132,26 @@ describe('SettingsPage', () => {
           },
         ],
       },
-    }));
+    });
 
-    render(<SettingsPage />);
-
+    // Agent Behavior section: execution fields only, Event Monitor moved out.
+    useSystemConfigMock.mockReturnValue(agentItems());
+    const { rerender } = render(<SettingsPage />);
     expect(screen.getByText('AGENT_ORCHESTRATOR_TIMEOUT_S')).toBeInTheDocument();
     expect(screen.getByText('AGENT_DEEP_RESEARCH_BUDGET')).toBeInTheDocument();
-    expect(screen.getByText('AGENT_EVENT_MONITOR_ENABLED')).toBeInTheDocument();
+    expect(screen.queryByText('AGENT_EVENT_MONITOR_ENABLED')).not.toBeInTheDocument();
     expect(settingsPanelErrorBoundary).toHaveBeenCalledWith('Agent 设置');
+
+    // Alerts section: the Event Monitor card renders the agent-category event keys.
+    useSystemConfigMock.mockReturnValue(agentItems());
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    expect(screen.getByText('事件监控')).toBeInTheDocument();
+    expect(screen.getByText('AGENT_EVENT_MONITOR_ENABLED')).toBeInTheDocument();
+    expect(screen.queryByText('AGENT_ORCHESTRATOR_TIMEOUT_S')).not.toBeInTheDocument();
   });
 
-  it('renders context compression profile labels and blank preset guidance in agent settings', () => {
+  it('renders context compression profile labels and blank preset guidance in the Conversation section', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'agent',
@@ -1160,6 +1223,9 @@ describe('SettingsPage', () => {
         ],
       },
     }));
+    // Context compression fields now live under the Conversation section
+    // (split out of the Agent category by the field placement map).
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'conversation', view: 'context' });
 
     render(<SettingsPage />);
 
@@ -1290,7 +1356,7 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(getSetupStatus).toHaveBeenCalled());
   });
 
-  it('renders the two-level IA navigation and routes section clicks through selectTab', () => {
+  it('renders the two-level IA navigation and routes section clicks through the section/view URL', () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model', activeSubCategory: 'model' }));
 
     render(<SettingsPage />);
@@ -1300,10 +1366,251 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('tab', { name: '连接' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '任务路由' })).toBeInTheDocument();
 
-    // Clicking another first-level section routes through selectTab with the
-    // legacy (category, sub) the section maps to.
+    // Clicking a first-level section pushes the canonical section/view URL
+    // (section is the single source of truth; no legacy params leak).
     fireEvent.click(screen.getByRole('button', { name: /系统与安全/ }));
-    expect(selectTab).toHaveBeenCalledWith('system', null);
+    const [nextParams, options] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('system_security');
+    expect(nextParams?.has('category')).toBe(false);
+    expect(nextParams?.has('sub')).toBe(false);
+    // Normal navigation must push history (not replace) so Back returns here.
+    expect(options?.replace).toBe(false);
+  });
+
+  it('makes Task Routing the single editor for per-task models and links fallback out to Reliability', () => {
+    const aiField = (key: string, value: string, displayOrder: number) => ({
+      key,
+      value,
+      rawValueExists: Boolean(value),
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl: 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          aiField('LITELLM_MODEL', 'openai/gpt-4o-mini', 1),
+          aiField('AGENT_LITELLM_MODEL', 'openai/gpt-4o', 2),
+          aiField('VISION_MODEL', 'gemini/gemini-3-pro', 3),
+          aiField('LLM_TEMPERATURE', '0.7', 4),
+          aiField('LITELLM_FALLBACK_MODELS', 'deepseek/deepseek-v4-pro', 5),
+        ],
+      },
+    }));
+    // Drive the Task Routing view directly (buildSystemConfigState defaults the
+    // ai_model tab to the connections view).
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    // Per-task model fields (plus temperature) are edited here — and only here.
+    expect(screen.getByTestId('settings-field-LITELLM_MODEL')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-AGENT_LITELLM_MODEL')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-VISION_MODEL')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
+    // Fallback order is NOT an editable field here; it is a read-only summary.
+    expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();
+    expect(screen.getByText('deepseek/deepseek-v4-pro')).toBeInTheDocument();
+
+    // The jump link routes to the Reliability view (the canonical fallback editor).
+    fireEvent.click(screen.getByRole('button', { name: /前往可靠性设置/ }));
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('ai_models');
+    expect(nextParams?.get('view')).toBe('reliability');
+  });
+
+  it('splits notification fields so Reports and Alerts render independent field sets', () => {
+    const notifyField = (key: string, uiControl = 'text') => ({
+      key,
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key,
+        category: 'notification',
+        dataType: 'string',
+        uiControl,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+      },
+    });
+    const notificationItems = [
+      notifyField('REPORT_TYPE'),
+      notifyField('REPORT_LANGUAGE'),
+      notifyField('NOTIFICATION_ALERT_CHANNELS'),
+      notifyField('NOTIFICATION_QUIET_HOURS'),
+      notifyField('WECHAT_WEBHOOK_URL'),
+    ];
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      itemsByCategory: { ...configState.itemsByCategory, notification: notificationItems },
+    }));
+
+    // Reports section: only report-output fields; no delivery-rule or channel fields.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'reports', view: 'output' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-REPORT_TYPE')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-REPORT_LANGUAGE')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
+
+    // Alerts section: delivery-rule fields; no report-output fields.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-NOTIFICATION_QUIET_HOURS')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-REPORT_TYPE')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
+  });
+
+  it('lists validation errors and jumps to the errored field section from any section', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      issueByKey: {
+        WECHAT_WEBHOOK_URL: [
+          { key: 'WECHAT_WEBHOOK_URL', code: 'invalid', message: '企业微信 Webhook 地址格式不正确', severity: 'error' },
+        ],
+      },
+    }));
+    // Start on a section that does not own the errored field.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'runtime' });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByText('有 1 项配置需要修正')).toBeInTheDocument();
+    expect(screen.getByText('企业微信 Webhook 地址格式不正确')).toBeInTheDocument();
+
+    // Clicking the summary entry navigates to the section that owns the field.
+    fireEvent.click(screen.getByRole('button', { name: /前往修正/ }));
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('notifications');
+    expect(nextParams?.get('view')).toBe('channels');
+  });
+
+  it('warns that changed restart-required settings need a restart to take effect', () => {
+    const restartField = {
+      key: 'WEBUI_PORT',
+      value: '8001',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'WEBUI_PORT',
+        category: 'system',
+        dataType: 'integer',
+        uiControl: 'number',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+        warningCodes: ['restart_required'],
+      },
+    };
+    const configState = buildSystemConfigState();
+    // No dirty restart field -> no notice.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: { ...configState.itemsByCategory, system: [restartField] },
+      dirtyKeys: [],
+    }));
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByText(/部分已修改的配置需要重启服务后才会生效/, { exact: false })).not.toBeInTheDocument();
+
+    // The restart-required field is now dirty -> the page-level notice shows.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: { ...configState.itemsByCategory, system: [restartField] },
+      dirtyKeys: ['WEBUI_PORT'],
+    }));
+    rerender(<SettingsPage />);
+    expect(screen.getByText(/部分已修改的配置需要重启服务后才会生效/, { exact: false })).toBeInTheDocument();
+  });
+
+  it('moves internal HMAC keys to the top-level Advanced section, out of Connections', () => {
+    const aiField = (key: string, value: string, displayOrder: number, uiControl = 'text') => ({
+      key,
+      value,
+      rawValueExists: Boolean(value),
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder,
+      },
+    });
+    const configState = buildSystemConfigState();
+    const withAiItems = () => buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          aiField('LLM_CHANNELS', 'openai', 1),
+          aiField('LLM_USAGE_HMAC_SECRET', '', 9, 'password'),
+          aiField('LLM_USAGE_HMAC_KEY_VERSION', '1', 10),
+        ],
+      },
+    });
+
+    // Connections view: the internal HMAC keys no longer clutter it.
+    useSystemConfigMock.mockReturnValue(withAiItems());
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByTestId('settings-field-LLM_USAGE_HMAC_SECRET')).not.toBeInTheDocument();
+
+    // Top-level Advanced section: renders the aggregated internal keys.
+    useSystemConfigMock.mockReturnValue(withAiItems());
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-LLM_USAGE_HMAC_SECRET')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_USAGE_HMAC_KEY_VERSION')).toBeInTheDocument();
+  });
+
+  it('opens the first-run wizard from Overview and saves its minimal config', async () => {
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'wizard apply' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith([
+      { key: 'LLM_CHANNELS', value: 'deepseek' },
+      { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-wizard' },
+    ]));
+    // The wizard closes once the save succeeds.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument());
   });
 
   it('keeps prompt cache settings collapsed and expandable at the bottom of AI model settings', () => {

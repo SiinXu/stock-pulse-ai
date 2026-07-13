@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsSectionNav, SettingsViewTabs } from '../SettingsNavigation';
 
@@ -31,6 +31,45 @@ describe('SettingsSectionNav', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Notifications/ }));
     expect(onSelect).toHaveBeenCalledWith('notifications');
+  });
+
+  it('offers a compact select for the short mobile path', () => {
+    const onSelect = vi.fn();
+    render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={onSelect}
+        language="zh"
+        navLabel="设置导航"
+      />,
+    );
+    const select = screen.getByRole('combobox', { name: '设置导航' });
+    expect(select).toHaveValue('ai_models');
+    // Every section is reachable in one tap from the current section.
+    expect(within(select).getAllByRole('option')).toHaveLength(11);
+    fireEvent.change(select, { target: { value: 'notifications' } });
+    expect(onSelect).toHaveBeenCalledWith('notifications');
+  });
+
+  it('prefers the mobile-specific handler for the compact selector when provided', () => {
+    const onSelect = vi.fn();
+    const onMobileSelect = vi.fn();
+    render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={onSelect}
+        onMobileSelectSection={onMobileSelect}
+        language="zh"
+        navLabel="设置导航"
+      />,
+    );
+    fireEvent.change(screen.getByRole('combobox', { name: '设置导航' }), {
+      target: { value: 'reports' },
+    });
+    // The mobile selector routes through the focus-shifting handler, not the
+    // plain desktop one.
+    expect(onMobileSelect).toHaveBeenCalledWith('reports');
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('shows a status dot (state only, never counts) with an accessible label', () => {

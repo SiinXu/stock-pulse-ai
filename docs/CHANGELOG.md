@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [新功能] Web 设置页新增首次配置向导：在「概览」点击「启动向导」即可分步完成最小可运行配置——选择云 API 或本机 CLI；云 API 下选服务商（自动预填 Base URL 与示例模型）、填 API Key、可用默认 Base URL 一键「自动发现模型」（失败时手填）、确认报告主模型；本机 CLI 下选后端。最后一步展示摘要，并可选「测试连接」（诊断用，可能访问外部服务/产生费用，不作为保存门禁），再统一「保存并应用」（复用现有校验+保存事务，敏感字段脱敏显示）。达到最低可运行配置即可完成，不强制配置通知或高级项；高级字段不进入向导。移动端 390×844 全流程可用。
+- [改进] Web 设置页顶层「高级」section 改为按字段 placement 聚合展示内部/底层配置：用量签名 HMAC 密钥（`LLM_USAGE_HMAC_SECRET`/`LLM_USAGE_HMAC_KEY_VERSION`）与执行后端底层调优限制（`GENERATION_BACKEND_MAX_CONCURRENCY`/`GENERATION_BACKEND_MAX_OUTPUT_BYTES`/`GENERATION_BACKEND_TIMEOUT_SECONDS`/`LOCAL_CLI_BACKEND_MAX_CONCURRENCY`）。顶层「高级」不再复用「模型供应商」面板（模型供应商仍在 AI 与模型 → 高级视图；执行后端的选择本身仍在可靠性视图）；这些内部键同时从「连接」视图移除，日常路径不再被内部项干扰。为 Web 呈现层调整，不改后端 category。
+- [改进] Web 设置页移动端（窄屏）用紧凑下拉选择一级 section 后，焦点自动移入内容区并滚动到所选 section，便于屏幕阅读器播报与继续操作；桌面端点击侧栏不受影响。
+- [新功能] Web 设置页标注需重启生效的配置：字段 schema 带 `restart_required` 时在字段旁显示"重启生效"徽章；当已修改的草稿中包含此类字段时，内容区顶部提示"部分已修改的配置需要重启服务后才会生效"，避免用户以为保存即时生效。
+- [新功能] Web 设置页新增页面级校验错误摘要：任一 section 存在校验错误时，内容区顶部列出所有出错字段及原因，点击可跨 section 跳转到该字段所属的 section/view 并自动聚焦、滚动到该字段，出错字段即使不在当前打开的 section 也能一键定位修正。
+- [改进] Web 设置页按字段级 placement 拆分共享后端分类的 section：报告（Reports）只展示报告输出（格式/语言/模板/渲染/完整性），告警与自动化（Alerts）只展示推送路由/频控/静默/摘要等投递规则，二者不再同时列出全部 notification 非渠道字段；对话（Conversation）独占 Agent 上下文压缩字段（`AGENT_CONTEXT_*`），Agent 行为不再重复展示；事件监控（`AGENT_EVENT_*`）从 Agent 行为迁移到告警与自动化下的独立「事件监控」卡片（跨后端 category 呈现）。section 状态徽章改由同一 placement 归属，报告/对话/事件监控可获得与告警/Agent 行为独立的错误/未保存徽章。该拆分为 Web 呈现层，不改后端 category。
+- [改进] Web 设置页「AI 与模型」模型配置收敛为唯一入口：连接视图的渠道编辑器不再内嵌运行时主模型/Agent 主模型/Vision/备用模型/Temperature 选择，这些运行时路由改由任务路由视图（报告/Agent/Vision 主模型与 Temperature）与可靠性视图（模型备用顺序）各自独占编辑；任务路由视图对备用模型顺序只读展示并提供“前往可靠性设置”跳转，避免同一键出现多个编辑入口。渠道编辑器在连接视图不再向草稿写入运行时键，字段值统一由任务路由/可靠性视图经统一草稿提交。
 - [新功能] Web 设置页「AI 与模型」新增总览与任务路由视图：总览以任务矩阵展示 股票报告/大盘复盘/问股·Agent/Vision 各任务当前的执行方式、主模型（大盘复盘、Agent、Vision 未单独配置时继承报告主模型并标注）、备用模型与生效状态，用户无需查看环境变量即可判断实际生效路径；任务路由视图集中编辑 报告/Agent/Vision 主模型与备用模型顺序。总览与任务路由视图下不再展示渠道编辑器与原始字段列表。
 - [改进] Web 设置页导航重构为两级信息架构（section/view）：一级 section（概览 / AI 与模型 / 数据源 / Agent 行为 / 对话 / 报告 / 告警与自动化 / 通知 / 回测 / 系统与安全 / 高级），AI 与模型下含 总览/连接/任务路由/可靠性/高级 二级视图；桌面为一级侧栏 + 内容区二级 tab，移动端为紧凑横向滚动。URL 改用 `?section=&view=` 并对旧 `?category=&sub=` 深链做 replace 迁移，返回/刷新/深链稳定；侧栏 badge 只表达错误/未保存状态，不再显示字段数量。该重排为 Web 映射层，不改动后端 category、Desktop 或旧 API 消费方；移除旧 `SettingsCategoryNav`，不再维护双导航。
 - [改进] Web 设置页统一保存成功副作用：保存按钮、保存失败后的重试以及 Legacy→Channels 迁移应用现在都会执行同一套 post-save 流程（通知配置变更、刷新首次配置检查、刷新调度状态、重载配置快照/版本并清理校验态），避免重试或迁移后状态面板与实际持久化配置不一致。

@@ -303,6 +303,9 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           {dependencyLocked ? (
             <Badge variant="default" size="sm">{t('settings.fieldDependencyLocked')}</Badge>
           ) : null}
+          {schema?.warningCodes?.includes('restart_required') ? (
+            <Badge variant="default" size="sm">{t('settings.fieldRestartRequired')}</Badge>
+          ) : null}
         </div>
         {schema?.docs?.length ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
