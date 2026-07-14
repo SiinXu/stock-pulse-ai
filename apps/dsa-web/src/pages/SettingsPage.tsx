@@ -970,7 +970,12 @@ const SettingsPage: React.FC = () => {
   } = useSystemConfig(initialTab);
   // Authoritative provider catalog (single source of truth) for the wizard and
   // the model-access page.
-  const { providers: providerCatalog, isLoading: isProviderCatalogLoading } = useProviderCatalog();
+  const {
+    providers: providerCatalog,
+    isLoading: isProviderCatalogLoading,
+    error: providerCatalogError,
+    reload: reloadProviderCatalog,
+  } = useProviderCatalog();
   // Available model routes (authoritative) refetched when the saved config changes.
   const {
     models: availableModels,
@@ -2684,6 +2689,17 @@ const SettingsPage: React.FC = () => {
                   maskToken={maskToken}
                   disabled={isSaving || isLoading}
                 />
+                {providerCatalogError ? (
+                  <SettingsAlert
+                    variant="error"
+                    title={uiLanguage === 'en' ? 'Failed to load the model-service catalog' : '模型服务商目录加载失败'}
+                    message={uiLanguage === 'en'
+                      ? 'Could not load the provider catalog, so new model services cannot be added right now. This is a load failure, not "no model services". Existing connections below stay read-only until it reloads.'
+                      : '无法加载模型服务商目录，暂时无法新增模型服务。这是加载失败，并非“暂无模型服务”；下方已有连接在恢复前保持只读。'}
+                    actionLabel={uiLanguage === 'en' ? 'Reload' : '重新加载'}
+                    onAction={() => reloadProviderCatalog()}
+                  />
+                ) : null}
                 <LLMChannelEditor
                   items={rawActiveItems}
                   providers={providerCatalog}
@@ -2693,6 +2709,7 @@ const SettingsPage: React.FC = () => {
                   onValidityChange={handleLlmChannelValidityChange}
                   resetSignal={llmChannelResetSignal}
                   disabled={isSaving || isLoading}
+                  catalogUnavailable={Boolean(providerCatalogError)}
                   overriddenByMode={channelsOverriddenByMode}
                   showRuntimeConfig={false}
                   taskModelRefs={taskModelRefs}

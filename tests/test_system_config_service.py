@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
+from tests._llm_env_isolation import restore_ambient_llm_env, strip_ambient_llm_env
 from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
@@ -26,6 +27,10 @@ from src.services.system_config_service import ConfigConflictError, ConfigImport
 
 class SystemConfigServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
+        # A developer .env leaked into os.environ (e.g. litellm's load_dotenv at
+        # import) must not bleed LLM config into these tests; the temp .env below
+        # is the authoritative source. Restored in tearDown.
+        self._saved_llm_env = strip_ambient_llm_env()
         self.temp_dir = tempfile.TemporaryDirectory()
         self.env_path = Path(self.temp_dir.name) / ".env"
         self.env_path.write_text(
@@ -49,6 +54,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         Config.reset_instance()
         os.environ.pop("ENV_FILE", None)
+        restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 
     def _rewrite_env(self, *lines: str) -> None:

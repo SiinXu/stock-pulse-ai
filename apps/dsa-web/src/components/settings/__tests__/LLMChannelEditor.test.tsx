@@ -8,7 +8,6 @@ import type { LlmProviderCatalogEntry } from '../../../types/systemConfig';
 function provider(overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProviderCatalogEntry, 'id' | 'label' | 'protocol'>): LlmProviderCatalogEntry {
   return {
     defaultBaseUrl: '',
-    placeholderModels: '',
     capabilities: [],
     requiresApiKey: true,
     requiresBaseUrl: false,
@@ -20,21 +19,21 @@ function provider(overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProvider
 }
 
 const PROVIDER_CATALOG: LlmProviderCatalogEntry[] = [
-  provider({ id: 'aihubmix', label: 'AIHubmix（聚合平台）', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', placeholderModels: 'gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview', capabilities: ['openai-compatible', 'aggregator'], supportsDiscovery: true }),
-  provider({ id: 'anspire', label: 'Anspire Open（一站式模型+搜索）', protocol: 'openai', defaultBaseUrl: 'https://open-gateway.anspire.cn/v6', placeholderModels: 'Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7', capabilities: ['openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', placeholderModels: 'deepseek-v4-flash,deepseek-v4-pro', capabilities: ['official-api', 'openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'dashscope', label: '通义千问（Dashscope）', protocol: 'openai', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', placeholderModels: 'qwen3.6-plus,qwen3.6-flash', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
-  provider({ id: 'zhipu', label: '智谱 GLM', protocol: 'openai', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', placeholderModels: 'glm-5.1,glm-4.7-flash', capabilities: ['openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'moonshot', label: 'Moonshot（月之暗面）', protocol: 'openai', defaultBaseUrl: 'https://api.moonshot.cn/v1', placeholderModels: 'kimi-k2.6,kimi-k2.5', capabilities: ['openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'minimax', label: 'MiniMax 官方', protocol: 'openai', defaultBaseUrl: 'https://api.minimax.io/v1', placeholderModels: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed', capabilities: ['openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'volcengine', label: '火山方舟（豆包）', protocol: 'openai', defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', placeholderModels: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015', capabilities: ['openai-compatible'], supportsDiscovery: true }),
-  provider({ id: 'siliconflow', label: '硅基流动（SiliconFlow）', protocol: 'openai', defaultBaseUrl: 'https://api.siliconflow.cn/v1', placeholderModels: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
-  provider({ id: 'openrouter', label: 'OpenRouter', protocol: 'openai', defaultBaseUrl: 'https://openrouter.ai/api/v1', placeholderModels: '~anthropic/claude-sonnet-latest,~openai/gpt-latest', capabilities: ['openai-compatible', 'aggregator', 'model-discovery'], supportsDiscovery: true }),
-  provider({ id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', placeholderModels: 'gemini-3.1-pro-preview,gemini-3-flash-preview', capabilities: ['official-api', 'vision'] }),
-  provider({ id: 'anthropic', label: 'Anthropic 官方', protocol: 'anthropic', defaultBaseUrl: '', placeholderModels: 'claude-sonnet-4-6,claude-opus-4-7', capabilities: ['official-api'] }),
-  provider({ id: 'openai', label: 'OpenAI 官方', protocol: 'openai', defaultBaseUrl: 'https://api.openai.com/v1', placeholderModels: 'gpt-5.5,gpt-5.4-mini', capabilities: ['official-api', 'openai-compatible', 'model-discovery'], supportsDiscovery: true }),
-  provider({ id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', placeholderModels: 'llama3.2,qwen2.5', capabilities: ['local-runtime'], requiresApiKey: false, supportsDiscovery: true, isLocal: true }),
-  provider({ id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', placeholderModels: 'model-name-1,model-name-2', capabilities: [], requiresBaseUrl: true, supportsDiscovery: true, isCustom: true }),
+  provider({ id: 'aihubmix', label: 'AIHubmix（聚合平台）', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', capabilities: ['openai-compatible', 'aggregator'], supportsDiscovery: true }),
+  provider({ id: 'anspire', label: 'Anspire Open（一站式模型+搜索）', protocol: 'openai', defaultBaseUrl: 'https://open-gateway.anspire.cn/v6', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: ['official-api', 'openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'dashscope', label: '通义千问（Dashscope）', protocol: 'openai', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'zhipu', label: '智谱 GLM', protocol: 'openai', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'moonshot', label: 'Moonshot（月之暗面）', protocol: 'openai', defaultBaseUrl: 'https://api.moonshot.cn/v1', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'minimax', label: 'MiniMax 官方', protocol: 'openai', defaultBaseUrl: 'https://api.minimax.io/v1', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'volcengine', label: '火山方舟（豆包）', protocol: 'openai', defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'siliconflow', label: '硅基流动（SiliconFlow）', protocol: 'openai', defaultBaseUrl: 'https://api.siliconflow.cn/v1', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'openrouter', label: 'OpenRouter', protocol: 'openai', defaultBaseUrl: 'https://openrouter.ai/api/v1', capabilities: ['openai-compatible', 'aggregator', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', capabilities: ['official-api', 'vision'] }),
+  provider({ id: 'anthropic', label: 'Anthropic 官方', protocol: 'anthropic', defaultBaseUrl: '', capabilities: ['official-api'] }),
+  provider({ id: 'openai', label: 'OpenAI 官方', protocol: 'openai', defaultBaseUrl: 'https://api.openai.com/v1', capabilities: ['official-api', 'openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', capabilities: ['local-runtime'], requiresApiKey: false, supportsDiscovery: true, isLocal: true }),
+  provider({ id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', capabilities: [], requiresBaseUrl: true, supportsDiscovery: true, isCustom: true }),
 ];
 
 // Set an expanded connection's models via the token editor (clear existing
@@ -155,11 +154,14 @@ describe('LLMChannelEditor', () => {
     expect(onDraftItemsChange).toHaveBeenCalledTimes(1);
   });
 
-  it('confirms before deleting a channel and removes it only on confirm', async () => {
+  it('confirms before deleting an unreferenced channel and removes it only on confirm', async () => {
     const onDraftItemsChange = vi.fn();
+    // No LITELLM_MODEL -> the connection is not referenced by any task, so direct
+    // deletion is allowed after confirmation.
+    const unreferencedItems = openAiItems.filter((item) => item.key !== 'LITELLM_MODEL');
     render(
       <LLMChannelEditor
-        items={openAiItems}
+        items={unreferencedItems}
         providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
@@ -179,6 +181,32 @@ describe('LLMChannelEditor', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /OpenAI 官方/i })).not.toBeInTheDocument();
     });
+  });
+
+  it('blocks direct deletion of a task-referenced connection and routes to replacement', async () => {
+    const onManageModels = vi.fn();
+    // openAiItems declares LITELLM_MODEL=openai/gpt-4o-mini, so the openai
+    // connection is referenced by the report task.
+    render(
+      <LLMChannelEditor
+        items={openAiItems}
+        providers={PROVIDER_CATALOG}
+        maskToken="******"
+        onManageModels={onManageModels}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '删除连接' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '无法直接删除连接' });
+    expect(within(dialog).getByText(/正被以下任务引用/)).toBeInTheDocument();
+    // No destructive "删除连接" confirm — only a jump to Task Routing.
+    expect(within(dialog).queryByRole('button', { name: '删除连接' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '前往任务路由替换' }));
+    expect(onManageModels).toHaveBeenCalledTimes(1);
+    // The connection is NOT removed by the block dialog.
+    expect(screen.getByRole('button', { name: /OpenAI 官方/i })).toBeInTheDocument();
   });
 
   it('reports unsaved channel edits as generation backend draft items', async () => {
@@ -497,7 +525,7 @@ describe('LLMChannelEditor', () => {
     }
   });
 
-  it('uses DeepSeek V4 defaults when adding the official preset', async () => {
+  it('uses the DeepSeek endpoint/protocol but seeds no models when adding the official preset', async () => {
     render(
       <LLMChannelEditor
         items={[]}
@@ -511,13 +539,16 @@ describe('LLMChannelEditor', () => {
 
     await screen.findByRole('button', { name: /DeepSeek 官方/i });
     expect(screen.getByLabelText('Base URL')).toHaveValue('https://api.deepseek.com');
-    expect(modelChipNames()).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro']);
+    // No concrete model IDs are seeded from the provider catalog: a new
+    // connection starts explicitly with no models (discover or add manually).
+    expect(modelChipNames()).toEqual([]);
+    expect(screen.getByText(/尚未添加模型/)).toBeInTheDocument();
   });
 
   it.each([
-    ['minimax', /MiniMax 官方/i, 'https://api.minimax.io/v1', 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed'],
-    ['volcengine', /火山方舟/i, 'https://ark.cn-beijing.volces.com/api/v3', 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015'],
-  ])('uses %s OpenAI-compatible defaults when adding the official preset', async (preset, buttonName, baseUrl, models) => {
+    ['minimax', /MiniMax 官方/i, 'https://api.minimax.io/v1'],
+    ['volcengine', /火山方舟/i, 'https://ark.cn-beijing.volces.com/api/v3'],
+  ])('uses %s OpenAI-compatible endpoint but seeds no models when adding the official preset', async (preset, buttonName, baseUrl) => {
     render(
       <LLMChannelEditor
         items={[]}
@@ -534,7 +565,7 @@ describe('LLMChannelEditor', () => {
       select.getAttribute('data-value') === 'openai'
     ))).toBe(true);
     expect(screen.getByLabelText('Base URL')).toHaveValue(baseUrl);
-    expect(modelChipNames()).toEqual(models.split(','));
+    expect(modelChipNames()).toEqual([]);
   });
 
   it('shows provider capability badges, official sources, and config hints', async () => {
@@ -661,11 +692,9 @@ describe('LLMChannelEditor', () => {
       'https://api.minimax.io/v1',
       'https://api.minimax.io/v1',
     ]);
-    // Both connections carry the same preset models (3 chips each = 6 total).
-    expect(modelChipNames()).toEqual([
-      'MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed',
-      'MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed',
-    ]);
+    // Neither connection carries seed models: the preset only fills the shared
+    // endpoint/protocol, models are added per connection afterwards.
+    expect(modelChipNames()).toEqual([]);
     expect(screen.getAllByRole('link', { name: 'MiniMax OpenAI API' })).toHaveLength(1);
   });
 
@@ -684,7 +713,9 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ 添加模型服务' }));
     await screen.findByRole('button', { name: /MiniMax 官方/i });
     // An enabled channel must be complete (credential + models) before saving.
+    // The preset seeds no models, so the user supplies both explicitly.
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
+    setConnectionModels(['minimax-user-model']);
 
     await waitFor(() => {
       expect(lastDraftCall(onDraftItemsChange)).toEqual(
@@ -692,7 +723,7 @@ describe('LLMChannelEditor', () => {
           expect.objectContaining({ key: 'LLM_CHANNELS', value: 'minimax' }),
           expect.objectContaining({ key: 'LLM_MINIMAX_PROTOCOL', value: 'openai' }),
           expect.objectContaining({ key: 'LLM_MINIMAX_BASE_URL', value: 'https://api.minimax.io/v1' }),
-          expect.objectContaining({ key: 'LLM_MINIMAX_MODELS', value: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed' }),
+          expect.objectContaining({ key: 'LLM_MINIMAX_MODELS', value: 'minimax-user-model' }),
         ]),
       );
     });
@@ -713,8 +744,14 @@ describe('LLMChannelEditor', () => {
     });
     expect(screen.getAllByText(/缺少 API Key/).length).toBeGreaterThan(0);
 
+    // Supplying the key alone is not enough: the preset seeds no models, so the
+    // enabled connection stays incomplete until a model is added.
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
+    await waitFor(() => {
+      expect(onValidityChange).toHaveBeenLastCalledWith(false);
+    });
 
+    setConnectionModels(['minimax-user-model']);
     await waitFor(() => {
       expect(onValidityChange).toHaveBeenLastCalledWith(true);
     });
@@ -1712,5 +1749,70 @@ describe('LLMChannelEditor', () => {
       expect(modelChipNames()).toEqual(['qwen-old']);
       expect(screen.queryByLabelText('stale-openai')).not.toBeInTheDocument();
     });
+  });
+
+  it('never surfaces the legacy "渠道" wording anywhere in the rendered model-access UI', async () => {
+    const { container } = render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'openai' },
+          { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' },
+          { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' },
+          { key: 'LLM_OPENAI_ENABLED', value: 'true' },
+          { key: 'LLM_OPENAI_API_KEY', value: 'sk-existing' },
+          { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
+        ]}
+        providers={PROVIDER_CATALOG}
+        maskToken="******"
+      />
+    );
+
+    // Negative assertion over ALL user-visible text (collapsed card, add flow,
+    // and the fully expanded editor: labels, hints, buttons, status copy).
+    expect(container.textContent || '').not.toMatch(/渠道/);
+
+    // Add a second connection so the add-flow copy is included, then expand the
+    // first connection so the full field editor (labels/hints/buttons) renders.
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加模型服务' }));
+    await screen.findByRole('button', { name: /AIHubmix/i });
+    expect(container.textContent || '').not.toMatch(/渠道/);
+
+    fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
+    await screen.findAllByLabelText('添加模型');
+    expect(container.textContent || '').not.toMatch(/渠道/);
+  });
+
+  it('deduplicates model tokens and removes them individually', async () => {
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'openai' },
+          { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' },
+          { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' },
+          { key: 'LLM_OPENAI_ENABLED', value: 'true' },
+          { key: 'LLM_OPENAI_API_KEY', value: 'sk-existing' },
+          { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
+        ]}
+        providers={PROVIDER_CATALOG}
+        maskToken="******"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
+    const addInput = await screen.findByLabelText('添加模型');
+    const addButton = screen.getByRole('button', { name: '添加' });
+
+    // Adding an existing model is a no-op (dedup); adding a new one appends.
+    fireEvent.change(addInput, { target: { value: 'gpt-4o-mini' } });
+    fireEvent.click(addButton);
+    expect(modelChipNames()).toEqual(['gpt-4o-mini']);
+
+    fireEvent.change(addInput, { target: { value: 'gpt-4o' } });
+    fireEvent.click(addButton);
+    expect(modelChipNames()).toEqual(['gpt-4o-mini', 'gpt-4o']);
+
+    // Individual removal.
+    fireEvent.click(screen.getByRole('button', { name: '移除模型 gpt-4o-mini' }));
+    expect(modelChipNames()).toEqual(['gpt-4o']);
   });
 });

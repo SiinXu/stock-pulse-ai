@@ -123,7 +123,7 @@ vi.mock('../../api/systemConfig', () => ({
     }),
     getLlmProviderCatalog: () => Promise.resolve({
       providers: [
-        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', placeholderModels: 'deepseek-v4-flash', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
       ],
     }),
     getLlmAvailableModels: () => Promise.resolve({

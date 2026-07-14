@@ -66,7 +66,7 @@ export const PROVIDER_PRESENTATION_BY_ID: Record<string, ProviderPresentation> =
       { label: 'LiteLLM OpenAI-compatible', url: 'https://docs.litellm.ai/docs/providers/openai_compatible' },
     ],
     configHint:
-      '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 渠道。以下模型与网关为配置示例，实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
+      '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 模型连接。实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
   },
   deepseek: { officialSources: [{ label: 'DeepSeek API Docs', url: 'https://api-docs.deepseek.com/' }] },
   dashscope: {
@@ -120,12 +120,3 @@ export function getProviderPresentation(id: string): ProviderPresentation {
   }
   return PROVIDER_PRESENTATION_BY_ID[id];
 }
-
-export const MODEL_PLACEHOLDERS_BY_PROTOCOL: Record<ChannelProtocol, string> = {
-  openai: 'gpt-5.5,qwen3.6-plus',
-  deepseek: 'deepseek-v4-flash,deepseek-v4-pro',
-  gemini: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
-  anthropic: 'claude-sonnet-4-6,claude-opus-4-7',
-  vertex_ai: 'gemini-3.1-pro-preview',
-  ollama: 'llama3.2,qwen2.5',
-};

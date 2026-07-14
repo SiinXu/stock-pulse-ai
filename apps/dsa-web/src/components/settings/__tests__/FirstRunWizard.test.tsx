@@ -33,14 +33,25 @@ function chooseOption(trigger: HTMLElement, value: string) {
 
 
 const CATALOG = [
-  { id: 'aihubmix', label: 'AIHubmix', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', placeholderModels: 'gpt-5.5', capabilities: ['openai-compatible'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
-  { id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', placeholderModels: 'deepseek-v4-flash,deepseek-v4-pro', capabilities: ['official-api'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
-  { id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', placeholderModels: 'gemini-3.1-pro-preview,gemini-3-flash-preview', capabilities: ['official-api', 'vision'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: false, isLocal: false, isCustom: false },
-  { id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', placeholderModels: 'llama3.2,qwen2.5', capabilities: ['local-runtime'], requiresApiKey: false, requiresBaseUrl: false, supportsDiscovery: true, isLocal: true, isCustom: false },
-  { id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', placeholderModels: 'model-name-1,model-name-2', capabilities: [], requiresApiKey: true, requiresBaseUrl: true, supportsDiscovery: true, isLocal: false, isCustom: false },
+  { id: 'aihubmix', label: 'AIHubmix', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', capabilities: ['openai-compatible'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+  { id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: ['official-api'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+  { id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', capabilities: ['official-api', 'vision'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: false, isLocal: false, isCustom: false },
+  { id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', capabilities: ['local-runtime'], requiresApiKey: false, requiresBaseUrl: false, supportsDiscovery: true, isLocal: true, isCustom: false },
+  { id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', capabilities: [], requiresApiKey: true, requiresBaseUrl: true, supportsDiscovery: true, isLocal: false, isCustom: false },
 ];
 
 const okComplete = () => vi.fn().mockResolvedValue({ success: true });
+
+// The wizard no longer prefills example models; add them via the token editor
+// (mirrors the real discover / manual-add flow) on the models step.
+function addWizardModels(models: string[]): void {
+  const input = screen.getByLabelText('添加模型');
+  const addButton = screen.getByRole('button', { name: '添加' });
+  for (const model of models) {
+    fireEvent.change(input, { target: { value: model } });
+    fireEvent.click(addButton);
+  }
+}
 
 describe('FirstRunWizard', () => {
   beforeEach(() => {
@@ -63,10 +74,11 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test-123' } });
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue('deepseek-v4-flash,deepseek-v4-pro');
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    // The preset seeds no models; add them explicitly (discovery / manual).
+    addWizardModels(['deepseek-v4-flash', 'deepseek-v4-pro']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> review
     fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
@@ -104,9 +116,10 @@ describe('FirstRunWizard', () => {
     chooseOption(screen.getByLabelText('服务商'), 'ollama');
     // No API key entered, but Ollama is key-exempt so we can proceed.
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
-    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    addWizardModels(['llama3.2']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> review
     fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
@@ -149,7 +162,9 @@ describe('FirstRunWizard', () => {
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     fireEvent.click(screen.getByRole('button', { name: '自动发现模型' }));
-    await waitFor(() => expect(screen.getByLabelText('模型（逗号分隔）')).toHaveValue('model-a,model-b'));
+    // Discovered models render as removable token chips (not a comma field).
+    await waitFor(() => expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument());
+    expect(screen.getByLabelText('移除模型 model-b')).toBeInTheDocument();
     expect(discoverLLMChannelModels).toHaveBeenCalledWith(expect.objectContaining({
       name: 'deepseek',
       protocol: 'deepseek',
@@ -165,6 +180,7 @@ describe('FirstRunWizard', () => {
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    addWizardModels(['deepseek-v4-flash']);
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> review
     fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
