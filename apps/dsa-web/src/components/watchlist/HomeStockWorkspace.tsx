@@ -377,7 +377,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               className="mb-0"
               title={t('watchlist.todayTitle')}
               titleClassName="text-sm font-medium"
-              leading={<CalendarDays className="h-4 w-4 text-cyan" aria-hidden="true" />}
+              leading={<CalendarDays className="h-4 w-4 text-success" aria-hidden="true" />}
               actions={<span className="text-[11px] text-muted-text">{t('common.itemsCount', { count: todayItems.length })}</span>}
             />
             <div className="grid grid-cols-2 gap-2">

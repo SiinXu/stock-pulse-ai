@@ -223,7 +223,7 @@ export const MarketStructureCard: React.FC<MarketStructureCardProps> = ({ contex
     <Card padding="md" className="rounded-lg">
       <section aria-label={text.title}>
         <DashboardPanelHeader
-          leading={<Map className="h-4 w-4 text-cyan" aria-hidden="true" />}
+          leading={<Map className="h-4 w-4 text-success" aria-hidden="true" />}
           eyebrow={text.eyebrow}
           title={text.title}
           actions={
@@ -249,7 +249,7 @@ export const MarketStructureCard: React.FC<MarketStructureCardProps> = ({ contex
 
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <Map className="h-4 w-4 text-cyan" aria-hidden="true" />
+              <Map className="h-4 w-4 text-success" aria-hidden="true" />
               <span>{text.stockLayer}</span>
               <Badge variant={STATUS_VARIANT[stockPosition.status] || 'default'}>
                 {text.status[stockPosition.status] || stockPosition.status}
