@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：移除并存的只读「模型接入」服务卡与旧渠道编辑器双结构，仅保留一套统一的连接管理界面；普通界面不再出现「AI 模型配置 / 快速添加渠道 / 添加渠道 / 渠道管理 / 渠道列表 / 渠道名称」等术语，统一使用「模型服务商 / 模型连接 / 可用模型」。连接卡片直接展示已添加模型 chip、被哪些任务使用、状态与测试结果，模型为 0 时提示「尚未添加可用模型」并引导发现/手动添加；「添加模型服务」使用连接内联创建流程（同一服务商可创建多条连接），不再复用首次配置向导。底层 `LLM_CHANNELS` 存储格式与 YAML/Legacy 兼容不变。
+- [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，高级视图仅保留 YAML/Legacy/原始配置与诊断；模型服务商元数据统一来自后端 Provider Catalog。
+- [改进] Web 设置页任务模型选择（报告/Agent/Vision）改为仅可从后端可用模型目录中选择，关闭自由输入（`allowCustom=false`）；无可用模型时任务路由不再渲染空选择框，改为展示明确空状态并提供「添加模型服务 / 管理模型」跳转到模型接入页；可用模型目录加载失败时展示错误与「重新加载」，不再静默折叠为「暂无模型」，可区分「未配置」与「加载失败」。
+- [改进] 后端 LLM 渠道校验的已知服务商列表由 `KNOWN_LLM_PROVIDER_CHANNEL_NAMES` 硬编码改为从 Provider Catalog 派生（单一权威源）；可用模型 API 每条模型补充 `provider_id/provider_label/connection_id/available` 字段，供 Web 选择器按服务商/连接分组而无需第二套前端清单。删除被引用连接会因任务模型引用失效被后端校验拒绝（`unknown_model`，直接调用 API 也无法绕过），需先改选替代模型再保存。
+- [测试] `test_daily_analysis_workflow_llm_env` 的服务商渠道清单来源由已收敛为纯展示层的前端 `llmProviderTemplates.ts`（不再声明 channelId/baseUrl）改为后端 Provider Catalog，使「每日分析 workflow env 与 `.env.example` 覆盖全部服务商渠道」的静态校验回到单一权威源。
 - [改进] Web 设置页 LLM 渠道编辑器的服务商业务元数据（标签、默认 Base URL、协议、示例模型、能力标签、是否已知服务商）改为统一从后端服务商目录（`GET /system/config/llm/providers`，经 useProviderCatalog）读取，删除前端并行维护的 `LLM_PROVIDER_TEMPLATES` 业务清单；仅保留能力显示文案、协议级占位与各服务商文档链接/配置提示等纯展示内容。前端不再维护第二套服务商业务源。
 - [改进] Web 设置页字段帮助弹窗新增「当前取值来源」说明：依据后端权威的 `raw_value_exists` 标识，明确该字段是「已显式设置」还是「未显式设置、使用内置默认值」（并展示默认值，敏感字段不展示），无内置默认值时提示「未设置」，帮助用户判断当前值来自显式配置还是默认回退。为字段帮助层展示，不改后端。
 - [新功能] Web 问股页支持中止生成：流式回复进行中时，发送按钮变为「停止生成」，点击立即中止当前请求并恢复输入框，已发出的用户消息与历史对话不受影响。

@@ -3,14 +3,12 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import yaml
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-TEMPLATE_PATH = ROOT_DIR / "apps/dsa-web/src/components/settings/llmProviderTemplates.ts"
 WORKFLOW_PATH = ROOT_DIR / ".github/workflows/00-daily-analysis.yml"
 ENV_EXAMPLE_PATH = ROOT_DIR / ".env.example"
 
@@ -32,15 +30,17 @@ EXPECTED_TEMPLATE_CHANNELS = {
 
 
 def _extract_provider_templates() -> dict[str, str]:
-    content = TEMPLATE_PATH.read_text(encoding="utf-8")
-    matches = re.findall(
-        r"channelId:\s*'(?P<channel>[^']+)'.*?baseUrl:\s*'(?P<base_url>[^']*)'",
-        content,
-        flags=re.DOTALL,
-    )
-    assert matches, "No provider channelId entries were found in llmProviderTemplates.ts"
+    # The authoritative provider channel list (ids + default endpoints) is the
+    # backend provider catalog; the frontend llmProviderTemplates.ts is now
+    # presentation-only and no longer declares channel/baseUrl business data.
+    from src.llm.provider_catalog import get_provider_catalog
 
-    templates = {channel: base_url for channel, base_url in matches if channel != "custom"}
+    templates = {
+        str(entry["id"]): str(entry["default_base_url"])
+        for entry in get_provider_catalog()
+        if str(entry["id"]) != "custom"
+    }
+    assert templates, "No provider entries were found in the backend provider catalog"
     assert EXPECTED_TEMPLATE_CHANNELS.issubset(templates.keys())
     assert "ark" not in templates
     return templates

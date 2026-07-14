@@ -108,16 +108,19 @@ class ConfigImportError(Exception):
         self.message = message
 
 
-# LLM provider channel names that ship a built-in default Base URL (mirrors the
-# frontend LLM_PROVIDER_TEMPLATES channelIds in
-# apps/dsa-web/src/components/settings/llmProviderTemplates.ts). Enabled channels
-# whose name is not listed here are treated as custom endpoints and must supply
-# their own Base URL.
-KNOWN_LLM_PROVIDER_CHANNEL_NAMES = frozenset({
-    "aihubmix", "anspire", "deepseek", "dashscope", "zhipu", "moonshot",
-    "minimax", "volcengine", "siliconflow", "openrouter", "gemini",
-    "anthropic", "openai", "ollama",
-})
+def known_llm_provider_channel_names() -> frozenset:
+    """Provider channel names that ship a built-in default endpoint.
+
+    Derived from the authoritative provider catalog ids (``src.llm.provider_catalog``)
+    so provider metadata has a single source of truth — enabled channels whose
+    name matches a non-custom catalog provider are not treated as custom
+    endpoints and are exempt from the explicit Base URL requirement. Uses the
+    pure ``get_provider_ids()`` (static ids only, no ``src.config`` coupling) so
+    it stays deterministic regardless of surrounding config/import state.
+    """
+    from src.llm.provider_catalog import get_provider_ids
+
+    return frozenset(pid.lower() for pid in get_provider_ids() if pid.lower() != "custom")
 
 
 @dataclass(frozen=True)
@@ -653,7 +656,21 @@ class SystemConfigService:
         )
         ordered_routes = list(dict.fromkeys(authoritative))
 
-        # Best-effort route -> (connection, provider, display) grouping.
+        # Resolve a connection to its authoritative catalog provider so selectors
+        # can group models by provider without a second frontend list.
+        from src.llm.provider_catalog import get_provider_catalog
+
+        provider_label_by_id = {
+            str(entry["id"]).lower(): str(entry["label"]) for entry in get_provider_catalog()
+        }
+
+        def _resolve_provider(connection_name: str) -> Tuple[str, str]:
+            pid = connection_name.lower()
+            if pid not in provider_label_by_id:
+                pid = "custom"
+            return pid, provider_label_by_id.get(pid, pid)
+
+        # Best-effort route -> grouping metadata (connection + provider + display).
         grouping: Dict[str, Dict[str, str]] = {}
         for raw_name in (effective_map.get("LLM_CHANNELS") or "").split(","):
             name = raw_name.strip()
@@ -667,13 +684,20 @@ class SystemConfigService:
                 continue
             protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip() or "openai"
             base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            provider_id, provider_label = _resolve_provider(name)
             for raw_model in (effective_map.get(f"{prefix}_MODELS") or "").split(","):
                 model = raw_model.strip()
                 if not model:
                     continue
                 route = normalize_llm_channel_model(model, protocol, base_url)
                 if route and route not in grouping:
-                    grouping[route] = {"connection": name, "provider": protocol, "display": model}
+                    grouping[route] = {
+                        "connection": name,
+                        "provider": protocol,
+                        "provider_id": provider_id,
+                        "provider_label": provider_label,
+                        "display": model,
+                    }
 
         models: List[Dict[str, Any]] = []
         for route in ordered_routes:
@@ -681,8 +705,17 @@ class SystemConfigService:
             models.append({
                 "route": route,
                 "display": meta["display"] if meta else route,
+                # `connection` is the channel name, which is also its stable id.
                 "connection": meta["connection"] if meta else None,
+                "connection_id": meta["connection"] if meta else None,
+                # `provider` stays the protocol for back-compat; provider_id/label
+                # are the authoritative catalog provider for display/grouping.
                 "provider": meta["provider"] if meta else None,
+                "provider_id": meta["provider_id"] if meta else None,
+                "provider_label": meta["provider_label"] if meta else None,
+                # Every returned route is declared by an enabled connection, so it
+                # is available/routable in the current config.
+                "available": True,
             })
         return {"models": models}
 
@@ -4767,7 +4800,7 @@ class SystemConfigService:
                 models=models_value or None,
                 channel_name=name,
             )
-            is_custom_endpoint = name.lower() not in KNOWN_LLM_PROVIDER_CHANNEL_NAMES
+            is_custom_endpoint = name.lower() not in known_llm_provider_channel_names()
             require_base_url = is_custom_endpoint and not channel_allows_empty_api_key(
                 resolved_gate_protocol,
                 base_url_value,

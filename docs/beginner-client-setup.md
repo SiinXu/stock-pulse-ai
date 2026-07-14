@@ -52,7 +52,7 @@ macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 ### 方案 A：Anspire Open
 
 1. 打开 [Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)，注册 / 登录后创建 API Key。
-2. 回到客户端，在快速添加渠道里选择 `Anspire Open`。
+2. 回到客户端，进入「AI 与模型 → 模型接入」，点击「添加模型服务」并选择 `Anspire Open`。
 3. 粘贴 API Key。
 4. 模型名选择控制台里已开通的模型；不确定就先选控制台推荐或轻量模型。
 5. 点击保存；看到保存成功后，再点击测试连接。
@@ -60,7 +60,7 @@ macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 ### 方案 B：AIHubMix
 
 1. 打开 [AIHubMix](https://aihubmix.com/?aff=CfMq)，注册 / 登录后创建 API Key。
-2. 回到客户端，在快速添加渠道里选择 `AIHubmix（聚合平台）`。
+2. 回到客户端，进入「AI 与模型 → 模型接入」，点击「添加模型服务」并选择 `AIHubmix（聚合平台）`。
 3. 粘贴 API Key。
 4. 模型名选择控制台里已开通的模型；不确定就先选控制台推荐模型。
 5. 点击保存；看到保存成功后，再点击测试连接。

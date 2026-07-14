@@ -45,7 +45,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: [
       '想恢复默认行为，选择“默认模型配置”并保存配置。',
       '本地 CLI 生成方式当前仍是实验能力；如果输出不稳定或经常失败，请设回默认模型配置。',
-      '默认模型配置会继续使用现有 API Key、模型渠道和备用模型设置。',
+      '默认模型配置会继续使用现有 API Key、模型连接和备用模型设置。',
     ],
     examples: [],
   },
@@ -58,7 +58,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '如果只是想设置主模型失败后的备用模型，请使用“备选模型”，不是这个字段。',
       '主生成方式本身就是默认模型配置时，这个字段不会额外生效。',
     ],
-    impact: ['不改变现有备用模型顺序，也不会影响渠道编辑器里的模型配置。'],
+    impact: ['不改变现有备用模型顺序，也不会影响连接编辑器里的模型配置。'],
     notes: [
       '希望本地 CLI 失败后立刻暴露错误时选择“禁用”；希望继续尝试云端模型时选择“默认模型配置”。',
     ],
@@ -106,7 +106,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '推荐使用 provider/model 格式，例如 deepseek/deepseek-v4-flash、gemini/gemini-3.1-pro-preview 或 ollama/qwen3:8b。',
     valueNotes: [
       '系统配置优先级为 LITELLM_CONFIG > LLM_CHANNELS > legacy provider keys。',
-      '如果留空，系统会尝试根据已配置的 API Key 或渠道声明自动推断。',
+      '如果留空，系统会尝试根据已配置的 API Key 或连接声明自动推断。',
       'Agent 可通过 AGENT_LITELLM_MODEL 单独指定模型；留空时继承主模型。',
     ],
     impact: [
@@ -114,24 +114,24 @@ const settingsHelpZhCN: SettingsHelpMap = {
     ],
     notes: [
       '无 provider 前缀时，LiteLLM 可能无法判断应该使用哪组 API Key。',
-      'Ollama 本地模型应配合 OLLAMA_API_BASE 或 Ollama 渠道使用，不要误用 OPENAI_BASE_URL。',
+      'Ollama 本地模型应配合 OLLAMA_API_BASE 或 Ollama 连接使用，不要误用 OPENAI_BASE_URL。',
     ],
   },
   'settings.ai_model.LLM_CHANNELS': {
-    title: 'LLM 渠道列表',
-    summary: '声明多个模型渠道，用于多 provider、多 Key、备用模型和可视化渠道管理。',
-    usage: '填写逗号分隔的渠道名，例如 deepseek,aihubmix；每个渠道再配置 LLM_<NAME>_BASE_URL、LLM_<NAME>_API_KEY(S)、LLM_<NAME>_MODELS 等字段。',
+    title: 'LLM 连接列表',
+    summary: '声明多个模型连接，用于多 provider、多 Key、备用模型和可视化连接管理。',
+    usage: '填写逗号分隔的连接名，例如 deepseek,aihubmix；每个连接再配置 LLM_<NAME>_BASE_URL、LLM_<NAME>_API_KEY(S)、LLM_<NAME>_MODELS 等字段。',
     valueNotes: [
-      '启用渠道模式后，同层运行时优先读取渠道配置。',
+      '启用连接模式后，同层运行时优先读取连接配置。',
       '在 Docker 或 GitHub Actions 中显式注入的环境变量会覆盖 Web 设置页写入的 .env。',
-      '渠道编辑器保存时只更新本次提交的 key，不会静默迁移整个旧配置。',
+      '连接编辑器保存时只更新本次提交的 key，不会静默迁移整个旧配置。',
     ],
     impact: [
       '影响主模型、Agent 模型、fallback 模型和 Vision 模型的可选来源。',
     ],
     notes: [
       '不要把极简 legacy key 和 Channels 混用后期待两边同时生效。',
-      '自定义渠道名在 GitHub Actions 中通常还需要 workflow 显式映射对应环境变量。',
+      '自定义连接名在 GitHub Actions 中通常还需要 workflow 显式映射对应环境变量。',
     ],
   },
   'settings.ai_model.AGENT_LITELLM_MODEL': {
@@ -143,7 +143,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       '该字段只影响 Agent 链路，不会改变普通个股分析的主模型。',
     ],
     impact: ['影响 Agent 问答、策略选择和相关工具调用的模型选择。'],
-    notes: ['请确认该模型存在于已启用渠道、YAML 路由或 legacy provider key 可达范围内。'],
+    notes: ['请确认该模型存在于已启用连接、YAML 路由或 legacy provider key 可达范围内。'],
   },
   'settings.ai_model.LITELLM_FALLBACK_MODELS': {
     title: '备用模型',
@@ -151,7 +151,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '多个模型使用英文逗号分隔，推荐仍使用 provider/model 格式。',
     valueNotes: [
       '备用模型只在主模型失败、超时或响应不可用时使用。',
-      '渠道编辑器保存时会清理已不可达的托管 provider 模型引用。',
+      '连接编辑器保存时会清理已不可达的托管 provider 模型引用。',
     ],
     impact: ['提升 LLM 调用失败时的可用性，但可能增加跨 provider 成本和响应差异。'],
     notes: ['不要把主模型重复加入备用模型列表。'],
@@ -162,10 +162,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '填写项目可访问的 YAML 文件路径，例如 ./litellm_config.yaml。',
     valueNotes: [
       '可解析且包含 model_list 时，优先级高于 LLM_CHANNELS 和 legacy provider keys。',
-      'Web 渠道编辑器不会修改 YAML 文件本身。',
+      'Web 连接编辑器不会修改 YAML 文件本身。',
     ],
     impact: ['影响模型选择、路由、fallback 和可用模型声明。'],
-    notes: ['如果 YAML 配置失效，系统会回退到渠道或 legacy 配置路径。'],
+    notes: ['如果 YAML 配置失效，系统会回退到连接或 legacy 配置路径。'],
   },
   'settings.ai_model.LLM_CONFIG_MODE': {
     title: '模型配置来源模式',
@@ -238,7 +238,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '在对应服务商控制台创建 API Key 后填入；如需轮换或负载均衡，对应的多 Key 变体字段使用英文逗号分隔。',
     valueNotes: [
       '密钥字段会在 Web 设置页以密码控件展示，保存后通常只显示掩码。',
-      '渠道模式优先读取 LLM_<NAME>_API_KEY(S)，legacy key 主要用于兼容旧配置。',
+      '连接模式优先读取 LLM_<NAME>_API_KEY(S)，legacy key 主要用于兼容旧配置。',
     ],
     impact: ['影响对应 provider 的模型调用、连接测试和可用模型发现。'],
     notes: ['不要在 issue、日志或截图里暴露真实 Key。'],
@@ -260,9 +260,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '这些字段用于兼容历史配置；新配置优先使用 LITELLM_MODEL、LITELLM_FALLBACK_MODELS、VISION_MODEL、LLM_TEMPERATURE 或 LLM Channels。',
     valueNotes: [
       '启用 LLM Channels 后，相关 legacy 字段通常会从通用表单隐藏。',
-      '字段只影响对应 provider 的 legacy 路径，不会自动迁移到渠道配置。',
+      '字段只影响对应 provider 的 legacy 路径，不会自动迁移到连接配置。',
     ],
-    impact: ['影响未使用渠道/YAML 路由时的 legacy provider 模型选择和采样参数。'],
+    impact: ['影响未使用连接/YAML 路由时的 legacy provider 模型选择和采样参数。'],
     notes: ['如果同时维护 legacy 字段和 Channels，请以设置页实际显示的运行时模型来源为准。'],
   },
   'settings.ai_model.OPENAI_BASE_URL': {
@@ -274,7 +274,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'Gemini、Anthropic 等官方 SDK 路径通常不需要填 OPENAI_BASE_URL。',
     ],
     impact: ['影响 OpenAI-compatible legacy 配置路径下的模型请求。'],
-    notes: ['渠道模式下优先维护各渠道自己的 LLM_<NAME>_BASE_URL。'],
+    notes: ['连接模式下优先维护各连接自己的 LLM_<NAME>_BASE_URL。'],
   },
   'settings.data_source.TUSHARE_TOKEN': {
     title: 'Tushare Token',
@@ -425,7 +425,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'FEISHU_APP_ID / FEISHU_APP_SECRET 用于飞书应用、云文档或 Stream Bot，不会直接启用群 Webhook 推送。',
     ],
     impact: [
-      '影响飞书通知渠道；失败时不应拖垮主分析流程，只影响该渠道送达。',
+      '影响飞书通知连接；失败时不应拖垮主分析流程，只影响该连接送达。',
     ],
     notes: [
       '不要把 FEISHU_APP_SECRET 当作 FEISHU_WEBHOOK_SECRET 使用。',
@@ -459,8 +459,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'App Bot 模式与 Webhook 模式互斥：Webhook URL 优先，未配置 Webhook 时才走 App Bot。',
     ],
     impact: [
-      '影响飞书 App Bot 通知渠道的送达目标。',
-      '失败时不应拖垮主分析流程，只影响该渠道送达。',
+      '影响飞书 App Bot 通知连接的送达目标。',
+      '失败时不应拖垮主分析流程，只影响该连接送达。',
     ],
     notes: [
       'App Bot 需要应用拥有 im:message:send_as_bot 权限。',
@@ -514,8 +514,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
       'Webhook URL 通常包含敏感 token，应按密钥处理。',
       '不同平台对消息长度、格式和频率限制不同。',
     ],
-    impact: ['影响对应 Webhook 通知渠道的报告送达。'],
-    notes: ['单个通知渠道失败不应阻断主分析流程。'],
+    impact: ['影响对应 Webhook 通知连接的报告送达。'],
+    notes: ['单个通知连接失败不应阻断主分析流程。'],
   },
   'settings.notification.CUSTOM_WEBHOOK_URLS': {
     title: '自定义 Webhook',
@@ -543,7 +543,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     summary: '通过 Telegram Bot 向个人、群组或 Topic 推送报告。',
     usage: '使用 @BotFather 创建 Bot，填写 Bot Token 和目标 Chat ID；群组 Topic 可额外填写 Thread ID。',
     valueNotes: ['Bot 需要被加入目标群组并具备发言权限。'],
-    impact: ['影响 Telegram 通知渠道。'],
+    impact: ['影响 Telegram 通知连接。'],
     notes: ['群组 Chat ID 通常是负数或 -100 开头。'],
   },
   'settings.notification.email': {
@@ -562,7 +562,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     summary: '配置 Discord、Slack、Pushover、ServerChan 等聊天或推送平台。',
     usage: '按平台选择 Webhook 或 Bot Token 模式；Bot 模式通常还需要频道 ID。',
     valueNotes: ['同一平台同时配置 Bot 与 Webhook 时，代码可能按既定优先级选择其中一种。'],
-    impact: ['影响对应聊天平台通知渠道。'],
+    impact: ['影响对应聊天平台通知连接。'],
     notes: ['Bot Token、Webhook URL、SendKey 都应按密钥处理。'],
   },
   'settings.notification.report_output': {
@@ -710,16 +710,16 @@ const settingsHelpZhCN: SettingsHelpMap = {
     notes: ['不要把代理地址写成只在本机可见但容器不可达的 127.0.0.1。'],
   },
   'settings.llm_channel.channel_name': {
-    title: '渠道名称',
-    summary: '渠道名称用于生成 LLM_<NAME>_* 环境变量。',
+    title: '连接名称',
+    summary: '连接名称用于生成 LLM_<NAME>_* 环境变量。',
     usage: '只能使用小写字母、数字和下划线；保存后会写入 LLM_CHANNELS。',
     valueNotes: ['例如 deepseek 会对应 LLM_DEEPSEEK_BASE_URL、LLM_DEEPSEEK_API_KEY(S)、LLM_DEEPSEEK_MODELS。'],
-    impact: ['影响渠道环境变量命名、运行时选择和 GitHub Actions 显式映射。'],
-    notes: ['修改名称不会自动迁移旧渠道的所有外部环境变量。'],
+    impact: ['影响连接环境变量命名、运行时选择和 GitHub Actions 显式映射。'],
+    notes: ['修改名称不会自动迁移旧连接的所有外部环境变量。'],
   },
   'settings.llm_channel.protocol': {
-    title: '渠道协议',
-    summary: '声明该渠道使用哪类兼容协议。',
+    title: '连接协议',
+    summary: '声明该连接使用哪类兼容协议。',
     usage: 'OpenAI Compatible 适合大多数中转和兼容服务；官方 Gemini/Anthropic/DeepSeek 可选择对应协议。',
     valueNotes: ['协议会影响模型名前缀归一、连接测试和模型发现方式。'],
     impact: ['影响请求适配器、模型列表解析和运行时模型引用。'],
@@ -727,31 +727,31 @@ const settingsHelpZhCN: SettingsHelpMap = {
   },
   'settings.llm_channel.base_url': {
     title: 'Base URL',
-    summary: '该渠道的接口根地址。',
-    usage: 'OpenAI-compatible 服务通常填写以 /v1 结尾的地址；部分官方 SDK 渠道可留空。',
+    summary: '该连接的接口根地址。',
+    usage: 'OpenAI-compatible 服务通常填写以 /v1 结尾的地址；部分官方 SDK 连接可留空。',
     valueNotes: ['服务商预设只提供参考值，实际可用性取决于账号、地区和 provider 当前接口。'],
-    impact: ['影响连接测试、模型发现和所有该渠道的 LLM 请求。'],
+    impact: ['影响连接测试、模型发现和所有该连接的 LLM 请求。'],
     notes: ['不要把不同 provider 的 API Key 和 Base URL 混用。'],
   },
   'settings.llm_channel.api_key': {
     title: 'API Key',
-    summary: '该渠道调用模型服务所需的访问密钥。',
+    summary: '该连接调用模型服务所需的访问密钥。',
     usage: '单个 Key 直接填写；多个 Key 使用英文逗号分隔。',
     valueNotes: ['本地 Ollama 等无需鉴权的服务可留空。'],
     impact: ['影响连接测试、模型发现、运行时调用和 Key 轮换。'],
     notes: ['不要在截图、日志或 issue 中暴露真实 Key。'],
   },
   'settings.llm_channel.models': {
-    title: '渠道模型列表',
-    summary: '声明该渠道可供运行时选择的模型。',
-    usage: '可点击“获取模型”从支持 /models 的渠道拉取，也可手动填写逗号分隔列表。',
+    title: '连接模型列表',
+    summary: '声明该连接可供运行时选择的模型。',
+    usage: '可点击“获取模型”从支持 /models 的连接拉取，也可手动填写逗号分隔列表。',
     valueNotes: ['保存时运行时主模型、Agent 模型、Vision 模型和 fallback 会引用这里的模型。'],
     impact: ['影响可选择模型、保存前失效模型清理和运行时模型路由。'],
     notes: ['模型是否真正可用仍取决于服务商权限和运行时连接测试。'],
   },
   'settings.llm_channel.capability_checks': {
     title: '运行时能力检测',
-    summary: '手动验证当前渠道模型是否支持 JSON、tools、stream 或 vision。',
+    summary: '手动验证当前连接模型是否支持 JSON、tools、stream 或 vision。',
     usage: '选择能力后点击检测；检测会发起真实 LLM 请求。',
     valueNotes: ['多选检测可能需要 20-40 秒，并可能消耗 provider 额度。'],
     impact: ['仅影响当前页面诊断结果，不会改变保存配置。'],
@@ -768,10 +768,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.llm_channel.primary_model': {
     title: '主模型',
     summary: '普通分析流程默认使用的运行时模型。',
-    usage: '从已启用渠道的模型列表中选择；自动模式使用第一个可用模型。',
+    usage: '从已启用连接的模型列表中选择；自动模式使用第一个可用模型。',
     valueNotes: ['保存后写入 LITELLM_MODEL。'],
     impact: ['影响个股分析、大盘复盘和默认报告生成。'],
-    notes: ['如果模型不在已启用渠道列表中，保存时可能被清理或要求重新选择。'],
+    notes: ['如果模型不在已启用连接列表中，保存时可能被清理或要求重新选择。'],
   },
   'settings.llm_channel.agent_primary_model': {
     title: 'Agent 主模型',
@@ -864,7 +864,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '开启后，私聊中高置信度的股票相关消息（或群聊 @机器人）会自动路由到 Agent，无需显式命令。',
     valueNotes: ['仅影响 bot 接入场景（飞书、Telegram 等），不影响 Web API。'],
     impact: ['影响 bot 交互体验和 Agent 触发方式。'],
-    notes: ['需要同时启用 Agent 模式和对应 bot 渠道。'],
+    notes: ['需要同时启用 Agent 模式和对应 bot 连接。'],
   },
   'settings.agent.AGENT_ARCH': {
     title: 'Agent 架构',
@@ -1086,17 +1086,17 @@ const settingsHelpZhCN: SettingsHelpMap = {
   // Notification routing
   // ------------------------------------------------------------------
   'settings.notification.channel_routing': {
-    title: '通知渠道路由',
-    summary: '为不同类型的通知指定目标推送渠道。',
-    usage: '三个路由字段分别控制报告推送、告警推送和系统错误推送的目标渠道。使用英文逗号分隔渠道名；留空则推送到所有已配置渠道。',
+    title: '通知连接路由',
+    summary: '为不同类型的通知指定目标推送连接。',
+    usage: '三个路由字段分别控制报告推送、告警推送和系统错误推送的目标连接。使用英文逗号分隔连接名；留空则推送到所有已配置连接。',
     valueNotes: [
-      'NOTIFICATION_REPORT_CHANNELS 控制日常分析报告推送渠道。',
-      'NOTIFICATION_ALERT_CHANNELS 控制事件告警推送渠道。',
-      'NOTIFICATION_SYSTEM_ERROR_CHANNELS 控制系统错误推送渠道。',
-      '可用渠道取决于已配置的通知渠道（如 email、feishu、telegram 等）。',
+      'NOTIFICATION_REPORT_CHANNELS 控制日常分析报告推送连接。',
+      'NOTIFICATION_ALERT_CHANNELS 控制事件告警推送连接。',
+      'NOTIFICATION_SYSTEM_ERROR_CHANNELS 控制系统错误推送连接。',
+      '可用连接取决于已配置的通知连接（如 email、feishu、telegram 等）。',
     ],
     impact: ['影响不同通知类型的推送目标。'],
-    notes: ['指定的渠道必须已完成对应配置，否则不会生效。'],
+    notes: ['指定的连接必须已完成对应配置，否则不会生效。'],
   },
   'settings.notification.dedup': {
     title: '通知去重与冷却',

@@ -424,7 +424,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   if (noConfiguredLlm) {
     return createParsedApiError({
       title: '系统没有配置可用的 LLM 模型',
-      message: '请先在系统设置中配置主模型、可用渠道或相关 API Key 后再重试。',
+      message: '请先在系统设置中配置主模型、可用连接或相关 API Key 后再重试。',
       rawMessage,
       status,
       category: 'llm_not_configured',

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NOTIFICATION_CHANNELS } from '../notificationChannels';
 import { DATA_PROVIDERS } from '../dataProviders';
-import { MODEL_PROVIDERS } from '../modelProviders';
-import { getCategoryFieldGroupId } from '../categoryFieldGroups';
 import {
   getDefaultSubCategory,
   getSubCategories,
@@ -38,18 +36,6 @@ describe('settingsSubCategories', () => {
     expect(getSubCategoryOfKey('ai_model', 'OPENAI_API_KEY')).toBe('providers');
     expect(getSubCategoryOfKey('ai_model', 'ANTHROPIC_API_KEY')).toBe('providers');
     expect(getSubCategoryOfKey('ai_model', 'AIHUBMIX_KEY')).toBe('providers');
-  });
-
-  it('scopes model provider configured keys to their own provider group', () => {
-    for (const provider of MODEL_PROVIDERS) {
-      expect(provider.configuredKeys.length, provider.id).toBeGreaterThan(0);
-      for (const key of provider.configuredKeys) {
-        // The configured badge must read this provider's own ai_model fields,
-        // not another provider's or an unrelated (e.g. data-source) credential.
-        expect(getCategoryFieldGroupId('ai_model', key), key).toBe(provider.id);
-        expect(getSubCategoryOfKey('ai_model', key), key).toBe('providers');
-      }
-    }
   });
 
   it('routes non-provider ai_model keys to the model tab', () => {

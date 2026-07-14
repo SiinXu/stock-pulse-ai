@@ -2,8 +2,14 @@ import type { UiTextKey } from '../../i18n/uiText';
 import { getCategoryFieldGroupId, getCategoryFieldOrder } from './categoryFieldGroups';
 import { getNotificationFieldOrder } from './notificationFieldGroups';
 import { isNotificationChannelKey } from './notificationChannels';
-import { MODEL_PROVIDER_GROUP_IDS } from './modelProviders';
 import { isDataProviderKey } from './dataProviders';
+
+// AI-model field groups that hold legacy provider credentials. These route to
+// the advanced sub (raw legacy/YAML config), never to the primary model-access
+// connections sub — provider credentials are edited only via Model Access.
+const MODEL_PROVIDER_GROUP_IDS = new Set<string>([
+  'openai', 'anthropic', 'gemini', 'deepseek', 'anspire', 'aihubmix',
+]);
 
 export interface SettingsSubCategory {
   id: string;

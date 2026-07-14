@@ -12,7 +12,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
 const SOURCE_LABEL: Record<string, { zh: string; en: string }> = {
   auto: { zh: '自动（兼容）', en: 'Auto (compatible)' },
-  channels: { zh: 'Web 渠道', en: 'Web Channels' },
+  channels: { zh: 'Web 连接', en: 'Web Connections' },
   yaml: { zh: 'YAML', en: 'YAML' },
   legacy: { zh: 'Legacy Provider', en: 'Legacy provider keys' },
 };
@@ -134,7 +134,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           <p className="text-xs text-muted-text">
             {en
               ? 'The following channels will be created from your legacy provider keys, and LLM_CONFIG_MODE will be set to channels. Legacy keys are kept.'
-              : '将根据旧版 Provider 凭据创建以下渠道，并把 LLM_CONFIG_MODE 设为 channels。旧版 keys 会保留，不会删除。'}
+              : '将根据旧版 Provider 凭据创建以下模型连接，并把配置来源设为 channels。旧版 keys 会保留，不会删除。'}
           </p>
           <div className="overflow-hidden rounded-lg border border-[var(--settings-border)]">
             {(preview?.channels ?? []).map((channel) => (

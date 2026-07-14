@@ -165,10 +165,6 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
-  ...(await import('../../components/settings/connectionModel')),
-  ConnectionServiceCards: ({ onAddService }: { onAddService: () => void }) => (
-    <button type="button" onClick={onAddService}>add model service</button>
-  ),
   isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>

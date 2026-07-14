@@ -19,7 +19,6 @@ import {
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationChannelsPanel,
-  ModelProvidersPanel,
   DataProvidersPanel,
   NotificationTestPanel,
   isNotificationChannelKey,
@@ -42,8 +41,6 @@ import {
   FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
-  ConnectionServiceCards,
-  deriveConnections,
   ModelFallbackEditor,
 } from '../components/settings';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
@@ -975,7 +972,12 @@ const SettingsPage: React.FC = () => {
   // the model-access page.
   const { providers: providerCatalog, isLoading: isProviderCatalogLoading } = useProviderCatalog();
   // Available model routes (authoritative) refetched when the saved config changes.
-  const { models: availableModels } = useAvailableModels(configVersion);
+  const {
+    models: availableModels,
+    isLoading: availableModelsLoading,
+    error: availableModelsError,
+    reload: reloadAvailableModels,
+  } = useAvailableModels(configVersion);
 
   // section/view is the single source of truth for navigation, driven by the
   // URL so Back/Forward/refresh/deep-links all work. Legacy category/sub only
@@ -1451,21 +1453,24 @@ const SettingsPage: React.FC = () => {
   );
   // Config keys whose value is a single model route (rendered via the selector).
   const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
-  // Model-access service cards: one per configured connection, derived from the
-  // current config + provider catalog + authoritative available models.
-  const modelAccessConnections = useMemo(
-    () => deriveConnections({
-      valuesByKey: allValuesByKey,
-      providers: providerCatalog,
-      availableModels,
-      taskAssignments: [
-        { label: uiLanguage === 'en' ? 'Report' : '报告', route: allValuesByKey.LITELLM_MODEL || '' },
-        { label: uiLanguage === 'en' ? 'Agent' : 'Agent', route: allValuesByKey.AGENT_LITELLM_MODEL || '' },
-        { label: uiLanguage === 'en' ? 'Vision' : 'Vision', route: allValuesByKey.VISION_MODEL || '' },
-      ],
-    }),
-    [allValuesByKey, providerCatalog, availableModels, uiLanguage],
-  );
+  // Task -> route references, used by the model-access manager to show which
+  // tasks use each connection and to protect referenced connections on delete.
+  const taskModelRefs = useMemo(() => {
+    const refs: Array<{ label: string; route: string }> = [];
+    const add = (label: string, route: string) => {
+      const trimmed = (route || '').trim();
+      if (trimmed) {
+        refs.push({ label, route: trimmed });
+      }
+    };
+    add(uiLanguage === 'en' ? 'Report' : '报告', allValuesByKey.LITELLM_MODEL || '');
+    add(uiLanguage === 'en' ? 'Agent' : 'Agent', allValuesByKey.AGENT_LITELLM_MODEL || '');
+    add(uiLanguage === 'en' ? 'Vision' : 'Vision', allValuesByKey.VISION_MODEL || '');
+    for (const route of (allValuesByKey.LITELLM_FALLBACK_MODELS || '').split(',')) {
+      add(uiLanguage === 'en' ? 'Fallback' : '备用', route);
+    }
+    return refs;
+  }, [allValuesByKey, uiLanguage]);
   // Reliability view: two distinct mechanisms — execution-backend failover and
   // in-LiteLLM model fallback order (MC-05, must not both read "Fallback").
   const isAiReliability = activeSection === 'ai_models' && activeView === 'reliability';
@@ -1888,13 +1893,6 @@ const SettingsPage: React.FC = () => {
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
           items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
-          disabled={isSaving}
-          onChange={setDraftValue}
-          issueByKey={issueByKey}
-        />
-      ) : isModelProvidersSub ? (
-        <ModelProvidersPanel
-          items={subFilteredItems}
           disabled={isSaving}
           onChange={setDraftValue}
           issueByKey={issueByKey}
@@ -2474,6 +2472,39 @@ const SettingsPage: React.FC = () => {
                   ? 'Choose the model for each task. Market review inherits the report model unless overridden.'
                   : '为每个任务选择模型。大盘复盘默认继承报告主模型，除非在此覆盖。'}
               >
+                {availableModelsError ? (
+                  <SettingsAlert
+                    variant="error"
+                    title={uiLanguage === 'en' ? 'Failed to load available models' : '可用模型加载失败'}
+                    message={uiLanguage === 'en'
+                      ? 'Could not load the available model catalog. This is not the same as having no models.'
+                      : '无法加载可用模型目录。这与“暂无模型”不同，可能是接口暂时不可用。'}
+                    actionLabel={uiLanguage === 'en' ? 'Reload' : '重新加载'}
+                    onAction={() => reloadAvailableModels()}
+                  />
+                ) : availableModelsLoading && availableModels.length === 0 ? (
+                  <p className="mb-3 text-xs text-secondary-text">{uiLanguage === 'en' ? 'Loading available models…' : '正在加载可用模型…'}</p>
+                ) : availableModels.length === 0 ? (
+                  <div className="mb-3 rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
+                    <p className="text-sm text-secondary-text">
+                      {(allValuesByKey.LLM_CHANNELS || '').trim()
+                        ? (uiLanguage === 'en'
+                          ? 'You have connected a model service, but it has no usable models yet. Add at least one model to it.'
+                          : '已接入模型服务，但还没有可用模型。请为其添加至少一个模型。')
+                        : (uiLanguage === 'en'
+                          ? 'No available models yet. Connect a model service and add at least one model.'
+                          : '尚无可用模型，请先接入模型服务并添加至少一个模型。')}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                      <Button type="button" variant="settings-primary" size="sm" onClick={() => selectSectionView('ai_models', 'connections')}>
+                        {uiLanguage === 'en' ? 'Add model service' : '添加模型服务'}
+                      </Button>
+                      <Button type="button" variant="settings-secondary" size="sm" onClick={() => selectSectionView('ai_models', 'connections')}>
+                        {uiLanguage === 'en' ? 'Manage models' : '管理模型'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 {taskRoutingItems.length > 0 ? (
                   <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
                     {taskRoutingItems.map((item) => (
@@ -2488,6 +2519,7 @@ const SettingsPage: React.FC = () => {
                               value={item.value}
                               onChange={(next) => setDraftValue(item.key, next)}
                               options={modelSelectorOptions}
+                              allowCustom={false}
                               ariaLabel={getFieldTitleZh(item.key, item.key)}
                               placeholder={item.key === 'LITELLM_MODEL'
                                 ? (uiLanguage === 'en' ? 'Select a model' : '选择模型')
@@ -2633,22 +2665,8 @@ const SettingsPage: React.FC = () => {
               <SettingsSectionCard
                 title={uiLanguage === 'en' ? 'Model access' : '模型接入'}
                 description={uiLanguage === 'en'
-                  ? 'Connected model services, their available models and which tasks use them.'
-                  : '已接入的模型服务、可用模型数量与被哪些任务使用。'}
-                contentBordered
-              >
-                <ConnectionServiceCards
-                  connections={modelAccessConnections}
-                  language={uiLanguage}
-                  onAddService={() => setIsWizardOpen(true)}
-                  addDisabled={isProviderCatalogLoading || providerCatalog.length === 0}
-                />
-              </SettingsSectionCard>
-            ) : null}
-            {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
-              <SettingsSectionCard
-                title={t('settings.llmAccess')}
-                description={t('settings.llmAccessDescription')}
+                  ? 'Connect model services, manage their models, and see which tasks use them — one place for providers, connections and models.'
+                  : '接入模型服务、管理各自的可用模型，并查看被哪些任务使用——模型服务商、连接与模型的唯一入口。'}
                 contentBordered
               >
                 <LLMConfigModeBanner
@@ -2677,6 +2695,8 @@ const SettingsPage: React.FC = () => {
                   disabled={isSaving || isLoading}
                   overriddenByMode={channelsOverriddenByMode}
                   showRuntimeConfig={false}
+                  taskModelRefs={taskModelRefs}
+                  onManageModels={() => selectSectionView('ai_models', 'task_routing')}
                 />
               </SettingsSectionCard>
             ) : null}

@@ -101,11 +101,11 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
         value=""
         onChange={addRoute}
         options={addOptions}
+        allowCustom={false}
         disabled={disabled}
         ariaLabel={tx('添加备用模型', 'Add a fallback model')}
         placeholder={tx('添加备用模型…', 'Add a fallback model…')}
         emptyText={tx('暂无可添加的模型', 'No models to add')}
-        customLabel={(val) => (language === 'en' ? `Custom: ${val}` : `自定义：${val}`)}
       />
     </div>
   );

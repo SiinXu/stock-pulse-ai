@@ -108,9 +108,68 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(set(routes), set(expected))
         self.assertIn("deepseek/deepseek-v4-flash", routes)
         by_route = {entry["route"]: entry for entry in result["models"]}
-        self.assertEqual(by_route["deepseek/deepseek-v4-flash"]["connection"], "deepseek")
-        self.assertEqual(by_route["deepseek/deepseek-v4-flash"]["display"], "deepseek-v4-flash")
+        ds = by_route["deepseek/deepseek-v4-flash"]
+        self.assertEqual(ds["connection"], "deepseek")
+        self.assertEqual(ds["display"], "deepseek-v4-flash")
         self.assertEqual(by_route["openai/gpt-5.5"]["provider"], "openai")
+        # Enriched authoritative fields: catalog provider id/label + connection id
+        # + availability, so Web selectors group without a second provider list.
+        self.assertEqual(ds["connection_id"], "deepseek")
+        self.assertEqual(ds["provider_id"], "deepseek")
+        self.assertEqual(ds["provider_label"], "DeepSeek 官方")
+        self.assertTrue(ds["available"])
+
+    def test_available_models_resolve_custom_connection_provider(self) -> None:
+        # A connection named outside the catalog resolves to the custom provider.
+        self._rewrite_env(
+            "LLM_CHANNELS=my_proxy",
+            "LLM_MY_PROXY_PROTOCOL=openai",
+            "LLM_MY_PROXY_BASE_URL=https://proxy.example.com/v1",
+            "LLM_MY_PROXY_API_KEY=sk-x",
+            "LLM_MY_PROXY_MODELS=gpt-5.5",
+            "LLM_MY_PROXY_ENABLED=true",
+        )
+        entry = self.service.get_available_models()["models"][0]
+        self.assertEqual(entry["connection"], "my_proxy")
+        self.assertEqual(entry["connection_id"], "my_proxy")
+        self.assertEqual(entry["provider_id"], "custom")
+        self.assertTrue(entry["available"])
+
+    def test_deleting_referenced_connection_is_rejected_by_validation(self) -> None:
+        # Authoritative reference protection: a task model that references a
+        # removed connection's route can no longer be resolved, so the save is
+        # blocked (direct API calls cannot bypass this either).
+        effective = {
+            "LLM_CHANNELS": "deepseek",  # an "openai" connection was deleted
+            "LLM_DEEPSEEK_PROTOCOL": "deepseek",
+            "LLM_DEEPSEEK_API_KEY": "sk-ds",
+            "LLM_DEEPSEEK_MODELS": "deepseek-v4-flash",
+            "LLM_DEEPSEEK_ENABLED": "true",
+            "LITELLM_MODEL": "openai/gpt-5.5",  # orphaned reference
+        }
+        issues = SystemConfigService._validate_llm_runtime_selection(effective)
+        errors = {(i["key"], i["code"]) for i in issues if i["severity"] == "error"}
+        self.assertIn(("LITELLM_MODEL", "unknown_model"), errors)
+        # Re-assigning the task model to a still-available route clears the error.
+        effective["LITELLM_MODEL"] = "deepseek/deepseek-v4-flash"
+        cleared = SystemConfigService._validate_llm_runtime_selection(effective)
+        self.assertFalse(
+            any(i["key"] == "LITELLM_MODEL" and i["severity"] == "error" for i in cleared)
+        )
+
+    def test_known_provider_channel_names_derive_from_catalog(self) -> None:
+        from src.services.system_config_service import known_llm_provider_channel_names
+        from src.llm.provider_catalog import get_provider_catalog
+
+        names = known_llm_provider_channel_names()
+        expected = {
+            str(entry["id"]).lower()
+            for entry in get_provider_catalog()
+            if not entry.get("is_custom")
+        }
+        self.assertEqual(names, expected)
+        self.assertIn("openai", names)
+        self.assertNotIn("custom", names)
 
     def test_available_models_excludes_disabled_connections(self) -> None:
         self._rewrite_env(

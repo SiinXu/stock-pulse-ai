@@ -192,8 +192,16 @@ export interface AvailableModelEntry {
   display: string;
   /** Owning connection name (best-effort grouping), null if unknown. */
   connection: string | null;
-  /** Provider/protocol of the owning connection, null if unknown. */
+  /** Stable connection id (equals the connection name), null if unknown. */
+  connectionId: string | null;
+  /** Protocol of the owning connection, null if unknown (back-compat). */
   provider: string | null;
+  /** Authoritative catalog provider id of the owning connection. */
+  providerId: string | null;
+  /** Authoritative catalog provider display label. */
+  providerLabel: string | null;
+  /** True when the route is declared by an enabled connection (routable now). */
+  available: boolean;
 }
 
 export interface AvailableModelsResponse {
