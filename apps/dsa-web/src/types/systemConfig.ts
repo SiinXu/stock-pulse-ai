@@ -172,7 +172,6 @@ export interface LlmProviderCatalogEntry {
   label: string;
   protocol: string;
   defaultBaseUrl: string;
-  placeholderModels: string;
   capabilities: string[];
   requiresApiKey: boolean;
   requiresBaseUrl: boolean;

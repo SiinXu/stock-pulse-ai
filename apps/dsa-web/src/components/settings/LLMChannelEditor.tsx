@@ -6,7 +6,6 @@ import type { LLMCapabilityCheck, LLMCapabilityCheckResult, LlmProviderCatalogEn
 import { Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import {
-  MODEL_PLACEHOLDERS_BY_PROTOCOL,
   getCapabilityLabel,
   getProviderPresentation,
 } from './llmProviderTemplates';
@@ -178,6 +177,12 @@ interface LLMChannelEditorProps {
   /** Bumped by the parent to discard the local draft back to the saved snapshot. */
   resetSignal?: number;
   disabled?: boolean;
+  /**
+   * The provider catalog failed to load. Existing connections stay editable/
+   * read-only, but adding a NEW connection is blocked so we never create a
+   * blank custom-like connection from a transient catalog outage.
+   */
+  catalogUnavailable?: boolean;
   /** When a non-channels config source is effective, the editor is read-only. */
   overriddenByMode?: 'yaml' | 'legacy' | null;
   /**
@@ -857,7 +862,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                   }
                 }}
                 aria-label="添加模型"
-                placeholder={`输入模型 ID 后回车或点“添加”，例如 ${(preset?.placeholderModels || MODEL_PLACEHOLDERS_BY_PROTOCOL[channel.protocol] || 'gpt-5.5').split(',')[0]}`}
+                placeholder="输入模型 ID 后回车或点“添加”"
               />
               <Button
                 type="button"
@@ -1682,6 +1687,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   onValidityChange,
   resetSignal = 0,
   disabled = false,
+  catalogUnavailable = false,
   overriddenByMode = null,
   showRuntimeConfig = true,
   taskModelRefs = [],
@@ -1904,9 +1910,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             updated.baseUrl = newPreset.defaultBaseUrl;
           }
           updated.protocol = normalizeProtocol(newPreset.protocol);
-          if (!updated.models || updated.models === (oldPreset?.placeholderModels ?? '')) {
-            updated.models = newPreset.placeholderModels;
-          }
+          // Models are never auto-seeded from a provider preset: they come from
+          // discovery or manual entry, so switching provider keeps the user's
+          // current models untouched.
         }
       }
 
@@ -2031,7 +2037,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           protocol: normalizeProtocol(preset?.protocol ?? 'openai'),
           baseUrl: preset?.defaultBaseUrl ?? '',
           apiKey: '',
-          models: preset?.placeholderModels || '',
+          // No default models: a new connection starts explicitly incomplete
+          // until the user discovers or manually adds models.
+          models: '',
           enabled: true,
         },
       ];
@@ -2334,7 +2342,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               <Badge variant="default" className="border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-muted-text">{channels.length} 个连接</Badge>
             </div>
             <div className="flex items-center gap-2">
-              <Button type="button" variant="settings-primary" className="whitespace-nowrap" disabled={busy} onClick={addChannel}>
+              <Button type="button" variant="settings-primary" className="whitespace-nowrap" disabled={busy || catalogUnavailable} onClick={addChannel}>
                 + 添加模型服务
               </Button>
               <Select
@@ -2344,11 +2352,14 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   value: provider.id,
                   label: provider.label,
                 }))}
-                disabled={busy}
+                disabled={busy || catalogUnavailable}
                 placeholder="选择服务商"
                 className="flex-1"
               />
             </div>
+            {catalogUnavailable ? (
+              <p className="mt-2 text-[11px] text-danger">模型服务商目录暂时不可用，无法新增连接；请先点击上方“重新加载”。</p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -2569,17 +2580,24 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       ) : null}
       <ConfirmDialog
         isOpen={pendingRemove !== null}
-        title="删除连接？"
+        title={pendingRemove && pendingRemove.referencedBy.length > 0 ? '无法直接删除连接' : '删除连接？'}
         message={pendingRemove
           ? (pendingRemove.referencedBy.length > 0
-            ? `模型服务「${pendingRemove.name}」正被${pendingRemove.referencedBy.join('、')}引用，删除后这些选择会失效并需重新指定。删除仅作用于当前草稿，保存后才生效。`
+            ? `模型服务「${pendingRemove.name}」正被以下任务引用：${pendingRemove.referencedBy.join('、')}。请先在任务路由为这些任务改选其它模型，再回来删除该连接（替换与删除会在同一次保存中一起提交）。`
             : `将从当前草稿中移除模型服务「${pendingRemove.name}」，保存后才生效。`)
           : ''}
-        confirmText="删除连接"
+        // A referenced connection cannot be deleted directly: the confirm action
+        // becomes "go to Task Routing to replace" instead of a destructive delete,
+        // so we never delete-then-rely-on-a-generic-save-error.
+        confirmText={pendingRemove && pendingRemove.referencedBy.length > 0 ? '前往任务路由替换' : '删除连接'}
         cancelText="取消"
         onConfirm={() => {
           if (pendingRemove) {
-            removeChannel(pendingRemove.index);
+            if (pendingRemove.referencedBy.length > 0) {
+              onManageModels?.();
+            } else {
+              removeChannel(pendingRemove.index);
+            }
           }
           setPendingRemove(null);
         }}

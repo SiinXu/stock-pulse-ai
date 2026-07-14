@@ -12,6 +12,7 @@ from unittest.mock import patch
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 
+from tests._llm_env_isolation import restore_ambient_llm_env, strip_ambient_llm_env
 from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
@@ -38,6 +39,9 @@ class SystemConfigApiTestCase(unittest.TestCase):
     """System config API tests in isolation without loading the full app."""
 
     def setUp(self) -> None:
+        # Keep ambient developer LLM env (e.g. litellm's load_dotenv at import)
+        # from bleeding into config validation; the temp .env is authoritative.
+        self._saved_llm_env = strip_ambient_llm_env()
         auth._auth_enabled = None
         auth._session_secret = None
         auth._password_hash_salt = None
@@ -82,6 +86,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             os.environ.pop("DATABASE_PATH", None)
         else:
             os.environ["DATABASE_PATH"] = self._orig_database_path
+        restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 
     @staticmethod
@@ -211,11 +216,14 @@ class SystemConfigApiTestCase(unittest.TestCase):
         # Every provider carries the fields the Web model-access page needs.
         for provider in payload["providers"]:
             for field in (
-                "id", "label", "protocol", "default_base_url", "placeholder_models",
+                "id", "label", "protocol", "default_base_url",
                 "capabilities", "requires_api_key", "requires_base_url",
                 "supports_discovery", "is_local", "is_custom",
             ):
                 self.assertIn(field, provider)
+            # The catalog must NOT ship concrete model IDs: model names age fast
+            # and must never seed a Connection's default models.
+            self.assertNotIn("placeholder_models", provider)
         # Credential/base-URL requirements are derived from the backend contract.
         self.assertTrue(providers["deepseek"]["requires_api_key"])
         self.assertEqual(providers["deepseek"]["default_base_url"], "https://api.deepseek.com")

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   LLM_PROVIDER_CAPABILITY_LABELS,
-  MODEL_PLACEHOLDERS_BY_PROTOCOL,
   PROVIDER_PRESENTATION_BY_ID,
   getCapabilityLabel,
   getProviderPresentation,
@@ -49,14 +48,8 @@ describe('llmProviderTemplates (presentation-only)', () => {
     expect(getProviderPresentation('openrouter').configHint).toContain('API Key');
   });
 
-  it('keeps protocol-level fallback placeholders centralized', () => {
-    expect(MODEL_PLACEHOLDERS_BY_PROTOCOL).toMatchObject({
-      openai: 'gpt-5.5,qwen3.6-plus',
-      deepseek: 'deepseek-v4-flash,deepseek-v4-pro',
-      gemini: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
-      anthropic: 'claude-sonnet-4-6,claude-opus-4-7',
-      vertex_ai: 'gemini-3.1-pro-preview',
-      ollama: 'llama3.2,qwen2.5',
-    });
+  it('does not ship concrete model IDs (models come from discovery / manual entry)', () => {
+    const source = JSON.stringify({ LLM_PROVIDER_CAPABILITY_LABELS, PROVIDER_PRESENTATION_BY_ID });
+    expect(source).not.toMatch(/gpt-\d|claude-(sonnet|opus|haiku)|gemini-\d|deepseek-v\d|qwen\d|llama\d/i);
   });
 });

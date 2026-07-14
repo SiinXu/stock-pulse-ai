@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，只保留 provider id/label/protocol/默认端点/是否需要凭据/是否需要 Base URL/是否支持发现/capabilities/是否本地/自定义。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
+- [修复] 修复全量测试在本地开发 `.env` 存在时的模型状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。仅剩 4 个与模型接入无关、单独运行也失败的既有基线用例（`test_agent_pipeline` 1 个、`test_decision_signal_service` 3 个时序相关）。
 - [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：移除并存的只读「模型接入」服务卡与旧渠道编辑器双结构，仅保留一套统一的连接管理界面；普通界面不再出现「AI 模型配置 / 快速添加渠道 / 添加渠道 / 渠道管理 / 渠道列表 / 渠道名称」等术语，统一使用「模型服务商 / 模型连接 / 可用模型」。连接卡片直接展示已添加模型 chip、被哪些任务使用、状态与测试结果，模型为 0 时提示「尚未添加可用模型」并引导发现/手动添加；「添加模型服务」使用连接内联创建流程（同一服务商可创建多条连接），不再复用首次配置向导。底层 `LLM_CHANNELS` 存储格式与 YAML/Legacy 兼容不变。
 - [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，高级视图仅保留 YAML/Legacy/原始配置与诊断；模型服务商元数据统一来自后端 Provider Catalog。
 - [改进] Web 设置页任务模型选择（报告/Agent/Vision）改为仅可从后端可用模型目录中选择，关闭自由输入（`allowCustom=false`）；无可用模型时任务路由不再渲染空选择框，改为展示明确空状态并提供「添加模型服务 / 管理模型」跳转到模型接入页；可用模型目录加载失败时展示错误与「重新加载」，不再静默折叠为「暂无模型」，可区分「未配置」与「加载失败」。

@@ -83,6 +83,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [models, setModels] = useState('');
+  const [modelDraft, setModelDraft] = useState('');
   const [reportModel, setReportModel] = useState('');
   const [cliBackend, setCliBackend] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -99,6 +100,16 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   );
   const modelOptions = useMemo(() => parseModels(models), [models]);
 
+  const addModelToken = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setModels(Array.from(new Set([...modelOptions, value])).join(','));
+    setModelDraft('');
+  };
+  const removeModelToken = (model: string) => {
+    setModels(modelOptions.filter((entry) => entry !== model).join(','));
+  };
+
   const order = mode ? STEP_ORDER[mode] : STEP_ORDER.cloud;
   const stepIndex = order.indexOf(step);
 
@@ -106,7 +117,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     setProviderId(nextProviderId);
     const nextProvider = providers.find((entry) => entry.id === nextProviderId);
     setBaseUrl(nextProvider?.defaultBaseUrl ?? '');
-    setModels(nextProvider?.placeholderModels ?? '');
+    // Do not seed example model IDs: models come from discovery or manual entry.
+    setModels('');
     setReportModel('');
     setDiscoverNote(null);
     setTestResult(null);
@@ -354,9 +366,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         {step === 'models' ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label htmlFor="wizard-models" className="block text-sm text-foreground">
-                {tx(language, '模型（逗号分隔）', 'Models (comma separated)')}
-              </label>
+              <span className="block text-sm text-foreground">
+                {tx(language, '可用模型', 'Available models')}
+              </span>
               <Button
                 type="button"
                 variant="settings-secondary"
@@ -368,19 +380,63 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 {tx(language, '自动发现模型', 'Discover models')}
               </Button>
             </div>
-            <Input
-              id="wizard-models"
-              value={models}
-              onChange={(event) => setModels(event.target.value)}
-            />
+            {modelOptions.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5" data-testid="wizard-model-chips">
+                {modelOptions.map((model) => (
+                  <span
+                    key={model}
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-[11px] text-secondary-text"
+                  >
+                    <span className="truncate">{model}</span>
+                    <button
+                      type="button"
+                      aria-label={tx(language, `移除模型 ${model}`, `Remove model ${model}`)}
+                      onClick={() => removeModelToken(model)}
+                      className="shrink-0 text-muted-text hover:text-danger"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-text">
+                {tx(language, '尚未添加模型，请自动发现或逐个手动添加。', 'No models yet — discover them or add each manually.')}
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                id="wizard-models"
+                value={modelDraft}
+                aria-label={tx(language, '添加模型', 'Add model')}
+                placeholder={tx(language, '输入模型 ID 后回车或点“添加”', 'Enter a model ID, then press Enter or “Add”')}
+                onChange={(event) => setModelDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addModelToken(modelDraft);
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="settings-secondary"
+                size="xsm"
+                className="shrink-0"
+                disabled={!modelDraft.trim()}
+                onClick={() => addModelToken(modelDraft)}
+              >
+                {tx(language, '添加', 'Add')}
+              </Button>
+            </div>
             {discoverNote ? (
               <p className={`text-xs ${discoverNote.ok ? 'text-success' : 'text-warning'}`}>{discoverNote.message}</p>
             ) : null}
             <p className="text-xs text-muted-text">
               {tx(
                 language,
-                '已用服务商默认模型预填，可按需修改，或用默认 Base URL 自动发现；发现失败时手动填写即可。',
-                'Prefilled with the provider defaults. You can edit them, or auto-discover via the default Base URL; enter them manually if discovery fails.',
+                '模型来自自动发现或手动逐个添加；不预填示例模型。发现失败时可手动添加。',
+                'Models come from auto-discovery or manual entry — no example models are prefilled. Add them manually if discovery fails.',
               )}
             </p>
           </div>

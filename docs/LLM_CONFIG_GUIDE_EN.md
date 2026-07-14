@@ -133,7 +133,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **Configure via Web UI directly:** After starting the application, you can do this visually under **System Settings -> AI Model -> AI Model Access** in the Web UI.
 
-> **New editor behavior**: For DeepSeek, DashScope, and other OpenAI-compatible providers that expose `/v1/models`, the settings page can now fetch models directly from `{base_url}/models` and let you select multiple entries visually. The underlying storage format is still the existing comma-separated `LLM_{CHANNEL}_MODELS=model1,model2` value. If a provider does not support `/models`, authentication fails, or the endpoint is temporarily unavailable, you can still type the model list manually and save normally.
+> **New editor behavior**: Model access is organized as Provider / Connection / Model. A new connection is NOT prefilled with example models (model names age quickly and are never written as defaults): for DeepSeek, DashScope, and other OpenAI-compatible connections that expose `/v1/models`, click "Discover models" to fetch from `{base_url}/models` and multi-select, or add each model manually. Every model is an independent, removable token; the underlying storage format is still the comma-separated `LLM_{CONNECTION}_MODELS=model1,model2` value (an existing comma config is parsed back into tokens). If a connection does not support `/models`, authentication fails, or the endpoint is temporarily unavailable, you can still add models manually and save normally. In Task Routing, the report / Agent / Vision / fallback models can only be selected from already-onboarded models — free-text input is disabled.
 
 ### First-run Setup Status
 
