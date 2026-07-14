@@ -220,7 +220,7 @@ export const MarketStructureCard: React.FC<MarketStructureCardProps> = ({ contex
   }
 
   return (
-    <Card padding="md" className="rounded-lg">
+    <Card padding="md">
       <section aria-label={text.title}>
         <DashboardPanelHeader
           leading={<Map className="h-4 w-4 text-success" aria-hidden="true" />}

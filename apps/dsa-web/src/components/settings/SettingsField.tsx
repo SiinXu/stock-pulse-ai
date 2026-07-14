@@ -48,12 +48,16 @@ function inferPasswordIconType(key: string): 'password' | 'key' {
 function resolveDisplayValue(item: SystemConfigItem, value: string): string {
   const schema = item.schema;
 
+  // Backfill the backend default for unset fields so the effective value is
+  // visible instead of a blank control. Passwords are excluded so a secret-ish
+  // default can never leak into a visible input.
   if (
-    schema?.uiControl === 'select'
+    schema?.uiControl !== 'password'
     && !value
     && item.rawValueExists === false
-    && schema.defaultValue !== undefined
-    && schema.defaultValue !== null
+    && schema?.defaultValue !== undefined
+    && schema?.defaultValue !== null
+    && schema.defaultValue !== ''
   ) {
     return schema.defaultValue;
   }
@@ -88,6 +92,65 @@ function renderFieldControl(
   const commonClass = 'w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
+
+  // Multi-value enums (finite options + multi_value validation) render as a
+  // checkbox group so users pick from the catalog instead of typing a
+  // comma-separated string. Stored values outside the catalog stay visible and
+  // deselectable so saving never silently drops them.
+  if (schema?.options?.length && isMultiValue) {
+    const normalizedOptions = normalizeSelectOptions(item.key, schema.options, language);
+    const selectedValues = value.split(',').map((entry) => entry.trim()).filter(Boolean);
+    const knownValues = new Set(normalizedOptions.map((option) => option.value));
+    const unknownValues = selectedValues.filter((entry) => !knownValues.has(entry));
+    const isDisabled = disabled || !schema.isEditable;
+
+    const toggleValue = (target: string) => {
+      const selected = new Set(selectedValues);
+      if (selected.has(target)) {
+        selected.delete(target);
+      } else {
+        selected.add(target);
+      }
+      const orderedKnown = normalizedOptions
+        .map((option) => option.value)
+        .filter((candidate) => selected.has(candidate));
+      const keptUnknown = unknownValues.filter((entry) => selected.has(entry));
+      onChange([...orderedKnown, ...keptUnknown].join(','));
+    };
+
+    return (
+      <div
+        className="max-h-48 space-y-2 overflow-y-auto rounded-[10px] border border-border p-3"
+        data-testid={`multi-enum-${item.key}`}
+      >
+        {normalizedOptions.map((option, index) => (
+          <label key={option.value} className="flex items-center gap-2 text-xs text-secondary-text">
+            <input
+              id={index === 0 ? controlId : undefined}
+              type="checkbox"
+              checked={selectedValues.includes(option.value)}
+              disabled={isDisabled}
+              onChange={() => toggleValue(option.value)}
+              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
+            />
+            <span className="min-w-0 truncate">{option.label}</span>
+          </label>
+        ))}
+        {unknownValues.map((entry) => (
+          <label key={`unknown-${entry}`} className="flex items-center gap-2 text-xs text-secondary-text">
+            <input
+              type="checkbox"
+              checked
+              disabled={isDisabled}
+              onChange={() => toggleValue(entry)}
+              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
+            />
+            <span className="min-w-0 truncate">{entry}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
 
   // Any field that declares a finite set of options is an enum: render a Select
   // regardless of the backend ui_control hint, so a stray ui_control=text never
@@ -226,6 +289,14 @@ function renderFieldControl(
   }
 
   const inputType = controlType === 'number' ? 'number' : controlType === 'time' ? 'time' : 'text';
+  const validation = (schema?.validation ?? {}) as Record<string, unknown>;
+  const numberProps = controlType === 'number'
+    ? {
+        min: typeof validation.min === 'number' ? validation.min : undefined,
+        max: typeof validation.max === 'number' ? validation.max : undefined,
+        step: schema?.dataType === 'number' ? 0.1 : 1,
+      }
+    : {};
 
   return (
     <input
@@ -235,6 +306,7 @@ function renderFieldControl(
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
+      {...numberProps}
     />
   );
 }

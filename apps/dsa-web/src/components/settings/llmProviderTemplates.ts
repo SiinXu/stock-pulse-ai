@@ -20,7 +20,7 @@ export type LLMProviderCapability =
 export const LLM_PROVIDER_CAPABILITY_LABELS: Record<LLMProviderCapability, { label: string; hint: string }> = {
   'openai-compatible': {
     label: 'OpenAI 兼容',
-    hint: '按 OpenAI-compatible endpoint 配置 Base URL，不额外拼接 /chat/completions。',
+    hint: '按 OpenAI-compatible endpoint 配置服务地址，不额外拼接 /chat/completions。',
   },
   aggregator: {
     label: '聚合平台',
@@ -32,7 +32,7 @@ export const LLM_PROVIDER_CAPABILITY_LABELS: Record<LLMProviderCapability, { lab
   },
   'model-discovery': {
     label: '可获取模型',
-    hint: '支持尝试通过 /models 获取模型列表；实际结果仍取决于账号权限和 API Key。',
+    hint: '支持尝试通过 /models 获取模型列表；实际结果仍取决于账号权限和 API 密钥。',
   },
   vision: {
     label: 'Vision 提示',
@@ -93,13 +93,13 @@ export const PROVIDER_PRESENTATION_BY_ID: Record<string, ProviderPresentation> =
   },
   siliconflow: {
     officialSources: [{ label: 'SiliconFlow Models', url: 'https://docs.siliconflow.cn/quickstart/models' }],
-    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
+    configHint: '模型列表和模型可见性依赖账号权限与 API 密钥。',
   },
   openrouter: {
     officialSources: [
       { label: 'OpenRouter Models API', url: 'https://openrouter.ai/docs/api/api-reference/models/get-models' },
     ],
-    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
+    configHint: '模型列表和模型可见性依赖账号权限与 API 密钥。',
   },
   gemini: { officialSources: [{ label: 'Gemini Models', url: 'https://ai.google.dev/gemini-api/docs/models' }] },
   anthropic: {

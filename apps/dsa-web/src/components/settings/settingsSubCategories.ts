@@ -4,13 +4,6 @@ import { getNotificationFieldOrder } from './notificationFieldGroups';
 import { isNotificationChannelKey } from './notificationChannels';
 import { isDataProviderKey } from './dataProviders';
 
-// AI-model field groups that hold legacy provider credentials. These route to
-// the advanced sub (raw legacy/YAML config), never to the primary model-access
-// connections sub — provider credentials are edited only via Model Access.
-const MODEL_PROVIDER_GROUP_IDS = new Set<string>([
-  'openai', 'anthropic', 'gemini', 'deepseek', 'anspire', 'aihubmix',
-]);
-
 export interface SettingsSubCategory {
   id: string;
   titleKey: UiTextKey;
@@ -22,14 +15,11 @@ type ItemsByCategory = Record<string, ReadonlyArray<{ key: string }>>;
 // the nav even when their raw field count is zero.
 export const ALWAYS_VISIBLE_SUB_CATEGORIES = new Set<string>(['channels', 'providers']);
 
-// Coarse first-level tabs are flat (no accordion). Only ai_model,
-// data_source and notification are split into a couple of tabs; every other
-// category is a single tab (returns null → no sub-navigation).
-const AI_MODEL_SUBS: SettingsSubCategory[] = [
-  { id: 'model', titleKey: 'settings.aiTabModel' },
-  { id: 'providers', titleKey: 'settings.aiGroupProviders' },
-];
-
+// Coarse first-level tabs are flat (no accordion). Only data_source and
+// notification are split into a couple of tabs; every other category is a
+// single tab (returns null → no sub-navigation). ai_model is deliberately a
+// single tab: Model Access is the only entry for provider credentials, so
+// there is no separate "providers" sub.
 const DATA_SOURCE_SUBS: SettingsSubCategory[] = [
   { id: 'source', titleKey: 'settings.dataTabSource' },
   { id: 'providers', titleKey: 'settings.dataTabProviders' },
@@ -45,9 +35,6 @@ const NOTIFICATION_SUBS: SettingsSubCategory[] = [
  * Returns null for categories that render as a single tab.
  */
 export function getSubCategories(category: string): SettingsSubCategory[] | null {
-  if (category === 'ai_model') {
-    return AI_MODEL_SUBS;
-  }
   if (category === 'data_source') {
     return DATA_SOURCE_SUBS;
   }
@@ -60,9 +47,6 @@ export function getSubCategories(category: string): SettingsSubCategory[] | null
 export function getSubCategoryOfKey(category: string, key: string): string {
   if (category === 'notification') {
     return isNotificationChannelKey(key) ? 'channels' : 'rules';
-  }
-  if (category === 'ai_model') {
-    return MODEL_PROVIDER_GROUP_IDS.has(getCategoryFieldGroupId('ai_model', key)) ? 'providers' : 'model';
   }
   if (category === 'data_source') {
     return isDataProviderKey(key) ? 'providers' : 'source';

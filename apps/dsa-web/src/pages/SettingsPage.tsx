@@ -28,6 +28,7 @@ import {
   getCategoryFieldGroupOrder,
   getCategoryFieldGroupId,
   getCategoryFieldOrder,
+  isLegacyModelProviderKey,
   getSubCategories,
   getSubCategoryOfKey,
   getSubCategoryFieldOrder,
@@ -1244,15 +1245,12 @@ const SettingsPage: React.FC = () => {
   }, [canCheckDesktopUpdate, desktopRuntimeApi, t]);
 
   const rawActiveItems = itemsByCategory[activeCategory] || [];
-  const rawActiveItemMap = new Map(rawActiveItems.map((item) => [item.key, String(item.value ?? '')]));
   const firstSetupStockCode = parseSetupStockList(getConfigItem(itemsByCategory.base || [], 'STOCK_LIST')?.value)[0] || '';
   const alphasiftItem = (itemsByCategory.data_source || []).find((item) => item.key === 'ALPHASIFT_ENABLED');
   const alphasiftEnabled = String(alphasiftItem?.value ?? '').trim().toLowerCase() === 'true';
   const shouldShowFirstRunSetup = activeCategory === 'base';
   const shouldShowAlphaSiftSettings =
     activeCategory === 'data_source' && activeSubCategory === 'providers' && Boolean(alphasiftItem);
-  const hasConfiguredChannels = Boolean((rawActiveItemMap.get('LLM_CHANNELS') || '').trim());
-  const hasLitellmConfig = Boolean((rawActiveItemMap.get('LITELLM_CONFIG') || '').trim());
   const hasRuntimeSchedulerMismatch =
     schedulerRuntimeEnabled !== null
     && schedulerOverrideFromUi !== null
@@ -1306,12 +1304,19 @@ const SettingsPage: React.FC = () => {
   }, []);
 
   // UI rendering rule only: hide channel-managed and legacy provider-specific
-  // LLM keys from generic fields when channel mode is active. This does not
-  // alter save/refresh payloads or config migration/rollback behavior.
+  // LLM keys from generic fields. This does not alter save/refresh payloads or
+  // config migration/rollback behavior. Legacy provider credentials
+  // (OPENAI_API_KEY, ANTHROPIC_*, …) stay backend-compatible but are edited
+  // exclusively through Model Access, so they never render as generic fields.
   const LLM_CHANNEL_KEY_RE = /^LLM_[A-Z0-9_]+_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
-  // Legacy LiteLLM keys decluttered from the "model" sub-tab once channels are
-  // configured. Provider API-key fields are intentionally excluded so the
-  // "providers" sub-tab always lists every provider.
+  // Static registry fields that share the LLM_*_<SUFFIX> shape with dynamic
+  // channel keys but are standalone settings, so they must keep rendering.
+  const LLM_CHANNEL_KEY_EXCEPTIONS = new Set([
+    'LLM_PROMPT_CACHE_TELEMETRY_ENABLED',
+    'LLM_PROMPT_CACHE_HINTS_ENABLED',
+  ]);
+  // Keys owned by dedicated views (Model Access / Task Routing / Reliability),
+  // so they never render as raw generic fields on the normal path.
   const AI_MODEL_HIDDEN_KEYS = new Set([
     'LLM_CHANNELS',
     'LLM_TEMPERATURE',
@@ -1331,10 +1336,13 @@ const SettingsPage: React.FC = () => {
   const activeItems =
     activeCategory === 'ai_model'
       ? rawActiveItems.filter((item) => {
-        if (hasConfiguredChannels && LLM_CHANNEL_KEY_RE.test(item.key)) {
+        if (isLegacyModelProviderKey(item.key)) {
           return false;
         }
-        if (hasConfiguredChannels && !hasLitellmConfig && AI_MODEL_HIDDEN_KEYS.has(item.key)) {
+        if (LLM_CHANNEL_KEY_RE.test(item.key) && !LLM_CHANNEL_KEY_EXCEPTIONS.has(item.key)) {
+          return false;
+        }
+        if (AI_MODEL_HIDDEN_KEYS.has(item.key)) {
           return false;
         }
         return true;
@@ -1495,9 +1503,8 @@ const SettingsPage: React.FC = () => {
   );
   const isAlertsSection = activeSection === 'alerts';
   // Top-level Advanced section aggregates internal/low-level keys across backend
-  // categories via the placement map (e.g. HMAC usage secrets), instead of the
-  // legacy Model Providers panel (which stays under the AI & Models → Advanced
-  // view). This keeps everyday views uncluttered (MC-18).
+  // categories via the placement map (e.g. HMAC usage secrets). This keeps
+  // everyday views uncluttered (MC-18).
   const isTopLevelAdvanced = activeSection === 'advanced';
   const advancedSectionItems = useMemo(
     () => Object.entries(itemsByCategory)
@@ -1531,9 +1538,8 @@ const SettingsPage: React.FC = () => {
     : visibleActiveItems
   ).filter((item) => belongsToActiveSection(item.key));
   const activeSubPromptCacheItems =
-    activeCategory === 'ai_model' && activeSubCategory === 'model' ? promptCacheAdvancedItems : [];
+    activeCategory === 'ai_model' ? promptCacheAdvancedItems : [];
   const isNotificationChannelsSub = activeCategory === 'notification' && activeSubCategory === 'channels';
-  const isModelProvidersSub = activeCategory === 'ai_model' && activeSubCategory === 'providers';
   const isDataProvidersSub = activeCategory === 'data_source' && activeSubCategory === 'providers';
   const activeSubTitle = hasSubNav && activeSubCategory
     ? t((activeSubCategoriesList?.find((sub) => sub.id === activeSubCategory)?.titleKey) ?? 'settings.activePanelTitle')
@@ -1541,7 +1547,6 @@ const SettingsPage: React.FC = () => {
   // Whether the field panel (SettingsSectionCard with fields) has any content for the active tab.
   const hasSubFieldContent =
     isNotificationChannelsSub ||
-    isModelProvidersSub ||
     isDataProvidersSub ||
     subFilteredItems.length > 0 ||
     activeSubPromptCacheItems.length > 0;
@@ -2475,7 +2480,7 @@ const SettingsPage: React.FC = () => {
                 title={uiLanguage === 'en' ? 'Task routing' : '任务路由'}
                 description={uiLanguage === 'en'
                   ? 'Choose the model for each task. Market review inherits the report model unless overridden.'
-                  : '为每个任务选择模型。大盘复盘默认继承报告主模型，除非在此覆盖。'}
+                  : '为每个任务选择模型。大盘复盘默认继承报告主要模型，除非在此覆盖。'}
               >
                 {availableModelsError ? (
                   <SettingsAlert
@@ -2528,7 +2533,7 @@ const SettingsPage: React.FC = () => {
                               ariaLabel={getFieldTitleZh(item.key, item.key)}
                               placeholder={item.key === 'LITELLM_MODEL'
                                 ? (uiLanguage === 'en' ? 'Select a model' : '选择模型')
-                                : (uiLanguage === 'en' ? 'Inherit report model' : '跟随报告主模型（默认）')}
+                                : (uiLanguage === 'en' ? 'Inherit report model' : '跟随报告主要模型（默认）')}
                               error={(issueByKey[item.key] || []).some((issue) => issue.severity === 'error')}
                               emptyText={uiLanguage === 'en' ? 'No available models — add a model service first' : '暂无可用模型，请先添加模型服务'}
                               customLabel={(val) => (uiLanguage === 'en' ? `Custom: ${val}` : `自定义：${val}`)}
@@ -2561,7 +2566,7 @@ const SettingsPage: React.FC = () => {
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-text">
-                  <span>{uiLanguage === 'en' ? 'Fallback order: ' : '备选顺序：'}</span>
+                  <span>{uiLanguage === 'en' ? 'Fallback order: ' : '备用顺序：'}</span>
                   <span className="font-medium text-foreground">
                     {allValuesByKey.LITELLM_FALLBACK_MODELS
                       || (uiLanguage === 'en' ? 'none set' : '未设置')}
@@ -2582,7 +2587,7 @@ const SettingsPage: React.FC = () => {
                   title={uiLanguage === 'en' ? 'Execution failover' : '执行后端故障切换'}
                   description={uiLanguage === 'en'
                     ? 'When the primary execution backend fails, requests switch to the failover backend. This is separate from model fallback.'
-                    : '主执行后端失败时切换到备用执行后端。这与模型备选顺序是两个独立机制。'}
+                    : '主执行后端失败时切换到备用执行后端。这与模型备用顺序是两个独立机制。'}
                 >
                   <p className="mb-3 text-xs text-secondary-text">
                     {uiLanguage === 'en' ? 'Current path: ' : '当前路径：'}
@@ -2611,10 +2616,10 @@ const SettingsPage: React.FC = () => {
                   ) : null}
                 </SettingsSectionCard>
                 <SettingsSectionCard
-                  title={uiLanguage === 'en' ? 'Model fallback order' : '模型备选顺序'}
+                  title={uiLanguage === 'en' ? 'Model fallback order' : '模型备用顺序'}
                   description={uiLanguage === 'en'
                     ? 'Within LiteLLM, when the primary model call fails these models are tried in order. This is separate from execution failover.'
-                    : '在 LiteLLM 内，主模型调用失败时按顺序尝试这些备选模型。这与执行后端切换是两个独立机制。'}
+                    : '在 LiteLLM 内，主要模型调用失败时按顺序尝试这些备用模型。这与执行后端切换是两个独立机制。'}
                 >
                   <p className="mb-3 text-xs text-secondary-text">
                     {uiLanguage === 'en' ? 'Current order: ' : '当前顺序：'}
@@ -2666,7 +2671,7 @@ const SettingsPage: React.FC = () => {
                 )}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
+            {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
               <SettingsSectionCard
                 title={uiLanguage === 'en' ? 'Model access' : '模型接入'}
                 description={uiLanguage === 'en'
@@ -2684,11 +2689,28 @@ const SettingsPage: React.FC = () => {
                     })();
                   }}
                 />
-                <GenerationBackendStatusPanel
-                  items={generationBackendDraftItems}
-                  maskToken={maskToken}
-                  disabled={isSaving || isLoading}
-                />
+                <details className="group/backend-diagnostics overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
+                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {uiLanguage === 'en' ? 'Developer diagnostics' : '开发者诊断信息'}
+                      </p>
+                      <p className="text-xs leading-5 text-muted-text">
+                        {uiLanguage === 'en'
+                          ? 'Execution backend health and smoke tests. Normal configuration does not require this.'
+                          : '执行后端健康状态与冒烟测试。日常配置无需展开。'}
+                      </p>
+                    </div>
+                    <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/backend-diagnostics:rotate-180" aria-hidden="true" />
+                  </summary>
+                  <div className="border-t border-[var(--settings-border-soft)] p-3">
+                    <GenerationBackendStatusPanel
+                      items={generationBackendDraftItems}
+                      maskToken={maskToken}
+                      disabled={isSaving || isLoading}
+                    />
+                  </div>
+                </details>
                 {providerCatalogError ? (
                   <SettingsAlert
                     variant="error"

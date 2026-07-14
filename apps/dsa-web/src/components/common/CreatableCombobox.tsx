@@ -77,8 +77,15 @@ export const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
     if (!q) {
       return options;
     }
+    // Search covers display name, stored value (e.g. model route), group header
+    // (e.g. connection name) and hint (e.g. provider) so users can filter model
+    // options by any of the facets they actually know.
     return options.filter(
-      (option) => option.label.toLowerCase().includes(q) || option.value.toLowerCase().includes(q),
+      (option) =>
+        option.label.toLowerCase().includes(q)
+        || option.value.toLowerCase().includes(q)
+        || (option.group ?? '').toLowerCase().includes(q)
+        || (option.hint ?? '').toLowerCase().includes(q),
     );
   }, [options, query]);
 

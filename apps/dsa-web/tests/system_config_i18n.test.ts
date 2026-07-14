@@ -158,6 +158,12 @@ describe('systemConfigI18n option label localization', () => {
     ['AGENT_ORCHESTRATOR_MODE', 'specialist', 'Specialist', '专家'],
     ['AGENT_SKILL_ROUTING', 'auto', 'Auto (Regime-based)', '自动（按市场状态）'],
     ['AGENT_SKILL_ROUTING', 'manual', 'Manual (Use AGENT_SKILLS)', '手动（使用 AGENT_SKILLS）'],
+    ['MARKET_REVIEW_REGION', 'cn', undefined, 'A 股（cn）'],
+    ['MARKET_REVIEW_REGION', 'hk', undefined, '港股（hk）'],
+    ['MARKET_REVIEW_REGION', 'us', undefined, '美股（us）'],
+    ['MARKET_REVIEW_REGION', 'jp', undefined, '日股（jp）'],
+    ['MARKET_REVIEW_REGION', 'kr', undefined, '韩股（kr）'],
+    ['MARKET_REVIEW_REGION', 'both', undefined, '全部市场（both）'],
   ] as const;
 
   it('localizes all select options currently exposed by system config schema', () => {
@@ -172,9 +178,11 @@ describe('systemConfigI18n option label localization', () => {
     });
   });
 
-  it('treats free-text config keys as passthrough for option labels', () => {
-    expect(getFieldOptionLabelZh('MARKET_REVIEW_REGION', 'cn')).toBe('cn');
+  it('treats values outside the option catalog as passthrough for option labels', () => {
+    // Multi-value combinations are stored as comma-joined strings; only the
+    // individual region values carry localized labels.
     expect(getFieldOptionLabelZh('MARKET_REVIEW_REGION', 'cn,us,jp,kr')).toBe('cn,us,jp,kr');
+    expect(getFieldOptionLabelZh('STOCK_LIST', '600519,hk00700')).toBe('600519,hk00700');
   });
 });
 

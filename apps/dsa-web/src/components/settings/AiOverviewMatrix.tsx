@@ -26,7 +26,7 @@ const T = {
   },
   colTask: { zh: '任务', en: 'Task' },
   colBackend: { zh: '执行方式', en: 'Execution backend' },
-  colPrimary: { zh: '主模型', en: 'Primary model' },
+  colPrimary: { zh: '主要模型', en: 'Primary model' },
   colFallback: { zh: '备用模型', en: 'Fallback models' },
   colStatus: { zh: '状态', en: 'Status' },
   inherited: { zh: '继承报告模型', en: 'inherits report model' },

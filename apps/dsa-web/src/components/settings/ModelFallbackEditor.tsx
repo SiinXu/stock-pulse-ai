@@ -34,6 +34,9 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
   const tx = (zh: string, en: string) => (language === 'en' ? en : zh);
   const routes = splitRoutes(value);
   const labelFor = (route: string) => options.find((option) => option.value === route)?.label ?? route;
+  // A configured route that is no longer in the available catalog is kept (never
+  // silently cleared) and marked as unavailable so the user can decide.
+  const isStale = (route: string) => !options.some((option) => option.value === route);
 
   const setRoutes = (next: string[]) => onChange(next.join(','));
   const removeAt = (index: number) => setRoutes(routes.filter((_, position) => position !== index));
@@ -43,6 +46,14 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     }
     const next = [...routes];
     [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    setRoutes(next);
+  };
+  const moveDown = (index: number) => {
+    if (index >= routes.length - 1) {
+      return;
+    }
+    const next = [...routes];
+    [next[index], next[index + 1]] = [next[index + 1], next[index]];
     setRoutes(next);
   };
   const addRoute = (route: string) => {
@@ -72,6 +83,11 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
               <span className="flex min-w-0 items-center gap-2">
                 <span className="text-muted-text">{index + 1}.</span>
                 <span className="truncate font-medium text-foreground">{labelFor(route)}</span>
+                {isStale(route) ? (
+                  <span className="shrink-0 text-xs text-warning">
+                    {tx('当前配置不可用', 'Currently unavailable')}
+                  </span>
+                ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-1">
                 <button
@@ -82,6 +98,15 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   className="rounded px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↑
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled || index === routes.length - 1}
+                  aria-label={tx(`下移 ${labelFor(route)}`, `Move ${labelFor(route)} down`)}
+                  onClick={() => moveDown(index)}
+                  className="rounded px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
+                >
+                  ↓
                 </button>
                 <button
                   type="button"

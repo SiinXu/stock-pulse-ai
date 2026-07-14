@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Button, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
+import { ModelMultiSelect } from './ModelMultiSelect';
 import type { UiLang } from './settingsInformationArchitecture';
 
 export interface WizardDraftItem {
@@ -86,6 +87,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [modelDraft, setModelDraft] = useState('');
   const [reportModel, setReportModel] = useState('');
   const [cliBackend, setCliBackend] = useState('');
+  // Discovery results are candidates only: the user confirms which ones to
+  // enable via the multi-select — never auto-selected wholesale.
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [discoverNote, setDiscoverNote] = useState<{ ok: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -100,10 +104,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   );
   const modelOptions = useMemo(() => parseModels(models), [models]);
 
+  // One model per Enter/click, but pasted comma/whitespace-separated lists are
+  // split, trimmed and deduped in one pass.
   const addModelToken = (raw: string) => {
-    const value = raw.trim();
-    if (!value) return;
-    setModels(Array.from(new Set([...modelOptions, value])).join(','));
+    const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    setModels(Array.from(new Set([...modelOptions, ...tokens])).join(','));
     setModelDraft('');
   };
   const removeModelToken = (model: string) => {
@@ -120,6 +126,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     // Do not seed example model IDs: models come from discovery or manual entry.
     setModels('');
     setReportModel('');
+    setDiscoveredModels([]);
     setDiscoverNote(null);
     setTestResult(null);
   };
@@ -138,14 +145,22 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         apiKey: apiKey.trim(),
       });
       if (result.success && result.models.length > 0) {
-        setModels(result.models.join(','));
-        setReportModel('');
-        setDiscoverNote({ ok: true, message: tx(language, `发现 ${result.models.length} 个模型`, `Found ${result.models.length} models`) });
+        // Present the results for explicit confirmation — never enable all of
+        // them automatically.
+        setDiscoveredModels(result.models);
+        setDiscoverNote({
+          ok: true,
+          message: tx(
+            language,
+            `发现 ${result.models.length} 个模型，请勾选要启用的模型`,
+            `Found ${result.models.length} models — pick the ones to enable`,
+          ),
+        });
       } else {
-        setDiscoverNote({ ok: false, message: result.message || tx(language, '未发现模型，可手动填写。', 'No models found — enter them manually.') });
+        setDiscoverNote({ ok: false, message: result.message || tx(language, '未发现模型，可手动逐个添加。', 'No models found — add them manually.') });
       }
     } catch {
-      setDiscoverNote({ ok: false, message: tx(language, '发现失败，可手动填写。', 'Discovery failed — enter them manually.') });
+      setDiscoverNote({ ok: false, message: tx(language, '发现失败，可手动逐个添加。', 'Discovery failed — add them manually.') });
     } finally {
       setIsDiscovering(false);
     }
@@ -325,19 +340,23 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             </div>
             <div>
               <label htmlFor="wizard-api-key" className="mb-1 block text-sm text-foreground">
-                {tx(language, 'API Key', 'API Key')}
+                {provider && !provider.requiresApiKey
+                  ? tx(language, 'API 密钥（可选）', 'API Key (optional)')
+                  : tx(language, 'API 密钥', 'API Key')}
               </label>
               <Input
                 id="wizard-api-key"
                 type="password"
                 value={apiKey}
                 onChange={(event) => setApiKey(event.target.value)}
-                placeholder={tx(language, '填写服务商密钥', 'Enter the provider API key')}
+                placeholder={provider && !provider.requiresApiKey
+                  ? tx(language, '该服务无需密钥，可留空', 'This service needs no key — leave blank')
+                  : tx(language, '填写服务商密钥', 'Enter the provider API key')}
               />
             </div>
             <div>
               <label htmlFor="wizard-base-url" className="mb-1 block text-sm text-foreground">
-                {tx(language, 'Base URL', 'Base URL')}
+                {tx(language, '服务地址', 'Base URL')}
               </label>
               <Input
                 id="wizard-base-url"
@@ -374,12 +393,22 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 variant="settings-secondary"
                 size="xsm"
                 onClick={() => void handleDiscover()}
-                disabled={isDiscovering || !apiKey.trim()}
+                // Key-exempt providers (e.g. Ollama) can discover with an empty
+                // key; only key-required providers gate on it.
+                disabled={isDiscovering || (Boolean(provider?.requiresApiKey) && !apiKey.trim())}
                 isLoading={isDiscovering}
               >
                 {tx(language, '自动发现模型', 'Discover models')}
               </Button>
             </div>
+            {discoveredModels.length > 0 ? (
+              <ModelMultiSelect
+                options={discoveredModels}
+                isSelected={(model) => modelOptions.includes(model)}
+                onToggle={(model) => (modelOptions.includes(model) ? removeModelToken(model) : addModelToken(model))}
+                language={language}
+              />
+            ) : null}
             {modelOptions.length > 0 ? (
               <div className="flex flex-wrap gap-1.5" data-testid="wizard-model-chips">
                 {modelOptions.map((model) => (
@@ -417,6 +446,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     addModelToken(modelDraft);
                   }
                 }}
+                onPaste={(event) => {
+                  const text = event.clipboardData.getData('text');
+                  // A pasted list (comma/whitespace separated) becomes tokens
+                  // immediately; a single id falls through to the normal input.
+                  if (/[,\s]/.test(text.trim())) {
+                    event.preventDefault();
+                    addModelToken(`${modelDraft} ${text}`);
+                  }
+                }}
               />
               <Button
                 type="button"
@@ -445,7 +483,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         {step === 'model' ? (
           <div className="space-y-2">
             <label htmlFor="wizard-report-model" className="block text-sm text-foreground">
-              {tx(language, '报告主模型', 'Report primary model')}
+              {tx(language, '报告主要模型', 'Report primary model')}
             </label>
             <Select
               id="wizard-report-model"
@@ -456,7 +494,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             <p className="text-xs text-muted-text">
               {tx(
                 language,
-                'Agent、Vision 与备用模型默认继承报告主模型，可稍后在任务路由与可靠性中单独调整。',
+                'Agent、Vision 与备用模型默认继承报告主要模型，可稍后在任务路由与可靠性中单独调整。',
                 'Agent, Vision and fallback models inherit this by default; adjust them later in Task Routing and Reliability.',
               )}
             </p>
@@ -496,7 +534,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-text">{tx(language, '报告主模型', 'Report primary model')}</dt>
+                    <dt className="text-muted-text">{tx(language, '报告主要模型', 'Report primary model')}</dt>
                     <dd className="min-w-0 truncate font-medium text-foreground">{reportModel || modelOptions[0] || '—'}</dd>
                   </div>
                 </>

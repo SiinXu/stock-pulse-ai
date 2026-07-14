@@ -395,7 +395,7 @@ describe('SettingsField', () => {
     });
   });
 
-  it('renders MARKET_REVIEW_REGION as free-text field with comma-separated defaults', () => {
+  it('renders MARKET_REVIEW_REGION as a multi-value enum checkbox group', () => {
     const onChange = vi.fn();
 
     render(
@@ -413,9 +413,14 @@ describe('SettingsField', () => {
             isSensitive: false,
             isRequired: false,
             isEditable: true,
-            options: [],
-            validation: {},
-            displayOrder: 1,
+            defaultValue: 'cn',
+            options: ['cn', 'hk', 'us', 'jp', 'kr', 'both'],
+            validation: {
+              allowed_values: ['cn', 'hk', 'us', 'jp', 'kr', 'both'],
+              multi_value: true,
+              delimiter: ',',
+            },
+            displayOrder: 48,
           },
         }}
         value="cn,jp"
@@ -423,15 +428,218 @@ describe('SettingsField', () => {
       />
     );
 
-    const input = screen.getByLabelText('大盘复盘市场') as HTMLInputElement;
-    expect(input).toHaveValue('cn,jp');
+    // Multi-value enums must not degrade into a single-choice Select or a
+    // free-text input.
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    const group = screen.getByTestId('multi-enum-MARKET_REVIEW_REGION');
+    const checkboxes = within(group).getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(6);
+    expect(checkboxes[0]).toBeChecked(); // cn
+    expect(checkboxes[3]).toBeChecked(); // jp
+    expect(checkboxes[1]).not.toBeChecked(); // hk
 
-    fireEvent.change(input, {
-      target: { value: 'cn,jp,kr' },
-    });
+    // The field label stays associated with the first checkbox.
+    expect(screen.getByLabelText('大盘复盘市场')).toBe(checkboxes[0]);
 
+    // Selecting kr serializes in catalog order, not click order.
+    fireEvent.click(checkboxes[4]);
     expect(onChange).toHaveBeenCalledWith('MARKET_REVIEW_REGION', 'cn,jp,kr');
+  });
+
+  it('keeps unknown stored values visible and deselectable in multi-value enums', () => {
+    const onChange = vi.fn();
+
+    render(
+      <SettingsField
+        item={{
+          key: 'NOTIFICATION_REPORT_CHANNELS',
+          value: 'email,legacy_channel',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'NOTIFICATION_REPORT_CHANNELS',
+            category: 'notification',
+            dataType: 'array',
+            uiControl: 'textarea',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [
+              { label: 'email', value: 'email' },
+              { label: 'feishu', value: 'feishu' },
+            ],
+            validation: { allowed_values: ['email', 'feishu'], multi_value: true, delimiter: ',' },
+            displayOrder: 62,
+          },
+        }}
+        value="email,legacy_channel"
+        onChange={onChange}
+      />
+    );
+
+    const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
+    const checkboxes = within(group).getAllByRole('checkbox');
+    // 2 catalog options + 1 unknown stored value that must stay visible.
+    expect(checkboxes).toHaveLength(3);
+    expect(within(group).getByText('legacy_channel')).toBeInTheDocument();
+    expect(checkboxes[2]).toBeChecked();
+
+    // Enabling feishu keeps the unknown stored value at the tail.
+    fireEvent.click(checkboxes[1]);
+    expect(onChange).toHaveBeenCalledWith('NOTIFICATION_REPORT_CHANNELS', 'email,feishu,legacy_channel');
+
+    // Deselecting the unknown value drops it explicitly (never silently).
+    fireEvent.click(checkboxes[2]);
+    expect(onChange).toHaveBeenCalledWith('NOTIFICATION_REPORT_CHANNELS', 'email');
+  });
+
+  it('applies min/max/step from schema validation to number inputs', () => {
+    const { rerender } = render(
+      <SettingsField
+        item={{
+          key: 'TICKFLOW_PRIORITY',
+          value: '2',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'TICKFLOW_PRIORITY',
+            category: 'data_source',
+            dataType: 'integer',
+            uiControl: 'number',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: { min: 0, max: 99 },
+            displayOrder: 16,
+          },
+        }}
+        value="2"
+        onChange={vi.fn()}
+      />
+    );
+
+    const integerInput = screen.getByLabelText('TickFlow 日 K 优先级');
+    expect(integerInput).toHaveAttribute('min', '0');
+    expect(integerInput).toHaveAttribute('max', '99');
+    expect(integerInput).toHaveAttribute('step', '1');
+
+    rerender(
+      <SettingsField
+        item={{
+          key: 'LLM_TEMPERATURE',
+          value: '0.7',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'LLM_TEMPERATURE',
+            category: 'ai_model',
+            dataType: 'number',
+            uiControl: 'number',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: { min: 0, max: 2 },
+            displayOrder: 20,
+          },
+        }}
+        value="0.7"
+        onChange={vi.fn()}
+      />
+    );
+
+    const floatInput = screen.getByRole('spinbutton');
+    expect(floatInput).toHaveAttribute('min', '0');
+    expect(floatInput).toHaveAttribute('max', '2');
+    expect(floatInput).toHaveAttribute('step', '0.1');
+  });
+
+  it('backfills the schema default for unset non-select controls', () => {
+    render(
+      <>
+        <SettingsField
+          item={{
+            key: 'NOTIFICATION_DEDUP_TTL_SECONDS',
+            value: '',
+            rawValueExists: false,
+            isMasked: false,
+            schema: {
+              key: 'NOTIFICATION_DEDUP_TTL_SECONDS',
+              category: 'notification',
+              dataType: 'integer',
+              uiControl: 'number',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              defaultValue: '300',
+              options: [],
+              validation: { min: 0 },
+              displayOrder: 65,
+            },
+          }}
+          value=""
+          onChange={vi.fn()}
+        />
+        <SettingsField
+          item={{
+            key: 'ENABLE_MARKET_REVIEW',
+            value: '',
+            rawValueExists: false,
+            isMasked: false,
+            schema: {
+              key: 'ENABLE_MARKET_REVIEW',
+              category: 'system',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              defaultValue: 'true',
+              options: [],
+              validation: {},
+              displayOrder: 47,
+            },
+          }}
+          value=""
+          onChange={vi.fn()}
+        />
+      </>
+    );
+
+    // Unset fields show the effective backend default instead of a blank control.
+    expect(screen.getByRole('spinbutton')).toHaveValue(300);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('never backfills defaults into password controls', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'SMTP_PASSWORD',
+          value: '',
+          rawValueExists: false,
+          isMasked: false,
+          schema: {
+            key: 'SMTP_PASSWORD',
+            category: 'notification',
+            dataType: 'string',
+            uiControl: 'password',
+            isSensitive: true,
+            isRequired: false,
+            isEditable: true,
+            defaultValue: 'should-not-render',
+            options: [],
+            validation: {},
+            displayOrder: 40,
+          },
+        }}
+        value=""
+        onChange={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByDisplayValue('should-not-render')).not.toBeInTheDocument();
   });
 
   it('renders context compression profile options with Chinese labels', () => {

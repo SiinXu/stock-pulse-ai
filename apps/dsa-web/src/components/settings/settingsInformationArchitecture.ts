@@ -32,13 +32,6 @@ export type SettingsSectionId =
   | 'system_security'
   | 'advanced';
 
-export type AiModelsViewId =
-  | 'overview'
-  | 'connections'
-  | 'task_routing'
-  | 'reliability'
-  | 'advanced';
-
 export interface SettingsView {
   id: string;
   label: BilingualLabel;
@@ -70,7 +63,6 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { id: 'connections', label: { zh: '连接', en: 'Connections' } },
       { id: 'task_routing', label: { zh: '任务路由', en: 'Task Routing' } },
       { id: 'reliability', label: { zh: '可靠性', en: 'Reliability' } },
-      { id: 'advanced', label: { zh: '高级', en: 'Advanced' } },
     ],
     defaultView: 'connections',
   },
@@ -179,9 +171,8 @@ export function legacyToSectionView(category: string, sub: string | null): Secti
     case 'base':
       return { section: 'overview', view: 'readiness' };
     case 'ai_model':
-      if (sub === 'providers') {
-        return { section: 'ai_models', view: 'advanced' };
-      }
+      // Model Access (Connections) is the single entry for provider
+      // credentials; the retired `providers` sub also lands here.
       return { section: 'ai_models', view: 'connections' };
     case 'data_source':
       return { section: 'data_sources', view: sub === 'providers' ? 'providers' : 'sources' };
@@ -210,7 +201,7 @@ export function sectionViewToLegacy(section: string, view: string | null): Legac
     case 'overview':
       return { category: 'base', sub: null };
     case 'ai_models':
-      return { category: 'ai_model', sub: view === 'advanced' ? 'providers' : 'model' };
+      return { category: 'ai_model', sub: null };
     case 'data_sources':
       return { category: 'data_source', sub: view === 'providers' ? 'providers' : 'source' };
     case 'agent_behavior':
@@ -232,7 +223,10 @@ export function sectionViewToLegacy(section: string, view: string | null): Legac
     case 'system_security':
       return { category: 'system', sub: null };
     case 'advanced':
-      return { category: 'ai_model', sub: 'providers' };
+      // The top-level Advanced section renders its own aggregated card (keys
+      // routed via the placement map); the legacy category only decides which
+      // backend items load, and must not trigger another category's side cards.
+      return { category: 'ai_model', sub: null };
     default:
       return { category: 'base', sub: null };
   }

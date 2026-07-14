@@ -28,13 +28,14 @@ describe('settingsInformationArchitecture', () => {
     ]);
   });
 
-  it('splits AI & Models into the five expected views with a default', () => {
+  it('splits AI & Models into the four expected views with a default', () => {
+    // No "advanced" view: the legacy Model Providers panel is retired and
+    // Model Access (Connections) is the single entry for provider credentials.
     expect(getSectionViews('ai_models').map((view) => view.id)).toEqual([
       'overview',
       'connections',
       'task_routing',
       'reliability',
-      'advanced',
     ]);
     expect(getDefaultView('ai_models')).toBe('connections');
   });
@@ -53,7 +54,9 @@ describe('settingsInformationArchitecture', () => {
 
   it('maps legacy category/sub to the new section/view', () => {
     expect(legacyToSectionView('ai_model', 'model')).toEqual({ section: 'ai_models', view: 'connections' });
-    expect(legacyToSectionView('ai_model', 'providers')).toEqual({ section: 'ai_models', view: 'advanced' });
+    // Retired providers sub (old deep links) also lands on Model Access.
+    expect(legacyToSectionView('ai_model', 'providers')).toEqual({ section: 'ai_models', view: 'connections' });
+    expect(legacyToSectionView('ai_model', null)).toEqual({ section: 'ai_models', view: 'connections' });
     expect(legacyToSectionView('notification', 'channels')).toEqual({ section: 'notifications', view: 'channels' });
     expect(legacyToSectionView('notification', 'rules')).toEqual({ section: 'alerts', view: 'rules' });
     expect(legacyToSectionView('data_source', 'source')).toEqual({ section: 'data_sources', view: 'sources' });
@@ -67,8 +70,10 @@ describe('settingsInformationArchitecture', () => {
   });
 
   it('maps new section/view back to a renderable legacy category/sub', () => {
-    expect(sectionViewToLegacy('ai_models', 'connections')).toEqual({ category: 'ai_model', sub: 'model' });
-    expect(sectionViewToLegacy('ai_models', 'advanced')).toEqual({ category: 'ai_model', sub: 'providers' });
+    expect(sectionViewToLegacy('ai_models', 'connections')).toEqual({ category: 'ai_model', sub: null });
+    // Top-level Advanced renders its own aggregated card; the legacy mapping
+    // must never resurrect a providers sub.
+    expect(sectionViewToLegacy('advanced', 'raw_config')).toEqual({ category: 'ai_model', sub: null });
     expect(sectionViewToLegacy('notifications', 'channels')).toEqual({ category: 'notification', sub: 'channels' });
     expect(sectionViewToLegacy('alerts', 'rules')).toEqual({ category: 'notification', sub: 'rules' });
     expect(sectionViewToLegacy('data_sources', 'providers')).toEqual({ category: 'data_source', sub: 'providers' });

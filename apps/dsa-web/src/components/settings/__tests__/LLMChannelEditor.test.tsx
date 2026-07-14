@@ -221,10 +221,10 @@ describe('LLMChannelEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
-    fireEvent.change(await screen.findByLabelText('Base URL'), {
+    fireEvent.change(await screen.findByLabelText('服务地址'), {
       target: { value: 'https://proxy.example.com/v1' },
     });
-    fireEvent.change(screen.getByLabelText('API Key'), {
+    fireEvent.change(screen.getByLabelText('API 密钥'), {
       target: { value: 'sk-draft' },
     });
     setConnectionModels(['gpt-4o-mini', 'gpt-4o']);
@@ -249,7 +249,7 @@ describe('LLMChannelEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
-    const baseUrlInput = await screen.findByLabelText('Base URL');
+    const baseUrlInput = await screen.findByLabelText('服务地址');
     fireEvent.change(baseUrlInput, { target: { value: 'https://proxy.example.com/v1' } });
     await waitFor(() => expect(lastDraftCall(onDraftItemsChange)).toContainEqual({
       key: 'LLM_OPENAI_BASE_URL',
@@ -301,7 +301,7 @@ describe('LLMChannelEditor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /OpenAI 官方/i }));
 
-    const input = await screen.findByLabelText('API Key');
+    const input = await screen.findByLabelText('API 密钥');
     expect(input).toHaveAttribute('type', 'password');
 
     fireEvent.click(screen.getByRole('button', { name: '显示内容' }));
@@ -325,11 +325,14 @@ describe('LLMChannelEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
-    fireEvent.click(await screen.findByRole('button', { name: '查看 Base URL 配置说明' }));
+    fireEvent.click(await screen.findByRole('button', { name: '查看 服务地址 配置说明' }));
 
-    expect(screen.getByRole('dialog', { name: 'Base URL' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '服务地址' })).toBeInTheDocument();
     expect(screen.getByText('该连接的接口根地址。')).toBeInTheDocument();
-    expect(screen.getByText('LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com')).toBeInTheDocument();
+    // Examples are plain user-facing values; env-var syntax stays out of the normal page.
+    expect(screen.getByText('https://openrouter.ai/api/v1')).toBeInTheDocument();
+    expect(screen.queryByText(/LLM_[A-Z0-9_]+=/)).not.toBeInTheDocument();
+    expect(screen.queryByText('LLM_CHANNEL_BASE_URL')).not.toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     fireEvent.click(await screen.findByRole('button', { name: '查看 Temperature 配置说明' }));
@@ -362,7 +365,7 @@ describe('LLMChannelEditor', () => {
     );
 
     expect(screen.getByText(/检测到已配置高级模型路由 YAML/i)).toBeInTheDocument();
-    expect(screen.getByText(/运行时主模型 \/ 备选模型 \/ Vision \/ Temperature 仍由下方通用字段决定/i)).toBeInTheDocument();
+    expect(screen.getByText(/运行时主要模型 \/ 备用模型 \/ Vision \/ Temperature 仍由下方通用字段决定/i)).toBeInTheDocument();
     expect(screen.queryByText(/LiteLLM/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/LITELLM_CONFIG/i)).not.toBeInTheDocument();
   });
@@ -383,8 +386,8 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    expect(selectOptionValues('主模型')).toContain('openai/hermes-agent');
-    expect(selectOptionValues('Agent 主模型')).not.toContain('openai/hermes-agent');
+    expect(selectOptionValues('主要模型')).toContain('openai/hermes-agent');
+    expect(selectOptionValues('Agent 主要模型')).not.toContain('openai/hermes-agent');
     expect(selectOptionValues('Vision 模型')).not.toContain('openai/hermes-agent');
   });
 
@@ -414,9 +417,9 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    expect(selectOptionValues('主模型')).not.toContain('openai/shared-route');
-    expect(selectOptionValues('主模型')).toContain('openai/pure-route');
-    expect(selectOptionValues('Agent 主模型')).toContain('openai/shared-route');
+    expect(selectOptionValues('主要模型')).not.toContain('openai/shared-route');
+    expect(selectOptionValues('主要模型')).toContain('openai/pure-route');
+    expect(selectOptionValues('Agent 主要模型')).toContain('openai/shared-route');
     expect(selectOptionValues('Vision 模型')).not.toContain('openai/shared-route');
   });
 
@@ -464,8 +467,8 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    expect(selectOptionValues('主模型')).toContain('openai/gpt-4o-mini');
-    expect(selectOptionValues('Agent 主模型')).toContain('openai/gpt-4o-mini');
+    expect(selectOptionValues('主要模型')).toContain('openai/gpt-4o-mini');
+    expect(selectOptionValues('Agent 主要模型')).toContain('openai/gpt-4o-mini');
     expect(selectOptionValues('Vision 模型')).toContain('openai/gpt-4o-mini');
   });
 
@@ -485,7 +488,7 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    for (const label of ['主模型', 'Agent 主模型', 'Vision 模型']) {
+    for (const label of ['主要模型', 'Agent 主要模型', 'Vision 模型']) {
       const trigger = screen.getByLabelText(label);
       const listbox = openListbox(trigger);
       expect(within(listbox).getByRole('option', { name: 'minimax/MiniMax-M1' })).toBeInTheDocument();
@@ -506,7 +509,7 @@ describe('LLMChannelEditor', () => {
     );
 
     // Runtime routing controls belong to Task Routing / Reliability now.
-    for (const label of ['主模型', 'Agent 主模型', 'Vision 模型']) {
+    for (const label of ['主要模型', 'Agent 主要模型', 'Vision 模型']) {
       expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
     }
     expect(screen.queryByText('运行时参数')).not.toBeInTheDocument();
@@ -538,7 +541,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ 添加模型服务' }));
 
     await screen.findByRole('button', { name: /DeepSeek 官方/i });
-    expect(screen.getByLabelText('Base URL')).toHaveValue('https://api.deepseek.com');
+    expect(screen.getByLabelText('服务地址')).toHaveValue('https://api.deepseek.com');
     // No concrete model IDs are seeded from the provider catalog: a new
     // connection starts explicitly with no models (discover or add manually).
     expect(modelChipNames()).toEqual([]);
@@ -564,7 +567,7 @@ describe('LLMChannelEditor', () => {
     expect(screen.getAllByRole('combobox').some((select) => (
       select.getAttribute('data-value') === 'openai'
     ))).toBe(true);
-    expect(screen.getByLabelText('Base URL')).toHaveValue(baseUrl);
+    expect(screen.getByLabelText('服务地址')).toHaveValue(baseUrl);
     expect(modelChipNames()).toEqual([]);
   });
 
@@ -590,7 +593,7 @@ describe('LLMChannelEditor', () => {
     expect(screen.getByText('OpenAI 兼容')).toBeInTheDocument();
     expect(screen.getByText('聚合平台')).toBeInTheDocument();
     expect(screen.getByText('可获取模型')).toBeInTheDocument();
-    expect(screen.getByText(/模型列表和模型可见性依赖账号权限与 API Key/i)).toBeInTheDocument();
+    expect(screen.getByText(/模型列表和模型可见性依赖账号权限与 API 密钥/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'OpenRouter Models API' })).toHaveAttribute(
       'href',
       'https://openrouter.ai/docs/api/api-reference/models/get-models',
@@ -656,7 +659,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ 添加模型服务' }));
 
     await screen.findByRole('button', { name: /DeepSeek 官方/i });
-    fireEvent.change(screen.getByLabelText('Base URL'), {
+    fireEvent.change(screen.getByLabelText('服务地址'), {
       target: { value: 'https://proxy.example.com/v1' },
     });
     setConnectionModels(['custom-model-a', 'custom-model-b']);
@@ -665,7 +668,7 @@ describe('LLMChannelEditor', () => {
     });
 
     await screen.findByRole('button', { name: /MiniMax 官方/i });
-    expect(screen.getByLabelText('Base URL')).toHaveValue('https://proxy.example.com/v1');
+    expect(screen.getByLabelText('服务地址')).toHaveValue('https://proxy.example.com/v1');
     expect(modelChipNames()).toEqual(['custom-model-a', 'custom-model-b']);
   });
 
@@ -688,7 +691,7 @@ describe('LLMChannelEditor', () => {
       'minimax',
       'minimax2',
     ]);
-    expect(screen.getAllByLabelText('Base URL').map((input) => (input as HTMLInputElement).value)).toEqual([
+    expect(screen.getAllByLabelText('服务地址').map((input) => (input as HTMLInputElement).value)).toEqual([
       'https://api.minimax.io/v1',
       'https://api.minimax.io/v1',
     ]);
@@ -714,7 +717,7 @@ describe('LLMChannelEditor', () => {
     await screen.findByRole('button', { name: /MiniMax 官方/i });
     // An enabled channel must be complete (credential + models) before saving.
     // The preset seeds no models, so the user supplies both explicitly.
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-minimax' } });
     setConnectionModels(['minimax-user-model']);
 
     await waitFor(() => {
@@ -742,11 +745,11 @@ describe('LLMChannelEditor', () => {
     await waitFor(() => {
       expect(onValidityChange).toHaveBeenLastCalledWith(false);
     });
-    expect(screen.getAllByText(/缺少 API Key/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/缺少 API 密钥/).length).toBeGreaterThan(0);
 
     // Supplying the key alone is not enough: the preset seeds no models, so the
     // enabled connection stays incomplete until a model is added.
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-minimax' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-minimax' } });
     await waitFor(() => {
       expect(onValidityChange).toHaveBeenLastCalledWith(false);
     });
@@ -762,11 +765,11 @@ describe('LLMChannelEditor', () => {
     // channel (the provider dropdown is empty but "add" still yields a row).
     render(<LLMChannelEditor items={[]} providers={[]} maskToken="******" />);
 
-    expect(screen.queryByLabelText('Base URL')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('服务地址')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '+ 添加模型服务' }));
 
     // A new channel row is created; its Base URL field is present (blank).
-    expect(await screen.findByLabelText('Base URL')).toHaveValue('');
+    expect(await screen.findByLabelText('服务地址')).toHaveValue('');
     expect(screen.getByText('已配置的连接')).toBeInTheDocument();
   });
 
@@ -813,7 +816,7 @@ describe('LLMChannelEditor', () => {
     );
 
     expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
-    expect(screen.queryByText(/缺少 API Key/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少 API 密钥/)).not.toBeInTheDocument();
   });
 
   it('renders read-only when a non-channels config mode is effective', async () => {
@@ -845,7 +848,7 @@ describe('LLMChannelEditor', () => {
     );
 
     expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
-    expect(screen.queryByText(/缺少 Base URL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少服务地址/)).not.toBeInTheDocument();
   });
 
   it('treats a known provider with a blank base URL as complete (official default)', async () => {
@@ -865,7 +868,7 @@ describe('LLMChannelEditor', () => {
     );
 
     expect(screen.queryByText('草稿 · 未完成')).not.toBeInTheDocument();
-    expect(screen.queryByText(/缺少 Base URL/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/缺少服务地址/)).not.toBeInTheDocument();
   });
 
   it('reports cleared Hermes unsupported multi-key and extra-header env keys in the draft', async () => {
@@ -985,7 +988,7 @@ describe('LLMChannelEditor', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /my_proxy/i }));
-    expect(screen.getByLabelText('API Key')).toHaveValue('sk-runtime-only');
+    expect(screen.getByLabelText('API 密钥')).toHaveValue('sk-runtime-only');
   });
 
   it('does not migrate conflicted API key data as API_KEY when renaming a channel', async () => {
@@ -1077,8 +1080,8 @@ describe('LLMChannelEditor', () => {
       />
     );
 
-    const primaryModelSelect = screen.getByRole('combobox', { name: '主模型' });
-    const agentModelSelect = screen.getByRole('combobox', { name: 'Agent 主模型' });
+    const primaryModelSelect = screen.getByRole('combobox', { name: '主要模型' });
+    const agentModelSelect = screen.getByRole('combobox', { name: 'Agent 主要模型' });
     const visionModelSelect = screen.getByRole('combobox', { name: 'Vision 模型' });
 
     fireEvent.click(screen.getByRole('button', { name: /DeepSeek 官方/i }));
@@ -1243,7 +1246,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
 
     expect(await screen.findByText(/聊天调用 · 鉴权失败：LLM authentication failed/i)).toBeInTheDocument();
-    expect(screen.getByText(/请检查 API Key 是否正确/i)).toBeInTheDocument();
+    expect(screen.getByText(/请检查 API 密钥是否正确/i)).toBeInTheDocument();
     expect(screen.queryByText(/调整模型顺序或移除不可用模型/i)).not.toBeInTheDocument();
   });
 
@@ -1285,7 +1288,7 @@ describe('LLMChannelEditor', () => {
     expect(screen.getByText(/基础连接测试默认只测试模型列表中的第一个模型/i)).toBeInTheDocument();
     expect(screen.getByText(/调整模型顺序或移除不可用模型/i)).toBeInTheDocument();
     expect(screen.getByText(/模型是否已开通、账号是否可见/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Base URL、代理、TLS/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/服务地址、代理、TLS/i)).not.toBeInTheDocument();
     expect(testLLMChannel).toHaveBeenCalledWith(expect.objectContaining({
       models: ['deepseek-ai/DeepSeek-V3', 'Qwen/Qwen3-Coder'],
     }));
@@ -1326,7 +1329,7 @@ describe('LLMChannelEditor', () => {
     expect(await screen.findByText(/聊天调用 · 请求被拦截/i)).toBeInTheDocument();
     expect(screen.getByText(/本次测试模型：openai\/gpt-5\.5/i)).toBeInTheDocument();
     expect(screen.getByText(/账号风控、地域限制、模型权限/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Base URL、代理、TLS/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/服务地址、代理、TLS/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/调整模型顺序或移除不可用模型/i)).not.toBeInTheDocument();
   });
 
@@ -1508,7 +1511,7 @@ describe('LLMChannelEditor', () => {
 
     expect(await screen.findByText(/能力检测完成：0 通过 \/ 0 失败 \/ 1 跳过/i)).toBeInTheDocument();
     expect(screen.getByText('JSON 跳过')).toBeInTheDocument();
-    expect(screen.getByText(/服务商拒绝了当前 API Key/i)).toBeInTheDocument();
+    expect(screen.getByText(/服务商拒绝了当前 API 密钥/i)).toBeInTheDocument();
     expect(screen.getByLabelText('添加模型')).toBeEnabled();
   });
 
@@ -1731,7 +1734,7 @@ describe('LLMChannelEditor', () => {
     fireEvent.click(screen.getByRole('button', { name: /Dashscope/i }));
     fireEvent.click(screen.getByRole('button', { name: '获取模型' }));
 
-    const baseUrlInput = screen.getByLabelText('Base URL');
+    const baseUrlInput = screen.getByLabelText('服务地址');
     fireEvent.change(baseUrlInput, {
       target: { value: 'https://dashscope.aliyuncs.com/compatible-mode/v2' },
     });

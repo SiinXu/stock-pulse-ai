@@ -24,6 +24,7 @@ function isKnownCatalogProvider(providers: LlmProviderCatalogEntry[], id: string
   return id !== 'custom' && providers.some((provider) => provider.id === id);
 }
 import { SettingsHelpButton } from './SettingsHelpButton';
+import { ModelMultiSelect } from './ModelMultiSelect';
 
 const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
   { value: 'openai', label: 'OpenAI Compatible' },
@@ -220,17 +221,6 @@ interface ChannelRowProps {
   onCheckCapabilities: (channel: ChannelConfig) => void;
 }
 
-const LLM_CHANNEL_HELP_DOCS = [
-  {
-    label: 'LLM 配置指南',
-    href: 'https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/LLM_CONFIG_GUIDE.md',
-  },
-  {
-    label: 'LLM 服务商配置速查',
-    href: 'https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/llm-providers.md',
-  },
-];
-
 function HelpLabel({
   htmlFor,
   label,
@@ -259,7 +249,6 @@ function HelpLabel({
         title={label}
         helpKey={helpKey}
         examples={examples}
-        docs={LLM_CHANNEL_HELP_DOCS}
       />
     </div>
   );
@@ -478,13 +467,21 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
     ),
   );
   const [modelDraft, setModelDraft] = useState('');
+  // Manual entry accepts one model per Enter/click, but pasted text may carry a
+  // comma/whitespace-separated list — split, trim and dedupe it in one pass.
   const addModelToken = (raw: string) => {
-    const model = raw.trim();
-    if (!model) {
+    const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
+    if (tokens.length === 0) {
       return;
     }
-    if (!selectedModels.some((existing) => areModelsEquivalent(existing, model, channel.protocol))) {
-      onUpdate(index, 'models', [...selectedModels, model].join(','));
+    let next = selectedModels;
+    for (const token of tokens) {
+      if (!next.some((existing) => areModelsEquivalent(existing, token, channel.protocol))) {
+        next = [...next, token];
+      }
+    }
+    if (next !== selectedModels) {
+      onUpdate(index, 'models', next.join(','));
     }
     setModelDraft('');
   };
@@ -643,7 +640,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                 label="连接名称"
                 fieldKey="LLM_CHANNEL_NAME"
                 helpKey="settings.llm_channel.channel_name"
-                examples={['LLM_CHANNELS=deepseek,aihubmix', 'LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro']}
+                examples={['deepseek', 'my_proxy']}
               />
             <Input
               id={channelNameInputId}
@@ -659,7 +656,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                 label="协议"
                 fieldKey="LLM_CHANNEL_PROTOCOL"
                 helpKey="settings.llm_channel.protocol"
-                examples={['LLM_DEEPSEEK_PROTOCOL=deepseek', 'LLM_OPENROUTER_PROTOCOL=openai']}
+                examples={['DeepSeek 官方服务选 deepseek', '中转/聚合服务通常选 openai']}
               />
               <Select
                 id={protocolInputId}
@@ -675,10 +672,10 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
           <div>
             <HelpLabel
               htmlFor={baseUrlInputId}
-              label="Base URL"
+              label="服务地址"
               fieldKey="LLM_CHANNEL_BASE_URL"
               helpKey="settings.llm_channel.base_url"
-              examples={['LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com', 'LLM_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1']}
+              examples={['https://api.deepseek.com', 'https://openrouter.ai/api/v1']}
             />
           <Input
             id={baseUrlInputId}
@@ -741,10 +738,10 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
           <div>
             <HelpLabel
               htmlFor={apiKeyInputId}
-              label="API Key"
+              label="API 密钥"
               fieldKey="LLM_CHANNEL_API_KEY"
               helpKey="settings.llm_channel.api_key"
-              examples={['LLM_DEEPSEEK_API_KEY=sk-xxxx', 'LLM_OPENAI_API_KEYS=sk-key-1,sk-key-2']}
+              examples={['sk-xxxx', '多个 Key 用逗号分隔：sk-key-1,sk-key-2']}
             />
           <Input
             id={apiKeyInputId}
@@ -792,27 +789,18 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
             {discoveredModels.length > 0 ? (
               <div>
                 <HelpLabel
-                  label="可选模型（可多选）"
+                  label="发现的模型（搜索并勾选启用）"
                   fieldKey="LLM_CHANNEL_DISCOVERED_MODELS"
                   helpKey="settings.llm_channel.models"
-                  examples={['LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro']}
                 />
-                <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3">
-                  {discoveredModels.map((model) => (
-                    <label key={model} className="flex items-center gap-2 text-sm text-secondary-text">
-                      <input
-                        type="checkbox"
-                        checked={selectedModels.some((selectedModel) => (
-                          areModelsEquivalent(selectedModel, model, channel.protocol)
-                        ))}
-                        disabled={busy}
-                        onChange={() => onUpdate(index, 'models', toggleModelSelection(channel.models, model, channel.protocol))}
-                        className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                      />
-                      <span>{model}</span>
-                    </label>
+                <ModelMultiSelect
+                  options={discoveredModels}
+                  isSelected={(model) => selectedModels.some((selectedModel) => (
+                    areModelsEquivalent(selectedModel, model, channel.protocol)
                   ))}
-                </div>
+                  onToggle={(model) => onUpdate(index, 'models', toggleModelSelection(channel.models, model, channel.protocol))}
+                  disabled={busy}
+                />
               </div>
             ) : null}
 
@@ -822,7 +810,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                 label="可用模型"
                 fieldKey="LLM_CHANNEL_MODELS"
                 helpKey="settings.llm_channel.models"
-                examples={['LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro', 'LLM_OLLAMA_MODELS=qwen3:8b,llama3.1:8b']}
+                examples={['deepseek-v4-flash', 'qwen3:8b']}
               />
             {selectedModels.length > 0 ? (
               <div className="mb-2 flex flex-wrap gap-1.5" data-testid={`connection-models-${channel.id}`}>
@@ -859,6 +847,15 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     addModelToken(modelDraft);
+                  }
+                }}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData('text');
+                  // A pasted list (comma/whitespace separated) becomes tokens
+                  // immediately; a single id falls through to the normal input.
+                  if (/[,\s]/.test(text.trim())) {
+                    e.preventDefault();
+                    addModelToken(`${modelDraft} ${text}`);
                   }
                 }}
                 aria-label="添加模型"
@@ -925,7 +922,6 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                     title="运行时能力检测"
                     helpKey="settings.llm_channel.capability_checks"
                     examples={['JSON / Tools / Stream / Vision']}
-                    docs={LLM_CHANNEL_HELP_DOCS}
                   />
                 </div>
                 <p className="mt-0.5 text-[11px] text-secondary-text">
@@ -1229,26 +1225,26 @@ const LLM_ERROR_LABELS: Record<string, string> = {
 };
 
 const LLM_TROUBLESHOOTING_HINTS: Record<string, string> = {
-  auth: '请检查 API Key 是否正确、是否有多余空格，以及当前连接是否需要额外组织/项目权限。',
-  timeout: '可重试；若持续超时，请检查 Base URL、网络代理、服务商可用区或本地防火墙。',
+  auth: '请检查 API 密钥是否正确、是否有多余空格，以及当前连接是否需要额外组织/项目权限。',
+  timeout: '可重试；若持续超时，请检查服务地址、网络代理、服务商可用区或本地防火墙。',
   quota: '请检查余额、套餐额度、RPM/TPM 限流或并发设置，必要时稍后重试。',
   model_not_found: '请确认模型名与连接协议匹配，并先用“获取模型”核对该连接实际可用模型列表。',
   empty_response: '连接已连通但未返回正文；可尝试切换兼容模型、关闭额外响应模式后再测试。',
-  network_error: '请检查 Base URL、代理、TLS/证书、中转网关或本地网络策略，并可稍后重试。',
-  invalid_config: '先补齐协议、Base URL、API Key 和模型配置，再执行一键测试。',
+  network_error: '请检查服务地址、代理、TLS/证书、中转网关或本地网络策略，并可稍后重试。',
+  invalid_config: '先补齐协议、服务地址、API 密钥和模型配置，再执行一键测试。',
   unsupported_protocol: '当前仅对 OpenAI Compatible / DeepSeek 连接提供自动模型发现，请改为手动维护模型列表。',
 };
 
 const LLM_REASON_HINTS: Record<string, string> = {
-  missing_api_key: 'API Key 为空，或逗号分隔后没有任何可用 Key；请填入至少一个有效 Key 后再测试。',
-  api_key_rejected: '服务商拒绝了当前 API Key；请检查 Key、组织/项目权限、区域和账号状态。',
+  missing_api_key: 'API 密钥为空，或逗号分隔后没有任何可用密钥；请填入至少一个有效密钥后再测试。',
+  api_key_rejected: '服务商拒绝了当前 API 密钥；请检查密钥、组织/项目权限、区域和账号状态。',
   rate_limit: '服务商触发 RPM/TPM 或并发限流；请降低请求频率或稍后重试。',
   insufficient_balance: '服务商返回余额、账单或额度不足；请检查账户余额和套餐状态。',
   quota_exceeded: '服务商返回配额已耗尽；请确认账号套餐、余量和项目额度。',
   provider_blocked: '请求被服务商或中转网关拦截；请检查账号风控、地域限制、模型权限、代理商网关策略、内容安全策略或请求来源限制。',
-  dns_error: '域名解析失败；请检查 Base URL 域名、网络代理和 DNS 配置。',
+  dns_error: '域名解析失败；请检查服务地址域名、网络代理和 DNS 配置。',
   tls_error: 'TLS/证书握手失败；请检查 HTTPS 证书、中转网关或公司代理策略。',
-  connection_refused: '目标服务拒绝连接；请确认 Base URL 端口、服务进程和防火墙配置。',
+  connection_refused: '目标服务拒绝连接；请确认服务地址端口、服务进程和防火墙配置。',
   model_access_denied: '当前账号无法使用该模型；请确认模型是否已开通、账号是否可见，或模型是否已被禁用。',
   provider_prefix_mismatch: '模型 provider 前缀与当前连接不匹配；请确认模型名是否应使用该连接的 OpenAI-compatible 路由。',
   capability_unsupported: '当前模型或兼容层不支持该能力；这不影响基础文本连接，可换模型或关闭该能力依赖。',
@@ -1278,7 +1274,7 @@ function getLlmTroubleshootingHint(
       : '返回结构与预期不一致，请确认该连接兼容 Chat Completions 接口。';
   }
   if (code === 'empty_response' && (context === 'discovery' || stage === 'model_discovery')) {
-    return '该连接的 /models 接口未返回可用模型 ID；请检查 Base URL 是否指向兼容的模型列表接口，或改为手动填写模型列表。';
+    return '该连接的 /models 接口未返回可用模型 ID；请检查服务地址是否指向兼容的模型列表接口，或改为手动填写模型列表。';
   }
   return LLM_TROUBLESHOOTING_HINTS[code || ''];
 }
@@ -1516,7 +1512,7 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
 function getChannelCompletenessIssues(channel: ChannelConfig, providers: LlmProviderCatalogEntry[]): string[] {
   const issues: string[] = [];
   if (channel.protocol !== 'ollama' && !channel.apiKey.trim()) {
-    issues.push('缺少 API Key');
+    issues.push('缺少 API 密钥');
   }
   // Known providers ship a default Base URL, and ollama/local endpoints have a
   // runtime default, so only custom remote endpoints must supply one. (The
@@ -1526,7 +1522,7 @@ function getChannelCompletenessIssues(channel: ChannelConfig, providers: LlmProv
     && channel.protocol !== 'ollama'
     && !channel.baseUrl.trim()
   ) {
-    issues.push('缺少 Base URL');
+    issues.push('缺少服务地址');
   }
   if (splitModels(channel.models).length === 0) {
     issues.push('至少配置一个模型');
@@ -2000,10 +1996,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     if (managesRuntimeConfig) {
       const routes = new Set(resolveChannelRouteModels(channel));
       if (runtimeConfig.primaryModel && routes.has(runtimeConfig.primaryModel)) {
-        referencedBy.push('主模型');
+        referencedBy.push('主要模型');
       }
       if (runtimeConfig.agentPrimaryModel && routes.has(runtimeConfig.agentPrimaryModel)) {
-        referencedBy.push('Agent 主模型');
+        referencedBy.push('Agent 主要模型');
       }
       if (runtimeConfig.visionModel && routes.has(runtimeConfig.visionModel)) {
         referencedBy.push('Vision 模型');
@@ -2405,7 +2401,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <span className="settings-accent-text text-xs font-medium uppercase tracking-wider">运行时参数</span>
-                  <p className="mt-1 text-[11px] text-muted-text">主模型、备选模型、Vision 与 Temperature 会直接写入运行时配置。</p>
+                  <p className="mt-1 text-[11px] text-muted-text">主要模型、备用模型、Vision 与 Temperature 会直接写入运行时配置。</p>
                 </div>
                 <Badge variant="default" className="border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-muted-text">Runtime</Badge>
               </div>
@@ -2437,14 +2433,14 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
               {availableModels.length === 0 ? (
                 <div className="rounded-xl border border-dashed settings-border-strong settings-surface-overlay-soft px-3 py-2 text-xs text-muted-text">
-                  先添加至少一个已启用连接并填写模型，下面的主模型 / 备选模型 / Vision 选项才会出现。
+                  先添加至少一个已启用连接并填写模型，下面的主要模型 / 备用模型 / Vision 选项才会出现。
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div>
                     <HelpLabel
                       htmlFor="runtime-primary-model"
-                      label="主模型"
+                      label="主要模型"
                       fieldKey="LITELLM_MODEL"
                       helpKey="settings.llm_channel.primary_model"
                       examples={['LITELLM_MODEL=deepseek/deepseek-v4-flash']}
@@ -2463,7 +2459,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   <div>
                     <HelpLabel
                       htmlFor="runtime-agent-primary-model"
-                      label="Agent 主模型"
+                      label="Agent 主要模型"
                       fieldKey="AGENT_LITELLM_MODEL"
                       helpKey="settings.llm_channel.agent_primary_model"
                       examples={['AGENT_LITELLM_MODEL=deepseek/deepseek-v4-pro']}
@@ -2479,7 +2475,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                       options={buildModelOptions(
                         agentSafeModels,
                         agentSelectedModelForOptions,
-                        '自动（继承普通分析主模型）',
+                        '自动（继承普通分析主要模型）',
                       )}
                       disabled={busy}
                       placeholder=""
@@ -2488,7 +2484,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
                   <div>
                     <HelpLabel
-                      label="备选模型"
+                      label="备用模型"
                       fieldKey="LITELLM_FALLBACK_MODELS"
                       helpKey="settings.llm_channel.fallback_models"
                       examples={['LITELLM_FALLBACK_MODELS=deepseek/deepseek-v4-pro,gemini/gemini-3-flash-preview']}
@@ -2509,7 +2505,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                       ))}
                     </div>
                     <p className="mt-1 text-[11px] text-secondary-text">
-                      备选模型只会在主模型失败时使用。主模型不会重复加入备选模型。
+                      备用模型只会在主要模型失败时使用。主要模型不会重复加入备用模型。
                     </p>
                   </div>
 
@@ -2541,7 +2537,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           ) : showRuntimeConfig ? (
             <InlineAlert
               variant="warning"
-              message="检测到已配置高级模型路由 YAML：此处仅管理连接条目和基础连接信息。运行时主模型 / 备选模型 / Vision / Temperature 仍由下方通用字段决定；若 YAML 解析成功，则以其中的路由与可用模型声明为准，本配置不会覆盖 YAML 文件本身。"
+              message="检测到已配置高级模型路由 YAML：此处仅管理连接条目和基础连接信息。运行时主要模型 / 备用模型 / Vision / Temperature 仍由下方通用字段决定；若 YAML 解析成功，则以其中的路由与可用模型声明为准，本配置不会覆盖 YAML 文件本身。"
               className="rounded-[1.35rem] px-4 py-3 text-xs shadow-none"
             />
           ) : null}

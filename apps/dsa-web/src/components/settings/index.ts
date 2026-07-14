@@ -19,5 +19,6 @@ export * from './SettingsSectionCard';
 export * from './SettingsErrorSummary';
 export * from './FirstRunWizard';
 export * from './ModelFallbackEditor';
+export * from './ModelMultiSelect';
 export * from './AuthSettingsCard';
 export * from './GenerationBackendStatusPanel';

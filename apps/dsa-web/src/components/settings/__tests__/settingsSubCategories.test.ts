@@ -17,9 +17,11 @@ describe('settingsSubCategories', () => {
     expect(getSubCategories('agent')).toBeNull();
   });
 
-  it('splits ai_model into model + providers tabs', () => {
-    const subs = getSubCategories('ai_model')?.map((sub) => sub.id);
-    expect(subs).toEqual(['model', 'providers']);
+  it('keeps ai_model a single tab — no separate providers entry', () => {
+    // Model Access is the only entry for provider credentials (no second
+    // "model providers" sub-tab).
+    expect(getSubCategories('ai_model')).toBeNull();
+    expect(getDefaultSubCategory('ai_model')).toBeNull();
   });
 
   it('splits data_source into source + providers tabs', () => {
@@ -32,16 +34,10 @@ describe('settingsSubCategories', () => {
     expect(subs).toEqual(['channels', 'rules']);
   });
 
-  it('routes provider keys to the merged providers tab', () => {
-    expect(getSubCategoryOfKey('ai_model', 'OPENAI_API_KEY')).toBe('providers');
-    expect(getSubCategoryOfKey('ai_model', 'ANTHROPIC_API_KEY')).toBe('providers');
-    expect(getSubCategoryOfKey('ai_model', 'AIHUBMIX_KEY')).toBe('providers');
-  });
-
-  it('routes non-provider ai_model keys to the model tab', () => {
-    expect(getSubCategoryOfKey('ai_model', 'GENERATION_BACKEND')).toBe('model');
-    expect(getSubCategoryOfKey('ai_model', 'LLM_CHANNELS')).toBe('model');
-    expect(getSubCategoryOfKey('ai_model', 'LLM_PROMPT_CACHE_HINTS_ENABLED')).toBe('model');
+  it('never routes an ai_model key to a providers sub', () => {
+    for (const key of ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'AIHUBMIX_KEY', 'GENERATION_BACKEND', 'LLM_CHANNELS']) {
+      expect(getSubCategoryOfKey('ai_model', key)).not.toBe('providers');
+    }
   });
 
   it('routes every data provider key to the merged providers tab', () => {
@@ -75,26 +71,23 @@ describe('settingsSubCategories', () => {
 
   it('counts items per tab and keeps companion tabs visible', () => {
     const itemsByCategory = {
-      ai_model: [
-        { key: 'GENERATION_BACKEND' },
-        { key: 'LLM_CHANNELS' },
-        { key: 'OPENAI_API_KEY' },
+      data_source: [
+        { key: 'NEWS_MAX_AGE_DAYS' },
+        { key: 'REALTIME_SOURCE_PRIORITY' },
+        { key: 'TICKFLOW_API_KEY' },
       ],
     };
-    expect(getSubCategoryCount('ai_model', 'model', itemsByCategory)).toBe(2);
-    expect(getSubCategoryCount('ai_model', 'providers', itemsByCategory)).toBe(1);
+    expect(getSubCategoryCount('data_source', 'source', itemsByCategory)).toBe(2);
+    expect(getSubCategoryCount('data_source', 'providers', itemsByCategory)).toBe(1);
 
-    const visible = getVisibleSubCategories('ai_model', itemsByCategory).map((sub) => sub.id);
-    expect(visible).toEqual(['model', 'providers']);
+    const visible = getVisibleSubCategories('data_source', itemsByCategory).map((sub) => sub.id);
+    expect(visible).toEqual(['source', 'providers']);
   });
 
   it('keeps channels + providers tabs visible even without matching items', () => {
     const notif = getVisibleSubCategories('notification', { notification: [{ key: 'REPORT_TYPE' }] }).map((s) => s.id);
     expect(notif).toContain('channels');
     expect(notif).toContain('rules');
-
-    const ai = getVisibleSubCategories('ai_model', { ai_model: [{ key: 'GENERATION_BACKEND' }] }).map((s) => s.id);
-    expect(ai).toContain('providers');
 
     const data = getVisibleSubCategories('data_source', { data_source: [{ key: 'NEWS_MAX_AGE_DAYS' }] }).map((s) => s.id);
     expect(data).toEqual(['source', 'providers']);
@@ -103,7 +96,6 @@ describe('settingsSubCategories', () => {
   it('defaults to the first visible tab', () => {
     expect(getDefaultSubCategory('base')).toBeNull();
     expect(getDefaultSubCategory('system')).toBeNull();
-    expect(getDefaultSubCategory('ai_model')).toBe('model');
     expect(getDefaultSubCategory('data_source')).toBe('source');
     expect(getDefaultSubCategory('notification')).toBe('channels');
   });

@@ -2750,7 +2750,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "NOTIFICATION_REPORT_CHANNELS": {
         "title": "Report Notification Channels",
-        "description": "Comma-separated route for report notifications. Empty keeps all configured channels.",
+        "description": "Notification channels used for report delivery; pick one or more. Empty keeps all configured channels.",
         "category": "notification",
         "data_type": "array",
         "ui_control": "textarea",
@@ -2759,7 +2759,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "",
         "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
-        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "multi_value": True, "delimiter": ","},
         "display_order": 62,
         "help_key": "settings.notification.channel_routing",
         "examples": [
@@ -2776,7 +2776,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "NOTIFICATION_ALERT_CHANNELS": {
         "title": "Alert Notification Channels",
-        "description": "Comma-separated route for event alert notifications. Empty keeps all configured channels.",
+        "description": "Notification channels used for event alerts; pick one or more. Empty keeps all configured channels.",
         "category": "notification",
         "data_type": "array",
         "ui_control": "textarea",
@@ -2785,7 +2785,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "",
         "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
-        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "multi_value": True, "delimiter": ","},
         "display_order": 63,
         "help_key": "settings.notification.channel_routing",
         "examples": [
@@ -2802,7 +2802,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "NOTIFICATION_SYSTEM_ERROR_CHANNELS": {
         "title": "System Error Notification Channels",
-        "description": "Comma-separated route reserved for system error notifications. Empty keeps all configured channels.",
+        "description": "Notification channels reserved for system error notifications; pick one or more. Empty keeps all configured channels.",
         "category": "notification",
         "data_type": "array",
         "ui_control": "textarea",
@@ -2811,7 +2811,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "",
         "options": [{"label": channel, "value": channel} for channel in ROUTABLE_NOTIFICATION_CHANNELS],
-        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "delimiter": ","},
+        "validation": {"allowed_values": list(ROUTABLE_NOTIFICATION_CHANNELS), "multi_value": True, "delimiter": ","},
         "display_order": 64,
         "help_key": "settings.notification.channel_routing",
         "examples": [
@@ -3464,7 +3464,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "cn",
         "options": ["cn", "hk", "us", "jp", "kr", "both"],
-        "validation": {"allowed_values": ["cn", "hk", "us", "jp", "kr", "both"], "delimiter": ","},
+        "validation": {"allowed_values": ["cn", "hk", "us", "jp", "kr", "both"], "multi_value": True, "delimiter": ","},
         "display_order": 48,
         "help_key": "settings.system.market_review",
         "examples": [

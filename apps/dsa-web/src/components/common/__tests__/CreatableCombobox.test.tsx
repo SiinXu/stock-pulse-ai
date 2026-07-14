@@ -38,6 +38,25 @@ describe('CreatableCombobox', () => {
     expect(within(listbox).queryByText('gpt-5.5')).not.toBeInTheDocument();
   });
 
+  it('searches across value, group (connection) and hint, not just the label', () => {
+    render(<CreatableCombobox value="" onChange={() => {}} options={options} ariaLabel="模型" allowCustom={false} />);
+    const input = screen.getByRole('combobox');
+    // Group name (e.g. connection) matches.
+    fireEvent.change(input, { target: { value: 'openai' } });
+    let listbox = document.getElementById(input.getAttribute('aria-controls')!)!;
+    expect(within(listbox).getByText('gpt-5.5')).toBeInTheDocument();
+    expect(within(listbox).queryByText('deepseek-v4-pro')).not.toBeInTheDocument();
+    // Hint matches.
+    fireEvent.change(input, { target: { value: 'tested' } });
+    listbox = document.getElementById(input.getAttribute('aria-controls')!)!;
+    expect(within(listbox).getByText('deepseek-v4-flash')).toBeInTheDocument();
+    expect(within(listbox).queryByText('deepseek-v4-pro')).not.toBeInTheDocument();
+    // Stored value (model route) matches even when the label differs.
+    fireEvent.change(input, { target: { value: 'deepseek/deepseek-v4-pro' } });
+    listbox = document.getElementById(input.getAttribute('aria-controls')!)!;
+    expect(within(listbox).getByText('deepseek-v4-pro')).toBeInTheDocument();
+  });
+
   it('offers a custom value when the query is not in the list and allowCustom is on', () => {
     const onChange = vi.fn();
     render(

@@ -1407,7 +1407,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(checks["llm_primary"]["status"], "configured")
         self.assertEqual(checks["stock_list"]["status"], "configured")
         self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-        self.assertIn("local CLI 主生成方式不会被自动继承", checks["llm_agent"]["message"])
+        self.assertIn("本机 CLI 生成方式不会被自动继承", checks["llm_agent"]["message"])
         self.assertEqual(status["required_missing_keys"], ["llm_agent"])
 
     def test_get_setup_status_codex_cli_missing_reports_backend_path(self) -> None:
@@ -1443,7 +1443,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertIn("普通分析使用 Codex CLI", checks["llm_agent"]["message"])
-        self.assertIn("Agent 工具调用仍使用 LiteLLM 主模型", checks["llm_agent"]["message"])
+        self.assertIn("Agent 工具调用仍使用主要模型", checks["llm_agent"]["message"])
 
     def test_get_setup_status_codex_primary_agent_inherited_model_explains_litellm_split(self) -> None:
         self._rewrite_env(
@@ -1461,7 +1461,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertIn(
-            "普通分析使用 Codex CLI；Agent 工具调用仍使用 LiteLLM 主模型: openai/gpt-5.5",
+            "普通分析使用 Codex CLI；Agent 工具调用仍使用主要模型: openai/gpt-5.5",
             checks["llm_agent"]["message"],
         )
 
@@ -1481,7 +1481,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "configured")
         self.assertIn(
-            "普通分析使用 Claude Code CLI；Agent 工具调用仍使用 LiteLLM 主模型: openai/gpt-5.5",
+            "普通分析使用 Claude Code CLI；Agent 工具调用仍使用主要模型: openai/gpt-5.5",
             checks["llm_agent"]["message"],
         )
         self.assertNotIn("Codex CLI", checks["llm_agent"]["message"])
@@ -1509,7 +1509,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertIn("Hermes", checks["llm_agent"]["message"])
         self.assertIn("llm_agent", status["required_missing_keys"])
         self.assertNotIn(
-            "Agent 工具调用仍使用 LiteLLM 主模型",
+            "Agent 工具调用仍使用主要模型",
             checks["llm_agent"]["message"],
         )
 
@@ -1572,7 +1572,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_agent"]["status"], "needs_action")
-        self.assertIn("未检测到可用 LiteLLM 模型配置", checks["llm_agent"]["message"])
+        self.assertIn("未检测到可用模型配置", checks["llm_agent"]["message"])
         self.assertNotIn("需要 LiteLLM backend", checks["llm_agent"]["message"])
 
     def test_get_setup_status_accepts_anspire_one_key_llm(self) -> None:
@@ -2273,6 +2273,124 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 for issue in validation["issues"]
             ),
             validation["issues"],
+        )
+
+    def test_update_blocks_removing_channel_referenced_by_vision_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha,beta",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://alpha.example.com/v1",
+            "LLM_ALPHA_API_KEY=sk-alpha",
+            "LLM_ALPHA_MODELS=alpha-model",
+            "LLM_BETA_PROTOCOL=openai",
+            "LLM_BETA_BASE_URL=https://beta.example.com/v1",
+            "LLM_BETA_API_KEY=sk-beta",
+            "LLM_BETA_MODELS=beta-model",
+            "LITELLM_MODEL=openai/beta-model",
+            "VISION_MODEL=openai/alpha-model",
+        )
+
+        with self.assertRaises(ConfigValidationError) as ctx:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "beta"},
+                    {"key": "LLM_ALPHA_PROTOCOL", "value": ""},
+                    {"key": "LLM_ALPHA_BASE_URL", "value": ""},
+                    {"key": "LLM_ALPHA_API_KEY", "value": ""},
+                    {"key": "LLM_ALPHA_MODELS", "value": ""},
+                ],
+            )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "VISION_MODEL" and issue["code"] == "unknown_model"
+                for issue in ctx.exception.issues
+            ),
+            ctx.exception.issues,
+        )
+
+    def test_update_blocks_disabling_channel_referenced_by_vision_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha,beta",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://alpha.example.com/v1",
+            "LLM_ALPHA_API_KEY=sk-alpha",
+            "LLM_ALPHA_MODELS=alpha-model",
+            "LLM_BETA_PROTOCOL=openai",
+            "LLM_BETA_BASE_URL=https://beta.example.com/v1",
+            "LLM_BETA_API_KEY=sk-beta",
+            "LLM_BETA_MODELS=beta-model",
+            "LITELLM_MODEL=openai/beta-model",
+            "VISION_MODEL=openai/alpha-model",
+        )
+
+        with self.assertRaises(ConfigValidationError) as ctx:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[{"key": "LLM_ALPHA_ENABLED", "value": "false"}],
+            )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "VISION_MODEL" and issue["code"] == "unknown_model"
+                for issue in ctx.exception.issues
+            ),
+            ctx.exception.issues,
+        )
+
+    def test_update_allows_unrelated_save_with_stale_vision_reference(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=beta",
+            "LLM_BETA_PROTOCOL=openai",
+            "LLM_BETA_BASE_URL=https://beta.example.com/v1",
+            "LLM_BETA_API_KEY=sk-beta",
+            "LLM_BETA_MODELS=beta-model",
+            "LITELLM_MODEL=openai/beta-model",
+            "VISION_MODEL=openai/ghost-model",
+            "STOCK_LIST=600519",
+        )
+
+        result = self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=[{"key": "STOCK_LIST", "value": "600519,000001"}],
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "600519,000001")
+
+    def test_update_blocks_removing_channel_referenced_by_primary_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha,beta",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://alpha.example.com/v1",
+            "LLM_ALPHA_API_KEY=sk-alpha",
+            "LLM_ALPHA_MODELS=alpha-model",
+            "LLM_BETA_PROTOCOL=openai",
+            "LLM_BETA_BASE_URL=https://beta.example.com/v1",
+            "LLM_BETA_API_KEY=sk-beta",
+            "LLM_BETA_MODELS=beta-model",
+            "LITELLM_MODEL=openai/alpha-model",
+        )
+
+        with self.assertRaises(ConfigValidationError) as ctx:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "beta"},
+                    {"key": "LLM_ALPHA_PROTOCOL", "value": ""},
+                    {"key": "LLM_ALPHA_BASE_URL", "value": ""},
+                    {"key": "LLM_ALPHA_API_KEY", "value": ""},
+                    {"key": "LLM_ALPHA_MODELS", "value": ""},
+                ],
+            )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "LITELLM_MODEL" and issue["code"] == "unknown_model"
+                for issue in ctx.exception.issues
+            ),
+            ctx.exception.issues,
         )
 
     def test_validate_accepts_deepseek_v4_primary_model_for_channel(self) -> None:
@@ -4494,7 +4612,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             for warning in response["warnings"]
             if "已同步清理失效的运行时模型引用" in warning
         )
-        self.assertIn("主模型 / Agent 主模型 / Vision 模型 / 备选模型中的失效项", warning)
+        self.assertIn("主要模型 / Agent 主要模型 / Vision 模型 / 备用模型中的失效项", warning)
         self.assertIn("桌面端导出备份", warning)
 
     def test_update_market_review_region_does_not_trigger_runtime_model_cleanup(self) -> None:

@@ -2829,6 +2829,45 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-LLM_MY_PROXY_MODELS')).not.toBeInTheDocument();
   });
 
+  it('never renders legacy provider credential fields even without configured channels', async () => {
+    // Model Access is the only entry for provider credentials: legacy keys
+    // like OPENAI_API_KEY stay backend-compatible but must not surface as
+    // generic fields, channels configured or not.
+    const legacyProviderItems = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'AIHUBMIX_KEY'].map((key, index) => ({
+      key,
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl: 'password',
+        isSensitive: true,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: index + 1,
+      },
+    }));
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...buildSystemConfigState().itemsByCategory,
+        ai_model: legacyProviderItems,
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    await screen.findByTestId('llm-channel-editor-items');
+    for (const item of legacyProviderItems) {
+      expect(screen.queryByTestId(`settings-field-${item.key}`)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText('模型供应商')).not.toBeInTheDocument();
+  });
+
   it('renders notification test panel before notification fields', () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'notification' }));
 

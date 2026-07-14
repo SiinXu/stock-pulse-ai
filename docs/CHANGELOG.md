@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] Web 设置页「AI 与模型」收敛为 总览/连接/任务路由/可靠性 四个视图：删除「高级」二级视图与遗留「模型供应商」子页映射，OPENAI/ANTHROPIC/GEMINI/DEEPSEEK/ANSPIRE/AIHUBMIX 等 legacy Provider 凭据键保持后端（env/YAML）兼容但只经「连接（模型接入）」编辑，普通设置视图不再以原始字段展示（`LLM_PROMPT_CACHE_*` 等同形状独立键豁免保留）；移除模型连接编辑器内嵌的「LLM 配置指南 / LLM 服务商配置速查」外链入口；生成后端状态面板折叠为按需展开的诊断区。
+- [改进] Web 设置页模型输入全面改为选择器交互：新增 `ModelMultiSelect` 多选组件，连接编辑器「发现的模型」改为搜索并勾选启用；手动添加模型改为每次回车/点击添加一项，粘贴逗号/空白分隔列表自动拆分去重；模型下拉搜索同时匹配显示名/模型路由/所属连接/服务商；可靠性页备用模型列表支持上移/下移排序，目录外的已配置路由保留并标注「当前配置不可用」而不静默清除。
+- [修复] 首次配置向导对 Ollama 等免密钥服务的首次配置不再受阻：API 密钥按服务商目录标注「（可选）/可留空」；「自动发现模型」结果不再整批自动启用，改为展示候选列表由用户勾选确认；手动输入逐项添加并兼容粘贴逗号分隔列表。
+- [改进] 模型接入术语与文案降低理解成本：统一「主要模型 / 备用模型 / 服务地址 / API 密钥」用语，连接编辑器表单示例从 `KEY=value` 环境变量形式改为纯值示例（如 `https://api.deepseek.com`、`sk-xxxx`），中英文界面与帮助文案术语对齐（model connections）。
+- [改进] Web 设置页多值枚举字段（`NOTIFICATION_REPORT_CHANNELS`/`NOTIFICATION_ALERT_CHANNELS`/`NOTIFICATION_SYSTEM_ERROR_CHANNELS`、`MARKET_REVIEW_REGION`）渲染为勾选组，不再要求手输逗号分隔字符串；目录外的已存值保持可见、可取消，保存不静默丢弃；未显式设置的字段回填后端默认值展示（密码控件除外）；后端注册表为上述字段标注 `multi_value` 并修正英文描述措辞。
+- [改进] 后端配置保存校验补齐 Vision 模型引用保护：当本次更新触及渠道结构（删除/停用连接、修改 `LLM_CHANNELS` 或渠道键）导致 `VISION_MODEL` 指向已启用连接中不存在的模型时，保存被拒绝（`unknown_model`），与主模型/备用模型引用保护一致；历史失效的 Vision 引用仍不阻断无关配置保存。
+- [新功能] 大盘复盘报告页接入市场结构上下文卡片：持久化报告包含市场结构字段时，在复盘报告视图渲染题材主线与个股位置（`MarketStructureCard`），旧报告无该字段时静默跳过。
+- [改进] 上游 UI 设计规范修复与守卫增强：首页股票工作区移除魔法像素字号（`text-[11px]` 改用 Tailwind 字号刻度）；设计守卫测试新增「禁止魔法像素字号」与「按钮保持胶囊形状（禁 rounded-lg/rounded-md）」断言，并对按钮提取正则做自检防止断言空转。
+- [文档] 修正模型接入相关文档与帮助文案的矛盾与过时描述：UI 路径统一为「设置 → AI 与模型 → 连接（模型接入）」（FAQ、LLM 配置指南、设置帮助、文档索引，中英文同步）；「保存前静默清理失效运行时模型引用」的旧说法更正为与实现一致的「后端校验拒绝（`unknown_model`）」；market-support 中 `MARKET_REVIEW_REGION` 的「文本框输入逗号分隔」描述更新为勾选组现状。
 - [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，只保留 provider id/label/protocol/默认端点/是否需要凭据/是否需要 Base URL/是否支持发现/capabilities/是否本地/自定义。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
 - [修复] 修复全量测试在本地开发 `.env` 存在时的模型状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。仅剩 4 个与模型接入无关、单独运行也失败的既有基线用例（`test_agent_pipeline` 1 个、`test_decision_signal_service` 3 个时序相关）。
 - [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：移除并存的只读「模型接入」服务卡与旧渠道编辑器双结构，仅保留一套统一的连接管理界面；普通界面不再出现「AI 模型配置 / 快速添加渠道 / 添加渠道 / 渠道管理 / 渠道列表 / 渠道名称」等术语，统一使用「模型服务商 / 模型连接 / 可用模型」。连接卡片直接展示已添加模型 chip、被哪些任务使用、状态与测试结果，模型为 0 时提示「尚未添加可用模型」并引导发现/手动添加；「添加模型服务」使用连接内联创建流程（同一服务商可创建多条连接），不再复用首次配置向导。底层 `LLM_CHANNELS` 存储格式与 YAML/Legacy 兼容不变。

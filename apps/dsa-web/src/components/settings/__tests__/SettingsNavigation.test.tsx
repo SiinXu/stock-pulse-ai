@@ -95,7 +95,7 @@ describe('SettingsSectionNav', () => {
 });
 
 describe('SettingsViewTabs', () => {
-  it('renders the five AI & Models views and marks the active tab', () => {
+  it('renders the four AI & Models views and marks the active tab', () => {
     render(
       <SettingsViewTabs
         section="ai_models"
@@ -111,7 +111,6 @@ describe('SettingsViewTabs', () => {
       'Connections',
       'Task Routing',
       'Reliability',
-      'Advanced',
     ]);
     expect(screen.getByRole('tab', { name: 'Task Routing' })).toHaveAttribute('aria-selected', 'true');
   });

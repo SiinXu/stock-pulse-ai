@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { AnalysisReport, MarketReviewPayload } from '../../../types/analysis';
+import type {
+  AnalysisReport,
+  MarketReviewPayload,
+  MarketStructureContext,
+} from '../../../types/analysis';
 import { MarketReviewReportView } from '../MarketReviewReportView';
 
 vi.mock('../../../api/history', () => ({
@@ -103,6 +107,64 @@ const noBreadthMarketReviewPayload: MarketReviewPayload = {
   },
   news: [],
   sections: [],
+};
+
+const marketStructureContext: MarketStructureContext = {
+  schemaVersion: 'market-structure-v1',
+  status: 'partial',
+  market: 'cn',
+  tradeDate: '2026-07-04',
+  marketThemeContext: {
+    schemaVersion: 'market-theme-v1',
+    status: 'partial',
+    market: 'cn',
+    activeThemes: [
+      { name: '机器人概念', changePct: 4.2, rank: 1, source: 'concept', phase: 'accelerating' },
+    ],
+    leadingConcepts: [
+      { name: '机器人概念', changePct: 4.2, rank: 1, source: 'concept' },
+    ],
+    leadingIndustries: [
+      { name: '通用设备', changePct: 2.1, rank: 2, source: 'industry' },
+    ],
+  },
+  stockMarketPosition: {
+    schemaVersion: 'stock-market-position-v1',
+    status: 'partial',
+    stockCode: '300024',
+    stockName: '机器人',
+    market: 'cn',
+    primaryTheme: {
+      name: '机器人概念',
+      source: 'concept',
+      phase: 'accelerating',
+      rank: 1,
+      changePct: 4.2,
+    },
+    stockRole: 'follower',
+    themePhase: 'accelerating',
+  },
+};
+
+const marketReviewReportWithStructure: AnalysisReport = {
+  meta: {
+    id: 101,
+    queryId: 'market-review-q-structure',
+    stockCode: 'MARKET_REVIEW',
+    stockName: '大盘复盘',
+    reportType: 'market_review',
+    reportLanguage: 'zh',
+    createdAt: '2026-07-04T08:00:00Z',
+  },
+  summary: {
+    analysisSummary: '大盘震荡上行',
+    operationAdvice: '关注题材轮动',
+    trendPrediction: '短期偏多',
+    sentimentScore: 68,
+  },
+  details: {
+    marketStructure: marketStructureContext,
+  },
 };
 
 describe('MarketReviewReportView', () => {
@@ -285,6 +347,34 @@ describe('MarketReviewReportView', () => {
     expect(screen.getByText('0.44%')).toBeInTheDocument();
     expect(screen.queryByText('0.00 / 0.00')).not.toBeInTheDocument();
     expect(screen.queryByText(/0\.440797/)).not.toBeInTheDocument();
+  });
+
+  it('renders the market structure card when report details carry marketStructure', () => {
+    render(
+      <MarketReviewReportView
+        report={marketReviewReportWithStructure}
+        content="# 大盘复盘"
+        reportLanguage="zh"
+      />,
+    );
+
+    expect(screen.getByRole('region', { name: '题材主线与个股位置' })).toBeInTheDocument();
+    expect(screen.getByText('大盘题材层')).toBeInTheDocument();
+    expect(screen.getByText('个股位置层')).toBeInTheDocument();
+    expect(screen.getAllByText(/机器人概念/).length).toBeGreaterThan(0);
+  });
+
+  it('does not render the market structure card for legacy reports without the field', () => {
+    render(
+      <MarketReviewReportView
+        report={englishMarketReviewReport}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+
+    expect(screen.queryByRole('region', { name: 'Themes and Stock Position' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '题材主线与个股位置' })).not.toBeInTheDocument();
   });
 
   it('opens run flow for historical market review records', () => {

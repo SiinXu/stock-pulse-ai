@@ -169,7 +169,7 @@ describe('agentChatStore.startStream', () => {
     expect(state.messages).toHaveLength(1);
     expect(state.chatError).toMatchObject({
       title: '系统没有配置可用的 LLM 模型',
-      message: '请先在系统设置中配置主模型、可用连接或相关 API Key 后再重试。',
+      message: '请先在系统设置中配置主要模型、可用连接或相关 API 密钥后再重试。',
       category: 'llm_not_configured',
       rawMessage: 'Agent LLM: no effective primary model configured',
     });

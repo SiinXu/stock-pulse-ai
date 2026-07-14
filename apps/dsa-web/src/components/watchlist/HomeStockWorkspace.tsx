@@ -80,7 +80,7 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
   const score = typeof item?.sentimentScore === 'number' ? item.sentimentScore : null;
   const color = score !== null ? getSentimentColor(score) : null;
   if (score === null || !color) {
-    return <span className="text-[11px] text-muted-text">{t('common.noData')}</span>;
+    return <span className="text-xs text-muted-text">{t('common.noData')}</span>;
   }
 
   const actionLabels = buildDecisionActionLabelMap(t);
@@ -96,7 +96,7 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
     <Badge
       variant="default"
       size="sm"
-      className="shrink-0 shadow-none text-[11px] font-semibold leading-none"
+      className="shrink-0 shadow-none font-semibold leading-none"
       style={{
         color,
         borderColor: `${color}30`,
@@ -137,11 +137,11 @@ const WatchlistRowItem: React.FC<{
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="font-mono text-[11px] text-secondary-text">{row.code}</span>
+            <span className="font-mono text-xs text-secondary-text">{row.code}</span>
             {item?.lastAnalysisTime ? (
               <>
                 <span className="h-1 w-1 rounded-full bg-subtle-hover" />
-                <span className="text-[11px] text-muted-text">{formatDateTime(item.lastAnalysisTime)}</span>
+                <span className="text-xs text-muted-text">{formatDateTime(item.lastAnalysisTime)}</span>
               </>
             ) : null}
           </div>
@@ -162,7 +162,7 @@ const WatchlistRowItem: React.FC<{
         </div>
       </div>
       {row.activeTask ? (
-        <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-text">
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-text">
           <StatusDot
             tone={row.activeTask.status === 'processing' ? 'info' : 'neutral'}
             pulse={row.activeTask.status === 'processing'}
@@ -188,7 +188,7 @@ const TodayItem: React.FC<{ item: StockBarItem; onClick: (recordId: number) => v
         <span className="block truncate text-sm font-semibold text-foreground">
           {truncateStockName(stockName)}
         </span>
-        <span className="mt-1 block truncate font-mono text-[11px] text-secondary-text">
+        <span className="mt-1 block truncate font-mono text-xs text-secondary-text">
           {item.stockCode}
         </span>
       </div>
@@ -259,7 +259,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             key={tab.key}
             type="button"
             aria-pressed={selected}
-            className={`h-8 rounded-lg px-2 text-xs font-medium transition-colors ${
+            className={`h-8 rounded-full px-2 text-xs font-medium transition-colors ${
               selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
             }`}
             onClick={() => onTabChange(tab.key)}
@@ -301,15 +301,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               title={t('watchlist.title')}
               titleClassName="text-sm font-medium"
               leading={<Star className="h-4 w-4 text-primary" aria-hidden="true" />}
-              actions={<span className="text-[11px] text-muted-text">{t('common.itemsCount', { count: watchlistRows.length })}</span>}
+              actions={<span className="text-xs text-muted-text">{t('common.itemsCount', { count: watchlistRows.length })}</span>}
             />
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2">
-                <p className="text-[11px] text-muted-text">{t('watchlist.todayCoverage')}</p>
+                <p className="text-xs text-muted-text">{t('watchlist.todayCoverage')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{watchlistAnalyzedTodayCount}/{watchlistRows.length}</p>
               </div>
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2">
-                <p className="text-[11px] text-muted-text">{t('watchlist.pendingToday')}</p>
+                <p className="text-xs text-muted-text">{t('watchlist.pendingToday')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{pendingWatchlistCount}</p>
               </div>
             </div>
@@ -344,7 +344,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 value={draftCode}
                 onChange={(event) => setDraftCode(event.target.value)}
                 placeholder={t('watchlist.addPlaceholder')}
-                className="h-9 rounded-lg px-3 text-xs"
+                className="h-9 px-3 text-xs"
                 disabled={watchlistActioning}
                 aria-label={t('watchlist.addPlaceholder')}
               />
@@ -378,15 +378,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               title={t('watchlist.todayTitle')}
               titleClassName="text-sm font-medium"
               leading={<CalendarDays className="h-4 w-4 text-success" aria-hidden="true" />}
-              actions={<span className="text-[11px] text-muted-text">{t('common.itemsCount', { count: todayItems.length })}</span>}
+              actions={<span className="text-xs text-muted-text">{t('common.itemsCount', { count: todayItems.length })}</span>}
             />
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2">
-                <p className="text-[11px] text-muted-text">{t('watchlist.watchlistCoverage')}</p>
+                <p className="text-xs text-muted-text">{t('watchlist.watchlistCoverage')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{watchlistAnalyzedTodayCount}/{watchlistRows.length}</p>
               </div>
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2">
-                <p className="text-[11px] text-muted-text">{t('watchlist.topScore')}</p>
+                <p className="text-xs text-muted-text">{t('watchlist.topScore')}</p>
                 <p className="mt-1 truncate text-sm font-semibold text-foreground">
                   {topTodayItem?.sentimentScore ?? '-'}
                 </p>
@@ -408,7 +408,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             />
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[11px] text-muted-text">
+              <div className="flex items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('watchlist.listHint')}
               </div>
@@ -438,7 +438,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           />
         ) : (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-[11px] text-muted-text">
+            <div className="flex items-center gap-2 text-xs text-muted-text">
               <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
               {t('watchlist.todaySortHint')}
             </div>

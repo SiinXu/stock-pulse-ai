@@ -77,5 +77,35 @@ describe('ModelFallbackEditor', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '上移 gpt-5.5' }));
     expect(onChange).toHaveBeenCalledWith('openai/gpt-5.5,deepseek/deepseek-v4-flash');
+
+    onChange.mockClear();
+    rerender(
+      <ModelFallbackEditor
+        value="deepseek/deepseek-v4-flash,openai/gpt-5.5"
+        onChange={onChange}
+        options={options}
+        language="zh"
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '下移 deepseek-v4-flash' }));
+    expect(onChange).toHaveBeenCalledWith('openai/gpt-5.5,deepseek/deepseek-v4-flash');
+    // Boundary moves are disabled instead of no-oping silently.
+    expect(screen.getByRole('button', { name: '上移 deepseek-v4-flash' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '下移 gpt-5.5' })).toBeDisabled();
+  });
+
+  it('marks a configured route missing from the catalog as unavailable without clearing it', () => {
+    render(
+      <ModelFallbackEditor
+        value="legacy/retired-model,openai/gpt-5.5"
+        onChange={() => {}}
+        options={options}
+        language="zh"
+      />,
+    );
+    // The stale route stays in the list (rendered by its raw route)…
+    expect(screen.getByText('legacy/retired-model')).toBeInTheDocument();
+    // …and is explicitly marked, while catalog-backed routes are not.
+    expect(screen.getAllByText('当前配置不可用')).toHaveLength(1);
   });
 });

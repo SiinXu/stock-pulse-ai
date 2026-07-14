@@ -28,8 +28,8 @@ describe('llmProviderTemplates (presentation-only)', () => {
 
   it('keeps focused config hints on providers with common setup pitfalls', () => {
     expect(PROVIDER_PRESENTATION_BY_ID.ollama.configHint).toContain('Ollama 服务');
-    expect(PROVIDER_PRESENTATION_BY_ID.siliconflow.configHint).toContain('API Key');
-    expect(PROVIDER_PRESENTATION_BY_ID.openrouter.configHint).toContain('API Key');
+    expect(PROVIDER_PRESENTATION_BY_ID.siliconflow.configHint).toContain('API 密钥');
+    expect(PROVIDER_PRESENTATION_BY_ID.openrouter.configHint).toContain('API 密钥');
     expect(PROVIDER_PRESENTATION_BY_ID.volcengine.configHint).toContain('endpoint');
     expect(PROVIDER_PRESENTATION_BY_ID.openai.configHint).toBeUndefined();
   });
@@ -45,7 +45,7 @@ describe('llmProviderTemplates (presentation-only)', () => {
     expect(getProviderPresentation('custom')).toEqual({ officialSources: [] });
     expect(getProviderPresentation('minimax2')).toEqual({ officialSources: [] });
     expect(getProviderPresentation('constructor')).toEqual({ officialSources: [] });
-    expect(getProviderPresentation('openrouter').configHint).toContain('API Key');
+    expect(getProviderPresentation('openrouter').configHint).toContain('API 密钥');
   });
 
   it('does not ship concrete model IDs (models come from discovery / manual entry)', () => {

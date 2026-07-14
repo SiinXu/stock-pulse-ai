@@ -73,7 +73,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test-123' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test-123' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
     // The preset seeds no models; add them explicitly (discovery / manual).
     addWizardModels(['deepseek-v4-flash', 'deepseek-v4-pro']);
@@ -103,8 +103,8 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'gemini');
     // Gemini template has a blank Base URL; entering only the key must be enough.
-    expect(screen.getByLabelText('Base URL')).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'gm-key' } });
+    expect(screen.getByLabelText('服务地址')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'gm-key' } });
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
   });
 
@@ -135,10 +135,10 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'custom');
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-custom' } });
-    expect(screen.getByLabelText('Base URL')).toHaveValue('');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-custom' } });
+    expect(screen.getByLabelText('服务地址')).toHaveValue('');
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Base URL'), { target: { value: 'https://my-proxy.example.com/v1' } });
+    fireEvent.change(screen.getByLabelText('服务地址'), { target: { value: 'https://my-proxy.example.com/v1' } });
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
   });
 
@@ -153,23 +153,72 @@ describe('FirstRunWizard', () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalledWith([{ key: 'GENERATION_BACKEND', value: 'claude_code_cli' }]));
   });
 
-  it('auto-discovers models and fills them into the models field', async () => {
+  it('presents discovered models for confirmation instead of auto-selecting them all', async () => {
     discoverLLMChannelModels.mockResolvedValue({ success: true, message: 'ok', models: ['model-a', 'model-b'] });
     render(<FirstRunWizard onComplete={okComplete()} onClose={() => {}} isSaving={false} language="zh" providers={CATALOG} />);
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     fireEvent.click(screen.getByRole('button', { name: '自动发现模型' }));
-    // Discovered models render as removable token chips (not a comma field).
-    await waitFor(() => expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument());
-    expect(screen.getByLabelText('移除模型 model-b')).toBeInTheDocument();
+    // Candidates land in the searchable multi-select, unchecked — nothing is
+    // enabled until the user confirms each model.
+    const checkboxA = await screen.findByLabelText('model-a');
+    expect(checkboxA).not.toBeChecked();
+    expect(screen.getByLabelText('model-b')).not.toBeChecked();
+    expect(screen.queryByLabelText('移除模型 model-a')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
+    fireEvent.click(checkboxA);
+    // Only the confirmed model becomes an enabled token chip.
+    expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument();
+    expect(screen.queryByLabelText('移除模型 model-b')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
+    // The candidate list is searchable.
+    fireEvent.change(screen.getByLabelText('搜索模型'), { target: { value: 'model-b' } });
+    expect(screen.queryByLabelText('model-a')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('model-b')).toBeInTheDocument();
     expect(discoverLLMChannelModels).toHaveBeenCalledWith(expect.objectContaining({
       name: 'deepseek',
       protocol: 'deepseek',
       apiKey: 'sk-test',
     }));
+  });
+
+  it('allows model discovery for key-exempt Ollama with an empty API key', async () => {
+    discoverLLMChannelModels.mockResolvedValue({ success: true, message: 'ok', models: ['llama3.2'] });
+    render(<FirstRunWizard onComplete={okComplete()} onClose={() => {}} isSaving={false} language="zh" providers={CATALOG} />);
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'ollama');
+    // The key field is explicitly marked optional for key-exempt providers.
+    expect(screen.getByLabelText('API 密钥（可选）')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    const discoverButton = screen.getByRole('button', { name: '自动发现模型' });
+    expect(discoverButton).toBeEnabled();
+    fireEvent.click(discoverButton);
+    await waitFor(() => expect(discoverLLMChannelModels).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'ollama',
+      protocol: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+      apiKey: '',
+    })));
+    expect(await screen.findByLabelText('llama3.2')).not.toBeChecked();
+  });
+
+  it('splits a pasted comma/whitespace-separated model list into deduped tokens', () => {
+    render(<FirstRunWizard onComplete={okComplete()} onClose={() => {}} isSaving={false} language="zh" providers={CATALOG} />);
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'deepseek');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
+    fireEvent.paste(screen.getByLabelText('添加模型'), {
+      clipboardData: { getData: () => ' model-a, model-b\nmodel-a ' },
+    });
+    expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument();
+    expect(screen.getByLabelText('移除模型 model-b')).toBeInTheDocument();
+    expect(within(screen.getByTestId('wizard-model-chips')).getAllByRole('button')).toHaveLength(2);
   });
 
   it('shows a backend save error in the modal and keeps it open', async () => {
@@ -178,7 +227,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk-test' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test' } });
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
     addWizardModels(['deepseek-v4-flash']);
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> model
@@ -199,7 +248,7 @@ describe('FirstRunWizard', () => {
     // may be key-exempt; explicitly pick DeepSeek) blocks until the key is set.
     chooseOption(screen.getByLabelText('服务商'), 'deepseek');
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'sk' } });
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk' } });
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
   });
 });

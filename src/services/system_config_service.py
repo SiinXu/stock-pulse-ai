@@ -2429,8 +2429,8 @@ class SystemConfigService:
     ) -> List[str]:
         """Explain when save payload clears stale runtime model references."""
         runtime_labels = {
-            "LITELLM_MODEL": "主模型",
-            "AGENT_LITELLM_MODEL": "Agent 主模型",
+            "LITELLM_MODEL": "主要模型",
+            "AGENT_LITELLM_MODEL": "Agent 主要模型",
             "VISION_MODEL": "Vision 模型",
         }
         cleared_labels: List[str] = []
@@ -2457,12 +2457,12 @@ class SystemConfigService:
 
         cleaned_targets = list(cleared_labels)
         if removed_fallbacks:
-            cleaned_targets.append("备选模型中的失效项")
+            cleaned_targets.append("备用模型中的失效项")
 
         cleaned_text = " / ".join(cleaned_targets)
         warning = (
             f"检测到已同步清理失效的运行时模型引用：{cleaned_text}。"
-            "如需恢复，请先补回对应渠道模型列表后重新选择；"
+            "如需恢复，请先补回对应连接的模型列表后重新选择；"
             "也可用桌面端导出备份或手动 .env 还原之前的 LLM_* / "
             "LITELLM_MODEL / AGENT_LITELLM_MODEL / VISION_MODEL / LLM_TEMPERATURE。"
         )
@@ -3680,12 +3680,12 @@ class SystemConfigService:
                 return explicit_model, "explicit"
             has_direct_source = self._has_setup_runtime_source_for_model(explicit_model, effective_map)
             if yaml_models and explicit_model not in set(yaml_models):
-                return "", "主模型未出现在当前 LiteLLM YAML model_list 中"
+                return "", "主要模型未出现在当前 LiteLLM YAML model_list 中"
             if channel_models and explicit_model not in set(channel_models):
-                return "", "主模型未出现在当前启用渠道模型列表中"
+                return "", "主要模型未出现在已启用连接的模型列表中"
             if yaml_models or channel_models or has_direct_source:
                 return explicit_model, "explicit"
-            return "", "主模型缺少可用渠道或匹配的 API Key"
+            return "", "主要模型缺少可用连接或匹配的 API 密钥"
 
         if yaml_models:
             return yaml_models[0], "yaml"
@@ -3696,7 +3696,7 @@ class SystemConfigService:
         if legacy_model:
             return legacy_model, "legacy"
 
-        return "", "尚未检测到主模型配置"
+        return "", "尚未检测到主要模型配置"
 
     def _build_setup_primary_llm_check(self, effective_map: Dict[str, str]) -> Dict[str, Any]:
         generation_backend = normalize_backend_id(
@@ -3708,7 +3708,7 @@ class SystemConfigService:
             if shutil.which(preset.executable):
                 return self._setup_check(
                     "llm_primary",
-                    "LLM 主渠道",
+                    "主要模型",
                     "ai_model",
                     True,
                     "configured",
@@ -3716,7 +3716,7 @@ class SystemConfigService:
                 )
             return self._setup_check(
                 "llm_primary",
-                "LLM 主渠道",
+                "主要模型",
                 "ai_model",
                 True,
                 "needs_action",
@@ -3728,23 +3728,23 @@ class SystemConfigService:
                 (
                     "请确认 Codex CLI 已安装到后端 PATH 可见目录；桌面端请完全退出并重开。"
                     "打开 Codex CLI 交互窗口不会改变已运行后端的 PATH；若找到后仍失败，再检查 Codex CLI 登录态，"
-                    "或将 GENERATION_BACKEND 设回 litellm。"
+                    "或将分析生成方式设回默认模型配置。"
                     if generation_backend == CODEX_CLI_BACKEND_ID
-                    else "请先安装并登录对应 CLI，或将 GENERATION_BACKEND 设回 litellm。"
+                    else "请先安装并登录对应 CLI，或将分析生成方式设回默认模型配置。"
                 ),
             )
 
         model, source = self._resolve_setup_primary_model(effective_map)
         if model:
             source_label = {
-                "explicit": "显式主模型",
+                "explicit": "显式主要模型",
                 "yaml": "LiteLLM YAML",
-                "channel": "LLM 渠道",
+                "channel": "模型连接",
                 "legacy": "legacy provider",
             }.get(source, source)
             return self._setup_check(
                 "llm_primary",
-                "LLM 主渠道",
+                "主要模型",
                 "ai_model",
                 True,
                 "configured",
@@ -3752,12 +3752,12 @@ class SystemConfigService:
             )
         return self._setup_check(
             "llm_primary",
-            "LLM 主渠道",
+            "主要模型",
             "ai_model",
             True,
             "needs_action",
             source,
-            "请配置 LITELLM_MODEL、LLM_CHANNELS、LITELLM_CONFIG 或 legacy provider API Key。",
+            "请在“模型接入”中添加模型服务，或在任务路由中选择主要模型。",
         )
 
     def _build_setup_agent_llm_check(
@@ -3776,12 +3776,12 @@ class SystemConfigService:
         if agent_backend in GENERATION_ONLY_BACKEND_IDS:
             return self._setup_check(
                 "llm_agent",
-                "Agent 渠道",
+                "Agent 模型",
                 "agent",
                 True,
                 "needs_action",
                 f"Agent 工具调用暂不支持 {agent_backend} text-only backend。",
-                "请将 AGENT_GENERATION_BACKEND 设为 auto 或 litellm，并配置 LiteLLM 工具调用渠道。",
+                "请将 Agent 生成方式设为自动或默认模型配置，并配置支持工具调用的模型连接。",
             )
 
         agent_model_raw = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
@@ -3795,70 +3795,70 @@ class SystemConfigService:
                     if litellm_model in hermes_routes and litellm_model not in non_hermes_routes:
                         return self._setup_check(
                             "llm_agent",
-                            "Agent 渠道",
+                            "Agent 模型",
                             "agent",
                             True,
                             "needs_action",
                             f"普通分析使用 {local_cli_display}；但当前 LiteLLM Agent 路径继承的是 Hermes-only 模型，"
                             "Hermes Phase 3 不支持 Agent 工具调用。",
-                            "如需使用 Ask-Stock Agent，请配置非 Hermes 的 AGENT_LITELLM_MODEL，"
-                            "或配置包含非 Hermes deployment 的 mixed Agent route。",
+                            "如需使用问股 Agent，请为 Agent 选择非 Hermes 的主要模型，"
+                            "或配置包含非 Hermes deployment 的混合 Agent 路由。",
                         )
                     return self._setup_check(
                         "llm_agent",
-                        "Agent 渠道",
+                        "Agent 模型",
                         "agent",
                         True,
                         "configured",
-                        f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用 LiteLLM 主模型: {litellm_model}",
+                        f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用主要模型: {litellm_model}",
                     )
                 if agent_backend == LITELLM_BACKEND_ID:
                     return self._setup_check(
                         "llm_agent",
-                        "Agent 渠道",
+                        "Agent 模型",
                         "agent",
                         True,
                         "needs_action",
-                        "AGENT_GENERATION_BACKEND 已选择 litellm，但未检测到可用 LiteLLM 模型配置。",
-                        "如需使用 Ask-Stock Agent，请配置 AGENT_LITELLM_MODEL、LITELLM_MODEL、LLM_CHANNELS 或 LITELLM_CONFIG。",
+                        "Agent 生成方式已固定为默认模型配置，但未检测到可用模型配置。",
+                        "如需使用问股 Agent，请先添加模型连接并选择主要模型或 Agent 主要模型。",
                     )
                 return self._setup_check(
                     "llm_agent",
-                    "Agent 渠道",
+                    "Agent 模型",
                     "agent",
                     True,
                     "needs_action",
-                    "Agent 工具调用需要 LiteLLM 模型配置；local CLI 主生成方式不会被自动继承。",
-                    "如需使用 Ask-Stock Agent，请配置 LiteLLM 模型，或将 AGENT_GENERATION_BACKEND 固定为 litellm 后补齐模型配置。",
+                    "Agent 工具调用需要默认模型配置；本机 CLI 生成方式不会被自动继承。",
+                    "如需使用问股 Agent，请先配置模型连接，或将 Agent 生成方式固定为默认模型配置后补齐模型。",
                 )
             if primary_check["status"] == "configured":
                 primary_model, _source = self._resolve_setup_primary_model(effective_map)
                 if primary_model in hermes_routes and primary_model not in non_hermes_routes:
                     return self._setup_check(
                         "llm_agent",
-                        "Agent 渠道",
+                        "Agent 模型",
                         "agent",
                         True,
                         "needs_action",
-                        "Hermes Phase 3 不支持 Agent 工具调用，且当前继承的主模型没有非 Hermes deployment。",
-                        "请选择非 Hermes Agent 模型，或配置包含非 Hermes deployment 的 mixed Agent route。",
+                        "Hermes Phase 3 不支持 Agent 工具调用，且当前继承的主要模型没有非 Hermes deployment。",
+                        "请选择非 Hermes Agent 模型，或配置包含非 Hermes deployment 的混合 Agent 路由。",
                     )
                 return self._setup_check(
                     "llm_agent",
-                    "Agent 渠道",
+                    "Agent 模型",
                     "agent",
                     True,
                     "inherited",
-                    "未单独配置 Agent 主模型，将继承 LLM 主渠道。",
+                    "未单独配置 Agent 主要模型，将继承主要模型。",
                 )
             return self._setup_check(
                 "llm_agent",
-                "Agent 渠道",
+                "Agent 模型",
                 "agent",
                 True,
                 "needs_action",
-                "Agent 未配置独立模型，且 LLM 主渠道尚不可用。",
-                "请先补齐 LLM 主渠道配置。",
+                "Agent 未配置独立模型，且主要模型尚不可用。",
+                "请先补齐主要模型配置。",
             )
 
         configured_models = set(
@@ -3869,23 +3869,23 @@ class SystemConfigService:
         if agent_model in hermes_routes and agent_model not in non_hermes_routes:
             return self._setup_check(
                 "llm_agent",
-                "Agent 渠道",
+                "Agent 模型",
                 "agent",
                 True,
                 "needs_action",
-                f"Agent 主模型 {agent_model} 只有 Hermes deployment，Phase 3 不支持 Agent 工具调用。",
+                f"Agent 主要模型 {agent_model} 只有 Hermes deployment，Phase 3 不支持 Agent 工具调用。",
                 "请选择非 Hermes Agent 模型，或配置 mixed route 中的非 Hermes deployment。",
             )
-        configured_agent_message = f"已配置 Agent 主模型: {agent_model}"
+        configured_agent_message = f"已配置 Agent 主要模型: {agent_model}"
         if generation_backend in LOCAL_CLI_GENERATION_BACKEND_IDS:
             local_cli_display = resolve_local_cli_preset(generation_backend).display_name
             configured_agent_message = (
-                f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用 LiteLLM 主模型: {agent_model}"
+                f"普通分析使用 {local_cli_display}；Agent 工具调用仍使用主要模型: {agent_model}"
             )
         if _uses_direct_env_provider(agent_model):
             return self._setup_check(
                 "llm_agent",
-                "Agent 渠道",
+                "Agent 模型",
                 "agent",
                 True,
                 "configured",
@@ -3897,7 +3897,7 @@ class SystemConfigService:
         ) or agent_model in configured_models:
             return self._setup_check(
                 "llm_agent",
-                "Agent 渠道",
+                "Agent 模型",
                 "agent",
                 True,
                 "configured",
@@ -3906,12 +3906,12 @@ class SystemConfigService:
 
         return self._setup_check(
             "llm_agent",
-            "Agent 渠道",
+            "Agent 模型",
             "agent",
             True,
             "needs_action",
-            f"Agent 主模型 {agent_model} 缺少可用渠道或匹配的 API Key。",
-            "请调整 AGENT_LITELLM_MODEL 或补齐对应渠道配置。",
+            f"Agent 主要模型 {agent_model} 缺少可用连接或匹配的 API 密钥。",
+            "请重新选择 Agent 主要模型或补齐对应模型连接配置。",
         )
 
     def _build_setup_stock_list_check(self, effective_map: Dict[str, str]) -> Dict[str, Any]:
@@ -4662,7 +4662,12 @@ class SystemConfigService:
                 updated_keys=updated_keys,
             )
         )
-        issues.extend(SystemConfigService._validate_llm_runtime_selection(effective_map=effective_map))
+        issues.extend(
+            SystemConfigService._validate_llm_runtime_selection(
+                effective_map=effective_map,
+                updated_keys=updated_keys,
+            )
+        )
 
         if parse_env_bool(effective_map.get("NOTIFICATION_DAILY_DIGEST_ENABLED"), default=False):
             issues.append(
@@ -5047,9 +5052,31 @@ class SystemConfigService:
         return SystemConfigService._has_legacy_key_for_provider(provider, effective_map)
 
     @staticmethod
-    def _validate_llm_runtime_selection(effective_map: Dict[str, str]) -> List[Dict[str, Any]]:
+    def _validate_llm_runtime_selection(
+        effective_map: Dict[str, str],
+        updated_keys: Optional[Set[str]] = None,
+    ) -> List[Dict[str, Any]]:
         """Validate selected primary/fallback/vision models against configured channels."""
         issues: List[Dict[str, Any]] = []
+
+        # Vision references normally degrade to warnings so historical breakage
+        # never blocks unrelated saves; but when this very update reshapes the
+        # channel map (delete/disable/model-list changes), removing the Vision
+        # model's declared source must block like other task references.
+        channel_shape_touched = False
+        if updated_keys:
+            if "LLM_CHANNELS" in updated_keys:
+                channel_shape_touched = True
+            else:
+                declared_channel_prefixes = tuple(
+                    f"LLM_{name.strip().upper()}_"
+                    for name in (effective_map.get("LLM_CHANNELS") or "").split(",")
+                    if name.strip()
+                )
+                channel_shape_touched = bool(declared_channel_prefixes) and any(
+                    key.startswith(declared_channel_prefixes) for key in updated_keys
+                )
+        vision_reference_severity = "error" if channel_shape_touched else "warning"
 
         available_models = (
             SystemConfigService._collect_yaml_models_from_map(effective_map)
@@ -5175,7 +5202,7 @@ class SystemConfigService:
                             "A Vision model is selected, but there is no enabled channel "
                             "or matching API key available for it"
                         ),
-                        "severity": "warning",
+                        "severity": vision_reference_severity,
                         "expected": "enabled channel model or matching legacy API key",
                         "actual": vision_model,
                     }
@@ -5333,7 +5360,7 @@ class SystemConfigService:
                         "The selected Vision model is not declared by the current enabled channels "
                         "or advanced model routing config"
                     ),
-                    "severity": "warning",
+                    "severity": vision_reference_severity,
                     "expected": ",".join(available_models[:6]),
                     "actual": vision_model,
                 }
