@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
 
 ## [Unreleased]
+- [改进] Web 设置页 LLM 渠道编辑器的服务商业务元数据（标签、默认 Base URL、协议、示例模型、能力标签、是否已知服务商）改为统一从后端服务商目录（`GET /system/config/llm/providers`，经 useProviderCatalog）读取，删除前端并行维护的 `LLM_PROVIDER_TEMPLATES` 业务清单；仅保留能力显示文案、协议级占位与各服务商文档链接/配置提示等纯展示内容。前端不再维护第二套服务商业务源。
+- [改进] Web 设置页字段帮助弹窗新增「当前取值来源」说明：依据后端权威的 `raw_value_exists` 标识，明确该字段是「已显式设置」还是「未显式设置、使用内置默认值」（并展示默认值，敏感字段不展示），无内置默认值时提示「未设置」，帮助用户判断当前值来自显式配置还是默认回退。为字段帮助层展示，不改后端。
+- [新功能] Web 问股页支持中止生成：流式回复进行中时，发送按钮变为「停止生成」，点击立即中止当前请求并恢复输入框，已发出的用户消息与历史对话不受影响。
+- [修复] Web 问股页消息输入框在中文/日文等输入法组词过程中按 Enter 选词不再误发送消息：仅当不处于输入法组字状态（`isComposing`）且未按 Shift 时 Enter 才提交，Shift+Enter 仍为换行。
+- [新功能] 后端新增模型服务 Provider 权威目录 `GET /api/v1/system/config/llm/providers`（label/protocol/默认端点/凭据与 Base URL 是否必填/发现能力/capabilities），凭据与端点必填规则由既有渠道完整性契约推导，Web 前端统一消费该目录、不再维护第二套业务规则；首次配置向导改由该目录驱动服务商列表与必填校验（Gemini/Anthropic 免 Base URL、Ollama 免 Key、自定义端点必填 Base URL 就地拦截）。
+- [新功能] 后端新增可用模型目录 `GET /api/v1/system/config/llm/available-models`（返回当前已启用连接声明的规范路由 + 显示名 + 所属连接/服务商，路由集合与保存校验一致）；Web 设置页任务模型（报告/Agent/Vision）改用按连接分组的模型选择器，不再要求手写 `provider/model`，旧配置若不在目录中标注「当前配置不可用」而不静默丢弃；可靠性页「模型备选顺序」改为可增删/上移的多值 token 列表（从模型目录添加，排除主模型与已选）。
+- [改进] Web 设置页 AI 与模型「连接」视图顶部新增「模型接入」服务卡片：按已配置连接展示服务商、已配置/未完成/已停用状态、可用模型数与被哪些任务使用，并提供「添加模型服务」（复用配置向导，合并 `LLM_CHANNELS` 不覆盖），普通路径不再出现「渠道/channel」字样。
+- [改进] Web 设置页 AI 与模型「总览」任务矩阵的生效状态改为权威判定，不再以模型字符串非空猜测：任务主模型被某个已启用连接声明为可用路由时才显示「生效」，已设置但当前配置不可路由显示「当前配置不可用」，未设置显示「待配置」；本地 CLI 后端按自身可用判定。可用路由集来自 `GET /api/v1/system/config/llm/available-models`，与保存校验一致。
+- [改进] Web 设置页字段控件与数据语义对齐：任何带有限枚举 `options` 的字段一律渲染下拉选择（不再因 `ui_control` 提示退化为自由文本框）；普通字段正文不再内联渲染 `schema.docs` 外部文档链接与 `KEY=value` 示例，这些改由字段帮助弹窗提供，普通路径保持无环境变量/配置指南干扰。
+- [修复] Web 设置页首次配置向导保存的配置无法通过后端校验：主模型 `LITELLM_MODEL` 现写入规范 `provider/model` 路由（如 `deepseek/deepseek-v4-flash`），不再保存被后端拒绝的裸模型名；Gemini/Anthropic 官方端点不再强制填写 Base URL（走 SDK 默认端点），Ollama 等本地运行时不再强制 API Key；新建连接合并进已有 `LLM_CHANNELS` 而不是整体覆盖；显式写入 `LLM_CONFIG_MODE=channels` 确保配置的渠道生效、不被 YAML/Legacy 静默覆盖；保存失败时错误在向导内当前步骤展示并保留草稿；摘要页只展示"执行方式/模型服务/可用模型/报告主模型"等用户文案，不再显示 `LLM_CHANNELS`、`API_KEY` 等内部 key。新增真实后端契约测试覆盖上述路径（裸模型名被拒、路由通过、Gemini 空 Base URL、Ollama 免 Key、合并已有渠道）。
 - [新功能] Web 设置页新增首次配置向导：在「概览」点击「启动向导」即可分步完成最小可运行配置——选择云 API 或本机 CLI；云 API 下选服务商（自动预填 Base URL 与示例模型）、填 API Key、可用默认 Base URL 一键「自动发现模型」（失败时手填）、确认报告主模型；本机 CLI 下选后端。最后一步展示摘要，并可选「测试连接」（诊断用，可能访问外部服务/产生费用，不作为保存门禁），再统一「保存并应用」（复用现有校验+保存事务，敏感字段脱敏显示）。达到最低可运行配置即可完成，不强制配置通知或高级项；高级字段不进入向导。移动端 390×844 全流程可用。
 - [改进] Web 设置页顶层「高级」section 改为按字段 placement 聚合展示内部/底层配置：用量签名 HMAC 密钥（`LLM_USAGE_HMAC_SECRET`/`LLM_USAGE_HMAC_KEY_VERSION`）与执行后端底层调优限制（`GENERATION_BACKEND_MAX_CONCURRENCY`/`GENERATION_BACKEND_MAX_OUTPUT_BYTES`/`GENERATION_BACKEND_TIMEOUT_SECONDS`/`LOCAL_CLI_BACKEND_MAX_CONCURRENCY`）。顶层「高级」不再复用「模型供应商」面板（模型供应商仍在 AI 与模型 → 高级视图；执行后端的选择本身仍在可靠性视图）；这些内部键同时从「连接」视图移除，日常路径不再被内部项干扰。为 Web 呈现层调整，不改后端 category。
 - [改进] Web 设置页移动端（窄屏）用紧凑下拉选择一级 section 后，焦点自动移入内容区并滚动到所选 section，便于屏幕阅读器播报与继续操作；桌面端点击侧栏不受影响。

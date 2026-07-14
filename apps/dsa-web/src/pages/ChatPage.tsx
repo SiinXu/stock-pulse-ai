@@ -325,6 +325,7 @@ const ChatPage: React.FC = () => {
     loadInitialSession,
     switchSession,
     startStream,
+    stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
 
@@ -642,6 +643,11 @@ const ChatPage: React.FC = () => {
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ignore the Enter that confirms an IME candidate so CJK input isn't sent
+    // mid-composition (isComposing is true, or legacy keyCode 229).
+    if (e.nativeEvent.isComposing || e.keyCode === 229) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -1478,15 +1484,25 @@ const ChatPage: React.FC = () => {
                     t.style.height = `${Math.min(t.scrollHeight, 200)}px`;
                   }}
                 />
-                <Button
-                  variant="primary"
-                  onClick={() => handleSend()}
-                  disabled={!input.trim() || loading}
-                  isLoading={loading}
-                  className="btn-primary flex-shrink-0"
-                >
-                  发送
-                </Button>
+                {loading ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => stopStream()}
+                    aria-label="停止生成"
+                    className="flex-shrink-0"
+                  >
+                    停止生成
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={() => handleSend()}
+                    disabled={!input.trim()}
+                    className="btn-primary flex-shrink-0"
+                  >
+                    发送
+                  </Button>
+                )}
               </div>
             </div>
           </div>

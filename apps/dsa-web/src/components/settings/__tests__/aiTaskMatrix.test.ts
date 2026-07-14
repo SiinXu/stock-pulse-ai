@@ -55,4 +55,44 @@ describe('resolveAiTaskMatrix', () => {
     const withModel = resolveAiTaskMatrix(accessor({ LITELLM_MODEL: 'm' }));
     expect(withModel.find((row) => row.id === 'report')!.active).toBe(true);
   });
+
+  describe('authoritative status', () => {
+    it('marks an empty model as unconfigured', () => {
+      const rows = resolveAiTaskMatrix(accessor({}), { availableRoutes: new Set(['openai/gpt-4o']) });
+      const report = rows.find((row) => row.id === 'report')!;
+      expect(report.status).toBe('unconfigured');
+      expect(report.active).toBe(false);
+    });
+
+    it('marks a model declared by an enabled connection as active', () => {
+      const rows = resolveAiTaskMatrix(accessor({ LITELLM_MODEL: 'openai/gpt-4o' }), {
+        availableRoutes: new Set(['openai/gpt-4o']),
+      });
+      const report = rows.find((row) => row.id === 'report')!;
+      expect(report.status).toBe('active');
+      expect(report.active).toBe(true);
+    });
+
+    it('marks a set model not declared by any connection as unavailable', () => {
+      const rows = resolveAiTaskMatrix(accessor({ LITELLM_MODEL: 'openai/gpt-4o' }), {
+        availableRoutes: new Set(['anthropic/claude-3-5-sonnet']),
+      });
+      const report = rows.find((row) => row.id === 'report')!;
+      expect(report.status).toBe('unavailable');
+      expect(report.active).toBe(false);
+    });
+
+    it('treats a selected local CLI backend as active without a route set', () => {
+      const rows = resolveAiTaskMatrix(accessor({ GENERATION_BACKEND: 'codex_cli' }), {
+        availableRoutes: new Set<string>(),
+      });
+      expect(rows.every((row) => row.status === 'active')).toBe(true);
+    });
+
+    it('falls back to non-empty status when no route set is provided', () => {
+      const rows = resolveAiTaskMatrix(accessor({ LITELLM_MODEL: 'openai/gpt-4o' }));
+      const report = rows.find((row) => row.id === 'report')!;
+      expect(report.status).toBe('active');
+    });
+  });
 });

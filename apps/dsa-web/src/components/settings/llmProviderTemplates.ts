@@ -1,3 +1,13 @@
+// Presentation-only provider content for the LLM channel editor.
+//
+// The authoritative provider *business* metadata (label, default endpoint,
+// protocol, placeholder models, capabilities, credential/base-URL requirements)
+// lives in the backend provider catalog (`GET /system/config/llm/providers`,
+// consumed via useProviderCatalog). This module intentionally holds only the
+// curated *presentation* content the backend does not model: capability display
+// labels, per-protocol placeholder fallbacks, and per-provider documentation
+// links / config hints. It must not re-declare a second business source.
+
 export type ChannelProtocol = 'openai' | 'deepseek' | 'gemini' | 'anthropic' | 'vertex_ai' | 'ollama';
 export type LLMProviderCapability =
   | 'openai-compatible'
@@ -6,20 +16,6 @@ export type LLMProviderCapability =
   | 'model-discovery'
   | 'vision'
   | 'local-runtime';
-
-export interface LLMProviderTemplate {
-  channelId: string;
-  label: string;
-  protocol: ChannelProtocol;
-  baseUrl: string;
-  placeholderModels: string;
-  capabilities: LLMProviderCapability[];
-  configHint?: string;
-  officialSources: Array<{
-    label: string;
-    url: string;
-  }>;
-}
 
 export const LLM_PROVIDER_CAPABILITY_LABELS: Record<LLMProviderCapability, { label: string; hint: string }> = {
   'openai-compatible': {
@@ -48,181 +44,81 @@ export const LLM_PROVIDER_CAPABILITY_LABELS: Record<LLMProviderCapability, { lab
   },
 };
 
-export const LLM_PROVIDER_TEMPLATES: LLMProviderTemplate[] = [
-  {
-    channelId: 'aihubmix',
-    label: 'AIHubmix（聚合平台）',
-    protocol: 'openai',
-    baseUrl: 'https://aihubmix.com/v1',
-    placeholderModels: 'gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview',
-    capabilities: ['openai-compatible', 'aggregator'],
-    officialSources: [{ label: 'AIHubmix', url: 'https://aihubmix.com/' }],
-  },
-  {
-    channelId: 'anspire',
-    label: 'Anspire Open（一站式模型+搜索）',
-    protocol: 'openai',
-    baseUrl: 'https://open-gateway.anspire.cn/v6',
-    placeholderModels: 'Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7',
-    capabilities: ['openai-compatible'],
-    configHint:
-      '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 渠道。以下模型与网关为配置示例，实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
+export function getCapabilityLabel(capability: string): { label: string; hint: string } | undefined {
+  if (!Object.prototype.hasOwnProperty.call(LLM_PROVIDER_CAPABILITY_LABELS, capability)) {
+    return undefined;
+  }
+  return LLM_PROVIDER_CAPABILITY_LABELS[capability as LLMProviderCapability];
+}
+
+export interface ProviderPresentation {
+  officialSources: Array<{ label: string; url: string }>;
+  configHint?: string;
+}
+
+// Curated documentation links / config hints keyed by provider id. These are
+// help content (like the settings help locale), not routing business metadata.
+export const PROVIDER_PRESENTATION_BY_ID: Record<string, ProviderPresentation> = {
+  aihubmix: { officialSources: [{ label: 'AIHubmix', url: 'https://aihubmix.com/' }] },
+  anspire: {
     officialSources: [
       { label: 'Anspire Open', url: 'https://open.anspire.cn/?share_code=QFBC0FYC' },
-      {
-        label: 'LiteLLM OpenAI-compatible',
-        url: 'https://docs.litellm.ai/docs/providers/openai_compatible',
-      },
+      { label: 'LiteLLM OpenAI-compatible', url: 'https://docs.litellm.ai/docs/providers/openai_compatible' },
     ],
+    configHint:
+      '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 渠道。以下模型与网关为配置示例，实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
   },
-  {
-    channelId: 'deepseek',
-    label: 'DeepSeek 官方',
-    protocol: 'deepseek',
-    baseUrl: 'https://api.deepseek.com',
-    placeholderModels: 'deepseek-v4-flash,deepseek-v4-pro',
-    capabilities: ['official-api', 'openai-compatible'],
-    officialSources: [{ label: 'DeepSeek API Docs', url: 'https://api-docs.deepseek.com/' }],
-  },
-  {
-    channelId: 'dashscope',
-    label: '通义千问（Dashscope）',
-    protocol: 'openai',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    placeholderModels: 'qwen3.6-plus,qwen3.6-flash',
-    capabilities: ['openai-compatible', 'model-discovery'],
+  deepseek: { officialSources: [{ label: 'DeepSeek API Docs', url: 'https://api-docs.deepseek.com/' }] },
+  dashscope: {
     officialSources: [
       { label: 'DashScope Text Generation', url: 'https://help.aliyun.com/zh/model-studio/text-generation-model/' },
     ],
   },
-  {
-    channelId: 'zhipu',
-    label: '智谱 GLM',
-    protocol: 'openai',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-    placeholderModels: 'glm-5.1,glm-4.7-flash',
-    capabilities: ['openai-compatible'],
+  zhipu: {
     officialSources: [{ label: 'Zhipu Model Overview', url: 'https://docs.bigmodel.cn/cn/guide/start/model-overview' }],
   },
-  {
-    channelId: 'moonshot',
-    label: 'Moonshot（月之暗面）',
-    protocol: 'openai',
-    baseUrl: 'https://api.moonshot.cn/v1',
-    placeholderModels: 'kimi-k2.6,kimi-k2.5',
-    capabilities: ['openai-compatible'],
-    officialSources: [{ label: 'Kimi Platform Docs', url: 'https://platform.kimi.com/docs/models' }],
-  },
-  {
-    channelId: 'minimax',
-    label: 'MiniMax 官方',
-    protocol: 'openai',
-    baseUrl: 'https://api.minimax.io/v1',
-    placeholderModels: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed',
-    capabilities: ['openai-compatible'],
+  moonshot: { officialSources: [{ label: 'Kimi Platform Docs', url: 'https://platform.kimi.com/docs/models' }] },
+  minimax: {
     officialSources: [
       { label: 'MiniMax OpenAI API', url: 'https://platform.minimax.io/docs/api-reference/text-chat' },
       { label: 'MiniMax Models', url: 'https://platform.minimax.io/docs/api-reference/models/openai/list-models' },
     ],
   },
-  {
-    channelId: 'volcengine',
-    label: '火山方舟（豆包）',
-    protocol: 'openai',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    placeholderModels: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015',
-    capabilities: ['openai-compatible'],
-    configHint: '确认在线推理 endpoint / region 与 Coding Plan 专用入口不要混用。',
+  volcengine: {
     officialSources: [
       { label: 'Volcengine Ark Inference', url: 'https://www.volcengine.com/docs/82379/2121998' },
       { label: 'Volcengine Ark Models', url: 'https://www.volcengine.com/docs/82379/1949118' },
     ],
+    configHint: '确认在线推理 endpoint / region 与 Coding Plan 专用入口不要混用。',
   },
-  {
-    channelId: 'siliconflow',
-    label: '硅基流动（SiliconFlow）',
-    protocol: 'openai',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    placeholderModels: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507',
-    capabilities: ['openai-compatible', 'model-discovery'],
-    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
+  siliconflow: {
     officialSources: [{ label: 'SiliconFlow Models', url: 'https://docs.siliconflow.cn/quickstart/models' }],
-  },
-  {
-    channelId: 'openrouter',
-    label: 'OpenRouter',
-    protocol: 'openai',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    placeholderModels: '~anthropic/claude-sonnet-latest,~openai/gpt-latest',
-    capabilities: ['openai-compatible', 'aggregator', 'model-discovery'],
     configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
+  },
+  openrouter: {
     officialSources: [
       { label: 'OpenRouter Models API', url: 'https://openrouter.ai/docs/api/api-reference/models/get-models' },
     ],
+    configHint: '模型列表和模型可见性依赖账号权限与 API Key。',
   },
-  {
-    channelId: 'gemini',
-    label: 'Gemini 官方',
-    protocol: 'gemini',
-    baseUrl: '',
-    placeholderModels: 'gemini-3.1-pro-preview,gemini-3-flash-preview',
-    capabilities: ['official-api', 'vision'],
-    officialSources: [{ label: 'Gemini Models', url: 'https://ai.google.dev/gemini-api/docs/models' }],
-  },
-  {
-    channelId: 'anthropic',
-    label: 'Anthropic 官方',
-    protocol: 'anthropic',
-    baseUrl: '',
-    placeholderModels: 'claude-sonnet-4-6,claude-opus-4-7',
-    capabilities: ['official-api'],
+  gemini: { officialSources: [{ label: 'Gemini Models', url: 'https://ai.google.dev/gemini-api/docs/models' }] },
+  anthropic: {
     officialSources: [
       { label: 'Anthropic Models', url: 'https://docs.anthropic.com/en/docs/about-claude/models/all-models' },
     ],
   },
-  {
-    channelId: 'openai',
-    label: 'OpenAI 官方',
-    protocol: 'openai',
-    baseUrl: 'https://api.openai.com/v1',
-    placeholderModels: 'gpt-5.5,gpt-5.4-mini',
-    capabilities: ['official-api', 'openai-compatible', 'model-discovery'],
-    officialSources: [{ label: 'OpenAI Models', url: 'https://platform.openai.com/docs/models' }],
-  },
-  {
-    channelId: 'ollama',
-    label: 'Ollama（本地）',
-    protocol: 'ollama',
-    baseUrl: 'http://127.0.0.1:11434',
-    placeholderModels: 'llama3.2,qwen2.5',
-    capabilities: ['local-runtime'],
-    configHint: '需要本机、Docker 或 self-hosted runner 能访问 Ollama 服务。',
+  openai: { officialSources: [{ label: 'OpenAI Models', url: 'https://platform.openai.com/docs/models' }] },
+  ollama: {
     officialSources: [{ label: 'Ollama API', url: 'https://github.com/ollama/ollama/blob/main/docs/api.md' }],
+    configHint: '需要本机、Docker 或 self-hosted runner 能访问 Ollama 服务。',
   },
-  {
-    channelId: 'custom',
-    label: '自定义渠道',
-    protocol: 'openai',
-    baseUrl: '',
-    placeholderModels: 'model-name-1,model-name-2',
-    capabilities: [],
-    officialSources: [],
-  },
-];
+};
 
-export const LLM_PROVIDER_TEMPLATE_BY_ID: Record<string, LLMProviderTemplate> = Object.fromEntries(
-  LLM_PROVIDER_TEMPLATES.map((template) => [template.channelId, template]),
-);
-
-export function getProviderTemplate(channelId: string): LLMProviderTemplate | undefined {
-  if (!Object.prototype.hasOwnProperty.call(LLM_PROVIDER_TEMPLATE_BY_ID, channelId)) {
-    return undefined;
+export function getProviderPresentation(id: string): ProviderPresentation {
+  if (!Object.prototype.hasOwnProperty.call(PROVIDER_PRESENTATION_BY_ID, id)) {
+    return { officialSources: [] };
   }
-  return LLM_PROVIDER_TEMPLATE_BY_ID[channelId];
-}
-
-export function isKnownProviderTemplate(channelId: string): boolean {
-  return channelId !== 'custom' && Boolean(getProviderTemplate(channelId));
+  return PROVIDER_PRESENTATION_BY_ID[id];
 }
 
 export const MODEL_PLACEHOLDERS_BY_PROTOCOL: Record<ChannelProtocol, string> = {

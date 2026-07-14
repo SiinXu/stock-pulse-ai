@@ -9,6 +9,8 @@ interface BilingualLabel {
   en: string;
 }
 
+export type AiTaskStatus = 'active' | 'unavailable' | 'unconfigured';
+
 export interface AiTaskRow {
   id: string;
   label: BilingualLabel;
@@ -21,8 +23,20 @@ export interface AiTaskRow {
   /** True when the task has no dedicated model and inherits the report model. */
   primaryInherited: boolean;
   fallbackModels: string[];
-  /** Whether an effective model is resolved (configured & routable). */
+  /**
+   * Authoritative status: 'active' when the effective model is declared by an
+   * enabled connection in the active source (routable); 'unavailable' when a
+   * model is set but not routable by the current config; 'unconfigured' when no
+   * model is set. Falls back to non-empty when no route set is provided.
+   */
+  status: AiTaskStatus;
+  /** Back-compat: true when the effective model is active/routable. */
   active: boolean;
+}
+
+interface ResolveOptions {
+  /** Authoritative set of model routes declared by enabled connections. */
+  availableRoutes?: Set<string>;
 }
 
 const BACKEND_LABELS: Record<string, BilingualLabel> = {
@@ -48,7 +62,11 @@ function splitModels(value: string): string[] {
  * report model; agent and vision inherit it only when they have no dedicated
  * model configured, mirroring the runtime resolution order.
  */
-export function resolveAiTaskMatrix(get: (key: string) => string): AiTaskRow[] {
+export function resolveAiTaskMatrix(
+  get: (key: string) => string,
+  options: ResolveOptions = {},
+): AiTaskRow[] {
+  const { availableRoutes } = options;
   const backendId = (get('GENERATION_BACKEND') || 'litellm').trim();
   const fallbackBackendId = (get('GENERATION_FALLBACK_BACKEND') || '').trim();
   const reportModel = get('LITELLM_MODEL').trim();
@@ -56,6 +74,22 @@ export function resolveAiTaskMatrix(get: (key: string) => string): AiTaskRow[] {
   const visionModel = get('VISION_MODEL').trim();
   const fallbackModels = splitModels(get('LITELLM_FALLBACK_MODELS'));
   const label = backendLabel(backendId);
+  // Local CLI backends run without a channel model, so their route set is not
+  // meaningful — treat a selected CLI backend as active on its own.
+  const isCliBackend = backendId !== 'litellm' && backendId.length > 0;
+
+  const resolveStatus = (model: string): AiTaskStatus => {
+    if (isCliBackend) {
+      return 'active';
+    }
+    if (model.length === 0) {
+      return 'unconfigured';
+    }
+    if (availableRoutes) {
+      return availableRoutes.has(model) ? 'active' : 'unavailable';
+    }
+    return 'active';
+  };
 
   const row = (
     id: string,
@@ -63,17 +97,21 @@ export function resolveAiTaskMatrix(get: (key: string) => string): AiTaskRow[] {
     model: string,
     inherited: boolean,
     fallbacks: string[],
-  ): AiTaskRow => ({
-    id,
-    label: labelText,
-    backendId,
-    backendLabel: label,
-    fallbackBackendId,
-    primaryModel: model,
-    primaryInherited: inherited,
-    fallbackModels: fallbacks,
-    active: model.length > 0,
-  });
+  ): AiTaskRow => {
+    const status = resolveStatus(model);
+    return {
+      id,
+      label: labelText,
+      backendId,
+      backendLabel: label,
+      fallbackBackendId,
+      primaryModel: model,
+      primaryInherited: inherited,
+      fallbackModels: fallbacks,
+      status,
+      active: status === 'active',
+    };
+  };
 
   return [
     row('report', { zh: '股票报告', en: 'Stock report' }, reportModel, false, fallbackModels),

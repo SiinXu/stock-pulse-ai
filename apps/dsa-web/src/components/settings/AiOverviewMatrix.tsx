@@ -1,6 +1,6 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { resolveAiTaskMatrix, type UiLang } from './aiTaskMatrix';
+import { resolveAiTaskMatrix, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
 
 interface AiOverviewMatrixProps {
   /** Config value accessor (draft-applied), used to resolve effective routing. */
@@ -8,7 +8,15 @@ interface AiOverviewMatrixProps {
   language: UiLang;
   /** Jump to the Task Routing view to edit models. */
   onEditRouting?: () => void;
+  /** Authoritative model routes declared by enabled connections (for Active state). */
+  availableRoutes?: Set<string>;
 }
+
+const STATUS_META: Record<AiTaskStatus, { zh: string; en: string; dot: string; text: string }> = {
+  active: { zh: '生效', en: 'Active', dot: 'bg-success', text: 'text-foreground' },
+  unavailable: { zh: '当前配置不可用', en: 'Unavailable', dot: 'bg-danger', text: 'text-danger' },
+  unconfigured: { zh: '待配置', en: 'Needs config', dot: 'bg-warning', text: 'text-warning' },
+};
 
 const T = {
   title: { zh: '任务路由总览', en: 'Task routing overview' },
@@ -23,14 +31,12 @@ const T = {
   colStatus: { zh: '状态', en: 'Status' },
   inherited: { zh: '继承报告模型', en: 'inherits report model' },
   none: { zh: '未配置', en: 'not configured' },
-  active: { zh: '生效', en: 'Active' },
-  needsConfig: { zh: '待配置', en: 'Needs config' },
   failover: { zh: '失败切换', en: 'failover' },
   edit: { zh: '前往任务路由', en: 'Edit task routing' },
 } as const;
 
-export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, language, onEditRouting }) => {
-  const rows = resolveAiTaskMatrix(getValue);
+export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, language, onEditRouting, availableRoutes }) => {
+  const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: { zh: string; en: string }) => entry[language];
 
   return (
@@ -93,9 +99,9 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                 </td>
                 <td className="px-3 py-2.5">
                   <span className="inline-flex items-center gap-1.5">
-                    <span className={cn('h-2 w-2 rounded-full', row.active ? 'bg-success' : 'bg-warning')} aria-hidden="true" />
-                    <span className={row.active ? 'text-foreground' : 'text-warning'}>
-                      {row.active ? tx(T.active) : tx(T.needsConfig)}
+                    <span className={cn('h-2 w-2 rounded-full', STATUS_META[row.status].dot)} aria-hidden="true" />
+                    <span className={STATUS_META[row.status].text}>
+                      {tx(STATUS_META[row.status])}
                     </span>
                   </span>
                 </td>

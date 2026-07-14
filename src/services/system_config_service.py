@@ -627,6 +627,65 @@ class SystemConfigService:
         effective_map = {**runtime_config_map, **saved_config_map}
         return self._resolve_llm_config_mode_status(effective_map)
 
+    def get_available_models(
+        self, items: Optional[Sequence[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Return the model routes declared by currently-enabled sources.
+
+        Each entry pairs the canonical backend route (what LITELLM_MODEL etc.
+        must store) with a display name and its owning connection/provider, so
+        Web model selectors let users pick a display name while the system keeps
+        the exact route. The route set is authoritative (matches validation);
+        connection/provider are best-effort grouping metadata.
+        """
+        saved_config_map = self._build_display_config_map(self._manager.read_config_map())
+        runtime_config_map = self._build_runtime_display_config_map(saved_config_map)
+        effective_map = {**runtime_config_map, **saved_config_map}
+        if items:
+            for item in items:
+                key = str(item.get("key", "")).strip().upper()
+                if key:
+                    effective_map[key] = str(item.get("value", ""))
+
+        authoritative = (
+            SystemConfigService._collect_yaml_models_from_map(effective_map)
+            or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
+        )
+        ordered_routes = list(dict.fromkeys(authoritative))
+
+        # Best-effort route -> (connection, provider, display) grouping.
+        grouping: Dict[str, Dict[str, str]] = {}
+        for raw_name in (effective_map.get("LLM_CHANNELS") or "").split(","):
+            name = raw_name.strip()
+            if not name:
+                continue
+            prefix = f"LLM_{name.upper()}"
+            enabled_raw = effective_map.get(f"{prefix}_ENABLED")
+            if name.lower() == "anspire" and not (enabled_raw or "").strip():
+                enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
+            if not parse_env_bool(enabled_raw, default=True):
+                continue
+            protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip() or "openai"
+            base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            for raw_model in (effective_map.get(f"{prefix}_MODELS") or "").split(","):
+                model = raw_model.strip()
+                if not model:
+                    continue
+                route = normalize_llm_channel_model(model, protocol, base_url)
+                if route and route not in grouping:
+                    grouping[route] = {"connection": name, "provider": protocol, "display": model}
+
+        models: List[Dict[str, Any]] = []
+        for route in ordered_routes:
+            meta = grouping.get(route)
+            models.append({
+                "route": route,
+                "display": meta["display"] if meta else route,
+                "connection": meta["connection"] if meta else None,
+                "provider": meta["provider"] if meta else None,
+            })
+        return {"models": models}
+
     _LEGACY_LLM_PROVIDER_KEYS = (
         "OPENAI_API_KEY", "OPENAI_API_KEYS", "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEYS",
         "GEMINI_API_KEY", "GEMINI_API_KEYS", "DEEPSEEK_API_KEY", "DEEPSEEK_API_KEYS",

@@ -45,6 +45,7 @@ const mockLoadSessions = vi.fn();
 const mockLoadInitialSession = vi.fn();
 const mockSwitchSession = vi.fn();
 const mockStartStream = vi.fn();
+const mockStopStream = vi.fn();
 const mockClearCompletionBadge = vi.fn();
 const mockStartNewChat = vi.fn();
 
@@ -68,6 +69,7 @@ const mockStoreState = {
   loadInitialSession: mockLoadInitialSession,
   switchSession: mockSwitchSession,
   startStream: mockStartStream,
+  stopStream: mockStopStream,
   clearCompletionBadge: mockClearCompletionBadge,
 };
 
@@ -1634,6 +1636,64 @@ describe('extractStockCodeFromMessage', () => {
     expect(extractStockCodesFromMessage('如果不考虑 TTM 和 PE')).toEqual([]);
     expect(extractStockCodesFromMessage('MACD AAPL 和 RSI')).toEqual(['AAPL']);
     expect(extractStockCodesFromMessage('KDJ AAPL 怎么看')).toEqual(['AAPL']);
+  });
+});
+
+describe('IME composition guard on Enter', () => {
+  it('does not send while an IME candidate is being composed, then sends on a plain Enter', async () => {
+    render(
+      <MemoryRouter>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const textarea = await screen.findByPlaceholderText(/例如/);
+    fireEvent.change(textarea, { target: { value: '茅台怎么看' } });
+
+    // Enter that confirms an IME candidate must not submit the message.
+    fireEvent.keyDown(textarea, { key: 'Enter', isComposing: true });
+    expect(mockStartStream).not.toHaveBeenCalled();
+    expect((textarea as HTMLTextAreaElement).value).toBe('茅台怎么看');
+
+    // A plain Enter (composition finished) submits.
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalledWith(
+        expect.objectContaining({ message: '茅台怎么看' }),
+        expect.anything(),
+      );
+    });
+  });
+});
+
+describe('stop generation', () => {
+  it('shows a stop button while streaming and calls stopStream when clicked', async () => {
+    mockStoreState.loading = true;
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    // While streaming the send button is replaced by a stop button.
+    expect(screen.queryByRole('button', { name: '发送' })).not.toBeInTheDocument();
+    const stopButton = await screen.findByRole('button', { name: '停止生成' });
+    fireEvent.click(stopButton);
+    expect(mockStopStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the send button when not streaming', () => {
+    mockStoreState.loading = false;
+
+    render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: '发送' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '停止生成' })).not.toBeInTheDocument();
   });
 });
 

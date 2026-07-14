@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, ChevronDown, CircleAlert, CircleDashed, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useAuth, useSystemConfig } from '../hooks';
+import { useProviderCatalog } from '../hooks/useProviderCatalog';
+import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, CreatableCombobox, EmptyState, type ComboboxOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -39,6 +41,10 @@ import {
   type ErrorSummaryEntry,
   FirstRunWizard,
   type WizardDraftItem,
+  type WizardCompleteResult,
+  ConnectionServiceCards,
+  deriveConnections,
+  ModelFallbackEditor,
 } from '../components/settings';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
@@ -965,6 +971,11 @@ const SettingsPage: React.FC = () => {
     configVersion,
     maskToken,
   } = useSystemConfig(initialTab);
+  // Authoritative provider catalog (single source of truth) for the wizard and
+  // the model-access page.
+  const { providers: providerCatalog, isLoading: isProviderCatalogLoading } = useProviderCatalog();
+  // Available model routes (authoritative) refetched when the saved config changes.
+  const { models: availableModels } = useAvailableModels(configVersion);
 
   // section/view is the single source of truth for navigation, driven by the
   // URL so Back/Forward/refresh/deep-links all work. Legacy category/sub only
@@ -1421,15 +1432,45 @@ const SettingsPage: React.FC = () => {
     () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE']),
     [pickAiModelItems],
   );
+  // Per-task model fields render a model selector fed by the authoritative
+  // available-model catalog (grouped by connection), so users pick a display
+  // name and never hand-type a provider/model route.
+  const modelSelectorOptions = useMemo<ComboboxOption[]>(
+    () => availableModels.map((entry) => ({
+      value: entry.route,
+      label: entry.display,
+      group: entry.connection ?? entry.provider ?? undefined,
+      hint: entry.provider ?? undefined,
+    })),
+    [availableModels],
+  );
+  // Authoritative routable route set for AI Overview Active/Unavailable status.
+  const availableRouteSet = useMemo(
+    () => new Set(availableModels.map((entry) => entry.route)),
+    [availableModels],
+  );
+  // Config keys whose value is a single model route (rendered via the selector).
+  const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
+  // Model-access service cards: one per configured connection, derived from the
+  // current config + provider catalog + authoritative available models.
+  const modelAccessConnections = useMemo(
+    () => deriveConnections({
+      valuesByKey: allValuesByKey,
+      providers: providerCatalog,
+      availableModels,
+      taskAssignments: [
+        { label: uiLanguage === 'en' ? 'Report' : '报告', route: allValuesByKey.LITELLM_MODEL || '' },
+        { label: uiLanguage === 'en' ? 'Agent' : 'Agent', route: allValuesByKey.AGENT_LITELLM_MODEL || '' },
+        { label: uiLanguage === 'en' ? 'Vision' : 'Vision', route: allValuesByKey.VISION_MODEL || '' },
+      ],
+    }),
+    [allValuesByKey, providerCatalog, availableModels, uiLanguage],
+  );
   // Reliability view: two distinct mechanisms — execution-backend failover and
   // in-LiteLLM model fallback order (MC-05, must not both read "Fallback").
   const isAiReliability = activeSection === 'ai_models' && activeView === 'reliability';
   const executionFailoverItems = useMemo(
     () => pickAiModelItems(['GENERATION_BACKEND', 'GENERATION_FALLBACK_BACKEND']),
-    [pickAiModelItems],
-  );
-  const modelFallbackItems = useMemo(
-    () => pickAiModelItems(['LITELLM_FALLBACK_MODELS']),
     [pickAiModelItems],
   );
   // Event Monitor lives under the agent backend category but belongs to the
@@ -1687,15 +1728,27 @@ const SettingsPage: React.FC = () => {
 
   // First-run wizard commits its minimal config through the same save
   // transaction (validate + update + apply server payload), so channel keys are
-  // persisted atomically and the normal post-save effects run.
-  const handleWizardComplete = async (items: WizardDraftItem[]) => {
+  // persisted atomically and the normal post-save effects run. The result is
+  // returned so the wizard can surface backend validation errors in place.
+  const handleWizardComplete = async (items: WizardDraftItem[]): Promise<WizardCompleteResult> => {
     const result = await save(items);
     if (!result.success) {
-      return;
+      const error = result.issues && result.issues.length > 0
+        ? result.issues.map((issue) => issue.message).join('；')
+        : result.message;
+      return { success: false, error };
     }
     applyPostSaveEffects();
     setIsWizardOpen(false);
+    return { success: true };
   };
+  const existingChannelNames = useMemo(
+    () => (allValuesByKey.LLM_CHANNELS || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    [allValuesByKey],
+  );
 
   const openDesktopReleasePage = async () => {
     if (!desktopRuntimeApi?.openReleasePage) {
@@ -2118,7 +2171,7 @@ const SettingsPage: React.FC = () => {
                 message={t('settings.restartRequiredNotice')}
               />
             ) : null}
-            {shouldShowFirstRunSetup ? (
+            {shouldShowFirstRunSetup && !setupStatus?.isComplete ? (
               <div className="flex flex-col gap-2 rounded-2xl border settings-border bg-card/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">
@@ -2135,6 +2188,7 @@ const SettingsPage: React.FC = () => {
                   variant="settings-primary"
                   size="sm"
                   className="shrink-0"
+                  disabled={isProviderCatalogLoading || providerCatalog.length === 0}
                   onClick={() => setIsWizardOpen(true)}
                 >
                   {uiLanguage === 'en' ? 'Start wizard' : '启动向导'}
@@ -2409,6 +2463,7 @@ const SettingsPage: React.FC = () => {
                   getValue={(key) => allValuesByKey[key.toUpperCase()] ?? ''}
                   language={uiLanguage}
                   onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
+                  availableRoutes={availableRouteSet}
                 />
               </SettingsSectionCard>
             ) : null}
@@ -2422,16 +2477,45 @@ const SettingsPage: React.FC = () => {
                 {taskRoutingItems.length > 0 ? (
                   <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
                     {taskRoutingItems.map((item) => (
-                      <SettingsField
-                        key={item.key}
-                        item={item}
-                        value={item.value}
-                        disabled={isSaving}
-                        onChange={setDraftValue}
-                        issues={issueByKey[item.key] || []}
-                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                      />
+                      TASK_MODEL_KEYS.has(item.key) ? (
+                        <div key={item.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_260px] md:items-center md:gap-6">
+                          <label htmlFor={`setting-${item.key}`} className="text-sm text-foreground">
+                            {getFieldTitleZh(item.key, item.key)}
+                          </label>
+                          <div className="min-w-0">
+                            <CreatableCombobox
+                              id={`setting-${item.key}`}
+                              value={item.value}
+                              onChange={(next) => setDraftValue(item.key, next)}
+                              options={modelSelectorOptions}
+                              ariaLabel={getFieldTitleZh(item.key, item.key)}
+                              placeholder={item.key === 'LITELLM_MODEL'
+                                ? (uiLanguage === 'en' ? 'Select a model' : '选择模型')
+                                : (uiLanguage === 'en' ? 'Inherit report model' : '跟随报告主模型（默认）')}
+                              error={(issueByKey[item.key] || []).some((issue) => issue.severity === 'error')}
+                              emptyText={uiLanguage === 'en' ? 'No available models — add a model service first' : '暂无可用模型，请先添加模型服务'}
+                              customLabel={(val) => (uiLanguage === 'en' ? `Custom: ${val}` : `自定义：${val}`)}
+                              unavailableLabel={uiLanguage === 'en'
+                                ? `Current value unavailable: ${item.value}`
+                                : `当前配置不可用：${item.value}`}
+                            />
+                            {(issueByKey[item.key] || []).map((issue) => (
+                              <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <SettingsField
+                          key={item.key}
+                          item={item}
+                          value={item.value}
+                          disabled={isSaving}
+                          onChange={setDraftValue}
+                          issues={issueByKey[item.key] || []}
+                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        />
+                      )
                     ))}
                   </div>
                 ) : (
@@ -2502,22 +2586,17 @@ const SettingsPage: React.FC = () => {
                         || (uiLanguage === 'en' ? 'none set' : '未设置')}
                     </span>
                   </p>
-                  {modelFallbackItems.length > 0 ? (
-                    <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                      {modelFallbackItems.map((item) => (
-                        <SettingsField
-                          key={item.key}
-                          item={item}
-                          value={item.value}
-                          disabled={isSaving}
-                          onChange={setDraftValue}
-                          issues={issueByKey[item.key] || []}
-                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  <ModelFallbackEditor
+                    value={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                    onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
+                    options={modelSelectorOptions}
+                    primaryRoute={allValuesByKey.LITELLM_MODEL || ''}
+                    language={uiLanguage}
+                    disabled={isSaving}
+                  />
+                  {(issueByKey.LITELLM_FALLBACK_MODELS || []).map((issue) => (
+                    <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
+                  ))}
                 </SettingsSectionCard>
               </div>
             ) : null}
@@ -2552,6 +2631,22 @@ const SettingsPage: React.FC = () => {
             ) : null}
             {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
               <SettingsSectionCard
+                title={uiLanguage === 'en' ? 'Model access' : '模型接入'}
+                description={uiLanguage === 'en'
+                  ? 'Connected model services, their available models and which tasks use them.'
+                  : '已接入的模型服务、可用模型数量与被哪些任务使用。'}
+                contentBordered
+              >
+                <ConnectionServiceCards
+                  connections={modelAccessConnections}
+                  language={uiLanguage}
+                  onAddService={() => setIsWizardOpen(true)}
+                  addDisabled={isProviderCatalogLoading || providerCatalog.length === 0}
+                />
+              </SettingsSectionCard>
+            ) : null}
+            {activeCategory === 'ai_model' && activeSubCategory === 'model' && !isAiOverview && !isAiTaskRouting && !isAiReliability ? (
+              <SettingsSectionCard
                 title={t('settings.llmAccess')}
                 description={t('settings.llmAccessDescription')}
                 contentBordered
@@ -2573,6 +2668,7 @@ const SettingsPage: React.FC = () => {
                 />
                 <LLMChannelEditor
                   items={rawActiveItems}
+                  providers={providerCatalog}
                   maskToken={maskToken}
                   persistedDraftItems={llmChannelDraftItems}
                   onDraftItemsChange={handleLlmChannelDraftItemsChange}
@@ -2697,6 +2793,8 @@ const SettingsPage: React.FC = () => {
           onClose={() => setIsWizardOpen(false)}
           isSaving={isSaving}
           language={uiLanguage}
+          existingChannelNames={existingChannelNames}
+          providers={providerCatalog}
         />
       ) : null}
     </div>

@@ -220,6 +220,34 @@ describe('agentChatStore.startStream', () => {
   });
 });
 
+describe('agentChatStore.stopStream', () => {
+  it('aborts the in-flight stream and clears transient state, keeping messages', () => {
+    const ac = new AbortController();
+    useAgentChatStore.setState({
+      loading: true,
+      progressSteps: [{ type: 'thinking', message: '正在制定分析路径...' }],
+      abortController: ac,
+      messages: [{ id: 'u1', role: 'user', content: '茅台怎么看' }],
+    });
+
+    useAgentChatStore.getState().stopStream();
+
+    const state = useAgentChatStore.getState();
+    expect(ac.signal.aborted).toBe(true);
+    expect(state.loading).toBe(false);
+    expect(state.progressSteps).toEqual([]);
+    expect(state.abortController).toBeNull();
+    // The user's message is preserved so the transcript is not lost.
+    expect(state.messages).toEqual([{ id: 'u1', role: 'user', content: '茅台怎么看' }]);
+  });
+
+  it('is a no-op when there is no active stream', () => {
+    useAgentChatStore.setState({ loading: false, abortController: null });
+    expect(() => useAgentChatStore.getState().stopStream()).not.toThrow();
+    expect(useAgentChatStore.getState().loading).toBe(false);
+  });
+});
+
 describe('agentChatStore.switchSession', () => {
 
   it('clears transient loading state when switching sessions during a stream', async () => {

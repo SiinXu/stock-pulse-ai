@@ -634,7 +634,79 @@ describe('SettingsField', () => {
     expect(screen.queryByRole('dialog', { name: '自选股列表' })).not.toBeInTheDocument();
   });
 
-  it('renders inline provider doc links and examples, filtering unsafe hrefs', () => {
+  it('shows the value source as explicitly set in the help dialog', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'STOCK_LIST',
+          value: '600519',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'STOCK_LIST',
+            category: 'base',
+            dataType: 'array',
+            uiControl: 'textarea',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            defaultValue: 'AAPL',
+            helpKey: 'settings.base.STOCK_LIST',
+            warningCodes: [],
+          },
+        }}
+        value="600519"
+        onChange={() => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
+    const dialog = screen.getByRole('dialog', { name: '自选股列表' });
+    expect(within(dialog).getByText('当前取值来源')).toBeInTheDocument();
+    expect(within(dialog).getByText('已显式设置')).toBeInTheDocument();
+    // An explicitly-set field must not advertise the built-in default value.
+    expect(within(dialog).queryByText('AAPL')).not.toBeInTheDocument();
+  });
+
+  it('shows the value source as the built-in default with the default value', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'STOCK_LIST',
+          value: '',
+          rawValueExists: false,
+          isMasked: false,
+          schema: {
+            key: 'STOCK_LIST',
+            category: 'base',
+            dataType: 'array',
+            uiControl: 'textarea',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            defaultValue: 'AAPL',
+            helpKey: 'settings.base.STOCK_LIST',
+            warningCodes: [],
+          },
+        }}
+        value=""
+        onChange={() => undefined}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
+    const dialog = screen.getByRole('dialog', { name: '自选股列表' });
+    expect(within(dialog).getByText('未显式设置，使用内置默认值')).toBeInTheDocument();
+    expect(within(dialog).getByText('AAPL')).toBeInTheDocument();
+  });
+
+  it('does not render inline external doc links or KEY=value examples on the field body', () => {
     render(
       <SettingsField
         item={{
@@ -656,7 +728,6 @@ describe('SettingsField', () => {
             examples: ['sk-example-token'],
             docs: [
               { label: '获取 API Key', href: 'https://platform.openai.com/api-keys' },
-              { label: 'unsafe', href: 'javascript:alert(1)' },
             ],
           },
         }}
@@ -665,13 +736,40 @@ describe('SettingsField', () => {
       />,
     );
 
-    const link = screen.getByRole('link', { name: '获取 API Key' });
-    expect(link).toHaveAttribute('href', 'https://platform.openai.com/api-keys');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
-    // Non-http(s) hrefs are filtered out for safety.
-    expect(screen.queryByRole('link', { name: 'unsafe' })).not.toBeInTheDocument();
-    expect(screen.getByText(/sk-example-token/)).toBeInTheDocument();
+    // Everyday fields no longer surface external "config guide" links or raw
+    // KEY=value examples inline — those live in the help dialog instead.
+    expect(screen.queryByRole('link', { name: '获取 API Key' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/sk-example-token/)).not.toBeInTheDocument();
+  });
+
+  it('renders a Select for an enum field even when ui_control is text', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'REPORT_TYPE',
+          value: 'markdown',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'REPORT_TYPE',
+            category: 'notification',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: ['markdown', 'html'],
+            validation: {},
+            displayOrder: 1,
+          },
+        }}
+        value="markdown"
+        onChange={() => undefined}
+      />,
+    );
+    // A finite option set must render a Select (combobox trigger), never a
+    // free-text Input.
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
   it('keeps generation channel help user-facing without env key or examples', () => {

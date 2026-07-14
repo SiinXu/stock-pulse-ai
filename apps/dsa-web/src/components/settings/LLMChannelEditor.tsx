@@ -2,16 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { LLMCapabilityCheck, LLMCapabilityCheckResult } from '../../types/systemConfig';
+import type { LLMCapabilityCheck, LLMCapabilityCheckResult, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import {
-  LLM_PROVIDER_CAPABILITY_LABELS,
-  LLM_PROVIDER_TEMPLATES,
   MODEL_PLACEHOLDERS_BY_PROTOCOL,
-  getProviderTemplate,
-  isKnownProviderTemplate,
+  getCapabilityLabel,
+  getProviderPresentation,
 } from './llmProviderTemplates';
+
+// Provider *business* metadata comes from the backend catalog (passed as a
+// prop). These helpers resolve an entry by channel/provider id; "known" excludes
+// the generic custom provider (which ships no default endpoint/models).
+function findCatalogProvider(
+  providers: LlmProviderCatalogEntry[],
+  id: string,
+): LlmProviderCatalogEntry | undefined {
+  return providers.find((provider) => provider.id === id);
+}
+
+function isKnownCatalogProvider(providers: LlmProviderCatalogEntry[], id: string): boolean {
+  return id !== 'custom' && providers.some((provider) => provider.id === id);
+}
 import { SettingsHelpButton } from './SettingsHelpButton';
 
 const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
@@ -155,6 +167,8 @@ interface RuntimeConfig {
 
 interface LLMChannelEditorProps {
   items: Array<{ key: string; value: string; rawValueExists?: boolean }>;
+  /** Authoritative provider catalog (business metadata) from the backend. */
+  providers: LlmProviderCatalogEntry[];
   maskToken: string;
   /** Parent-held channel draft, used to rehydrate after a tab-switch remount. */
   persistedDraftItems?: Array<{ key: string; value: string }>;
@@ -177,6 +191,7 @@ interface LLMChannelEditorProps {
 
 interface ChannelRowProps {
   channel: ChannelConfig;
+  providers: LlmProviderCatalogEntry[];
   index: number;
   busy: boolean;
   visibleKey: boolean;
@@ -411,6 +426,7 @@ function buildChangedItemKeys(
 
 const ChannelRow: React.FC<ChannelRowProps> = ({
   channel,
+  providers,
   index,
   busy,
   visibleKey,
@@ -427,12 +443,13 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
   onToggleCapability,
   onCheckCapabilities,
 }) => {
-  const preset = getProviderTemplate(channel.name);
-  const showProviderTemplateDetails = isKnownProviderTemplate(channel.name);
+  const preset = findCatalogProvider(providers, channel.name);
+  const showProviderTemplateDetails = isKnownCatalogProvider(providers, channel.name);
   const displayName = preset?.label || channel.name;
   const providerCapabilities = showProviderTemplateDetails ? (preset?.capabilities || []) : [];
-  const providerSources = showProviderTemplateDetails ? (preset?.officialSources || []) : [];
-  const providerHint = showProviderTemplateDetails ? preset?.configHint : undefined;
+  const presentation = getProviderPresentation(channel.name);
+  const providerSources = showProviderTemplateDetails ? presentation.officialSources : [];
+  const providerHint = showProviderTemplateDetails ? presentation.configHint : undefined;
   const selectedModels = splitModels(channel.models);
   const runtimeCapabilityOptions = isHermesChannel(channel)
     ? RUNTIME_CAPABILITY_OPTIONS.filter((option) => option.value === 'json')
@@ -443,7 +460,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
   );
   const modelCount = selectedModels.length;
   const nameIssues = getChannelNameIssues(channel);
-  const completenessIssues = getChannelCompletenessIssues(channel);
+  const completenessIssues = getChannelCompletenessIssues(channel, providers);
   const isComplete = nameIssues.length === 0 && completenessIssues.length === 0;
   const missingIssues = [...nameIssues, ...completenessIssues];
   const selectedCapabilities = capabilityState?.selected || [];
@@ -620,7 +637,7 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
             placeholder={
               channel.protocol === 'gemini' || channel.protocol === 'anthropic'
                 ? '官方接口可留空'
-                : preset?.baseUrl || 'https://api.example.com/v1'
+                : preset?.defaultBaseUrl || 'https://api.example.com/v1'
             }
           />
           </div>
@@ -630,7 +647,10 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-medium text-muted-text">配置参考</span>
                 {providerCapabilities.map((capability) => {
-                  const capabilityMeta = LLM_PROVIDER_CAPABILITY_LABELS[capability];
+                  const capabilityMeta = getCapabilityLabel(capability);
+                  if (!capabilityMeta) {
+                    return null;
+                  }
                   return (
                     <Tooltip key={capability} content={capabilityMeta.hint}>
                       <span className="inline-flex">
@@ -1409,15 +1429,16 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
 }
 
 // Fields required to run the channel; surfaced as "未完成" while missing.
-function getChannelCompletenessIssues(channel: ChannelConfig): string[] {
+function getChannelCompletenessIssues(channel: ChannelConfig, providers: LlmProviderCatalogEntry[]): string[] {
   const issues: string[] = [];
   if (channel.protocol !== 'ollama' && !channel.apiKey.trim()) {
     issues.push('缺少 API Key');
   }
-  // Known provider templates ship a default Base URL, and ollama/local endpoints
-  // have a runtime default, so only custom remote endpoints must supply one.
+  // Known providers ship a default Base URL, and ollama/local endpoints have a
+  // runtime default, so only custom remote endpoints must supply one. (The
+  // backend completeness contract remains authoritative on save.)
   if (
-    !isKnownProviderTemplate(channel.name)
+    !isKnownCatalogProvider(providers, channel.name)
     && channel.protocol !== 'ollama'
     && !channel.baseUrl.trim()
   ) {
@@ -1431,12 +1452,12 @@ function getChannelCompletenessIssues(channel: ChannelConfig): string[] {
 
 // Issues that block saving: names must always be valid; enabled channels must
 // additionally be complete. Disabled channels may be saved as drafts.
-function getChannelSaveIssues(channel: ChannelConfig): string[] {
+function getChannelSaveIssues(channel: ChannelConfig, providers: LlmProviderCatalogEntry[]): string[] {
   const nameIssues = getChannelNameIssues(channel);
   if (nameIssues.length > 0) {
     return nameIssues;
   }
-  return channel.enabled ? getChannelCompletenessIssues(channel) : [];
+  return channel.enabled ? getChannelCompletenessIssues(channel, providers) : [];
 }
 
 function buildFilteredChannelUpdateItems({
@@ -1575,6 +1596,7 @@ function applyChannelDraftItems(
 
 export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   items,
+  providers,
   maskToken,
   persistedDraftItems,
   onDraftItemsChange,
@@ -1728,9 +1750,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   // channel must be complete before the draft can be saved.
   const blockingChannels = useMemo(
     () => channels
-      .map((channel, index) => ({ channel, index, issues: getChannelSaveIssues(channel) }))
+      .map((channel, index) => ({ channel, index, issues: getChannelSaveIssues(channel, providers) }))
       .filter((entry) => entry.issues.length > 0),
-    [channels],
+    [channels, providers],
   );
   const draftValid = blockingChannels.length === 0;
 
@@ -1794,13 +1816,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       const updated = { ...channel, [field]: value };
 
       if (field === 'name' && typeof value === 'string') {
-        const newPreset = getProviderTemplate(value);
+        const newPreset = findCatalogProvider(providers, value);
         if (newPreset) {
-          const oldPreset = getProviderTemplate(channel.name);
-          if (!updated.baseUrl || updated.baseUrl === (oldPreset?.baseUrl ?? '')) {
-            updated.baseUrl = newPreset.baseUrl;
+          const oldPreset = findCatalogProvider(providers, channel.name);
+          if (!updated.baseUrl || updated.baseUrl === (oldPreset?.defaultBaseUrl ?? '')) {
+            updated.baseUrl = newPreset.defaultBaseUrl;
           }
-          updated.protocol = newPreset.protocol;
+          updated.protocol = normalizeProtocol(newPreset.protocol);
           if (!updated.models || updated.models === (oldPreset?.placeholderModels ?? '')) {
             updated.models = newPreset.placeholderModels;
           }
@@ -1907,13 +1929,12 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   };
 
   const addChannel = () => {
-    const preset = getProviderTemplate(addPreset) || getProviderTemplate('custom');
-    if (!preset) {
-      return;
-    }
+    // Prefer the catalog preset; fall back to a minimal blank custom channel so
+    // the editor stays usable even if the provider catalog failed to load.
+    const preset = findCatalogProvider(providers, addPreset) || findCatalogProvider(providers, 'custom');
     setChannels((previous) => {
       const existingNames = new Set(previous.map((channel) => channel.name));
-      const baseName = addPreset === 'custom' ? 'custom' : addPreset;
+      const baseName = addPreset && addPreset !== 'custom' ? addPreset : 'custom';
       let nextName = baseName;
       let counter = 2;
       while (existingNames.has(nextName)) {
@@ -1926,10 +1947,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         {
           id: `added:${addChannelIdRef.current += 1}`,
           name: nextName,
-          protocol: preset.protocol,
-          baseUrl: preset.baseUrl,
+          protocol: normalizeProtocol(preset?.protocol ?? 'openai'),
+          baseUrl: preset?.defaultBaseUrl ?? '',
           apiKey: '',
-          models: preset.placeholderModels || '',
+          models: preset?.placeholderModels || '',
           enabled: true,
         },
       ];
@@ -2239,9 +2260,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               <Select
                 value={addPreset}
                 onChange={setAddPreset}
-                options={LLM_PROVIDER_TEMPLATES.map((preset) => ({
-                  value: preset.channelId,
-                  label: preset.label,
+                options={providers.map((provider) => ({
+                  value: provider.id,
+                  label: provider.label,
                 }))}
                 disabled={busy}
                 placeholder="选择服务商"
@@ -2267,6 +2288,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               <ChannelRow
                 key={channel.id}
                 channel={channel}
+                providers={providers}
                 index={index}
                 busy={busy}
                 visibleKey={Boolean(visibleKeys[index])}

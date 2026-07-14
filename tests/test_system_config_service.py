@@ -58,6 +58,153 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.service = SystemConfigService(manager=self.manager)
 
     @staticmethod
+    def _wizard_channel_items(
+        *,
+        name: str,
+        protocol: str,
+        models: str,
+        primary_route: str,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        existing_channels: Optional[List[str]] = None,
+    ) -> List[Dict[str, str]]:
+        """Mirror exactly what the first-run wizard emits for one Connection."""
+        channels = list(dict.fromkeys(list(existing_channels or []) + [name]))
+        up = name.upper()
+        items: List[Dict[str, str]] = [
+            {"key": "LLM_CONFIG_MODE", "value": "channels"},
+            {"key": "GENERATION_BACKEND", "value": "litellm"},
+            {"key": "LLM_CHANNELS", "value": ",".join(channels)},
+            {"key": f"LLM_{up}_PROTOCOL", "value": protocol},
+            {"key": f"LLM_{up}_MODELS", "value": models},
+            {"key": f"LLM_{up}_ENABLED", "value": "true"},
+            {"key": "LITELLM_MODEL", "value": primary_route},
+        ]
+        if base_url:
+            items.append({"key": f"LLM_{up}_BASE_URL", "value": base_url})
+        if api_key:
+            items.append({"key": f"LLM_{up}_API_KEY", "value": api_key})
+        return items
+
+    def test_available_models_returns_authoritative_routes_with_grouping(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=deepseek,openai",
+            "LLM_DEEPSEEK_PROTOCOL=deepseek",
+            "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",
+            "LLM_DEEPSEEK_API_KEY=sk-ds",
+            "LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro",
+            "LLM_DEEPSEEK_ENABLED=true",
+            "LLM_OPENAI_PROTOCOL=openai",
+            "LLM_OPENAI_BASE_URL=https://api.openai.com/v1",
+            "LLM_OPENAI_API_KEY=sk-oa",
+            "LLM_OPENAI_MODELS=gpt-5.5",
+            "LLM_OPENAI_ENABLED=true",
+        )
+        result = self.service.get_available_models()
+        routes = [entry["route"] for entry in result["models"]]
+        # The route set is authoritative — it matches the validator's source.
+        effective = self.service._build_display_config_map(self.manager.read_config_map())
+        expected = SystemConfigService._collect_llm_channel_models_from_map(effective)
+        self.assertEqual(set(routes), set(expected))
+        self.assertIn("deepseek/deepseek-v4-flash", routes)
+        by_route = {entry["route"]: entry for entry in result["models"]}
+        self.assertEqual(by_route["deepseek/deepseek-v4-flash"]["connection"], "deepseek")
+        self.assertEqual(by_route["deepseek/deepseek-v4-flash"]["display"], "deepseek-v4-flash")
+        self.assertEqual(by_route["openai/gpt-5.5"]["provider"], "openai")
+
+    def test_available_models_excludes_disabled_connections(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=deepseek,openai",
+            "LLM_DEEPSEEK_PROTOCOL=deepseek",
+            "LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com",
+            "LLM_DEEPSEEK_API_KEY=sk-ds",
+            "LLM_DEEPSEEK_MODELS=deepseek-v4-flash",
+            "LLM_DEEPSEEK_ENABLED=true",
+            "LLM_OPENAI_PROTOCOL=openai",
+            "LLM_OPENAI_MODELS=gpt-5.5",
+            "LLM_OPENAI_ENABLED=false",
+        )
+        routes = [entry["route"] for entry in self.service.get_available_models()["models"]]
+        self.assertIn("deepseek/deepseek-v4-flash", routes)
+        self.assertNotIn("openai/gpt-5.5", routes)
+
+    def test_first_run_wizard_deepseek_route_config_validates(self) -> None:
+        items = self._wizard_channel_items(
+            name="deepseek",
+            protocol="deepseek",
+            models="deepseek-v4-flash,deepseek-v4-pro",
+            primary_route="deepseek/deepseek-v4-flash",
+            api_key="sk-test",
+            base_url="https://api.deepseek.com",
+        )
+        result = self.service.validate(items=items)
+        self.assertTrue(result["valid"], result["issues"])
+
+    def test_first_run_wizard_bare_model_name_is_rejected(self) -> None:
+        # The wizard must emit a provider/model route; a bare model name is the
+        # exact P1 regression that a mocked validate had hidden.
+        items = self._wizard_channel_items(
+            name="deepseek",
+            protocol="deepseek",
+            models="deepseek-v4-flash,deepseek-v4-pro",
+            primary_route="deepseek-v4-flash",
+            api_key="sk-test",
+            base_url="https://api.deepseek.com",
+        )
+        result = self.service.validate(items=items)
+        self.assertFalse(result["valid"])
+        self.assertTrue(
+            any(i["key"] == "LITELLM_MODEL" and i["code"] == "unknown_model" for i in result["issues"]),
+            result["issues"],
+        )
+
+    def test_first_run_wizard_gemini_without_base_url_validates(self) -> None:
+        items = self._wizard_channel_items(
+            name="gemini",
+            protocol="gemini",
+            models="gemini-3.1-pro-preview,gemini-3-flash-preview",
+            primary_route="gemini/gemini-3.1-pro-preview",
+            api_key="gm-key",
+        )
+        result = self.service.validate(items=items)
+        self.assertTrue(result["valid"], result["issues"])
+
+    def test_first_run_wizard_ollama_without_key_validates(self) -> None:
+        items = self._wizard_channel_items(
+            name="ollama",
+            protocol="ollama",
+            models="llama3.2",
+            primary_route="ollama/llama3.2",
+            base_url="http://127.0.0.1:11434",
+        )
+        result = self.service.validate(items=items)
+        self.assertTrue(result["valid"], result["issues"])
+
+    def test_first_run_wizard_merges_existing_channels(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=openai",
+            "LLM_OPENAI_PROTOCOL=openai",
+            "LLM_OPENAI_BASE_URL=https://api.openai.com/v1",
+            "LLM_OPENAI_API_KEY=sk-openai",
+            "LLM_OPENAI_MODELS=gpt-5.5",
+            "LLM_OPENAI_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-5.5",
+        )
+        items = self._wizard_channel_items(
+            name="deepseek",
+            protocol="deepseek",
+            models="deepseek-v4-flash",
+            primary_route="deepseek/deepseek-v4-flash",
+            api_key="sk-test",
+            base_url="https://api.deepseek.com",
+            existing_channels=["openai"],
+        )
+        channels = next(i["value"] for i in items if i["key"] == "LLM_CHANNELS")
+        self.assertEqual(channels, "openai,deepseek")
+        result = self.service.validate(items=items)
+        self.assertTrue(result["valid"], result["issues"])
+
+    @staticmethod
     def _mock_completion_response(content: str = "OK", tool_calls=None):
         message = SimpleNamespace(content=content, tool_calls=tool_calls or [])
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])

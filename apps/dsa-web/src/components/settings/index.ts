@@ -20,5 +20,8 @@ export * from './SettingsPanelErrorBoundary';
 export * from './SettingsSectionCard';
 export * from './SettingsErrorSummary';
 export * from './FirstRunWizard';
+export * from './ConnectionServiceCards';
+export * from './connectionModel';
+export * from './ModelFallbackEditor';
 export * from './AuthSettingsCard';
 export * from './GenerationBackendStatusPanel';

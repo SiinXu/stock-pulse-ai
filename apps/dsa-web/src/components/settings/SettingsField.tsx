@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type React from 'react';
-import { ExternalLink, Info, Trash2 } from 'lucide-react';
+import { Info, Trash2 } from 'lucide-react';
 import { Badge, Button, Select, Input, Tooltip } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -89,19 +89,10 @@ function renderFieldControl(
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
 
-  if (controlType === 'textarea') {
-    return (
-      <textarea
-        id={controlId}
-        className={`${commonClass} min-h-[92px] resize-y py-2`}
-        value={value}
-        disabled={disabled || !schema?.isEditable}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    );
-  }
-
-  if (controlType === 'select' && schema?.options?.length) {
+  // Any field that declares a finite set of options is an enum: render a Select
+  // regardless of the backend ui_control hint, so a stray ui_control=text never
+  // degrades an enum into a free-text Input.
+  if (schema?.options?.length && !isMultiValue) {
     return (
         <Select
           id={controlId}
@@ -114,6 +105,18 @@ function renderFieldControl(
           menuAlign="end"
         />
       );
+  }
+
+  if (controlType === 'textarea') {
+    return (
+      <textarea
+        id={controlId}
+        className={`${commonClass} min-h-[92px] resize-y py-2`}
+        value={value}
+        disabled={disabled || !schema?.isEditable}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    );
   }
 
   if (controlType === 'switch') {
@@ -287,6 +290,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             title={title}
             schema={schema}
             description={description}
+            rawValueExists={item.rawValueExists}
           />
           {!schema?.isEditable ? (
             <Badge variant="default" size="sm">
@@ -307,29 +311,9 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             <Badge variant="default" size="sm">{t('settings.fieldRestartRequired')}</Badge>
           ) : null}
         </div>
-        {schema?.docs?.length ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {schema.docs
-              .filter((doc) => /^https?:\/\//i.test(doc.href))
-              .map((doc) => (
-                <a
-                  key={doc.href}
-                  href={doc.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                  {doc.label}
-                </a>
-              ))}
-          </div>
-        ) : null}
-        {schema?.examples?.length ? (
-          <p className="text-xs text-muted-text">
-            {t('settings.fieldExamples')}: {schema.examples.join(language === 'zh' ? '、' : ', ')}
-          </p>
-        ) : null}
+        {/* External docs links and raw KEY=value examples are intentionally not
+            shown inline on everyday fields — they live in the field's help
+            dialog instead, so the everyday path stays free of config jargon. */}
       </div>
 
       <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>

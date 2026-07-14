@@ -167,6 +167,39 @@ export interface LLMConfigModeStatus {
   }>;
 }
 
+export interface LlmProviderCatalogEntry {
+  id: string;
+  label: string;
+  protocol: string;
+  defaultBaseUrl: string;
+  placeholderModels: string;
+  capabilities: string[];
+  requiresApiKey: boolean;
+  requiresBaseUrl: boolean;
+  supportsDiscovery: boolean;
+  isLocal: boolean;
+  isCustom: boolean;
+}
+
+export interface LlmProviderCatalogResponse {
+  providers: LlmProviderCatalogEntry[];
+}
+
+export interface AvailableModelEntry {
+  /** Canonical backend route stored on selection (e.g. deepseek/deepseek-v4-flash). */
+  route: string;
+  /** User-facing display name. */
+  display: string;
+  /** Owning connection name (best-effort grouping), null if unknown. */
+  connection: string | null;
+  /** Provider/protocol of the owning connection, null if unknown. */
+  provider: string | null;
+}
+
+export interface AvailableModelsResponse {
+  models: AvailableModelEntry[];
+}
+
 export interface LegacyChannelsMigrationPreview {
   channels: Array<{
     name: string;

@@ -1,6 +1,41 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LLMChannelEditor } from '../LLMChannelEditor';
+import type { LlmProviderCatalogEntry } from '../../../types/systemConfig';
+
+// Mirrors the backend provider catalog (GET /system/config/llm/providers); the
+// editor sources provider business metadata from this prop.
+function provider(overrides: Partial<LlmProviderCatalogEntry> & Pick<LlmProviderCatalogEntry, 'id' | 'label' | 'protocol'>): LlmProviderCatalogEntry {
+  return {
+    defaultBaseUrl: '',
+    placeholderModels: '',
+    capabilities: [],
+    requiresApiKey: true,
+    requiresBaseUrl: false,
+    supportsDiscovery: false,
+    isLocal: false,
+    isCustom: false,
+    ...overrides,
+  };
+}
+
+const PROVIDER_CATALOG: LlmProviderCatalogEntry[] = [
+  provider({ id: 'aihubmix', label: 'AIHubmix（聚合平台）', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', placeholderModels: 'gpt-5.5,claude-sonnet-4-6,gemini-3.1-pro-preview', capabilities: ['openai-compatible', 'aggregator'], supportsDiscovery: true }),
+  provider({ id: 'anspire', label: 'Anspire Open（一站式模型+搜索）', protocol: 'openai', defaultBaseUrl: 'https://open-gateway.anspire.cn/v6', placeholderModels: 'Doubao-Seed-2.0-lite,Doubao-Seed-2.0-pro,qwen3.5-flash,MiniMax-M2.7', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', placeholderModels: 'deepseek-v4-flash,deepseek-v4-pro', capabilities: ['official-api', 'openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'dashscope', label: '通义千问（Dashscope）', protocol: 'openai', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', placeholderModels: 'qwen3.6-plus,qwen3.6-flash', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'zhipu', label: '智谱 GLM', protocol: 'openai', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', placeholderModels: 'glm-5.1,glm-4.7-flash', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'moonshot', label: 'Moonshot（月之暗面）', protocol: 'openai', defaultBaseUrl: 'https://api.moonshot.cn/v1', placeholderModels: 'kimi-k2.6,kimi-k2.5', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'minimax', label: 'MiniMax 官方', protocol: 'openai', defaultBaseUrl: 'https://api.minimax.io/v1', placeholderModels: 'MiniMax-M3,MiniMax-M2.7,MiniMax-M2.7-highspeed', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'volcengine', label: '火山方舟（豆包）', protocol: 'openai', defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', placeholderModels: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015', capabilities: ['openai-compatible'], supportsDiscovery: true }),
+  provider({ id: 'siliconflow', label: '硅基流动（SiliconFlow）', protocol: 'openai', defaultBaseUrl: 'https://api.siliconflow.cn/v1', placeholderModels: 'deepseek-ai/DeepSeek-V3.2,Qwen/Qwen3-235B-A22B-Thinking-2507', capabilities: ['openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'openrouter', label: 'OpenRouter', protocol: 'openai', defaultBaseUrl: 'https://openrouter.ai/api/v1', placeholderModels: '~anthropic/claude-sonnet-latest,~openai/gpt-latest', capabilities: ['openai-compatible', 'aggregator', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', placeholderModels: 'gemini-3.1-pro-preview,gemini-3-flash-preview', capabilities: ['official-api', 'vision'] }),
+  provider({ id: 'anthropic', label: 'Anthropic 官方', protocol: 'anthropic', defaultBaseUrl: '', placeholderModels: 'claude-sonnet-4-6,claude-opus-4-7', capabilities: ['official-api'] }),
+  provider({ id: 'openai', label: 'OpenAI 官方', protocol: 'openai', defaultBaseUrl: 'https://api.openai.com/v1', placeholderModels: 'gpt-5.5,gpt-5.4-mini', capabilities: ['official-api', 'openai-compatible', 'model-discovery'], supportsDiscovery: true }),
+  provider({ id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', placeholderModels: 'llama3.2,qwen2.5', capabilities: ['local-runtime'], requiresApiKey: false, supportsDiscovery: true, isLocal: true }),
+  provider({ id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', placeholderModels: 'model-name-1,model-name-2', capabilities: [], requiresBaseUrl: true, supportsDiscovery: true, isCustom: true }),
+];
 
 const {
   update,
@@ -75,6 +110,7 @@ describe('LLMChannelEditor', () => {
     const { rerender } = render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -86,6 +122,7 @@ describe('LLMChannelEditor', () => {
     rerender(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -99,6 +136,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -124,6 +162,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -153,6 +192,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -178,6 +218,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -203,6 +244,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -227,6 +269,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DEEPSEEK_API_KEY', value: 'sk-test' },
           { key: 'LLM_DEEPSEEK_MODELS', value: 'deepseek-v4-flash' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -263,6 +306,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -284,6 +328,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_API_KEY', value: '******' },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -314,6 +359,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_PURE_API_KEY', value: 'sk-pure' },
           { key: 'LLM_PURE_MODELS', value: 'pure-route' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -335,6 +381,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_API_KEY', value: '******', rawValueExists: false },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -362,6 +409,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_REMOTE_API_KEY', value: 'sk-remote' },
           { key: 'LLM_REMOTE_MODELS', value: 'gpt-4o-mini' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -382,6 +430,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: 'minimax/MiniMax-M1' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -399,6 +448,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         showRuntimeConfig={false}
         onDraftItemsChange={onDraftItemsChange}
@@ -431,6 +481,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -450,6 +501,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -476,6 +528,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENROUTER_API_KEY', value: 'sk-or-test' },
           { key: 'LLM_OPENROUTER_MODELS', value: '~anthropic/claude-sonnet-latest' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -505,6 +558,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_SILICONFLOW_API_KEY', value: 'sk-test' },
           { key: 'LLM_SILICONFLOW_MODELS', value: 'deepseek-ai/DeepSeek-V3.2' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -526,6 +580,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEY', value: 'sk-test' },
           { key: 'LLM_MY_PROXY_MODELS', value: 'custom-model' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -541,6 +596,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -568,6 +624,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -598,6 +655,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -624,7 +682,7 @@ describe('LLMChannelEditor', () => {
 
   it('reports an enabled but incomplete channel as invalid until it is completed', async () => {
     const onValidityChange = vi.fn();
-    render(<LLMChannelEditor items={[]} maskToken="******" onValidityChange={onValidityChange} />);
+    render(<LLMChannelEditor items={[]} providers={PROVIDER_CATALOG} maskToken="******" onValidityChange={onValidityChange} />);
 
     chooseOption(screen.getByRole('combobox'), 'minimax');
     fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
@@ -643,12 +701,26 @@ describe('LLMChannelEditor', () => {
     });
   });
 
+  it('still adds a blank channel when the provider catalog failed to load', async () => {
+    // Degraded mode: an empty catalog must not make the editor unable to add a
+    // channel (the provider dropdown is empty but "add" still yields a row).
+    render(<LLMChannelEditor items={[]} providers={[]} maskToken="******" />);
+
+    expect(screen.queryByLabelText('Base URL')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ 添加渠道' }));
+
+    // A new channel row is created; its Base URL field is present (blank).
+    expect(await screen.findByLabelText('Base URL')).toHaveValue('');
+    expect(screen.getByText('渠道列表')).toBeInTheDocument();
+  });
+
   it('reports an incomplete channel as a valid draft once it is disabled', async () => {
     const onValidityChange = vi.fn();
     const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
         items={[]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onValidityChange={onValidityChange}
         onDraftItemsChange={onDraftItemsChange}
@@ -679,6 +751,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OLLAMA_ENABLED', value: 'true' },
           { key: 'LLM_OLLAMA_MODELS', value: 'llama3' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -691,6 +764,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={openAiItems}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         overriddenByMode="legacy"
       />
@@ -709,6 +783,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MYLOCAL_ENABLED', value: 'true' },
           { key: 'LLM_MYLOCAL_MODELS', value: 'llama3' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -728,6 +803,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'sk-openai' },
           { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -750,6 +826,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_HERMES_EXTRA_HEADERS', value: '{"X":"Y"}' },
           { key: 'LLM_HERMES_MODELS', value: 'hermes-agent' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />,
@@ -780,6 +857,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />,
@@ -811,6 +889,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEY', value: 'sk-saved' },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />,
@@ -844,6 +923,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />,
     );
@@ -865,6 +945,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />,
@@ -899,6 +980,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_MY_PROXY_API_KEYS', value: 'sk-runtime-only', rawValueExists: false },
           { key: 'LLM_MY_PROXY_MODELS', value: 'gpt-4o-mini', rawValueExists: false },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />,
@@ -934,6 +1016,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LITELLM_FALLBACK_MODELS', value: 'deepseek/deepseek-v4-pro' },
           { key: 'VISION_MODEL', value: 'deepseek/deepseek-reasoner' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -986,6 +1069,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'openai/MiniMax-M1' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1022,6 +1106,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'minimax/MiniMax-M1' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1055,6 +1140,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'sk-test' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
         onDraftItemsChange={onDraftItemsChange}
       />
@@ -1097,6 +1183,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1133,6 +1220,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_SILICONFLOW_API_KEY', value: 'secret-key' },
           { key: 'LLM_SILICONFLOW_MODELS', value: 'deepseek-ai/DeepSeek-V3,Qwen/Qwen3-Coder' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1176,6 +1264,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_PROXY_API_KEY', value: 'secret-key' },
           { key: 'LLM_PROXY_MODELS', value: 'gpt-5.5,gpt-4o-mini' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1207,6 +1296,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1235,6 +1325,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1264,6 +1355,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1310,6 +1402,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1353,6 +1446,7 @@ describe('LLMChannelEditor', () => {
     render(
       <LLMChannelEditor
         items={[{ key: 'LLM_CHANNELS', value: 'openai' }, { key: 'LLM_OPENAI_PROTOCOL', value: 'openai' }, { key: 'LLM_OPENAI_BASE_URL', value: 'https://api.openai.com/v1' }, { key: 'LLM_OPENAI_ENABLED', value: 'true' }, { key: 'LLM_OPENAI_API_KEY', value: 'bad-key' }, { key: 'LLM_OPENAI_MODELS', value: 'gpt-4o-mini' }]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1391,6 +1485,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_GEMINI_API_KEY', value: 'sk-test' },
           { key: 'LLM_GEMINI_MODELS', value: '' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1430,6 +1525,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: '' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1465,6 +1561,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_OPENAI_API_KEY', value: 'secret-key' },
           { key: 'LLM_OPENAI_MODELS', value: '' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />
     );
@@ -1509,6 +1606,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'dash-old' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />,
     );
@@ -1526,6 +1624,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'dash-old' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />,
     );
@@ -1571,6 +1670,7 @@ describe('LLMChannelEditor', () => {
           { key: 'LLM_DASHSCOPE_API_KEY', value: 'dash-key' },
           { key: 'LLM_DASHSCOPE_MODELS', value: 'qwen-old' },
         ]}
+        providers={PROVIDER_CATALOG}
         maskToken="******"
       />,
     );

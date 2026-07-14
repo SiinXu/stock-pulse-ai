@@ -2,7 +2,7 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Button, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
-import { LLM_PROVIDER_TEMPLATES } from './llmProviderTemplates';
+import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
 import type { UiLang } from './settingsInformationArchitecture';
 
 export interface WizardDraftItem {
@@ -10,12 +10,32 @@ export interface WizardDraftItem {
   value: string;
 }
 
+export interface WizardCompleteResult {
+  success: boolean;
+  error?: string;
+}
+
 interface FirstRunWizardProps {
-  /** Commit the collected minimal config into the unified draft and Save & Apply. */
-  onComplete: (items: WizardDraftItem[]) => void;
+  /**
+   * Commit the collected minimal config through the unified Save & Apply
+   * transaction. Returns whether the backend accepted it so the wizard can keep
+   * the modal open and show the error in place on failure.
+   */
+  onComplete: (items: WizardDraftItem[]) => Promise<WizardCompleteResult>;
   onClose: () => void;
   isSaving: boolean;
   language: UiLang;
+  /**
+   * Names already present in LLM_CHANNELS. A new Connection is merged into this
+   * list instead of replacing it, so the wizard never clobbers existing setups.
+   */
+  existingChannelNames?: string[];
+  /**
+   * Authoritative provider catalog from the backend. The wizard reads provider
+   * metadata and credential/base-URL requirements from here — it does not keep a
+   * second hardcoded business list.
+   */
+  providers: LlmProviderCatalogEntry[];
 }
 
 type WizardMode = 'cloud' | 'cli';
@@ -54,10 +74,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   onClose,
   isSaving,
   language,
+  existingChannelNames = [],
+  providers,
 }) => {
   const [step, setStep] = useState<StepId>('mode');
   const [mode, setMode] = useState<WizardMode | null>(null);
-  const [providerId, setProviderId] = useState<string>(LLM_PROVIDER_TEMPLATES[0]?.channelId ?? '');
+  const [providerId, setProviderId] = useState<string>(providers[0]?.id ?? '');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [models, setModels] = useState('');
@@ -67,10 +89,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [discoverNote, setDiscoverNote] = useState<{ ok: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const template = useMemo(
-    () => LLM_PROVIDER_TEMPLATES.find((entry) => entry.channelId === providerId),
-    [providerId],
+  // Resolve the selected provider against the backend catalog. If the stored id
+  // is stale (catalog re-loaded), fall back to the first available provider.
+  const provider = useMemo(
+    () => providers.find((entry) => entry.id === providerId) ?? providers[0],
+    [providers, providerId],
   );
   const modelOptions = useMemo(() => parseModels(models), [models]);
 
@@ -79,24 +104,24 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
 
   const applyProvider = (nextProviderId: string) => {
     setProviderId(nextProviderId);
-    const nextTemplate = LLM_PROVIDER_TEMPLATES.find((entry) => entry.channelId === nextProviderId);
-    setBaseUrl(nextTemplate?.baseUrl ?? '');
-    setModels(nextTemplate?.placeholderModels ?? '');
+    const nextProvider = providers.find((entry) => entry.id === nextProviderId);
+    setBaseUrl(nextProvider?.defaultBaseUrl ?? '');
+    setModels(nextProvider?.placeholderModels ?? '');
     setReportModel('');
     setDiscoverNote(null);
     setTestResult(null);
   };
 
   const handleDiscover = async () => {
-    if (!template) {
+    if (!provider) {
       return;
     }
     setIsDiscovering(true);
     setDiscoverNote(null);
     try {
       const result = await systemConfigApi.discoverLLMChannelModels({
-        name: template.channelId,
-        protocol: template.protocol,
+        name: provider.id,
+        protocol: provider.protocol,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
       });
@@ -115,15 +140,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleTestConnection = async () => {
-    if (!template) {
+    if (!provider) {
       return;
     }
     setIsTesting(true);
     setTestResult(null);
     try {
       const result = await systemConfigApi.testLLMChannel({
-        name: template.channelId,
-        protocol: template.protocol,
+        name: provider.id,
+        protocol: provider.protocol,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
         models: modelOptions,
@@ -147,8 +172,17 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     switch (step) {
       case 'mode':
         return mode !== null;
-      case 'connection':
-        return mode === 'cli' ? Boolean(cliBackend) : Boolean(providerId && apiKey.trim() && baseUrl.trim());
+      case 'connection': {
+        if (mode === 'cli') {
+          return Boolean(cliBackend);
+        }
+        // Official providers use their SDK default / prefilled endpoint, so Base
+        // URL is never a blocker here; the API key is required unless the
+        // provider is key-exempt (e.g. Ollama).
+        const keyOk = !provider?.requiresApiKey || apiKey.trim().length > 0;
+        const baseUrlOk = !provider?.requiresBaseUrl || baseUrl.trim().length > 0;
+        return Boolean(provider && keyOk && baseUrlOk);
+      }
       case 'models':
         return modelOptions.length > 0;
       case 'model':
@@ -174,26 +208,51 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
   };
 
+  const handleSave = async () => {
+    setSaveError(null);
+    const result = await onComplete(buildItems());
+    if (!result.success) {
+      // Keep the modal open and surface the failure in place.
+      setSaveError(result.error || tx(language, '保存失败，请检查配置后重试。', 'Save failed. Check the config and try again.'));
+    }
+  };
+
   const buildItems = (): WizardDraftItem[] => {
     if (mode === 'cli') {
       return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
     }
-    if (!template) {
+    if (!provider) {
       return [];
     }
-    const name = template.channelId;
+    const name = provider.id;
     const up = name.toUpperCase();
-    const primary = reportModel || modelOptions[0] || '';
-    return [
+    const primaryModel = reportModel || modelOptions[0] || '';
+    // The backend routes channel models as `<protocol>/<model>` and rejects a
+    // bare model name; the user only ever sees/selects the display model.
+    const primaryRoute = primaryModel ? `${provider.protocol}/${primaryModel}` : '';
+    // Merge into any existing channels instead of replacing the whole list.
+    const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
+    const items: WizardDraftItem[] = [
+      // Make the configured channels the active source so a co-existing YAML /
+      // Legacy config doesn't silently shadow the wizard result.
+      { key: 'LLM_CONFIG_MODE', value: 'channels' },
       { key: 'GENERATION_BACKEND', value: 'litellm' },
-      { key: 'LLM_CHANNELS', value: name },
-      { key: `LLM_${up}_PROTOCOL`, value: template.protocol },
-      { key: `LLM_${up}_BASE_URL`, value: baseUrl.trim() },
-      { key: `LLM_${up}_API_KEY`, value: apiKey.trim() },
+      { key: 'LLM_CHANNELS', value: mergedChannels },
+      { key: `LLM_${up}_PROTOCOL`, value: provider.protocol },
       { key: `LLM_${up}_MODELS`, value: modelOptions.join(',') },
       { key: `LLM_${up}_ENABLED`, value: 'true' },
-      { key: 'LITELLM_MODEL', value: primary },
+      { key: 'LITELLM_MODEL', value: primaryRoute },
     ];
+    // Base URL: official providers with a blank template endpoint use the SDK
+    // default; only emit an explicit endpoint when one is provided.
+    if (baseUrl.trim()) {
+      items.push({ key: `LLM_${up}_BASE_URL`, value: baseUrl.trim() });
+    }
+    // API key: omit for key-exempt local runtimes (e.g. Ollama).
+    if (apiKey.trim()) {
+      items.push({ key: `LLM_${up}_API_KEY`, value: apiKey.trim() });
+    }
+    return items;
   };
 
   const stepLabel = tx(
@@ -249,7 +308,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 id="wizard-provider"
                 value={providerId}
                 onChange={applyProvider}
-                options={LLM_PROVIDER_TEMPLATES.map((entry) => ({ value: entry.channelId, label: entry.label }))}
+                options={providers.map((entry) => ({ value: entry.id, label: entry.label }))}
               />
             </div>
             <div>
@@ -358,16 +417,36 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 'The following minimal runnable config will be applied. You can refine it later in Settings.',
               )}
             />
+            {/* User-facing summary only — no internal keys such as LLM_CHANNELS. */}
             <dl className="space-y-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm">
-              {buildItems().map((item) => (
-                <div key={item.key} className="flex justify-between gap-3">
-                  <dt className="text-muted-text">{item.key}</dt>
-                  <dd className="min-w-0 truncate font-medium text-foreground">
-                    {item.key.includes('API_KEY') ? '••••••' : item.value || '—'}
-                  </dd>
-                </div>
-              ))}
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-text">{tx(language, '执行方式', 'Execution')}</dt>
+                <dd className="font-medium text-foreground">
+                  {mode === 'cli'
+                    ? CLI_BACKENDS.find((entry) => entry.value === cliBackend)?.label ?? tx(language, '本机 CLI', 'Local CLI')
+                    : tx(language, '云 API', 'Cloud API')}
+                </dd>
+              </div>
+              {mode === 'cloud' ? (
+                <>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-text">{tx(language, '模型服务', 'Model service')}</dt>
+                    <dd className="min-w-0 truncate font-medium text-foreground">{provider?.label ?? '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-text">{tx(language, '可用模型', 'Available models')}</dt>
+                    <dd className="min-w-0 truncate font-medium text-foreground">
+                      {tx(language, `${modelOptions.length} 个`, `${modelOptions.length}`)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-muted-text">{tx(language, '报告主模型', 'Report primary model')}</dt>
+                    <dd className="min-w-0 truncate font-medium text-foreground">{reportModel || modelOptions[0] || '—'}</dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
+            {saveError ? <InlineAlert variant="danger" title={tx(language, '保存失败', 'Save failed')} message={saveError} /> : null}
             {mode === 'cloud' ? (
               <div className="space-y-1.5">
                 <Button
@@ -410,7 +489,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 type="button"
                 variant="settings-primary"
                 size="sm"
-                onClick={() => onComplete(buildItems())}
+                onClick={() => void handleSave()}
                 disabled={isSaving}
                 isLoading={isSaving}
               >

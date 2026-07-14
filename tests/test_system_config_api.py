@@ -205,6 +205,30 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(check_map["llm_primary"]["status"], "configured")
         self.assertEqual(check_map["llm_agent"]["status"], "inherited")
 
+    def test_get_llm_provider_catalog_exposes_provider_metadata(self) -> None:
+        payload = system_config.get_llm_provider_catalog()
+        providers = {p["id"]: p for p in payload["providers"]}
+        # Every provider carries the fields the Web model-access page needs.
+        for provider in payload["providers"]:
+            for field in (
+                "id", "label", "protocol", "default_base_url", "placeholder_models",
+                "capabilities", "requires_api_key", "requires_base_url",
+                "supports_discovery", "is_local", "is_custom",
+            ):
+                self.assertIn(field, provider)
+        # Credential/base-URL requirements are derived from the backend contract.
+        self.assertTrue(providers["deepseek"]["requires_api_key"])
+        self.assertEqual(providers["deepseek"]["default_base_url"], "https://api.deepseek.com")
+        # Ollama is a local runtime: no key required.
+        self.assertFalse(providers["ollama"]["requires_api_key"])
+        self.assertTrue(providers["ollama"]["is_local"])
+        # Gemini / Anthropic officials use the SDK default endpoint (no base URL).
+        self.assertEqual(providers["gemini"]["default_base_url"], "")
+        self.assertFalse(providers["gemini"]["requires_base_url"])
+        # Only custom needs a user-supplied endpoint.
+        self.assertTrue(providers["custom"]["is_custom"])
+        self.assertTrue(providers["custom"]["requires_base_url"])
+
     def test_get_generation_backend_status_uses_saved_config_only(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=litellm",

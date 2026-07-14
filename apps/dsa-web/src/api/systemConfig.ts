@@ -2,6 +2,7 @@ import apiClient from './index';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
+  AvailableModelsResponse,
   DiscoverLLMChannelModelsRequest,
   DiscoverLLMChannelModelsResponse,
   ExportSystemConfigResponse,
@@ -9,6 +10,7 @@ import type {
   GenerationBackendStatusResponse,
   ImportSystemConfigRequest,
   LegacyChannelsMigrationPreview,
+  LlmProviderCatalogResponse,
   LLMConfigModeStatus,
   SchedulerRunNowResponse,
   SchedulerStatusResponse,
@@ -221,6 +223,16 @@ export const systemConfigApi = {
       { config_version: configVersion },
     );
     return toCamelCase<UpdateSystemConfigResponse>(response.data);
+  },
+
+  async getLlmProviderCatalog(): Promise<LlmProviderCatalogResponse> {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/system/config/llm/providers');
+    return toCamelCase<LlmProviderCatalogResponse>(response.data);
+  },
+
+  async getLlmAvailableModels(): Promise<AvailableModelsResponse> {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/system/config/llm/available-models');
+    return toCamelCase<AvailableModelsResponse>(response.data);
   },
 
   async previewGenerationBackendStatus(

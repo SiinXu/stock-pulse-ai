@@ -121,6 +121,17 @@ vi.mock('../../api/systemConfig', () => ({
       overriddenSources: [],
       issues: [],
     }),
+    getLlmProviderCatalog: () => Promise.resolve({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', placeholderModels: 'deepseek-v4-flash', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+    }),
+    getLlmAvailableModels: () => Promise.resolve({
+      models: [
+        { route: 'deepseek/deepseek-v4-flash', display: 'deepseek-v4-flash', connection: 'deepseek', provider: 'deepseek' },
+        { route: 'deepseek/deepseek-v4-pro', display: 'deepseek-v4-pro', connection: 'deepseek', provider: 'deepseek' },
+      ],
+    }),
     importEnv: (...args: unknown[]) => importEnv(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
     update: (...args: unknown[]) => updateSystemConfig(...args),
@@ -154,6 +165,10 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
+  ...(await import('../../components/settings/connectionModel')),
+  ConnectionServiceCards: ({ onAddService }: { onAddService: () => void }) => (
+    <button type="button" onClick={onAddService}>add model service</button>
+  ),
   isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
@@ -1377,7 +1392,7 @@ describe('SettingsPage', () => {
     expect(options?.replace).toBe(false);
   });
 
-  it('makes Task Routing the single editor for per-task models and links fallback out to Reliability', () => {
+  it('makes Task Routing the single editor for per-task models and links fallback out to Reliability', async () => {
     const aiField = (key: string, value: string, displayOrder: number) => ({
       key,
       value,
@@ -1417,10 +1432,15 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    // Per-task model fields (plus temperature) are edited here — and only here.
-    expect(screen.getByTestId('settings-field-LITELLM_MODEL')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-field-AGENT_LITELLM_MODEL')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-field-VISION_MODEL')).toBeInTheDocument();
+    // Per-task model fields render as searchable model selectors (comboboxes),
+    // not raw text inputs; temperature stays a plain field.
+    const comboboxes = await screen.findAllByRole('combobox');
+    expect(comboboxes.length).toBeGreaterThanOrEqual(3);
+    // Current routes (not in the available catalog here) are preserved as-is,
+    // never silently dropped.
+    expect(screen.getByDisplayValue('openai/gpt-4o-mini')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('openai/gpt-4o')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('gemini/gemini-3-pro')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
     // Fallback order is NOT an editable field here; it is a read-only summary.
     expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();
@@ -1595,10 +1615,19 @@ describe('SettingsPage', () => {
 
   it('opens the first-run wizard from Overview and saves its minimal config', async () => {
     save.mockResolvedValue({ success: true });
+    // The wizard entry is only the first-time path when setup is incomplete.
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
 
     render(<SettingsPage />);
 
+    // The entry button is enabled once the async provider catalog has loaded.
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
     expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
 
@@ -1611,6 +1640,24 @@ describe('SettingsPage', () => {
     // The wizard closes once the save succeeds.
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument());
+  });
+
+  it('hides the first-run wizard entry once setup is complete', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: true,
+      readyForSmoke: true,
+      requiredMissingKeys: [],
+      checks: [],
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+
+    // Configured users no longer see the first-run "Start wizard" entry — they
+    // add a service from the model-access cards instead.
+    await waitFor(() => expect(getSetupStatus).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '启动向导' })).not.toBeInTheDocument());
   });
 
   it('keeps prompt cache settings collapsed and expandable at the bottom of AI model settings', () => {

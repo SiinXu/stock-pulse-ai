@@ -108,6 +108,7 @@ interface AgentChatActions {
   switchSession: (targetSessionId: string) => Promise<void>;
   startNewChat: () => void;
   startStream: (payload: ChatStreamRequest, meta?: StreamMeta) => Promise<void>;
+  stopStream: () => void;
 }
 
 const getInitialSessionId = (): string =>
@@ -212,6 +213,16 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     } catch {
       // Ignore
     }
+  },
+
+  stopStream: () => {
+    // User-initiated stop of an in-flight generation. Aborting rejects the
+    // reader with AbortError (handled silently), and the running startStream's
+    // finally would reset state anyway; reset here too for immediate feedback.
+    const { abortController } = get();
+    if (!abortController) return;
+    abortController.abort();
+    set({ loading: false, progressSteps: [], abortController: null });
   },
 
   startNewChat: () => {

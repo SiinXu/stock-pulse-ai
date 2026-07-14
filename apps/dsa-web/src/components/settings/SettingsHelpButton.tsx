@@ -16,6 +16,8 @@ interface SettingsHelpButtonProps {
   examples?: string[];
   docs?: SystemConfigFieldSchema['docs'];
   description?: string;
+  /** Whether the saved config sets this key explicitly (vs. using the default). */
+  rawValueExists?: boolean;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -98,9 +100,30 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
   examples: providedExamples,
   docs: providedDocs,
   description,
+  rawValueExists,
 }) => {
   const { language, t } = useUiLanguage();
   const help = getSettingsHelpContent(helpKey ?? schema?.helpKey, description, language);
+  const defaultValue = schema?.defaultValue != null ? String(schema.defaultValue) : '';
+  const hasDefault = defaultValue.length > 0;
+  // Authoritative source of the saved value: explicit when the backend reports a
+  // raw value exists; otherwise it falls back to the built-in default (if any).
+  const valueSource: 'explicit' | 'default' | 'unset' | null =
+    rawValueExists === undefined
+      ? null
+      : rawValueExists
+        ? 'explicit'
+        : hasDefault
+          ? 'default'
+          : 'unset';
+  const sourceLabel =
+    valueSource === 'explicit'
+      ? t('settings.sourceExplicit')
+      : valueSource === 'default'
+        ? t('settings.sourceDefault')
+        : valueSource === 'unset'
+          ? t('settings.sourceUnset')
+          : '';
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -248,6 +271,21 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
                   <HelpSection title={t('settings.helpPurpose')}>
                     {help.usage ? <p className="text-sm leading-6 text-secondary-text">{help.usage}</p> : null}
                   </HelpSection>
+
+                  {valueSource ? (
+                    <HelpSection title={t('settings.helpCurrentSource')}>
+                      <p className="text-sm leading-6 text-secondary-text">
+                        {sourceLabel}
+                        {valueSource === 'default' && !schema?.isSensitive ? (
+                          <>
+                            {' '}
+                            <span className="text-muted-text">{t('settings.sourceDefaultValueLabel')}: </span>
+                            <code className="rounded bg-background/70 px-1.5 py-0.5 font-mono text-xs text-foreground">{defaultValue}</code>
+                          </>
+                        ) : null}
+                      </p>
+                    </HelpSection>
+                  ) : null}
 
                   <HelpSection title={t('settings.helpValueNotes')}>
                     <HelpList items={help.valueNotes} />

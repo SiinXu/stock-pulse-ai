@@ -1,58 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   LLM_PROVIDER_CAPABILITY_LABELS,
-  LLM_PROVIDER_TEMPLATE_BY_ID,
-  LLM_PROVIDER_TEMPLATES,
   MODEL_PLACEHOLDERS_BY_PROTOCOL,
-  getProviderTemplate,
-  isKnownProviderTemplate,
+  PROVIDER_PRESENTATION_BY_ID,
+  getCapabilityLabel,
+  getProviderPresentation,
 } from '../llmProviderTemplates';
 
-describe('llmProviderTemplates', () => {
-  it('keeps provider template order aligned with the existing preset dropdown order', () => {
-    expect(LLM_PROVIDER_TEMPLATES.map((template) => template.channelId)).toEqual([
-      'aihubmix',
-      'anspire',
-      'deepseek',
-      'dashscope',
-      'zhipu',
-      'moonshot',
-      'minimax',
-      'volcengine',
-      'siliconflow',
-      'openrouter',
-      'gemini',
-      'anthropic',
-      'openai',
-      'ollama',
-      'custom',
-    ]);
-  });
-
-  it('derives lookup keys from unique channel ids', () => {
-    const channelIds = LLM_PROVIDER_TEMPLATES.map((template) => template.channelId);
-
-    expect(new Set(channelIds).size).toBe(channelIds.length);
-    for (const template of LLM_PROVIDER_TEMPLATES) {
-      expect(LLM_PROVIDER_TEMPLATE_BY_ID[template.channelId]).toBe(template);
-    }
-  });
-
-  it('exposes safe helpers for known, custom, and unknown channel ids', () => {
-    expect(getProviderTemplate('openrouter')).toBe(LLM_PROVIDER_TEMPLATE_BY_ID.openrouter);
-    expect(getProviderTemplate('custom')).toBe(LLM_PROVIDER_TEMPLATE_BY_ID.custom);
-    expect(getProviderTemplate('minimax2')).toBeUndefined();
-    expect(getProviderTemplate('constructor')).toBeUndefined();
-    expect(getProviderTemplate('toString')).toBeUndefined();
-
-    expect(isKnownProviderTemplate('openrouter')).toBe(true);
-    expect(isKnownProviderTemplate('custom')).toBe(false);
-    expect(isKnownProviderTemplate('minimax2')).toBe(false);
-    expect(isKnownProviderTemplate('constructor')).toBe(false);
-    expect(isKnownProviderTemplate('toString')).toBe(false);
-  });
-
-  it('only defines static provider-template capabilities for P2 UI hints', () => {
+describe('llmProviderTemplates (presentation-only)', () => {
+  it('only defines static capability labels for the provider UI hints', () => {
     expect(Object.keys(LLM_PROVIDER_CAPABILITY_LABELS).sort()).toEqual([
       'aggregator',
       'local-runtime',
@@ -63,32 +19,34 @@ describe('llmProviderTemplates', () => {
     ]);
     expect(LLM_PROVIDER_CAPABILITY_LABELS).not.toHaveProperty('json');
     expect(LLM_PROVIDER_CAPABILITY_LABELS).not.toHaveProperty('tools');
-    expect(LLM_PROVIDER_CAPABILITY_LABELS).not.toHaveProperty('stream');
   });
 
-  it('uses volcengine as the default Volcengine Ark provider id', () => {
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.volcengine).toMatchObject({
-      label: '火山方舟（豆包）',
-      protocol: 'openai',
-      baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-      placeholderModels: 'doubao-seed-1-6-251015,doubao-seed-1-6-thinking-251015',
-      configHint: '确认在线推理 endpoint / region 与 Coding Plan 专用入口不要混用。',
-    });
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.ark).toBeUndefined();
+  it('resolves capability labels safely, returning undefined for unknown ids', () => {
+    expect(getCapabilityLabel('openai-compatible')?.label).toBe('OpenAI 兼容');
+    expect(getCapabilityLabel('json')).toBeUndefined();
+    expect(getCapabilityLabel('constructor')).toBeUndefined();
   });
 
   it('keeps focused config hints on providers with common setup pitfalls', () => {
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.ollama.configHint).toContain('Ollama 服务');
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.siliconflow.configHint).toContain('API Key');
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.openrouter.configHint).toContain('API Key');
-    expect(LLM_PROVIDER_TEMPLATE_BY_ID.openai.configHint).toBeUndefined();
+    expect(PROVIDER_PRESENTATION_BY_ID.ollama.configHint).toContain('Ollama 服务');
+    expect(PROVIDER_PRESENTATION_BY_ID.siliconflow.configHint).toContain('API Key');
+    expect(PROVIDER_PRESENTATION_BY_ID.openrouter.configHint).toContain('API Key');
+    expect(PROVIDER_PRESENTATION_BY_ID.volcengine.configHint).toContain('endpoint');
+    expect(PROVIDER_PRESENTATION_BY_ID.openai.configHint).toBeUndefined();
   });
 
-  it('keeps basic metadata on non-custom provider templates', () => {
-    for (const template of LLM_PROVIDER_TEMPLATES.filter((item) => item.channelId !== 'custom')) {
-      expect(template.capabilities.length).toBeGreaterThan(0);
-      expect(template.officialSources.length).toBeGreaterThan(0);
+  it('keeps documentation links on non-custom providers', () => {
+    for (const [id, presentation] of Object.entries(PROVIDER_PRESENTATION_BY_ID)) {
+      if (id === 'custom') continue;
+      expect(presentation.officialSources.length).toBeGreaterThan(0);
     }
+  });
+
+  it('returns an empty presentation for unknown / custom provider ids', () => {
+    expect(getProviderPresentation('custom')).toEqual({ officialSources: [] });
+    expect(getProviderPresentation('minimax2')).toEqual({ officialSources: [] });
+    expect(getProviderPresentation('constructor')).toEqual({ officialSources: [] });
+    expect(getProviderPresentation('openrouter').configHint).toContain('API Key');
   });
 
   it('keeps protocol-level fallback placeholders centralized', () => {

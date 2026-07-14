@@ -249,6 +249,60 @@ def get_llm_config_mode_status(
 
 
 @router.get(
+    "/config/llm/available-models",
+    responses={
+        200: {"description": "Available model routes loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get the model routes declared by currently-enabled connections",
+    description=(
+        "Return the canonical model routes (and their display name / connection / "
+        "provider grouping) the Web model selectors offer. The route set matches "
+        "backend validation, so the UI never has to derive routes itself."
+    ),
+)
+def get_llm_available_models(
+    service: SystemConfigService = Depends(get_system_config_service),
+) -> dict:
+    """Return available model routes for the current saved config."""
+    try:
+        return service.get_available_models()
+    except Exception as exc:
+        logger.error("Failed to load available models: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Failed to load available models"},
+        )
+
+
+@router.get(
+    "/config/llm/providers",
+    responses={
+        200: {"description": "LLM provider catalog loaded"},
+        500: {"description": "Internal server error", "model": ErrorResponse},
+    },
+    summary="Get the authoritative LLM model-service provider catalog",
+    description=(
+        "Return provider metadata (label, protocol, default endpoint, credential "
+        "and base-URL requirements, discovery support, capabilities). This is the "
+        "single source of truth the Web model-access page consumes."
+    ),
+)
+def get_llm_provider_catalog() -> dict:
+    """Return the authoritative provider catalog without reading user config."""
+    try:
+        from src.llm.provider_catalog import get_provider_catalog
+
+        return {"providers": get_provider_catalog()}
+    except Exception as exc:
+        logger.error("Failed to load LLM provider catalog: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "Failed to load LLM provider catalog"},
+        )
+
+
+@router.get(
     "/config/llm/legacy-migration/preview",
     responses={
         200: {"description": "Legacy migration preview loaded"},
