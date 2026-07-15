@@ -8,15 +8,17 @@
 
 1. Windows 或 macOS 电脑。
 2. 一个模型服务密钥（Key），推荐从下面任选一个：
-   - [Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)：支持全球主流模型，一个 Key 可同时用于模型和新闻搜索，第一次配置最省事。
-   - [AIHubMix](https://aihubmix.com/?aff=CfMq)：支持全球主流模型，适合想在一个平台切换多种模型的用户。
+   - [Anspire Open](https://open.anspire.cn/)：支持全球主流模型，一个 Key 可同时用于模型和新闻搜索，第一次配置最省事。
+   - [AIHubMix](https://aihubmix.com/)：支持全球主流模型，适合想在一个平台切换多种模型的用户。
 3. 想分析的股票代码，例如 `600519,hk00700,AAPL`。
 
 ## 1. 下载客户端
 
 打开发布页：
 
-<https://github.com/ZhuLinsen/daily_stock_analysis/releases/latest>
+<https://github.com/SiinXu/stock-pulse-ai/releases>
+
+只有发布页中存在带 `Assets`（附件）的正式版本时，客户端安装包才可下载。如果页面为空或最新版本没有对应附件，说明 StockPulse 尚未发布可下载客户端；请先按 [README](../README.md) 使用源码 / WebUI 方式运行，不要从上游或第三方下载并冒充 StockPulse 的安装包。
 
 在页面下方 `Assets`（附件）里下载：
 
@@ -51,7 +53,7 @@ macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 
 ### 方案 A：Anspire Open
 
-1. 打开 [Anspire Open](https://open.anspire.cn/?share_code=QFBC0FYC)，注册 / 登录后创建 API Key。
+1. 打开 [Anspire Open](https://open.anspire.cn/)，注册 / 登录后创建 API Key。
 2. 回到客户端，进入「AI 与模型 → 模型接入」，点击「添加模型服务」并选择 `Anspire Open`。
 3. 粘贴 API Key。
 4. 添加模型：点击「获取模型」自动发现并勾选，或手动逐个添加控制台里已开通的模型名（新建连接不会预填示例模型）；不确定就先选控制台推荐或轻量模型。
@@ -59,7 +61,7 @@ macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 
 ### 方案 B：AIHubMix
 
-1. 打开 [AIHubMix](https://aihubmix.com/?aff=CfMq)，注册 / 登录后创建 API Key。
+1. 打开 [AIHubMix](https://aihubmix.com/)，注册 / 登录后创建 API Key。
 2. 回到客户端，进入「AI 与模型 → 模型接入」，点击「添加模型服务」并选择 `AIHubmix（聚合平台）`。
 3. 粘贴 API Key。
 4. 模型名选择控制台里已开通的模型；不确定就先选控制台推荐模型。
@@ -96,7 +98,7 @@ macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 按你的模型服务选择：
 
 1. 用 Anspire Open：找到 `Anspire API Keys`，填入同一个 Anspire Key，保存成功后即可。
-2. 用 AIHubMix：建议再申请 [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 或 [Tavily](https://tavily.com/) 的 Key，填到 `SerpAPI API Keys` 或 `Tavily API Keys`，保存成功后即可。
+2. 用 AIHubMix：建议再申请 [SerpAPI](https://serpapi.com/baidu-search-api) 或 [Tavily](https://tavily.com/) 的 Key，填到 `SerpAPI API Keys` 或 `Tavily API Keys`，保存成功后即可。
 
 想先试用也可以跳过新闻源，客户端仍然能生成基础分析。
 

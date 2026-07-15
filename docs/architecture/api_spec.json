@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Daily Stock Analysis API",
+    "title": "StockPulse API",
     "description": "A股/港股/美股自选股智能分析系统 API\n\n## 功能模块\n- 股票分析：触发 AI 智能分析\n- 历史记录：查询历史分析报告\n- 股票数据：获取行情数据\n\n## 认证方式\n支持可选管理员认证：ADMIN_AUTH_ENABLED=true 时，除登录、状态、健康检查和 OpenAPI 文档外，/api/v1/* 需要有效管理员会话 Cookie；关闭时不强制认证。",
     "version": "1.0.0"
   },
@@ -2594,10 +2594,12 @@
         "properties": {
           "message": {
             "type": "string",
-            "example": "Daily Stock Analysis API is running"
+            "description": "API runtime status message",
+            "example": "StockPulse API is running"
           },
           "version": {
             "type": "string",
+            "description": "API version",
             "example": "1.0.0"
           }
         },
@@ -2610,11 +2612,13 @@
         "properties": {
           "status": {
             "type": "string",
+            "description": "Service status",
             "example": "ok"
           },
           "timestamp": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Timestamp"
           }
         },
         "required": [
@@ -4593,14 +4597,14 @@
           "error": {
             "type": "string",
             "title": "Error",
-            "description": "错误类型",
+            "description": "Error type",
             "example": "validation_error"
           },
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "错误详情",
-            "example": "请求参数错误"
+            "description": "Error details",
+            "example": "Invalid request parameters"
           },
           "detail": {
             "anyOf": [
@@ -4610,7 +4614,7 @@
               }
             ],
             "title": "Detail",
-            "description": "附加错误信息"
+            "description": "Additional error information"
           }
         },
         "type": "object",
@@ -4619,10 +4623,10 @@
           "message"
         ],
         "title": "ErrorResponse",
-        "description": "错误响应",
+        "description": "Error response.",
         "example": {
           "error": "not_found",
-          "message": "资源不存在"
+          "message": "Resource not found"
         }
       },
       "RunFlowLane": {

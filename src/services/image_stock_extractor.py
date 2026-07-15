@@ -267,12 +267,10 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
         "api_key": key,
         "timeout": VISION_API_TIMEOUT,
     }
-    # Add api_base and custom headers for OpenAI-compatible providers
+    # Add the configured Base URL for OpenAI-compatible providers.
     if not model.startswith("gemini/") and not model.startswith("anthropic/") and not model.startswith("vertex_ai/"):
         if cfg.openai_base_url:
             call_kwargs["api_base"] = cfg.openai_base_url
-        if cfg.openai_base_url and "aihubmix.com" in cfg.openai_base_url:
-            call_kwargs["extra_headers"] = {"APP-Code": "GPIJ3886"}
 
     if getattr(litellm, "completion", None) is None:
         import litellm as litellm_module

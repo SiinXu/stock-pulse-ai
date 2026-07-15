@@ -176,7 +176,7 @@ class TestCallLitellmVision:
             assert kwargs["timeout"] == VISION_API_TIMEOUT
             assert kwargs["max_tokens"] == 1024
 
-    def test_openai_model_uses_api_base_and_aihubmix_headers(self):
+    def test_openai_model_uses_api_base_without_sponsored_headers(self):
         cfg = _cfg(
             openai_vision_model="openai/gpt-4o-mini",
             openai_api_keys=[_OPENAI_KEY],
@@ -188,7 +188,7 @@ class TestCallLitellmVision:
             _call_litellm_vision("b64", "image/jpeg")
             kwargs = mock_comp.call_args[1]
             assert kwargs["api_base"] == "https://aihubmix.com/v1"
-            assert kwargs["extra_headers"]["APP-Code"] == "GPIJ3886"
+            assert "extra_headers" not in kwargs
 
     def test_raises_when_model_not_configured(self):
         cfg = _cfg(openai_vision_model=None, litellm_model="", gemini_api_keys=[], anthropic_api_keys=[], openai_api_keys=[])

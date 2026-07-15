@@ -8,7 +8,7 @@ export interface SearchableSelectOption {
   value: string;
   /** Primary display line (e.g. model display name). */
   label: string;
-  /** Secondary display line (e.g. "OpenAI · 生产连接"). */
+  /** Secondary display line (e.g. "OpenAI · Production connection"). */
   sublabel?: string;
   /** Optional group header the option is listed under. */
   group?: string;

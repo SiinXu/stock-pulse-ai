@@ -16,10 +16,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CHANGELOG = ROOT / "docs" / "CHANGELOG.md"
 LOGGER = logging.getLogger(__name__)
+HAN_PATTERN = re.compile(
+    r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\U00020000-\U0002ebef\U00030000-\U0003134f]"
+)
+CHARACTER_REFERENCE_PATTERN = re.compile(
+    r"&(?:\#[xX][0-9A-Fa-f]+|\#\d+|[A-Za-z][A-Za-z0-9]+);"
+)
+GITHUB_LOGIN_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 KNOWN_AUTHOR_LOGINS = {
     "Alfred": "massif-01",
     "massif0601@gmail.com": "massif-01",
 }
+
+
+def _contains_non_english_letter(value: str) -> bool:
+    """Return whether text contains letters outside the basic English alphabet."""
+    return any(character.isalpha() and not character.isascii() for character in value)
 
 
 def _run_git(*args: str) -> str:
@@ -51,6 +63,8 @@ def _highlights(section: str) -> list[str]:
             continue
         item = line[2:].strip()
         item = re.sub(r"^(feat|fix|docs|test|chore|ci|refactor):\s*", "", item, flags=re.I)
+        if _contains_non_english_letter(item) or CHARACTER_REFERENCE_PATTERN.search(item):
+            continue
         bullets.append(item)
         if len(bullets) >= 6:
             break
@@ -87,7 +101,7 @@ def _github_login_from_pr(repo: str, token: str, pr_number: str) -> str | None:
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
-            "User-Agent": "daily-stock-analysis-release-notes",
+            "User-Agent": "stock-pulse-ai-release-notes",
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
@@ -136,9 +150,10 @@ def _fallback_login(author: str) -> str | None:
             return login
     noreply = re.search(r"\+([^@<>]+)@users\.noreply\.github\.com", author)
     if noreply:
-        return noreply.group(1)
+        login = noreply.group(1)
+        return login if GITHUB_LOGIN_PATTERN.fullmatch(login) else None
     name = author.split("<", 1)[0].strip()
-    if name and " " not in name and "[" not in name and name.lower() not in {"github", "dependabot"}:
+    if GITHUB_LOGIN_PATTERN.fullmatch(name) and name.lower() not in {"github", "dependabot"}:
         return name
     return None
 
@@ -185,11 +200,12 @@ def build(tag: str) -> str:
         lines.append("Maintainers")
 
     compare_from = previous_tag or tag
+    repo = os.environ.get("GITHUB_REPOSITORY", "SiinXu/stock-pulse-ai")
     lines.extend(
         [
             "",
             "### Full changelog",
-            f"https://github.com/ZhuLinsen/daily_stock_analysis/compare/{compare_from}...{tag}",
+            f"https://github.com/{repo}/compare/{compare_from}...{tag}",
             "",
         ]
     )

@@ -5,9 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-> For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
+> For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
+- [修复] 移除上游 AIHubMix referral `APP-Code` 自动注入及 Anspire/AIHubMix/SerpAPI 推荐参数和优惠宣称；用户显式配置的自定义 headers 保持不变。
+- [改进] Workflow、邮件默认发件人、HTTP User-Agent、Web fallback 标题与 OpenAPI 标题统一使用 StockPulse；部署、桌面发布校验和远程股票索引切换到当前仓库。
+- [文档] Docker 指南不再把上游或尚未发布的镜像描述为 StockPulse 官方产物，并移除未启用的 Discussions 入口。
+- [测试] 新增 GitHub 协作资产英文守卫，并要求 PR 自动标签与审查报告通过分页 API 统计全部变更文件，避免大型 PR 只报告前 30 个文件。
+- [测试] SettingsPage 调度器运行态回填测试在两个状态方向都等待异步 API 响应，避免 CI 高负载下在运行态同步完成前提前断言。
+- [文档] 三语 README 将 StockPulse 明确为 ZhuLinsen/daily_stock_analysis 的 MIT License 独立维护 fork，并将当前仓库、CI、文档与反馈入口切换到 SiinXu/stock-pulse-ai。
 - [改进] StockPulse Web 补齐 Chat、Screening、Alerts、Portfolio、Settings、公共选择器、股票搜索和报告外围诊断的中英文界面，并将 UI language、report language 与动态原文边界分离。
 - [改进] Web 翻译按 alerts、portfolio、screening、settings、stock search、report chrome 等领域拆分为 typed locale 文件，便于后续扩展更多语言，避免单一字典持续膨胀。
 - [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 硬编码文案守卫及 30 项 Playwright i18n 验收；CI `web-gate` 显式执行 i18n 门禁。
@@ -2084,7 +2091,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-[Unreleased]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.25.0...HEAD
+[Unreleased]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.0...HEAD
 [3.25.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.1...v3.25.0
 [3.24.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.0...v3.24.1
 [3.24.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.23.0...v3.24.0

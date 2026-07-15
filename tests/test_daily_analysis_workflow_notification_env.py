@@ -31,11 +31,11 @@ P0_EXCLUDED_BEHAVIOR_SWITCHES = {
 def _load_daily_analysis_env() -> dict[str, str]:
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     steps = workflow["jobs"]["analyze"]["steps"]
-    analyze_step = next((step for step in steps if step.get("name") == "执行股票分析"), None)
+    analyze_step = next((step for step in steps if step.get("name") == "Run Stock Analysis"), None)
     available_step_names = [step.get("name", "<unnamed>") for step in steps]
     assert analyze_step is not None, (
         "Expected 00-daily-analysis.yml job analyze to include a step named "
-        f"'执行股票分析'; available step names: {available_step_names}"
+        f"'Run Stock Analysis'; available step names: {available_step_names}"
     )
     return analyze_step["env"]
 
@@ -72,7 +72,7 @@ def test_daily_analysis_feishu_status_accepts_webhook_or_app_bot_triad() -> None
     status_line = next(
         line
         for line in WORKFLOW_PATH.read_text(encoding="utf-8").splitlines()
-        if 'echo "  飞书:' in line
+        if 'echo "  Feishu:' in line
     )
 
     for key in ("FEISHU_WEBHOOK_URL", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_CHAT_ID"):

@@ -13,6 +13,7 @@
   - 部署与流水线改动在 `scripts/`、`.github/workflows/`、`docker/`
 - 未经明确确认，不执行 `git commit`、`git tag`、`git push`。
 - commit message 使用英文，不添加 `Co-Authored-By`。
+- 所有 GitHub 协作内容必须使用英文，包括 Issue / PR 标题与正文、评论、review、check / job / step 名称、step summary、bot 评论和自动审查输出。
 - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑。
 - 优先复用现有模块、配置入口、脚本和测试，不新增平行实现。
 - 默认稳定性优先于“顺手优化”；非当前任务直接需要的重构、抽象和基础设施迁移一律克制。
@@ -24,11 +25,11 @@
 - `README.md` 只用于项目定位、核心能力总览、快速开始、主要入口、赞助/合作等首页级信息；非必要不更新 README，避免持续膨胀。
 - 更细的模块行为、页面交互、专题配置、排障说明、字段契约、实现语义和边界条件，优先更新对应 `docs/*.md` 或专题文档，不写入 README。
 - 变更中英双语文档之一时，需评估另一份是否需要同步；若未同步，交付说明里要写明原因。
-- 注释、docstring、日志文案以清晰准确为准，不强制要求英文，但应与文件语境保持一致。
+- 新增或修改的源码注释、docstring 与面向开发者的日志必须使用英文；未触碰的历史文案可渐进迁移。本地化产品文案、用户通知内容及对应语言文档可使用目标语言。
 
 ## 1.1 PR 标题规范（非阻断建议）
 
-- 推荐使用 `<类型>: <修改内容>` 作为 PR 标题，例如 `fix: 修复大盘分析历史记录丢失`，优先类型为 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`。
+- 推荐使用 `<type>: <change summary>` 作为英文 PR 标题，例如 `fix: preserve market analysis history`，优先类型为 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`。
 - 标题应描述实际变更内容，建议不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀。
 - 该规范仅用于协作可读性与一致性提示，不应单独作为 review process blocker。
 
