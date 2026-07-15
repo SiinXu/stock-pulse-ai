@@ -30,7 +30,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.deps import get_config_dep
-from api.v1.errors import api_error
+from api.v1.errors import api_error, error_body
 from api.v1.schemas.analysis import (
     AnalyzeRequest,
     AnalysisResultResponse,
@@ -82,6 +82,8 @@ from src.services.task_queue import (
     get_task_queue,
     DuplicateTaskError,
     TaskStatus as TaskStatusEnum,
+    public_task_error,
+    public_task_message,
 )
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
@@ -109,6 +111,16 @@ def _get_task_trace_id(task: Any) -> Optional[str]:
     if isinstance(task_id, str) and task_id.strip():
         return task_id
     return None
+
+
+def _get_task_message_code(task: Any, default: str = "task.status") -> str:
+    value = getattr(task, "message_code", None)
+    return value if isinstance(value, str) and value.strip() else default
+
+
+def _get_task_message_params(task: Any, **fallback: Any) -> Dict[str, Any]:
+    value = getattr(task, "message_params", None)
+    return dict(value) if isinstance(value, dict) else fallback
 
 
 def _market_review_lock_path(config: Config) -> Path:
@@ -395,6 +407,8 @@ def _handle_async_analysis_batch(
             stock_code=task.stock_code,
             status="pending",
             message=f"分析任务已加入队列: {task.stock_code}",
+            message_code=_get_task_message_code(task, "task.queued"),
+            message_params=_get_task_message_params(task, stock_code=task.stock_code),
             analysis_phase=task.analysis_phase,
         )
         for task in accepted_tasks
@@ -419,7 +433,14 @@ def _handle_async_analysis_batch(
         )
         return JSONResponse(
             status_code=409,
-            content=error_response.model_dump()
+            content=error_body(
+                error_response.error,
+                error_response.message,
+                params={
+                    "stock_code": error_response.stock_code,
+                    "existing_task_id": error_response.existing_task_id,
+                },
+            ),
         )
     
     # 单只股票成功：保持原有响应格式兼容性
@@ -429,6 +450,8 @@ def _handle_async_analysis_batch(
             trace_id=accepted[0].trace_id,
             status="pending",
             message=accepted[0].message,
+            message_code=_get_task_message_code(accepted[0], "task.queued"),
+            message_params=_get_task_message_params(accepted[0], stock_code=accepted[0].stock_code),
             analysis_phase=accepted[0].analysis_phase,
         )
         return JSONResponse(
@@ -565,6 +588,7 @@ def trigger_market_review(
             stock_name="大盘复盘",
             message="大盘复盘任务已提交",
             task_id=task_id,
+            failure_error_code="analysis_failed",
         )
     except Exception:
         _release_market_review_lock(lock_token)
@@ -573,6 +597,8 @@ def trigger_market_review(
     return MarketReviewAccepted(
         status="accepted",
         message="大盘复盘任务已提交，完成后会保存报告并按配置推送通知",
+        message_code="task.market_review.queued",
+        message_params={},
         send_notification=request.send_notification,
         task_id=task.task_id,
         trace_id=_get_task_trace_id(task),
@@ -631,12 +657,14 @@ def get_task_list(
             stock_name=t.stock_name,
             status=t.status.value,
             progress=t.progress,
-            message=t.message,
+            message=public_task_message(t),
+            message_code=_get_task_message_code(t),
+            message_params=_get_task_message_params(t),
             report_type=t.report_type,
             created_at=t.created_at.isoformat(),
             started_at=t.started_at.isoformat() if t.started_at else None,
             completed_at=t.completed_at.isoformat() if t.completed_at else None,
-            error=t.error,
+            error=public_task_error(t, default_error_code="analysis_failed"),
             original_query=t.original_query,
             selection_source=t.selection_source,
             analysis_phase=t.analysis_phase,
@@ -1073,10 +1101,13 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             trace_id=_get_task_trace_id(task),
             status=task.status.value,
             progress=task.progress,
+            message=public_task_message(task),
+            message_code=_get_task_message_code(task),
+            message_params=_get_task_message_params(task),
             result=result,
             market_review_report=market_review_report,
             market_review_payload=market_review_payload,
-            error=task.error,
+            error=public_task_error(task, default_error_code="analysis_failed"),
             stock_name=task.stock_name,
             original_query=task.original_query,
             selection_source=task.selection_source,

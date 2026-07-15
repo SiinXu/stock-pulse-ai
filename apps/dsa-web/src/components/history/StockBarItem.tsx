@@ -4,7 +4,7 @@ import type { StockBarItem as StockBarItemType } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
+import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../../utils/marketPhase';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -37,10 +37,9 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
     t('history.sentiment'),
     actionLabels,
   );
-  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, language)
-    ?.replace('市场阶段: ', '')
-    .replace('市场阶段：', '')
-    .replace('Market phase: ', '');
+  const phaseLabel = stripMarketPhaseSummaryPrefix(
+    getMarketPhaseSummaryLabel(item.marketPhaseSummary, language),
+  );
 
   return (
     <div
@@ -56,7 +55,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
       >
         <div className="relative z-10 flex items-center gap-2">
           {isMarketReview ? (
-            <div className="w-1 h-7 rounded-full flex-shrink-0 bg-amber-400" />
+            <div className="h-7 w-1 flex-shrink-0 rounded-full bg-warning" />
           ) : sentimentColor ? (
             <div
               className="w-1 h-7 rounded-full flex-shrink-0"
@@ -79,12 +78,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="shrink-0 shadow-none text-[10px] font-semibold leading-none"
-                    style={{
-                      color: '#f59e0b',
-                      borderColor: 'rgba(245,158,11,0.3)',
-                      backgroundColor: 'rgba(245,158,11,0.1)',
-                    }}
+                    className="shrink-0 border-warning/30 bg-warning/10 text-xs font-semibold leading-none text-warning shadow-none"
                   >
                     {t('stockBar.market')}
                   </Badge>
@@ -92,7 +86,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="home-history-sentiment-badge shrink-0 shadow-none text-[11px] font-semibold leading-none transition-opacity duration-200"
+                    className="home-history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
                     style={{
                       color: sentimentColor,
                       borderColor: `${sentimentColor}30`,
@@ -106,17 +100,17 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             </div>
             <div className="mt-1 flex items-center gap-2" data-testid="history-card-meta">
               {item.lastAnalysisTime && (
-                <span className="text-[11px] text-muted-text">
+                <span className="text-xs text-muted-text">
                   {formatDateTime(item.lastAnalysisTime, language)}
                 </span>
               )}
               {item.analysisCount > 1 && (
-                <span className="text-[10px] text-muted-text">
+                <span className="text-xs text-muted-text">
                   {t('history.analysisCount', { count: item.analysisCount })}
                 </span>
               )}
               {phaseLabel ? (
-                <Badge variant="default" size="sm" className="shrink-0 shadow-none text-[10px] leading-none">
+                <Badge variant="default" size="sm" className="shrink-0 text-xs leading-none shadow-none">
                   {phaseLabel}
                 </Badge>
               ) : null}
@@ -133,7 +127,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             onDelete(item.stockCode);
           }}
           disabled={isDeleting}
-          className="relative z-10 mr-1 flex h-8 w-8 shrink-0 items-center justify-center self-center p-0 opacity-70 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100"
+          className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center self-center p-0 opacity-70 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100"
           aria-label={t('history.deleteRecord', { name: item.stockName || item.stockCode })}
         >
           <svg className="h-3.5 w-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">

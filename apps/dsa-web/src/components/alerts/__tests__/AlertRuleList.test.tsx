@@ -281,7 +281,7 @@ describe('AlertRuleList', () => {
   });
 
   it('shows loading text only for the active rule operation', () => {
-    renderList({ busyRule: { id: 1, action: 'toggle' } });
+    renderList({ busyRules: { 1: 'toggle' } });
 
     expect(screen.getAllByRole('button', { name: '测试' })[0]).toBeDisabled();
     expect(screen.getByRole('button', { name: '停用中' })).toHaveAttribute('aria-busy', 'true');

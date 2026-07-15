@@ -14,6 +14,7 @@ vi.mock('../../api/systemConfig', () => ({
 
 function modelEntry(route: string) {
   return {
+    modelRef: `modelref:v1:openai:${encodeURIComponent(route)}`,
     route,
     display: route.split('/').pop() || route,
     connection: 'openai',

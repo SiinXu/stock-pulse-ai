@@ -1713,14 +1713,31 @@ class TestOrchestratorExecution(unittest.TestCase):
         from src.agent.orchestrator import OrchestratorResult
 
         orch = self._make_orchestrator()
-        fake_result = OrchestratorResult(success=False, error="boom")
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+        fake_result = OrchestratorResult(success=False, error=raw_error)
 
         with patch.object(orch, "_execute_pipeline", return_value=fake_result):
             with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
-                result = orch.chat("hello", "session-2")
+                with self.assertLogs("src.agent.orchestrator", level="ERROR") as logs:
+                    result = orch.chat("hello", "session-2")
 
         self.assertFalse(result.success)
-        add_message.assert_any_call("session-2", "assistant", "[分析失败] boom")
+        add_message.assert_any_call(
+            "session-2",
+            "assistant",
+            "[分析失败] Agent chat failed",
+        )
+        persisted_content = "\n".join(
+            call.args[2]
+            for call in add_message.call_args_list
+            if len(call.args) >= 3
+        )
+        self.assertNotIn("super-secret", persisted_content)
+        self.assertNotIn("private.example", persisted_content)
+        self.assertIn(raw_error, "\n".join(logs.output))
 
     def test_execute_pipeline_fails_when_dashboard_parse_fails(self):
         orch = self._make_orchestrator()
@@ -2834,7 +2851,10 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
             response = await agent_research(ResearchRequest(question="600519 风险"))
 
         self.assertFalse(response.success)
-        self.assertIn("timed out", response.error)
+        self.assertEqual(response.content, "")
+        self.assertEqual(response.sources, [])
+        self.assertEqual(response.token_usage, 0)
+        self.assertEqual(response.error, "agent_research_failed")
 
 
 if __name__ == '__main__':

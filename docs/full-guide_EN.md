@@ -1527,6 +1527,13 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 
 ## Portfolio Web Notes
 
+### Idempotent portfolio mutations
+
+- Trade, cash-ledger, corporate-action, and CSV commit requests accept a client `operation_id`; clients may also send the same value in the `Idempotency-Key` header.
+- Retrying the same operation ID with the same payload replays the first committed response. This prevents duplicate ledger entries when the original response times out after commit. Reusing an ID with a different payload returns `409 idempotency_conflict`.
+- CSV records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
+- The Web client keeps the operation ID after a failed request, locks fields and close behavior while submission is pending, and changes compact forms to one column at 320px.
+
 ### Portfolio account archive on `/portfolio`
 
 - The `/portfolio` account toolbar can delete a selected single account through the existing `DELETE /api/v1/portfolio/accounts/{account_id}` endpoint.

@@ -6,6 +6,8 @@ import { ApiErrorAlert, Card } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { historyApi } from '../../api/history';
 import type { NewsIntelItem, ReportLanguage } from '../../types/analysis';
+import { REPORT_NEWS_CONTENT_TEXT } from '../../locales/reportContent';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -15,21 +17,6 @@ interface ReportNewsProps {
   language?: ReportLanguage;
 }
 
-const NEWS_SOURCE_TEXT = {
-  zh: {
-    sourceLabel: '相关资讯/后续检索',
-    sourceHint: '来源：报告页补充资讯；是否用于分析以输入数据块为准。',
-  },
-  en: {
-    sourceLabel: 'Related news / follow-up retrieval',
-    sourceHint: 'Source: supplemental report-page news; analysis input is shown in Input Blocks.',
-  },
-  ko: {
-    sourceLabel: '관련 뉴스 / 후속 검색',
-    sourceHint: '출처: 리포트 페이지 보충 뉴스이며, 분석 사용 여부는 입력 데이터 블록 기준입니다.',
-  },
-} as const;
-
 /**
  * 资讯区组件 - 终端风格
  */
@@ -37,7 +24,8 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const { language: uiLanguage, t } = useUiLanguage();
-  const sourceText = NEWS_SOURCE_TEXT[reportLanguage];
+  const chromeText = REPORT_CHROME_TEXT[uiLanguage];
+  const sourceText = REPORT_NEWS_CONTENT_TEXT[reportLanguage];
   const [isLoading, setIsLoading] = useState(false);
   const [items, setItems] = useState<NewsIntelItem[]>([]);
   const [error, setError] = useState<ParsedApiError | null>(null);
@@ -111,15 +99,15 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
         <DashboardStateBlock
           compact
           loading
-          title={text.loadingNews}
+          title={chromeText.loadingNews}
         />
       )}
 
       {!isLoading && !error && items.length === 0 && (
         <DashboardStateBlock
           compact
-          title={text.noNews}
-          description={text.noNewsDescription}
+          title={chromeText.noNews}
+          description={chromeText.noNewsDescription}
           icon={(
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7-7m0 0l-7 7m7-7v18" />
@@ -152,9 +140,9 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
                     target="_blank"
                     rel="noopener noreferrer"
                     className="home-accent-pill-link shrink-0 whitespace-nowrap px-2.5 py-1 text-xs"
-                    aria-label={text.openLink}
+                    aria-label={chromeText.openLink}
                   >
-                    {text.openLink}
+                    {chromeText.openLink}
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
                         strokeLinecap="round"

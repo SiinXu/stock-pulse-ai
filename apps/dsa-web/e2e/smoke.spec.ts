@@ -115,7 +115,7 @@ test.describe('web smoke', () => {
     await captureSmokeScreenshot(page, testInfo, 'smoke-mobile-shell-nav');
   });
 
-  test('settings page renders title and save actions after login', async ({ page }, testInfo) => {
+  test('settings page renders without legacy global save actions after login', async ({ page }, testInfo) => {
     await login(page);
 
     // Navigate to settings page by clicking the link
@@ -125,8 +125,8 @@ test.describe('web smoke', () => {
 
     // Use heading role for more precise selection
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: '重置' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /保存配置/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: '重置当前分组' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /保存配置/ })).toHaveCount(0);
 
     await captureSmokeScreenshot(page, testInfo, 'smoke-settings-page-zh');
   });
@@ -161,7 +161,7 @@ test.describe('web smoke', () => {
     await page.waitForTimeout(1000);
 
     await expect(page.getByRole('heading', { name: 'System settings' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Save configuration' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save configuration' })).toHaveCount(0);
 
     await captureSmokeScreenshot(page, testInfo, 'smoke-settings-page-en');
   });

@@ -1,5 +1,7 @@
 import type React from 'react';
-import { useRef } from 'react';
+import { useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { OVERLAY_Z } from './overlayZ';
@@ -8,12 +10,18 @@ import { useDialogA11y } from './useDialogA11y';
 interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
+  title: string;
   children: React.ReactNode;
+  description?: string;
   width?: string;
   zIndex?: number;
   side?: 'left' | 'right';
   backdropClassName?: string;
+  rootClassName?: string;
+  panelClassName?: string;
+  contentClassName?: string;
+  showHeader?: boolean;
+  closeDisabled?: boolean;
 }
 
 /**
@@ -24,31 +32,53 @@ export const Drawer: React.FC<DrawerProps> = ({
   onClose,
   title,
   children,
+  description,
   width = 'max-w-2xl',
   zIndex = OVERLAY_Z.drawer,
   side = 'right',
   backdropClassName,
+  rootClassName,
+  panelClassName,
+  contentClassName,
+  showHeader = true,
+  closeDisabled = false,
 }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  const handleClose = () => {
+    if (!closeDisabled) {
+      onClose();
+    }
+  };
 
-  useDialogA11y({ isOpen, containerRef: dialogRef, onEscape: onClose });
+  useDialogA11y({
+    isOpen,
+    containerRef: dialogRef,
+    onEscape: handleClose,
+    closeOnEscape: !closeDisabled,
+  });
 
   if (!isOpen) return null;
 
-  const titleId = title ? `drawer-title-${side}` : undefined;
   const sidePositionClass = side === 'left' ? 'left-0 justify-start' : 'right-0 justify-end';
   const borderClass = side === 'left' ? 'border-r' : 'border-l';
 
-  return (
-    <div className="fixed inset-0 overflow-hidden" style={{ zIndex }} role="presentation">
+  return createPortal(
+    <div
+      data-overlay-root="drawer"
+      className={cn('fixed inset-0 overflow-hidden', rootClassName)}
+      style={{ zIndex }}
+      role="presentation"
+    >
       {/* Backdrop */}
       <div
         className={cn(
           'absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300',
           backdropClassName,
         )}
-        onClick={onClose}
+        onClick={handleClose}
       />
 
       <div className={cn('absolute inset-y-0 flex w-full', sidePositionClass, width)}>
@@ -57,37 +87,47 @@ export const Drawer: React.FC<DrawerProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
           tabIndex={-1}
           className={cn(
             'relative flex w-full flex-col bg-card focus:outline-none',
             borderClass,
             side === 'right' ? 'border-border/80' : 'border-border/70 shadow-2xl',
-            side === 'left' ? 'animate-slide-in-left' : 'animate-slide-in-right'
+            side === 'left' ? 'animate-slide-in-left' : 'animate-slide-in-right',
+            panelClassName,
           )}
         >
-          <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-            {title ? (
+          {showHeader ? (
+            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
               <div>
                 <span className="label-uppercase">{t('common.detailView')}</span>
                 <h2 id={titleId} className="mt-1 text-lg font-semibold text-foreground">{title}</h2>
+                {description ? (
+                  <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
+                ) : null}
               </div>
-            ) : <div />}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-              aria-label={t('common.closeDrawer')}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6">
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={closeDisabled}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label={t('common.closeDrawer')}
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <h2 id={titleId} className="sr-only">{title}</h2>
+              {description ? <p id={descriptionId} className="sr-only">{description}</p> : null}
+            </>
+          )}
+          <div className={cn('flex-1 overflow-y-auto p-6', contentClassName)}>
             {children}
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

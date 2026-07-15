@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
 
@@ -223,9 +223,44 @@ describe('AlertsPage', () => {
     fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
-    expect(await screen.findByText('加载失败')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('加载失败')).toBeInTheDocument();
     expect(screen.getByLabelText('标的代码')).toHaveValue('aapl');
     expect(screen.getByLabelText('价格阈值')).toHaveValue(200);
+  });
+
+  it('keeps concurrent operations busy for each rule independently', async () => {
+    const secondRule = { ...rule, id: 2, name: '苹果价格突破', target: 'AAPL' };
+    const disableRequest = createDeferred<typeof rule>();
+    const testRequest = createDeferred<{
+      ruleId: number;
+      status: 'not_triggered';
+      triggered: boolean;
+      message: string;
+    }>();
+    listRules.mockResolvedValue({ items: [rule, secondRule], total: 2, page: 1, pageSize: 20 });
+    disableRule.mockReturnValueOnce(disableRequest.promise);
+    testRule.mockReturnValueOnce(testRequest.promise);
+
+    render(<AlertsPage />);
+
+    const firstRow = (await screen.findByText('茅台价格突破')).closest('tr') as HTMLElement;
+    const secondRow = screen.getByText('苹果价格突破').closest('tr') as HTMLElement;
+    fireEvent.click(within(firstRow).getByRole('button', { name: '停用' }));
+    fireEvent.click(within(secondRow).getByRole('button', { name: '测试' }));
+    expect(within(firstRow).getByRole('button', { name: '停用中' })).toBeDisabled();
+    expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
+
+    await act(async () => {
+      disableRequest.resolve({ ...rule, enabled: false });
+    });
+    await waitFor(() => expect(within(firstRow).queryByRole('button', { name: '停用中' })).not.toBeInTheDocument());
+    expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
+
+    await act(async () => {
+      testRequest.resolve({ ruleId: 2, status: 'not_triggered', triggered: false, message: 'not triggered' });
+    });
+    await waitFor(() => expect(within(secondRow).queryByRole('button', { name: '测试中' })).not.toBeInTheDocument());
   });
 
   it('clamps rules pagination when a mutation leaves the current page empty', async () => {

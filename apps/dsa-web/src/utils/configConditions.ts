@@ -11,21 +11,33 @@ export function evaluateConfigConditions(
   conditions: ConfigCondition[] | undefined,
   values: Record<string, string>,
 ): ConditionResult {
-  if (!conditions || conditions.length === 0) {
+  if (!conditions) {
+    return 'met';
+  }
+  if (!Array.isArray(conditions)) {
+    return 'unknown';
+  }
+  if (conditions.length === 0) {
     return 'met';
   }
   for (const condition of conditions) {
+    if (!condition || typeof condition.key !== 'string' || !condition.key.trim()) {
+      return 'unknown';
+    }
     const actual = values[condition.key.toUpperCase()] ?? '';
     let met: boolean;
     switch (condition.operator) {
       case 'equals':
+        if (Array.isArray(condition.value)) return 'unknown';
         met = actual === String(condition.value ?? '');
         break;
       case 'notEquals':
+        if (Array.isArray(condition.value)) return 'unknown';
         met = actual !== String(condition.value ?? '');
         break;
       case 'in':
-        met = (Array.isArray(condition.value) ? condition.value : []).map(String).includes(actual);
+        if (!Array.isArray(condition.value)) return 'unknown';
+        met = condition.value.map(String).includes(actual);
         break;
       case 'notEmpty':
         met = actual.trim().length > 0;
@@ -51,15 +63,30 @@ export function isFieldVisibleByContract(
   return evaluateConfigConditions(contract.visibleWhen, values) !== 'notMet';
 }
 
+/** Unknown condition operators must keep a field visible but prevent edits. */
+export function hasUnknownConfigContractCondition(
+  contract: ConfigFieldContract | undefined,
+  values: Record<string, string>,
+): boolean {
+  if (!contract) {
+    return false;
+  }
+  return [contract.requiredWhen, contract.visibleWhen, contract.enabledWhen]
+    .some((conditions) => conditions && evaluateConfigConditions(conditions, values) === 'unknown');
+}
+
 /** A field is editable unless its enabledWhen conditions are definitively not met. */
 export function isFieldEnabledByContract(
   contract: ConfigFieldContract | undefined,
   values: Record<string, string>,
 ): boolean {
+  if (contract?.requirement === 'inherited' || hasUnknownConfigContractCondition(contract, values)) {
+    return false;
+  }
   if (!contract?.enabledWhen) {
     return true;
   }
-  return evaluateConfigConditions(contract.enabledWhen, values) !== 'notMet';
+  return evaluateConfigConditions(contract.enabledWhen, values) === 'met';
 }
 
 export type FieldRequirement = 'required' | 'optional' | 'inherited';

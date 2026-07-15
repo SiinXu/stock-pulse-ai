@@ -28,6 +28,11 @@ describe('useDashboardLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    vi.mocked(useTaskStream).mockReturnValue({
+      isConnected: true,
+      reconnect: vi.fn(),
+      disconnect: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -130,6 +135,7 @@ describe('useDashboardLifecycle', () => {
         syncTaskFailed: vi.fn(),
         removeTask,
         onCompletedTaskDataRefreshed,
+        terminalRetentionMs: 6_000,
         ...defaultMocks,
       }),
     );
@@ -200,6 +206,7 @@ describe('useDashboardLifecycle', () => {
         syncTaskUpdated: vi.fn(),
         syncTaskFailed,
         removeTask,
+        terminalRetentionMs: 8_000,
         ...defaultMocks,
       }),
     );
@@ -247,5 +254,39 @@ describe('useDashboardLifecycle', () => {
     });
 
     expect(refreshActiveTasks).toHaveBeenCalledTimes(2);
+  });
+
+  it('polls known task ids while SSE is disconnected', () => {
+    const pollKnownTasks = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useTaskStream).mockReturnValue({
+      isConnected: false,
+      reconnect: vi.fn(),
+      disconnect: vi.fn(),
+    });
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory: vi.fn().mockResolvedValue(undefined),
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        pollKnownTasks,
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated: vi.fn(),
+        syncTaskFailed: vi.fn(),
+        removeTask: vi.fn(),
+        taskPollIntervalMs: 2_000,
+        ...defaultMocks,
+      }),
+    );
+
+    expect(pollKnownTasks).toHaveBeenCalledTimes(1);
+    act(() => {
+      vi.advanceTimersByTime(4_000);
+    });
+    expect(pollKnownTasks).toHaveBeenCalledTimes(3);
+
+    const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
+    act(() => taskStreamOptions?.onError?.(new Event('error')));
+    expect(pollKnownTasks).toHaveBeenCalledTimes(4);
   });
 });

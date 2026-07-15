@@ -1,10 +1,13 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
-import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Tooltip } from '../common/Tooltip';
+import { ApiErrorAlert } from '../common/ApiErrorAlert';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
 export interface ReportMarkdownPanelProps {
@@ -20,13 +23,12 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   stockName,
   stockCode,
   onRequestClose,
-  reportLanguage = 'zh',
 }) => {
-  const text = getReportText(normalizeReportLanguage(reportLanguage));
-  const loadReportFailedText = text.loadReportFailed;
+  const { language: uiLanguage } = useUiLanguage();
+  const text = REPORT_CHROME_TEXT[uiLanguage];
   const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
 
   const handleCopyMarkdown = useCallback(async () => {
@@ -65,7 +67,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : loadReportFailedText);
+          setError(getParsedApiError(err, uiLanguage));
         }
       } finally {
         if (isMounted) {
@@ -79,7 +81,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [recordId, loadReportFailedText]);
+  }, [recordId, uiLanguage]);
 
   return (
     <>
@@ -150,19 +152,12 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         </div>
       ) : error ? (
         <div className="flex h-64 flex-col items-center justify-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-danger/10">
-            <svg className="h-6 w-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <p className="text-sm text-danger">{error}</p>
-          <button
-            type="button"
-            onClick={onRequestClose}
-            className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
-          >
-            {text.dismiss}
-          </button>
+          <ApiErrorAlert
+            error={error}
+            className="w-full max-w-lg"
+            dismissLabel={text.dismiss}
+            onDismiss={onRequestClose}
+          />
         </div>
       ) : (
         <ReportMarkdownBody content={content} />

@@ -36,7 +36,13 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
 }) => {
   const text = SETTINGS_CONTROLS_TEXT[language];
   const routes = splitRoutes(value);
-  const labelFor = (route: string) => options.find((option) => option.value === route)?.label ?? route;
+  const labelFor = (route: string) => {
+    const option = options.find((candidate) => candidate.value === route);
+    if (!option) {
+      return route;
+    }
+    return option.sublabel ? `${option.label} · ${option.sublabel}` : option.label;
+  };
   // A configured route that is no longer in the available catalog is kept (never
   // silently cleared) and marked as unavailable so the user can decide.
   const isStale = (route: string) => !options.some((option) => option.value === route);
@@ -60,7 +66,10 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     setRoutes(next);
   };
   const selectableOptions = options.filter((option) => option.value !== primaryRoute);
-  const optionLabelByRoute = new Map(selectableOptions.map((option) => [option.value, option.label]));
+  const optionLabelByRoute = new Map(selectableOptions.map((option) => [
+    option.value,
+    option.sublabel ? `${option.label} · ${option.sublabel}` : option.label,
+  ]));
   const toggleRoute = (route: string) => {
     if (routes.includes(route)) {
       setRoutes(routes.filter((entry) => entry !== route));

@@ -45,6 +45,7 @@ const mockLoadSessions = vi.fn();
 const mockLoadInitialSession = vi.fn();
 const mockSwitchSession = vi.fn();
 const mockStartStream = vi.fn();
+const mockRetryLastStream = vi.fn();
 const mockStopStream = vi.fn();
 const mockClearCompletionBadge = vi.fn();
 const mockStartNewChat = vi.fn();
@@ -64,11 +65,14 @@ const mockStoreState = {
     },
   ],
   sessionsLoading: false,
-  chatError: null,
+  hasInitialLoad: true,
+  chatError: null as ReturnType<typeof createParsedApiError> | null,
+  lastFailedRequest: null as { payload: { message: string; session_id: string } } | null,
   loadSessions: mockLoadSessions,
   loadInitialSession: mockLoadInitialSession,
   switchSession: mockSwitchSession,
   startStream: mockStartStream,
+  retryLastStream: mockRetryLastStream,
   stopStream: mockStopStream,
   clearCompletionBadge: mockClearCompletionBadge,
 };
@@ -151,7 +155,9 @@ beforeEach(() => {
   mockStoreState.loading = false;
   mockStoreState.progressSteps = [];
   mockStoreState.chatError = null;
+  mockStoreState.lastFailedRequest = null;
   mockStoreState.sessionsLoading = false;
+  mockStoreState.hasInitialLoad = true;
   mockStoreState.sessionId = 'session-1';
   mockStoreState.sessions = [
     {
@@ -194,6 +200,7 @@ beforeEach(() => {
   });
   mockDownloadSession.mockImplementation(() => {});
   mockFormatSessionAsMarkdown.mockReturnValue('# exported session');
+  mockStartNewChat.mockReturnValue('session-new');
 });
 
 describe('ChatPage', () => {
@@ -209,6 +216,63 @@ describe('ChatPage', () => {
     expect(screen.getByTestId('chat-message-scroll')).toBeInTheDocument();
     expect(mockLoadInitialSession).toHaveBeenCalled();
     expect(mockClearCompletionBadge).toHaveBeenCalled();
+  });
+
+  it('uses the shared mobile history drawer and restores focus after Escape', async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/chat']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    const trigger = await screen.findByRole('button', { name: '历史对话' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: '历史对话' });
+    expect(dialog.closest('[data-overlay-root="drawer"]')).toBeInTheDocument();
+    expect(container).not.toContainElement(dialog);
+    expect(container).toHaveAttribute('inert');
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: '历史对话' })).not.toBeInTheDocument();
+    expect(container).not.toHaveAttribute('inert');
+    expect(trigger).toHaveFocus();
+  });
+
+  it('passes the URL session to initial hydration so shared links restore the intended conversation', async () => {
+    render(
+      <MemoryRouter initialEntries={['/chat?session=session-2']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('chat-workspace')).toBeInTheDocument();
+    expect(mockLoadInitialSession).toHaveBeenCalledWith('session-2');
+  });
+
+  it('writes a selected session to the URL', async () => {
+    mockStoreState.sessions = [
+      ...mockStoreState.sessions,
+      {
+        session_id: 'session-2',
+        title: '旧会话',
+        message_count: 1,
+        created_at: '2026-03-16T09:00:00Z',
+        last_active: '2026-03-16T09:05:00Z',
+      },
+    ];
+    const router = createMemoryRouter(
+      [{ path: '/chat', element: <ChatPage /> }],
+      { initialEntries: ['/chat?session=session-1'] },
+    );
+
+    render(<RouterProvider router={router} />);
+    fireEvent.click(await screen.findByRole('button', { name: '切换到对话 旧会话' }));
+
+    expect(mockSwitchSession).toHaveBeenCalledWith('session-2');
+    expect(router.state.location.search).toBe('?session=session-2');
   });
 
   it('loads and saves the global context compression setting from the chat input area', async () => {
@@ -747,7 +811,29 @@ describe('ChatPage', () => {
     });
   });
 
-  it('allows sending with base follow-up context before report hydration completes', async () => {
+  it('offers an explicit retry for the last failed chat stream', async () => {
+    mockStoreState.chatError = createParsedApiError({
+      title: '请求失败',
+      message: '流式响应中断',
+      rawMessage: 'upstream disconnected',
+      category: 'upstream_network',
+    });
+    mockStoreState.lastFailedRequest = {
+      payload: { message: '分析茅台', session_id: 'session-1' },
+    };
+
+    render(
+      <MemoryRouter initialEntries={['/chat?session=session-1']}>
+        <ChatPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '重试' }));
+
+    expect(mockRetryLastStream).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks sending until report follow-up context hydration completes', async () => {
     const deferred = createDeferred<Awaited<ReturnType<typeof historyApi.getDetail>>>();
 
     vi.mocked(historyApi.getDetail).mockImplementation(() => deferred.promise);
@@ -761,25 +847,11 @@ describe('ChatPage', () => {
     expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
 
     const sendButton = screen.getByRole('button', { name: /发送|处理中\.\.\./ });
-    expect(sendButton).not.toBeDisabled();
-    expect(screen.getByText('正在加载历史分析上下文；现在可直接发送追问。')).toBeInTheDocument();
+    expect(sendButton).toBeDisabled();
+    expect(screen.getByText('正在加载历史分析上下文；加载完成后可发送追问。')).toBeInTheDocument();
 
     fireEvent.click(sendButton);
-
-    await waitFor(() => {
-      expect(mockStartStream).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: '请深入分析 贵州茅台(600519)',
-          context: {
-            stock_code: '600519',
-            stock_name: '贵州茅台',
-          },
-        }),
-        expect.objectContaining({
-          skillName: '趋势分析',
-        }),
-      );
-    });
+    expect(mockStartStream).not.toHaveBeenCalled();
 
     deferred.resolve({
       meta: {
@@ -804,21 +876,21 @@ describe('ChatPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('正在加载历史分析上下文；现在可直接发送追问。')).not.toBeInTheDocument();
+      expect(screen.queryByText('正在加载历史分析上下文；加载完成后可发送追问。')).not.toBeInTheDocument();
+      expect(sendButton).not.toBeDisabled();
     });
 
-    fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
-      target: { value: '继续分析成交量' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(sendButton);
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          message: '继续分析成交量',
+          message: '请深入分析 贵州茅台(600519)',
           context: expect.objectContaining({
             stock_code: '600519',
             stock_name: '贵州茅台',
+            previous_price: 1523.6,
+            previous_change_pct: 1.8,
           }),
         }),
         expect.objectContaining({
@@ -880,7 +952,7 @@ describe('ChatPage', () => {
     expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.queryByText('正在加载历史分析上下文；现在可直接发送追问。')).not.toBeInTheDocument();
+      expect(screen.queryByText('正在加载历史分析上下文；加载完成后可发送追问。')).not.toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
@@ -1417,7 +1489,7 @@ describe('ChatPage', () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
-    expect(screen.getByText('正在加载历史分析上下文；现在可直接发送追问。')).toBeInTheDocument();
+    expect(screen.getByText('正在加载历史分析上下文；加载完成后可发送追问。')).toBeInTheDocument();
 
     await router.navigate('/chat?stock=AAPL&name=Apple&recordId=2');
 
@@ -1468,7 +1540,7 @@ describe('ChatPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByText('正在加载历史分析上下文；现在可直接发送追问。')).not.toBeInTheDocument();
+      expect(screen.queryByText('正在加载历史分析上下文；加载完成后可发送追问。')).not.toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: '发送' }));

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateConfigConditions, isFieldVisibleByContract, isFieldEnabledByContract } from '../configConditions';
+import {
+  evaluateConfigConditions,
+  hasUnknownConfigContractCondition,
+  isFieldVisibleByContract,
+  isFieldEnabledByContract,
+} from '../configConditions';
 
 describe('evaluateConfigConditions', () => {
   it('returns met for empty conditions', () => {
@@ -24,12 +29,22 @@ describe('evaluateConfigConditions', () => {
 
   it('fails safe to unknown for unknown operators', () => {
     expect(evaluateConfigConditions([{ key: 'X', operator: 'regex' as never }], {})).toBe('unknown');
+    expect(evaluateConfigConditions([{ key: '', operator: 'notEmpty' }], {})).toBe('unknown');
+    expect(evaluateConfigConditions([{ key: 'X', operator: 'in', value: 'not-an-array' }], {})).toBe('unknown');
+    expect(evaluateConfigConditions({ key: 'X' } as never, {})).toBe('unknown');
   });
 
-  it('keeps fields visible/editable on unknown conditions (fail-safe)', () => {
+  it('keeps fields visible but read-only on unknown conditions (fail-safe)', () => {
     const contract = { visibleWhen: [{ key: 'X', operator: 'regex' as never }] };
     expect(isFieldVisibleByContract(contract, {})).toBe(true);
-    expect(isFieldEnabledByContract({ enabledWhen: [{ key: 'X', operator: 'regex' as never }] }, {})).toBe(true);
+    expect(isFieldEnabledByContract(contract, {})).toBe(false);
+    expect(isFieldEnabledByContract({ enabledWhen: [{ key: 'X', operator: 'regex' as never }] }, {})).toBe(false);
+    expect(isFieldEnabledByContract({ requiredWhen: [{ key: 'X', operator: 'regex' as never }] }, {})).toBe(false);
+    expect(hasUnknownConfigContractCondition(contract, {})).toBe(true);
+  });
+
+  it('keeps inherited fields read-only', () => {
+    expect(isFieldEnabledByContract({ requirement: 'inherited' }, {})).toBe(false);
   });
 
   it('hides a field when visibleWhen is definitively not met', () => {

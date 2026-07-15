@@ -1,4 +1,5 @@
 export const CHANNEL_FIELD_SUFFIXES = [
+  'DISPLAY_NAME',
   'PROVIDER',
   'PROTOCOL',
   'BASE_URL',

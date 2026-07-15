@@ -490,7 +490,11 @@ def get_configured_llm_models(model_list: List[Dict[str, Any]]) -> List[str]:
         if not name:
             params = entry.get("litellm_params", {}) or {}
             name = str(params.get("model") or "").strip()
-        if not name or name.startswith("__legacy_") or name in seen:
+        if (
+            not name
+            or name.startswith("__legacy_")
+            or name in seen
+        ):
             continue
         seen.add(name)
         models.append(name)
@@ -589,6 +593,14 @@ def _get_litellm_provider(model: str) -> str:
     """Extract the LiteLLM provider prefix from a model string."""
     if not model:
         return ""
+    from src.llm.model_ref import decode_model_ref
+
+    try:
+        decoded = decode_model_ref(model)
+    except ValueError:
+        return ""
+    if decoded is not None:
+        model = decoded.runtime_route
     if "/" in model:
         return model.split("/", 1)[0]
     return "openai"
@@ -602,6 +614,14 @@ def _uses_direct_env_provider(model: str) -> bool:
 
 def _matches_route_set(model: str, routes: set[str]) -> bool:
     """Loose safety match for Hermes/provenance checks, not normal route availability."""
+    from src.llm.model_ref import decode_model_ref
+
+    try:
+        decoded = decode_model_ref(model)
+    except ValueError:
+        decoded = None
+    if decoded is not None:
+        model = decoded.runtime_route
     return bool(route_identity_candidates(model) & set(routes or set()))
 
 
@@ -619,6 +639,12 @@ def normalize_agent_litellm_model(
     normalized_model = (model or "").strip()
     if not normalized_model:
         return ""
+    from src.llm.model_ref import is_model_ref, normalize_model_ref
+
+    # Preserve both valid and malformed versioned values for authoritative
+    # validation. Never reinterpret a ModelRef as a bare OpenAI model.
+    if is_model_ref(normalized_model):
+        return normalize_model_ref(normalized_model)
     if "/" not in normalized_model:
         if configured_models and normalized_model in configured_models:
             return normalized_model
@@ -1345,7 +1371,9 @@ class Config:
         # LITELLM_MODEL / LITELLM_FALLBACK_MODELS explicit values are recorded
         # before YAML/channels are parsed, but legacy inference is delayed until
         # the higher-priority sources and Hermes blocking issues are known.
-        litellm_model_explicit = os.getenv('LITELLM_MODEL', '').strip()
+        from src.llm.model_ref import normalize_model_ref
+
+        litellm_model_explicit = normalize_model_ref(os.getenv('LITELLM_MODEL', ''))
         litellm_model = litellm_model_explicit
         inferred_legacy_deepseek_model = False
         _openai_model_env = os.getenv('OPENAI_MODEL', '').strip()
@@ -1358,7 +1386,11 @@ class Config:
         _fallback_str = os.getenv('LITELLM_FALLBACK_MODELS', '')
         litellm_fallback_models_explicit = bool(_fallback_str.strip())
         if _fallback_str.strip():
-            litellm_fallback_models = [m.strip() for m in _fallback_str.split(',') if m.strip()]
+            litellm_fallback_models = [
+                normalize_model_ref(model)
+                for model in _fallback_str.split(',')
+                if model.strip()
+            ]
         else:
             litellm_fallback_models = []
 
@@ -1387,8 +1419,10 @@ class Config:
         if not llm_model_list and llm_config_mode in ('auto', 'channels'):
             _channels_str = os.getenv('LLM_CHANNELS', '').strip()
             if _channels_str:
+                from src.llm.model_ref import canonicalize_connection_id
+
                 llm_channel_names = [
-                    ch.strip().lower()
+                    canonicalize_connection_id(ch)
                     for ch in _channels_str.split(',')
                     if ch.strip()
                 ]
@@ -1404,13 +1438,35 @@ class Config:
                     llm_models_source = "llm_channels"
 
         route_models = get_configured_llm_models(llm_model_list)
+        from src.llm.model_ref import is_model_ref
+
+        # Connection-aware aliases coexist with legacy routes in Router config.
+        # Existing installations without explicit task refs must keep the same
+        # route defaults instead of receiving duplicate ModelRef fallbacks.
+        default_route_models = [
+            model for model in route_models if not is_model_ref(model)
+        ]
         if route_models:
-            if not litellm_model:
-                litellm_model = route_models[0]
-            if not litellm_fallback_models and not litellm_fallback_models_explicit and litellm_model:
-                _seen = {litellm_model}
+            if not litellm_model and default_route_models:
+                litellm_model = default_route_models[0]
+            if (
+                default_route_models
+                and not litellm_fallback_models
+                and not litellm_fallback_models_explicit
+                and litellm_model
+            ):
+                from src.llm.model_ref import decode_model_ref
+
+                try:
+                    selected_ref = decode_model_ref(litellm_model)
+                except ValueError:
+                    selected_ref = None
+                _seen = {
+                    litellm_model,
+                    selected_ref.runtime_route if selected_ref else litellm_model,
+                }
                 litellm_fallback_models = [
-                    model for model in route_models
+                    model for model in default_route_models
                     if model not in _seen and not _seen.add(model)  # type: ignore[func-returns-value]
                 ]
 
@@ -1712,9 +1768,11 @@ class Config:
             openai_temperature=parse_env_float(os.getenv('OPENAI_TEMPERATURE'), 0.7, field_name='OPENAI_TEMPERATURE'),
             # Vision model: VISION_MODEL > OPENAI_VISION_MODEL (alias) > default
             vision_model=(
-                os.getenv('VISION_MODEL')
-                or os.getenv('OPENAI_VISION_MODEL')
-                or ""
+                normalize_model_ref(
+                    os.getenv('VISION_MODEL')
+                    or os.getenv('OPENAI_VISION_MODEL')
+                    or ""
+                )
             ),
             vision_provider_priority=os.getenv('VISION_PROVIDER_PRIORITY', 'gemini,anthropic,openai'),
             anspire_api_keys=anspire_api_keys,
@@ -2181,6 +2239,8 @@ class Config:
         import logging
         _logger = logging.getLogger(__name__)
 
+        from src.llm.model_ref import canonicalize_connection_id
+
         channels: List[Dict[str, Any]] = []
         issues: List[HermesConfigIssue] = []
         blocks_legacy_fallback = False
@@ -2189,7 +2249,7 @@ class Config:
             ch_name = raw_name.strip()
             if not ch_name:
                 continue
-            ch_lower = ch_name.lower()
+            ch_lower = canonicalize_connection_id(ch_name)
             ch_upper = ch_name.upper()
 
             explicit_provider_id = os.getenv(f'LLM_{ch_upper}_PROVIDER', '').strip().lower()
@@ -2327,7 +2387,18 @@ class Config:
         - LiteLLM providers: https://docs.litellm.ai/docs/providers
         - LiteLLM model_list 语义: https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
         """
+        from src.llm.model_ref import canonicalize_connection_id, encode_model_ref
+
         model_list: List[Dict[str, Any]] = []
+        model_ref_entries: List[Dict[str, Any]] = []
+        route_owner_ids: Dict[str, set[str]] = {}
+        for ch in channels:
+            connection_id = canonicalize_connection_id(ch.get("name"))
+            if not connection_id:
+                continue
+            for model_name in ch.get("models") or []:
+                route_owner_ids.setdefault(str(model_name), set()).add(connection_id)
+
         for ch in channels:
             hermes_refs = {
                 str(ref.get("route_model") or ""): ref
@@ -2360,8 +2431,27 @@ class Config:
                         entry["model_info"] = hermes_model_info(
                             str((model_ref or {}).get("display_model") or "")
                         )
-                    model_list.append(entry)
-        return model_list
+                    if len(route_owner_ids.get(str(model_name), set())) == 1:
+                        model_list.append(entry)
+
+                    connection_id = canonicalize_connection_id(ch.get("name"))
+                    if connection_id:
+                        reference_value = encode_model_ref(connection_id, model_name)
+                        reference_info = dict(entry.get("model_info") or {})
+                        reference_info.update({
+                            "dsa_model_ref": reference_value,
+                            "dsa_connection_id": connection_id,
+                            "dsa_runtime_route": model_name,
+                        })
+                        model_ref_entries.append({
+                            "model_name": reference_value,
+                            "litellm_params": dict(litellm_params),
+                            "model_info": reference_info,
+                        })
+
+        # Keep legacy aliases first for compatibility. The ModelRef aliases are
+        # unique per Connection and let new assignments select exact credentials.
+        return model_list + model_ref_entries
 
     @classmethod
     def _legacy_keys_to_model_list(

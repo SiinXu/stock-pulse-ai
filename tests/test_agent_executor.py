@@ -267,6 +267,48 @@ class TestAgentExecutor(unittest.TestCase):
         assert messages[-1] == {"role": "user", "content": "当前问题"}
         assert captured["stock_scope"].expected_stock_code == "600519"
 
+    def test_chat_failure_redacts_log_and_persists_only_safe_message(self):
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter._config = MagicMock()
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+
+        with patch.object(
+            executor,
+            "_run_loop",
+            return_value=AgentResult(success=False, content="", error=raw_error),
+        ):
+            with patch(
+                "src.agent.executor.build_agent_chat_context_bundle",
+                return_value=SimpleNamespace(context_messages=[], diagnostics={}),
+            ):
+                with patch("src.agent.conversation.conversation_manager.get_or_create"):
+                    with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+                        with self.assertLogs("src.agent.executor", level="ERROR") as logs:
+                            result = executor.chat("当前问题", "private-executor")
+
+        self.assertFalse(result.success)
+        add_message.assert_any_call(
+            "private-executor",
+            "assistant",
+            "[分析失败] Agent chat failed",
+        )
+        persisted_content = "\n".join(
+            call.args[2]
+            for call in add_message.call_args_list
+            if len(call.args) >= 3
+        )
+        self.assertNotIn("super-secret", persisted_content)
+        self.assertNotIn("private.example", persisted_content)
+        rendered_logs = "\n".join(logs.output)
+        self.assertNotIn(raw_error, rendered_logs)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
+
     def test_chat_switches_effective_context_and_clears_previous_stock_fields(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()

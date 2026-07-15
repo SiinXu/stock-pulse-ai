@@ -229,6 +229,15 @@ def _resolve_vision_model() -> str:
 
 def _get_api_keys_for_model(model: str, cfg: Config) -> List[str]:
     """Return available API keys for the given litellm model."""
+    from src.llm.model_ref import is_model_ref
+
+    if is_model_ref(model):
+        keys = [
+            str((entry.get("litellm_params") or {}).get("api_key") or "").strip()
+            for entry in (getattr(cfg, "llm_model_list", []) or [])
+            if str(entry.get("model_name") or "").strip() == model
+        ]
+        return list(dict.fromkeys(key for key in keys if key))
     if model.startswith("gemini/") or model.startswith("vertex_ai/"):
         return [k for k in cfg.gemini_api_keys if k and len(k) >= 8]
     if model.startswith("anthropic/"):
@@ -240,10 +249,11 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
     """Extract stock codes from an image using litellm (all providers via OpenAI vision format)."""
     global litellm
     cfg = get_config()
+    model_list = getattr(cfg, "llm_model_list", []) or []
     model = _resolve_vision_model()
     if not model:
         raise ValueError("未配置 Vision API。请设置 LITELLM_MODEL 或相关 API Key。")
-    if route_has_hermes(getattr(cfg, "llm_model_list", []) or [], model):
+    if route_has_hermes(model_list, model):
         raise ValueError("Hermes Vision 未验证：VISION_MODEL 不能选择包含 Hermes deployment 的 route。")
 
     keys = _get_api_keys_for_model(model, cfg)
@@ -251,9 +261,23 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
         raise ValueError(f"No API key found for vision model {model}")
     key = api_key if api_key and api_key in keys else random.choice(keys)
 
+    # Vision calls LiteLLM directly instead of using the shared Router. Resolve
+    # a ModelRef back to the exact Connection deployment so its credential,
+    # endpoint and headers cannot be replaced by another same-route Connection.
+    deployment_params = next(
+        (
+            dict(entry.get("litellm_params") or {})
+            for entry in model_list
+            if str(entry.get("model_name") or "").strip() == model
+            and str((entry.get("litellm_params") or {}).get("api_key") or "").strip() == key
+        ),
+        {},
+    )
+    wire_model = str(deployment_params.get("model") or model).strip()
+
     data_url = f"data:{mime_type};base64,{image_b64}"
     call_kwargs: dict = {
-        "model": model,
+        "model": wire_model,
         "messages": [
             {
                 "role": "user",
@@ -268,7 +292,12 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
         "timeout": VISION_API_TIMEOUT,
     }
     # Add api_base and custom headers for OpenAI-compatible providers
-    if not model.startswith("gemini/") and not model.startswith("anthropic/") and not model.startswith("vertex_ai/"):
+    api_base = str(deployment_params.get("api_base") or "").strip()
+    if api_base:
+        call_kwargs["api_base"] = api_base
+    if deployment_params.get("extra_headers"):
+        call_kwargs["extra_headers"] = dict(deployment_params["extra_headers"])
+    elif not wire_model.startswith(("gemini/", "anthropic/", "vertex_ai/")):
         if cfg.openai_base_url:
             call_kwargs["api_base"] = cfg.openai_base_url
         if cfg.openai_base_url and "aihubmix.com" in cfg.openai_base_url:
@@ -338,6 +367,4 @@ def extract_stock_codes_from_image(
                 logger.warning(f"[ImageExtractor] 尝试 {attempt + 1}/3 失败，{delay}s 后重试: {e}")
                 time.sleep(delay)
 
-    raise ValueError(
-        f"Vision API 调用失败，请检查 API Key 与网络: {last_error}"
-    ) from last_error
+    raise ValueError("Vision API 调用失败") from last_error

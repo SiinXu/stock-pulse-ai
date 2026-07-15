@@ -1,19 +1,19 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 // Shared accessibility behaviour for modal-like surfaces (Modal / Drawer /
 // ConfirmDialog / page sidebars): move focus in on open, trap Tab within the
 // surface, close on Escape, restore focus to the trigger on close, and lock
-// body scroll across stacked dialogs. Combined with role="dialog" + aria-modal
-// on the container, this makes the background effectively inert for keyboard
-// and screen readers.
+// body scroll across stacked dialogs. Background application roots and lower
+// overlay roots receive native inert plus aria-hidden while a surface is open.
 //
 // A shared stack tracks every open surface so that only the topmost one reacts
 // to Escape and Tab. Without this, stacked overlays (e.g. a ConfirmDialog
 // opened from inside a Drawer) would all close on a single Escape and fight
 // over focus.
 
-let openDialogCount = 0;
 const dialogStack: Array<RefObject<HTMLElement | null>> = [];
+const isolationState = new Map<HTMLElement, { inert: boolean; ariaHidden: string | null }>();
+let previousBodyOverflow: string | null = null;
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -37,49 +37,93 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
   );
 }
 
+function restoreIsolationState(element: HTMLElement): void {
+  const previous = isolationState.get(element);
+  if (!previous) {
+    return;
+  }
+  if (previous.inert) {
+    element.setAttribute('inert', '');
+  } else {
+    element.removeAttribute('inert');
+  }
+  if (previous.ariaHidden === null) {
+    element.removeAttribute('aria-hidden');
+  } else {
+    element.setAttribute('aria-hidden', previous.ariaHidden);
+  }
+}
+
+function syncDocumentIsolation(): void {
+  if (dialogStack.length === 0) {
+    isolationState.forEach((_, element) => restoreIsolationState(element));
+    isolationState.clear();
+    if (previousBodyOverflow !== null) {
+      document.body.style.overflow = previousBodyOverflow;
+      previousBodyOverflow = null;
+    }
+    return;
+  }
+
+  if (previousBodyOverflow === null) {
+    previousBodyOverflow = document.body.style.overflow;
+  }
+  document.body.style.overflow = 'hidden';
+
+  const topContainer = dialogStack[dialogStack.length - 1]?.current;
+  const topOverlayRoot = topContainer?.closest<HTMLElement>('[data-overlay-root]') ?? null;
+
+  Array.from(document.body.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) {
+      return;
+    }
+    if (!isolationState.has(child)) {
+      isolationState.set(child, {
+        inert: child.hasAttribute('inert'),
+        ariaHidden: child.getAttribute('aria-hidden'),
+      });
+    }
+
+    if (topOverlayRoot && child.contains(topOverlayRoot)) {
+      restoreIsolationState(child);
+      return;
+    }
+    child.setAttribute('inert', '');
+    child.setAttribute('aria-hidden', 'true');
+  });
+}
+
 export function useDialogA11y({
   isOpen,
   containerRef,
   onEscape,
   closeOnEscape = true,
 }: DialogA11yOptions): void {
-  // Stack membership + body scroll lock. Depends only on open state so that
-  // re-renders (e.g. a new onEscape identity) never reorder the stack or
-  // flicker the scroll lock.
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-    dialogStack.push(containerRef);
-    openDialogCount += 1;
-    if (openDialogCount === 1) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      const index = dialogStack.lastIndexOf(containerRef);
-      if (index >= 0) {
-        dialogStack.splice(index, 1);
-      }
-      openDialogCount -= 1;
-      if (openDialogCount === 0) {
-        document.body.style.overflow = '';
-      }
-    };
-  }, [isOpen, containerRef]);
+  const onEscapeRef = useRef(onEscape);
+  const closeOnEscapeRef = useRef(closeOnEscape);
 
-  // Focus move-in / restore and key handling for the topmost dialog.
+  useEffect(() => {
+    onEscapeRef.current = onEscape;
+    closeOnEscapeRef.current = closeOnEscape;
+  }, [onEscape, closeOnEscape]);
+
+  // Stack registration, focus movement and key handling share one stable open
+  // lifecycle. Changing callback identities must not reorder the stack or
+  // restore focus while the dialog remains open.
   useEffect(() => {
     if (!isOpen) {
       return undefined;
     }
 
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogStack.push(containerRef);
 
     const container = containerRef.current;
     if (container && !container.contains(document.activeElement)) {
       const first = getFocusable(container)[0];
       (first ?? container).focus();
     }
+    syncDocumentIsolation();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const container = containerRef.current;
@@ -99,9 +143,10 @@ export function useDialogA11y({
         ) {
           return;
         }
-        if (closeOnEscape && onEscape) {
+        if (closeOnEscapeRef.current && onEscapeRef.current) {
+          event.preventDefault();
           event.stopPropagation();
-          onEscape();
+          onEscapeRef.current();
         }
         return;
       }
@@ -131,11 +176,28 @@ export function useDialogA11y({
     document.addEventListener('keydown', handleKeyDown, true);
 
     return () => {
+      const wasTopmost = dialogStack[dialogStack.length - 1] === containerRef;
       document.removeEventListener('keydown', handleKeyDown, true);
-      // Only restore focus to a trigger that is still in the document.
-      if (previouslyFocused && previouslyFocused.isConnected) {
+      const index = dialogStack.lastIndexOf(containerRef);
+      if (index >= 0) {
+        dialogStack.splice(index, 1);
+      }
+      syncDocumentIsolation();
+
+      if (!wasTopmost) {
+        return;
+      }
+      const nextTopContainer = dialogStack[dialogStack.length - 1]?.current ?? null;
+      if (
+        previouslyFocused
+        && previouslyFocused.isConnected
+        && (!nextTopContainer || nextTopContainer.contains(previouslyFocused))
+      ) {
         previouslyFocused.focus();
+      } else if (nextTopContainer) {
+        const first = getFocusable(nextTopContainer)[0];
+        (first ?? nextTopContainer).focus();
       }
     };
-  }, [isOpen, containerRef, onEscape, closeOnEscape]);
+  }, [isOpen, containerRef]);
 }

@@ -32,6 +32,8 @@ export interface MarketReviewRequest {
 export interface MarketReviewAccepted {
   status: 'accepted';
   message: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   sendNotification: boolean;
   traceId?: string;
   taskId?: string;
@@ -422,6 +424,8 @@ export interface TaskAccepted {
   traceId?: string;
   status: 'pending' | 'processing';
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   analysisPhase?: AnalysisPhase;
 }
 
@@ -431,6 +435,8 @@ export interface BatchTaskAcceptedItem {
   stockCode: string;
   status: 'pending' | 'processing';
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   analysisPhase?: AnalysisPhase;
 }
 
@@ -456,6 +462,9 @@ export interface TaskStatus {
   traceId?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
   progress?: number;
+  message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   result?: AnalysisResult;
   marketReviewReport?: string;
   marketReviewPayload?: MarketReviewPayload;
@@ -476,6 +485,8 @@ export interface TaskInfo {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
   progress: number;
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   reportType: string;
   createdAt: string;
   startedAt?: string;

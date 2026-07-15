@@ -24,6 +24,10 @@ from src.config import get_config
 from src.agent.chat_context import build_agent_chat_context_bundle
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import extract_provider_trace_turns
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.agent.runner import run_agent_loop, parse_dashboard_json
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
@@ -681,8 +685,16 @@ class AgentExecutor:
                 assistant_message_id=assistant_message_id,
             )
         else:
-            error_note = f"[分析失败] {result.error or '未知错误'}"
-            conversation_manager.add_message(session_id, "assistant", error_note)
+            logger.error(
+                "Agent chat failed: session_id=%s diagnostic=%s",
+                session_id,
+                sanitize_agent_diagnostic(result.error),
+            )
+            conversation_manager.add_message(
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
+            )
 
         return result
 

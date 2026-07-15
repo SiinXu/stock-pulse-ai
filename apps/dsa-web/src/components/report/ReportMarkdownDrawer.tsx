@@ -1,7 +1,8 @@
 import type React from 'react';
 import { Component, lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
-import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Drawer } from '../common/Drawer';
 import { OVERLAY_Z } from '../common/overlayZ';
 
@@ -90,8 +91,9 @@ export const ReportMarkdownDrawer: React.FC<ReportMarkdownDrawerProps> = ({
   onClose,
   reportLanguage = 'zh',
 }) => {
+  const { language: uiLanguage } = useUiLanguage();
   const [isOpen, setIsOpen] = useState(true);
-  const text = getReportText(normalizeReportLanguage(reportLanguage));
+  const text = REPORT_CHROME_TEXT[uiLanguage];
   const LazyReportMarkdownPanel = useMemo(
     () => lazy(() => import('./ReportMarkdownPanel').then((m) => ({ default: m.ReportMarkdownPanel }))),
     [],
@@ -106,6 +108,7 @@ export const ReportMarkdownDrawer: React.FC<ReportMarkdownDrawerProps> = ({
     <Drawer
       isOpen={isOpen}
       onClose={handleClose}
+      title={text.fullReport}
       width="max-w-3xl"
       zIndex={OVERLAY_Z.reportDrawer}
       backdropClassName="bg-background/56 backdrop-blur-[2px]"

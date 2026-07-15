@@ -12,6 +12,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.v1.errors import error_body
 from src.auth import COOKIE_NAME, is_auth_enabled, verify_session
 
 logger = logging.getLogger(__name__)
@@ -56,10 +57,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not cookie_val or not verify_session(cookie_val):
             return JSONResponse(
                 status_code=401,
-                content={
-                    "error": "unauthorized",
-                    "message": "Login required",
-                },
+                content=error_body("unauthorized", "Login required"),
             )
 
         return await call_next(request)

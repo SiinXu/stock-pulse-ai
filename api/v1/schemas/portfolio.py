@@ -43,6 +43,7 @@ class PortfolioAccountListResponse(BaseModel):
 
 
 class PortfolioTradeCreateRequest(BaseModel):
+    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     trade_date: date
@@ -58,6 +59,7 @@ class PortfolioTradeCreateRequest(BaseModel):
 
 
 class PortfolioCashLedgerCreateRequest(BaseModel):
+    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
     account_id: int
     event_date: date
     direction: Literal["in", "out"]
@@ -67,6 +69,7 @@ class PortfolioCashLedgerCreateRequest(BaseModel):
 
 
 class PortfolioCorporateActionCreateRequest(BaseModel):
+    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     effective_date: date

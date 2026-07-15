@@ -394,7 +394,13 @@ def route_deployment_origins(model_list: Sequence[Dict[str, Any]], route_name: s
         if not isinstance(deployment, dict):
             continue
         deployment_route_name = str(deployment.get("model_name") or "").strip()
-        if deployment_route_name not in candidates:
+        deployment_candidates = route_identity_candidates(deployment_route_name)
+        model_info = deployment.get("model_info")
+        if isinstance(model_info, dict):
+            deployment_candidates.update(
+                route_identity_candidates(model_info.get("dsa_runtime_route"))
+            )
+        if not candidates.intersection(deployment_candidates):
             continue
         if is_hermes_deployment(deployment):
             hermes.append(deployment)

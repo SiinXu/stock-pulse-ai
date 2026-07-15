@@ -5,6 +5,7 @@ import type {
   AnalysisContextPackOverview,
   ReportLanguage,
 } from '../../types/analysis';
+import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Card, StatusDot } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
@@ -35,159 +36,6 @@ const QUALITY_STYLE = {
   poor: { variant: 'danger', tone: 'danger' },
 } as const satisfies Record<string, { variant: BadgeVariant; tone: StatusTone }>;
 
-const BLOCK_LABELS: Record<ReportLanguage, Record<string, string>> = {
-  zh: {
-    quote: '行情',
-    daily_bars: '日线',
-    technical: '技术',
-    news: '新闻',
-    fundamentals: '基本面',
-    chip: '筹码',
-  },
-  en: {
-    quote: 'quote',
-    daily_bars: 'daily bars',
-    technical: 'technical',
-    news: 'news',
-    fundamentals: 'fundamentals',
-    chip: 'chip',
-  },
-  ko: {
-    quote: '시세',
-    daily_bars: '일봉',
-    technical: '기술',
-    news: '뉴스',
-    fundamentals: '펀더멘털',
-    chip: '매물대',
-  },
-};
-
-const TEXT = {
-  zh: {
-    eyebrow: '数据上下文',
-    title: '输入数据块',
-    counts: '状态计数',
-    source: '来源',
-    warnings: '告警',
-    missingReasons: '缺失原因',
-    inputScope: '本次分析输入',
-    evidenceScope: '仅代表进入本次 LLM 的输入，不等同于数据源运行成功',
-    qualityScore: '质量分',
-    limitations: '数据限制',
-    newsResultCount: '新闻结果数',
-    triggerSource: '触发来源',
-    qualityLevel: {
-      good: '良好',
-      usable: '可用',
-      limited: '受限',
-      poor: '较差',
-    },
-    status: {
-      available: '可用',
-      missing: '缺失',
-      not_supported: '不支持',
-      fallback: '降级',
-      stale: '过期',
-      estimated: '估算',
-      partial: '部分可用',
-      fetch_failed: '抓取失败',
-    },
-  },
-  en: {
-    eyebrow: 'DATA CONTEXT',
-    title: 'Input Blocks',
-    counts: 'Status Counts',
-    source: 'Source',
-    warnings: 'Warnings',
-    missingReasons: 'Missing Reasons',
-    inputScope: 'Analysis Input',
-    evidenceScope: 'Shows inputs included in this LLM run, not provider run success',
-    qualityScore: 'Quality',
-    limitations: 'Data Limitations',
-    newsResultCount: 'News Results',
-    triggerSource: 'Trigger',
-    qualityLevel: {
-      good: 'Good',
-      usable: 'Usable',
-      limited: 'Limited',
-      poor: 'Poor',
-    },
-    status: {
-      available: 'Available',
-      missing: 'Missing',
-      not_supported: 'Not supported',
-      fallback: 'Fallback',
-      stale: 'Stale',
-      estimated: 'Estimated',
-      partial: 'Partial',
-      fetch_failed: 'Fetch failed',
-    },
-  },
-  ko: {
-    eyebrow: '데이터 컨텍스트',
-    title: '입력 데이터 블록',
-    counts: '상태 카운트',
-    source: '출처',
-    warnings: '경고',
-    missingReasons: '누락 사유',
-    inputScope: '이번 분석 입력',
-    evidenceScope: '이번 LLM 입력에 포함된 항목만 표시하며, 데이터 소스 실행 성공과는 다릅니다',
-    qualityScore: '품질 점수',
-    limitations: '데이터 한계',
-    newsResultCount: '뉴스 결과 수',
-    triggerSource: '트리거',
-    qualityLevel: {
-      good: '양호',
-      usable: '사용 가능',
-      limited: '제한적',
-      poor: '미흡',
-    },
-    status: {
-      available: '사용 가능',
-      missing: '누락',
-      not_supported: '미지원',
-      fallback: '강등',
-      stale: '만료',
-      estimated: '추정',
-      partial: '부분 사용',
-      fetch_failed: '수집 실패',
-    },
-  },
-} as const;
-
-const MISSING_REASON_LABELS: Record<ReportLanguage, Record<string, string>> = {
-  zh: {
-    daily_bars_missing: '未进入分析输入',
-    news_context_missing: '未进入分析输入',
-    realtime_quote_missing: '未进入分析输入',
-    trend_result_missing: '未进入分析输入',
-    fundamental_context_missing: '未进入分析输入',
-    chip_distribution_missing: '未进入分析输入',
-    today_missing: '今日数据未进入分析输入',
-    yesterday_missing: '昨日数据未进入分析输入',
-  },
-  en: {
-    daily_bars_missing: 'Not included in analysis input',
-    news_context_missing: 'Not included in analysis input',
-    realtime_quote_missing: 'Not included in analysis input',
-    trend_result_missing: 'Not included in analysis input',
-    fundamental_context_missing: 'Not included in analysis input',
-    chip_distribution_missing: 'Not included in analysis input',
-    today_missing: 'Today data not included in analysis input',
-    yesterday_missing: 'Yesterday data not included in analysis input',
-  },
-  ko: {
-    daily_bars_missing: '분석 입력에 포함되지 않음',
-    news_context_missing: '분석 입력에 포함되지 않음',
-    realtime_quote_missing: '분석 입력에 포함되지 않음',
-    trend_result_missing: '분석 입력에 포함되지 않음',
-    fundamental_context_missing: '분석 입력에 포함되지 않음',
-    chip_distribution_missing: '분석 입력에 포함되지 않음',
-    today_missing: '당일 데이터가 분석 입력에 포함되지 않음',
-    yesterday_missing: '전일 데이터가 분석 입력에 포함되지 않음',
-  },
-};
-
 const STATUS_ORDER: AnalysisContextPackBlockStatus[] = [
   'available',
   'missing',
@@ -215,7 +63,7 @@ const getCount = (
 const formatLimitation = (
   value: string,
   language: ReportLanguage,
-  text: (typeof TEXT)[ReportLanguage],
+  text: (typeof ANALYSIS_CONTEXT_CONTENT_TEXT)[ReportLanguage],
 ): string => {
   const [rawKey, ...statusParts] = value.split(':');
   if (!rawKey || statusParts.length === 0) {
@@ -228,13 +76,13 @@ const formatLimitation = (
     return value;
   }
 
-  const label = BLOCK_LABELS[language][key] || key;
+  const label = text.blockLabels[key] || key;
   const statusLabel = (text.status as Record<string, string>)[status] || status;
   return language === 'zh' ? `${label}：${statusLabel}` : `${label}: ${statusLabel}`;
 };
 
 const formatMissingReason = (reason: string, language: ReportLanguage): string => {
-  const label = MISSING_REASON_LABELS[language][reason];
+  const label = ANALYSIS_CONTEXT_CONTENT_TEXT[language].missingReasonLabels[reason];
   return label ? `${label} (${reason})` : reason;
 };
 
@@ -243,7 +91,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   language = 'zh',
 }) => {
   const reportLanguage = normalizeReportLanguage(language);
-  const text = TEXT[reportLanguage];
+  const text = ANALYSIS_CONTEXT_CONTENT_TEXT[reportLanguage];
 
   if (!overview || !overview.blocks?.length) {
     return null;

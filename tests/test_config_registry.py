@@ -239,7 +239,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-07-15-connection-provider")
+        self.assertEqual(SCHEMA_VERSION, "2026-07-16-config-contract")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -854,12 +854,31 @@ class TestUiPlacement(unittest.TestCase):
     """The backend declares which UI surface owns each AI-model field so the
     Web never maintains a second provider/key list."""
 
+    def test_every_registered_ai_field_has_an_explicit_known_placement(self):
+        from src.core.config_registry import build_schema_response
+
+        known = {
+            "model_access",
+            "task_routing",
+            "developer_diagnostics",
+            "hidden_legacy",
+        }
+        ai_fields = next(
+            category["fields"]
+            for category in build_schema_response()["categories"]
+            if category["category"] == "ai_model"
+        )
+        self.assertTrue(ai_fields)
+        for field in ai_fields:
+            self.assertIn(field.get("ui_placement"), known, field["key"])
+
     def test_model_access_keys(self):
-        from src.core.config_registry import derive_ui_placement
+        from src.core.config_registry import derive_ui_placement, get_field_definition
 
         self.assertEqual(derive_ui_placement("LLM_CHANNELS"), "model_access")
         for key in (
             "LLM_OPENAI_PROVIDER",
+            "LLM_OPENAI_DISPLAY_NAME",
             "LLM_OPENAI_PROTOCOL",
             "LLM_MY_CHANNEL_BASE_URL",
             "LLM_DEEPSEEK_API_KEY",
@@ -869,6 +888,14 @@ class TestUiPlacement(unittest.TestCase):
             "LLM_CUSTOM01_ENABLED",
         ):
             self.assertEqual(derive_ui_placement(key), "model_access", key)
+
+        extra_headers = get_field_definition(
+            "LLM_CUSTOM01_EXTRA_HEADERS",
+            '{"Authorization":"Bearer private"}',
+        )
+        self.assertTrue(extra_headers["is_sensitive"])
+        self.assertEqual(extra_headers["data_type"], "json")
+        self.assertEqual(extra_headers["ui_control"], "textarea")
 
     def test_task_routing_keys(self):
         from src.core.config_registry import derive_ui_placement

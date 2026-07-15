@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, Minus, X } from 'lucide-react';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
@@ -23,13 +23,58 @@ import type {
   BacktestPhaseFilter,
 } from '../types/backtest';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
-import { getMarketPhaseSummaryLabel } from '../utils/marketPhase';
+import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_INPUT_CLASS =
   'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const BACKTEST_COMPACT_INPUT_CLASS =
   'h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
+
+type BacktestFilterSnapshot = {
+  code: string;
+  windowDays?: number;
+  startDate: string;
+  endDate: string;
+  phase: BacktestPhaseFilter;
+  page: number;
+};
+
+const BACKTEST_PHASES = new Set<BacktestPhaseFilter>(['all', 'premarket', 'intraday', 'postmarket', 'unknown']);
+
+function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' : window.location.search): BacktestFilterSnapshot {
+  const params = new URLSearchParams(search);
+  const rawWindow = params.get('window') ?? '';
+  const parsedWindow = parseEvalWindowDays(rawWindow);
+  const rawPage = Number(params.get('page'));
+  const rawPhase = params.get('phase') as BacktestPhaseFilter | null;
+  return {
+    code: normalizeBacktestCode(params.get('code') ?? '') ?? '',
+    windowDays: parsedWindow && parsedWindow <= 120 ? parsedWindow : undefined,
+    startDate: params.get('from') ?? '',
+    endDate: params.get('to') ?? '',
+    phase: rawPhase && BACKTEST_PHASES.has(rawPhase) ? rawPhase : 'all',
+    page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
+  };
+}
+
+function syncBacktestFiltersToUrl(filters: BacktestFilterSnapshot): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const values: Record<string, string | undefined> = {
+    code: normalizeBacktestCode(filters.code),
+    window: filters.windowDays ? String(filters.windowDays) : undefined,
+    from: filters.startDate || undefined,
+    to: filters.endDate || undefined,
+    phase: filters.phase === 'all' ? undefined : filters.phase,
+    page: filters.page > 1 ? String(filters.page) : undefined,
+  };
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  });
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
 
 // ============ Helpers ============
 
@@ -41,10 +86,7 @@ function pct(value?: number | null): string {
 function phaseLabel(row: BacktestResultItem, language: UiLanguage): string {
   const label = getMarketPhaseSummaryLabel(row.marketPhaseSummary, language);
   if (label) {
-    return label
-      .replace('市场阶段: ', '')
-      .replace('市场阶段：', '')
-      .replace('Market phase: ', '');
+    return stripMarketPhaseSummaryPrefix(label) ?? label;
   }
   return (row.marketPhase ? BACKTEST_PHASE_LABELS[language][row.marketPhase] : undefined) || row.marketPhase || '--';
 }
@@ -248,6 +290,7 @@ const BacktestPage: React.FC = () => {
   const text = BACKTEST_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
+  const [initialFilters] = useState(() => getInitialBacktestFilters());
 
   // Set page title
   useEffect(() => {
@@ -255,28 +298,32 @@ const BacktestPage: React.FC = () => {
   }, [text.documentTitle]);
 
   // Input state
-  const [codeFilter, setCodeFilter] = useState('');
-  const [analysisDateFrom, setAnalysisDateFrom] = useState('');
-  const [analysisDateTo, setAnalysisDateTo] = useState('');
-  const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>('all');
-  const [evalDays, setEvalDays] = useState('');
+  const [codeFilter, setCodeFilter] = useState(initialFilters.code);
+  const [analysisDateFrom, setAnalysisDateFrom] = useState(initialFilters.startDate);
+  const [analysisDateTo, setAnalysisDateTo] = useState(initialFilters.endDate);
+  const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialFilters.phase);
+  const [evalDays, setEvalDays] = useState(initialFilters.windowDays ? String(initialFilters.windowDays) : '');
   const [forceRerun, setForceRerun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
-  const [pageError, setPageError] = useState<ParsedApiError | null>(null);
+  const runRequestGenerationRef = useRef(0);
 
   // Results state
   const [results, setResults] = useState<BacktestResultItem[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [resultsError, setResultsError] = useState<ParsedApiError | null>(null);
+  const resultsRequestGenerationRef = useRef(0);
   const pageSize = 20;
 
   // Performance state
   const [overallPerf, setOverallPerf] = useState<PerformanceMetrics | null>(null);
   const [stockPerf, setStockPerf] = useState<PerformanceMetrics | null>(null);
   const [isLoadingPerf, setIsLoadingPerf] = useState(false);
+  const [performanceError, setPerformanceError] = useState<ParsedApiError | null>(null);
+  const performanceRequestGenerationRef = useRef(0);
   const effectiveWindowDays = parseEvalWindowDays(evalDays) ?? overallPerf?.evalWindowDays;
   const isNextDayValidation = effectiveWindowDays === 1;
   const showNextDayActualColumns = isNextDayValidation;
@@ -290,7 +337,11 @@ const BacktestPage: React.FC = () => {
     endDate?: string,
     phase?: BacktestPhaseFilter,
   ) => {
+    const requestGeneration = resultsRequestGenerationRef.current + 1;
+    resultsRequestGenerationRef.current = requestGeneration;
+    const isLatestRequest = () => resultsRequestGenerationRef.current === requestGeneration;
     setIsLoadingResults(true);
+    setResultsError(null);
     try {
       const response = await backtestApi.getResults({
         code: code || undefined,
@@ -301,15 +352,16 @@ const BacktestPage: React.FC = () => {
         page,
         limit: pageSize,
       });
+      if (!isLatestRequest()) return;
       setResults(response.items);
       setTotalResults(response.total);
       setCurrentPage(response.page);
-      setPageError(null);
     } catch (err) {
+      if (!isLatestRequest()) return;
       console.error('Failed to fetch backtest results:', err);
-      setPageError(getParsedApiError(err));
+      setResultsError(getParsedApiError(err));
     } finally {
-      setIsLoadingResults(false);
+      if (isLatestRequest()) setIsLoadingResults(false);
     }
   }, []);
 
@@ -320,55 +372,65 @@ const BacktestPage: React.FC = () => {
     startDate?: string,
     endDate?: string,
     phase?: BacktestPhaseFilter,
-  ) => {
+  ): Promise<PerformanceMetrics | null> => {
+    const requestGeneration = performanceRequestGenerationRef.current + 1;
+    performanceRequestGenerationRef.current = requestGeneration;
+    const isLatestRequest = () => performanceRequestGenerationRef.current === requestGeneration;
     setIsLoadingPerf(true);
+    setPerformanceError(null);
     try {
-      const overall = await backtestApi.getOverallPerformance({
+      const query = {
         evalWindowDays: windowDays,
         analysisDateFrom: startDate || undefined,
         analysisDateTo: endDate || undefined,
         analysisPhase: phase && phase !== 'all' ? phase : undefined,
-      });
+      };
+      const [overall, stock] = await Promise.all([
+        backtestApi.getOverallPerformance(query),
+        code ? backtestApi.getStockPerformance(code, query) : Promise.resolve(null),
+      ]);
+      if (!isLatestRequest()) return null;
       setOverallPerf(overall);
-
-      if (code) {
-        const stock = await backtestApi.getStockPerformance(code, {
-          evalWindowDays: windowDays,
-          analysisDateFrom: startDate || undefined,
-          analysisDateTo: endDate || undefined,
-          analysisPhase: phase && phase !== 'all' ? phase : undefined,
-        });
-        setStockPerf(stock);
-      } else {
-        setStockPerf(null);
-      }
-      setPageError(null);
+      setStockPerf(stock);
+      return overall;
     } catch (err) {
+      if (!isLatestRequest()) return null;
       console.error('Failed to fetch performance:', err);
-      setPageError(getParsedApiError(err));
+      setPerformanceError(getParsedApiError(err));
+      return null;
     } finally {
-      setIsLoadingPerf(false);
+      if (isLatestRequest()) setIsLoadingPerf(false);
     }
   }, []);
 
   // Initial load — fetch performance first, then filter results by its window
   useEffect(() => {
     const init = async () => {
-      // Get latest performance (unfiltered returns most recent summary)
-      const overall = await backtestApi.getOverallPerformance();
-      setOverallPerf(overall);
-      // Use the summary's eval_window_days to filter results consistently
-      const windowDays = overall?.evalWindowDays;
-      if (windowDays && !evalDays) {
-        setEvalDays(String(windowDays));
+      const { code, windowDays: restoredWindow, startDate, endDate, phase, page } = initialFilters;
+      if (restoredWindow) {
+        void fetchPerformance(code || undefined, restoredWindow, startDate, endDate, phase);
+        void fetchResults(page, code || undefined, restoredWindow, startDate, endDate, phase);
+        return;
       }
-      fetchResults(1, undefined, windowDays, undefined, undefined, 'all');
+      const overall = await fetchPerformance(code || undefined, undefined, startDate, endDate, phase);
+      if (!overall) return;
+      const inferredWindow = overall.evalWindowDays;
+      setEvalDays(String(inferredWindow));
+      void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
     };
-    init();
+    void init();
+    return () => {
+      resultsRequestGenerationRef.current += 1;
+      performanceRequestGenerationRef.current += 1;
+      runRequestGenerationRef.current += 1;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Run backtest
   const handleRun = async () => {
+    const requestGeneration = runRequestGenerationRef.current + 1;
+    runRequestGenerationRef.current = requestGeneration;
+    const isLatestRequest = () => runRequestGenerationRef.current === requestGeneration;
     setIsRunning(true);
     setRunResult(null);
     setRunError(null);
@@ -385,6 +447,7 @@ const BacktestPage: React.FC = () => {
         analysisDateFrom: dateFrom,
         analysisDateTo: dateTo,
       });
+      if (!isLatestRequest()) return;
       setRunResult(response);
       const effectiveEvalWindowDays =
         response.appliedEvalWindowDays
@@ -394,13 +457,21 @@ const BacktestPage: React.FC = () => {
       if (effectiveEvalWindowDays != null) {
         setEvalDays(String(effectiveEvalWindowDays));
       }
+      syncBacktestFiltersToUrl({
+        code: code ?? '',
+        windowDays: effectiveEvalWindowDays,
+        startDate: analysisDateFrom,
+        endDate: analysisDateTo,
+        phase: phaseFilter,
+        page: 1,
+      });
       // Refresh data with same eval_window_days
-      fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
-      fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
+      void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
+      void fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
     } catch (err) {
-      setRunError(getParsedApiError(err));
+      if (isLatestRequest()) setRunError(getParsedApiError(err));
     } finally {
-      setIsRunning(false);
+      if (isLatestRequest()) setIsRunning(false);
     }
   };
 
@@ -411,8 +482,9 @@ const BacktestPage: React.FC = () => {
     const code = normalizeBacktestCode(codeFilter);
     const windowDays = parseEvalWindowDays(evalDays);
     setCurrentPage(1);
-    fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, value);
-    fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, value);
+    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: value, page: 1 });
+    void fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, value);
+    void fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, value);
   };
 
   // Filter by code
@@ -420,8 +492,9 @@ const BacktestPage: React.FC = () => {
     const code = normalizeBacktestCode(codeFilter);
     const windowDays = parseEvalWindowDays(evalDays);
     setCurrentPage(1);
-    fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
-    fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page: 1 });
+    void fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    void fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -434,15 +507,18 @@ const BacktestPage: React.FC = () => {
     const code = normalizeBacktestCode(codeFilter);
     setEvalDays('1');
     setCurrentPage(1);
-    fetchResults(1, code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
-    fetchPerformance(code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
+    syncBacktestFiltersToUrl({ code: code ?? '', windowDays: 1, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page: 1 });
+    void fetchResults(1, code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
+    void fetchPerformance(code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
   };
 
   // Pagination
   const totalPages = Math.ceil(totalResults / pageSize);
   const handlePageChange = (page: number) => {
     const windowDays = parseEvalWindowDays(evalDays);
-    fetchResults(page, normalizeBacktestCode(codeFilter), windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    const code = normalizeBacktestCode(codeFilter);
+    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page });
+    void fetchResults(page, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
   };
 
   return (
@@ -562,13 +638,14 @@ const BacktestPage: React.FC = () => {
       <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
         {/* Left sidebar - Performance */}
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
+          {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
           {isLoadingPerf ? (
             <div className="flex items-center justify-center py-8">
               <div className="backtest-spinner sm" />
             </div>
           ) : overallPerf ? (
             <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
-          ) : (
+          ) : performanceError ? null : (
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
@@ -594,15 +671,15 @@ const BacktestPage: React.FC = () => {
             />
             <span className="pb-1.5 text-xs text-muted-text">{text.resultPhaseHint}</span>
           </div>
-          {pageError ? (
-            <ApiErrorAlert error={pageError} className="mb-3" />
+          {resultsError ? (
+            <ApiErrorAlert error={resultsError} className="mb-3" />
           ) : null}
           {isLoadingResults ? (
             <div className="flex flex-col items-center justify-center h-64">
               <div className="backtest-spinner md" />
               <p className="mt-3 text-secondary-text text-sm">{text.loadingResults}</p>
             </div>
-          ) : results.length === 0 ? (
+          ) : results.length === 0 && !resultsError ? (
             <EmptyState
               title={text.noResultsTitle}
               description={text.noResultsDescription}
@@ -613,7 +690,7 @@ const BacktestPage: React.FC = () => {
                 </svg>
               )}
             />
-          ) : (
+          ) : results.length > 0 ? (
             <div className="animate-fade-in">
               <div className="backtest-table-toolbar">
                 <div className="backtest-table-toolbar-meta">
@@ -727,7 +804,7 @@ const BacktestPage: React.FC = () => {
                 {formatUiText(text.totalPage, { total: totalResults, page: currentPage, pages: Math.max(totalPages, 1) })}
               </p>
             </div>
-          )}
+          ) : null}
         </section>
       </main>
     </div>

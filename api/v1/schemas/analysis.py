@@ -10,7 +10,7 @@
 3. 定义异步任务队列相关模型
 """
 
-from typing import Optional, List, Any, Literal
+from typing import Optional, List, Any, Dict, Literal
 from enum import Enum
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -128,6 +128,8 @@ class MarketReviewAccepted(BaseModel):
 
     status: str = Field("accepted", description="提交状态")
     message: str = Field(..., description="提示信息")
+    message_code: str = Field("task.market_review.queued", description="稳定的本地化消息码")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="消息插值参数")
     send_notification: bool = Field(..., description="是否发送通知")
     trace_id: Optional[str] = Field(
         None,
@@ -177,6 +179,8 @@ class TaskAccepted(BaseModel):
         pattern="^(pending|processing)$"
     )
     message: Optional[str] = Field(None, description="提示信息")
+    message_code: str = Field("task.queued", description="稳定的本地化消息码")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="消息插值参数")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
     
     model_config = ConfigDict(json_schema_extra={
@@ -201,6 +205,8 @@ class BatchTaskAcceptedItem(BaseModel):
         pattern="^(pending|processing)$"
     )
     message: Optional[str] = Field(None, description="提示信息")
+    message_code: str = Field("task.queued", description="稳定的本地化消息码")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="消息插值参数")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
 
     model_config = ConfigDict(json_schema_extra={
@@ -275,6 +281,9 @@ class TaskStatus(BaseModel):
         ge=0,
         le=100
     )
+    message: Optional[str] = Field(None, description="Legacy 状态消息，仅作诊断 fallback")
+    message_code: str = Field("task.status", description="稳定的本地化消息码")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="消息插值参数")
     result: Optional[AnalysisResultResponse] = Field(
         None, 
         description="分析结果（仅在 completed 时存在）"
@@ -335,6 +344,8 @@ class TaskInfo(BaseModel):
     status: TaskStatusEnum = Field(..., description="任务状态")
     progress: int = Field(0, description="进度百分比 (0-100)", ge=0, le=100)
     message: Optional[str] = Field(None, description="状态消息")
+    message_code: str = Field("task.status", description="稳定的本地化消息码")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="消息插值参数")
     report_type: str = Field("detailed", description="报告类型")
     created_at: str = Field(..., description="创建时间")
     started_at: Optional[str] = Field(None, description="开始执行时间")

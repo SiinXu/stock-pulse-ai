@@ -36,7 +36,7 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
         {onDismiss ? (
           <button
             type="button"
-            className="shrink-0 rounded-md border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-2 py-1 text-[11px] text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
+            className="shrink-0 rounded-md border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-2 py-1 text-xs text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
             onClick={onDismiss}
           >
             {dismissLabel ?? t('common.close')}
@@ -46,7 +46,7 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
       {showDetails ? (
         <details className="mt-3 rounded-lg border border-subtle bg-surface-2 px-3 py-2">
           <summary className="cursor-pointer text-xs text-[hsl(var(--color-danger-alert-text))] opacity-90">{t('common.details')}</summary>
-          <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-85">
+          <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-5 text-[hsl(var(--color-danger-alert-text))] opacity-85">
             {localizedError.rawMessage}
           </pre>
         </details>

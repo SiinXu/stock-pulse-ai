@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
+import { OVERLAY_Z } from '../common/overlayZ';
 import { SidebarNav } from './SidebarNav';
 import { cn } from '../../utils/cn';
 import { ThemeToggle } from '../theme/ThemeToggle';
@@ -58,7 +59,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="pointer-events-auto inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-md transition-colors hover:bg-hover hover:text-foreground"
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-md transition-colors hover:bg-hover hover:text-foreground"
           aria-label={t('layout.openNav')}
         >
           <Menu className="h-5 w-5" />
@@ -94,7 +95,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         onClose={() => setMobileOpen(false)}
         title={t('layout.navMenu')}
         width="max-w-xs"
-        zIndex={90}
+        zIndex={OVERLAY_Z.navigationDrawer}
         side="left"
       >
         <div className="flex h-full flex-col">

@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReportDetails as ReportDetailsType, ReportLanguage } from '../../types/analysis';
 import { Card } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
-import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 
 interface ReportDetailsProps {
   details?: ReportDetailsType;
@@ -17,13 +18,12 @@ interface ReportDetailsProps {
 export const ReportDetails: React.FC<ReportDetailsProps> = ({
   details,
   recordId,
-  language = 'zh',
 }) => {
   type JsonPanel = 'raw' | 'snapshot';
   type CopiedPanelState = Record<JsonPanel, boolean>;
 
-  const reportLanguage = normalizeReportLanguage(language);
-  const text = getReportText(reportLanguage);
+  const { language: uiLanguage } = useUiLanguage();
+  const text = REPORT_CHROME_TEXT[uiLanguage];
   const [showRaw, setShowRaw] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
   const [copiedPanels, setCopiedPanels] = useState<CopiedPanelState>({

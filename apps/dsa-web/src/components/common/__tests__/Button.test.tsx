@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { Button } from '../Button';
 
 describe('Button', () => {
+  it('keeps compact variants at least 44px tall on touch viewports', () => {
+    render(<Button size="xsm">Compact action</Button>);
+
+    expect(screen.getByRole('button', { name: 'Compact action' })).toHaveClass(
+      'min-h-11',
+      'sm:min-h-0',
+    );
+  });
+
   it('renders children', () => {
     render(<Button>Click me</Button>);
 

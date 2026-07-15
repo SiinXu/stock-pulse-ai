@@ -52,6 +52,7 @@ import type {
 import { areStockCodesEquivalent, normalizeStockCode } from '../utils/stockCode';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
+import { createOperationId } from '../utils/operationId';
 
 const PIE_COLORS = ['#41B83D', '#6E9BD1', '#E9C40C', '#E9415D', '#9B8FB0', '#4FB0A5'];
 const DEFAULT_PAGE_SIZE = 20;
@@ -94,6 +95,22 @@ type FxRefreshContext = {
   viewKey: string;
   requestId: number;
 };
+
+type OperationAttempt = {
+  fingerprint: string;
+  operationId: string;
+};
+
+function resolveOperationAttempt(
+  current: OperationAttempt | null,
+  fingerprint: string,
+  scope: string,
+): OperationAttempt {
+  if (current?.fingerprint === fingerprint) {
+    return current;
+  }
+  return { fingerprint, operationId: createOperationId(scope) };
+}
 
 const PORTFOLIO_INPUT_CLASS =
   'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
@@ -217,6 +234,7 @@ const PortfolioPage: React.FC = () => {
   const [csvDryRun, setCsvDryRun] = useState(true);
   const [csvParsing, setCsvParsing] = useState(false);
   const [csvCommitting, setCsvCommitting] = useState(false);
+  const [csvError, setCsvError] = useState<ParsedApiError | null>(null);
   const [csvParseResult, setCsvParseResult] = useState<PortfolioImportParseResponse | null>(null);
   const [csvCommitResult, setCsvCommitResult] = useState<PortfolioImportCommitResponse | null>(null);
   const [brokerLoadWarning, setBrokerLoadWarning] = useState<string | null>(null);
@@ -265,6 +283,10 @@ const PortfolioPage: React.FC = () => {
     splitRatio: '',
     note: '',
   });
+  const tradeOperationRef = useRef<OperationAttempt | null>(null);
+  const cashOperationRef = useRef<OperationAttempt | null>(null);
+  const corporateOperationRef = useRef<OperationAttempt | null>(null);
+  const csvOperationRef = useRef<OperationAttempt | null>(null);
 
   const queryAccountId = selectedAccount === 'all' ? undefined : selectedAccount;
   const refreshViewKey = `${selectedAccount === 'all' ? 'all' : `account:${selectedAccount}`}:cost:${costMethod}`;
@@ -616,27 +638,38 @@ const PortfolioPage: React.FC = () => {
       return;
     }
     if (tradeSubmitting) return;
+    const requestPayload = {
+      accountId: writableAccountId,
+      symbol: tradeForm.symbol,
+      tradeDate: tradeForm.tradeDate,
+      side: tradeForm.side,
+      quantity: Number(tradeForm.quantity),
+      price: Number(tradeForm.price),
+      fee: Number(tradeForm.fee || 0),
+      tax: Number(tradeForm.tax || 0),
+      tradeUid: tradeForm.tradeUid || undefined,
+      note: tradeForm.note || undefined,
+    };
+    const attempt = resolveOperationAttempt(
+      tradeOperationRef.current,
+      JSON.stringify(requestPayload),
+      'portfolio-trade',
+    );
+    tradeOperationRef.current = attempt;
     setTradeSubmitting(true);
     setTradeError(null);
     setWriteWarning(null);
     try {
       await portfolioApi.createTrade({
-        accountId: writableAccountId,
-        symbol: tradeForm.symbol,
-        tradeDate: tradeForm.tradeDate,
-        side: tradeForm.side,
-        quantity: Number(tradeForm.quantity),
-        price: Number(tradeForm.price),
-        fee: Number(tradeForm.fee || 0),
-        tax: Number(tradeForm.tax || 0),
-        tradeUid: tradeForm.tradeUid || undefined,
-        note: tradeForm.note || undefined,
+        ...requestPayload,
+        operationId: attempt.operationId,
       });
     } catch (err) {
       setTradeError(getParsedApiError(err));
       setTradeSubmitting(false);
       return;
     }
+    tradeOperationRef.current = null;
     setTradeForm((prev) => ({ ...prev, symbol: '', tradeUid: '', note: '' }));
     setTradeModalOpen(false);
     setTradeSubmitting(false);
@@ -650,23 +683,34 @@ const PortfolioPage: React.FC = () => {
       return;
     }
     if (cashSubmitting) return;
+    const requestPayload = {
+      accountId: writableAccountId,
+      eventDate: cashForm.eventDate,
+      direction: cashForm.direction,
+      amount: Number(cashForm.amount),
+      currency: cashForm.currency || undefined,
+      note: cashForm.note || undefined,
+    };
+    const attempt = resolveOperationAttempt(
+      cashOperationRef.current,
+      JSON.stringify(requestPayload),
+      'portfolio-cash',
+    );
+    cashOperationRef.current = attempt;
     setCashSubmitting(true);
     setCashError(null);
     setWriteWarning(null);
     try {
       await portfolioApi.createCashLedger({
-        accountId: writableAccountId,
-        eventDate: cashForm.eventDate,
-        direction: cashForm.direction,
-        amount: Number(cashForm.amount),
-        currency: cashForm.currency || undefined,
-        note: cashForm.note || undefined,
+        ...requestPayload,
+        operationId: attempt.operationId,
       });
     } catch (err) {
       setCashError(getParsedApiError(err));
       setCashSubmitting(false);
       return;
     }
+    cashOperationRef.current = null;
     setCashForm((prev) => ({ ...prev, note: '' }));
     setCashModalOpen(false);
     setCashSubmitting(false);
@@ -680,24 +724,35 @@ const PortfolioPage: React.FC = () => {
       return;
     }
     if (corpSubmitting) return;
+    const requestPayload = {
+      accountId: writableAccountId,
+      symbol: corpForm.symbol,
+      effectiveDate: corpForm.effectiveDate,
+      actionType: corpForm.actionType,
+      cashDividendPerShare: corpForm.cashDividendPerShare ? Number(corpForm.cashDividendPerShare) : undefined,
+      splitRatio: corpForm.splitRatio ? Number(corpForm.splitRatio) : undefined,
+      note: corpForm.note || undefined,
+    };
+    const attempt = resolveOperationAttempt(
+      corporateOperationRef.current,
+      JSON.stringify(requestPayload),
+      'portfolio-corporate',
+    );
+    corporateOperationRef.current = attempt;
     setCorpSubmitting(true);
     setCorpError(null);
     setWriteWarning(null);
     try {
       await portfolioApi.createCorporateAction({
-        accountId: writableAccountId,
-        symbol: corpForm.symbol,
-        effectiveDate: corpForm.effectiveDate,
-        actionType: corpForm.actionType,
-        cashDividendPerShare: corpForm.cashDividendPerShare ? Number(corpForm.cashDividendPerShare) : undefined,
-        splitRatio: corpForm.splitRatio ? Number(corpForm.splitRatio) : undefined,
-        note: corpForm.note || undefined,
+        ...requestPayload,
+        operationId: attempt.operationId,
       });
     } catch (err) {
       setCorpError(getParsedApiError(err));
       setCorpSubmitting(false);
       return;
     }
+    corporateOperationRef.current = null;
     setCorpForm((prev) => ({ ...prev, symbol: '', note: '' }));
     setCorpModalOpen(false);
     setCorpSubmitting(false);
@@ -708,11 +763,12 @@ const PortfolioPage: React.FC = () => {
     if (!csvFile) return;
     try {
       setCsvParsing(true);
+      setCsvError(null);
       const parsed = await portfolioApi.parseCsvImport(selectedBroker, csvFile);
       setCsvParseResult(parsed);
       setCsvCommitResult(null);
     } catch (err) {
-      setError(getParsedApiError(err));
+      setCsvError(getParsedApiError(err));
     } finally {
       setCsvParsing(false);
     }
@@ -724,16 +780,46 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountWrite);
       return;
     }
+    const fingerprint = JSON.stringify({
+      accountId: writableAccountId,
+      broker: selectedBroker,
+      dryRun: csvDryRun,
+      file: {
+        name: csvFile.name,
+        size: csvFile.size,
+        type: csvFile.type,
+        lastModified: csvFile.lastModified,
+      },
+    });
+    const attempt = resolveOperationAttempt(
+      csvOperationRef.current,
+      fingerprint,
+      'portfolio-csv',
+    );
+    csvOperationRef.current = attempt;
     try {
       setWriteWarning(null);
       setCsvCommitting(true);
-      const committed = await portfolioApi.commitCsvImport(writableAccountId, selectedBroker, csvFile, csvDryRun);
+      setCsvError(null);
+      const committed = await portfolioApi.commitCsvImport(
+        writableAccountId,
+        selectedBroker,
+        csvFile,
+        attempt.operationId,
+        csvDryRun,
+      );
       setCsvCommitResult(committed);
+      if (committed.failedCount > 0) {
+        // A replay of the same operation ID would permanently return the first
+        // partial result. Start a new attempt so failed rows can run again;
+        // stable trade UID/dedup hashes keep already-inserted rows idempotent.
+        csvOperationRef.current = null;
+      }
       if (!csvDryRun) {
         await refreshPortfolioData();
       }
     } catch (err) {
-      setError(getParsedApiError(err));
+      setCsvError(getParsedApiError(err));
     } finally {
       setCsvCommitting(false);
     }
@@ -967,7 +1053,7 @@ const PortfolioPage: React.FC = () => {
     : null;
 
   return (
-    <div className="portfolio-page min-h-screen space-y-4 p-4 md:p-6">
+    <div className="portfolio-page min-h-dvh space-y-4 p-4 md:p-6">
       <section className="space-y-3">
         <div className="space-y-2">
           <h1 className="text-xl md:text-2xl font-semibold text-foreground">{text.title}</h1>
@@ -1239,7 +1325,7 @@ const PortfolioPage: React.FC = () => {
                       <td className="py-2 pr-2 text-right">{row.avgCost.toFixed(4)}</td>
                       <td className="py-2 pr-2 text-right">
                         <div>{formatPositionPrice(row)}</div>
-                        <div className={`text-[11px] ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
+                        <div className={`text-xs ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
                           {getPositionPriceLabel(row, language)}
                         </div>
                       </td>
@@ -1390,14 +1476,15 @@ const PortfolioPage: React.FC = () => {
         <button type="button" className="btn-secondary text-sm" onClick={() => setEventModalOpen(true)}>{text.eventLog}</button>
       </div>
 
-      <Modal isOpen={tradeModalOpen} onClose={() => { if (!tradeSubmitting) { setTradeError(null); setTradeModalOpen(false); } }} title={text.manualTrade}>
-          <form className="space-y-2" onSubmit={handleTradeSubmit}>
+      <Modal isOpen={tradeModalOpen} closeDisabled={tradeSubmitting} onClose={() => { setTradeError(null); setTradeModalOpen(false); }} title={text.manualTrade}>
+          <form onSubmit={handleTradeSubmit} aria-busy={tradeSubmitting}>
+            <fieldset disabled={tradeSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <label className="block space-y-1">
               <span className="text-xs text-muted-text">{text.stockCode}</span>
               <input className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockExample} value={tradeForm.symbol}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.tradeDate}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="date" value={tradeForm.tradeDate}
@@ -1406,6 +1493,7 @@ const PortfolioPage: React.FC = () => {
               <Select
                 label={text.side}
                 value={tradeForm.side}
+                disabled={tradeSubmitting}
                 onChange={(value) => setTradeForm((prev) => ({ ...prev, side: value as PortfolioSide }))}
                 options={[
                   { value: 'buy', label: text.buy },
@@ -1413,7 +1501,7 @@ const PortfolioPage: React.FC = () => {
                 ]}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.quantity}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.required} value={tradeForm.quantity}
@@ -1425,7 +1513,7 @@ const PortfolioPage: React.FC = () => {
                   onChange={(e) => setTradeForm((prev) => ({ ...prev, price: e.target.value }))} required />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.fee}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.fee}
@@ -1444,12 +1532,14 @@ const PortfolioPage: React.FC = () => {
             <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || tradeSubmitting}>
               {tradeSubmitting ? text.submitting : text.submitTrade}
             </button>
+            </fieldset>
           </form>
       </Modal>
 
-      <Modal isOpen={cashModalOpen} onClose={() => { if (!cashSubmitting) { setCashError(null); setCashModalOpen(false); } }} title={text.manualCash}>
-          <form className="space-y-2" onSubmit={handleCashSubmit}>
-            <div className="grid grid-cols-2 gap-2">
+      <Modal isOpen={cashModalOpen} closeDisabled={cashSubmitting} onClose={() => { setCashError(null); setCashModalOpen(false); }} title={text.manualCash}>
+          <form onSubmit={handleCashSubmit} aria-busy={cashSubmitting}>
+            <fieldset disabled={cashSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.date}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="date" value={cashForm.eventDate}
@@ -1458,6 +1548,7 @@ const PortfolioPage: React.FC = () => {
               <Select
                 label={text.direction}
                 value={cashForm.direction}
+                disabled={cashSubmitting}
                 onChange={(value) => setCashForm((prev) => ({ ...prev, direction: value as PortfolioCashDirection }))}
                 options={[
                   { value: 'in', label: text.inflow },
@@ -1481,17 +1572,19 @@ const PortfolioPage: React.FC = () => {
             <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || cashSubmitting}>
               {cashSubmitting ? text.submitting : text.submitCash}
             </button>
+            </fieldset>
           </form>
       </Modal>
 
-      <Modal isOpen={corpModalOpen} onClose={() => { if (!corpSubmitting) { setCorpError(null); setCorpModalOpen(false); } }} title={text.manualCorporate}>
-          <form className="space-y-2" onSubmit={handleCorporateSubmit}>
+      <Modal isOpen={corpModalOpen} closeDisabled={corpSubmitting} onClose={() => { setCorpError(null); setCorpModalOpen(false); }} title={text.manualCorporate}>
+          <form onSubmit={handleCorporateSubmit} aria-busy={corpSubmitting}>
+            <fieldset disabled={corpSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <label className="block space-y-1">
               <span className="text-xs text-muted-text">{text.stockCode}</span>
               <input className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockCode} value={corpForm.symbol}
                 onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.effectiveDate}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="date" value={corpForm.effectiveDate}
@@ -1500,6 +1593,7 @@ const PortfolioPage: React.FC = () => {
               <Select
                 label={text.actionType}
                 value={corpForm.actionType}
+                disabled={corpSubmitting}
                 onChange={(value) => setCorpForm((prev) => ({ ...prev, actionType: value as PortfolioCorporateActionType }))}
                 options={[
                   { value: 'cash_dividend', label: text.cashDividend },
@@ -1528,11 +1622,24 @@ const PortfolioPage: React.FC = () => {
             <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || corpSubmitting}>
               {corpSubmitting ? text.submitting : text.submitCorporate}
             </button>
+            </fieldset>
           </form>
       </Modal>
 
-      <Modal isOpen={csvModalOpen} onClose={() => setCsvModalOpen(false)} title={text.csvImport}>
-          <div className="space-y-2">
+      <Modal
+        isOpen={csvModalOpen}
+        closeDisabled={csvParsing || csvCommitting}
+        onClose={() => {
+          setCsvError(null);
+          setCsvModalOpen(false);
+        }}
+        title={text.csvImport}
+      >
+          <fieldset
+            disabled={csvParsing || csvCommitting}
+            aria-busy={csvParsing || csvCommitting}
+            className="m-0 min-w-0 space-y-2 border-0 p-0"
+          >
             {brokerLoadWarning ? (
               <InlineAlert
                 variant="warning"
@@ -1540,11 +1647,16 @@ const PortfolioPage: React.FC = () => {
                 message={brokerLoadWarning}
               />
             ) : null}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Select
                 label={text.broker}
                 value={selectedBroker}
-                onChange={setSelectedBroker}
+                onChange={(value) => {
+                  setSelectedBroker(value);
+                  csvOperationRef.current = null;
+                  setCsvCommitResult(null);
+                }}
+                disabled={csvParsing || csvCommitting}
                 options={brokers.length > 0
                   ? brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))
                   : [{ value: 'huatai', label: formatBrokerLabel('huatai', undefined, language) }]}
@@ -1554,23 +1666,39 @@ const PortfolioPage: React.FC = () => {
                 <label className={PORTFOLIO_FILE_PICKER_CLASS}>
                   {text.chooseCsv}
                   <input type="file" accept=".csv" className="hidden"
-                    onChange={(e) => setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
+                    onChange={(e) => {
+                      setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+                      csvOperationRef.current = null;
+                      setCsvParseResult(null);
+                      setCsvCommitResult(null);
+                    }} />
                 </label>
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-secondary">
-              <input id="csv-dry-run" type="checkbox" checked={csvDryRun} onChange={(e) => setCsvDryRun(e.target.checked)} />
+              <input
+                id="csv-dry-run"
+                type="checkbox"
+                checked={csvDryRun}
+                onChange={(e) => {
+                  setCsvDryRun(e.target.checked);
+                  csvOperationRef.current = null;
+                }}
+              />
               <label htmlFor="csv-dry-run">{text.dryRun}</label>
             </div>
             <div className="flex gap-2">
-              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing} onClick={() => void handleParseCsv()}>
+              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing || csvCommitting} onClick={() => void handleParseCsv()}>
                 {csvParsing ? text.parsing : text.parseFile}
               </button>
               <button type="button" className="btn-secondary flex-1"
-                disabled={!csvFile || !writableAccountId || csvCommitting} onClick={() => void handleCommitCsv()}>
+                disabled={!csvFile || !writableAccountId || csvParsing || csvCommitting} onClick={() => void handleCommitCsv()}>
                 {csvCommitting ? text.submitting : text.commitImport}
               </button>
             </div>
+            {csvError ? (
+              <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
+            ) : null}
             {csvParseResult ? (
               <InlineAlert
                 variant={getCsvParseVariant(csvParseResult)}
@@ -1581,18 +1709,18 @@ const PortfolioPage: React.FC = () => {
             ) : null}
             {csvCommitResult ? (
               <InlineAlert
-                variant={getCsvCommitVariant(csvCommitResult, csvDryRun)}
-                title={csvDryRun ? text.csvDryResult : text.csvCommitResult}
-                message={formatUiText(text.csvCommitSummary, { mode: csvDryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
+                variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
+                title={csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult}
+                message={formatUiText(text.csvCommitSummary, { mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
                 className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
-          </div>
+          </fieldset>
       </Modal>
 
       <Modal isOpen={eventModalOpen} onClose={() => setEventModalOpen(false)} title={text.eventLog}>
           <div className="space-y-2">
-            <div className="grid grid-cols-2 items-end gap-2">
+            <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
               <Select
                 label={text.type}
                 value={eventType}
@@ -1607,7 +1735,7 @@ const PortfolioPage: React.FC = () => {
                 {eventLoading ? text.loading : text.refreshLedger}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs text-muted-text">{text.startDate}</span>
                 <input className={PORTFOLIO_INPUT_CLASS} type="date" value={eventDateFrom} onChange={(e) => setEventDateFrom(e.target.value)} />
@@ -1657,7 +1785,7 @@ const PortfolioPage: React.FC = () => {
                 ]}
               />
             ) : null}
-            <div className="text-[11px] text-secondary">
+            <div className="text-xs text-secondary">
               {writeBlocked ? text.deleteBlocked : text.deleteHint}
             </div>
             <div className="max-h-64 overflow-auto rounded-lg border border-white/10 p-2">
@@ -1669,7 +1797,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-[11px]"
+                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
                         id: item.id,
@@ -1689,7 +1817,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-[11px]"
+                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
                         id: item.id,
@@ -1709,7 +1837,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-[11px]"
+                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
                         id: item.id,

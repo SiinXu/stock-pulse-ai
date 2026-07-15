@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { ReportNews } from '../ReportNews';
 
 vi.mock('../../../api/history', () => ({
@@ -12,6 +14,7 @@ vi.mock('../../../api/history', () => ({
 describe('ReportNews', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
   });
 
   it('renders news items and refreshes with preserved subpanel styling', async () => {
@@ -54,7 +57,7 @@ describe('ReportNews', () => {
     expect(screen.getByText('可稍后刷新以获取最新资讯。')).toBeInTheDocument();
   });
 
-  it('localizes the empty state description for english reports', async () => {
+  it('keeps UI-owned empty state Chinese around an English report section', async () => {
     vi.mocked(historyApi.getNews).mockResolvedValue({
       total: 0,
       items: [],
@@ -62,9 +65,27 @@ describe('ReportNews', () => {
 
     render(<ReportNews recordId={1} language="en" />);
 
+    expect(await screen.findByText('暂无相关资讯')).toBeInTheDocument();
+    expect(screen.getByText('可稍后刷新以获取最新资讯。')).toBeInTheDocument();
+    expect(screen.getByText('Related news / follow-up retrieval')).toBeVisible();
+  });
+
+  it('keeps UI-owned empty state English around a Chinese report section', async () => {
+    vi.mocked(historyApi.getNews).mockResolvedValue({
+      total: 0,
+      items: [],
+    });
+    localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+
+    render(
+      <UiLanguageProvider>
+        <ReportNews recordId={1} language="zh" />
+      </UiLanguageProvider>,
+    );
+
     expect(await screen.findByText('No related news')).toBeInTheDocument();
     expect(screen.getByText('Refresh later to check for the latest updates.')).toBeInTheDocument();
-    expect(screen.getByText('Related news / follow-up retrieval')).toBeVisible();
+    expect(screen.getByText('相关资讯/后续检索')).toBeVisible();
   });
 
   it('renders the error state and supports retry', async () => {

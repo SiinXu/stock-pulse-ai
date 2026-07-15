@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
+import re
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, Future
@@ -39,6 +40,59 @@ from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 logger = logging.getLogger(__name__)
 
 
+_TASK_MESSAGE_SUFFIX_CODES: Tuple[Tuple[str, str], ...] = (
+    ("正在准备分析任务", "task.analysis.preparing"),
+    ("正在获取行情与筹码数据", "task.analysis.market_data"),
+    ("行情数据准备完成", "task.analysis.market_data_ready"),
+    ("正在聚合基本面与趋势数据", "task.analysis.fundamentals"),
+    ("正在切换 Agent 分析链路", "task.analysis.agent"),
+    ("正在检索新闻与舆情", "task.analysis.news"),
+    ("正在整理分析上下文", "task.analysis.context"),
+    ("正在请求 LLM 生成报告", "task.analysis.llm"),
+    ("正在校验并整理分析结果", "task.analysis.validating"),
+    ("正在保存分析报告", "task.analysis.saving"),
+)
+
+
+def _task_message_metadata(
+    message: Optional[str],
+    *,
+    fallback_code: str,
+) -> Tuple[str, Dict[str, Any]]:
+    """Map legacy task copy to a stable UI message identity."""
+    normalized = (message or "").strip()
+    exact_codes = {
+        "任务已加入队列": "task.queued",
+        "正在分析中...": "task.analysis.processing",
+        "分析完成": "task.analysis.completed",
+        "任务执行中": "task.processing",
+        "任务执行完成": "task.completed",
+        "大盘复盘任务已提交": "task.market_review.queued",
+        "AlphaSift 选股任务已提交": "task.screening.queued",
+        "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行": "task.screening.processing",
+    }
+    if normalized in exact_codes:
+        return exact_codes[normalized], {}
+
+    if normalized.startswith("选股已完成，正在整理 ") and normalized.endswith(" 条候选"):
+        raw_count = normalized.removeprefix("选股已完成，正在整理 ").removesuffix(" 条候选")
+        try:
+            candidate_count: Any = int(raw_count)
+        except ValueError:
+            candidate_count = raw_count
+        return "task.screening.organizing", {"candidate_count": candidate_count}
+
+    for suffix, code in _TASK_MESSAGE_SUFFIX_CODES:
+        if normalized == suffix:
+            return code, {}
+        marker = f"：{suffix}"
+        if normalized.endswith(marker):
+            subject = normalized[: -len(marker)].strip()
+            return code, {"subject": subject} if subject else {}
+
+    return fallback_code, {}
+
+
 def _dedupe_stock_code_key(stock_code: str) -> str:
     """
     Build the internal duplicate-detection key for a stock code.
@@ -59,6 +113,32 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"    # Cancelled by user/system
 
 
+_STABLE_TASK_ERROR_CODE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+
+
+def public_task_error(task: Any, default_error_code: str = "task_failed") -> Optional[str]:
+    """Project a failed task to a stable public error code."""
+    status = getattr(task, "status", None)
+    status_value = status.value if isinstance(status, Enum) else str(status or "")
+    if status_value != TaskStatus.FAILED.value:
+        return None
+    candidate = str(getattr(task, "failure_error_code", "") or "").strip()
+    if not _STABLE_TASK_ERROR_CODE.fullmatch(candidate):
+        candidate = default_error_code
+    return candidate
+
+
+def public_task_message(task: Any, default_failed_message: str = "任务执行失败") -> Optional[str]:
+    """Project task copy while keeping failure diagnostics server-side."""
+    status = getattr(task, "status", None)
+    status_value = status.value if isinstance(status, Enum) else str(status or "")
+    if status_value != TaskStatus.FAILED.value:
+        return getattr(task, "message", None)
+    if getattr(task, "message_code", None) == "task.analysis.failed":
+        return "分析失败"
+    return default_failed_message
+
+
 @dataclass
 class TaskInfo:
     """
@@ -72,8 +152,12 @@ class TaskInfo:
     status: TaskStatus = TaskStatus.PENDING
     progress: int = 0
     message: Optional[str] = None
+    message_code: str = "task.queued"
+    message_params: Dict[str, Any] = field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    diagnostic_error: Optional[str] = field(default=None, repr=False)
+    failure_error_code: str = field(default="analysis_failed", repr=False)
     report_type: str = "detailed"
     analysis_phase: str = "auto"
     created_at: datetime = field(default_factory=datetime.now)
@@ -87,6 +171,14 @@ class TaskInfo:
     report_language: Optional[str] = None
     trace_id: Optional[str] = None
     flow_events: List[Dict[str, Any]] = field(default_factory=list)
+
+    def public_error(self) -> Optional[str]:
+        """Return only a stable error code for public task payloads."""
+        return public_task_error(self, default_error_code="task_failed")
+
+    def public_message(self) -> Optional[str]:
+        """Return status copy that cannot contain a provider exception."""
+        return public_task_message(self)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert task info into an API-friendly dictionary."""
@@ -97,13 +189,15 @@ class TaskInfo:
             "stock_name": self.stock_name,
             "status": self.status.value,
             "progress": self.progress,
-            "message": self.message,
+            "message": self.public_message(),
+            "message_code": self.message_code,
+            "message_params": copy.deepcopy(self.message_params),
             "report_type": self.report_type,
             "analysis_phase": self.analysis_phase,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
-            "error": self.error,
+            "error": self.public_error(),
             "original_query": self.original_query,
             "selection_source": self.selection_source,
             "skills": self.skills,
@@ -118,8 +212,12 @@ class TaskInfo:
             status=self.status,
             progress=self.progress,
             message=self.message,
+            message_code=self.message_code,
+            message_params=copy.deepcopy(self.message_params),
             result=self.result,
             error=self.error,
+            diagnostic_error=self.diagnostic_error,
+            failure_error_code=self.failure_error_code,
             report_type=self.report_type,
             analysis_phase=self.analysis_phase,
             created_at=self.created_at,
@@ -421,6 +519,8 @@ class AnalysisTaskQueue:
                     stock_name=stock_name,
                     status=TaskStatus.PENDING,
                     message="任务已加入队列",
+                    message_code="task.queued",
+                    message_params={"stock_code": stock_code},
                     report_type=report_type,
                     analysis_phase=analysis_phase or "auto",
                     original_query=original_query,
@@ -472,6 +572,7 @@ class AnalysisTaskQueue:
         message: Optional[str] = "任务已加入队列",
         task_id: Optional[str] = None,
         trace_id: Optional[str] = None,
+        failure_error_code: str = "task_failed",
     ) -> TaskInfo:
         """
         Submit a generic background callable with task lifecycle tracking.
@@ -487,6 +588,9 @@ class AnalysisTaskQueue:
             stock_name=stock_name,
             status=TaskStatus.PENDING,
             message=message,
+            message_code=_task_message_metadata(message, fallback_code="task.queued")[0],
+            message_params=_task_message_metadata(message, fallback_code="task.queued")[1],
+            failure_error_code=failure_error_code,
             report_type=report_type,
         )
 
@@ -626,6 +730,8 @@ class AnalysisTaskQueue:
         progress: int,
         message: Optional[str] = None,
         *,
+        message_code: Optional[str] = None,
+        message_params: Optional[Dict[str, Any]] = None,
         event_type: str = "task_progress",
     ) -> Optional[TaskInfo]:
         """
@@ -646,6 +752,18 @@ class AnalysisTaskQueue:
                 changed = True
             if message is not None and message != task.message:
                 task.message = message
+                changed = True
+            resolved_code, resolved_params = _task_message_metadata(
+                message,
+                fallback_code=message_code or "task.processing",
+            )
+            next_message_code = message_code or resolved_code
+            next_message_params = dict(message_params) if message_params is not None else resolved_params
+            if next_message_code != task.message_code:
+                task.message_code = next_message_code
+                changed = True
+            if next_message_params != task.message_params:
+                task.message_params = next_message_params
                 changed = True
 
             if not changed:
@@ -692,6 +810,8 @@ class AnalysisTaskQueue:
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
             task.message = "正在分析中..."
+            task.message_code = "task.analysis.processing"
+            task.message_params = {"stock_code": stock_code}
             task.progress = 10
         
         self._broadcast_event("task_started", task.to_dict())
@@ -743,6 +863,8 @@ class AnalysisTaskQueue:
                         task.completed_at = datetime.now()
                         task.result = result
                         task.message = "分析完成"
+                        task.message_code = "task.analysis.completed"
+                        task.message_params = {"stock_code": stock_code}
                         task.stock_name = result.get("stock_name", task.stock_name)
                         
                         # 从分析中集合移除
@@ -772,8 +894,11 @@ class AnalysisTaskQueue:
                 if task:
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now()
-                    task.error = error_msg[:200]  # 限制错误信息长度
-                    task.message = f"分析失败: {error_msg[:50]}"
+                    task.error = task.failure_error_code
+                    task.diagnostic_error = error_msg
+                    task.message = "分析失败"
+                    task.message_code = "task.analysis.failed"
+                    task.message_params = {"stock_code": stock_code}
                     
                     # 从分析中集合移除
                     dedupe_key = _dedupe_stock_code_key(task.stock_code)
@@ -811,6 +936,8 @@ class AnalysisTaskQueue:
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
             task.message = "任务执行中"
+            task.message_code = "task.processing"
+            task.message_params = {}
             task.progress = 10
             self._broadcast_event("task_started", task.to_dict())
 
@@ -840,6 +967,8 @@ class AnalysisTaskQueue:
                     task.completed_at = datetime.now()
                     task.result = result
                     task.message = "任务执行完成"
+                    task.message_code = "task.completed"
+                    task.message_params = {}
 
             self._broadcast_event("task_completed", task.to_dict())
             logger.info(f"[TaskQueue] 自定义任务完成: {task_id}")
@@ -858,8 +987,11 @@ class AnalysisTaskQueue:
                 if task:
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now()
-                    task.error = error_msg[:200]
-                    task.message = f"任务失败: {error_msg[:80]}"
+                    task.error = task.failure_error_code
+                    task.diagnostic_error = error_msg
+                    task.message = "任务执行失败"
+                    task.message_code = "task.failed"
+                    task.message_params = {}
 
             if task:
                 self._broadcast_event("task_failed", task.to_dict())

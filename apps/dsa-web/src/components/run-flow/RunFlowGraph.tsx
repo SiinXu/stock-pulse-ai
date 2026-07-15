@@ -9,12 +9,11 @@ import {
   formatDateTime,
   formatDuration,
   getNodeDisplayOrder,
+  getRunFlowEdgeLabel,
   getRunFlowEdgeKindLabel,
   getRunFlowStatusLabel,
   RUN_FLOW_STATUS_STYLE,
 } from './utils';
-
-type RunFlowT = ReturnType<typeof useUiLanguage>['t'];
 
 interface RunFlowGraphProps {
   lanes: RunFlowLane[];
@@ -147,13 +146,6 @@ const getLaneRowHeight = (laneId: string): number => (
 );
 
 const isExpandableNode = (node: RunFlowNode): boolean => node.metadata?.topologyGroup === 'provider_attempts';
-
-const getEdgeLabel = (label: string | null | undefined, t: RunFlowT): string | null => {
-  if (!label) return null;
-  if (label === '调用') return t('runFlow.edgeLabel.invoke');
-  if (label === '详情') return t('runFlow.edgeLabel.details');
-  return label;
-};
 
 const metadataString = (node: RunFlowNode, key: string): string | null => {
   const value = node.metadata?.[key];
@@ -609,12 +601,12 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
     displayLabel: string | null;
     showLabel: boolean;
   }>>((items, item) => {
-    const displayLabel = getEdgeLabel(item.edge.label, t);
+    const displayLabel = getRunFlowEdgeLabel(item.edge.label, t);
     const labelKey = `${item.edge.to}:${displayLabel || ''}`;
     const duplicateLabel = items.some((existing) => (
       existing.relatedToSelected
-      && getEdgeLabel(existing.edge.label, t)
-      && `${existing.edge.to}:${getEdgeLabel(existing.edge.label, t)}` === labelKey
+      && getRunFlowEdgeLabel(existing.edge.label, t)
+      && `${existing.edge.to}:${getRunFlowEdgeLabel(existing.edge.label, t)}` === labelKey
     ));
     items.push({
       ...item,
@@ -686,7 +678,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                     x={labelX}
                     y={labelY}
                     textAnchor={labelAnchor}
-                    className="fill-muted-text text-[10px]"
+                    className="fill-muted-text text-xs"
                     style={{ paintOrder: 'stroke', stroke: 'hsl(var(--card))', strokeWidth: 4 }}
                   >
                     {compactText(displayLabel, 22)}
@@ -792,11 +784,11 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       {statusLabel}
                     </Badge>
                     {typeof node.durationMs === 'number' ? (
-                      <span className="min-w-0 truncate text-[11px] text-muted-text">{formatDuration(node.durationMs, t)}</span>
+                      <span className="min-w-0 truncate text-xs text-muted-text">{formatDuration(node.durationMs, t)}</span>
                     ) : null}
                   </span>
                   {node.startedAt ? (
-                    <span className="mt-1 block w-full min-w-0 truncate text-[11px] text-muted-text">
+                    <span className="mt-1 block w-full min-w-0 truncate text-xs text-muted-text">
                       {t('runFlow.graph.startedAt')}: {formatDateTime(node.startedAt, language, t)}
                     </span>
                   ) : null}
@@ -811,7 +803,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       event.stopPropagation();
                       onToggleExpanded?.(node.id);
                     }}
-                    className="absolute bottom-2 right-2 z-40 inline-flex h-[18px] items-center gap-0.5 rounded-md border border-subtle bg-base/80 px-1 text-[9px] font-medium leading-none text-secondary-text shadow-sm transition-colors hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
+                    className="absolute bottom-2 right-2 z-40 inline-flex h-[18px] items-center gap-0.5 rounded-md border border-subtle bg-base/80 px-1 text-xs font-medium leading-none text-secondary-text shadow-sm transition-colors hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
                   >
                     {expanded ? (
                       <ChevronDown className="h-2 w-2" aria-hidden="true" />

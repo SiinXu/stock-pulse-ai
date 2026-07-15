@@ -78,10 +78,18 @@ export type AlphaSiftCandidate = {
 export type AlphaSiftStrategy = {
   id: string;
   name: string;
+  nameZh?: string;
+  nameEn?: string;
   title?: string;
+  titleZh?: string;
+  titleEn?: string;
   description: string;
+  descriptionZh?: string;
+  descriptionEn?: string;
   version?: string;
   category?: string;
+  categoryZh?: string;
+  categoryEn?: string;
   tag?: string;
   tags?: string[];
   marketScope?: string[];
@@ -221,6 +229,8 @@ export type AlphaSiftScreenAccepted = {
   traceId?: string | null;
   status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   message: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   strategy: string;
   market: string;
   maxResults: number;
@@ -232,6 +242,8 @@ export type AlphaSiftScreenTaskStatus = {
   status: 'pending' | 'processing' | 'completed' | 'failed' | string;
   progress?: number | null;
   message?: string | null;
+  messageCode?: string | null;
+  messageParams?: Record<string, unknown> | null;
   error?: string | null;
   result?: AlphaSiftScreenResponse | null;
 };

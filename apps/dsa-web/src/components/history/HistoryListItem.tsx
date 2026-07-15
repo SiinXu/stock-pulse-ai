@@ -4,7 +4,7 @@ import type { HistoryItem } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
+import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../../utils/marketPhase';
 import { truncateStockName } from '../../utils/stockName';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -36,22 +36,22 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
     t('history.sentiment'),
     actionLabels,
   );
-  const phaseLabel = getMarketPhaseSummaryLabel(item.marketPhaseSummary, language)
-    ?.replace('市场阶段: ', '')
-    .replace('市场阶段：', '')
-    .replace('Market phase: ', '');
+  const phaseLabel = stripMarketPhaseSummaryPrefix(
+    getMarketPhaseSummaryLabel(item.marketPhaseSummary, language),
+  );
 
   return (
     <div className="flex items-start gap-2 group">
-      <div className="pt-5">
+      <label className="-ml-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-center">
         <input
           type="checkbox"
           checked={isChecked}
           onChange={() => onToggleChecked(item.id)}
           disabled={isDeleting}
-          className="h-3.5 w-3.5 cursor-pointer rounded border-subtle-hover bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
+          aria-label={t('history.selectRecordAria', { name: stockName })}
+          className="h-4 w-4 cursor-pointer rounded border-subtle-hover bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
         />
-      </div>
+      </label>
       <button
         type="button"
         onClick={() => onClick(item.id)}
@@ -82,7 +82,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="home-history-sentiment-badge shrink-0 shadow-none text-[11px] font-semibold leading-none transition-opacity duration-200"
+                    className="home-history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
                     style={{
                       color: sentimentColor,
                       borderColor: `${sentimentColor}30`,
@@ -95,17 +95,17 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
               </div>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2" data-testid="history-card-meta">
-              <span className="text-[11px] text-secondary-text font-mono">
+              <span className="font-mono text-xs text-secondary-text">
                 {item.stockCode}
               </span>
               <span className="w-1 h-1 rounded-full bg-subtle-hover" />
-              <span className="text-[11px] text-muted-text">
+              <span className="text-xs text-muted-text">
                 {formatDateTime(item.createdAt, language)}
               </span>
               {phaseLabel ? (
                 <>
                   <span className="w-1 h-1 rounded-full bg-subtle-hover" />
-                  <Badge variant="default" size="sm" className="shrink-0 shadow-none text-[10px] leading-none">
+                  <Badge variant="default" size="sm" className="shrink-0 text-xs leading-none shadow-none">
                     {phaseLabel}
                   </Badge>
                 </>

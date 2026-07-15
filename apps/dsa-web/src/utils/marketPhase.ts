@@ -113,3 +113,16 @@ export const getMarketPhaseSummaryLabel = (
 
 export const getPartialBarLabel = (language?: ReportLanguage | null): string =>
   TEXT[normalizeReportLanguage(language)].partialBar;
+
+const MARKET_PHASE_PREFIXES = Object.values(TEXT).flatMap(({ finalPrefix }) => [
+  `${finalPrefix}: `,
+  `${finalPrefix}：`,
+]);
+
+export const stripMarketPhaseSummaryPrefix = (label?: string | null): string | null => {
+  if (!label) {
+    return null;
+  }
+  const prefix = MARKET_PHASE_PREFIXES.find((candidate) => label.startsWith(candidate));
+  return prefix ? label.slice(prefix.length) : label;
+};

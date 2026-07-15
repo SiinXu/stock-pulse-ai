@@ -135,7 +135,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                   aria-label={t('history.selectAllHistoryAria')}
                   className="history-select-all-checkbox h-3.5 w-3.5 cursor-pointer bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
                 />
-                <span className="text-[11px] text-muted-text select-none">{t('common.selectAllCurrent')}</span>
+                <span className="text-xs text-muted-text select-none">{t('common.selectAllCurrent')}</span>
               </label>
               <Button
                 variant="danger-subtle"
@@ -192,7 +192,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             {!hasMore && items.length > 0 && (
               <div className="text-center py-5">
                 <div className="h-px bg-subtle w-full mb-3" />
-                <span className="text-[10px] text-secondary-text uppercase tracking-[0.2em]">{t('history.bottomReached')}</span>
+                <span className="text-xs text-secondary-text uppercase tracking-[0.2em]">{t('history.bottomReached')}</span>
               </div>
             )}
           </div>

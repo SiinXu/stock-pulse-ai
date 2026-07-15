@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.config_manager import ConfigManager
+from src.core.config_manager import ConfigManager, ConfigVersionMismatchError
 
 
 class ConfigManagerTestCase(unittest.TestCase):
@@ -53,6 +53,31 @@ class ConfigManagerTestCase(unittest.TestCase):
         self.assertIn("\n\nexport SHOULD_STAY_UNCHANGED\n", env_content)
         self.assertIn("# Secrets\nGEMINI_API_KEY=secret-key\n", env_content)
         self.assertIn("STOCK_LIST=600519,300750\n", env_content)
+
+    def test_apply_updates_rejects_a_stale_expected_version_inside_write_lock(self) -> None:
+        self.env_path.write_text("STOCK_LIST=600519\n", encoding="utf-8")
+        stale_version = self.manager.get_config_version()
+        self.manager.apply_updates(
+            updates=[("STOCK_LIST", "300750")],
+            sensitive_keys=set(),
+            mask_token="******",
+            expected_version=stale_version,
+        )
+
+        with self.assertRaises(ConfigVersionMismatchError):
+            self.manager.apply_updates(
+                updates=[("STOCK_LIST", "AAPL")],
+                sensitive_keys=set(),
+                mask_token="******",
+                expected_version=stale_version,
+            )
+
+        self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "300750")
+
+    def test_managers_for_the_same_env_share_the_atomic_write_lock(self) -> None:
+        second_manager = ConfigManager(env_path=self.env_path)
+
+        self.assertIs(self.manager._lock, second_manager._lock)
 
     def test_apply_updates_only_rewrites_last_duplicate_assignment(self) -> None:
         self.env_path.write_text(

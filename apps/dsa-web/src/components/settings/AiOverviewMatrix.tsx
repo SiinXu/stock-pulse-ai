@@ -11,6 +11,8 @@ interface AiOverviewMatrixProps {
   onEditRouting?: () => void;
   /** Authoritative model routes declared by enabled connections (for Active state). */
   availableRoutes?: Set<string>;
+  /** Render an opaque ModelRef as a user-facing model/Connection label. */
+  formatModel?: (modelRef: string) => string;
 }
 
 const STATUS_META: Record<AiTaskStatus, { dot: string; text: string }> = {
@@ -19,7 +21,13 @@ const STATUS_META: Record<AiTaskStatus, { dot: string; text: string }> = {
   unconfigured: { dot: 'bg-warning', text: 'text-warning' },
 };
 
-export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, language, onEditRouting, availableRoutes }) => {
+export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
+  getValue,
+  language,
+  onEditRouting,
+  availableRoutes,
+  formatModel = (modelRef) => modelRef,
+}) => {
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: { zh: string; en: string }) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
@@ -67,7 +75,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                 </td>
                 <td className="px-3 py-2.5">
                   {row.primaryModel ? (
-                    <span className="break-all text-foreground">{row.primaryModel}</span>
+                    <span className="break-all text-foreground">{formatModel(row.primaryModel)}</span>
                   ) : (
                     <span className="text-muted-text">{text.none}</span>
                   )}
@@ -77,7 +85,9 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                 </td>
                 <td className="px-3 py-2.5 text-secondary-text">
                   {row.fallbackModels.length > 0 ? (
-                    <span className="break-all">{row.fallbackModels.join(language === 'en' ? ', ' : '、')}</span>
+                    <span className="break-all">
+                      {row.fallbackModels.map(formatModel).join(language === 'en' ? ', ' : '、')}
+                    </span>
                   ) : (
                     <span className="text-muted-text">—</span>
                   )}

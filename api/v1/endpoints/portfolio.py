@@ -7,11 +7,11 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
-from api.v1.errors import api_error
-from api.v1.schemas.analysis import DuplicateTaskErrorResponse, TaskAccepted
+from api.v1.errors import api_error, error_body
+from api.v1.schemas.analysis import TaskAccepted
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.portfolio import (
     PortfolioAccountCreateRequest,
@@ -41,6 +41,7 @@ from src.services.portfolio_risk_service import PortfolioRiskService
 from src.services.portfolio_service import (
     PortfolioBusyError,
     PortfolioConflictError,
+    PortfolioIdempotencyConflictError,
     PortfolioOversellError,
     PortfolioService,
 )
@@ -56,11 +57,30 @@ def _bad_request(exc: Exception) -> HTTPException:
 
 def _internal_error(message: str, exc: Exception) -> HTTPException:
     logger.error(f"{message}: {exc}", exc_info=True)
-    return api_error(500, "internal_error", f"{message}: {str(exc)}")
+    return api_error(500, "internal_error", message)
 
 
 def _conflict_error(*, error: str, message: str) -> HTTPException:
     return api_error(409, error, message)
+
+
+def _resolve_operation_id(
+    operation_id: Optional[str],
+    idempotency_key: Optional[str],
+) -> Optional[str]:
+    body_value = operation_id.strip() if isinstance(operation_id, str) else None
+    header_value = idempotency_key.strip() if isinstance(idempotency_key, str) else None
+    if isinstance(operation_id, str) and not body_value:
+        raise api_error(400, "validation_error", "operation_id must not be blank")
+    if isinstance(idempotency_key, str) and not header_value:
+        raise api_error(400, "validation_error", "Idempotency-Key must not be blank")
+    if body_value and header_value and body_value != header_value:
+        raise api_error(
+            400,
+            "operation_id_mismatch",
+            "operation_id and Idempotency-Key must match when both are provided",
+        )
+    return header_value or body_value
 
 
 def _serialize_import_record(item: dict) -> PortfolioImportTradeItem:
@@ -166,7 +186,10 @@ def delete_account(account_id: int):
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record trade event",
 )
-def create_trade(request: PortfolioTradeCreateRequest) -> PortfolioEventCreatedResponse:
+def create_trade(
+    request: PortfolioTradeCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_trade(
@@ -182,14 +205,19 @@ def create_trade(request: PortfolioTradeCreateRequest) -> PortfolioEventCreatedR
             currency=request.currency,
             trade_uid=request.trade_uid,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
     except PortfolioOversellError as exc:
         raise _conflict_error(error="portfolio_oversell", message=str(exc))
     except PortfolioConflictError as exc:
         raise _conflict_error(error="conflict", message=str(exc))
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:
@@ -256,7 +284,10 @@ def delete_trade(trade_id: int) -> PortfolioDeleteResponse:
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record cash event",
 )
-def create_cash_ledger(request: PortfolioCashLedgerCreateRequest) -> PortfolioEventCreatedResponse:
+def create_cash_ledger(
+    request: PortfolioCashLedgerCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_cash_ledger(
@@ -266,10 +297,15 @@ def create_cash_ledger(request: PortfolioCashLedgerCreateRequest) -> PortfolioEv
             amount=request.amount,
             currency=request.currency,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:
@@ -334,7 +370,10 @@ def delete_cash_ledger(entry_id: int) -> PortfolioDeleteResponse:
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record corporate action event",
 )
-def create_corporate_action(request: PortfolioCorporateActionCreateRequest) -> PortfolioEventCreatedResponse:
+def create_corporate_action(
+    request: PortfolioCorporateActionCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_corporate_action(
@@ -347,10 +386,15 @@ def create_corporate_action(request: PortfolioCorporateActionCreateRequest) -> P
             cash_dividend_per_share=request.cash_dividend_per_share,
             split_ratio=request.split_ratio,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:
@@ -445,7 +489,7 @@ def get_snapshot(
     "/positions/{symbol}/analysis",
     status_code=202,
     response_model=TaskAccepted,
-    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": DuplicateTaskErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Submit manual analysis for a held portfolio position",
 )
 def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> TaskAccepted | JSONResponse:
@@ -474,19 +518,30 @@ def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> 
     )
     if duplicates:
         dup = duplicates[0]
-        error_response = DuplicateTaskErrorResponse(
-            error="duplicate_task",
-            message=str(dup),
-            stock_code=dup.stock_code,
-            existing_task_id=dup.existing_task_id,
+        return JSONResponse(
+            status_code=409,
+            content=error_body(
+                "duplicate_task",
+                str(dup),
+                params={
+                    "stock_code": dup.stock_code,
+                    "existing_task_id": dup.existing_task_id,
+                },
+            ),
         )
-        return JSONResponse(status_code=409, content=error_response.model_dump())
     task = accepted[0]
+    task_message_params = getattr(task, "message_params", None)
     response = TaskAccepted(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,
         status="pending",
         message=f"分析任务已加入队列: {task.stock_code}",
+        message_code=getattr(task, "message_code", None) or "task.queued",
+        message_params=(
+            dict(task_message_params)
+            if isinstance(task_message_params, dict)
+            else {"stock_code": task.stock_code}
+        ),
         analysis_phase=task.analysis_phase,
     )
     return response
@@ -600,14 +655,16 @@ def list_csv_brokers() -> PortfolioImportBrokerListResponse:
 @router.post(
     "/imports/csv/commit",
     response_model=PortfolioImportCommitResponse,
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Parse and commit broker CSV with dedup",
 )
 def commit_csv_import(
     account_id: int = Form(...),
     broker: str = Form(..., description="Broker id: huatai/citic/cmb"),
     dry_run: bool = Form(False),
+    operation_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> PortfolioImportCommitResponse:
     importer = PortfolioImportService()
     try:
@@ -618,8 +675,15 @@ def commit_csv_import(
             broker=parsed["broker"],
             records=list(parsed.get("records", [])),
             dry_run=dry_run,
+            operation_id=_resolve_operation_id(operation_id, idempotency_key),
         )
         return PortfolioImportCommitResponse(**result)
+    except PortfolioIdempotencyConflictError as exc:
+        raise _conflict_error(error="idempotency_conflict", message=str(exc))
+    except PortfolioBusyError as exc:
+        raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:

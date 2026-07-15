@@ -80,10 +80,11 @@ After opening a PR, CI will automatically run the following PR checks:
 
 | Check | Description | Required |
 |-------|-------------|:--------:|
-| `backend-gate` | `scripts/ci_gate.sh` — py_compile + flake8 critical errors + `./scripts/test.sh code` + `./scripts/test.sh yfinance` + offline pytest | ✅ |
+| `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
+| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
-| `web-gate` | `npm run lint` + `npm run test` + `npm run build` (triggered when `apps/dsa-web/` changes) | ✅ (when triggered) |
-| `web-e2e` | Starts the real backend, Vite, and a local fake model endpoint in an isolated runtime, then runs `npm run test:smoke` (Playwright) | ✅ (when triggered) |
+| `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
+| `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
 
 Separately, the repository also has a non-blocking `network-smoke` workflow in `.github/workflows/network-smoke.yml`, but it is only triggered by `schedule` and `workflow_dispatch`, not by pull requests.
 
@@ -109,7 +110,9 @@ npm run test:smoke
 
 See [Web Internationalization Conventions](web-i18n_EN.md) for UI/report-language boundaries, domain registries, and error-code handling. New pages and languages must extend the relevant `src/locales/` domain instead of hardcoding visible JSX copy.
 
-Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. It seeds deterministic report data at startup and removes runtime state when the suite ends, without reading or modifying the developer's `.env`, database, or auth files. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`; CI uploads them with screenshots, traces, and videos on failure. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. Reports, tasks, accounts, and configuration required by a scenario must be seeded deterministically by the fixture or the scenario itself; runtime state is removed when the suite ends without reading or modifying the developer's `.env`, database, or auth files. Backend Python resolution checks ancestor `.venv` directories first, then `python3`, then `python`, and prints the selected interpreter before startup; deterministic scenarios use `retries: 0`. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`; CI uploads them with screenshots, traces, and videos on failure. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+
+Contract regressions cannot be represented by mock counts, loop entries, or numbered comments. Model-routing tests must cover the same model name on two Connections and assert the exact `ModelRef`. Portfolio trade, cash-flow, corporate-action, and CSV-commit tests must reuse one operation ID to prove timeout-after-commit does not duplicate the ledger, and must reject a different payload under the same ID. Overlay tests must cover top-layer-only Escape handling, focus trapping/restoration, background inertness, and scroll locking. Every Playwright acceptance scenario needs its own readable test name and key assertion.
 
 For local frontend/backend integration, `npm run dev` proxies `/api` to `DSA_WEB_DEV_API_PROXY` (default `http://127.0.0.1:8000`). Set it when the backend is running elsewhere; this variable only affects the Vite development server.
 

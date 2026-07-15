@@ -186,88 +186,123 @@ class PortfolioImportService:
         broker: str,
         records: List[Dict[str, Any]],
         dry_run: bool = False,
+        operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         broker_norm = self._normalize_broker(broker)
-
-        inserted_count = 0
-        duplicate_count = 0
-        failed_count = 0
-        errors: List[str] = []
-        seen_trade_uids: set[str] = set()
-        seen_dedup_hashes: set[str] = set()
-
-        for i, record in enumerate(records):
-            try:
-                trade_uid = (record.get("trade_uid") or "").strip() or None
-                dedup_hash = (record.get("dedup_hash") or "").strip()
-                if not dedup_hash:
-                    dedup_hash = self._build_dedup_hash(record)
-
-                if trade_uid and self.repo.has_trade_uid(account_id, trade_uid):
-                    duplicate_count += 1
-                    continue
-                dedup_hash_to_use: Optional[str] = dedup_hash or None
-                if dedup_hash_to_use and self.repo.has_trade_dedup_hash(account_id, dedup_hash_to_use):
-                    duplicate_count += 1
-                    continue
-
-                if dry_run:
-                    if trade_uid and trade_uid in seen_trade_uids:
-                        duplicate_count += 1
-                        continue
-                    if dedup_hash_to_use and dedup_hash_to_use in seen_dedup_hashes:
-                        duplicate_count += 1
-                        continue
-                    inserted_count += 1
-                    if trade_uid:
-                        seen_trade_uids.add(trade_uid)
-                    if dedup_hash_to_use:
-                        seen_dedup_hashes.add(dedup_hash_to_use)
-                    continue
-
-                trade_date_value = record.get("trade_date")
-                if isinstance(trade_date_value, date):
-                    trade_date_obj = trade_date_value
-                else:
-                    trade_date_obj = date.fromisoformat(str(trade_date_value))
-
-                self.portfolio_service.record_trade(
-                    account_id=account_id,
-                    symbol=str(record["symbol"]),
-                    trade_date=trade_date_obj,
-                    side=str(record["side"]),
-                    quantity=float(record["quantity"]),
-                    price=float(record["price"]),
-                    fee=float(record.get("fee", 0.0) or 0.0),
-                    tax=float(record.get("tax", 0.0) or 0.0),
-                    market=record.get("market"),
-                    currency=record.get("currency"),
-                    trade_uid=trade_uid,
-                    dedup_hash=dedup_hash_to_use,
-                    note=(record.get("note") or "").strip() or f"csv_import:{broker_norm}",
-                )
-                inserted_count += 1
-            except PortfolioConflictError:
-                duplicate_count += 1
-            except PortfolioOversellError as exc:
-                failed_count += 1
-                errors.append(f"idx={i}: {exc}")
-            except PortfolioBusyError as exc:
-                failed_count += 1
-                errors.append(f"idx={i}: portfolio_busy: {exc}")
-            except Exception as exc:
-                failed_count += 1
-                errors.append(f"idx={i}: {exc}")
-
-        return {
-            "account_id": account_id,
-            "record_count": len(records),
-            "inserted_count": inserted_count,
-            "duplicate_count": duplicate_count,
-            "failed_count": failed_count,
+        operation_payload = {
+            "account_id": int(account_id),
+            "broker": broker_norm,
+            "records": records,
             "dry_run": bool(dry_run),
-            "errors": errors[:20],
         }
+
+        with self.repo.portfolio_write_session() as session:
+            replay = self.portfolio_service.replay_operation_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="csv_import.commit",
+                payload=operation_payload,
+            )
+            if replay is not None:
+                return replay
+
+            inserted_count = 0
+            duplicate_count = 0
+            failed_count = 0
+            errors: List[str] = []
+            seen_trade_uids: set[str] = set()
+            seen_dedup_hashes: set[str] = set()
+
+            for i, record in enumerate(records):
+                try:
+                    trade_uid = (record.get("trade_uid") or "").strip() or None
+                    dedup_hash = (record.get("dedup_hash") or "").strip()
+                    if not dedup_hash:
+                        dedup_hash = self._build_dedup_hash(record)
+                    dedup_hash_to_use: Optional[str] = dedup_hash or None
+
+                    if trade_uid and self.repo.has_trade_uid_in_session(
+                        session=session,
+                        account_id=account_id,
+                        trade_uid=trade_uid,
+                    ):
+                        duplicate_count += 1
+                        continue
+                    if dedup_hash_to_use and self.repo.has_trade_dedup_hash_in_session(
+                        session=session,
+                        account_id=account_id,
+                        dedup_hash=dedup_hash_to_use,
+                    ):
+                        duplicate_count += 1
+                        continue
+
+                    if dry_run:
+                        if trade_uid and trade_uid in seen_trade_uids:
+                            duplicate_count += 1
+                            continue
+                        if dedup_hash_to_use and dedup_hash_to_use in seen_dedup_hashes:
+                            duplicate_count += 1
+                            continue
+                        inserted_count += 1
+                        if trade_uid:
+                            seen_trade_uids.add(trade_uid)
+                        if dedup_hash_to_use:
+                            seen_dedup_hashes.add(dedup_hash_to_use)
+                        continue
+
+                    trade_date_value = record.get("trade_date")
+                    trade_date_obj = (
+                        trade_date_value
+                        if isinstance(trade_date_value, date)
+                        else date.fromisoformat(str(trade_date_value))
+                    )
+                    with session.begin_nested():
+                        self.portfolio_service.record_trade_in_session(
+                            session=session,
+                            account_id=account_id,
+                            symbol=str(record["symbol"]),
+                            trade_date=trade_date_obj,
+                            side=str(record["side"]),
+                            quantity=float(record["quantity"]),
+                            price=float(record["price"]),
+                            fee=float(record.get("fee", 0.0) or 0.0),
+                            tax=float(record.get("tax", 0.0) or 0.0),
+                            market=record.get("market"),
+                            currency=record.get("currency"),
+                            trade_uid=trade_uid,
+                            dedup_hash=dedup_hash_to_use,
+                            note=(record.get("note") or "").strip() or f"csv_import:{broker_norm}",
+                        )
+                    inserted_count += 1
+                except PortfolioConflictError:
+                    duplicate_count += 1
+                except PortfolioOversellError as exc:
+                    failed_count += 1
+                    errors.append(f"idx={i}: {exc}")
+                except PortfolioBusyError as exc:
+                    failed_count += 1
+                    errors.append(f"idx={i}: portfolio_busy: {exc}")
+                except Exception as exc:
+                    failed_count += 1
+                    errors.append(f"idx={i}: {exc}")
+
+            result = {
+                "account_id": account_id,
+                "record_count": len(records),
+                "inserted_count": inserted_count,
+                "duplicate_count": duplicate_count,
+                "failed_count": failed_count,
+                "dry_run": bool(dry_run),
+                "errors": errors[:20],
+            }
+            self.portfolio_service.store_operation_result_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="csv_import.commit",
+                payload=operation_payload,
+                response=result,
+            )
+            return result
 
     def _normalize_broker(self, value: str) -> str:
         broker = (value or "").strip().lower()

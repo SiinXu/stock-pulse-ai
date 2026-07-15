@@ -12,7 +12,7 @@ export const PageLoadingFallback: React.FC<PageLoadingFallbackProps> = ({ fullPa
   <div
     className={
       fullPage
-        ? 'flex min-h-screen items-center justify-center bg-base'
+        ? 'flex min-h-dvh items-center justify-center bg-base'
         : 'flex min-h-[60vh] items-center justify-center'
     }
   >
@@ -64,7 +64,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
       <div
         className={
           this.props.fullPage
-            ? 'flex min-h-screen items-center justify-center bg-base px-4'
+            ? 'flex min-h-dvh items-center justify-center bg-base px-4'
             : 'flex min-h-[60vh] items-center justify-center px-2 py-8'
         }
       >

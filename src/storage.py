@@ -56,6 +56,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from src.agent.provider_trace import PROVIDER_TRACE_RETENTION_LIMIT
+from src.agent.public_contract import sanitize_agent_history_content
 from src.config import get_config
 from src.schemas.decision_profile import extract_legacy_decision_profile
 from src.utils.sniper_points import extract_sniper_points, parse_sniper_value
@@ -504,6 +505,19 @@ class PortfolioAccount(Base):
     __table_args__ = (
         Index('ix_portfolio_account_owner_active', 'owner_id', 'is_active'),
     )
+
+
+class PortfolioIdempotencyRecord(Base):
+    """Persisted result for one client-generated portfolio mutation."""
+
+    __tablename__ = 'portfolio_idempotency_records'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operation_id = Column(String(128), nullable=False, unique=True, index=True)
+    operation_type = Column(String(32), nullable=False, index=True)
+    request_hash = Column(String(64), nullable=False)
+    response_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
 
 
 class PortfolioTrade(Base):
@@ -2921,7 +2935,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             messages = session.execute(stmt).scalars().all()
 
             # 倒序返回，保证时间顺序
-            return [{"role": msg.role, "content": msg.content} for msg in reversed(messages)]
+            return [
+                {
+                    "role": msg.role,
+                    "content": sanitize_agent_history_content(msg.role, msg.content),
+                }
+                for msg in reversed(messages)
+            ]
 
     def get_visible_conversation_messages(self, session_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Return visible user/assistant conversation messages in chronological order."""
@@ -2949,7 +2969,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 {
                     "id": msg.id,
                     "role": msg.role,
-                    "content": msg.content,
+                    "content": sanitize_agent_history_content(msg.role, msg.content),
                     "created_at": msg.created_at,
                 }
                 for msg in messages
@@ -3236,7 +3256,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 {
                     "id": str(msg.id),
                     "role": msg.role,
-                    "content": msg.content,
+                    "content": sanitize_agent_history_content(msg.role, msg.content),
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
                 }
                 for msg in messages

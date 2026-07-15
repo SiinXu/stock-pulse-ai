@@ -812,7 +812,8 @@ describe('PortfolioPage FX refresh', () => {
 
     expect(await screen.findByText('已加载风险')).toBeInTheDocument();
     expect(await screen.findByText('AI 建议降级')).toBeInTheDocument();
-    expect(screen.getByText(/latest AAPL failed/)).toBeInTheDocument();
+    expect(screen.getByText(/请求未能完成，请稍后重试/)).toBeInTheDocument();
+    expect(screen.queryByText(/latest AAPL failed/)).not.toBeInTheDocument();
   });
 
   it('loads each unique holding through the latest endpoint once', async () => {
@@ -1125,5 +1126,137 @@ describe('PortfolioPage FX refresh', () => {
     const accountListbox = document.getElementById(accountSelect.getAttribute('aria-controls')!)!;
     expect(within(accountListbox).getByRole('option', { name: 'Alt (#2)' })).toBeInTheDocument();
     expect(within(accountListbox).queryByRole('option', { name: 'Main (#1)' })).not.toBeInTheDocument();
+  });
+
+  it('reuses the cash operation ID after a failed request and preserves the form', async () => {
+    createCashLedger
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '提交失败', message: '响应超时' })),
+      )
+      .mockResolvedValueOnce({ id: 91 });
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    fireEvent.click(screen.getByRole('button', { name: '录入资金流水' }));
+    fireEvent.change(screen.getByLabelText('金额'), { target: { value: '1200' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交资金流水' }));
+
+    expect(await screen.findByText('提交失败')).toBeInTheDocument();
+    expect(screen.getByLabelText('金额')).toHaveValue(1200);
+    const firstOperationId = createCashLedger.mock.calls[0][0].operationId;
+    expect(firstOperationId).toMatch(/^portfolio-cash-/);
+
+    fireEvent.click(screen.getByRole('button', { name: '提交资金流水' }));
+    await waitFor(() => expect(createCashLedger).toHaveBeenCalledTimes(2));
+    expect(createCashLedger.mock.calls[1][0].operationId).toBe(firstOperationId);
+  });
+
+  it('locks trade fields and close behavior while a mutation is pending', async () => {
+    const pendingTrade = deferredPromise<{ id: number }>();
+    createTrade.mockReturnValueOnce(pendingTrade.promise);
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '210' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    const dialog = screen.getByRole('dialog', { name: '手工录入：交易' });
+    expect(screen.getByLabelText('股票代码')).toBeDisabled();
+    expect(screen.getByLabelText('数量')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '提交中' })).toBeDisabled();
+    expect(screen.getByLabelText('交易日期').closest('.grid')).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
+    expect(within(dialog).getByRole('button', { name: '关闭抽屉' })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
+    expect(screen.getByRole('dialog', { name: '手工录入：交易' })).toBeInTheDocument();
+
+    await act(async () => {
+      pendingTrade.resolve({ id: 92 });
+      await pendingTrade.promise;
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '手工录入：交易' })).not.toBeInTheDocument());
+  });
+
+  it('reuses a failed CSV commit operation and keeps result mode separate from the checkbox', async () => {
+    commitCsvImport
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '导入失败', message: '响应超时' })),
+      )
+      .mockResolvedValueOnce({
+        accountId: 1,
+        recordCount: 1,
+        insertedCount: 1,
+        duplicateCount: 0,
+        failedCount: 0,
+        dryRun: false,
+        errors: [],
+      });
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+
+    expect(await screen.findByText('导入失败')).toBeInTheDocument();
+    const firstOperationId = commitCsvImport.mock.calls[0][3];
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+    await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
+    expect(commitCsvImport.mock.calls[1][3]).toBe(firstOperationId);
+    expect(await screen.findByText('CSV 提交结果')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
+    expect(screen.getByText('CSV 提交结果')).toBeInTheDocument();
+    expect(screen.queryByText('CSV 预演结果')).not.toBeInTheDocument();
+  });
+
+  it('starts a new CSV operation after a partial result so failed rows can retry', async () => {
+    commitCsvImport
+      .mockResolvedValueOnce({
+        accountId: 1,
+        recordCount: 2,
+        insertedCount: 1,
+        duplicateCount: 0,
+        failedCount: 1,
+        dryRun: false,
+        errors: ['idx=1: temporary failure'],
+      })
+      .mockResolvedValueOnce({
+        accountId: 1,
+        recordCount: 2,
+        insertedCount: 1,
+        duplicateCount: 1,
+        failedCount: 0,
+        dryRun: false,
+        errors: [],
+      });
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    const file = new File(['header\nrow'], 'partial-trades.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByLabelText('仅预演（不写入）'));
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+
+    await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(1));
+    const firstOperationId = commitCsvImport.mock.calls[0][3];
+    await screen.findByText(/失败 1 条/);
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+
+    await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
+    expect(commitCsvImport.mock.calls[1][3]).not.toBe(firstOperationId);
   });
 });

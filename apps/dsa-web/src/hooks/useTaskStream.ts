@@ -119,6 +119,12 @@ const toTaskInfo = (data: Record<string, unknown>): TaskInfo => {
   if (typeof data.trace_id === 'string' && data.trace_id.trim()) {
     task.traceId = data.trace_id;
   }
+  if (typeof data.message_code === 'string' && data.message_code.trim()) {
+    task.messageCode = data.message_code;
+  }
+  if (data.message_params && typeof data.message_params === 'object') {
+    task.messageParams = data.message_params as Record<string, unknown>;
+  }
 
   return task;
 };

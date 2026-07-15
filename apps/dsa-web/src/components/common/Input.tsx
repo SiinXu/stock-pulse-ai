@@ -88,8 +88,7 @@ export const Input = ({
     <button
       type="button"
       className={cn(
-        'inline-flex items-center justify-center rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2',
-        isLoginAppearance ? 'h-8 w-8' : 'h-6 w-6',
+        'inline-flex h-11 w-11 items-center justify-center rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2',
         isLoginAppearance
           ? visible
             ? 'border-[var(--login-input-toggle-active-border)] bg-[var(--login-input-toggle-active-bg)] text-[var(--login-input-toggle-active-text)] shadow-[0_0_14px_var(--login-accent-glow)] focus:ring-[var(--login-input-toggle-ring)]'
@@ -140,8 +139,8 @@ export const Input = ({
           data-appearance={appearance}
           className={cn(
             isLoginAppearance
-              ? 'input-surface input-focus-glow input-appearance-login h-10 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
-              : 'h-8 w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text',
+              ? 'input-surface input-focus-glow input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
+              : `${defaultTrailingAction ? 'h-11' : 'h-8'} w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text`,
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
             finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',
@@ -152,7 +151,7 @@ export const Input = ({
           type={effectiveType}
         />
         {finalTrailingAction ? (
-          <div className="absolute inset-y-0 right-2 flex items-center">
+          <div className="absolute inset-y-0 right-0 flex items-center">
             {finalTrailingAction}
           </div>
         ) : null}

@@ -97,6 +97,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   // Serializes config writes: a re-entrant save() reuses the in-flight promise
   // instead of submitting a second, stale-version transaction concurrently.
   const savePromiseRef = useRef<Promise<SaveResult> | null>(null);
+  const loadRequestIdRef = useRef(0);
   // Set when a save is rejected with a 409; carries the field-level three-way
   // diff (base/server/local) so the UI can resolve conflicts without clobbering.
   const [conflictState, setConflictState] = useState<ConfigConflictState | null>(null);
@@ -271,22 +272,32 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   );
 
   const load = useCallback(async (): Promise<boolean> => {
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
     setIsLoading(true);
     setLoadError(null);
     setRetryAction(null);
 
     try {
       const config = await systemConfigApi.getConfig(true);
+      if (loadRequestIdRef.current !== requestId) {
+        return false;
+      }
       applyServerPayload(config.items, config.configVersion, config.maskToken);
       setConflictState(null);
       setToast(null);
       return true;
     } catch (error: unknown) {
+      if (loadRequestIdRef.current !== requestId) {
+        return false;
+      }
       setLoadError(getParsedApiError(error));
       setRetryAction('load');
       return false;
     } finally {
-      setIsLoading(false);
+      if (loadRequestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
     }
   }, [applyServerPayload]);
 
@@ -300,6 +311,29 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setSaveError(null);
     setConflictState(null);
   }, [serverItems]);
+
+  const resetDraftKeys = useCallback((keys: string[]) => {
+    const keySet = new Set(keys.map((key) => key.toUpperCase()));
+    setDraftValues((previous) => {
+      const next = { ...previous };
+      for (const key of keySet) {
+        const item = serverItemByKeyRef.current[key];
+        if (item) {
+          next[key] = item.value;
+        }
+      }
+      return next;
+    });
+    setValidationIssues((previous) => previous.filter((issue) => !keySet.has(issue.key.toUpperCase())));
+    setConflictState((previous) => {
+      if (!previous) {
+        return previous;
+      }
+      const fields = previous.fields.filter((field) => !keySet.has(field.key.toUpperCase()));
+      return fields.length > 0 ? { ...previous, fields } : null;
+    });
+    setSaveError(null);
+  }, []);
 
   const applyPartialUpdate = useCallback((updatedItems: Array<{ key: string; value: string }>) => {
     setDraftValues((prevDraft) => {
@@ -382,19 +416,25 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         const serverItem = latestByKey.get(submitted.key);
         const server = serverItem?.value ?? '';
         const local = submitted.value;
-        if (server === base) {
-          continue; // server did not touch this key -> safe to replay
-        }
-        if (local === server) {
-          continue; // both sides converged on the same value
-        }
         const schema = serverItem?.schema ?? baseItem?.schema;
+        const isSensitive = Boolean(serverItem?.isMasked || baseItem?.isMasked || schema?.isSensitive);
+        // Masked snapshots carry no value identity. On any 409, a submitted
+        // secret must be resolved explicitly because `****** === ******`
+        // cannot prove that another session left the stored secret unchanged.
+        if (!isSensitive) {
+          if (server === base) {
+            continue; // server did not touch this key -> safe to replay
+          }
+          if (local === server) {
+            continue; // both sides converged on the same value
+          }
+        }
         conflictFields.push({
           key: submitted.key,
           base,
           server,
           local,
-          isSensitive: Boolean(serverItem?.isMasked || baseItem?.isMasked || schema?.isSensitive),
+          isSensitive,
           title: schema?.title,
           category: schema?.category,
         });
@@ -541,7 +581,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         if (!silent) {
           setToast({ type: 'error', error: getParsedApiError(error) });
         }
-        return { success: false, message: '配置版本冲突' };
+        return { success: false, message: 'config_conflict' };
       }
 
       setSaveError(getParsedApiError(error));
@@ -616,8 +656,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setSaveError(null);
   }, []);
 
-  // Editing a field only updates the local draft; nothing persists until the
-  // user runs an explicit Save & Apply. There is no config autosave.
+  // Editing updates the local draft; Settings groups schedule the actual save
+  // and use this retry entry point after a failed autosave.
 
   const retry = useCallback(async () => {
     if (retryAction === 'load') {
@@ -672,6 +712,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     retry,
     save,
     resetDraft,
+    resetDraftKeys,
     setDraftValue,
     getChangedItems,
     applyPartialUpdate,

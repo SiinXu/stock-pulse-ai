@@ -9,7 +9,7 @@
 2. 提供统一的响应格式
 """
 
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -43,17 +43,21 @@ class HealthResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """错误响应"""
+    """Stable API error envelope."""
     
     error: str = Field(..., description="错误类型", json_schema_extra={"example": "validation_error"})
     message: str = Field(..., description="错误详情", json_schema_extra={"example": "请求参数错误"})
-    detail: Optional[Any] = Field(None, description="附加错误信息")
+    params: Dict[str, Any] = Field(default_factory=dict, description="本地化插值参数")
+    details: Optional[Any] = Field(None, description="仅用于诊断的附加信息")
+    trace_id: Optional[str] = Field(None, description="诊断 trace ID")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "error": "not_found",
             "message": "资源不存在",
-            "detail": None
+            "params": {},
+            "details": None,
+            "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         }
     })
 

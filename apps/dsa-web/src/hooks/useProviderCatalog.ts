@@ -22,7 +22,7 @@ export function useProviderCatalog(): ProviderCatalogState {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const activeRef = useRef(true);
+  const requestGenerationRef = useRef(0);
 
   const reload = useCallback(() => {
     setIsLoading(true);
@@ -31,11 +31,13 @@ export function useProviderCatalog(): ProviderCatalogState {
   }, []);
 
   useEffect(() => {
-    activeRef.current = true;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
+    const isLatestRequest = () => requestGenerationRef.current === requestGeneration;
     systemConfigApi
       .getLlmProviderCatalog()
       .then((response) => {
-        if (!activeRef.current) {
+        if (!isLatestRequest()) {
           return;
         }
         setProviders(response.providers ?? []);
@@ -43,14 +45,16 @@ export function useProviderCatalog(): ProviderCatalogState {
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (!activeRef.current) {
+        if (!isLatestRequest()) {
           return;
         }
         setError(err instanceof Error ? err.message : 'Failed to load provider catalog');
         setIsLoading(false);
       });
     return () => {
-      activeRef.current = false;
+      if (isLatestRequest()) {
+        requestGenerationRef.current += 1;
+      }
     };
   }, [reloadToken]);
 

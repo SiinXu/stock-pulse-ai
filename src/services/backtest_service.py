@@ -24,6 +24,10 @@ from src.services.stock_code_utils import normalize_code as normalize_backtest_c
 logger = logging.getLogger(__name__)
 
 
+class BacktestValidationError(ValueError):
+    """Controlled validation failure that is safe to expose to API clients."""
+
+
 class BacktestService:
     """Service layer to run and query backtests."""
 
@@ -48,7 +52,7 @@ class BacktestService:
         config = get_config()
 
         if analysis_date_from and analysis_date_to and analysis_date_from > analysis_date_to:
-            raise ValueError("analysis_date_from cannot be after analysis_date_to")
+            raise BacktestValidationError("analysis_date_from cannot be after analysis_date_to")
 
         query_code = self._normalize_code(code)
         diagnostic_code = self._normalize_code_for_display(code)
@@ -453,7 +457,7 @@ class BacktestService:
 
         normalized = normalize_backtest_code(str(code).strip())
         if normalized is None:
-            raise ValueError(f"非法股票代码格式: {code}")
+            raise BacktestValidationError(f"非法股票代码格式: {code}")
         return normalized
 
     @staticmethod
@@ -474,7 +478,7 @@ class BacktestService:
 
         normalized = normalize_backtest_code(str(code).strip())
         if normalized is None:
-            raise ValueError(f"非法股票代码格式: {code}")
+            raise BacktestValidationError(f"非法股票代码格式: {code}")
         return normalized
 
     @staticmethod
@@ -701,11 +705,13 @@ class BacktestService:
             )
             if count > self.MAX_DYNAMIC_SUMMARY_ROWS:
                 if phase_bucket is not None:
-                    raise ValueError(
+                    raise BacktestValidationError(
                         "Phase-filtered summary candidate set matches too many rows; "
                         "narrow the analysis date range, stock code, or evaluation window."
                     )
-                raise ValueError("Date-filtered summary matches too many rows; narrow the analysis date range or stock code.")
+                raise BacktestValidationError(
+                    "Date-filtered summary matches too many rows; narrow the analysis date range or stock code."
+                )
             if phase_bucket is not None:
                 rows_with_context = self.repo.list_results_with_context(
                     code=code,
@@ -716,7 +722,7 @@ class BacktestService:
                     limit=self.MAX_DYNAMIC_SUMMARY_ROWS + 1,
                 )
                 if len(rows_with_context) > self.MAX_DYNAMIC_SUMMARY_ROWS:
-                    raise ValueError(
+                    raise BacktestValidationError(
                         "Phase-filtered summary matches too many rows; narrow the analysis date range or stock code."
                     )
                 filtered_pairs = [
@@ -842,7 +848,9 @@ class BacktestService:
         while True:
             remaining_probe_rows = self.MAX_DYNAMIC_SUMMARY_ROWS + 1 - scanned
             if remaining_probe_rows <= 0:
-                raise ValueError("Phase-filtered results match too many rows; narrow the analysis date range or stock code.")
+                raise BacktestValidationError(
+                    "Phase-filtered results match too many rows; narrow the analysis date range or stock code."
+                )
             batch_limit = min(batch_size, remaining_probe_rows)
             batch = self.repo.get_results_with_context_batch(
                 code=code,
@@ -858,7 +866,9 @@ class BacktestService:
                 break
             scanned += len(batch)
             if scanned > self.MAX_DYNAMIC_SUMMARY_ROWS:
-                raise ValueError("Phase-filtered results match too many rows; narrow the analysis date range or stock code.")
+                raise BacktestValidationError(
+                    "Phase-filtered results match too many rows; narrow the analysis date range or stock code."
+                )
             sql_offset += len(batch)
             for (
                 result,
@@ -904,7 +914,7 @@ class BacktestService:
             return None
         allowed = {"premarket", "intraday", "postmarket", "unknown"}
         if text not in allowed:
-            raise ValueError("analysis_phase must be one of premarket, intraday, postmarket, unknown")
+            raise BacktestValidationError("analysis_phase must be one of premarket, intraday, postmarket, unknown")
         return text
 
     @staticmethod
@@ -1209,7 +1219,7 @@ class BacktestService:
         ]
 
         if max_rows is not None and len(filtered_rows) > max_rows:
-            raise ValueError(
+            raise BacktestValidationError(
                 "Date-filtered summary matches too many rows; narrow the analysis date range or stock code."
             )
 

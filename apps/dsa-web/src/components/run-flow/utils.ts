@@ -75,6 +75,11 @@ const NODE_KIND_LABEL_KEYS: Record<RunFlowNodeKind, UiTextKey> = {
   notification: 'runFlow.nodeKind.notification',
 };
 
+const LEGACY_EDGE_LABEL_KEYS: Record<string, UiTextKey> = {
+  '调用': 'runFlow.edgeLabel.invoke',
+  '详情': 'runFlow.edgeLabel.details',
+};
+
 export const getRunFlowStatusLabel = (status: RunFlowStatus, t: RunFlowT): string =>
   t(STATUS_LABEL_KEYS[status] || 'runFlow.status.unknown');
 
@@ -83,6 +88,17 @@ export const getRunFlowSeverityLabel = (severity: RunFlowEventSeverity, t: RunFl
 
 export const getRunFlowEdgeKindLabel = (kind: RunFlowEdgeKind, t: RunFlowT): string =>
   t(EDGE_KIND_LABEL_KEYS[kind] || 'runFlow.edge.control');
+
+export const getRunFlowEdgeLabel = (
+  label: string | null | undefined,
+  t: RunFlowT,
+): string | null => {
+  if (!label) {
+    return null;
+  }
+  const localeKey = LEGACY_EDGE_LABEL_KEYS[label];
+  return localeKey ? t(localeKey) : label;
+};
 
 export const getRunFlowNodeKindLabel = (kind: RunFlowNodeKind, t: RunFlowT): string =>
   t(NODE_KIND_LABEL_KEYS[kind] || 'runFlow.nodeKind.analysis');

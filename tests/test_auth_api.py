@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from dotenv import dotenv_values
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from fastapi.responses import Response
 from starlette.requests import Request
 
@@ -22,6 +24,7 @@ except ModuleNotFoundError:
 
 import src.auth as auth
 from api.middlewares.auth import AuthMiddleware
+from api.middlewares.error_handler import add_error_handlers
 from api.v1.endpoints import auth as auth_endpoint
 from src.config import Config
 
@@ -101,6 +104,28 @@ class AuthApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("dsa_session=", response.headers["set-cookie"])
         self.assertIn(b'"ok":true', response.body)
+
+    def test_login_request_validation_does_not_echo_password_input(self) -> None:
+        app = FastAPI()
+        app.include_router(auth_endpoint.router, prefix="/api/v1/auth")
+        add_error_handlers(app)
+
+        secret = "plain-secret-value"
+        response = TestClient(app).post(
+            "/api/v1/auth/login",
+            json={
+                "password": {
+                    "api_key": secret,
+                    "x-api-key": secret,
+                    "credential": secret,
+                }
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["error"], "validation_error")
+        self.assertNotIn(secret, response.text)
+        self.assertNotIn('"input"', response.text)
 
     def test_login_first_time_mismatch_rejected(self) -> None:
         response = asyncio.run(

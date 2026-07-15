@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createHash } from 'node:crypto';
 
 const port = Number(process.argv[2] || 18101);
 const models = [
@@ -30,6 +31,13 @@ function readJson(request, callback) {
   });
 }
 
+function authorizationFingerprint(request) {
+  const authorization = String(request.headers.authorization || '');
+  return authorization
+    ? createHash('sha256').update(authorization).digest('hex')
+    : null;
+}
+
 const server = http.createServer((request, response) => {
   console.log(`[fake-provider] ${request.method} ${request.url}`);
   const pathname = new URL(request.url || '/', `http://${request.headers.host || '127.0.0.1'}`).pathname;
@@ -46,6 +54,7 @@ const server = http.createServer((request, response) => {
     method: request.method,
     path: pathname,
     authorization: Boolean(request.headers.authorization),
+    authorization_sha256: authorizationFingerprint(request),
   });
   if (pathname === '/health') {
     sendJson(response, 200, { ok: true });
@@ -62,12 +71,18 @@ const server = http.createServer((request, response) => {
   if (request.method === 'POST' && pathname.replace(/\/$/, '') === '/v1/chat/completions') {
     readJson(request, (payload) => {
       const model = payload.model || 'fake-report-model';
+      const prompt = Array.isArray(payload.messages)
+        ? payload.messages.map((message) => String(message?.content || '')).join('\n')
+        : '';
+      const content = prompt.includes('"backend_smoke": "passed"')
+        ? '{"ok": true, "backend_smoke": "passed"}'
+        : 'ok';
       sendJson(response, 200, {
         id: 'chatcmpl-dsa-e2e',
         object: 'chat.completion',
         created: 0,
         model,
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       });
     });

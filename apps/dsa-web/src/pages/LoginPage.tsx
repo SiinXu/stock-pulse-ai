@@ -6,14 +6,14 @@ import { Button, Input, ParticleBackground } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
-import { isParsedApiError } from '../api/error';
+import { isParsedApiError, localizeParsedApiError } from '../api/error';
 import { useAuth } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { SettingsAlert } from '../components/settings';
 
 const LoginPage: React.FC = () => {
   const { login, passwordSet, setupState } = useAuth();
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const navigate = useNavigate();
 
   // Set page title
@@ -72,7 +72,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col justify-center overflow-hidden bg-[var(--login-bg-main)] py-12 font-sans selection:bg-[var(--login-accent-soft)] sm:px-6 lg:px-8 [perspective:1500px]">
+    <div className="relative flex min-h-dvh flex-col justify-center overflow-hidden bg-[var(--login-bg-main)] py-12 font-sans selection:bg-[var(--login-accent-soft)] sm:px-6 lg:px-8 [perspective:1500px]">
       {/* Dynamic Background */}
       <ParticleBackground />
 
@@ -134,7 +134,7 @@ const LoginPage: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="mt-6 flex items-center gap-2 rounded-full border border-[var(--login-accent-border)] bg-[var(--login-accent-soft)] px-3 py-1 text-[10px] font-medium text-[var(--login-accent-text)] backdrop-blur-sm"
+            className="mt-6 flex items-center gap-2 rounded-full border border-[var(--login-accent-border)] bg-[var(--login-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--login-accent-text)] backdrop-blur-sm"
           >
             <Network className="h-3 w-3" />
             <span>V3.X QUANTITATIVE SYSTEM</span>
@@ -218,7 +218,7 @@ const LoginPage: React.FC = () => {
                 >
                   <SettingsAlert
                     title={isFirstTime ? t('login.setupFailed') : t('login.validationFailed')}
-                    message={isParsedApiError(error) ? error.message : error}
+                    message={isParsedApiError(error) ? localizeParsedApiError(error, language).message : error}
                     variant="error"
                     className="!border-[var(--login-error-border)] !bg-[var(--login-error-bg)] !text-[var(--login-error-text)]"
                   />

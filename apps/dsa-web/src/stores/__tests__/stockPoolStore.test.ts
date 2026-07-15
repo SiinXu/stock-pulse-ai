@@ -27,6 +27,7 @@ vi.mock('../../api/analysis', async () => {
     analysisApi: {
       analyzeAsync: vi.fn(),
       getTasks: vi.fn(),
+      getStatus: vi.fn(),
     },
   };
 });
@@ -1060,13 +1061,76 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().refreshActiveTasks();
 
     expect(analysisApi.getTasks).toHaveBeenCalledWith({
-      status: 'pending,processing,cancel_requested',
+      status: 'pending,processing,cancel_requested,completed,failed,cancelled',
       limit: 100,
     });
     expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
 
     useStockPoolStore.getState().syncTaskCreated(staleTask);
     expect(useStockPoolStore.getState().activeTasks).toEqual([staleTask]);
+  });
+
+  it('polls each known active task id and merges a terminal result without duplicates', async () => {
+    const task = createTask({ status: 'processing', progress: 45 });
+    useStockPoolStore.getState().syncTaskCreated(task);
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: task.taskId,
+      traceId: 'trace-task-1',
+      status: 'completed',
+      progress: 100,
+      message: '分析完成',
+      messageCode: 'task.analysis.completed',
+      messageParams: { stock_code: task.stockCode },
+    });
+
+    await useStockPoolStore.getState().pollKnownTasks();
+
+    expect(analysisApi.getStatus).toHaveBeenCalledWith(task.taskId);
+    expect(useStockPoolStore.getState().activeTasks).toHaveLength(1);
+    expect(useStockPoolStore.getState().activeTasks[0]).toMatchObject({
+      taskId: task.taskId,
+      status: 'completed',
+      progress: 100,
+      messageCode: 'task.analysis.completed',
+    });
+  });
+
+  it('recovers recent terminal tasks from the task-list snapshot', async () => {
+    const completed = createTask({
+      status: 'completed',
+      progress: 100,
+      completedAt: new Date().toISOString(),
+      messageCode: 'task.analysis.completed',
+    });
+    vi.mocked(analysisApi.getTasks).mockResolvedValue(createTaskListResponse([completed]));
+
+    await useStockPoolStore.getState().refreshActiveTasks();
+
+    expect(useStockPoolStore.getState().activeTasks).toEqual([completed]);
+  });
+
+  it('expires dismissed task ids so they cannot permanently hide a reused id', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T08:00:00Z'));
+    const completed = createTask({
+      status: 'completed',
+      progress: 100,
+      completedAt: '2026-03-18T08:00:00Z',
+    });
+    useStockPoolStore.getState().syncTaskCreated(completed);
+    useStockPoolStore.getState().removeTask(completed.taskId);
+    useStockPoolStore.getState().syncTaskCreated(completed);
+    expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
+
+    vi.advanceTimersByTime(2 * 60 * 1000 + 1);
+    useStockPoolStore.getState().syncTaskCreated({
+      ...completed,
+      status: 'processing',
+      progress: 10,
+      completedAt: undefined,
+    });
+    expect(useStockPoolStore.getState().activeTasks).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   it('does not prune tasks created after an active-task refresh request started', async () => {

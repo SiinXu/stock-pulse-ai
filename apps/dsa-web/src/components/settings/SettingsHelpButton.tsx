@@ -9,6 +9,7 @@ import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
 import { cn } from '../../utils/cn';
 import { Tooltip } from '../common';
+import { OVERLAY_Z } from '../common/overlayZ';
 
 interface SettingsHelpButtonProps {
   fieldKey: string;
@@ -222,7 +223,10 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
 
       {open && typeof document !== 'undefined'
         ? createPortal(
-            <div className="fixed inset-0 z-[140] flex items-end bg-background/25 backdrop-blur-sm sm:items-center sm:justify-center">
+            <div
+              className="fixed inset-0 flex items-end bg-background/25 backdrop-blur-sm sm:items-center sm:justify-center"
+              style={{ zIndex: OVERLAY_Z.settingsModal }}
+            >
               <button
                 type="button"
                 className="absolute inset-0 cursor-default"

@@ -7,6 +7,7 @@ import type {
 import { Badge, Button, Card, ScoreGauge } from '../common';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
+import { normalizeBoardType } from '../../utils/reportDomain';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -43,20 +44,6 @@ type PreparedBoard = {
 
 const normalizeBoardName = (value?: string): string =>
   (value || '').trim().replace(/\s+/g, ' ');
-
-const normalizeBoardType = (value?: string): 'sector' | 'concept' | null => {
-  const normalized = (value || '').trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  if (['行业', '行业板块', 'industry', 'sector'].includes(normalized)) {
-    return 'sector';
-  }
-  if (['概念', '概念板块', '题材', 'concept', 'theme'].includes(normalized)) {
-    return 'concept';
-  }
-  return null;
-};
 
 const coerceFiniteNumber = (value: unknown): number | undefined => {
   if (typeof value === 'number') {
@@ -253,7 +240,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             <div className="flex items-start justify-between mb-5">
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-[28px] font-bold leading-tight text-foreground">
+                  <h2 className="text-3xl font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
                   {/* 价格和涨跌幅 */}
@@ -295,7 +282,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             {/* 关键结论 */}
             <div className="home-divider border-t pt-5">
               <span className="label-uppercase">{text.keyInsights}</span>
-              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-[15px] leading-7 text-foreground">
+              <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-base leading-7 text-foreground">
                 {summary.analysisSummary || text.noAnalysisSummary}
               </p>
             </div>
@@ -317,7 +304,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   </svg>
                 </div>
                 <div className="space-y-1.5">
-                  <h4 className="home-insight-title text-[11px] font-medium uppercase tracking-[0.16em]">{text.actionAdvice}</h4>
+                  <h4 className="home-insight-title text-xs font-medium uppercase tracking-[0.16em]">{text.actionAdvice}</h4>
                   <p className="home-insight-body text-sm leading-6">
                     {summary.operationAdvice || text.noAdvice}
                   </p>
@@ -340,7 +327,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   </svg>
                 </div>
                 <div className="space-y-1.5">
-                  <h4 className="home-insight-title text-[11px] font-medium uppercase tracking-[0.16em]">{text.trendPrediction}</h4>
+                  <h4 className="home-insight-title text-xs font-medium uppercase tracking-[0.16em]">{text.trendPrediction}</h4>
                   <p className="home-insight-body text-sm leading-6">
                     {summary.trendPrediction || text.noPrediction}
                   </p>
@@ -382,7 +369,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   {watchlist.isInWatchlist(meta.stockCode) ? t('report.removeFromWatchlist') : t('report.addToWatchlist')}
                 </Button>
                 {watchlist.actionMessage && (
-                  <p className="text-[11px] text-secondary-text animate-in fade-in">{watchlist.actionMessage}</p>
+                  <p className="text-xs text-secondary-text animate-in fade-in">{watchlist.actionMessage}</p>
                 )}
               </div>
             </Card>

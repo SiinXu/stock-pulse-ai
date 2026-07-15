@@ -12,6 +12,7 @@ _REDACTED = "[REDACTED]"
 _SENSITIVE_KEY_PARTS = {
     "authorization",
     "cookie",
+    "credential",
     "password",
     "secret",
     "sendkey",
@@ -48,7 +49,7 @@ _SENSITIVE_COMPACT_KEY_PHRASES = {
     phrase.replace("_", "") for phrase in _SENSITIVE_KEY_PHRASES
 }
 _SENSITIVE_COMPACT_KEY_PATTERN = re.compile(
-    r"authorization|cookie|password|secret|sendkey|token(?!s)|webhook"
+    r"authorization|cookie|credential|password|secret|sendkey|token(?!s)|webhook"
 )
 _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
 _BEARER_PATTERN = re.compile(r"\b(bearer\s+)[^\s,;&]+", re.IGNORECASE)
@@ -62,7 +63,8 @@ _COOKIE_HEADER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"\b(token|secret|password|sendkey|api[_-]?key|apikey|api[_-]?token|auth[_-]?token|"
+    r"\b(token|secret|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
+    r"api[_-]?key|apikey|api[_-]?token|auth[_-]?token|"
     r"access[_-]?token|refresh[_-]?token|session[_-]?token|license[_-]?key|private[_-]?key|"
     r"secret[_-]?key|webhook[_-]?url|authorization|proxy[_-]?authorization|cookie|set[_-]?cookie)"
     r"([=:]\s*)[^\s,;&]+",
@@ -82,8 +84,9 @@ def sanitize_diagnostic_text(text: Any, *, max_length: int = 300) -> str:
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
-    sanitized = re.sub(r"(?i)(token|secret|password|sendkey)([=:]\s*)[^\s,;&]+", r"\1\2[REDACTED]", sanitized)
-    sanitized = re.sub(r"https?://[^\s]+", "[REDACTED_URL]", sanitized)
+    sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
+    sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
     return " ".join(sanitized.split())[:max_length]
 
 
@@ -106,8 +109,8 @@ def redact_sensitive_mapping(obj: Any) -> Any:
     return obj
 
 
-def sanitize_decision_signal_text(text: Any) -> str:
-    """Redact obvious secrets from persisted decision-signal text without truncating."""
+def sanitize_sensitive_text(text: Any) -> str:
+    """Redact secrets and credential-bearing URLs without changing normal text."""
     sanitized = str(text or "").strip()
     if not sanitized:
         return ""
@@ -118,6 +121,11 @@ def sanitize_decision_signal_text(text: Any) -> str:
     sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
     return " ".join(sanitized.split())
+
+
+def sanitize_decision_signal_text(text: Any) -> str:
+    """Backward-compatible sanitizer for persisted decision-signal text."""
+    return sanitize_sensitive_text(text)
 
 
 def sanitize_decision_signal_payload(obj: Any) -> Any:
