@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,26 +28,39 @@ function findVenvPython() {
     }
     const parent = path.dirname(directory);
     if (parent === directory) {
-      return 'python';
+      break;
     }
     directory = parent;
   }
+
+  for (const candidate of ['python3', 'python']) {
+    const probe = spawnSync(candidate, ['--version'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) {
+      return candidate;
+    }
+  }
+  throw new Error('Playwright backend requires .venv Python, python3, or python on PATH.');
 }
 
 function resolveBackendCommand() {
-  return `${findVenvPython()} apps/dsa-web/e2e/run-backend-fixture.py --port ${backendPort}`;
+  const python = findVenvPython();
+  console.info(`[playwright] backend Python: ${python}`);
+  return `${python} apps/dsa-web/e2e/run-backend-fixture.py --port ${backendPort}`;
 }
 
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 2 : 0,
-  reporter: 'list',
+  retries: 0,
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+  ],
   use: {
     baseURL: `http://127.0.0.1:${frontendPort}`,
     locale: 'zh-CN',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

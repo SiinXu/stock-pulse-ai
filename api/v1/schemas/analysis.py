@@ -10,7 +10,7 @@
 3. 定义异步任务队列相关模型
 """
 
-from typing import Optional, List, Any, Literal
+from typing import Optional, List, Any, Dict, Literal
 from enum import Enum
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
@@ -177,6 +177,10 @@ class TaskAccepted(BaseModel):
         pattern="^(pending|processing)$"
     )
     message: Optional[str] = Field(None, description="提示信息")
+    message_code: Optional[str] = Field(None, description="Stable status message code")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="Status message parameters")
+    revision: int = Field(1, ge=1, description="Monotonic server-owned task revision")
+    updated_at: Optional[str] = Field(None, description="Last task state update time")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
     
     model_config = ConfigDict(json_schema_extra={
@@ -201,6 +205,10 @@ class BatchTaskAcceptedItem(BaseModel):
         pattern="^(pending|processing)$"
     )
     message: Optional[str] = Field(None, description="提示信息")
+    message_code: Optional[str] = Field(None, description="Stable status message code")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="Status message parameters")
+    revision: int = Field(1, ge=1, description="Monotonic server-owned task revision")
+    updated_at: Optional[str] = Field(None, description="Last task state update time")
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
 
     model_config = ConfigDict(json_schema_extra={
@@ -291,6 +299,13 @@ class TaskStatus(BaseModel):
         None, 
         description="错误信息（仅在 failed 时存在）"
     )
+    message: Optional[str] = Field(None, description="Legacy raw status message")
+    message_code: Optional[str] = Field(None, description="Stable status message code")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="Status message parameters")
+    error_code: Optional[str] = Field(None, description="Stable task error code")
+    error_params: Dict[str, Any] = Field(default_factory=dict, description="Task error parameters")
+    revision: int = Field(1, ge=1, description="Monotonic server-owned task revision")
+    updated_at: Optional[str] = Field(None, description="Last task state update time")
     stock_name: Optional[str] = Field(None, description="股票名称")
     original_query: Optional[str] = Field(None, description="用户原始输入")
     selection_source: Optional[str] = Field(
@@ -335,11 +350,15 @@ class TaskInfo(BaseModel):
     status: TaskStatusEnum = Field(..., description="任务状态")
     progress: int = Field(0, description="进度百分比 (0-100)", ge=0, le=100)
     message: Optional[str] = Field(None, description="状态消息")
+    message_code: Optional[str] = Field(None, description="Stable status message code")
+    message_params: Dict[str, Any] = Field(default_factory=dict, description="Status message parameters")
     report_type: str = Field("detailed", description="报告类型")
     created_at: str = Field(..., description="创建时间")
     started_at: Optional[str] = Field(None, description="开始执行时间")
     completed_at: Optional[str] = Field(None, description="完成时间")
     error: Optional[str] = Field(None, description="错误信息（仅在 failed 时存在）")
+    error_code: Optional[str] = Field(None, description="Stable task error code")
+    error_params: Dict[str, Any] = Field(default_factory=dict, description="Task error parameters")
     original_query: Optional[str] = Field(None, description="用户原始输入")
     selection_source: Optional[str] = Field(
         None,
@@ -348,6 +367,8 @@ class TaskInfo(BaseModel):
     )
     analysis_phase: AnalysisPhase = Field("auto", description="请求的分析阶段")
     skills: Optional[List[str]] = Field(None, description="本次任务使用的策略 skill ID 列表")
+    revision: int = Field(1, ge=1, description="Monotonic server-owned task revision")
+    updated_at: str = Field(..., description="Last task state update time")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {

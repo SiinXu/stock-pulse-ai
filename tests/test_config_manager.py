@@ -3,12 +3,16 @@
 
 import errno
 import os
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.core.config_manager import ConfigManager
+import src.core.config_manager as config_manager_module
+from src.core.config_manager import ConfigManager, ConfigVersionConflictError
 
 
 class ConfigManagerTestCase(unittest.TestCase):
@@ -53,6 +57,93 @@ class ConfigManagerTestCase(unittest.TestCase):
         self.assertIn("\n\nexport SHOULD_STAY_UNCHANGED\n", env_content)
         self.assertIn("# Secrets\nGEMINI_API_KEY=secret-key\n", env_content)
         self.assertIn("STOCK_LIST=600519,300750\n", env_content)
+
+    def test_apply_updates_rejects_stale_version_inside_write_lock(self) -> None:
+        self.env_path.write_text("STOCK_LIST=600519\n", encoding="utf-8")
+        stale_version = self.manager.get_config_version()
+        self.manager.apply_updates(
+            updates=[("STOCK_LIST", "300750")],
+            sensitive_keys=set(),
+            mask_token="******",
+            expected_version=stale_version,
+        )
+
+        with self.assertRaises(ConfigVersionConflictError) as context:
+            self.manager.apply_updates(
+                updates=[("STOCK_LIST", "AAPL")],
+                sensitive_keys=set(),
+                mask_token="******",
+                expected_version=stale_version,
+            )
+
+        self.assertEqual(context.exception.current_version, self.manager.get_config_version())
+        self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "300750")
+
+    def test_managers_for_same_path_share_the_atomic_write_lock(self) -> None:
+        second_manager = ConfigManager(env_path=self.env_path)
+        other_manager = ConfigManager(env_path=self.env_path.parent / "other.env")
+
+        self.assertIs(self.manager._lock, second_manager._lock)
+        self.assertIsNot(self.manager._lock, other_manager._lock)
+
+    @unittest.skipIf(config_manager_module.fcntl is None, "requires POSIX flock")
+    def test_expected_version_is_checked_under_cross_process_lock(self) -> None:
+        self.env_path.write_text("STOCK_LIST=600519\n", encoding="utf-8")
+        expected_version = self.manager.get_config_version()
+        ready_path = Path(self.temp_dir.name) / "child-ready"
+        result_path = Path(self.temp_dir.name) / "child-result"
+        script = """
+import sys
+from pathlib import Path
+from src.core.config_manager import ConfigManager, ConfigVersionConflictError
+
+manager = ConfigManager(env_path=Path(sys.argv[1]))
+Path(sys.argv[3]).write_text("ready", encoding="utf-8")
+try:
+    manager.apply_updates(
+        updates=[("STOCK_LIST", "AAPL")],
+        sensitive_keys=set(),
+        mask_token="******",
+        expected_version=sys.argv[2],
+    )
+except ConfigVersionConflictError:
+    outcome = "conflict"
+else:
+    outcome = "success"
+Path(sys.argv[4]).write_text(outcome, encoding="utf-8")
+"""
+        process = None
+        try:
+            with self.manager._exclusive_file_lock():
+                process = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-c",
+                        script,
+                        str(self.env_path),
+                        expected_version,
+                        str(ready_path),
+                        str(result_path),
+                    ],
+                    cwd=Path(__file__).resolve().parents[1],
+                )
+                deadline = time.monotonic() + 5
+                while not ready_path.exists() and time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        self.fail(f"child exited before locking: {process.returncode}")
+                    time.sleep(0.01)
+                self.assertTrue(ready_path.exists())
+                time.sleep(0.1)
+                self.assertFalse(result_path.exists())
+                self.manager._atomic_upsert({"STOCK_LIST": "300750"})
+
+            self.assertEqual(process.wait(timeout=5), 0)
+            self.assertEqual(result_path.read_text(encoding="utf-8"), "conflict")
+            self.assertEqual(self.manager.read_config_map()["STOCK_LIST"], "300750")
+        finally:
+            if process is not None and process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
 
     def test_apply_updates_only_rewrites_last_duplicate_assignment(self) -> None:
         self.env_path.write_text(

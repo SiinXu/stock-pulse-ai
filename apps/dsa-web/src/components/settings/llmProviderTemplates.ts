@@ -52,71 +52,34 @@ export function getCapabilityLabel(capability: string): { label: string; hint: s
 }
 
 export interface ProviderPresentation {
-  officialSources: Array<{ label: string; url: string }>;
   configHint?: string;
 }
 
-// Curated documentation links / config hints keyed by provider id. These are
-// help content (like the settings help locale), not routing business metadata.
+// Focused presentation hints keyed by provider id. Provider URLs, identity,
+// protocol, endpoints, credentials, and discovery rules belong exclusively to
+// the backend Catalog and must not be added here.
 export const PROVIDER_PRESENTATION_BY_ID: Record<string, ProviderPresentation> = {
-  aihubmix: { officialSources: [{ label: 'AIHubmix', url: 'https://aihubmix.com/' }] },
   anspire: {
-    officialSources: [
-      { label: 'Anspire Open', url: 'https://open.anspire.cn/' },
-      { label: 'LiteLLM OpenAI-compatible', url: 'https://docs.litellm.ai/docs/providers/openai_compatible' },
-    ],
     configHint:
       '同一 ANSPIRE_API_KEYS 可复用到搜索与 LLM 模型连接。实际可用性请以账号权限和控制台为准；建议先点“测试连接”确认。',
   },
-  deepseek: { officialSources: [{ label: 'DeepSeek API Docs', url: 'https://api-docs.deepseek.com/' }] },
-  dashscope: {
-    officialSources: [
-      { label: 'DashScope Text Generation', url: 'https://help.aliyun.com/zh/model-studio/text-generation-model/' },
-    ],
-  },
-  zhipu: {
-    officialSources: [{ label: 'Zhipu Model Overview', url: 'https://docs.bigmodel.cn/cn/guide/start/model-overview' }],
-  },
-  moonshot: { officialSources: [{ label: 'Kimi Platform Docs', url: 'https://platform.kimi.com/docs/models' }] },
-  minimax: {
-    officialSources: [
-      { label: 'MiniMax OpenAI API', url: 'https://platform.minimax.io/docs/api-reference/text-chat' },
-      { label: 'MiniMax Models', url: 'https://platform.minimax.io/docs/api-reference/models/openai/list-models' },
-    ],
-  },
   volcengine: {
-    officialSources: [
-      { label: 'Volcengine Ark Inference', url: 'https://www.volcengine.com/docs/82379/2121998' },
-      { label: 'Volcengine Ark Models', url: 'https://www.volcengine.com/docs/82379/1949118' },
-    ],
     configHint: '确认在线推理 endpoint / region 与 Coding Plan 专用入口不要混用。',
   },
   siliconflow: {
-    officialSources: [{ label: 'SiliconFlow Models', url: 'https://docs.siliconflow.cn/quickstart/models' }],
     configHint: '模型列表和模型可见性依赖账号权限与 API 密钥。',
   },
   openrouter: {
-    officialSources: [
-      { label: 'OpenRouter Models API', url: 'https://openrouter.ai/docs/api/api-reference/models/get-models' },
-    ],
     configHint: '模型列表和模型可见性依赖账号权限与 API 密钥。',
   },
-  gemini: { officialSources: [{ label: 'Gemini Models', url: 'https://ai.google.dev/gemini-api/docs/models' }] },
-  anthropic: {
-    officialSources: [
-      { label: 'Anthropic Models', url: 'https://docs.anthropic.com/en/docs/about-claude/models/all-models' },
-    ],
-  },
-  openai: { officialSources: [{ label: 'OpenAI Models', url: 'https://platform.openai.com/docs/models' }] },
   ollama: {
-    officialSources: [{ label: 'Ollama API', url: 'https://github.com/ollama/ollama/blob/main/docs/api.md' }],
     configHint: '需要本机、Docker 或 self-hosted runner 能访问 Ollama 服务。',
   },
 };
 
 export function getProviderPresentation(id: string): ProviderPresentation {
   if (!Object.prototype.hasOwnProperty.call(PROVIDER_PRESENTATION_BY_ID, id)) {
-    return { officialSources: [] };
+    return {};
   }
   return PROVIDER_PRESENTATION_BY_ID[id];
 }

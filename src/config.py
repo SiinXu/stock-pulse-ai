@@ -472,8 +472,8 @@ def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: O
     return f"{resolved_protocol}/{normalized_model}"
 
 
-def get_configured_llm_models(model_list: List[Dict[str, Any]]) -> List[str]:
-    """Return non-legacy model names declared in Router model_list order.
+def get_configured_llm_model_aliases(model_list: List[Dict[str, Any]]) -> List[str]:
+    """Return every non-legacy Router alias, including stable ModelRefs.
 
     Uses the top-level ``model_name`` (the routing alias that users set in
     LITELLM_MODEL) rather than ``litellm_params.model`` (the wire-level
@@ -495,6 +495,22 @@ def get_configured_llm_models(model_list: List[Dict[str, Any]]) -> List[str]:
         seen.add(name)
         models.append(name)
     return models
+
+
+def get_configured_llm_models(model_list: List[Dict[str, Any]]) -> List[str]:
+    """Return configured legacy runtime-route aliases without ModelRefs.
+
+    RuntimeRoute and ModelRef are separate domain identities. Call
+    :func:`get_configured_llm_model_aliases` when checking whether an exact
+    configured value can be sent to the Router.
+    """
+    from src.llm.model_ref import is_model_ref
+
+    return [
+        alias
+        for alias in get_configured_llm_model_aliases(model_list)
+        if not is_model_ref(alias)
+    ]
 
 
 def resolve_litellm_wire_model(
@@ -589,6 +605,14 @@ def _get_litellm_provider(model: str) -> str:
     """Extract the LiteLLM provider prefix from a model string."""
     if not model:
         return ""
+    from src.llm.model_ref import decode_model_ref
+
+    try:
+        model_ref = decode_model_ref(model)
+    except ValueError:
+        return ""
+    if model_ref is not None:
+        model = model_ref.runtime_route
     if "/" in model:
         return model.split("/", 1)[0]
     return "openai"
@@ -596,6 +620,10 @@ def _get_litellm_provider(model: str) -> str:
 
 def _uses_direct_env_provider(model: str) -> bool:
     """Whether runtime handles the model via direct litellm env/provider resolution."""
+    from src.llm.model_ref import is_model_ref
+
+    if is_model_ref(model):
+        return False
     provider = _get_litellm_provider(model)
     return bool(provider) and provider not in _MANAGED_LITELLM_KEY_PROVIDERS
 
@@ -619,6 +647,12 @@ def normalize_agent_litellm_model(
     normalized_model = (model or "").strip()
     if not normalized_model:
         return ""
+    from src.llm.model_ref import is_model_ref
+
+    # Both valid and malformed versioned values must reach authoritative
+    # ModelRef validation unchanged; never reinterpret them as OpenAI routes.
+    if is_model_ref(normalized_model):
+        return normalized_model
     if "/" not in normalized_model:
         if configured_models and normalized_model in configured_models:
             return normalized_model
@@ -629,7 +663,7 @@ def normalize_agent_litellm_model(
 def get_effective_agent_primary_model(config: "Config") -> str:
     """Return the effective Agent primary model with fallback inheritance."""
     configured_router_models = set(
-        get_configured_llm_models(getattr(config, "llm_model_list", []) or [])
+        get_configured_llm_model_aliases(getattr(config, "llm_model_list", []) or [])
     )
     configured_agent_model = normalize_agent_litellm_model(
         getattr(config, "agent_litellm_model", ""),
@@ -643,7 +677,7 @@ def get_effective_agent_primary_model(config: "Config") -> str:
 def get_effective_agent_models_to_try(config: "Config") -> List[str]:
     """Return Agent model try-order: primary + global fallbacks (deduped)."""
     configured_router_models = set(
-        get_configured_llm_models(getattr(config, "llm_model_list", []) or [])
+        get_configured_llm_model_aliases(getattr(config, "llm_model_list", []) or [])
     )
     raw_models = [get_effective_agent_primary_model(config)] + (
         getattr(config, "litellm_fallback_models", []) or []
@@ -1404,13 +1438,22 @@ class Config:
                     llm_models_source = "llm_channels"
 
         route_models = get_configured_llm_models(llm_model_list)
+        model_aliases = get_configured_llm_model_aliases(llm_model_list)
+        default_route_models = route_models
         if route_models:
             if not litellm_model:
-                litellm_model = route_models[0]
+                litellm_model = default_route_models[0]
             if not litellm_fallback_models and not litellm_fallback_models_explicit and litellm_model:
+                from src.llm.model_ref import is_model_ref
+
+                fallback_candidates = (
+                    [alias for alias in model_aliases if is_model_ref(alias)]
+                    if is_model_ref(litellm_model)
+                    else default_route_models
+                )
                 _seen = {litellm_model}
                 litellm_fallback_models = [
-                    model for model in route_models
+                    model for model in fallback_candidates
                     if model not in _seen and not _seen.add(model)  # type: ignore[func-returns-value]
                 ]
 
@@ -1509,7 +1552,7 @@ class Config:
 
         agent_litellm_model = normalize_agent_litellm_model(
             os.getenv('AGENT_LITELLM_MODEL', ''),
-            configured_models=set(get_configured_llm_models(llm_model_list)),
+            configured_models=set(get_configured_llm_model_aliases(llm_model_list)),
         )
         agent_context_compression_profile = normalize_agent_context_compression_profile(
             os.getenv('AGENT_CONTEXT_COMPRESSION_PROFILE')
@@ -2327,7 +2370,10 @@ class Config:
         - LiteLLM providers: https://docs.litellm.ai/docs/providers
         - LiteLLM model_list semantics: https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
         """
+        from src.llm.model_ref import encode_model_ref
+
         model_list: List[Dict[str, Any]] = []
+        model_ref_entries: List[Dict[str, Any]] = []
         for ch in channels:
             hermes_refs = {
                 str(ref.get("route_model") or ""): ref
@@ -2359,7 +2405,26 @@ class Config:
                             str((model_ref or {}).get("display_model") or "")
                         )
                     model_list.append(entry)
-        return model_list
+
+                    connection_id = str(ch.get("name") or "").strip()
+                    if connection_id:
+                        reference_value = encode_model_ref(connection_id, model_name)
+                        reference_info = dict(entry.get("model_info") or {})
+                        reference_info.update({
+                            "dsa_model_ref": reference_value,
+                            "dsa_connection_id": connection_id,
+                            "dsa_runtime_route": model_name,
+                        })
+                        model_ref_entries.append({
+                            "model_name": reference_value,
+                            "litellm_params": dict(litellm_params),
+                            "model_info": reference_info,
+                        })
+
+        # Legacy route aliases stay first and unchanged so existing route-only
+        # configuration remains compatible. Connection-aware aliases are unique
+        # and let new task assignments target one exact connection.
+        return model_list + model_ref_entries
 
     @classmethod
     def _legacy_keys_to_model_list(
@@ -2992,7 +3057,7 @@ class Config:
                 field="LITELLM_MODEL",
             ))
 
-        available_router_models = get_configured_llm_models(self.llm_model_list)
+        available_router_models = get_configured_llm_model_aliases(self.llm_model_list)
         available_router_model_set = set(available_router_models)
 
         def _has_runtime_source_for_model(model: str) -> bool:

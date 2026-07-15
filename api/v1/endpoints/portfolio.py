@@ -7,7 +7,7 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
 from api.v1.errors import api_error
@@ -37,6 +37,10 @@ from api.v1.schemas.portfolio import (
 )
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import PortfolioImportService
+from src.services.portfolio_idempotency import (
+    PortfolioIdempotencyKeyReusedError,
+    normalize_portfolio_operation_id,
+)
 from src.services.portfolio_risk_service import PortfolioRiskService
 from src.services.portfolio_service import (
     PortfolioBusyError,
@@ -61,6 +65,14 @@ def _internal_error(message: str, exc: Exception) -> HTTPException:
 
 def _conflict_error(*, error: str, message: str) -> HTTPException:
     return api_error(409, error, message)
+
+
+def _resolve_operation_id(body_value: Optional[str], header_value: Optional[str]) -> Optional[str]:
+    body_id = normalize_portfolio_operation_id(body_value)
+    header_id = normalize_portfolio_operation_id(header_value)
+    if body_id is not None and header_id is not None and body_id != header_id:
+        raise ValueError("operation_id and Idempotency-Key must match")
+    return header_id or body_id
 
 
 def _serialize_import_record(item: dict) -> PortfolioImportTradeItem:
@@ -166,7 +178,10 @@ def delete_account(account_id: int):
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record trade event",
 )
-def create_trade(request: PortfolioTradeCreateRequest) -> PortfolioEventCreatedResponse:
+def create_trade(
+    request: PortfolioTradeCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_trade(
@@ -182,12 +197,15 @@ def create_trade(request: PortfolioTradeCreateRequest) -> PortfolioEventCreatedR
             currency=request.currency,
             trade_uid=request.trade_uid,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
     except PortfolioOversellError as exc:
         raise _conflict_error(error="portfolio_oversell", message=str(exc))
+    except PortfolioIdempotencyKeyReusedError as exc:
+        raise _conflict_error(error="idempotency_key_reused", message=str(exc))
     except PortfolioConflictError as exc:
         raise _conflict_error(error="conflict", message=str(exc))
     except ValueError as exc:
@@ -256,7 +274,10 @@ def delete_trade(trade_id: int) -> PortfolioDeleteResponse:
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record cash event",
 )
-def create_cash_ledger(request: PortfolioCashLedgerCreateRequest) -> PortfolioEventCreatedResponse:
+def create_cash_ledger(
+    request: PortfolioCashLedgerCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_cash_ledger(
@@ -266,10 +287,13 @@ def create_cash_ledger(request: PortfolioCashLedgerCreateRequest) -> PortfolioEv
             amount=request.amount,
             currency=request.currency,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except PortfolioIdempotencyKeyReusedError as exc:
+        raise _conflict_error(error="idempotency_key_reused", message=str(exc))
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:
@@ -334,7 +358,10 @@ def delete_cash_ledger(entry_id: int) -> PortfolioDeleteResponse:
     responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Record corporate action event",
 )
-def create_corporate_action(request: PortfolioCorporateActionCreateRequest) -> PortfolioEventCreatedResponse:
+def create_corporate_action(
+    request: PortfolioCorporateActionCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
         data = service.record_corporate_action(
@@ -347,10 +374,13 @@ def create_corporate_action(request: PortfolioCorporateActionCreateRequest) -> P
             cash_dividend_per_share=request.cash_dividend_per_share,
             split_ratio=request.split_ratio,
             note=request.note,
+            operation_id=_resolve_operation_id(request.operation_id, idempotency_key),
         )
         return PortfolioEventCreatedResponse(**data)
     except PortfolioBusyError as exc:
         raise _conflict_error(error="portfolio_busy", message=str(exc))
+    except PortfolioIdempotencyKeyReusedError as exc:
+        raise _conflict_error(error="idempotency_key_reused", message=str(exc))
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:
@@ -600,14 +630,16 @@ def list_csv_brokers() -> PortfolioImportBrokerListResponse:
 @router.post(
     "/imports/csv/commit",
     response_model=PortfolioImportCommitResponse,
-    responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Parse and commit broker CSV with dedup",
 )
 def commit_csv_import(
     account_id: int = Form(...),
     broker: str = Form(..., description="Broker id: huatai/citic/cmb"),
     dry_run: bool = Form(False),
+    operation_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> PortfolioImportCommitResponse:
     importer = PortfolioImportService()
     try:
@@ -618,8 +650,11 @@ def commit_csv_import(
             broker=parsed["broker"],
             records=list(parsed.get("records", [])),
             dry_run=dry_run,
+            operation_id=_resolve_operation_id(operation_id, idempotency_key),
         )
         return PortfolioImportCommitResponse(**result)
+    except PortfolioIdempotencyKeyReusedError as exc:
+        raise _conflict_error(error="idempotency_key_reused", message=str(exc))
     except ValueError as exc:
         raise _bad_request(exc)
     except Exception as exc:

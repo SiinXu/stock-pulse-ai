@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.v1.schemas.common import ErrorResponse
+
 LLMCapabilityCheck = Literal["json", "tools", "vision", "stream"]
 GenerationBackendSmokeMode = Literal["text", "json"]
 GenerationBackendHealthStatus = Literal["not_tested", "passed", "failed", "skipped"]
@@ -41,6 +43,25 @@ class SystemConfigDocLink(BaseModel):
     href: str
 
 
+class SystemConfigCondition(BaseModel):
+    """One supported field condition; condition arrays use AND semantics."""
+
+    key: str
+    operator: Literal["equals", "notEquals", "in", "notEmpty"]
+    value: Optional[str | List[str]] = None
+
+
+class SystemConfigFieldContract(BaseModel):
+    """Server-authored requirement, visibility, and editability contract."""
+
+    requirement: Literal["required", "optional", "inherited"]
+    required_when: Optional[List[SystemConfigCondition]] = None
+    visible_when: Optional[List[SystemConfigCondition]] = None
+    enabled_when: Optional[List[SystemConfigCondition]] = None
+    requires_connection_test: bool = False
+    restart_required: bool = False
+
+
 class SystemConfigFieldSchema(BaseModel):
     """Metadata schema for a single config field."""
 
@@ -51,7 +72,11 @@ class SystemConfigFieldSchema(BaseModel):
     data_type: Literal["string", "integer", "number", "boolean", "array", "json", "time"]
     ui_control: Literal["text", "password", "number", "select", "textarea", "switch", "time"]
     is_sensitive: bool
-    is_required: bool
+    is_required: bool = Field(
+        ...,
+        deprecated=True,
+        description="Deprecated compatibility flag; new clients must use contract.requirement.",
+    )
     is_editable: bool
     default_value: Optional[str] = None
     options: List[str | SystemConfigOption] = Field(default_factory=list)
@@ -61,6 +86,10 @@ class SystemConfigFieldSchema(BaseModel):
     examples: List[str] = Field(default_factory=list, description="Safe example values for help panels")
     docs: List[SystemConfigDocLink] = Field(default_factory=list, description="Related documentation links")
     warning_codes: List[str] = Field(default_factory=list, description="Stable warning identifiers for help panels")
+    contract: Optional[SystemConfigFieldContract] = Field(
+        None,
+        description="Authoritative conditional requirement and editability contract.",
+    )
     ui_placement: Optional[
         Literal[
             "model_access",
@@ -71,6 +100,11 @@ class SystemConfigFieldSchema(BaseModel):
     ] = Field(
         None,
         description="Dedicated settings surface that owns this field; null means generic rendering",
+    )
+    save_group: str = Field(
+        ...,
+        min_length=1,
+        description="Stable atomic group used by Settings autosave transactions",
     )
 
 
@@ -371,17 +405,25 @@ class DiscoverLLMChannelModelsResponse(BaseModel):
     latency_ms: Optional[int] = None
 
 
-class SystemConfigValidationErrorResponse(BaseModel):
-    """Error payload for failed update validation."""
+class SystemConfigValidationErrorDetails(BaseModel):
+    """Field-level diagnostics for a rejected configuration update."""
 
-    error: str
-    message: str
     issues: List[ConfigValidationIssue]
 
 
-class SystemConfigConflictResponse(BaseModel):
+class SystemConfigValidationErrorResponse(ErrorResponse):
+    """Error payload for failed update validation."""
+
+    details: SystemConfigValidationErrorDetails
+
+
+class SystemConfigConflictDetails(BaseModel):
+    """Current version returned after an optimistic-lock conflict."""
+
+    current_config_version: str
+
+
+class SystemConfigConflictResponse(ErrorResponse):
     """Error payload for optimistic lock conflict."""
 
-    error: str
-    message: str
-    current_config_version: str
+    details: SystemConfigConflictDetails

@@ -617,6 +617,25 @@ describe('useSystemConfig', () => {
     }));
   });
 
+  it('does not automatically replay a touched secret after any version conflict', async () => {
+    const latestConfig = {
+      ...sensitiveConfig,
+      configVersion: 'v2',
+    };
+    getConfig.mockResolvedValueOnce(sensitiveConfig).mockResolvedValueOnce(latestConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict'));
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('OPENAI_API_KEY', 'sk-local-secret'));
+    await act(async () => { await result.current.save(); });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(result.current.conflictState?.fields).toEqual([
+      expect.objectContaining({ key: 'OPENAI_API_KEY', isSensitive: true }),
+    ]);
+  });
+
   it('includes channel dynamic keys in the three-way conflict', async () => {
     const channelKey = 'LLM_PRIMARY_MODELS';
     const withChannel = {

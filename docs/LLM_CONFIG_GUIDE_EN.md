@@ -8,6 +8,20 @@ If you are choosing a concrete provider, setting up GitHub Actions Secrets / Var
 
 ---
 
+## Web Settings Autosave
+
+Regular Web settings no longer expose a global "Save configuration" button. Changes enter a local draft and autosave after 800ms without further input, grouped by an explicit atomic boundary. Model Connections, Task Routing, and Reliability share one model-graph group and are submitted through a FIFO so concurrent requests cannot overwrite a newer `config_version`.
+
+- `Waiting to autosave`, `Autosaving`, and `Autosaved` represent scheduled, saving, and saved states.
+- A failed save keeps the local input and offers `Retry this group` and `Restore server values`. Failed, saving, and conflicted groups activate the leave guard.
+- HTTP 409 never silently chooses the local or server value. The page opens three-way conflict resolution and resumes only after the conflict is resolved.
+- A masked API key is submitted only after the user actually changes it; the mask token never overwrites the saved secret.
+- Connection tests and runtime capability checks remain explicit operations. An untested or failed connection does not block saving, and autosave never sends a hidden model request.
+
+The first-run wizard's explicit "Save and apply" action completes that wizard transaction; it is not a global Save control for regular Settings.
+
+---
+
 ## Quick Navigation: Which section should you read?
 
 1. **[Beginners]** "I just want to get the system running ASAP, keep it as simple as possible!" -> [Go to Method 1: Simple Model Config](#method-1-simple-model-config-for-beginners)
@@ -133,7 +147,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **Configure via Web UI directly:** After starting the application, you can do this visually under **Settings -> AI & Models -> Model Access** in the Web UI.
 
-> **New editor behavior**: Model access is organized as Provider / Connection / Model / Task Assignment. The Provider Catalog controls field requirements and whether discovery is offered. OpenAI-compatible providers use their model-list endpoint, Ollama uses `/api/tags`, and unsupported or failed discovery falls back to manual model-ID entry; discovery never auto-selects results. Models remain independent tokens stored in `LLM_{CONNECTION}_MODELS`, while Provider identity is stored separately in `LLM_{CONNECTION}_PROVIDER=<provider_id>` and is never guessed from a renameable Connection name. Task Routing only accepts the available-model catalog. Historical unavailable values remain visibly marked until the user replaces or removes them; saving does not silently clean them.
+> **New editor behavior**: Model access is organized as Provider / Connection / Model / Task Assignment. The Provider Catalog controls field requirements and whether discovery is offered, and new Connections are never prefilled with example models that can go stale. DeepSeek, DashScope, and other OpenAI-compatible Connections discover models from `{base_url}/models`; Ollama uses `/api/tags`. Users can multi-select discovery results, but the system never auto-selects them. Unsupported discovery, authentication failures, and temporary outages still allow manual model-ID entry. Every model is an independent, removable token stored in the comma-separated `LLM_{CONNECTION}_MODELS=model1,model2` value, and existing comma-separated values are parsed back into tokens. Provider identity is stored separately in `LLM_{CONNECTION}_PROVIDER=<provider_id>` and is never guessed from a renameable Connection name. Task Routing only accepts the available-model catalog; free-text input is disabled. Historical unavailable values remain visibly marked until the user replaces or removes them, and saving does not silently clean them.
 
 ### First-run Setup Status
 

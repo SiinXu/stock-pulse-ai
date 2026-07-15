@@ -1636,6 +1636,10 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             trace_id="screen-task-1",
             status=QueueTaskStatus.PENDING,
             message="AlphaSift 选股任务已提交",
+            message_code="alphasift_screen_queued",
+            message_params={"strategy": "dual_low", "market": "cn"},
+            revision=1,
+            updated_at=datetime(2026, 7, 15, 12, 0, 0),
         )
 
         with (
@@ -1657,6 +1661,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(payload.task_id, "screen-task-1")
         self.assertEqual(payload.max_results, 3)
+        self.assertEqual(payload.message_code, "alphasift_screen_queued")
+        self.assertEqual(payload.revision, 1)
         fake_queue.submit_background_task.assert_called_once()
         self.assertEqual(fake_queue.submit_background_task.call_args.kwargs["report_type"], "alphasift_screen")
         screen_mock.assert_called_once_with(strategy="dual_low", market="cn", max_results=3)
@@ -1665,6 +1671,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             "screen-task-1",
             20,
             "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行",
+            message_code="alphasift_screen_running",
+            message_params={"strategy": "dual_low", "market": "cn"},
         )
 
     def test_screen_task_status_returns_alphasift_result(self) -> None:
@@ -1675,8 +1683,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             status=QueueTaskStatus.COMPLETED,
             progress=100,
             message="任务执行完成",
+            message_code="task_completed",
+            message_params={"stock_code": "alphasift_screen"},
             result={"enabled": True, "candidates": [], "candidate_count": 0},
             report_type="alphasift_screen",
+            revision=4,
+            updated_at=datetime(2026, 7, 15, 12, 0, 0),
         )
         fake_queue = MagicMock()
         fake_queue.get_task.return_value = task
@@ -1686,6 +1698,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(payload.status, "completed")
         self.assertEqual(payload.result["candidate_count"], 0)
+        self.assertEqual(payload.message_code, "task_completed")
+        self.assertEqual(payload.revision, 4)
 
     def test_screen_task_status_rejects_non_alphasift_task(self) -> None:
         task = TaskInfo(

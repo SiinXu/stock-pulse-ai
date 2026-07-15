@@ -1039,8 +1039,11 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         task_info = queue.get_task(task.task_id)
         self.assertIsNotNone(task_info)
         self.assertEqual(task_info.status, TaskStatus.FAILED)
-        self.assertEqual(task_info.error, "runtime init failed")
-        self.assertEqual(task_info.message, "任务失败: runtime init failed")
+        self.assertEqual(task_info.error, "Task execution failed")
+        self.assertEqual(task_info.error_code, "task_execution_failed")
+        self.assertEqual(task_info.message, "Task failed")
+        self.assertEqual(task_info.message_code, "task_failed")
+        self.assertNotIn("runtime init failed", json.dumps(task_info.to_dict()))
         release_market_review_lock.assert_called_once()
 
     def test_get_analysis_status_completed_db_snapshot_preserves_zero_change_pct(self) -> None:
@@ -1306,6 +1309,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             {
                 "error": "analysis_failed",
                 "message": "LLM stream interrupted",
+                "params": {},
+                "details": {},
             },
         )
 

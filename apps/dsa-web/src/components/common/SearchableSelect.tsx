@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { OVERLAY_Z } from './overlayZ';
 
 export interface SearchableSelectOption {
   /** Stable value stored on selection (e.g. a canonical model route). */
@@ -36,6 +37,8 @@ interface SearchableSelectProps {
    * stays visible until the user actively replaces it.
    */
   staleValueLabel?: string;
+  /** Display text for a stale value when its stored representation is opaque. */
+  staleValueText?: string;
   /** When true a clear affordance is rendered next to the trigger. */
   clearable?: boolean;
 }
@@ -59,6 +62,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   emptyText,
   searchPlaceholder,
   staleValueLabel,
+  staleValueText,
   clearable = false,
 }) => {
   const { t } = useUiLanguage();
@@ -216,7 +220,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   };
 
-  const triggerText = selectedOption ? selectedOption.label : (value || '');
+  const triggerText = selectedOption ? selectedOption.label : (staleValueText ?? value ?? '');
 
   return (
     <div className={cn('relative flex w-full flex-col', className)}>
@@ -239,7 +243,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground',
+            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground max-sm:h-11',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : '',
@@ -264,7 +268,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             type="button"
             aria-label={ariaLabel ? `${t('common.clear')} ${ariaLabel}` : t('common.clear')}
             onClick={() => onChange('')}
-            className="absolute right-8 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-secondary-text hover:text-foreground"
+            className="absolute right-7 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-secondary-text hover:text-foreground"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -282,8 +286,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <div
             ref={popoverRef}
             data-dialog-popup="true"
-            style={{ top: triggerRect.bottom + 4, left: triggerRect.left, minWidth: triggerRect.width }}
-            className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+            style={{
+              zIndex: OVERLAY_Z.dropdown,
+              top: triggerRect.bottom + 4,
+              left: triggerRect.left,
+              minWidth: triggerRect.width,
+            }}
+            className="fixed flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">
               <input
@@ -303,7 +312,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                className="h-7 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
+                className="h-11 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
               />
             </div>
             <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="max-h-60 overflow-auto p-1">
@@ -328,7 +337,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => !item.disabled && commit(item.value)}
                     className={cn(
-                      'flex cursor-pointer flex-col gap-0.5 rounded-md px-3 py-1.5 text-xs text-foreground',
+                      'flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 rounded-md px-3 py-1.5 text-xs text-foreground',
                       index === activeIndex && 'bg-hover',
                       item.value === value && 'font-medium',
                       item.disabled && 'cursor-not-allowed opacity-50',

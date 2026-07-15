@@ -176,7 +176,8 @@ export const portfolioApi = {
       currency: payload.currency,
       trade_uid: payload.tradeUid,
       note: payload.note,
-    });
+      operation_id: payload.operationId,
+    }, payload.operationId ? { headers: { 'Idempotency-Key': payload.operationId } } : undefined);
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -193,7 +194,8 @@ export const portfolioApi = {
       amount: payload.amount,
       currency: payload.currency,
       note: payload.note,
-    });
+      operation_id: payload.operationId,
+    }, payload.operationId ? { headers: { 'Idempotency-Key': payload.operationId } } : undefined);
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -213,7 +215,8 @@ export const portfolioApi = {
       cash_dividend_per_share: payload.cashDividendPerShare,
       split_ratio: payload.splitRatio,
       note: payload.note,
-    });
+      operation_id: payload.operationId,
+    }, payload.operationId ? { headers: { 'Idempotency-Key': payload.operationId } } : undefined);
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -275,14 +278,21 @@ export const portfolioApi = {
     broker: string,
     file: File,
     dryRun = false,
+    operationId?: string,
   ): Promise<PortfolioImportCommitResponse> {
     const formData = new FormData();
     formData.append('account_id', String(accountId));
     formData.append('broker', broker);
     formData.append('dry_run', dryRun ? 'true' : 'false');
+    if (operationId) {
+      formData.append('operation_id', operationId);
+    }
     formData.append('file', file);
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/imports/csv/commit', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(operationId ? { 'Idempotency-Key': operationId } : {}),
+      },
     });
     return toCamelCase<PortfolioImportCommitResponse>(response.data);
   },

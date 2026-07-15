@@ -26,7 +26,7 @@ const PageButton: React.FC<PageButtonProps> = ({ page, isActive, disabled, onCli
       aria-label={ariaLabel}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'inline-flex h-10 min-w-[2.5rem] items-center justify-center rounded-full border px-3 text-sm font-medium transition-all duration-200',
+        'inline-flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-sm font-medium transition-all duration-200',
         isActive
           ? 'border-transparent bg-foreground text-background shadow-soft-card'
           : 'border-border bg-elevated text-secondary-text hover:bg-hover hover:text-foreground',
@@ -57,7 +57,8 @@ export const Pagination: React.FC<PaginationProps> = ({
   const { t } = useUiLanguage();
   if (totalPages <= 1) return null;
 
-  // Build the page list with ellipsis placeholders.
+  // Desktop exposes direct page jumps; narrow screens retain the complete
+  // previous/current/next contract without overflowing a 320px viewport.
   const getPageNumbers = (): (number | string)[] => {
     const pages: (number | string)[] = [];
     const delta = 2;
@@ -79,7 +80,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <nav
-      className={cn('flex items-center justify-center gap-2', className)}
+      className={cn('flex max-w-full items-center justify-center gap-2', className)}
       aria-label={t('common.pageNav')}
     >
       {/* Previous page */}
@@ -94,15 +95,19 @@ export const Pagination: React.FC<PaginationProps> = ({
         </svg>
       </PageButton>
 
-      {/* Page numbers */}
-      {getPageNumbers().map((page, index) => (
-        <PageButton
-          key={`${page}-${index}`}
-          page={page}
-          isActive={page === currentPage}
-          onClick={() => typeof page === 'number' && onPageChange(page)}
-        />
-      ))}
+      <span className="min-w-16 text-center text-sm text-secondary-text sm:hidden" aria-live="polite">
+        {currentPage} / {totalPages}
+      </span>
+      <div className="hidden items-center gap-2 sm:flex">
+        {getPageNumbers().map((page, index) => (
+          <PageButton
+            key={`${page}-${index}`}
+            page={page}
+            isActive={page === currentPage}
+            onClick={() => typeof page === 'number' && onPageChange(page)}
+          />
+        ))}
+      </div>
 
       {/* Next page */}
       <PageButton

@@ -1,9 +1,10 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { historyApi } from '../../api/history';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
-import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Tooltip } from '../common/Tooltip';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
@@ -20,9 +21,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   stockName,
   stockCode,
   onRequestClose,
-  reportLanguage = 'zh',
 }) => {
-  const text = getReportText(normalizeReportLanguage(reportLanguage));
+  const { language: uiLanguage } = useUiLanguage();
+  const text = REPORT_CHROME_TEXT[uiLanguage];
   const loadReportFailedText = text.loadReportFailed;
   const [content, setContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -64,8 +65,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           setContent(markdownContent);
         }
       } catch (err) {
+        console.error('Report markdown load failed:', err);
         if (isMounted) {
-          setError(err instanceof Error ? err.message : loadReportFailedText);
+          setError(loadReportFailedText);
         }
       } finally {
         if (isMounted) {
@@ -103,7 +105,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 type="button"
                 onClick={handleCopyMarkdown}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyMarkdownSource}
               >
                 {copiedType === 'markdown' ? (
@@ -125,7 +127,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 type="button"
                 onClick={handleCopyPlainText}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyPlainText}
               >
                 {copiedType === 'text' ? (
@@ -161,7 +163,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
             onClick={onRequestClose}
             className="home-surface-button mt-4 rounded-lg px-4 py-2 text-sm text-secondary-text"
           >
-            {text.dismiss}
+            {text.close}
           </button>
         </div>
       ) : (
@@ -174,7 +176,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           onClick={onRequestClose}
           className="home-surface-button rounded-lg px-4 py-2 text-sm text-secondary-text hover:text-foreground"
         >
-          {text.dismiss}
+          {text.close}
         </button>
       </div>
     </>

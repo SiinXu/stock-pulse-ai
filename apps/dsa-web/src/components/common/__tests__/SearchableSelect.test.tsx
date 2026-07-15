@@ -87,6 +87,27 @@ describe('SearchableSelect', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('can render human-readable stale text without changing the stored value', () => {
+    const onChange = vi.fn();
+    const storedValue = 'modelref:v1:custom:openai%2Fretired-model';
+    render(
+      <SearchableSelect
+        value={storedValue}
+        onChange={onChange}
+        options={options}
+        ariaLabel="主要模型"
+        staleValueText="openai/retired-model · custom"
+        staleValueLabel="当前配置不可用：openai/retired-model · custom"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveTextContent('openai/retired-model · custom');
+    expect(trigger).toHaveAttribute('data-value', storedValue);
+    expect(screen.queryByText(storedValue)).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('associates validation errors with the trigger', () => {
     render(
       <>

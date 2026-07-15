@@ -9,10 +9,11 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from api.v1.errors import api_error, error_json_response
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
 
@@ -153,7 +154,7 @@ async def agent_chat(request: ChatRequest):
     config = get_config()
     
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
         
     session_id = request.session_id or str(uuid.uuid4())
     
@@ -183,10 +184,10 @@ async def agent_chat(request: ChatRequest):
             error=result.error
         )
             
-    except Exception as e:
-        logger.error(f"Agent chat API failed: {e}")
+    except Exception as exc:
+        logger.error("Agent chat API failed: %s", exc)
         logger.exception("Agent chat error details:")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise api_error(500, "agent_request_failed", "Agent chat failed") from exc
 
 
 class SessionItem(BaseModel):
@@ -262,11 +263,11 @@ async def send_chat_to_notification(request: SendChatRequest):
         lambda: NotificationService().send(request.content),
     )
     if not success:
-        return {
-            "success": False,
-            "error": "no_channels",
-            "message": "未配置通知渠道，请先在设置中配置",
-        }
+        return error_json_response(
+            424,
+            "notification_channels_missing",
+            "No notification channel is configured",
+        )
     return {"success": True}
 
 
@@ -306,6 +307,8 @@ class ResearchResponse(BaseModel):
     sources: List[str] = Field(default_factory=list)
     token_usage: int = 0
     error: Optional[str] = None
+    error_code: Optional[str] = None
+    error_params: Dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/research", response_model=ResearchResponse)
@@ -316,7 +319,7 @@ async def agent_research(request: ResearchRequest):
     """
     config = get_config()
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
 
     question = request.question
     context: Optional[Dict[str, Any]] = None
@@ -355,6 +358,8 @@ async def agent_research(request: ResearchRequest):
                 sources=[],
                 token_usage=0,
                 error=f"Deep research timed out after {research_timeout}s",
+                error_code="upstream_timeout",
+                error_params={"timeout_seconds": research_timeout},
             )
 
         return ResearchResponse(
@@ -363,11 +368,12 @@ async def agent_research(request: ResearchRequest):
             sources=[f"Sub-question {i+1}: {q}" for i, q in enumerate(result.sub_questions)],
             token_usage=result.total_tokens,
             error=result.error if not result.success else None,
+            error_code="agent_request_failed" if not result.success else None,
         )
-    except Exception as e:
-        logger.error("Agent research API failed: %s", e)
+    except Exception as exc:
+        logger.error("Agent research API failed: %s", exc)
         logger.exception("Agent research error details:")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise api_error(500, "agent_request_failed", "Agent research failed") from exc
 
 
 @router.post("/chat/stream")
@@ -389,7 +395,7 @@ async def agent_chat_stream(request: ChatRequest):
     """
     config = get_config()
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
 
     session_id = request.session_id or str(uuid.uuid4())
     loop = asyncio.get_running_loop()
@@ -432,7 +438,13 @@ async def agent_chat_stream(request: ChatRequest):
         except Exception as exc:
             logger.error(f"Agent stream error: {exc}")
             asyncio.run_coroutine_threadsafe(
-                queue.put({"type": "error", "message": str(exc)}),
+                queue.put({
+                    "type": "error",
+                    "error_code": "agent_stream_failed",
+                    "error_params": {},
+                    "message": "Agent stream failed",
+                    "details": {},
+                }),
                 loop,
             )
 
@@ -444,7 +456,13 @@ async def agent_chat_stream(request: ChatRequest):
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=300.0)
                 except asyncio.TimeoutError:
-                    yield "data: " + json.dumps({"type": "error", "message": "分析超时"}, ensure_ascii=False) + "\n\n"
+                    yield "data: " + json.dumps({
+                        "type": "error",
+                        "error_code": "upstream_timeout",
+                        "error_params": {"timeout_seconds": 300},
+                        "message": "Agent stream timed out",
+                        "details": {},
+                    }, ensure_ascii=False) + "\n\n"
                     break
                 yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
                 if event.get("type") in ("done", "error"):

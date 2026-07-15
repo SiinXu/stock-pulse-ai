@@ -62,12 +62,20 @@ const server = http.createServer((request, response) => {
   if (request.method === 'POST' && pathname.replace(/\/$/, '') === '/v1/chat/completions') {
     readJson(request, (payload) => {
       const model = payload.model || 'fake-report-model';
+      const prompt = Array.isArray(payload.messages)
+        ? payload.messages.map((message) => String(message?.content || '')).join('\n')
+        : '';
+      const content = prompt.includes('DSA_GENERATION_BACKEND_SMOKE_OK')
+        ? 'DSA_GENERATION_BACKEND_SMOKE_OK'
+        : prompt.includes('"backend_smoke": "passed"')
+          ? '{"ok": true, "backend_smoke": "passed"}'
+          : 'ok';
       sendJson(response, 200, {
         id: 'chatcmpl-dsa-e2e',
         object: 'chat.completion',
         created: 0,
         model,
-        choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       });
     });

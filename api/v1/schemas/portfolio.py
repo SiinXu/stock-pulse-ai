@@ -55,6 +55,7 @@ class PortfolioTradeCreateRequest(BaseModel):
     currency: Optional[str] = Field(None, min_length=3, max_length=8)
     trade_uid: Optional[str] = Field(None, max_length=128)
     note: Optional[str] = Field(None, max_length=255)
+    operation_id: Optional[str] = Field(None, max_length=128)
 
 
 class PortfolioCashLedgerCreateRequest(BaseModel):
@@ -64,6 +65,7 @@ class PortfolioCashLedgerCreateRequest(BaseModel):
     amount: float = Field(..., gt=0)
     currency: Optional[str] = Field(None, min_length=3, max_length=8)
     note: Optional[str] = Field(None, max_length=255)
+    operation_id: Optional[str] = Field(None, max_length=128)
 
 
 class PortfolioCorporateActionCreateRequest(BaseModel):
@@ -76,6 +78,7 @@ class PortfolioCorporateActionCreateRequest(BaseModel):
     cash_dividend_per_share: Optional[float] = Field(None, ge=0)
     split_ratio: Optional[float] = Field(None, gt=0)
     note: Optional[str] = Field(None, max_length=255)
+    operation_id: Optional[str] = Field(None, max_length=128)
 
 
 class PortfolioEventCreatedResponse(BaseModel):

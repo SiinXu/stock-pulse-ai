@@ -5,7 +5,9 @@ import os
 import json
 import logging
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -162,6 +164,43 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertEqual(entry["connection_id"], "openai2")
         self.assertEqual(entry["provider_id"], "custom")
+
+    def test_config_read_injects_legacy_provider_identity_without_persisting(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=openai,anthropic,research_proxy",
+            "LLM_OPENAI_ENABLED=false",
+            "LLM_ANTHROPIC_ENABLED=true",
+            "LLM_RESEARCH_PROXY_ENABLED=false",
+        )
+        before = self.env_path.read_bytes()
+
+        items = {
+            item["key"]: item
+            for item in self.service.get_config(include_schema=True)["items"]
+        }
+
+        self.assertEqual(items["LLM_OPENAI_PROVIDER"]["value"], "openai")
+        self.assertEqual(items["LLM_ANTHROPIC_PROVIDER"]["value"], "anthropic")
+        self.assertEqual(items["LLM_RESEARCH_PROXY_PROVIDER"]["value"], "custom")
+        self.assertFalse(items["LLM_OPENAI_PROVIDER"]["raw_value_exists"])
+        self.assertFalse(items["LLM_ANTHROPIC_PROVIDER"]["raw_value_exists"])
+        self.assertFalse(items["LLM_RESEARCH_PROXY_PROVIDER"]["raw_value_exists"])
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_config_read_keeps_explicit_provider_identity_as_persisted(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=research",
+            "LLM_RESEARCH_PROVIDER=openai",
+            "LLM_RESEARCH_ENABLED=false",
+        )
+
+        items = {
+            item["key"]: item
+            for item in self.service.get_config(include_schema=True)["items"]
+        }
+
+        self.assertEqual(items["LLM_RESEARCH_PROVIDER"]["value"], "openai")
+        self.assertTrue(items["LLM_RESEARCH_PROVIDER"]["raw_value_exists"])
 
     def test_explicit_provider_identity_survives_renamed_connection_round_trip(self) -> None:
         response = self.service.update(
@@ -3000,6 +3039,86 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             result = self.service.validate(items=[{"key": "GENERATION_BACKEND", "value": "litellm"}])
             self.assertTrue(result["valid"], result["issues"])
 
+    def test_hidden_field_skips_value_validation_until_visible_again(self) -> None:
+        hidden = self.service.validate(items=[
+            {"key": "GENERATION_BACKEND", "value": "litellm"},
+            {"key": "OPENCODE_CLI_MODEL", "value": "invalid model with spaces"},
+        ])
+        self.assertTrue(hidden["valid"], hidden["issues"])
+
+        visible = self.service.validate(items=[
+            {"key": "GENERATION_BACKEND", "value": "opencode_cli"},
+            {"key": "OPENCODE_CLI_MODEL", "value": "invalid model with spaces"},
+        ])
+        self.assertFalse(visible["valid"])
+        self.assertTrue(
+            any(
+                issue["key"] == "OPENCODE_CLI_MODEL"
+                and issue["code"] == "invalid_format"
+                for issue in visible["issues"]
+            ),
+            visible["issues"],
+        )
+
+    def test_field_contract_enabled_when_is_server_authoritative(self) -> None:
+        fake_contracts = {
+            "OPENCODE_CLI_MODEL": {
+                "requirement": "optional",
+                "enabled_when": [
+                    {"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"},
+                ],
+            },
+        }
+        with patch("src.services.system_config_service.get_contract_field_definitions", return_value=fake_contracts):
+            disabled = self.service.validate(items=[
+                {"key": "GENERATION_BACKEND", "value": "litellm"},
+                {"key": "OPENCODE_CLI_MODEL", "value": "provider/model"},
+            ])
+            self.assertFalse(disabled["valid"])
+            self.assertTrue(
+                any(issue["code"] == "field_disabled" for issue in disabled["issues"]),
+                disabled["issues"],
+            )
+
+            enabled = self.service.validate(items=[
+                {"key": "GENERATION_BACKEND", "value": "opencode_cli"},
+                {"key": "OPENCODE_CLI_MODEL", "value": "provider/model"},
+            ])
+            self.assertFalse(
+                any(issue["code"] == "field_disabled" for issue in enabled["issues"]),
+                enabled["issues"],
+            )
+
+    def test_unknown_contract_condition_has_stable_read_only_diagnostic(self) -> None:
+        fake_contracts = {
+            "MY_CONDITIONAL_FIELD": {
+                "requirement": "optional",
+                "visible_when": [
+                    {"key": "GENERATION_BACKEND", "operator": "regex", "value": ".*"},
+                ],
+            },
+        }
+        with patch("src.services.system_config_service.get_contract_field_definitions", return_value=fake_contracts):
+            diagnostic = self.service.validate(items=[{"key": "STOCK_LIST", "value": "600519"}])
+            issue = next(
+                issue for issue in diagnostic["issues"]
+                if issue["key"] == "MY_CONDITIONAL_FIELD"
+            )
+            self.assertEqual(issue["code"], "unsupported_config_condition")
+            self.assertEqual(issue["severity"], "warning")
+            self.assertTrue(diagnostic["valid"], diagnostic["issues"])
+
+            attempted_update = self.service.validate(items=[
+                {"key": "MY_CONDITIONAL_FIELD", "value": "changed"},
+            ])
+            issue = next(
+                issue for issue in attempted_update["issues"]
+                if issue["key"] == "MY_CONDITIONAL_FIELD"
+            )
+            self.assertEqual(issue["code"], "unsupported_config_condition")
+            self.assertEqual(issue["severity"], "error")
+            self.assertFalse(attempted_update["valid"])
+
     def test_validate_rejects_explicit_hermes_only_agent_model(self) -> None:
         validation = self.service.validate(
             items=[
@@ -4959,6 +5078,45 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 items=[{"key": "STOCK_LIST", "value": "600519"}],
                 reload_now=False,
             )
+
+    def test_concurrent_updates_with_same_version_allow_exactly_one_writer(self) -> None:
+        config_version = self.manager.get_config_version()
+        barrier = threading.Barrier(2)
+        original_collect_issues = self.service._collect_issues
+
+        def synchronized_collect_issues(*args, **kwargs):
+            issues = original_collect_issues(*args, **kwargs)
+            barrier.wait(timeout=5)
+            return issues
+
+        with patch.object(
+            self.service,
+            "_collect_issues",
+            side_effect=synchronized_collect_issues,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(
+                        self.service.update,
+                        config_version=config_version,
+                        items=[{"key": "STOCK_LIST", "value": value}],
+                        reload_now=False,
+                    )
+                    for value in ("300750", "AAPL")
+                ]
+
+                successes = []
+                conflicts = []
+                for future in futures:
+                    try:
+                        successes.append(future.result(timeout=10))
+                    except ConfigConflictError as exc:
+                        conflicts.append(exc)
+
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(conflicts), 1)
+        self.assertEqual(conflicts[0].current_version, self.manager.get_config_version())
+        self.assertIn(self.manager.read_config_map()["STOCK_LIST"], {"300750", "AAPL"})
 
     def test_update_appends_news_window_explainability_warning(self) -> None:
         response = self.service.update(

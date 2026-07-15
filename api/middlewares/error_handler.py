@@ -1,128 +1,211 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-全局异常处理中间件
+Global exception handling middleware
 ===================================
 
-职责：
-1. 捕获未处理的异常
-2. 统一错误响应格式
-3. 记录错误日志
+Responsibilities:
+1. Catch unhandled exceptions.
+2. Normalize error response envelopes.
+3. Record diagnostic logs.
 """
 
 import logging
+import re
 import traceback
-from typing import Callable
+import uuid
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from api.v1.errors import error_body
+
 logger = logging.getLogger(__name__)
+
+_TRACE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_STABLE_ERROR_CODE_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_CANONICAL_ERROR_KEYS = {
+    "error",
+    "code",
+    "message",
+    "params",
+    "details",
+    "detail",
+    "trace_id",
+}
+
+
+def _request_trace_id(request: Request) -> str:
+    candidate = (
+        request.headers.get("x-request-id")
+        or request.headers.get("x-trace-id")
+        or ""
+    ).strip()
+    if candidate and _TRACE_ID_RE.fullmatch(candidate):
+        return candidate
+    return uuid.uuid4().hex
+
+
+def _merge_diagnostic_details(payload: Dict[str, Any]) -> Any:
+    explicit = payload.get("details", payload.get("detail"))
+    extras = {
+        key: value
+        for key, value in payload.items()
+        if key not in _CANONICAL_ERROR_KEYS
+    }
+    if explicit is None:
+        return extras
+    if isinstance(explicit, dict):
+        return {**extras, **explicit}
+    if extras:
+        return {**extras, "value": explicit}
+    return explicit
+
+
+def _normalise_http_error(detail: Any, status_code: int, trace_id: str) -> Dict[str, Any]:
+    if status_code >= 500:
+        code = "internal_error"
+        if isinstance(detail, dict):
+            candidate = detail.get("error") or detail.get("code")
+            if isinstance(candidate, str):
+                normalized_candidate = candidate.strip()
+                if _STABLE_ERROR_CODE_RE.fullmatch(normalized_candidate):
+                    code = normalized_candidate
+        return error_body(
+            code,
+            "Internal server error",
+            trace_id=trace_id,
+        )
+
+    if isinstance(detail, dict):
+        code = str(detail.get("error") or detail.get("code") or "legacy_http_error")
+        message = str(detail.get("message") or "Request failed")
+        params = detail.get("params") if isinstance(detail.get("params"), dict) else {}
+        return error_body(
+            code,
+            message,
+            params=params,
+            details=_merge_diagnostic_details(detail),
+            trace_id=trace_id,
+        )
+
+    details = {}
+    if detail is not None and str(detail).strip():
+        details = {"legacy_message": str(detail).strip()}
+    return error_body(
+        "legacy_http_error",
+        "Request failed",
+        details=details,
+        trace_id=trace_id,
+    )
+
+
+def _error_response(
+    *,
+    status_code: int,
+    content: Dict[str, Any],
+    trace_id: str,
+    headers: Optional[Dict[str, str]] = None,
+) -> JSONResponse:
+    response_headers = dict(headers or {})
+    response_headers["X-Trace-ID"] = trace_id
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers=response_headers,
+    )
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
-    """
-    全局异常处理中间件
-    
-    捕获所有未处理的异常，返回统一格式的错误响应
-    """
+    """Catch unhandled exceptions and return the canonical error envelope."""
     
     async def dispatch(
         self, 
         request: Request, 
         call_next: Callable
     ) -> Response:
-        """
-        处理请求，捕获异常
-        
-        Args:
-            request: 请求对象
-            call_next: 下一个处理器
-            
-        Returns:
-            Response: 响应对象
-        """
+        """Run the next request handler and normalize unexpected failures."""
         try:
             response = await call_next(request)
             return response
             
         except Exception as e:
-            # 记录错误日志
+            trace_id = _request_trace_id(request)
+            # Keep full diagnostics in server logs; the client receives only a trace ID.
             logger.error(
-                f"未处理的异常: {e}\n"
-                f"请求路径: {request.url.path}\n"
-                f"请求方法: {request.method}\n"
-                f"堆栈: {traceback.format_exc()}"
+                f"Unhandled exception [trace_id={trace_id}]: {e}\n"
+                f"Request path: {request.url.path}\n"
+                f"Request method: {request.method}\n"
+                f"Stack trace: {traceback.format_exc()}"
             )
             
-            # 返回统一格式的错误响应
-            return JSONResponse(
+            return _error_response(
                 status_code=500,
-                content={
-                    "error": "internal_error",
-                    "message": "服务器内部错误，请稍后重试",
-                    "detail": str(e) if logger.isEnabledFor(logging.DEBUG) else None
-                }
+                content=error_body(
+                    "internal_error",
+                    "Internal server error",
+                    trace_id=trace_id,
+                ),
+                trace_id=trace_id,
             )
 
 
 def add_error_handlers(app) -> None:
-    """
-    添加全局异常处理器
-    
-    为 FastAPI 应用添加各类异常的处理器
-    
-    Args:
-        app: FastAPI 应用实例
-    """
+    """Register canonical exception handlers on a FastAPI application."""
     from fastapi import HTTPException
     from fastapi.exceptions import RequestValidationError
     
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        """处理 HTTP 异常"""
-        # 如果 detail 已经是 ErrorResponse 格式的 dict，直接使用
-        if isinstance(exc.detail, dict) and "error" in exc.detail and "message" in exc.detail:
-            return JSONResponse(
-                status_code=exc.status_code,
-                content=exc.detail
-            )
-        # 否则将 detail 包装成 ErrorResponse 格式
-        return JSONResponse(
+        """Normalize both current and legacy HTTPException payloads."""
+        trace_id = _request_trace_id(request)
+        return _error_response(
             status_code=exc.status_code,
-            content={
-                "error": "http_error",
-                "message": str(exc.detail) if exc.detail else "HTTP Error",
-                "detail": None
-            }
+            content=_normalise_http_error(exc.detail, exc.status_code, trace_id),
+            trace_id=trace_id,
+            headers=exc.headers,
         )
     
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """处理请求验证异常"""
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": "validation_error",
-                "message": "请求参数验证失败",
-                "detail": exc.errors()
+        """Return structured field diagnostics for request validation failures."""
+        trace_id = _request_trace_id(request)
+        validation_errors = [
+            {
+                "loc": list(error.get("loc") or []),
+                "msg": str(error.get("msg") or "Invalid value"),
+                "type": str(error.get("type") or "validation_error"),
             }
+            for error in exc.errors()
+        ]
+        return _error_response(
+            status_code=422,
+            content=error_body(
+                "validation_error",
+                "Request validation failed",
+                details={"validation_errors": validation_errors},
+                trace_id=trace_id,
+            ),
+            trace_id=trace_id,
         )
     
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        """处理通用异常"""
+        """Redact an unhandled application exception behind a trace ID."""
+        trace_id = _request_trace_id(request)
         logger.error(
-            f"未处理的异常: {exc}\n"
-            f"请求路径: {request.url.path}\n"
-            f"堆栈: {traceback.format_exc()}"
+            f"Unhandled exception [trace_id={trace_id}]: {exc}\n"
+            f"Request path: {request.url.path}\n"
+            f"Stack trace: {traceback.format_exc()}"
         )
-        return JSONResponse(
+        return _error_response(
             status_code=500,
-            content={
-                "error": "internal_error",
-                "message": "服务器内部错误",
-                "detail": None
-            }
+            content=error_body(
+                "internal_error",
+                "Internal server error",
+                trace_id=trace_id,
+            ),
+            trace_id=trace_id,
         )

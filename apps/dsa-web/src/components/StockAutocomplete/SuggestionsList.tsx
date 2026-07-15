@@ -8,6 +8,7 @@ import { Badge } from '../common';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
+import { OVERLAY_Z } from '../common/overlayZ';
 
 export interface SuggestionsListProps {
   /** Suggestion list */
@@ -36,9 +37,10 @@ export function SuggestionsList({
   return (
     <ul
       id="suggestions-list"
-      className="z-[100] border-x border-b rounded-b-lg rounded-t-none max-h-60 overflow-auto"
+      className="max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b"
       style={{
         ...style,
+        zIndex: OVERLAY_Z.dropdown,
         backgroundColor: 'hsl(var(--card))',
         borderColor: 'hsl(var(--border))',
         boxShadow: '0 12px 28px -12px rgba(0, 0, 0, 0.18)',
@@ -51,7 +53,7 @@ export function SuggestionsList({
           role="option"
           aria-selected={index === highlightedIndex}
           className={cn(
-            'px-4 py-2 cursor-pointer flex items-center justify-between',
+            'flex min-h-11 cursor-pointer items-center justify-between px-4 py-2',
             'hover:bg-muted',
             index === highlightedIndex && 'bg-muted',
           )}

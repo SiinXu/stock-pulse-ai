@@ -129,7 +129,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                   {t('common.selectedCount', { count: selectedCount })}
                 </Badge>
               ) : items.length > 0 ? (
-                <span className="text-[11px] text-muted-text">{t('common.itemsCount', { count: items.length })}</span>
+                <span className="text-xs text-muted-text">{t('common.itemsCount', { count: items.length })}</span>
               ) : undefined
             }
           />
@@ -137,7 +137,7 @@ export const StockBar: React.FC<StockBarProps> = ({
           {items.length > 0 && onDeleteStock && (
             <div className="flex items-center gap-2">
               <label
-                className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg py-1"
+                className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-lg"
                 htmlFor={selectAllId}
               >
                 <input
@@ -150,7 +150,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                   aria-label={t('history.selectAllStockAria')}
                   className="chat-skill-checkbox cursor-pointer"
                 />
-                <span className="text-[11px] text-muted-text select-none">{t('common.selectAllCurrent')}</span>
+                <span className="select-none text-xs text-muted-text">{t('common.selectAllCurrent')}</span>
               </label>
               <Button
                 variant="danger-subtle"

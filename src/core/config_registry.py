@@ -19,7 +19,7 @@ from src.config import (
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
-SCHEMA_VERSION = "2026-07-15-connection-provider"
+SCHEMA_VERSION = "2026-07-15-authoritative-config-contract"
 
 _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
     {
@@ -317,6 +317,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
+        "contract": {"requirement": "inherited"},
         "display_order": 1,
         "help_key": "settings.ai_model.LITELLM_MODEL",
         "examples": [
@@ -360,6 +361,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
+        "contract": {"requirement": "inherited"},
         "display_order": 2,
         "help_key": "settings.ai_model.AGENT_LITELLM_MODEL",
         "examples": [
@@ -390,6 +392,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": None,
         "options": [],
         "validation": {},
+        "contract": {"requirement": "inherited"},
         "display_order": 3,
         "help_key": "settings.ai_model.VISION_MODEL",
         "examples": ["VISION_MODEL=openai/gpt-5.4-mini"],
@@ -4957,7 +4960,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
 )
 
 
@@ -4978,7 +4981,59 @@ def derive_ui_placement(key: str) -> Optional[str]:
         return "hidden_legacy"
     if LLM_CHANNEL_FIELD_KEY_RE.match(key_upper):
         return "model_access"
+    # A stale/new AI key must never fall through to the generic form: an older
+    # Web/Desktop client cannot know which dedicated model surface owns it.
+    if _infer_category(key_upper) == "ai_model":
+        return "developer_diagnostics"
     return None
+
+
+def derive_save_group(key: str, category: Optional[str] = None) -> str:
+    """Return the atomic autosave group for one configuration field."""
+    key_upper = key.upper()
+    resolved_category = category or _infer_category(key_upper)
+
+    if (
+        resolved_category == "ai_model"
+        or derive_ui_placement(key_upper) is not None
+        or key_upper == "LLM_CHANNELS"
+        or LLM_CHANNEL_FIELD_KEY_RE.match(key_upper)
+    ):
+        return "ai.model_graph"
+    if key_upper.startswith("SCHEDULE_"):
+        return "system.scheduler"
+    if key_upper.startswith("ADMIN_"):
+        return "system.authentication"
+    if resolved_category == "notification":
+        return "notifications.channels"
+    if key_upper.startswith(("REPORT_", "MARKET_REVIEW_", "DAILY_MARKET_")):
+        return "reports.generation"
+    if resolved_category == "agent":
+        return "agent.behavior"
+    if resolved_category == "backtest":
+        return "backtest.defaults"
+    if key_upper == "STOCK_LIST":
+        return "overview.watchlist"
+    return f"{resolved_category}.general"
+
+
+def _derive_field_contract(field: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Return the canonical contract for a field definition.
+
+    AI/model fields are the first migrated scope and always expose an explicit
+    requirement. ``is_required`` remains a deprecated compatibility projection
+    for older clients; the contract is authoritative for new consumers.
+    """
+    contract = deepcopy(field.get("contract")) if field.get("contract") else None
+    if contract is None and field.get("category") != "ai_model":
+        return None
+    if contract is None:
+        contract = {}
+    contract.setdefault(
+        "requirement",
+        "required" if field.get("is_required", False) else "optional",
+    )
+    return contract
 
 
 def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str, Any]:
@@ -4994,7 +5049,12 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
         if field.get("ui_control") == "select" and option_values and "enum" not in validation:
             validation["enum"] = option_values
         field["validation"] = validation
+        contract = _derive_field_contract(field)
+        if contract is not None:
+            field["contract"] = contract
+            field["is_required"] = contract["requirement"] == "required"
         field["ui_placement"] = derive_ui_placement(key_upper)
+        field["save_group"] = derive_save_group(key_upper, field.get("category"))
         return field
 
     category = _infer_category(key_upper)
@@ -5014,17 +5074,22 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
         "validation": {},
         "display_order": 9000,
         "ui_placement": derive_ui_placement(key_upper),
+        "save_group": derive_save_group(key_upper, category),
     }
+    contract = _derive_field_contract(field)
+    if contract is not None:
+        field["contract"] = contract
     return field
 
 
 def get_contract_field_definitions() -> Dict[str, Dict[str, Any]]:
     """Return {KEY: contract} for registered fields that declare a schema contract."""
-    return {
-        key: deepcopy(field["contract"])
-        for key, field in _FIELD_DEFINITIONS.items()
-        if field.get("contract")
-    }
+    contracts: Dict[str, Dict[str, Any]] = {}
+    for key in _FIELD_DEFINITIONS:
+        contract = get_field_definition(key).get("contract")
+        if contract:
+            contracts[key] = deepcopy(contract)
+    return contracts
 
 
 def evaluate_config_conditions(
@@ -5038,24 +5103,38 @@ def evaluate_config_conditions(
     """
     if not conditions:
         return "met"
+    has_unmet_condition = False
     for condition in conditions:
-        key = str(condition.get("key", "")).upper()
+        if not isinstance(condition, dict):
+            return "unknown"
+        raw_key = condition.get("key")
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            return "unknown"
+        key = raw_key.strip().upper()
         operator = condition.get("operator")
         expected = condition.get("value")
         actual = str(config_map.get(key, "") or "")
         if operator == "equals":
-            met = actual == str(expected)
+            if not isinstance(expected, str):
+                return "unknown"
+            met = actual == expected
         elif operator == "notEquals":
-            met = actual != str(expected)
+            if not isinstance(expected, str):
+                return "unknown"
+            met = actual != expected
         elif operator == "in":
-            met = actual in [str(value) for value in (expected or [])]
+            if not isinstance(expected, list) or not all(
+                isinstance(value, str) for value in expected
+            ):
+                return "unknown"
+            met = actual in expected
         elif operator == "notEmpty":
             met = bool(actual.strip())
         else:
             return "unknown"
         if not met:
-            return "not_met"
-    return "met"
+            has_unmet_condition = True
+    return "not_met" if has_unmet_condition else "met"
 
 
 def build_schema_response() -> Dict[str, Any]:

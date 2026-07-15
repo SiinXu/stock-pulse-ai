@@ -7,7 +7,7 @@ import { getParsedApiError } from '../api/error';
 import { AlertRuleForm } from '../components/alerts/AlertRuleForm';
 import {
   AlertRuleList,
-  type AlertRuleBusyState,
+  type AlertRuleBusyAction,
   type AlertRuleEnabledFilter,
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
@@ -29,8 +29,17 @@ import {
   ALERT_PAGE_TEXT,
 } from '../locales/alerts';
 import { formatUiDateTime } from '../utils/uiLocale';
+import { createRequestKey, useAsyncResource } from '../hooks/useAsyncResource';
 
 const PAGE_SIZE = 20;
+
+interface AlertRulesResourceData {
+  items: AlertRuleItem[];
+  total: number;
+  page: number;
+}
+
+const EMPTY_ALERT_RULES: AlertRulesResourceData = { items: [], total: 0, page: 1 };
 
 function enabledFilterToQuery(value: AlertRuleEnabledFilter): boolean | undefined {
   if (value === 'enabled') return true;
@@ -101,103 +110,116 @@ const AlertsPage: React.FC = () => {
   }, [text.documentTitle]);
 
   const [createRuleModalOpen, setCreateRuleModalOpen] = useState(false);
-  const [rules, setRules] = useState<AlertRuleItem[]>([]);
-  const [rulesTotal, setRulesTotal] = useState(0);
   const [rulesPage, setRulesPage] = useState(1);
   const [enabledFilter, setEnabledFilter] = useState<AlertRuleEnabledFilter>('all');
   const [alertTypeFilter, setAlertTypeFilter] = useState<AlertTypeFilter>('all');
-  const [rulesLoading, setRulesLoading] = useState(false);
-  const [rulesError, setRulesError] = useState<ParsedApiError | null>(null);
-  const [rulesLoaded, setRulesLoaded] = useState(false);
-
-  const [triggers, setTriggers] = useState<AlertTriggerItem[]>([]);
-  const [triggersLoading, setTriggersLoading] = useState(false);
-  const [triggersError, setTriggersError] = useState<ParsedApiError | null>(null);
-
-  const [notifications, setNotifications] = useState<AlertNotificationItem[]>([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [notificationsError, setNotificationsError] = useState<ParsedApiError | null>(null);
+  const rulesQueryRef = useRef({ page: 1, enabledFilter, alertTypeFilter });
+  const [rulesResource, rulesRequests] = useAsyncResource<AlertRulesResourceData, ParsedApiError>({
+    initialData: EMPTY_ALERT_RULES,
+    isEmpty: (data) => data.items.length === 0,
+  });
+  const [triggersResource, triggersRequests] = useAsyncResource<AlertTriggerItem[], ParsedApiError>({
+    initialData: [],
+    isEmpty: (items) => items.length === 0,
+  });
+  const [notificationsResource, notificationsRequests] = useAsyncResource<AlertNotificationItem[], ParsedApiError>({
+    initialData: [],
+    isEmpty: (items) => items.length === 0,
+  });
+  const rules = rulesResource.data.items;
+  const rulesTotal = rulesResource.data.total;
+  const rulesLoading = rulesResource.status === 'idle' || rulesResource.status === 'loading';
+  const triggers = triggersResource.data;
+  const triggersLoading = triggersResource.status === 'idle' || triggersResource.status === 'loading';
+  const notifications = notificationsResource.data;
+  const notificationsLoading = notificationsResource.status === 'idle' || notificationsResource.status === 'loading';
 
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
-  const [busyRule, setBusyRule] = useState<AlertRuleBusyState | null>(null);
+  const [ruleMutationError, setRuleMutationError] = useState<ParsedApiError | null>(null);
+  const [busyRules, setBusyRules] = useState<Record<number, AlertRuleBusyAction>>({});
   const [testResult, setTestResult] = useState<AlertRuleTestResponse | null>(null);
-  const rulesRequestIdRef = useRef(0);
 
-  const loadRules = useCallback(async (pageOverride?: number) => {
-    const requestId = rulesRequestIdRef.current + 1;
-    rulesRequestIdRef.current = requestId;
-    const isLatestRequest = () => rulesRequestIdRef.current === requestId;
-    const requestedPage = pageOverride ?? rulesPage;
-    const baseQuery = {
-      enabled: enabledFilterToQuery(enabledFilter),
-      alertType: alertTypeFilterToQuery(alertTypeFilter),
-      pageSize: PAGE_SIZE,
-    };
-    setRulesLoading(true);
-    try {
-      let response = await alertsApi.listRules({ ...baseQuery, page: requestedPage });
-      if (!isLatestRequest()) return null;
-      const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
-      if (response.items.length === 0 && response.total > 0 && requestedPage > lastPage) {
-        setRulesPage(lastPage);
-        response = await alertsApi.listRules({ ...baseQuery, page: lastPage });
-        if (!isLatestRequest()) return null;
-      } else if (pageOverride !== undefined && pageOverride !== rulesPage) {
-        setRulesPage(pageOverride);
-      }
-      setRules(response.items);
-      setRulesTotal(response.total);
-      setRulesError(null);
-      setRulesLoaded(true);
-      return response;
-    } catch (error) {
-      if (!isLatestRequest()) return null;
-      setRulesError(getParsedApiError(error));
-      return null;
-    } finally {
-      if (isLatestRequest()) {
-        setRulesLoading(false);
-      }
-    }
+  useEffect(() => {
+    rulesQueryRef.current = { page: rulesPage, enabledFilter, alertTypeFilter };
   }, [alertTypeFilter, enabledFilter, rulesPage]);
 
+  const loadRules = useCallback(async (
+    pageOverride?: number,
+    options: { retainData: boolean } = { retainData: false },
+  ) => {
+    const currentQuery = rulesQueryRef.current;
+    const requestedPage = pageOverride ?? currentQuery.page;
+    const baseQuery = {
+      enabled: enabledFilterToQuery(currentQuery.enabledFilter),
+      alertType: alertTypeFilterToQuery(currentQuery.alertTypeFilter),
+      pageSize: PAGE_SIZE,
+    };
+    const makeRequest = (page: number) => rulesRequests.begin(
+      createRequestKey('alert-rules', [baseQuery.enabled ?? null, baseQuery.alertType ?? null, page, PAGE_SIZE]),
+      { retainData: options.retainData },
+    );
+    let request = makeRequest(requestedPage);
+    try {
+      let response = await alertsApi.listRules({ ...baseQuery, page: requestedPage });
+      if (!rulesRequests.isCurrent(request)) return null;
+      const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
+      if (response.items.length === 0 && response.total > 0 && requestedPage > lastPage) {
+        rulesQueryRef.current = { ...rulesQueryRef.current, page: lastPage };
+        setRulesPage(lastPage);
+        request = makeRequest(lastPage);
+        response = await alertsApi.listRules({ ...baseQuery, page: lastPage });
+        if (!rulesRequests.isCurrent(request)) return null;
+      } else if (pageOverride !== undefined && pageOverride !== currentQuery.page) {
+        rulesQueryRef.current = { ...rulesQueryRef.current, page: pageOverride };
+        setRulesPage(pageOverride);
+      }
+      return rulesRequests.resolve(request, {
+        items: response.items,
+        total: response.total,
+        page: response.page,
+      }) ? response : null;
+    } catch (error) {
+      rulesRequests.reject(request, getParsedApiError(error));
+      return null;
+    }
+  }, [rulesRequests]);
+
   const loadTriggers = useCallback(async () => {
-    setTriggersLoading(true);
+    const request = triggersRequests.begin(
+      createRequestKey('alert-triggers', [1, PAGE_SIZE]),
+      { retainData: true },
+    );
     try {
       const response = await alertsApi.listTriggers({ page: 1, pageSize: PAGE_SIZE });
-      setTriggers(response.items);
-      setTriggersError(null);
+      triggersRequests.resolve(request, response.items);
     } catch (error) {
-      setTriggersError(getParsedApiError(error));
-    } finally {
-      setTriggersLoading(false);
+      triggersRequests.reject(request, getParsedApiError(error));
     }
-  }, []);
+  }, [triggersRequests]);
 
   const loadNotifications = useCallback(async () => {
-    setNotificationsLoading(true);
+    const request = notificationsRequests.begin(
+      createRequestKey('alert-notifications', [1, PAGE_SIZE]),
+      { retainData: true },
+    );
     try {
       const response = await alertsApi.listNotifications({ page: 1, pageSize: PAGE_SIZE });
-      setNotifications(response.items);
-      setNotificationsError(null);
+      notificationsRequests.resolve(request, response.items);
     } catch (error) {
-      setNotificationsError(getParsedApiError(error));
-    } finally {
-      setNotificationsLoading(false);
+      notificationsRequests.reject(request, getParsedApiError(error));
     }
-  }, []);
+  }, [notificationsRequests]);
 
   useEffect(() => {
     void loadRules();
-  }, [loadRules]);
+  }, [alertTypeFilter, enabledFilter, loadRules, rulesPage]);
 
   useEffect(() => {
-    if (!rulesLoaded) return;
     void loadTriggers();
     void loadNotifications();
-  }, [loadNotifications, loadTriggers, rulesLoaded]);
+  }, [loadNotifications, loadTriggers]);
 
   const handleCreateRule = async (payload: AlertRuleCreateRequest) => {
     setCreateLoading(true);
@@ -206,7 +228,7 @@ const AlertsPage: React.FC = () => {
     try {
       const created = await alertsApi.createRule(payload);
       setCreateSuccess(formatUiText(text.created, { name: created.name }));
-      await loadRules(1);
+      await loadRules(1, { retainData: true });
       return true;
     } catch (error) {
       setCreateError(getParsedApiError(error));
@@ -217,43 +239,64 @@ const AlertsPage: React.FC = () => {
   };
 
   const handleToggleEnabled = async (rule: AlertRuleItem) => {
-    setBusyRule({ id: rule.id, action: 'toggle' });
+    const action: AlertRuleBusyAction = 'toggle';
+    setBusyRules((current) => ({ ...current, [rule.id]: action }));
+    setRuleMutationError(null);
     try {
       if (rule.enabled) {
         await alertsApi.disableRule(rule.id);
       } else {
         await alertsApi.enableRule(rule.id);
       }
-      await loadRules();
+      await loadRules(undefined, { retainData: true });
     } catch (error) {
-      setRulesError(getParsedApiError(error));
+      setRuleMutationError(getParsedApiError(error));
     } finally {
-      setBusyRule(null);
+      setBusyRules((current) => {
+        if (current[rule.id] !== action) return current;
+        const next = { ...current };
+        delete next[rule.id];
+        return next;
+      });
     }
   };
 
   const handleDeleteRule = async (rule: AlertRuleItem) => {
-    setBusyRule({ id: rule.id, action: 'delete' });
+    const action: AlertRuleBusyAction = 'delete';
+    setBusyRules((current) => ({ ...current, [rule.id]: action }));
+    setRuleMutationError(null);
     try {
       await alertsApi.deleteRule(rule.id);
-      await loadRules();
+      await loadRules(undefined, { retainData: true });
     } catch (error) {
-      setRulesError(getParsedApiError(error));
+      setRuleMutationError(getParsedApiError(error));
     } finally {
-      setBusyRule(null);
+      setBusyRules((current) => {
+        if (current[rule.id] !== action) return current;
+        const next = { ...current };
+        delete next[rule.id];
+        return next;
+      });
     }
   };
 
   const handleTestRule = async (rule: AlertRuleItem) => {
-    setBusyRule({ id: rule.id, action: 'test' });
+    const action: AlertRuleBusyAction = 'test';
+    setBusyRules((current) => ({ ...current, [rule.id]: action }));
+    setRuleMutationError(null);
     setTestResult(null);
     try {
       const result = await alertsApi.testRule(rule.id);
       setTestResult(result);
     } catch (error) {
-      setRulesError(getParsedApiError(error));
+      setRuleMutationError(getParsedApiError(error));
     } finally {
-      setBusyRule(null);
+      setBusyRules((current) => {
+        if (current[rule.id] !== action) return current;
+        const next = { ...current };
+        delete next[rule.id];
+        return next;
+      });
     }
   };
 
@@ -267,14 +310,16 @@ const AlertsPage: React.FC = () => {
           <button
             type="button"
             className="btn-primary inline-flex items-center gap-2"
-            onClick={() => setCreateRuleModalOpen(true)}
+            onClick={() => {
+              setCreateError(null);
+              setCreateRuleModalOpen(true);
+            }}
           >
             {text.createRule}
           </button>
         )}
       />
 
-      {createError ? <ApiErrorAlert error={createError} onDismiss={() => setCreateError(null)} /> : null}
       {createSuccess ? (
         <InlineAlert
           title={text.createSuccess}
@@ -287,9 +332,17 @@ const AlertsPage: React.FC = () => {
           )}
         />
       ) : null}
-      {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
+      {rulesResource.error ? (
+        <ApiErrorAlert error={rulesResource.error} onDismiss={rulesRequests.clearError} />
+      ) : null}
+      {ruleMutationError ? (
+        <ApiErrorAlert error={ruleMutationError} onDismiss={() => setRuleMutationError(null)} />
+      ) : null}
 
       <Modal isOpen={createRuleModalOpen} onClose={() => setCreateRuleModalOpen(false)} title={text.createRule}>
+        {createError ? (
+          <ApiErrorAlert error={createError} className="mb-4" onDismiss={() => setCreateError(null)} />
+        ) : null}
         <AlertRuleForm
           onSubmit={async (payload) => {
             const ok = await handleCreateRule(payload);
@@ -313,18 +366,24 @@ const AlertsPage: React.FC = () => {
             enabledFilter={enabledFilter}
             alertTypeFilter={alertTypeFilter}
             onEnabledFilterChange={(value) => {
+              rulesQueryRef.current = { ...rulesQueryRef.current, enabledFilter: value, page: 1 };
               setEnabledFilter(value);
               setRulesPage(1);
             }}
             onAlertTypeFilterChange={(value) => {
+              rulesQueryRef.current = { ...rulesQueryRef.current, alertTypeFilter: value, page: 1 };
               setAlertTypeFilter(value);
               setRulesPage(1);
             }}
-            onPageChange={setRulesPage}
+            onPageChange={(page) => {
+              rulesQueryRef.current = { ...rulesQueryRef.current, page };
+              setRulesPage(page);
+            }}
             onToggleEnabled={(rule) => void handleToggleEnabled(rule)}
             onDelete={(rule) => void handleDeleteRule(rule)}
             onTest={(rule) => void handleTestRule(rule)}
-            busyRule={busyRule}
+            busyRules={busyRules}
+            showEmptyState={rulesResource.status !== 'error'}
           />
           {testResult ? (
             <InlineAlert
@@ -335,13 +394,21 @@ const AlertsPage: React.FC = () => {
           ) : null}
         </div>
 
-      {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
-      <AlertTriggerHistory triggers={triggers} isLoading={triggersLoading} />
+      {triggersResource.error ? (
+        <ApiErrorAlert error={triggersResource.error} onDismiss={triggersRequests.clearError} />
+      ) : null}
+      <AlertTriggerHistory
+        triggers={triggers}
+        isLoading={triggersLoading}
+        showEmptyState={triggersResource.status !== 'error'}
+      />
 
-      {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
+      {notificationsResource.error ? (
+        <ApiErrorAlert error={notificationsResource.error} onDismiss={notificationsRequests.clearError} />
+      ) : null}
       <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
         {notificationsLoading ? <Loading label={text.loadingNotifications} /> : null}
-        {!notificationsLoading && notifications.length === 0 ? (
+        {!notificationsLoading && notificationsResource.status !== 'error' && notifications.length === 0 ? (
           <EmptyState
             icon={<BellRing className="h-6 w-6" />}
             title={text.noNotifications}

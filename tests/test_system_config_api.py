@@ -229,6 +229,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 "id", "label", "protocol", "default_base_url",
                 "capabilities", "requires_api_key", "requires_base_url",
                 "supports_discovery", "is_local", "is_custom",
+                "credential_url", "console_url", "models_url", "docs_url",
             ):
                 self.assertIn(field, provider)
             # The catalog must NOT ship concrete model IDs: model names age fast
@@ -268,6 +269,55 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(fields["GENERATION_BACKEND"]["ui_placement"], "developer_diagnostics")
         self.assertEqual(fields["OPENAI_API_KEY"]["ui_placement"], "hidden_legacy")
         self.assertIsNone(fields["STOCK_LIST"]["ui_placement"])
+        self.assertEqual(fields["LLM_CHANNELS"]["save_group"], "ai.model_graph")
+        self.assertEqual(fields["LITELLM_MODEL"]["save_group"], "ai.model_graph")
+        self.assertEqual(fields["VISION_MODEL"]["save_group"], "ai.model_graph")
+        self.assertEqual(fields["STOCK_LIST"]["save_group"], "overview.watchlist")
+
+    def test_config_schema_preserves_authoritative_field_contract(self) -> None:
+        payload = system_config.get_system_config_schema(service=self.service).model_dump()
+        fields = {
+            field["key"]: field
+            for category in payload["categories"]
+            for field in category["fields"]
+        }
+
+        self.assertEqual(
+            fields["OPENCODE_CLI_MODEL"]["contract"],
+            {
+                "requirement": "optional",
+                "required_when": None,
+                "visible_when": [
+                    {
+                        "key": "GENERATION_BACKEND",
+                        "operator": "equals",
+                        "value": "opencode_cli",
+                    }
+                ],
+                "enabled_when": None,
+                "requires_connection_test": False,
+                "restart_required": False,
+            },
+        )
+        self.assertEqual(fields["LITELLM_MODEL"]["contract"]["requirement"], "inherited")
+        self.assertEqual(fields["AGENT_LITELLM_MODEL"]["contract"]["requirement"], "inherited")
+        self.assertEqual(fields["VISION_MODEL"]["contract"]["requirement"], "inherited")
+
+    def test_config_api_returns_legacy_connection_provider_compatibility_identity(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=openai",
+            "LLM_OPENAI_ENABLED=false",
+        )
+
+        payload = system_config.get_system_config(service=self.service).model_dump(by_alias=True)
+        items = {item["key"]: item for item in payload["items"]}
+
+        self.assertEqual(items["LLM_OPENAI_PROVIDER"]["value"], "openai")
+        self.assertFalse(items["LLM_OPENAI_PROVIDER"]["raw_value_exists"])
+        self.assertEqual(
+            items["LLM_OPENAI_PROVIDER"]["schema"]["ui_placement"],
+            "model_access",
+        )
 
     def test_get_generation_backend_status_uses_saved_config_only(self) -> None:
         self._rewrite_env(
@@ -325,6 +375,37 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["status"]["backend_id"], "codex_cli")
         self.assertEqual(payload["status"]["last_error_code"], "command_not_found")
 
+    def test_generation_backend_smoke_test_accepts_integral_json_timeout(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LITELLM_MODEL=openai/fake-report-model",
+            "OPENAI_API_KEY=secret-key-value",
+        )
+
+        def dispatch(_self, _model, _kwargs, *, config, use_channel_router, router_model_names):
+            del config, use_channel_router, router_model_names
+            return {
+                "choices": [{"message": {"content": "DSA_GENERATION_BACKEND_SMOKE_OK"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            }
+
+        request = TestGenerationBackendRequest(
+            backend_id="litellm",
+            mode="text",
+            timeout_seconds=20,
+        )
+        self.assertEqual(request.timeout_seconds, 20.0)
+
+        with patch("src.analyzer.GeminiAnalyzer._dispatch_litellm_completion", new=dispatch):
+            payload = system_config.test_generation_backend(
+                request=request,
+                service=self.service,
+            ).model_dump()
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["status"]["health_status"], "passed")
+
     def test_preview_generation_backend_status_returns_validation_error_for_bad_draft(self) -> None:
         self._rewrite_env(
             "GENERATION_BACKEND=codex_cli",
@@ -342,7 +423,10 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertEqual(ctx.exception.detail["error"], "validation_failed")
-        self.assertEqual(ctx.exception.detail["issues"][0]["key"], "GENERATION_BACKEND_TIMEOUT_SECONDS")
+        self.assertEqual(
+            ctx.exception.detail["details"]["issues"][0]["key"],
+            "GENERATION_BACKEND_TIMEOUT_SECONDS",
+        )
 
     def test_put_config_updates_secret_and_plain_field(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
@@ -414,6 +498,58 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 409)
         self.assertEqual(context.exception.detail["error"], "config_version_conflict")
+
+    def test_http_update_keeps_validation_and_conflict_data_in_canonical_details(self) -> None:
+        app = FastAPI()
+
+        @app.put("/api/v1/system/config")
+        async def update_config(request: UpdateSystemConfigRequest):
+            return system_config.update_system_config(request=request, service=self.service)
+
+        add_error_handlers(app)
+
+        async def send(payload: dict) -> httpx.Response:
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                return await client.put(
+                    "/api/v1/system/config",
+                    json=payload,
+                    headers={"X-Request-ID": "settings-contract"},
+                )
+
+        validation_response = asyncio.run(send({
+            "config_version": self.manager.get_config_version(),
+            "reload_now": False,
+            "items": [{
+                "key": "GENERATION_BACKEND_TIMEOUT_SECONDS",
+                "value": "not-an-integer",
+            }],
+        }))
+        self.assertEqual(validation_response.status_code, 400)
+        validation_payload = validation_response.json()
+        self.assertEqual(validation_payload["error"], "validation_failed")
+        self.assertEqual(
+            validation_payload["details"]["issues"][0]["key"],
+            "GENERATION_BACKEND_TIMEOUT_SECONDS",
+        )
+        self.assertEqual(validation_payload["trace_id"], "settings-contract")
+
+        conflict_response = asyncio.run(send({
+            "config_version": "stale-version",
+            "reload_now": False,
+            "items": [{"key": "STOCK_LIST", "value": "600519"}],
+        }))
+        self.assertEqual(conflict_response.status_code, 409)
+        conflict_payload = conflict_response.json()
+        self.assertEqual(conflict_payload["error"], "config_version_conflict")
+        self.assertEqual(
+            conflict_payload["details"]["current_config_version"],
+            self.manager.get_config_version(),
+        )
+        self.assertEqual(conflict_payload["trace_id"], "settings-contract")
 
     def test_put_config_preserves_comments_and_blank_lines(self) -> None:
         self.env_path.write_text(
@@ -995,7 +1131,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 400)
         issue = next(
             issue
-            for issue in context.exception.detail["issues"]
+            for issue in context.exception.detail["details"]["issues"]
             if issue["code"] == "model_in_use"
         )
         self.assertEqual(issue["details"]["route"], "openai/used-model")

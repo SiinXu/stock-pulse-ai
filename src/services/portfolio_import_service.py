@@ -14,6 +14,7 @@ import pandas as pd
 
 from data_provider.base import canonical_stock_code
 from src.repositories.portfolio_repo import PortfolioRepository
+from src.services.portfolio_idempotency import normalize_portfolio_operation_id
 from src.services.portfolio_service import (
     PortfolioBusyError,
     PortfolioConflictError,
@@ -22,6 +23,7 @@ from src.services.portfolio_service import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class CsvParserSpec:
@@ -88,8 +90,8 @@ class PortfolioImportService:
         portfolio_service: Optional[PortfolioService] = None,
         repo: Optional[PortfolioRepository] = None,
     ):
-        self.portfolio_service = portfolio_service or PortfolioService()
-        self.repo = repo or PortfolioRepository()
+        self.portfolio_service = portfolio_service or PortfolioService(repo=repo)
+        self.repo = repo or self.portfolio_service.repo
         self._parser_registry = self.__class__._shared_parser_registry
         self._broker_alias_map = self.__class__._shared_broker_alias_map
         if not self.__class__._shared_registry_initialized:
@@ -186,9 +188,52 @@ class PortfolioImportService:
         broker: str,
         records: List[Dict[str, Any]],
         dry_run: bool = False,
+        operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         broker_norm = self._normalize_broker(broker)
+        normalized_operation_id = normalize_portfolio_operation_id(operation_id)
+        if normalized_operation_id is None:
+            return self._commit_trade_records_core(
+                session=None,
+                account_id=account_id,
+                broker=broker_norm,
+                records=records,
+                dry_run=dry_run,
+            )
 
+        return self.portfolio_service.idempotency.execute(
+            operation_kind="csv_commit",
+            account_id=account_id,
+            operation_id=normalized_operation_id,
+            payload={
+                "account_id": account_id,
+                "broker": broker_norm,
+                "dry_run": bool(dry_run),
+                "records": records,
+            },
+            write=lambda session: self._commit_trade_records_core(
+                session=session,
+                account_id=account_id,
+                broker=broker_norm,
+                records=records,
+                dry_run=dry_run,
+            ),
+        )
+
+    def _commit_trade_records_core(
+        self,
+        *,
+        session: Optional[Any],
+        account_id: int,
+        broker: str,
+        records: List[Dict[str, Any]],
+        dry_run: bool,
+    ) -> Dict[str, Any]:
+        if session is not None:
+            self.portfolio_service._require_active_account_in_session(
+                session=session,
+                account_id=account_id,
+            )
         inserted_count = 0
         duplicate_count = 0
         failed_count = 0
@@ -197,67 +242,119 @@ class PortfolioImportService:
         seen_dedup_hashes: set[str] = set()
 
         for i, record in enumerate(records):
+            source_row = record.get("_source_line_number")
+            location = f"row={source_row}" if source_row is not None else f"record={i + 1}"
             try:
                 trade_uid = (record.get("trade_uid") or "").strip() or None
                 dedup_hash = (record.get("dedup_hash") or "").strip()
                 if not dedup_hash:
                     dedup_hash = self._build_dedup_hash(record)
-
-                if trade_uid and self.repo.has_trade_uid(account_id, trade_uid):
-                    duplicate_count += 1
-                    continue
                 dedup_hash_to_use: Optional[str] = dedup_hash or None
-                if dedup_hash_to_use and self.repo.has_trade_dedup_hash(account_id, dedup_hash_to_use):
+
+                has_trade_uid = False
+                if trade_uid:
+                    has_trade_uid = (
+                        self.repo.has_trade_uid(account_id, trade_uid)
+                        if session is None
+                        else self.repo.has_trade_uid_in_session(
+                            session=session,
+                            account_id=account_id,
+                            trade_uid=trade_uid,
+                        )
+                    )
+                if trade_uid and (trade_uid in seen_trade_uids or has_trade_uid):
                     duplicate_count += 1
                     continue
 
-                if dry_run:
-                    if trade_uid and trade_uid in seen_trade_uids:
-                        duplicate_count += 1
-                        continue
-                    if dedup_hash_to_use and dedup_hash_to_use in seen_dedup_hashes:
-                        duplicate_count += 1
-                        continue
-                    inserted_count += 1
-                    if trade_uid:
-                        seen_trade_uids.add(trade_uid)
-                    if dedup_hash_to_use:
-                        seen_dedup_hashes.add(dedup_hash_to_use)
+                has_dedup_hash = False
+                if dedup_hash_to_use:
+                    has_dedup_hash = (
+                        self.repo.has_trade_dedup_hash(account_id, dedup_hash_to_use)
+                        if session is None
+                        else self.repo.has_trade_dedup_hash_in_session(
+                            session=session,
+                            account_id=account_id,
+                            dedup_hash=dedup_hash_to_use,
+                        )
+                    )
+                if dedup_hash_to_use and (
+                    dedup_hash_to_use in seen_dedup_hashes or has_dedup_hash
+                ):
+                    duplicate_count += 1
                     continue
 
                 trade_date_value = record.get("trade_date")
-                if isinstance(trade_date_value, date):
-                    trade_date_obj = trade_date_value
-                else:
-                    trade_date_obj = date.fromisoformat(str(trade_date_value))
-
-                self.portfolio_service.record_trade(
-                    account_id=account_id,
-                    symbol=str(record["symbol"]),
-                    trade_date=trade_date_obj,
-                    side=str(record["side"]),
-                    quantity=float(record["quantity"]),
-                    price=float(record["price"]),
-                    fee=float(record.get("fee", 0.0) or 0.0),
-                    tax=float(record.get("tax", 0.0) or 0.0),
-                    market=record.get("market"),
-                    currency=record.get("currency"),
-                    trade_uid=trade_uid,
-                    dedup_hash=dedup_hash_to_use,
-                    note=(record.get("note") or "").strip() or f"csv_import:{broker_norm}",
+                trade_date_obj = (
+                    trade_date_value
+                    if isinstance(trade_date_value, date)
+                    else date.fromisoformat(str(trade_date_value))
                 )
+                side = str(record["side"]).strip().lower()
+                quantity = float(record["quantity"])
+                price = float(record["price"])
+                fee = float(record.get("fee", 0.0) or 0.0)
+                tax = float(record.get("tax", 0.0) or 0.0)
+                symbol = self.portfolio_service._normalize_symbol_for_storage(str(record["symbol"]))
+                if not symbol:
+                    raise ValueError("symbol is required")
+                if side not in {"buy", "sell"}:
+                    raise ValueError("side must be buy or sell")
+                if quantity <= 0 or price <= 0:
+                    raise ValueError("quantity and price must be > 0")
+                if fee < 0 or tax < 0:
+                    raise ValueError("fee and tax must be >= 0")
+
+                if not dry_run and session is None:
+                    self.portfolio_service.record_trade(
+                        account_id=account_id,
+                        symbol=symbol,
+                        trade_date=trade_date_obj,
+                        side=side,
+                        quantity=quantity,
+                        price=price,
+                        fee=fee,
+                        tax=tax,
+                        market=record.get("market"),
+                        currency=record.get("currency"),
+                        trade_uid=trade_uid,
+                        dedup_hash=dedup_hash_to_use,
+                        note=(record.get("note") or "").strip() or f"csv_import:{broker}",
+                    )
+                elif not dry_run:
+                    with session.begin_nested():
+                        self.portfolio_service._record_trade_in_session(
+                            session=session,
+                            account_id=account_id,
+                            symbol=symbol,
+                            trade_date=trade_date_obj,
+                            side=side,
+                            quantity=quantity,
+                            price=price,
+                            fee=fee,
+                            tax=tax,
+                            market=record.get("market"),
+                            currency=record.get("currency"),
+                            trade_uid=trade_uid,
+                            dedup_hash=dedup_hash_to_use,
+                            note=(record.get("note") or "").strip() or f"csv_import:{broker}",
+                        )
+
                 inserted_count += 1
+                if trade_uid:
+                    seen_trade_uids.add(trade_uid)
+                if dedup_hash_to_use:
+                    seen_dedup_hashes.add(dedup_hash_to_use)
             except PortfolioConflictError:
                 duplicate_count += 1
-            except PortfolioOversellError as exc:
+            except (PortfolioOversellError, ValueError, KeyError, TypeError) as exc:
                 failed_count += 1
-                errors.append(f"idx={i}: {exc}")
+                errors.append(f"{location}: {exc}")
             except PortfolioBusyError as exc:
                 failed_count += 1
-                errors.append(f"idx={i}: portfolio_busy: {exc}")
+                errors.append(f"{location}: portfolio_busy: {exc}")
             except Exception as exc:
                 failed_count += 1
-                errors.append(f"idx={i}: {exc}")
+                errors.append(f"{location}: {exc}")
 
         return {
             "account_id": account_id,

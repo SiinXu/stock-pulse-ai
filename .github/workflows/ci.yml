@@ -24,6 +24,14 @@ jobs:
           filters: |
             frontend:
               - 'apps/dsa-web/**'
+              - 'api/**'
+              - 'data_provider/**'
+              - 'src/**'
+              - 'main.py'
+              - 'server.py'
+              - 'requirements.txt'
+              - '.github/requirements-ci.txt'
+              - '.github/workflows/ci.yml'
 
   ai-governance:
     name: ai-governance
@@ -187,10 +195,12 @@ jobs:
           # credential and never written to the repository .env.
           DSA_WEB_SMOKE_PASSWORD: dsa-ci-smoke
         run: npm run test:smoke
-      - name: 📤 Upload Playwright artifacts
-        if: failure()
+      - name: 📤 Upload Playwright evidence and failure diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
-          path: apps/dsa-web/test-results/
+          name: playwright-artifacts-${{ github.run_id }}
+          path: |
+            apps/dsa-web/test-results/
+            apps/dsa-web/playwright-report/
           retention-days: 7

@@ -67,6 +67,9 @@ class TestAnalysisIntegration:
         data = response.json()
         assert data["task_id"] == "test_task_123"
         assert data["status"] == "pending"
+        assert data["message_code"] == "task_queued"
+        assert data["message_params"] == {"stock_code": "600519"}
+        assert data["revision"] == 1
 
         # Verify task queue received the correct resolved code and metadata.
         # Use call_args so this integration test stays focused on analysis flow

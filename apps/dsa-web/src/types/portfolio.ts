@@ -191,6 +191,7 @@ export interface PortfolioTradeCreateRequest {
   currency?: string;
   tradeUid?: string;
   note?: string;
+  operationId?: string;
 }
 
 export interface PortfolioCashLedgerCreateRequest {
@@ -200,6 +201,7 @@ export interface PortfolioCashLedgerCreateRequest {
   amount: number;
   currency?: string;
   note?: string;
+  operationId?: string;
 }
 
 export interface PortfolioCorporateActionCreateRequest {
@@ -212,6 +214,7 @@ export interface PortfolioCorporateActionCreateRequest {
   cashDividendPerShare?: number;
   splitRatio?: number;
   note?: string;
+  operationId?: string;
 }
 
 export interface PortfolioEventCreatedResponse {

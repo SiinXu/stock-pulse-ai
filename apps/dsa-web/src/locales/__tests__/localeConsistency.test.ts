@@ -10,6 +10,15 @@ import { UI_TEXT } from '../../i18n/uiText';
 import { ALERT_FORM_TEXT, ALERT_LIST_TEXT, ALERT_PAGE_TEXT, ALERT_TRIGGER_TEXT } from '../alerts';
 import { BACKTEST_TEXT } from '../backtest';
 import { PORTFOLIO_TEXT } from '../portfolio';
+import {
+  ANALYSIS_CONTEXT_BLOCK_LABELS,
+  ANALYSIS_CONTEXT_MISSING_REASON_LABELS,
+  ANALYSIS_CONTEXT_TEXT,
+  MARKET_REVIEW_TEXT,
+  MARKET_STRUCTURE_RISK_TAG_TEXT,
+  MARKET_STRUCTURE_TEXT,
+  REPORT_NEWS_SOURCE_TEXT,
+} from '../reportBody';
 import { REPORT_CHROME_TEXT } from '../reportChrome';
 import { SCREENING_TEXT } from '../screening';
 import { SETTINGS_CONTROLS_TEXT } from '../settingsControls';
@@ -27,6 +36,7 @@ import { SETTINGS_NOTIFICATION_TEXT } from '../settingsNotifications';
 import { SETTINGS_PAGE_TEXT } from '../settingsPage';
 import { SETTINGS_WIZARD_TEXT } from '../settingsWizard';
 import { STOCK_SEARCH_TEXT } from '../stockSearch';
+import { BUILTIN_STRATEGY_TEXT } from '../strategies';
 
 type LocaleMap = { zh: unknown; en: unknown };
 
@@ -38,6 +48,13 @@ const registries: Record<string, LocaleMap> = {
   alertsTrigger: ALERT_TRIGGER_TEXT,
   backtest: BACKTEST_TEXT,
   portfolio: PORTFOLIO_TEXT,
+  analysisContextBlocks: ANALYSIS_CONTEXT_BLOCK_LABELS,
+  analysisContextMissingReasons: ANALYSIS_CONTEXT_MISSING_REASON_LABELS,
+  analysisContext: ANALYSIS_CONTEXT_TEXT,
+  marketReview: MARKET_REVIEW_TEXT,
+  marketStructureRiskTags: MARKET_STRUCTURE_RISK_TAG_TEXT,
+  marketStructure: MARKET_STRUCTURE_TEXT,
+  reportNewsSource: REPORT_NEWS_SOURCE_TEXT,
   reportChrome: REPORT_CHROME_TEXT,
   screening: SCREENING_TEXT,
   settingsControls: SETTINGS_CONTROLS_TEXT,
@@ -53,6 +70,7 @@ const registries: Record<string, LocaleMap> = {
   settingsPage: SETTINGS_PAGE_TEXT,
   settingsWizard: SETTINGS_WIZARD_TEXT,
   stockSearch: STOCK_SEARCH_TEXT,
+  strategies: BUILTIN_STRATEGY_TEXT,
 };
 
 function flatten(value: unknown, prefix = ''): Map<string, string> {

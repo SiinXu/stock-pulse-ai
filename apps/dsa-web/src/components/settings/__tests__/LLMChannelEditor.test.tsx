@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LlmProviderCatalogEntry } from '../../../types/systemConfig';
+import { encodeModelRef } from '../../../utils/modelRef';
 import { LLMChannelEditor } from '../LLMChannelEditor';
 
 function provider(
@@ -193,13 +194,13 @@ describe('LLMChannelEditor', () => {
     expect(within(card).getByText('未测试')).toBeInTheDocument();
   });
 
-  it('keeps explicit provider identity through read-back and connection rename', async () => {
+  it('reads and saves an editable display name without changing the stable connection id', async () => {
     const onDraftItemsChange = vi.fn();
     const renamedItems = OPENAI_ITEMS.map((item) => ({
       ...item,
       key: item.key.replace('LLM_OPENAI_', 'LLM_PRODUCTION_'),
       value: item.key === 'LLM_CHANNELS' ? 'production' : item.value,
-    }));
+    })).concat({ key: 'LLM_PRODUCTION_DISPLAY_NAME', value: 'Production gateway' });
     render(
       <LLMChannelEditor
         items={renamedItems}
@@ -209,17 +210,19 @@ describe('LLMChannelEditor', () => {
       />,
     );
 
-    expect(connectionCard('production')).toHaveTextContent('OpenAI 官方');
+    expect(connectionCard('production')).toHaveTextContent('Production gateway');
     const dialog = editConnection('production');
-    fireEvent.change(within(dialog).getByLabelText('连接名称'), { target: { value: 'research' } });
+    expect(within(dialog).getByLabelText('连接 ID')).toHaveValue('production');
+    fireEvent.change(within(dialog).getByLabelText('连接名称'), { target: { value: 'Research gateway' } });
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
 
     await waitFor(() => {
       const draft = lastDraft(onDraftItemsChange);
-      expect(draft).toContainEqual({ key: 'LLM_RESEARCH_PROVIDER', value: 'openai' });
-      expect(draft).toContainEqual({ key: 'LLM_PRODUCTION_PROVIDER', value: '' });
+      expect(draft).toContainEqual({ key: 'LLM_CHANNELS', value: 'production' });
+      expect(draft).toContainEqual({ key: 'LLM_PRODUCTION_DISPLAY_NAME', value: 'Research gateway' });
+      expect(draft.some((item) => item.key.startsWith('LLM_RESEARCH_'))).toBe(false);
     });
-    expect(connectionCard('research')).toHaveTextContent('OpenAI 官方');
+    expect(connectionCard('production')).toHaveTextContent('Research gateway');
   });
 
   it('reports one stable empty draft while the saved connection is unchanged', async () => {
@@ -329,7 +332,7 @@ describe('LLMChannelEditor', () => {
     expect(within(dialog).getByText('Agent')).toBeInTheDocument();
   });
 
-  it('allows removing one owner when another enabled connection still exposes the route', () => {
+  it('requires confirmation before removing an owner of an ambiguous legacy route', () => {
     const items = [
       { key: 'LLM_CHANNELS', value: 'openai,backup' },
       ...OPENAI_ITEMS.filter((item) => item.key !== 'LLM_CHANNELS' && item.key !== 'LITELLM_MODEL'),
@@ -355,8 +358,45 @@ describe('LLMChannelEditor', () => {
     const dialog = editConnection('openai');
     fireEvent.click(within(dialog).getByRole('button', { name: '移除模型 gpt-4o-mini' }));
 
-    expect(within(dialog).queryByText('无法直接删除模型')).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: '移除模型 gpt-4o-mini' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('无法直接删除模型')).toBeInTheDocument();
+    expect(within(dialog).getByText('报告主要模型')).toBeInTheDocument();
+  });
+
+  it('matches same-route references by Connection-aware ModelRef', () => {
+    const items = [
+      { key: 'LLM_CHANNELS', value: 'openai,backup' },
+      ...OPENAI_ITEMS.filter((item) => item.key !== 'LLM_CHANNELS' && item.key !== 'LITELLM_MODEL'),
+      { key: 'LLM_BACKUP_PROVIDER', value: 'openai' },
+      { key: 'LLM_BACKUP_PROTOCOL', value: 'openai' },
+      { key: 'LLM_BACKUP_BASE_URL', value: 'https://api.openai.com/v1' },
+      { key: 'LLM_BACKUP_ENABLED', value: 'true' },
+      { key: 'LLM_BACKUP_API_KEY', value: 'backup-key' },
+      { key: 'LLM_BACKUP_MODELS', value: 'gpt-4o-mini' },
+    ];
+    render(
+      <LLMChannelEditor
+        items={items}
+        providers={PROVIDERS}
+        maskToken="******"
+        taskModelRefs={[{
+          key: 'LITELLM_MODEL',
+          label: '报告主要模型',
+          route: encodeModelRef('backup', 'openai/gpt-4o-mini'),
+        }]}
+        onReplaceModelReferences={vi.fn()}
+      />,
+    );
+
+    const primaryDialog = editConnection('openai');
+    fireEvent.click(within(primaryDialog).getByRole('button', { name: '移除模型 gpt-4o-mini' }));
+    expect(within(primaryDialog).queryByText('无法直接删除模型')).not.toBeInTheDocument();
+    fireEvent.click(within(primaryDialog).getByRole('button', { name: '取消' }));
+
+    const backupDialog = editConnection('backup');
+    fireEvent.click(within(backupDialog).getByRole('button', { name: '移除模型 gpt-4o-mini' }));
+    expect(within(backupDialog).getByText('无法直接删除模型')).toBeInTheDocument();
+    fireEvent.click(within(backupDialog).getByRole('button', { name: '替代模型' }));
+    expect(within(backupDialog).getByRole('option', { name: /gpt-4o-mini.*openai/i })).toBeInTheDocument();
   });
 
   it('replaces task references and removes the model in the same page draft', () => {
@@ -387,8 +427,9 @@ describe('LLMChannelEditor', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
     expect(onReplaceModelReferences).toHaveBeenCalledWith([{
-      fromRoute: 'openai/gpt-4o-mini',
-      toRoute: 'openai/gpt-5.5',
+      fromModelRef: encodeModelRef('openai', 'openai/gpt-4o-mini'),
+      fromRuntimeRoute: 'openai/gpt-4o-mini',
+      toModelRef: encodeModelRef('openai', 'openai/gpt-5.5'),
       references: [{ key: 'LITELLM_MODEL', label: '报告主要模型', route: 'openai/gpt-4o-mini' }],
     }]);
   });
@@ -595,7 +636,7 @@ describe('LLMChannelEditor', () => {
     await waitFor(() => expect(lastDraft(onDraftItemsChange)).toEqual([]));
   });
 
-  it('does not emit invalid env keys while the connection name is empty', () => {
+  it('keeps the stable connection id when the display name is cleared', async () => {
     const onDraftItemsChange = vi.fn();
     render(
       <LLMChannelEditor
@@ -607,8 +648,16 @@ describe('LLMChannelEditor', () => {
     );
     const dialog = editConnection();
     fireEvent.change(within(dialog).getByLabelText('连接名称'), { target: { value: '' } });
-    expect(within(dialog).getByRole('button', { name: '保存修改' })).toBeDisabled();
-    expect(lastDraft(onDraftItemsChange)).toEqual([]);
+    expect(within(dialog).getByRole('button', { name: '保存修改' })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => {
+      const draft = lastDraft(onDraftItemsChange);
+      expect(draft).toContainEqual({ key: 'LLM_CHANNELS', value: 'openai' });
+      expect(draft).toContainEqual({ key: 'LLM_OPENAI_DISPLAY_NAME', value: '' });
+      expect(draft.some((item) => item.key.startsWith('LLM__'))).toBe(false);
+    });
+    expect(connectionCard()).toHaveTextContent('openai');
   });
 
   it('keeps the API key masked until the user requests visibility', () => {

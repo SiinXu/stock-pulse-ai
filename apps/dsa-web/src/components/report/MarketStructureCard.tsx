@@ -8,6 +8,10 @@ import type {
   RankedThemeItem,
   ReportLanguage,
 } from '../../types/analysis';
+import {
+  MARKET_STRUCTURE_RISK_TAG_TEXT as RISK_TAG_TEXT,
+  MARKET_STRUCTURE_TEXT as TEXT,
+} from '../../locales/reportBody';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Card } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
@@ -25,129 +29,6 @@ const STATUS_VARIANT: Record<MarketStructureStatus, BadgeVariant> = {
   unknown: 'default',
   not_supported: 'default',
 };
-
-const TEXT = {
-  zh: {
-    eyebrow: '市场位置',
-    title: '题材主线与个股位置',
-    marketLayer: '大盘题材层',
-    stockLayer: '个股位置层',
-    activeThemes: '活跃题材',
-    leadingConcepts: '领涨概念',
-    leadingIndustries: '领涨行业',
-    primaryTheme: '主关联题材',
-    themePhase: '题材阶段',
-    stockRole: '个股位置',
-    riskTags: '风险标签',
-    dataQuality: '数据质量',
-    missingFields: '缺失证据',
-    empty: '暂无',
-    status: {
-      ok: '可用',
-      partial: '部分可用',
-      unknown: '未知',
-      not_supported: '不支持',
-    },
-    phase: {
-      warming: '升温',
-      accelerating: '加速',
-      cooling: '降温',
-      unknown: '未知',
-    },
-    role: {
-      leader: '龙头',
-      follower: '跟随',
-      edge: '边缘关联',
-      unknown: '未知',
-    },
-  },
-  en: {
-    eyebrow: 'MARKET POSITION',
-    title: 'Themes and Stock Position',
-    marketLayer: 'Market Theme Layer',
-    stockLayer: 'Stock Position Layer',
-    activeThemes: 'Active Themes',
-    leadingConcepts: 'Leading Concepts',
-    leadingIndustries: 'Leading Industries',
-    primaryTheme: 'Primary Theme',
-    themePhase: 'Theme Phase',
-    stockRole: 'Stock Role',
-    riskTags: 'Risk Tags',
-    dataQuality: 'Data Quality',
-    missingFields: 'Missing Evidence',
-    empty: 'None',
-    status: {
-      ok: 'Available',
-      partial: 'Partial',
-      unknown: 'Unknown',
-      not_supported: 'Not supported',
-    },
-    phase: {
-      warming: 'Warming',
-      accelerating: 'Accelerating',
-      cooling: 'Cooling',
-      unknown: 'Unknown',
-    },
-    role: {
-      leader: 'Leader',
-      follower: 'Follower',
-      edge: 'Edge',
-      unknown: 'Unknown',
-    },
-  },
-  ko: {
-    eyebrow: '시장 포지션',
-    title: '테마 라인 및 종목 포지션',
-    marketLayer: '시장 테마 레이어',
-    stockLayer: '종목 포지션 레이어',
-    activeThemes: '활성 테마',
-    leadingConcepts: '선도 테마',
-    leadingIndustries: '선도 산업',
-    primaryTheme: '주요 관련 테마',
-    themePhase: '테마 단계',
-    stockRole: '종목 역할',
-    riskTags: '리스크 태그',
-    dataQuality: '데이터 품질',
-    missingFields: '부족한 근거',
-    empty: '없음',
-    status: {
-      ok: '사용 가능',
-      partial: '일부 사용',
-      unknown: '알 수 없음',
-      not_supported: '미지원',
-    },
-    phase: {
-      warming: '온도 상승',
-      accelerating: '가속',
-      cooling: '쿨다운',
-      unknown: '알 수 없음',
-    },
-    role: {
-      leader: '리더',
-      follower: '추종',
-      edge: '엣지',
-      unknown: '알 수 없음',
-    },
-  },
-} as const;
-
-const RISK_TAG_TEXT = {
-  zh: {
-    theme_data_partial: '题材主线数据不完整',
-    stock_theme_evidence_partial: '个股板块未匹配到市场题材榜单，个股位置按降级证据处理',
-    board_membership_missing: '缺少个股所属板块证据，无法判断题材位置',
-  },
-  en: {
-    theme_data_partial: 'Market theme data is incomplete',
-    stock_theme_evidence_partial: 'Stock board did not match theme rankings',
-    board_membership_missing: 'Stock board membership evidence is missing',
-  },
-  ko: {
-    theme_data_partial: '테마 데이터가 불완전합니다',
-    stock_theme_evidence_partial: '종목 보드가 테마 랭킹과 일치하지 않았습니다',
-    board_membership_missing: '종목 보드 근거가 없어 테마 위치를 판단할 수 없습니다',
-  },
-} as const;
 
 const formatItem = (item: RankedThemeItem): string => {
   if (typeof item.changePct === 'number') {

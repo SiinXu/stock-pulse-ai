@@ -31,6 +31,12 @@ locales/reportChrome.ts
 
 日期、数字、货币和列表使用 `src/utils/uiLocale.ts`。显示 locale 与市场业务时区分离；ISO 表单值、股票代码和模型 ID 不做本地化。
 
+## 任务消息与恢复
+
+分析任务的 POST 接受响应、任务列表、单任务状态与 SSE 事件使用同一份版本化契约：`message_code/message_params` 和 `error_code/error_params` 用于界面主文案，`message/error` 只作为兼容诊断。Web 必须在每次渲染时按当前 UI language 翻译 code；未知 code 或旧载荷显示通用本地化文案，原文只放在可展开诊断中。
+
+同一任务的 POST、SSE 和轮询快照按 `task_id + revision` 合并，旧 revision 不得覆盖新状态。SSE 断开后，Web 针对已知非终态 task ID 立即轮询 `/analysis/status/{task_id}`，连接恢复后停止降级轮询。刷新时恢复活跃任务和保留窗口内的 terminal 任务；dismiss 绑定当前 revision 并具有 TTL，新 revision 会重新显示。
+
 ## 验证
 
 ```bash

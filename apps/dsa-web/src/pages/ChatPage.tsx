@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -6,8 +6,8 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, ConfirmDialog, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
-import { useDialogA11y } from '../components/common/useDialogA11y';
+import { ApiErrorAlert, Badge, Button, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
+import { OVERLAY_Z } from '../components/common/overlayZ';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -30,8 +30,9 @@ import { getReportText } from '../utils/reportLanguage';
 import { extractStockCodesFromMessage } from '../utils/chatStockCode';
 import { findMatchingStockCode, includesStockCode, normalizeStockCode } from '../utils/stockCode';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import type { UiTextKey } from '../i18n/uiText';
+import type { UiLanguage, UiTextKey } from '../i18n/uiText';
 import { formatUiDateTime } from '../utils/uiLocale';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -45,6 +46,7 @@ const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> 
 
 const MAX_SELECTED_SKILLS = 3;
 const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
+const CHAT_SESSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 const STRONG_COMPARE_STOCK_MESSAGE_RE = /比较|对比|\bvs\b|和[^，。,.!?！？]{0,40}比/i;
 const WEAK_COMPARE_STOCK_MESSAGE_RE = /差异(?!化)|区别|不同|相比|对照|比一比/;
 const CHOICE_COMPARE_STOCK_MESSAGE_RE = /哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一/;
@@ -57,6 +59,11 @@ type ActiveStockResolution = {
   useForCurrentSend: boolean;
 };
 
+const sanitizeChatSessionId = (value: string | null): string | null => {
+  const normalized = value?.trim() ?? '';
+  return CHAT_SESSION_ID_RE.test(normalized) ? normalized : null;
+};
+
 const getMessageSkillNames = (msg: Message): string[] => {
   if (msg.skillNames?.length) return msg.skillNames;
   if (msg.skillName) return [msg.skillName];
@@ -65,7 +72,16 @@ const getMessageSkillNames = (msg: Message): string[] => {
   return [];
 };
 
-const getMessageSkillLabel = (msg: Message): string => getMessageSkillNames(msg).join('、');
+const getMessageSkillLabel = (msg: Message, language: UiLanguage): string => {
+  const names = getMessageSkillNames(msg);
+  const ids = msg.skills?.length ? msg.skills : msg.skill ? [msg.skill] : [];
+  if (ids.length === 0) {
+    return names.join(language === 'en' ? ', ' : '、');
+  }
+  return ids
+    .map((id, index) => getStrategyDisplay({ id, name: names[index] }, language).name)
+    .join(language === 'en' ? ', ' : '、');
+};
 
 const isStageDoneSuccessful = (status?: string): boolean => {
   if (!status) return true;
@@ -174,6 +190,8 @@ const restoreActiveStockContextFromMessages = (messages: Message[]): ActiveStock
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
+  const latestSearchParamsRef = useRef(searchParams);
+  latestSearchParamsRef.current = searchParams;
   const [input, setInput] = useState('');
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
@@ -182,11 +200,11 @@ const ChatPage: React.FC = () => {
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  useDialogA11y({ isOpen: sidebarOpen, containerRef: sidebarRef, onEscape: closeSidebar });
   const [sending, setSending] = useState(false);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
+  const [followUpContextFallback, setFollowUpContextFallback] = useState(false);
+  const [sessionRoutingReady, setSessionRoutingReady] = useState(false);
   const [sendToast, setSendToast] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -324,10 +342,12 @@ const ChatPage: React.FC = () => {
     sessions,
     sessionsLoading,
     chatError,
+    failedStreamRequest,
     loadSessions,
     loadInitialSession,
     switchSession,
     startStream,
+    retryLastFailedStream,
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
@@ -403,8 +423,57 @@ const ChatPage: React.FC = () => {
   }, [clearCompletionBadge]);
 
   useEffect(() => {
-    loadInitialSession();
+    const requestedSessionId = sanitizeChatSessionId(searchParams.get('session')) ?? undefined;
+    let active = true;
+    void Promise.resolve(loadInitialSession(requestedSessionId)).finally(() => {
+      if (active) setSessionRoutingReady(true);
+    });
+    return () => {
+      active = false;
+    };
+    // Initial session hydration runs once; later URL changes are handled by
+    // the route synchronization effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadInitialSession]);
+
+  const setSessionRoute = useCallback((nextSessionId: string, replace = false) => {
+    const next = new URLSearchParams(latestSearchParamsRef.current);
+    next.set('session', nextSessionId);
+    setSearchParams(next, { replace });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (!sessionRoutingReady) return;
+    const requestedSessionId = sanitizeChatSessionId(searchParams.get('session'));
+    if (!requestedSessionId) {
+      if (searchParams.has('stock')) return;
+      const timer = window.setTimeout(() => {
+        const latest = latestSearchParamsRef.current;
+        if (!latest.has('session') && !latest.has('stock')) {
+          setSessionRoute(sessionId, true);
+        }
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+    if (requestedSessionId === sessionId) return;
+
+    followUpHydrationTokenRef.current += 1;
+    followUpContextRef.current = null;
+    setIsFollowUpContextLoading(false);
+    setFollowUpContextFallback(false);
+    setActiveStockContext(null);
+    setActiveStockCode(null);
+    requestScrollToBottom('auto');
+    void switchSession(requestedSessionId);
+    return undefined;
+  }, [
+    requestScrollToBottom,
+    searchParams,
+    sessionId,
+    sessionRoutingReady,
+    setSessionRoute,
+    switchSession,
+  ]);
 
   useEffect(() => {
     agentApi.getSkills()
@@ -499,10 +568,14 @@ const ChatPage: React.FC = () => {
     .map((question) => ({ label: t(question.labelKey), skill: question.skill }));
   const selectedSkillIdSet = new Set(selectedSkillIds);
   const skillLimitReached = selectedSkillIds.length >= MAX_SELECTED_SKILLS;
+  const displayedSkills = useMemo(
+    () => skills.map((skill) => ({ ...skill, display: getStrategyDisplay(skill, language) })),
+    [language, skills],
+  );
 
   const getSkillNames = useCallback(
-    (skillIds: string[]) => skillIds.map((id) => skills.find((s) => s.id === id)?.name || id),
-    [skills],
+    (skillIds: string[]) => skillIds.map((id) => displayedSkills.find((skill) => skill.id === id)?.display.name || id),
+    [displayedSkills],
   );
 
   const normalizeSelectedSkillIds = useCallback((skillIds: string[]) => {
@@ -529,26 +602,35 @@ const ChatPage: React.FC = () => {
   }, []);
 
   const handleStartNewChat = useCallback(() => {
+    followUpHydrationTokenRef.current += 1;
     followUpContextRef.current = null;
+    setIsFollowUpContextLoading(false);
+    setFollowUpContextFallback(false);
     setActiveStockContext(null);
     setActiveStockCode(null);
     requestScrollToBottom('auto');
     useAgentChatStore.getState().startNewChat();
+    const nextSessionId = useAgentChatStore.getState().sessionId;
+    if (nextSessionId) setSessionRoute(nextSessionId);
     setSidebarOpen(false);
-  }, [requestScrollToBottom]);
+  }, [requestScrollToBottom, setSessionRoute]);
 
   const handleSwitchSession = useCallback((targetSessionId: string) => {
     if (targetSessionId === sessionId) {
       setSidebarOpen(false);
       return;
     }
+    followUpHydrationTokenRef.current += 1;
     followUpContextRef.current = null;
+    setIsFollowUpContextLoading(false);
+    setFollowUpContextFallback(false);
     setActiveStockContext(null);
     setActiveStockCode(null);
     requestScrollToBottom('auto');
-    switchSession(targetSessionId);
+    setSessionRoute(targetSessionId);
+    void switchSession(targetSessionId);
     setSidebarOpen(false);
-  }, [requestScrollToBottom, sessionId, switchSession]);
+  }, [requestScrollToBottom, sessionId, setSessionRoute, switchSession]);
 
   const confirmDelete = useCallback(() => {
     if (!deleteConfirmId) return;
@@ -572,7 +654,6 @@ const ChatPage: React.FC = () => {
     const recordId = parseFollowUpRecordId(searchParams.get('recordId'));
 
     if (!stock) {
-      setSearchParams({}, { replace: true });
       return;
     }
 
@@ -587,6 +668,7 @@ const ChatPage: React.FC = () => {
       stock_code: stock,
       stock_name: name,
     };
+    setFollowUpContextFallback(false);
     if (recordId !== undefined) {
       setIsFollowUpContextLoading(true);
     }
@@ -594,6 +676,11 @@ const ChatPage: React.FC = () => {
       stockCode: stock,
       stockName: name,
       recordId,
+      onHydrationFailure: () => {
+        if (isMountedRef.current && followUpHydrationTokenRef.current === hydrationToken) {
+          setFollowUpContextFallback(true);
+        }
+      },
     }).then((context) => {
       if (!isMountedRef.current || followUpHydrationTokenRef.current !== hydrationToken) {
         return;
@@ -604,13 +691,17 @@ const ChatPage: React.FC = () => {
         setIsFollowUpContextLoading(false);
       }
     });
-    setSearchParams({}, { replace: true });
+    const next = new URLSearchParams(searchParams);
+    next.delete('stock');
+    next.delete('name');
+    next.delete('recordId');
+    setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
-      if (!msgText || loading) return;
+      if (!msgText || loading || isFollowUpContextLoading) return;
       const usedSkillIds = normalizeSelectedSkillIds(overrideSkillIds ?? selectedSkillIds);
       const usedSkillNames = usedSkillIds.length > 0 ? getSkillNames(usedSkillIds) : [t('chat.general')];
 
@@ -636,6 +727,7 @@ const ChatPage: React.FC = () => {
       followUpHydrationTokenRef.current += 1;
       followUpContextRef.current = null;
       setIsFollowUpContextLoading(false);
+      setFollowUpContextFallback(false);
 
       setInput('');
       setMobileSkillPickerOpen(false);
@@ -645,7 +737,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(language === 'en' ? ', ' : '、'),
       });
     },
-    [activeStockContext, getSkillNames, input, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
+    [activeStockContext, getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -707,7 +799,7 @@ const ChatPage: React.FC = () => {
   };
 
   const downloadMessageAsMarkdown = useCallback((msg: Message) => {
-    const skillLabel = getMessageSkillLabel(msg);
+    const skillLabel = getMessageSkillLabel(msg, language);
     const heading = msg.role === 'user'
       ? `# ${t('chat.userMessageHeading')}`
       : `# ${t('chat.aiReplyHeading')}${skillLabel ? ` · ${skillLabel}` : ''}`;
@@ -721,7 +813,7 @@ const ChatPage: React.FC = () => {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
-  }, [t]);
+  }, [language, t]);
 
   const getCurrentStage = (steps: ProgressStep[]): string => {
     if (steps.length === 0) return t('chat.connecting');
@@ -836,9 +928,9 @@ const ChatPage: React.FC = () => {
     </div>
   );
 
-  const sidebarContent = (
+  const renderSidebarContent = (showHeader = true) => (
     <>
-      <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
+      {showHeader ? <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
         <h2 className="text-sm font-semibold text-cyan uppercase tracking-[0.2em] flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -864,7 +956,7 @@ const ChatPage: React.FC = () => {
             />
           </svg>
         </button>
-      </div>
+      </div> : null}
       <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
         {sessionsLoading ? (
           <DashboardStateBlock
@@ -946,34 +1038,38 @@ const ChatPage: React.FC = () => {
   return (
     <div
       data-testid="chat-workspace"
-      className="flex h-[calc(100vh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
       <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-card/82 shadow-soft-card md:flex">
-        {sidebarContent}
+        {renderSidebarContent()}
       </div>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 md:hidden"
-          onClick={closeSidebar}
-          role="presentation"
-        >
-          <div className="page-drawer-overlay absolute inset-0" />
-          <div
-            ref={sidebarRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('chat.history')}
-            tabIndex={-1}
-            className="absolute left-0 top-0 bottom-0 w-72 flex flex-col glass-card overflow-hidden border-r border-white/10 bg-card/90 shadow-2xl focus:outline-none"
-            onClick={(e) => e.stopPropagation()}
+      <Drawer
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        title={t('chat.history')}
+        width="max-w-[18rem]"
+        zIndex={OVERLAY_Z.pageDrawer}
+        side="left"
+        showEyebrow={false}
+        overlayClassName="md:hidden"
+        contentClassName="flex min-h-0 flex-col overflow-hidden p-0"
+        headerActions={(
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-colors hover:bg-hover hover:text-foreground"
+            aria-label={t('chat.newConversation')}
           >
-            {sidebarContent}
-          </div>
-        </div>
-      )}
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
+        )}
+      >
+        {renderSidebarContent(false)}
+      </Drawer>
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog
@@ -993,8 +1089,9 @@ const ChatPage: React.FC = () => {
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-hover transition-colors text-secondary-text hover:text-foreground"
+                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('chat.history')}
               >
                 <svg
@@ -1169,7 +1266,9 @@ const ChatPage: React.FC = () => {
                       {quickQuestions.map((q, i) => (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => handleQuickQuestion(q)}
+                          disabled={loading || isFollowUpContextLoading}
                           className="quick-question-btn"
                         >
                           {q.label}
@@ -1181,7 +1280,7 @@ const ChatPage: React.FC = () => {
               </div>
             ) : (
               messages.map((msg) => {
-                const skillLabel = getMessageSkillLabel(msg);
+                const skillLabel = getMessageSkillLabel(msg, language);
                 return (
                 <div
                   key={msg.id}
@@ -1324,12 +1423,26 @@ const ChatPage: React.FC = () => {
           {/* Input area */}
           <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
             <div className="space-y-3">
-              {chatError ? <ApiErrorAlert error={chatError} /> : null}
+              {chatError ? (
+                <ApiErrorAlert
+                  error={chatError}
+                  actionLabel={failedStreamRequest ? t('common.retry') : undefined}
+                  onAction={failedStreamRequest ? () => void retryLastFailedStream() : undefined}
+                />
+              ) : null}
               {isFollowUpContextLoading ? (
                 <InlineAlert
                   variant="info"
                   title={t('chat.followUpLoadingTitle')}
                   message={t('chat.followUpLoadingMessage')}
+                  className="rounded-xl px-3 py-2 text-xs shadow-none"
+                />
+              ) : null}
+              {followUpContextFallback ? (
+                <InlineAlert
+                  variant="warning"
+                  title={t('chat.followUpFallbackTitle')}
+                  message={t('chat.followUpFallbackMessage')}
                   className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
@@ -1420,7 +1533,7 @@ const ChatPage: React.FC = () => {
                         {t('chat.generalAnalysis')}
                       </span>
                     </label>
-                    {skills.map((s) => {
+                    {displayedSkills.map((s) => {
                       const checked = selectedSkillIdSet.has(s.id);
                       const disabled = !checked && skillLimitReached;
                       return (
@@ -1442,12 +1555,12 @@ const ChatPage: React.FC = () => {
                           <span
                             className={`transition-colors text-sm ${checked ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
                           >
-                            {s.name}
+                            {s.display.name}
                           </span>
-                          {showSkillDesc === s.id && s.description && (
+                          {showSkillDesc === s.id && s.display.description && (
                             <div className="skill-desc-tooltip">
-                              <p className="skill-title">{s.name}</p>
-                              <p>{s.description}</p>
+                              <p className="skill-title">{s.display.name}</p>
+                              <p>{s.display.description}</p>
                             </div>
                           )}
                         </label>
@@ -1505,7 +1618,7 @@ const ChatPage: React.FC = () => {
                   <Button
                     variant="primary"
                     onClick={() => handleSend()}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || isFollowUpContextLoading}
                     className="btn-primary flex-shrink-0"
                   >
                     {t('chat.send')}

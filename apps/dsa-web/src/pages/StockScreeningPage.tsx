@@ -43,9 +43,24 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
 import { formatUiDateTime, formatUiNumber } from '../utils/uiLocale';
+import { createRequestKey, useAsyncResource } from '../hooks/useAsyncResource';
+import { localizeTaskMessage } from '../utils/taskMessage';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 const SCREEN_TASK_STORAGE_KEY = 'dsa.alphasift.activeScreenTask.v1';
 const SCREEN_TASK_POLL_INTERVAL_MS = 2000;
+
+interface HotspotResourceData {
+  items: AlphaSiftHotspot[];
+  updatedAt: string | null;
+  emptyMessage: string;
+}
+
+const EMPTY_HOTSPOTS: HotspotResourceData = {
+  items: [],
+  updatedAt: null,
+  emptyMessage: '',
+};
 
 type PersistedScreenTask = {
   taskId: string;
@@ -277,12 +292,18 @@ const getScreenMessages = (meta: AlphaSiftScreenResponse | null, text: Screening
 
 const isRunningScreenTask = (status: string | undefined | null) => status === 'pending' || status === 'processing';
 
-const formatScreenTaskFailure = (value: string | null | undefined, textMap: ScreeningText) => {
-  const text = String(value || '').trim();
-  if (!text) {
-    return textMap.taskFailed;
+const normalizeScreenTaskStatus = (status: string | undefined | null) => {
+  switch (status) {
+    case 'pending':
+    case 'processing':
+    case 'completed':
+    case 'failed':
+    case 'cancel_requested':
+    case 'cancelled':
+      return status;
+    default:
+      return 'processing';
   }
-  return formatUiText(textMap.taskFailedDetail, { detail: summarizeAlphaSiftDiagnostic(text, textMap) });
 };
 
 const ALPHASIFT_HOTSPOT_NO_CACHE_HINT = 'No cached AlphaSift hotspot snapshot. Click refresh to fetch live hotspots.';
@@ -450,7 +471,7 @@ const MiniSparkline: React.FC<{ score?: number | null; selected?: boolean }> = (
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const text = SCREENING_TEXT[language];
   const markets = useMemo(() => [{ id: 'cn', label: text.marketCn }], [text.marketCn]);
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
@@ -458,35 +479,69 @@ const StockScreeningPage: React.FC = () => {
   const [available, setAvailable] = useState(false);
   const [market, setMarket] = useState(restoredTask?.market || 'cn');
   const [strategy, setStrategy] = useState(restoredTask?.strategy || 'dual_low');
-  const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
+  const [strategiesResource, strategyRequests] = useAsyncResource<AlphaSiftStrategy[], string>({
+    initialData: [],
+    isEmpty: (items) => items.length === 0,
+  });
+  const strategies = strategiesResource.data;
   const [maxResults, setMaxResults] = useState(restoredTask?.maxResults || 3);
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
-  const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
-  const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
+  const [hotspotsResource, hotspotRequests] = useAsyncResource<HotspotResourceData, string>({
+    initialData: EMPTY_HOTSPOTS,
+    isEmpty: (data) => data.items.length === 0,
+  });
+  const hotspots = hotspotsResource.data.items;
+  const hotspotsUpdatedAt = hotspotsResource.data.updatedAt;
   const [hotspotsExpanded, setHotspotsExpanded] = useState(false);
   const [selectedHotspotTopic, setSelectedHotspotTopic] = useState<string | null>(null);
+  const componentMountedRef = useRef(true);
   const selectedHotspotTopicRef = useRef<string | null>(null);
   const hotspotDetailRequestIdRef = useRef(0);
   const hotspotDetailsByTopicRef = useRef<Record<string, AlphaSiftHotspotDetail>>({});
   const [hotspotDetail, setHotspotDetail] = useState<AlphaSiftHotspotDetail | null>(null);
   const [loadingHotspotDetail, setLoadingHotspotDetail] = useState(false);
   const [hotspotDetailError, setHotspotDetailError] = useState('');
-  const [loadingHotspots, setLoadingHotspots] = useState(false);
-  const [hotspotError, setHotspotError] = useState('');
+  const loadingHotspots = hotspotsResource.status === 'loading' || hotspotsResource.status === 'refreshing';
+  const hotspotError = hotspotsResource.error || '';
   const [screenMeta, setScreenMeta] = useState<AlphaSiftScreenResponse | null>(null);
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(restoredTask?.taskId));
   const [enabling, setEnabling] = useState(false);
-  const [loadingStrategies, setLoadingStrategies] = useState(false);
+  const loadingStrategies = strategiesResource.status === 'loading';
   const [error, setError] = useState('');
-  const [strategyLoadError, setStrategyLoadError] = useState('');
+  const strategyLoadError = strategiesResource.error || '';
   const [activeTaskId, setActiveTaskId] = useState<string | null>(restoredTask?.taskId ?? null);
   const [taskProgress, setTaskProgress] = useState(restoredTask?.taskId ? 10 : 0);
-  const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
+  const [taskMessageFallback, setTaskMessageFallback] = useState(restoredTask?.taskId ? text.restoringTask : '');
+  const [taskSnapshot, setTaskSnapshot] = useState<AlphaSiftScreenTaskStatus | null>(null);
+
+  const taskMessage = taskSnapshot
+    ? localizeTaskMessage({
+        status: normalizeScreenTaskStatus(taskSnapshot.status),
+        messageCode: taskSnapshot.messageCode || undefined,
+        messageParams: taskSnapshot.messageParams,
+      }, t)
+    : taskMessageFallback;
+  const taskRawMessage = String(taskSnapshot?.message || '').trim();
+  const taskRawError = String(taskSnapshot?.error || '').trim();
+  const taskErrorCode = String(taskSnapshot?.errorCode || '').trim();
+  const hasTaskDiagnostics = Boolean(taskSnapshot?.traceId || taskRawMessage || taskRawError || taskErrorCode);
+  const taskFailureMessage = taskSnapshot?.status === 'failed'
+    ? localizeTaskMessage({
+        status: 'failed',
+        messageCode: taskSnapshot.messageCode || undefined,
+        messageParams: taskSnapshot.messageParams,
+      }, t)
+    : '';
+  const displayedError = taskFailureMessage || error;
 
   const selectedStrategy = useMemo(() => strategies.find((item) => item.id === strategy), [strategies, strategy]);
-  const selectedStrategyTitle = selectedStrategy?.name || selectedStrategy?.title || text.customStrategy;
-  const selectedStrategyTag = selectedStrategy?.category || selectedStrategy?.tag || selectedStrategy?.tags?.[0] || text.custom;
+  const selectedStrategyDisplay = useMemo(
+    () => (selectedStrategy ? getStrategyDisplay(selectedStrategy, language) : null),
+    [language, selectedStrategy],
+  );
+  const selectedStrategyTitle = selectedStrategyDisplay?.name || text.customStrategy;
+  const selectedStrategyTag = selectedStrategyDisplay?.category || text.custom;
   const displayedStrategy = selectedStrategy ? selectedStrategyTitle : `${text.customStrategy} (${strategy})`;
   const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
   const llmDegraded = screenMeta?.llmRanked === false;
@@ -501,6 +556,14 @@ const StockScreeningPage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
+
+  useEffect(() => {
+    componentMountedRef.current = true;
+    return () => {
+      componentMountedRef.current = false;
+      hotspotDetailRequestIdRef.current += 1;
+    };
+  }, []);
 
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
@@ -529,7 +592,11 @@ const StockScreeningPage: React.FC = () => {
     const requestId = hotspotDetailRequestIdRef.current + 1;
     hotspotDetailRequestIdRef.current = requestId;
     const isCurrentRequest = () => hotspotDetailRequestIdRef.current === requestId;
-    const canApplyRequest = () => isCurrentRequest() && selectedHotspotTopicRef.current === topic;
+    const canApplyRequest = () => (
+      componentMountedRef.current
+      && isCurrentRequest()
+      && selectedHotspotTopicRef.current === topic
+    );
     setLoadingHotspotDetail(true);
     setHotspotDetail((currentDetail) => (currentDetail?.topic === topic ? currentDetail : null));
     setHotspotDetailError('');
@@ -550,39 +617,47 @@ const StockScreeningPage: React.FC = () => {
       setHotspotDetail(null);
       setHotspotDetailError(toApiErrorMessage(err, text.hotspotDetailLoadFailed, language));
     } finally {
-      if (isCurrentRequest()) {
+      if (componentMountedRef.current && isCurrentRequest()) {
         setLoadingHotspotDetail(false);
       }
     }
   }, [language, text.hotspotDetailLoadFailed]);
 
   const loadStrategies = useCallback(async () => {
-    setLoadingStrategies(true);
+    const request = strategyRequests.begin(
+      createRequestKey('screening-strategies', ['alphasift']),
+      { retainData: true },
+    );
     try {
-      setStrategyLoadError('');
       const result = await alphasiftApi.getStrategies();
       const loadedStrategies = result.strategies || [];
-      setStrategies(loadedStrategies);
-      if (loadedStrategies.length > 0) {
+      if (strategyRequests.resolve(request, loadedStrategies) && loadedStrategies.length > 0) {
         setStrategy((currentStrategy) =>
           loadedStrategies.some((item) => item.id === currentStrategy) ? currentStrategy : loadedStrategies[0].id,
         );
       }
     } catch (err) {
-      setStrategies([]);
-      setStrategyLoadError(getParsedApiError(err, language).message || text.strategyLoadFailed);
-    } finally {
-      setLoadingStrategies(false);
+      strategyRequests.reject(request, getParsedApiError(err, language).message || text.strategyLoadFailed);
     }
-  }, [language, text.strategyLoadFailed]);
+  }, [language, strategyRequests, text.strategyLoadFailed]);
 
   const loadHotspots = useCallback(async (refresh = false) => {
-    setLoadingHotspots(true);
-    setHotspotError('');
+    const request = hotspotRequests.begin(
+      createRequestKey('screening-hotspots', ['akshare', 12, refresh]),
+      { retainData: refresh },
+    );
     try {
       const result = await alphasiftApi.getHotspots({ provider: 'akshare', top: 12, refresh });
       const nextHotspots = result.hotspots || [];
       const nextDetails = result.details || {};
+      const nextResource = {
+        items: nextHotspots,
+        updatedAt: result.cachedAt || (nextHotspots.length > 0 ? new Date().toISOString() : null),
+        emptyMessage: nextHotspots.length === 0 ? formatHotspotEmptyMessage(result, text) : '',
+      };
+      if (!hotspotRequests.resolve(request, nextResource)) {
+        return;
+      }
       hotspotDetailsByTopicRef.current = {
         ...hotspotDetailsByTopicRef.current,
         ...nextDetails,
@@ -590,8 +665,6 @@ const StockScreeningPage: React.FC = () => {
       const currentTopic = selectedHotspotTopicRef.current;
       const retainedTopic = Boolean(currentTopic && nextHotspots.some((item) => item.topic === currentTopic));
       const nextTopic = retainedTopic ? currentTopic : null;
-      setHotspots(nextHotspots);
-      setHotspotsUpdatedAt(result.cachedAt || (nextHotspots.length > 0 ? new Date().toISOString() : null));
       setSelectedHotspotTopic(nextTopic);
       selectedHotspotTopicRef.current = nextTopic;
       if (nextTopic && nextDetails[nextTopic]) {
@@ -603,15 +676,10 @@ const StockScreeningPage: React.FC = () => {
         setHotspotDetail(null);
       }
       setHotspotDetailError('');
-      if (nextHotspots.length === 0) {
-        setHotspotError(formatHotspotEmptyMessage(result, text));
-      }
     } catch (err) {
-      setHotspotError(toApiErrorMessage(err, text.hotspotLoadFailed, language));
-    } finally {
-      setLoadingHotspots(false);
+      hotspotRequests.reject(request, toApiErrorMessage(err, text.hotspotLoadFailed, language));
     }
-  }, [language, loadHotspotDetail, text]);
+  }, [hotspotRequests, language, loadHotspotDetail, text]);
 
   const handleHotspotSelect = useCallback((topic: string) => {
     selectedHotspotTopicRef.current = topic;
@@ -710,7 +778,7 @@ const StockScreeningPage: React.FC = () => {
     function applyTaskStatus(task: AlphaSiftScreenTaskStatus) {
       const nextProgress = Number(task.progress ?? 0);
       setTaskProgress(Number.isFinite(nextProgress) ? nextProgress : 0);
-      setTaskMessage(task.message || '');
+      setTaskSnapshot(task);
 
       if (task.status === 'completed') {
         if (task.result) {
@@ -729,7 +797,7 @@ const StockScreeningPage: React.FC = () => {
         setCandidates([]);
         setScreenMeta(null);
         setExpandedCode(null);
-        setError(formatScreenTaskFailure(task.error || task.message, text));
+        setError('');
         finishTask();
         return;
       }
@@ -828,7 +896,8 @@ const StockScreeningPage: React.FC = () => {
     setError('');
     setScreenMeta(null);
     setTaskProgress(0);
-    setTaskMessage(text.submittingTask);
+    setTaskSnapshot(null);
+    setTaskMessageFallback(text.submittingTask);
     try {
       const task = await alphasiftApi.startScreen({ market, strategy, maxResults });
       persistScreenTask({
@@ -839,7 +908,18 @@ const StockScreeningPage: React.FC = () => {
       });
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
-      setTaskMessage(task.message || text.taskSubmitted);
+      setTaskSnapshot({
+        taskId: task.taskId,
+        traceId: task.traceId,
+        status: task.status,
+        progress: 0,
+        message: task.message,
+        messageCode: task.messageCode,
+        messageParams: task.messageParams,
+        revision: task.revision,
+        updatedAt: task.updatedAt,
+      });
+      setTaskMessageFallback(text.taskSubmitted);
     } catch (err) {
       setCandidates([]);
       setLoading(false);
@@ -901,7 +981,19 @@ const StockScreeningPage: React.FC = () => {
         />
       ) : null}
 
-      {error ? <InlineAlert variant="danger" title={text.callFailed} message={error} /> : null}
+      {displayedError ? <InlineAlert variant="danger" title={text.callFailed} message={displayedError} /> : null}
+
+      {(loading || displayedError) && hasTaskDiagnostics ? (
+        <details className="rounded-lg border border-border/70 bg-surface/70 px-3 py-2 text-xs text-muted-text">
+          <summary className="cursor-pointer font-medium text-secondary-text">{t('taskPanel.diagnostics')}</summary>
+          <div className="mt-2 grid gap-1">
+            {taskSnapshot?.traceId ? <div>{text.traceId}: <code>{taskSnapshot.traceId}</code></div> : null}
+            {taskErrorCode ? <div>{t('taskPanel.errorCode')}: <code>{taskErrorCode}</code></div> : null}
+            {taskRawMessage ? <div>{t('taskPanel.rawMessage')}: <span>{taskRawMessage}</span></div> : null}
+            {taskRawError ? <div>{t('taskPanel.rawError')}: <span>{taskRawError}</span></div> : null}
+          </div>
+        </details>
+      ) : null}
 
       <section className="rounded-2xl border border-border/80 bg-card/95 p-4 shadow-soft-card">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -952,18 +1044,22 @@ const StockScreeningPage: React.FC = () => {
           </p>
         ) : null}
 
-        {!hotspotsExpanded ? (
+        {hotspotsResource.status === 'error' && hotspots.length === 0 ? null : hotspotsResource.status === 'loading' ? (
+          <div className="rounded-xl border border-dashed border-border bg-surface/70 px-4 py-6 text-sm text-secondary-text">
+            {text.refreshing}
+          </div>
+        ) : !hotspotsExpanded ? (
           <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-surface/70 px-4 py-3 text-sm text-secondary-text sm:flex-row sm:items-center sm:justify-between">
             <span>
               {hotspots.length > 0
                 ? formatUiText(text.cachedHotspots, { count: hotspots.length })
-                : text.hotspotsCollapsed}
+                : hotspotsResource.data.emptyMessage || text.hotspotsCollapsed}
             </span>
             <span className="text-xs">{text.liveDetailHint}</span>
           </div>
         ) : hotspots.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-surface/70 px-4 py-6 text-sm text-secondary-text">
-            {text.refreshDescription}
+            {hotspotsResource.data.emptyMessage || text.refreshDescription}
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -975,7 +1071,7 @@ const StockScreeningPage: React.FC = () => {
               return (
               <button
                 key={`${item.topic}-${item.rank ?? ''}`}
-                className={`group relative min-h-[116px] overflow-hidden rounded-xl border px-3 py-3 text-left transition-all ${
+                className={`group relative min-h-28 overflow-hidden rounded-xl border px-3 py-3 text-left transition-all ${
                   selected
                     ? 'border-orange-400 bg-gradient-to-br from-orange-500/10 via-card to-card shadow-[0_0_0_1px_rgba(249,115,22,0.16),0_18px_44px_rgba(249,115,22,0.14)]'
                     : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-orange-300/70 hover:shadow-soft-card'
@@ -997,7 +1093,7 @@ const StockScreeningPage: React.FC = () => {
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-foreground">{item.name || item.topic}</p>
-                      <span className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${strength.className}`}>
+                      <span className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-xs font-semibold ${strength.className}`}>
                         {strength.label}
                       </span>
                     </div>
@@ -1006,7 +1102,7 @@ const StockScreeningPage: React.FC = () => {
                     {formatNumber(item.heatScore, 0)}
                   </span>
                 </div>
-                <div className="mt-4 grid max-w-[72%] gap-1 text-[11px] text-secondary-text">
+                <div className="mt-4 grid max-w-3xl gap-1 text-xs text-secondary-text">
                   <span>{text.change} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.changePct, text)}%</strong></span>
                   <span>{text.trend} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.trendScore, text)}</strong> · {text.persistence} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.persistenceScore, text)}</strong></span>
                   <span>{getHotspotSampleText(item, text)} · {text.leader} {getHotspotLeadersText(item, language, text)}</span>
@@ -1031,7 +1127,7 @@ const StockScreeningPage: React.FC = () => {
                   {loadingHotspotDetail ? text.loadingHotspotDetail : hotspotDetail?.summary || text.selectHotspot}
                 </p>
                 {hotspotDetail?.canonicalTopic && hotspotDetail.canonicalTopic !== selectedHotspotTopic ? (
-                  <p className="mt-1 text-[11px] text-secondary-text">{formatUiText(text.canonicalTopic, { topic: hotspotDetail.canonicalTopic })}</p>
+                  <p className="mt-1 text-xs text-secondary-text">{formatUiText(text.canonicalTopic, { topic: hotspotDetail.canonicalTopic })}</p>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1085,10 +1181,10 @@ const StockScreeningPage: React.FC = () => {
                       <div key={`${item.title}-${index}`} className="relative pb-4 last:pb-0">
                         <span className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border border-orange-400 bg-card" />
                         <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                          <p className="text-[11px] font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
+                          <p className="text-xs font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
                           <p className="mt-1 text-xs font-semibold text-foreground">{item.title}</p>
                           <p className="mt-1 text-xs leading-5 text-secondary-text">{item.description}</p>
-                          {item.source ? <p className="mt-2 text-[11px] text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
+                          {item.source ? <p className="mt-2 text-xs text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
                         </div>
                       </div>
                     ))}
@@ -1102,17 +1198,17 @@ const StockScreeningPage: React.FC = () => {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-foreground">{stock.name || stock.code || '-'}</p>
-                            <p className="mt-1 text-[11px] text-secondary-text">{stock.code || '-'}</p>
+                            <p className="mt-1 text-xs text-secondary-text">{stock.code || '-'}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            <span className="rounded-full bg-cyan/10 px-2 py-1 text-[11px] font-semibold text-cyan">
+                            <span className="rounded-lg bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan">
                               {stock.role || text.conceptStock}
                             </span>
                             {stock.code ? (
                               <button
                                 type="button"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 text-[11px] font-semibold text-cyan transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground"
+                                className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-cyan/30 bg-cyan/10 px-3 text-xs font-semibold text-cyan transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
                                 <Play className="h-3 w-3" />
@@ -1121,11 +1217,11 @@ const StockScreeningPage: React.FC = () => {
                             ) : null}
                           </div>
                         </div>
-                        <p className="mt-2 text-[11px] text-secondary-text">
+                        <p className="mt-2 text-xs text-secondary-text">
                           {text.change} {formatStockChangeText(stock.changePct, text)} · {text.heat} {formatNumber(stock.hotStockScore, 0)}
                         </p>
                         {stock.source || stock.sourceConfidence != null || stock.fallbackUsed ? (
-                          <p className="mt-1 text-[11px] text-secondary-text">
+                          <p className="mt-1 text-xs text-secondary-text">
                             {formatUiText(text.source, { source: stock.source || '-' })}
                             {stock.sourceConfidence != null ? ` · ${formatUiText(text.confidence, { value: formatPercent(stock.sourceConfidence) })}` : ''}
                             {stock.fallbackUsed ? ` · ${text.fallback}` : ''}
@@ -1153,17 +1249,22 @@ const StockScreeningPage: React.FC = () => {
         </div>
 
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {loadingStrategies ? (
+          {strategiesResource.status === 'error' ? (
+            <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+              {strategyLoadError || text.strategyLoadFailed}
+            </div>
+          ) : loadingStrategies ? (
             <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
               {text.loadingStrategies}
             </div>
           ) : strategies.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
-              {strategyLoadError || text.strategiesUnavailable}
+              {text.strategiesUnavailable}
             </div>
           ) : (
             strategies.map((item) => {
               const selected = item.id === strategy;
+              const display = getStrategyDisplay(item, language);
               return (
                 <button
                   key={item.id}
@@ -1176,10 +1277,10 @@ const StockScreeningPage: React.FC = () => {
                   disabled={loading}
                   onClick={() => handleStrategyChange(item.id)}
                 >
-                  <span className="text-base font-semibold text-foreground">{item.name || item.title || item.id}</span>
-                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{item.description || item.id}</span>
+                  <span className="text-base font-semibold text-foreground">{display.name}</span>
+                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{display.description}</span>
                   <span className="mt-3 inline-flex text-xs font-semibold text-cyan">
-                    {item.category || item.tag || item.tags?.[0] || item.id}
+                    {display.category}
                   </span>
                 </button>
               );
@@ -1262,7 +1363,7 @@ const StockScreeningPage: React.FC = () => {
           </div>
           <div className="grid gap-1 text-xs text-secondary-text sm:text-right">
             <span>{formatUiText(text.task, { id: activeTaskId ? activeTaskId.slice(0, 12) : '-' })}</span>
-            <span>Run ID：{screenMeta?.runId || '-'}</span>
+            <span>{text.runId}: {screenMeta?.runId || '-'}</span>
             <span>
               {formatUiText(text.taskStats, { snapshot: screenMeta?.snapshotCount ?? '-', filtered: screenMeta?.afterFilterCount ?? '-', candidates: screenMeta?.candidateCount ?? candidates.length })}
             </span>
@@ -1305,7 +1406,7 @@ const StockScreeningPage: React.FC = () => {
             <p className="mt-2 text-sm text-secondary-text">{text.noResultsDescription}</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border">
+          <div className="overflow-x-auto rounded-xl border border-border" role="region" aria-label={text.results} tabIndex={0}>
             <table className="w-full min-w-[860px] border-collapse text-sm">
               <thead className="bg-surface text-left text-xs text-secondary-text">
                 <tr>
@@ -1350,8 +1451,9 @@ const StockScreeningPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <button
-                            className="text-sm font-semibold text-cyan transition-colors hover:text-foreground"
+                            className="min-h-11 min-w-11 text-sm font-semibold text-cyan transition-colors hover:text-foreground"
                             type="button"
+                            aria-expanded={expanded}
                             onClick={() => setExpandedCode(expanded ? null : item.code)}
                           >
                             {expanded ? text.collapse : text.expand}

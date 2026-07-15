@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { TaskInfo } from '../types/analysis';
 import { useTaskStream } from './useTaskStream';
+import { TASK_TERMINAL_RETENTION_MS } from '../utils/taskLifecycle';
 
 type UseDashboardLifecycleOptions = {
   loadInitialHistory: () => Promise<void>;
@@ -14,9 +15,10 @@ type UseDashboardLifecycleOptions = {
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
-  removeTask: (taskId: string) => void;
+  removeTask: (taskId: string, revision?: number) => void;
   onDashboardDataRefresh?: () => void;
   onCompletedTaskDataRefreshed?: (task: TaskInfo) => void;
+  activeTasks?: readonly TaskInfo[];
   enabled?: boolean;
 };
 
@@ -35,6 +37,7 @@ export function useDashboardLifecycle({
   removeTask,
   onDashboardDataRefresh,
   onCompletedTaskDataRefreshed,
+  activeTasks = [],
   enabled = true,
 }: UseDashboardLifecycleOptions): void {
   const removalTimeoutsRef = useRef<number[]>([]);
@@ -92,9 +95,9 @@ export function useDashboardLifecycle({
     };
   }, []);
 
-  const scheduleTaskRemoval = (taskId: string, delayMs: number) => {
+  const scheduleTaskRemoval = (taskId: string, revision: number | undefined, delayMs: number) => {
     const timeoutId = window.setTimeout(() => {
-      removeTask(taskId);
+      removeTask(taskId, revision);
       removalTimeoutsRef.current = removalTimeoutsRef.current.filter((item) => item !== timeoutId);
     }, delayMs);
 
@@ -120,16 +123,17 @@ export function useDashboardLifecycle({
       void refreshMarketReviewHistory?.(true);
       // Keep the terminal task visible long enough for the user to see the
       // completion and dismiss it; the panel now renders terminal tasks.
-      scheduleTaskRemoval(task.taskId, 6_000);
+      scheduleTaskRemoval(task.taskId, task.revision, TASK_TERMINAL_RETENTION_MS);
     },
     onTaskFailed: (task) => {
       syncTaskFailed(task);
-      scheduleTaskRemoval(task.taskId, 8_000);
+      scheduleTaskRemoval(task.taskId, task.revision, TASK_TERMINAL_RETENTION_MS);
     },
     onError: () => {
       console.warn('SSE connection disconnected, reconnecting...');
     },
     enabled,
+    trackedTasks: activeTasks,
   });
 }
 

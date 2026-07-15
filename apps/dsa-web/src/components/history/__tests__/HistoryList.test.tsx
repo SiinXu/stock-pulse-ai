@@ -73,7 +73,9 @@ describe('HistoryList', () => {
     fireEvent.click(screen.getByRole('button', { name: /贵州茅台/i }));
     expect(onItemClick).toHaveBeenCalledWith(1);
 
-    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    const itemCheckbox = screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' });
+    expect(itemCheckbox.closest('label')).toHaveClass('h-11', 'w-11');
+    fireEvent.click(itemCheckbox);
     expect(onToggleItemSelection).toHaveBeenCalledWith(1);
   });
 

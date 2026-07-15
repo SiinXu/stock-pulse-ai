@@ -38,6 +38,9 @@ from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 
 logger = logging.getLogger(__name__)
 
+_TASK_FAILED_LEGACY_MESSAGE = "Task failed"
+_TASK_FAILED_LEGACY_ERROR = "Task execution failed"
+
 
 def _dedupe_stock_code_key(stock_code: str) -> str:
     """
@@ -72,8 +75,12 @@ class TaskInfo:
     status: TaskStatus = TaskStatus.PENDING
     progress: int = 0
     message: Optional[str] = None
+    message_code: Optional[str] = None
+    message_params: Dict[str, Any] = field(default_factory=dict)
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    error_code: Optional[str] = None
+    error_params: Dict[str, Any] = field(default_factory=dict)
     report_type: str = "detailed"
     analysis_phase: str = "auto"
     created_at: datetime = field(default_factory=datetime.now)
@@ -87,6 +94,12 @@ class TaskInfo:
     report_language: Optional[str] = None
     trace_id: Optional[str] = None
     flow_events: List[Dict[str, Any]] = field(default_factory=list)
+    revision: int = 1
+    updated_at: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        if self.updated_at is None:
+            self.updated_at = self.created_at
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert task info into an API-friendly dictionary."""
@@ -98,15 +111,21 @@ class TaskInfo:
             "status": self.status.value,
             "progress": self.progress,
             "message": self.message,
+            "message_code": self.message_code,
+            "message_params": dict(self.message_params),
             "report_type": self.report_type,
             "analysis_phase": self.analysis_phase,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "error": self.error,
+            "error_code": self.error_code,
+            "error_params": dict(self.error_params),
             "original_query": self.original_query,
             "selection_source": self.selection_source,
             "skills": self.skills,
+            "revision": self.revision,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else self.created_at.isoformat(),
         }
     
     def copy(self) -> 'TaskInfo':
@@ -118,8 +137,12 @@ class TaskInfo:
             status=self.status,
             progress=self.progress,
             message=self.message,
+            message_code=self.message_code,
+            message_params=dict(self.message_params),
             result=self.result,
             error=self.error,
+            error_code=self.error_code,
+            error_params=dict(self.error_params),
             report_type=self.report_type,
             analysis_phase=self.analysis_phase,
             created_at=self.created_at,
@@ -133,6 +156,8 @@ class TaskInfo:
             report_language=self.report_language,
             trace_id=self.trace_id or self.task_id,
             flow_events=copy.deepcopy(self.flow_events),
+            revision=self.revision,
+            updated_at=self.updated_at,
         )
 
 
@@ -224,6 +249,12 @@ class AnalysisTaskQueue:
             task.status in (TaskStatus.PENDING, TaskStatus.PROCESSING)
             for task in self._tasks.values()
         )
+
+    @staticmethod
+    def _touch_task_locked(task: TaskInfo) -> None:
+        """Advance the server-owned version used to merge task snapshots."""
+        task.revision += 1
+        task.updated_at = datetime.now()
 
     def sync_max_workers(
         self,
@@ -421,6 +452,8 @@ class AnalysisTaskQueue:
                     stock_name=stock_name,
                     status=TaskStatus.PENDING,
                     message="任务已加入队列",
+                    message_code="task_queued",
+                    message_params={"stock_code": stock_code},
                     report_type=report_type,
                     analysis_phase=analysis_phase or "auto",
                     original_query=original_query,
@@ -470,6 +503,8 @@ class AnalysisTaskQueue:
         stock_name: Optional[str] = None,
         report_type: str = "detailed",
         message: Optional[str] = "任务已加入队列",
+        message_code: str = "task_queued",
+        message_params: Optional[Dict[str, Any]] = None,
         task_id: Optional[str] = None,
         trace_id: Optional[str] = None,
     ) -> TaskInfo:
@@ -487,6 +522,8 @@ class AnalysisTaskQueue:
             stock_name=stock_name,
             status=TaskStatus.PENDING,
             message=message,
+            message_code=message_code,
+            message_params=dict(message_params or {"stock_code": stock_code}),
             report_type=report_type,
         )
 
@@ -555,6 +592,7 @@ class AnalysisTaskQueue:
             task.flow_events.append(event_payload)
             if len(task.flow_events) > self._max_flow_events_per_task:
                 task.flow_events = task.flow_events[-self._max_flow_events_per_task:]
+            self._touch_task_locked(task)
             task_snapshot = task.copy()
 
         payload = task_snapshot.to_dict()
@@ -626,6 +664,8 @@ class AnalysisTaskQueue:
         progress: int,
         message: Optional[str] = None,
         *,
+        message_code: Optional[str] = None,
+        message_params: Optional[Dict[str, Any]] = None,
         event_type: str = "task_progress",
     ) -> Optional[TaskInfo]:
         """
@@ -647,10 +687,19 @@ class AnalysisTaskQueue:
             if message is not None and message != task.message:
                 task.message = message
                 changed = True
+            next_message_code = message_code or "task_progress"
+            next_message_params = dict(message_params or {"progress": next_progress})
+            if next_message_code != task.message_code:
+                task.message_code = next_message_code
+                changed = True
+            if next_message_params != task.message_params:
+                task.message_params = next_message_params
+                changed = True
 
             if not changed:
                 return task.copy()
 
+            self._touch_task_locked(task)
             task_snapshot = task.copy()
 
         self._broadcast_event(event_type, task_snapshot.to_dict())
@@ -692,7 +741,10 @@ class AnalysisTaskQueue:
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
             task.message = "正在分析中..."
+            task.message_code = "task_started"
+            task.message_params = {"stock_code": stock_code}
             task.progress = 10
+            self._touch_task_locked(task)
         
         self._broadcast_event("task_started", task.to_dict())
         
@@ -743,7 +795,12 @@ class AnalysisTaskQueue:
                         task.completed_at = datetime.now()
                         task.result = result
                         task.message = "分析完成"
+                        task.message_code = "task_completed"
+                        task.message_params = {"stock_code": stock_code}
+                        task.error_code = None
+                        task.error_params = {}
                         task.stock_name = result.get("stock_name", task.stock_name)
+                        self._touch_task_locked(task)
                         
                         # 从分析中集合移除
                         dedupe_key = _dedupe_stock_code_key(task.stock_code)
@@ -765,15 +822,26 @@ class AnalysisTaskQueue:
             if "diag_token" in locals():
                 reset_run_diagnostic_context(diag_token)
             error_msg = str(e)
-            logger.error(f"[TaskQueue] 任务失败: {task_id} ({stock_code}), 错误: {error_msg}")
+            logger.error(
+                "[TaskQueue] Task failed: %s (%s), error: %s",
+                task_id,
+                stock_code,
+                error_msg,
+                exc_info=True,
+            )
             
             with self._data_lock:
                 task = self._tasks.get(task_id)
                 if task:
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now()
-                    task.error = error_msg[:200]  # 限制错误信息长度
-                    task.message = f"分析失败: {error_msg[:50]}"
+                    task.error = _TASK_FAILED_LEGACY_ERROR
+                    task.error_code = "task_execution_failed"
+                    task.error_params = {}
+                    task.message = _TASK_FAILED_LEGACY_MESSAGE
+                    task.message_code = "task_failed"
+                    task.message_params = {"stock_code": stock_code}
+                    self._touch_task_locked(task)
                     
                     # 从分析中集合移除
                     dedupe_key = _dedupe_stock_code_key(task.stock_code)
@@ -811,7 +879,10 @@ class AnalysisTaskQueue:
             task.status = TaskStatus.PROCESSING
             task.started_at = datetime.now()
             task.message = "任务执行中"
+            task.message_code = "task_started"
+            task.message_params = {"stock_code": task.stock_code}
             task.progress = 10
+            self._touch_task_locked(task)
             self._broadcast_event("task_started", task.to_dict())
 
         try:
@@ -840,6 +911,11 @@ class AnalysisTaskQueue:
                     task.completed_at = datetime.now()
                     task.result = result
                     task.message = "任务执行完成"
+                    task.message_code = "task_completed"
+                    task.message_params = {"stock_code": task.stock_code}
+                    task.error_code = None
+                    task.error_params = {}
+                    self._touch_task_locked(task)
 
             self._broadcast_event("task_completed", task.to_dict())
             logger.info(f"[TaskQueue] 自定义任务完成: {task_id}")
@@ -850,7 +926,10 @@ class AnalysisTaskQueue:
         except Exception as e:  # pragma: no cover - behavior verified in downstream tests
             error_msg = str(e)
             logger.error(
-                f"[TaskQueue] 自定义任务失败: {task_id}, 错误: {error_msg}"
+                "[TaskQueue] Background task failed: %s, error: %s",
+                task_id,
+                error_msg,
+                exc_info=True,
             )
 
             with self._data_lock:
@@ -858,8 +937,13 @@ class AnalysisTaskQueue:
                 if task:
                     task.status = TaskStatus.FAILED
                     task.completed_at = datetime.now()
-                    task.error = error_msg[:200]
-                    task.message = f"任务失败: {error_msg[:80]}"
+                    task.error = _TASK_FAILED_LEGACY_ERROR
+                    task.error_code = "task_execution_failed"
+                    task.error_params = {}
+                    task.message = _TASK_FAILED_LEGACY_MESSAGE
+                    task.message_code = "task_failed"
+                    task.message_params = {}
+                    self._touch_task_locked(task)
 
             if task:
                 self._broadcast_event("task_failed", task.to_dict())

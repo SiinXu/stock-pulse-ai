@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsPage from '../AlertsPage';
 
@@ -223,7 +223,8 @@ describe('AlertsPage', () => {
     fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '200' } });
     fireEvent.click(screen.getByRole('button', { name: '创建规则' }));
 
-    expect(await screen.findByText('加载失败')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText('加载失败')).toBeInTheDocument();
     expect(screen.getByLabelText('标的代码')).toHaveValue('aapl');
     expect(screen.getByLabelText('价格阈值')).toHaveValue(200);
   });
@@ -279,6 +280,90 @@ describe('AlertsPage', () => {
     expect(screen.getByText('停用规则')).toBeInTheDocument();
   });
 
+  it('tracks concurrent rule mutations independently by rule id', async () => {
+    const secondRule = { ...rule, id: 2, name: '苹果价格突破', target: 'AAPL' };
+    const firstMutation = createDeferred<typeof rule>();
+    const secondMutation = createDeferred<typeof rule>();
+    listRules.mockResolvedValue({ items: [rule, secondRule], total: 2, page: 1, pageSize: 20 });
+    disableRule.mockImplementation((ruleId: number) => (
+      ruleId === rule.id ? firstMutation.promise : secondMutation.promise
+    ));
+
+    render(<AlertsPage />);
+    const firstRow = (await screen.findByText(rule.name)).closest('tr');
+    const secondRow = (await screen.findByText(secondRule.name)).closest('tr');
+    expect(firstRow).not.toBeNull();
+    expect(secondRow).not.toBeNull();
+
+    fireEvent.click(within(firstRow as HTMLElement).getByRole('button', { name: '停用' }));
+    fireEvent.click(within(secondRow as HTMLElement).getByRole('button', { name: '停用' }));
+    await waitFor(() => expect(screen.getAllByText('停用中')).toHaveLength(2));
+
+    await act(async () => {
+      firstMutation.resolve({ ...rule, enabled: false });
+      await firstMutation.promise;
+    });
+    await waitFor(() => expect(screen.getAllByText('停用中')).toHaveLength(1));
+
+    await act(async () => {
+      secondMutation.resolve({ ...secondRule, enabled: false });
+      await secondMutation.promise;
+    });
+    await waitFor(() => expect(screen.queryByText('停用中')).not.toBeInTheDocument());
+    expect(disableRule).toHaveBeenCalledWith(1);
+    expect(disableRule).toHaveBeenCalledWith(2);
+  });
+
+  it('refreshes a completed mutation with the latest active filters', async () => {
+    const mutation = createDeferred<typeof rule>();
+    const disabledRule = { ...rule, name: '停用范围规则', enabled: false };
+    disableRule.mockReturnValueOnce(mutation.promise);
+    listRules.mockImplementation(({ enabled }: { enabled?: boolean }) => Promise.resolve({
+      items: enabled === false ? [disabledRule] : [rule],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    }));
+
+    render(<AlertsPage />);
+    const initialRow = (await screen.findByText(rule.name)).closest('tr');
+    expect(initialRow).not.toBeNull();
+    fireEvent.click(within(initialRow as HTMLElement).getByRole('button', { name: '停用' }));
+    chooseOption(screen.getByLabelText('启停状态'), 'disabled');
+
+    expect(await screen.findByText(disabledRule.name)).toBeInTheDocument();
+    await act(async () => {
+      mutation.resolve(disabledRule);
+      await mutation.promise;
+    });
+
+    await waitFor(() => expect(listRules).toHaveBeenCalledTimes(3));
+    expect(listRules).toHaveBeenLastCalledWith({
+      enabled: false,
+      alertType: undefined,
+      page: 1,
+      pageSize: 20,
+    });
+    expect(screen.getByText(disabledRule.name)).toBeInTheDocument();
+    expect(screen.queryByText(rule.name)).not.toBeInTheDocument();
+  });
+
+  it('keeps valid rule data when a mutation refresh fails', async () => {
+    listRules
+      .mockResolvedValueOnce({ items: [rule], total: 1, page: 1, pageSize: 20 })
+      .mockRejectedValueOnce({ parsedError });
+    render(<AlertsPage />);
+
+    const ruleName = await screen.findByText(rule.name);
+    const row = ruleName.closest('tr');
+    expect(row).not.toBeNull();
+    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: '停用' }));
+
+    expect(await screen.findByText('加载失败')).toBeInTheDocument();
+    expect(screen.getByText(rule.name)).toBeInTheDocument();
+    expect(screen.queryByText('暂无告警规则')).not.toBeInTheDocument();
+  });
+
   it('renders API errors through ApiErrorAlert', async () => {
     listRules.mockRejectedValueOnce({ parsedError });
 
@@ -286,5 +371,6 @@ describe('AlertsPage', () => {
 
     expect(await screen.findByText('加载失败')).toBeInTheDocument();
     expect(screen.getByText('告警 API 不可用')).toBeInTheDocument();
+    expect(screen.queryByText('暂无告警规则')).not.toBeInTheDocument();
   });
 });

@@ -32,6 +32,7 @@ from src.services.image_stock_extractor import (
     VISION_API_TIMEOUT,
 )
 from src.config import Config
+from src.llm.model_ref import encode_model_ref
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +190,61 @@ class TestCallLitellmVision:
             kwargs = mock_comp.call_args[1]
             assert kwargs["api_base"] == "https://aihubmix.com/v1"
             assert "extra_headers" not in kwargs
+
+    def test_model_ref_uses_only_its_connection_router_deployment(self):
+        selected_ref = encode_model_ref("openai_personal", "openai/gpt-4o")
+        model_list = Config._channels_to_model_list([
+            {
+                "name": "openai_work",
+                "protocol": "openai",
+                "enabled": True,
+                "base_url": "https://work.example.com/v1",
+                "api_keys": ["sk-work-connection"],
+                "models": ["openai/gpt-4o"],
+                "extra_headers": {},
+            },
+            {
+                "name": "openai_personal",
+                "protocol": "openai",
+                "enabled": True,
+                "base_url": "https://personal.example.com/v1",
+                "api_keys": ["sk-personal-connection"],
+                "models": ["openai/gpt-4o"],
+                "extra_headers": {},
+            },
+        ])
+        cfg = _cfg(
+            vision_model=selected_ref,
+            llm_model_list=model_list,
+            openai_api_keys=[],
+            openai_base_url="https://legacy.example.com/v1",
+        )
+        router = MagicMock()
+        router.completion.return_value = self._good_response()
+
+        with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
+             patch("src.services.image_stock_extractor.litellm.Router", return_value=router) as router_cls, \
+             patch("src.services.image_stock_extractor.litellm.completion") as direct_completion:
+            result = _call_litellm_vision("b64", "image/jpeg")
+
+        assert result == '["600519"]'
+        router_cls.assert_called_once()
+        deployments = router_cls.call_args.kwargs["model_list"]
+        assert {entry["model_name"] for entry in deployments} == {selected_ref}
+        assert {
+            entry["litellm_params"]["api_key"]
+            for entry in deployments
+        } == {"sk-personal-connection"}
+        assert {
+            entry["litellm_params"]["api_base"]
+            for entry in deployments
+        } == {"https://personal.example.com/v1"}
+        router.completion.assert_called_once()
+        call_kwargs = router.completion.call_args.kwargs
+        assert call_kwargs["model"] == selected_ref
+        assert "api_key" not in call_kwargs
+        assert "api_base" not in call_kwargs
+        direct_completion.assert_not_called()
 
     def test_raises_when_model_not_configured(self):
         cfg = _cfg(openai_vision_model=None, litellm_model="", gemini_api_keys=[], anthropic_api_keys=[], openai_api_keys=[])

@@ -34,7 +34,7 @@ from src.config import (
     extra_litellm_params,
     get_api_keys_for_model,
     get_config,
-    get_configured_llm_models,
+    get_configured_llm_model_aliases,
     resolve_news_window_days,
 )
 from src.llm.hermes import (
@@ -3123,7 +3123,7 @@ class GeminiAnalyzer:
         last_model: Optional[str] = None
         last_usage: Dict[str, Any] = {}
         effective_system_prompt = system_prompt or self.TEXT_SYSTEM_PROMPT
-        router_model_names = set(get_configured_llm_models(config.llm_model_list))
+        router_model_names = set(get_configured_llm_model_aliases(config.llm_model_list))
         for model in models_to_try:
             origins = route_deployment_origins(config.llm_model_list, model)
             model_stream = bool(stream and not origins.has_hermes)

@@ -23,7 +23,129 @@ export interface ParsedApiError {
   status?: number;
   category: ApiErrorCategory;
   code?: string;
+  params?: Record<string, unknown>;
+  details?: unknown;
+  traceId?: string;
 }
+
+type LocalizedErrorText = {
+  category: ApiErrorCategory;
+  zh: { title: string; message: string };
+  en: { title: string; message: string };
+};
+
+const STABLE_ERROR_TEXT: Record<string, LocalizedErrorText> = {
+  agent_disabled: {
+    category: 'agent_disabled',
+    zh: { title: 'Agent 模式未开启', message: '请先在设置中开启 Agent 模式，然后重试。' },
+    en: { title: 'Agent mode is disabled', message: 'Enable Agent mode in Settings, then try again.' },
+  },
+  agent_request_failed: {
+    category: 'unknown',
+    zh: { title: 'Agent 请求失败', message: '请求未能完成，请稍后重试。' },
+    en: { title: 'Agent request failed', message: 'The request could not be completed. Try again later.' },
+  },
+  agent_stream_failed: {
+    category: 'upstream_network',
+    zh: { title: 'Agent 响应中断', message: '流式响应未能完成，请重试。' },
+    en: { title: 'Agent response interrupted', message: 'The streaming response could not be completed. Try again.' },
+  },
+  upstream_timeout: {
+    category: 'upstream_timeout',
+    zh: { title: '上游服务响应超时', message: '请稍后重试，或检查网络和代理设置。' },
+    en: { title: 'The upstream service timed out', message: 'Try again later, or check the network and proxy settings.' },
+  },
+  notification_channels_missing: {
+    category: 'http_error',
+    zh: { title: '尚未配置通知渠道', message: '请先在设置中配置至少一个通知渠道。' },
+    en: { title: 'No notification channel is configured', message: 'Configure at least one notification channel in Settings.' },
+  },
+  auth_disabled: {
+    category: 'http_error',
+    zh: { title: '密码登录尚未启用', message: '请先完成管理员认证设置。' },
+    en: { title: 'Password login is disabled', message: 'Complete the administrator authentication setup first.' },
+  },
+  password_required: {
+    category: 'missing_params',
+    zh: { title: '请输入密码', message: '密码不能为空。' },
+    en: { title: 'Password required', message: 'Enter a password to continue.' },
+  },
+  current_required: {
+    category: 'missing_params',
+    zh: { title: '请输入当前密码', message: '验证当前密码后才能继续。' },
+    en: { title: 'Current password required', message: 'Verify the current password to continue.' },
+  },
+  password_mismatch: {
+    category: 'http_error',
+    zh: { title: '两次密码不一致', message: '请重新输入并确认相同的密码。' },
+    en: { title: 'Passwords do not match', message: 'Re-enter the same password in both fields.' },
+  },
+  invalid_password: {
+    category: 'http_error',
+    zh: { title: '密码验证失败', message: '请检查密码后重试。' },
+    en: { title: 'Password verification failed', message: 'Check the password and try again.' },
+  },
+  password_already_set: {
+    category: 'http_error',
+    zh: { title: '管理员密码已存在', message: '请使用当前密码启用认证，或登录后修改密码。' },
+    en: { title: 'Administrator password already exists', message: 'Use the current password to enable authentication, or change it after signing in.' },
+  },
+  not_changeable: {
+    category: 'http_error',
+    zh: { title: '无法在网页中修改密码', message: '请使用部署环境支持的密码管理方式。' },
+    en: { title: 'Password cannot be changed here', message: 'Use the password management method supported by this deployment.' },
+  },
+  rate_limited: {
+    category: 'http_error',
+    zh: { title: '尝试次数过多', message: '请稍后再试。' },
+    en: { title: 'Too many attempts', message: 'Wait a moment, then try again.' },
+  },
+  validation_error: {
+    category: 'missing_params',
+    zh: { title: '输入未通过验证', message: '请检查标记的字段后重试。' },
+    en: { title: 'Input validation failed', message: 'Review the highlighted fields and try again.' },
+  },
+  portfolio_oversell: {
+    category: 'portfolio_oversell',
+    zh: { title: '卖出数量超过可用持仓', message: '请修正对应卖出记录后重试。' },
+    en: { title: 'Sell quantity exceeds available holdings', message: 'Correct the related sell entry, then try again.' },
+  },
+  portfolio_busy: {
+    category: 'portfolio_busy',
+    zh: { title: '持仓账本正忙', message: '另一笔持仓变更正在处理，请稍后重试。' },
+    en: { title: 'The portfolio ledger is busy', message: 'Another portfolio change is being processed. Try again shortly.' },
+  },
+  idempotency_key_reused: {
+    category: 'http_error',
+    zh: { title: '操作标识已被使用', message: '请刷新当前数据后重新提交。' },
+    en: { title: 'Operation identifier already used', message: 'Refresh the current data before submitting again.' },
+  },
+  alphasift_unavailable: {
+    category: 'http_error',
+    zh: { title: 'AlphaSift 未就绪', message: '请检查 AlphaSift 配置和运行环境后重试。' },
+    en: { title: 'AlphaSift is unavailable', message: 'Check the AlphaSift configuration and runtime, then try again.' },
+  },
+  alphasift_adapter_unavailable: {
+    category: 'http_error',
+    zh: { title: 'AlphaSift 适配层不可用', message: '请重新安装或升级 AlphaSift 后重试。' },
+    en: { title: 'AlphaSift adapter is unavailable', message: 'Reinstall or upgrade AlphaSift, then try again.' },
+  },
+  alphasift_screen_task_not_found: {
+    category: 'http_error',
+    zh: { title: '选股任务不可恢复', message: '任务记录可能已清理，请重新运行选股。' },
+    en: { title: 'Screening task cannot be recovered', message: 'The task record may have expired. Run the screening again.' },
+  },
+  alphasift_screen_failed: {
+    category: 'upstream_network',
+    zh: { title: 'AlphaSift 选股失败', message: '请稍后重试，或检查行情、模型服务和网络设置。' },
+    en: { title: 'AlphaSift screening failed', message: 'Try again later, or check market data, model services, and network settings.' },
+  },
+  internal_error: {
+    category: 'unknown',
+    zh: { title: '服务暂时不可用', message: '请求未能完成，请稍后重试。' },
+    en: { title: 'Service temporarily unavailable', message: 'The request could not be completed. Try again later.' },
+  },
+};
 
 const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }> = {
   agent_disabled: { title: 'Agent mode is disabled', message: 'Enable Agent mode, then try again.' },
@@ -42,6 +164,19 @@ const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }
 };
 
 export function localizeParsedApiError(error: ParsedApiError, language: UiLanguage): ParsedApiError {
+  if (error.code) {
+    const stable = STABLE_ERROR_TEXT[error.code];
+    const localized = stable?.[language] ?? (language === 'en' ? EN_ERROR_TEXT.unknown : {
+      title: '请求失败',
+      message: '请求未能完成，请稍后重试。',
+    });
+    return {
+      ...error,
+      title: localized.title,
+      message: localized.message,
+      category: stable?.category ?? 'unknown',
+    };
+  }
   if (language !== 'en') return error;
   const localized = EN_ERROR_TEXT[error.category] ?? EN_ERROR_TEXT.unknown;
   return {
@@ -72,6 +207,17 @@ type CreateParsedApiErrorOptions = {
   status?: number;
   category?: ApiErrorCategory;
   code?: string;
+  params?: Record<string, unknown>;
+  details?: unknown;
+  traceId?: string;
+};
+
+type StableErrorEnvelope = {
+  code: string;
+  message: string | null;
+  params: Record<string, unknown>;
+  details: unknown;
+  traceId?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +251,64 @@ function stringifyValue(value: unknown): string | null {
   } catch {
     return String(value);
   }
+}
+
+function extractStableErrorEnvelope(data: unknown): StableErrorEnvelope | null {
+  if (!isRecord(data)) {
+    return null;
+  }
+
+  const nested = isRecord(data.detail) ? data.detail : null;
+  const candidate = nested && pickString(nested.error, nested.code) ? nested : data;
+  const code = pickString(candidate.error, candidate.code);
+  if (!code) {
+    return null;
+  }
+
+  const params = isRecord(candidate.params) ? candidate.params : {};
+  const details = candidate.details ?? candidate.detail ?? {};
+  const traceId = pickString(candidate.trace_id, candidate.traceId, data.trace_id, data.traceId) ?? undefined;
+  return {
+    code,
+    message: pickString(candidate.message),
+    params,
+    details,
+    traceId,
+  };
+}
+
+function hasDiagnosticValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === '') {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (isRecord(value)) {
+    return Object.keys(value).length > 0;
+  }
+  return true;
+}
+
+function formatEnvelopeDiagnostics(envelope: StableErrorEnvelope, status?: number): string {
+  if (status !== undefined && status >= 500) {
+    return envelope.traceId ? `Trace ID: ${envelope.traceId}` : 'Internal server error';
+  }
+
+  const parts: string[] = [];
+  if (envelope.message) {
+    parts.push(envelope.message);
+  }
+  if (hasDiagnosticValue(envelope.details)) {
+    const serialized = stringifyValue(envelope.details);
+    if (serialized) {
+      parts.push(serialized);
+    }
+  }
+  if (envelope.traceId) {
+    parts.push(`Trace ID: ${envelope.traceId}`);
+  }
+  return parts.join('\n') || 'Request failed';
 }
 
 function getResponse(error: unknown): ResponseLike | undefined {
@@ -183,19 +387,6 @@ function extractValidationDetail(detail: unknown): string | null {
   return parts.length > 0 ? parts.join('; ') : null;
 }
 
-function extractErrorCode(data: unknown): string | null {
-  if (!isRecord(data)) {
-    return null;
-  }
-
-  const detail = data.detail;
-  if (isRecord(detail)) {
-    return pickString(detail.error, detail.code, data.error, data.code);
-  }
-
-  return pickString(data.error, data.code);
-}
-
 export function extractErrorPayloadText(data: unknown): string | null {
   if (typeof data === 'string') {
     return data.trim() || null;
@@ -241,6 +432,9 @@ export function createParsedApiError(options: CreateParsedApiErrorOptions): Pars
     status: options.status,
     category: options.category ?? 'unknown',
     code: options.code,
+    params: options.params,
+    details: options.details,
+    traceId: options.traceId,
   };
 }
 
@@ -322,14 +516,45 @@ export function isLocalConnectionFailure(error: unknown): boolean {
 export function parseApiError(error: unknown): ParsedApiError {
   const response = getResponse(error);
   const status = response?.status;
-  const payloadText = extractErrorPayloadText(response?.data);
-  const errorCode = extractErrorCode(response?.data);
+  const envelope = extractStableErrorEnvelope(response?.data);
+  if (envelope) {
+    const scrubInternal = status !== undefined && status >= 500;
+    return localizeParsedApiError(createParsedApiError({
+      title: '请求失败',
+      message: '请求未能完成，请稍后重试。',
+      rawMessage: formatEnvelopeDiagnostics(envelope, status),
+      status,
+      category: STABLE_ERROR_TEXT[envelope.code]?.category ?? 'unknown',
+      code: envelope.code,
+      params: scrubInternal ? {} : envelope.params,
+      details: scrubInternal ? {} : envelope.details,
+      traceId: envelope.traceId,
+    }), 'zh');
+  }
+
+  if (response) {
+    const legacyDiagnostic = status !== undefined && status >= 500
+      ? pickString(response.statusText) ?? 'Internal server error'
+      : extractErrorPayloadText(response.data)
+        ?? pickString(response.statusText)
+        ?? 'Request failed';
+    return createParsedApiError({
+      title: '请求失败',
+      message: '请求未能完成，请稍后重试。',
+      rawMessage: legacyDiagnostic,
+      status,
+      category: 'http_error',
+    });
+  }
+
+  const payloadText: string | null = null;
+  const errorCode: string | null = null;
   const errorMessage = getErrorMessage(error);
   const causeMessage = getCauseMessage(error);
   const code = getErrorCode(error);
-  const rawMessage = pickString(payloadText, response?.statusText, errorMessage, causeMessage, code)
+  const rawMessage = pickString(payloadText, errorMessage, causeMessage, code)
     ?? '请求未成功完成，请稍后重试。';
-  const matchText = buildMatchText([rawMessage, errorMessage, causeMessage, code, errorCode, response?.statusText]);
+  const matchText = buildMatchText([rawMessage, errorMessage, causeMessage, code, errorCode]);
 
   if (includesAny(matchText, ['agent mode is not enabled', 'agent_mode'])) {
     return createParsedApiError({

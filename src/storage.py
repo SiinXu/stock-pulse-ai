@@ -506,6 +506,29 @@ class PortfolioAccount(Base):
     )
 
 
+class PortfolioIdempotencyRecord(Base):
+    """Durable result of one client-identified portfolio write operation."""
+
+    __tablename__ = 'portfolio_idempotency_records'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    operation_kind = Column(String(32), nullable=False)
+    account_id = Column(Integer, ForeignKey('portfolio_accounts.id'), nullable=False, index=True)
+    operation_id = Column(String(128), nullable=False)
+    payload_hash = Column(String(64), nullable=False)
+    response_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=utc_naive_now, nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'operation_kind',
+            'account_id',
+            'operation_id',
+            name='uix_portfolio_idempotency_operation',
+        ),
+    )
+
+
 class PortfolioTrade(Base):
     """Executed trade events used as the source of truth for replay."""
 

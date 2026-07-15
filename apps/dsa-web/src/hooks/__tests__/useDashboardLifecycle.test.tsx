@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardLifecycle } from '../useDashboardLifecycle';
 import { useTaskStream } from '../useTaskStream';
+import { TASK_TERMINAL_RETENTION_MS } from '../../utils/taskLifecycle';
 
 vi.mock('../useTaskStream', () => ({
   useTaskStream: vi.fn(),
@@ -15,6 +16,7 @@ const createTask = () => ({
   progress: 100,
   reportType: 'detailed',
   createdAt: '2026-03-18T08:00:00Z',
+  revision: 1,
 });
 
 const defaultMocks = {
@@ -151,9 +153,9 @@ describe('useDashboardLifecycle', () => {
     expect(onCompletedTaskDataRefreshed).toHaveBeenCalledWith(completedTask);
 
     act(() => {
-      vi.advanceTimersByTime(6_000);
+      vi.advanceTimersByTime(TASK_TERMINAL_RETENTION_MS);
     });
-    expect(removeTask).toHaveBeenCalledWith(completedTask.taskId);
+    expect(removeTask).toHaveBeenCalledWith(completedTask.taskId, completedTask.revision);
   });
 
   it('forwards task progress updates to the task sync handler', () => {
@@ -218,10 +220,10 @@ describe('useDashboardLifecycle', () => {
     expect(syncTaskFailed).toHaveBeenCalledWith(failedTask);
 
     act(() => {
-      vi.advanceTimersByTime(8_000);
+      vi.advanceTimersByTime(TASK_TERMINAL_RETENTION_MS);
     });
 
-    expect(removeTask).toHaveBeenCalledWith(failedTask.taskId);
+    expect(removeTask).toHaveBeenCalledWith(failedTask.taskId, failedTask.revision);
   });
 
   it('reconciles active tasks when the SSE stream connects', () => {

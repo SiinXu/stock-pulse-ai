@@ -64,6 +64,29 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
   });
 
+  it('explains an expired session and preserves the return URL', async () => {
+    useSearchParamsMock.mockReturnValue([
+      new URLSearchParams('redirect=%2Fdecision-signals%3Fstock%3DAAPL&reason=session_expired'),
+    ]);
+    useAuthMock.mockReturnValue({
+      login: vi.fn().mockResolvedValue({ success: true }),
+      passwordSet: true,
+      setupState: 'enabled',
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByText('会话已过期')).toBeInTheDocument();
+    expect(screen.getByText('你的登录会话已过期。重新登录后将返回刚才的页面。')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('登录密码'), { target: { value: 'passwd6' } });
+    fireEvent.click(screen.getByRole('button', { name: '授权进入工作台' }));
+
+    await waitFor(() => {
+      expect(navigate).toHaveBeenCalledWith('/decision-signals?stock=AAPL', { replace: true });
+    });
+  });
+
   it('does not override login theme tokens inline so light mode can take effect', () => {
     useAuthMock.mockReturnValue({
       login: vi.fn(),

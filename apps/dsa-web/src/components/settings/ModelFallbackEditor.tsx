@@ -13,6 +13,8 @@ interface ModelFallbackEditorProps {
   options: SearchableSelectOption[];
   /** The primary model route — excluded from the add list (it's the primary). */
   primaryRoute?: string;
+  /** Ambiguous legacy routes and the ModelRefs the user may explicitly choose. */
+  ambiguousLegacyCandidates?: ReadonlyMap<string, readonly string[]>;
   language: UiLang;
   disabled?: boolean;
 }
@@ -31,12 +33,22 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
   onChange,
   options,
   primaryRoute,
+  ambiguousLegacyCandidates,
   language,
   disabled = false,
 }) => {
   const text = SETTINGS_CONTROLS_TEXT[language];
   const routes = splitRoutes(value);
-  const labelFor = (route: string) => options.find((option) => option.value === route)?.label ?? route;
+  const displayOption = (option: SearchableSelectOption) => (
+    option.sublabel ? `${option.label} · ${option.sublabel}` : option.label
+  );
+  const labelFor = (route: string) => {
+    const option = options.find((candidate) => candidate.value === route);
+    return option ? displayOption(option) : route;
+  };
+  const requiresConnectionChoice = (route: string) => (
+    (ambiguousLegacyCandidates?.get(route)?.length ?? 0) > 1
+  );
   // A configured route that is no longer in the available catalog is kept (never
   // silently cleared) and marked as unavailable so the user can decide.
   const isStale = (route: string) => !options.some((option) => option.value === route);
@@ -60,8 +72,17 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     setRoutes(next);
   };
   const selectableOptions = options.filter((option) => option.value !== primaryRoute);
-  const optionLabelByRoute = new Map(selectableOptions.map((option) => [option.value, option.label]));
+  const optionLabelByRoute = new Map(selectableOptions.map((option) => [option.value, displayOption(option)]));
   const toggleRoute = (route: string) => {
+    const ambiguousLegacyRoute = routes.find((configured) => (
+      ambiguousLegacyCandidates?.get(configured)?.includes(route)
+    ));
+    if (ambiguousLegacyRoute) {
+      setRoutes(Array.from(new Set(
+        routes.map((configured) => (configured === ambiguousLegacyRoute ? route : configured)),
+      )));
+      return;
+    }
     if (routes.includes(route)) {
       setRoutes(routes.filter((entry) => entry !== route));
       return;
@@ -85,7 +106,11 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
               <span className="flex min-w-0 items-center gap-2">
                 <span className="text-muted-text">{index + 1}.</span>
                 <span className="truncate font-medium text-foreground">{labelFor(route)}</span>
-                {isStale(route) ? (
+                {requiresConnectionChoice(route) ? (
+                  <span className="shrink-0 text-xs text-warning">
+                    {text.chooseConnection}
+                  </span>
+                ) : isStale(route) ? (
                   <span className="shrink-0 text-xs text-warning">
                     {text.unavailable}
                   </span>

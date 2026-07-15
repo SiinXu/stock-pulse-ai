@@ -49,7 +49,7 @@ from src.llm.hermes import (
     parse_hermes_channel,
     route_identity_candidates,
 )
-from src.core.config_manager import ConfigManager
+from src.core.config_manager import ConfigManager, ConfigVersionConflictError
 from src.core.config_registry import (
     LLM_CHANNEL_FIELD_KEY_RE,
     build_schema_response,
@@ -443,6 +443,37 @@ class SystemConfigService:
 
         return cls._build_display_config_map(runtime_map)
 
+    @classmethod
+    def _inject_legacy_connection_provider_summaries(
+        cls,
+        config_map: Dict[str, str],
+    ) -> Set[str]:
+        """Expose inferred Provider identities without persisting a migration.
+
+        Legacy Connections predate ``LLM_<ID>_PROVIDER``. The server can still
+        resolve an exact Catalog-id connection name even when the separate
+        Catalog request fails in a client. Injecting the compatibility value in
+        the read payload keeps disabled/incomplete Connections identifiable;
+        ``raw_value_exists`` remains false and the user's config is not changed.
+        """
+        injected: Set[str] = set()
+        channel_names = [
+            segment.strip()
+            for segment in str(config_map.get("LLM_CHANNELS", "") or "").split(",")
+            if segment.strip()
+        ]
+        for connection_name in channel_names:
+            provider_key = f"LLM_{connection_name.upper()}_PROVIDER"
+            if str(config_map.get(provider_key, "") or "").strip():
+                continue
+            _provider, provider_id, _is_explicit = cls._resolve_connection_provider(
+                config_map,
+                connection_name,
+            )
+            config_map[provider_key] = provider_id
+            injected.add(provider_key)
+        return injected
+
     def get_config(self, include_schema: bool = True, mask_token: str = "******") -> Dict[str, Any]:
         """Return display config values with mask metadata for server-masked fields."""
         saved_config_map = self._build_display_config_map(self._manager.read_config_map())
@@ -451,6 +482,7 @@ class SystemConfigService:
             **runtime_config_map,
             **saved_config_map,
         }
+        compatibility_provider_keys = self._inject_legacy_connection_provider_summaries(config_map)
         registered_keys = set(get_registered_field_keys())
         all_keys = set(config_map.keys()) | registered_keys
         if include_schema:
@@ -468,7 +500,7 @@ class SystemConfigService:
 
         items: List[Dict[str, Any]] = []
         for key in all_keys:
-            raw_value_exists = key in saved_config_map
+            raw_value_exists = key in saved_config_map and key not in compatibility_provider_keys
             raw_value = config_map.get(key, "")
             field_schema = schema_by_key[key]
             display_value = self._resolve_display_value(raw_value, field_schema, raw_value_exists)
@@ -648,15 +680,12 @@ class SystemConfigService:
                 if key:
                     effective_map[key] = str(item.get("value", ""))
 
-        authoritative = (
-            SystemConfigService._collect_yaml_models_from_map(effective_map)
-            or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
-        )
-        ordered_routes = list(dict.fromkeys(authoritative))
+        yaml_routes = SystemConfigService._collect_yaml_models_from_map(effective_map)
 
         # Resolve a connection to its authoritative catalog provider so selectors
         # can group models by provider without a second frontend list.
         from src.llm.provider_catalog import get_provider_catalog
+        from src.llm.model_ref import encode_model_ref
 
         provider_label_by_id = {
             str(entry["id"]).lower(): str(entry["label"]) for entry in get_provider_catalog()
@@ -671,8 +700,26 @@ class SystemConfigService:
                 pid = "custom"
             return pid, provider_label_by_id.get(pid, pid)
 
-        # Best-effort route -> grouping metadata (connection + provider + display).
-        grouping: Dict[str, Dict[str, str]] = {}
+        if yaml_routes:
+            return {
+                "models": [
+                    {
+                        "model_ref": route,
+                        "route": route,
+                        "display": route,
+                        "connection": None,
+                        "connection_id": None,
+                        "connection_name": None,
+                        "provider": None,
+                        "provider_id": None,
+                        "provider_label": None,
+                        "available": True,
+                    }
+                    for route in dict.fromkeys(yaml_routes)
+                ]
+            }
+
+        models: List[Dict[str, Any]] = []
         for raw_name in (effective_map.get("LLM_CHANNELS") or "").split(","):
             name = raw_name.strip()
             if not name:
@@ -689,39 +736,32 @@ class SystemConfigService:
             )
             protocol = protocol or "openai"
             provider_id, provider_label = _resolve_provider(name)
+            connection_name = (
+                effective_map.get(f"{prefix}_DISPLAY_NAME") or ""
+            ).strip() or name
+            seen_routes: Set[str] = set()
             for raw_model in (effective_map.get(f"{prefix}_MODELS") or "").split(","):
                 model = raw_model.strip()
                 if not model:
                     continue
                 route = normalize_llm_channel_model(model, protocol, base_url)
-                if route and route not in grouping:
-                    grouping[route] = {
-                        "connection": name,
-                        "provider": protocol,
-                        "provider_id": provider_id,
-                        "provider_label": provider_label,
-                        "display": model,
-                    }
-
-        models: List[Dict[str, Any]] = []
-        for route in ordered_routes:
-            meta = grouping.get(route)
-            models.append({
-                "route": route,
-                "display": meta["display"] if meta else route,
-                # `connection` is the channel name, which is also its stable id.
-                "connection": meta["connection"] if meta else None,
-                "connection_id": meta["connection"] if meta else None,
-                "connection_name": meta["connection"] if meta else None,
-                # `provider` stays the protocol for back-compat; provider_id/label
-                # are the authoritative catalog provider for display/grouping.
-                "provider": meta["provider"] if meta else None,
-                "provider_id": meta["provider_id"] if meta else None,
-                "provider_label": meta["provider_label"] if meta else None,
-                # Every returned route is declared by an enabled connection, so it
-                # is available/routable in the current config.
-                "available": True,
-            })
+                if not route or route in seen_routes:
+                    continue
+                seen_routes.add(route)
+                models.append({
+                    "model_ref": encode_model_ref(name, route),
+                    "route": route,
+                    "display": model,
+                    "connection": name,
+                    "connection_id": name,
+                    "connection_name": connection_name,
+                    # `provider` stays the protocol for back-compat; provider_id/label
+                    # are the authoritative catalog provider for display/grouping.
+                    "provider": protocol,
+                    "provider_id": provider_id,
+                    "provider_label": provider_label,
+                    "available": True,
+                })
         return {"models": models}
 
     @staticmethod
@@ -2399,11 +2439,15 @@ class SystemConfigService:
             if bool(field_schema.get("is_sensitive", False)):
                 sensitive_keys.add(key)
 
-        updated_keys, skipped_masked_keys, new_version = self._manager.apply_updates(
-            updates=updates,
-            sensitive_keys=sensitive_keys,
-            mask_token=mask_token,
-        )
+        try:
+            updated_keys, skipped_masked_keys, new_version = self._manager.apply_updates(
+                updates=updates,
+                sensitive_keys=sensitive_keys,
+                mask_token=mask_token,
+                expected_version=config_version,
+            )
+        except ConfigVersionConflictError as exc:
+            raise ConfigConflictError(current_version=exc.current_version) from exc
 
         warnings: List[str] = []
         reload_triggered = False
@@ -2712,6 +2756,7 @@ class SystemConfigService:
         previous_effective_map = dict(effective_map)
         issues: List[Dict[str, Any]] = []
         updated_map: Dict[str, str] = {}
+        submitted_fields: List[Tuple[str, str, Dict[str, Any]]] = []
 
         for item in items:
             key = item["key"].upper()
@@ -2724,6 +2769,15 @@ class SystemConfigService:
 
             updated_map[key] = value
             effective_map[key] = value
+            submitted_fields.append((key, value, field_schema))
+
+        # Evaluate visibility against the complete draft, independent of item
+        # order. Hidden fields are outside the current validation scope.
+        for key, value, field_schema in submitted_fields:
+            contract = field_schema.get("contract") or {}
+            visibility = evaluate_config_conditions(contract.get("visible_when"), effective_map)
+            if visibility == "not_met":
+                continue
             issues.extend(self._validate_value(key=key, value=value, field_schema=field_schema))
 
         issues.extend(
@@ -2733,23 +2787,71 @@ class SystemConfigService:
                 previous_effective_map=previous_effective_map,
             )
         )
-        issues.extend(self._validate_field_contracts(effective_map))
+        issues.extend(
+            self._validate_field_contracts(
+                effective_map=effective_map,
+                updated_map=updated_map,
+                previous_effective_map=previous_effective_map,
+            )
+        )
         return issues
 
     @staticmethod
-    def _validate_field_contracts(effective_map: Dict[str, str]) -> List[Dict[str, Any]]:
-        """Authoritative required/conditionally-required schema contract checks.
+    def _validate_field_contracts(
+        *,
+        effective_map: Dict[str, str],
+        updated_map: Dict[str, str],
+        previous_effective_map: Dict[str, str],
+    ) -> List[Dict[str, Any]]:
+        """Authoritative conditional requirement and editability checks.
 
         Hidden fields (visibleWhen not met) are excluded; a field is required when
-        requirement=required or its requiredWhen conditions are met.
+        requirement=required or its requiredWhen conditions are met. Unsupported
+        condition shapes remain visible but become read-only with a stable
+        diagnostic instead of being silently hidden or skipped.
         """
         issues: List[Dict[str, Any]] = []
         for key, contract in get_contract_field_definitions().items():
-            if evaluate_config_conditions(contract.get("visible_when"), effective_map) == "not_met":
+            condition_results = {
+                name: evaluate_config_conditions(contract.get(name), effective_map)
+                for name in ("visible_when", "required_when", "enabled_when")
+                if contract.get(name)
+            }
+            unknown_conditions = [
+                name for name, result in condition_results.items() if result == "unknown"
+            ]
+            field_changed = key in updated_map and str(updated_map[key]) != str(
+                previous_effective_map.get(key, "") or ""
+            )
+            if unknown_conditions:
+                issues.append({
+                    "key": key,
+                    "code": "unsupported_config_condition",
+                    "severity": "error" if field_changed else "warning",
+                    "message": (
+                        f"{key} has an unsupported schema condition and remains "
+                        "visible but read-only."
+                    ),
+                    "expected": "equals|notEquals|in|notEmpty",
+                    "actual": ",".join(unknown_conditions),
+                })
+
+            if condition_results.get("visible_when") == "not_met":
                 continue
+
+            enabled_result = condition_results.get("enabled_when", "met")
+            if field_changed and enabled_result == "not_met":
+                issues.append({
+                    "key": key,
+                    "code": "field_disabled",
+                    "severity": "error",
+                    "message": f"{key} cannot be changed in the current configuration.",
+                    "expected": "enabled_when conditions met",
+                    "actual": "disabled",
+                })
+
             required = contract.get("requirement") == "required"
-            required_when = contract.get("required_when")
-            if required_when and evaluate_config_conditions(required_when, effective_map) == "met":
+            if condition_results.get("required_when") == "met":
                 required = True
             if required and not str(effective_map.get(key, "") or "").strip():
                 issues.append({
@@ -5283,7 +5385,7 @@ class SystemConfigService:
         effective_map: Dict[str, str],
         known_routes: Set[str],
     ) -> Dict[str, List[Dict[str, str]]]:
-        """Collect explicit task assignments by exact model route."""
+        """Collect explicit task assignments by exact route or ModelRef."""
         references: Dict[str, List[Dict[str, str]]] = {}
 
         def add(route: str, task: str, key: str) -> None:
@@ -5295,23 +5397,46 @@ class SystemConfigService:
             if entry not in route_references:
                 route_references.append(entry)
 
-        add(effective_map.get("LITELLM_MODEL", ""), "report", "LITELLM_MODEL")
-        raw_agent_model = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
-        if raw_agent_model:
-            add(
+        for key, value, task in SystemConfigService._collect_task_model_assignments(
+            effective_map,
+            known_routes,
+        ):
+            add(value, task, key)
+        return references
+
+    @staticmethod
+    def _collect_task_model_assignments(
+        effective_map: Dict[str, str],
+        known_routes: Optional[Set[str]] = None,
+    ) -> List[Tuple[str, str, str]]:
+        """Return task config key, normalized reference, and stable task name."""
+        assignments: List[Tuple[str, str, str]] = [
+            (
+                "LITELLM_MODEL",
+                (effective_map.get("LITELLM_MODEL") or "").strip(),
+                "report",
+            ),
+            (
+                "AGENT_LITELLM_MODEL",
                 normalize_agent_litellm_model(
-                    raw_agent_model,
-                    configured_models=known_routes,
+                    (effective_map.get("AGENT_LITELLM_MODEL") or "").strip(),
+                    configured_models=known_routes or set(),
                 ),
                 "agent",
-                "AGENT_LITELLM_MODEL",
+            ),
+            (
+                "VISION_MODEL",
+                (effective_map.get("VISION_MODEL") or "").strip(),
+                "vision",
+            ),
+        ]
+        assignments.extend(
+            ("LITELLM_FALLBACK_MODELS", route, "fallback")
+            for route in SystemConfigService._split_csv(
+                effective_map.get("LITELLM_FALLBACK_MODELS") or ""
             )
-        add(effective_map.get("VISION_MODEL", ""), "vision", "VISION_MODEL")
-        for fallback in SystemConfigService._split_csv(
-            effective_map.get("LITELLM_FALLBACK_MODELS") or ""
-        ):
-            add(fallback, "fallback", "LITELLM_FALLBACK_MODELS")
-        return references
+        )
+        return [assignment for assignment in assignments if assignment[1]]
 
     @staticmethod
     def _collect_llm_route_connection_ids(
@@ -5332,6 +5457,156 @@ class SystemConfigService:
                 if connection_id not in route_owners:
                     route_owners.append(connection_id)
         return owners
+
+    @staticmethod
+    def _collect_llm_channel_model_refs_from_map(effective_map: Dict[str, str]) -> List[str]:
+        """Collect stable connection-aware aliases for enabled channel models."""
+        from src.llm.model_ref import encode_model_ref
+
+        refs: List[str] = []
+        for route, connection_ids in (
+            SystemConfigService._collect_llm_route_connection_ids(effective_map).items()
+        ):
+            for connection_id in connection_ids:
+                refs.append(encode_model_ref(connection_id, route))
+        return refs
+
+    @staticmethod
+    def _collect_hermes_channel_model_refs_from_map(effective_map: Dict[str, str]) -> Set[str]:
+        """Collect exact ModelRefs whose selected Connection is Hermes."""
+        from src.llm.model_ref import encode_model_ref
+
+        refs: Set[str] = set()
+        for route, connection_ids in (
+            SystemConfigService._collect_llm_route_connection_ids(effective_map).items()
+        ):
+            for connection_id in connection_ids:
+                if is_reserved_hermes_name(connection_id):
+                    refs.add(encode_model_ref(connection_id, route))
+        return refs
+
+    @staticmethod
+    def _collect_ambiguous_legacy_model_route_issues(
+        effective_map: Dict[str, str],
+        updated_keys: Set[str],
+        previous_effective_map: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Require an explicit Connection when a legacy route has many owners."""
+        from src.llm.model_ref import decode_model_ref, encode_model_ref
+
+        owners = SystemConfigService._collect_llm_route_connection_ids(effective_map)
+        previous_owners = (
+            SystemConfigService._collect_llm_route_connection_ids(previous_effective_map)
+            if previous_effective_map is not None
+            else {}
+        )
+        known_routes = set(owners)
+        assignments = SystemConfigService._collect_task_model_assignments(
+            effective_map,
+            known_routes,
+        )
+
+        issues: List[Dict[str, Any]] = []
+        seen: Set[Tuple[str, str]] = set()
+        for key, route, _task in assignments:
+            try:
+                model_ref = decode_model_ref(route)
+            except ValueError:
+                # Invalid versioned values are reported by the dedicated parser
+                # check and must not fall through as legacy runtime routes.
+                continue
+            if model_ref is not None or (key, route) in seen:
+                continue
+            seen.add((key, route))
+            connection_ids = owners.get(route, [])
+            prior_connection_ids = previous_owners.get(route, [])
+            owners_changed = (
+                previous_effective_map is not None
+                and connection_ids != prior_connection_ids
+            )
+            is_currently_ambiguous = len(connection_ids) >= 2
+            became_unique_after_ambiguous = (
+                len(connection_ids) == 1 and len(prior_connection_ids) >= 2
+            )
+            if not is_currently_ambiguous and not became_unique_after_ambiguous:
+                continue
+            diagnostic_connection_ids = (
+                prior_connection_ids
+                if became_unique_after_ambiguous
+                else connection_ids
+            )
+            issues.append({
+                "key": key,
+                "code": "ambiguous_model_route",
+                "message": (
+                    f"Model route '{route}' exists on multiple Connections. "
+                    "Choose the intended Connection before saving this task assignment."
+                ),
+                # A mutation that creates or masks ambiguity must be blocked even
+                # when the task field itself was not submitted in that update.
+                "severity": "error" if key in updated_keys or owners_changed else "warning",
+                "expected": "connection-aware model_ref",
+                "actual": route,
+                "details": {
+                    "route": route,
+                    "connection_ids": diagnostic_connection_ids,
+                    "available_connection_ids": connection_ids,
+                    "model_refs": [
+                        encode_model_ref(connection_id, route)
+                        for connection_id in connection_ids
+                    ],
+                },
+            })
+        return issues
+
+    @staticmethod
+    def _collect_invalid_model_ref_issues(
+        effective_map: Dict[str, str],
+        updated_keys: Set[str],
+    ) -> List[Dict[str, Any]]:
+        """Report malformed or unresolvable connection-aware references."""
+        from src.llm.model_ref import decode_model_ref, is_model_ref
+
+        issues: List[Dict[str, Any]] = []
+        seen: Set[Tuple[str, str]] = set()
+        configured_refs = set(
+            SystemConfigService._collect_llm_channel_model_refs_from_map(effective_map)
+        )
+        for key, value, _task in SystemConfigService._collect_task_model_assignments(
+            effective_map
+        ):
+            if not is_model_ref(value) or (key, value) in seen:
+                continue
+            seen.add((key, value))
+            try:
+                model_ref = decode_model_ref(value)
+            except ValueError:
+                issues.append({
+                    "key": key,
+                    "code": "invalid_model_ref",
+                    "message": "The selected model reference is malformed or unsupported.",
+                    "severity": "error" if key in updated_keys else "warning",
+                    "expected": "versioned connection-aware model_ref",
+                    "actual": value,
+                })
+                continue
+            if model_ref is not None and value not in configured_refs:
+                issues.append({
+                    "key": key,
+                    "code": "unknown_model",
+                    "message": (
+                        "The selected model reference does not belong to an enabled "
+                        "Connection and model."
+                    ),
+                    "severity": "error" if key in updated_keys else "warning",
+                    "expected": "model_ref from an enabled configured Connection",
+                    "actual": value,
+                    "details": {
+                        "connection_id": model_ref.connection_id,
+                        "runtime_route": model_ref.runtime_route,
+                    },
+                })
+        return issues
 
     @staticmethod
     def _model_removal_issue_key(
@@ -5370,10 +5645,32 @@ class SystemConfigService:
         removed_models = [
             route for route in previous_models if route not in current_model_set
         ]
-        if not removed_models:
+        previous_model_refs = (
+            set()
+            if SystemConfigService._collect_yaml_models_from_map(previous_effective_map)
+            else set(
+                SystemConfigService._collect_llm_channel_model_refs_from_map(
+                    previous_effective_map
+                )
+            )
+        )
+        current_model_refs = (
+            set()
+            if SystemConfigService._collect_yaml_models_from_map(effective_map)
+            else set(
+                SystemConfigService._collect_llm_channel_model_refs_from_map(effective_map)
+            )
+        )
+        removed_model_refs = sorted(previous_model_refs - current_model_refs)
+        if not removed_models and not removed_model_refs:
             return []
 
-        known_routes = set(previous_models) | current_model_set
+        known_routes = (
+            set(previous_models)
+            | current_model_set
+            | previous_model_refs
+            | current_model_refs
+        )
         references = SystemConfigService._collect_llm_route_references(
             effective_map,
             known_routes,
@@ -5409,6 +5706,39 @@ class SystemConfigService:
                     },
                 }
             )
+
+        from src.llm.model_ref import decode_model_ref
+
+        for model_ref_value in removed_model_refs:
+            referenced_by = references.get(model_ref_value, [])
+            if not referenced_by:
+                continue
+            decoded = decode_model_ref(model_ref_value)
+            if decoded is None:  # pragma: no cover - generated refs are versioned
+                continue
+            issues.append(
+                {
+                    "key": SystemConfigService._model_removal_issue_key(
+                        [decoded.connection_id],
+                        updated_keys,
+                    ),
+                    "code": "model_in_use",
+                    "message": (
+                        f"Model '{decoded.runtime_route}' on Connection "
+                        f"'{decoded.connection_id}' is still assigned to one or more tasks. "
+                        "Replace or clear those assignments in the same update before removing it."
+                    ),
+                    "severity": "error",
+                    "expected": "all task references replaced or cleared atomically",
+                    "actual": model_ref_value,
+                    "details": {
+                        "route": decoded.runtime_route,
+                        "model_ref": model_ref_value,
+                        "connection_ids": [decoded.connection_id],
+                        "referenced_by": referenced_by,
+                    },
+                }
+            )
         return issues
 
     @staticmethod
@@ -5423,9 +5753,24 @@ class SystemConfigService:
             previous_effective_map=previous_effective_map,
             updated_keys=updated_keys or set(),
         )
-        issues: List[Dict[str, Any]] = list(removal_issues)
+        model_ref_issues = SystemConfigService._collect_invalid_model_ref_issues(
+            effective_map,
+            updated_keys or set(),
+        )
+        issues: List[Dict[str, Any]] = [*removal_issues, *model_ref_issues]
+        issues.extend(
+            SystemConfigService._collect_ambiguous_legacy_model_route_issues(
+                effective_map,
+                updated_keys or set(),
+                previous_effective_map,
+            )
+        )
         removed_routes_in_use = {
-            issue["details"]["route"] for issue in removal_issues
+            issue["details"].get("model_ref") or issue["details"]["route"]
+            for issue in removal_issues
+        }
+        unavailable_task_models = removed_routes_in_use | {
+            issue["actual"] for issue in model_ref_issues
         }
 
         # Vision references normally degrade to warnings so historical breakage
@@ -5445,15 +5790,49 @@ class SystemConfigService:
                 channel_shape_touched = bool(declared_channel_prefixes) and any(
                     key.startswith(declared_channel_prefixes) for key in updated_keys
                 )
-        vision_reference_severity = "error" if channel_shape_touched else "warning"
+        vision_reference_severity = (
+            "error"
+            if channel_shape_touched or "VISION_MODEL" in (updated_keys or set())
+            else "warning"
+        )
 
         available_models = (
             SystemConfigService._collect_yaml_models_from_map(effective_map)
             or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
         )
         available_model_set = set(available_models)
+        if not SystemConfigService._collect_yaml_models_from_map(effective_map):
+            available_model_set.update(
+                SystemConfigService._collect_llm_channel_model_refs_from_map(effective_map)
+            )
         hermes_route_set = set(SystemConfigService._collect_hermes_channel_models_from_map(effective_map))
+        hermes_model_ref_set = (
+            SystemConfigService._collect_hermes_channel_model_refs_from_map(effective_map)
+        )
         mixed_hermes_routes = SystemConfigService._collect_mixed_hermes_routes_from_map(effective_map)
+
+        from src.llm.model_ref import decode_model_ref
+
+        def is_hermes_model(model: str) -> bool:
+            try:
+                model_ref = decode_model_ref(model)
+            except ValueError:
+                return False
+            if model_ref is not None:
+                return model in hermes_model_ref_set
+            return SystemConfigService._matches_route_set(model, hermes_route_set)
+
+        def is_mixed_hermes_model(model: str) -> bool:
+            try:
+                model_ref = decode_model_ref(model)
+            except ValueError:
+                return False
+            # A ModelRef chooses one Connection, so it cannot inherit the mixed
+            # provenance of a legacy alias shared by several Connections.
+            if model_ref is not None:
+                return False
+            return SystemConfigService._matches_route_set(model, mixed_hermes_routes)
+
         if not available_model_set:
             raw_channels = (effective_map.get("LLM_CHANNELS") or "").strip()
             if not raw_channels:
@@ -5467,7 +5846,7 @@ class SystemConfigService:
             primary_model = (effective_map.get("LITELLM_MODEL") or "").strip()
             if (
                 primary_model
-                and primary_model not in removed_routes_in_use
+                and primary_model not in unavailable_task_models
                 and not SystemConfigService._has_runtime_source_for_model(primary_model, effective_map)
             ):
                 issues.append(
@@ -5488,7 +5867,7 @@ class SystemConfigService:
             if (
                 configured_agent_model_raw
                 and configured_agent_model
-                and configured_agent_model not in removed_routes_in_use
+                and configured_agent_model not in unavailable_task_models
                 and not SystemConfigService._has_runtime_source_for_model(
                     configured_agent_model,
                     effective_map,
@@ -5511,8 +5890,8 @@ class SystemConfigService:
             elif (
                 configured_agent_model_raw
                 and configured_agent_model
-                and SystemConfigService._matches_route_set(configured_agent_model, hermes_route_set)
-                and not SystemConfigService._matches_route_set(configured_agent_model, mixed_hermes_routes)
+                and is_hermes_model(configured_agent_model)
+                and not is_mixed_hermes_model(configured_agent_model)
             ):
                 issues.append(
                     {
@@ -5535,7 +5914,7 @@ class SystemConfigService:
             ]
             invalid_fallbacks = [
                 model for model in fallback_models
-                if model not in removed_routes_in_use
+                if model not in unavailable_task_models
                 if not SystemConfigService._has_runtime_source_for_model(model, effective_map)
             ]
             if invalid_fallbacks:
@@ -5554,7 +5933,7 @@ class SystemConfigService:
                 )
 
             vision_model = (effective_map.get("VISION_MODEL") or "").strip()
-            if vision_model and SystemConfigService._matches_route_set(vision_model, hermes_route_set):
+            if vision_model and is_hermes_model(vision_model):
                 issues.append(
                     {
                         "key": "VISION_MODEL",
@@ -5570,7 +5949,7 @@ class SystemConfigService:
                 )
             elif (
                 vision_model
-                and vision_model not in removed_routes_in_use
+                and vision_model not in unavailable_task_models
                 and not SystemConfigService._has_runtime_source_for_model(vision_model, effective_map)
             ):
                 issues.append(
@@ -5590,7 +5969,7 @@ class SystemConfigService:
             return issues
 
         primary_model = (effective_map.get("LITELLM_MODEL") or "").strip()
-        if SystemConfigService._matches_route_set(primary_model, mixed_hermes_routes):
+        if is_mixed_hermes_model(primary_model):
             issues.append(
                 {
                     "key": "LITELLM_MODEL",
@@ -5606,7 +5985,7 @@ class SystemConfigService:
             )
         if (
             primary_model
-            and primary_model not in removed_routes_in_use
+            and primary_model not in unavailable_task_models
             and not SystemConfigService._matches_exact_route(primary_model, available_model_set)
             and not _uses_direct_env_provider(primary_model)
         ):
@@ -5633,7 +6012,7 @@ class SystemConfigService:
         if (
             configured_agent_model_raw
             and configured_agent_model
-            and configured_agent_model not in removed_routes_in_use
+            and configured_agent_model not in unavailable_task_models
             and not SystemConfigService._matches_exact_route(configured_agent_model, available_model_set)
             and not _uses_direct_env_provider(configured_agent_model)
         ):
@@ -5654,8 +6033,8 @@ class SystemConfigService:
         elif (
                 configured_agent_model_raw
                 and configured_agent_model
-                and SystemConfigService._matches_route_set(configured_agent_model, hermes_route_set)
-                and not SystemConfigService._matches_route_set(configured_agent_model, mixed_hermes_routes)
+                and is_hermes_model(configured_agent_model)
+                and not is_mixed_hermes_model(configured_agent_model)
             ):
             issues.append(
                 {
@@ -5678,7 +6057,7 @@ class SystemConfigService:
         ]
         mixed_fallbacks = [
             model for model in fallback_models
-            if SystemConfigService._matches_route_set(model, mixed_hermes_routes)
+            if is_mixed_hermes_model(model)
         ]
         if mixed_fallbacks:
             issues.append(
@@ -5695,7 +6074,7 @@ class SystemConfigService:
             )
         invalid_fallbacks = [
             model for model in fallback_models
-            if model not in removed_routes_in_use
+            if model not in unavailable_task_models
             if not SystemConfigService._matches_exact_route(model, available_model_set)
             and not _uses_direct_env_provider(model)
         ]
@@ -5715,7 +6094,7 @@ class SystemConfigService:
             )
 
         vision_model = (effective_map.get("VISION_MODEL") or "").strip()
-        if vision_model and SystemConfigService._matches_route_set(vision_model, hermes_route_set):
+        if vision_model and is_hermes_model(vision_model):
             issues.append(
                 {
                     "key": "VISION_MODEL",
@@ -5731,7 +6110,7 @@ class SystemConfigService:
             )
         elif (
             vision_model
-            and vision_model not in removed_routes_in_use
+            and vision_model not in unavailable_task_models
             and not SystemConfigService._matches_exact_route(vision_model, available_model_set)
             and not _uses_direct_env_provider(vision_model)
         ):

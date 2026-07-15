@@ -31,6 +31,12 @@ Backend errors exposed to the Web should include a stable `error` code, diagnost
 
 Use `src/utils/uiLocale.ts` for dates, numbers, currency, and lists. Keep display locale separate from market business time zones. ISO form values, stock symbols, and model IDs are not localized.
 
+## Task Messages and Recovery
+
+Analysis-task acceptance responses, task lists, individual status responses, and SSE events share one versioned contract. `message_code/message_params` and `error_code/error_params` drive primary UI copy; raw `message/error` fields are retained only for compatibility diagnostics. The Web translates codes using the current UI language on every render. Unknown codes and legacy payloads use localized generic copy, while original text appears only in expandable diagnostics.
+
+POST, SSE, and polling snapshots for the same task merge by `task_id + revision`; an older revision must never overwrite newer state. When SSE disconnects, the Web immediately polls `/analysis/status/{task_id}` for each known non-terminal task and stops fallback polling after reconnecting. A refresh restores active tasks and terminal tasks inside the retention window. Dismissal is tied to the observed revision and has a TTL, so a newer revision becomes visible again.
+
 ## Verification
 
 ```bash

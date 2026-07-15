@@ -84,7 +84,7 @@ After opening a PR, CI will automatically run the following PR checks:
 |-------|-------------|:--------:|
 | `backend-gate` | `scripts/ci_gate.sh` — py_compile + flake8 critical errors + `./scripts/test.sh code` + `./scripts/test.sh yfinance` + offline pytest | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
-| `web-gate` | `npm run lint` + `npm run test` + `npm run build` (triggered when `apps/dsa-web/` changes) | ✅ (when triggered) |
+| `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` (triggered when Web-related paths change) | ✅ (when triggered) |
 | `web-e2e` | Starts the real backend, Vite, and a local fake model endpoint in an isolated runtime, then runs `npm run test:smoke` (Playwright) | ✅ (when triggered) |
 
 Separately, the repository also has a non-blocking `network-smoke` workflow in `.github/workflows/network-smoke.yml`, but it is only triggered by `schedule` and `workflow_dispatch`, not by pull requests.
@@ -111,7 +111,9 @@ npm run test:smoke
 
 See [Web Internationalization Conventions](web-i18n_EN.md) for UI/report-language boundaries, domain registries, and error-code handling. New pages and languages must extend the relevant `src/locales/` domain instead of hardcoding visible JSX copy.
 
-Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. It seeds deterministic report data at startup and removes runtime state when the suite ends, without reading or modifying the developer's `.env`, database, or auth files. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`; CI uploads them with screenshots, traces, and videos on failure. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. It seeds deterministic report data at startup and removes runtime state when the suite ends, without reading or modifying the developer's `.env`, database, or auth files. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`. CI always uploads acceptance screenshots and the HTML report as PR evidence; on failure the same artifact also contains traces, videos, and service logs. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+
+Each semantic acceptance scenario must be its own clearly named `test()` with a direct assertion on the scenario's critical outcome. Loops, numbered comments, retries, or route-render smoke assertions do not count as independent coverage. Deterministic race tests run with zero retries; use traces, videos, screenshots, and service logs to diagnose failures.
 
 For local frontend/backend integration, `npm run dev` proxies `/api` to `DSA_WEB_DEV_API_PROXY` (default `http://127.0.0.1:8000`). Set it when the backend is running elsewhere; this variable only affects the Vite development server.
 

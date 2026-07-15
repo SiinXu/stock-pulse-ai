@@ -924,7 +924,10 @@ def test_internal_errors_do_not_reflect_exception_details(client_and_db) -> None
     assert resp.status_code == 500
     payload = resp.json()
     assert payload["error"] == "internal_error"
-    assert payload["message"] == "List decision signals failed"
+    assert payload["message"] == "Internal server error"
+    assert payload["params"] == {}
+    assert payload["details"] == {}
+    assert payload["trace_id"]
     assert "secret-token" not in str(payload)
     assert "internal-path" not in str(payload)
 
@@ -943,25 +946,19 @@ def test_corrupt_persisted_json_returns_internal_error_consistently(client_and_d
         row = session.query(DecisionSignalRecord).filter_by(id=signal_id).one()
         row.evidence_json = "{bad persisted json"
 
-    cases = [
-        (
-            client.get("/api/v1/decision-signals", params={"stock_code": "600519"}),
-            "List decision signals failed",
-        ),
-        (
-            client.get(f"/api/v1/decision-signals/{signal_id}"),
-            "Get decision signal failed",
-        ),
-        (
-            client.get("/api/v1/decision-signals/latest/600519"),
-            "Get latest decision signals failed",
-        ),
+    responses = [
+        client.get("/api/v1/decision-signals", params={"stock_code": "600519"}),
+        client.get(f"/api/v1/decision-signals/{signal_id}"),
+        client.get("/api/v1/decision-signals/latest/600519"),
     ]
-    for resp, message in cases:
+    for resp in responses:
         assert resp.status_code == 500, resp.text
         payload = resp.json()
         assert payload["error"] == "internal_error"
-        assert payload["message"] == message
+        assert payload["message"] == "Internal server error"
+        assert payload["params"] == {}
+        assert payload["details"] == {}
+        assert payload["trace_id"]
         assert "bad persisted json" not in str(payload)
 
 

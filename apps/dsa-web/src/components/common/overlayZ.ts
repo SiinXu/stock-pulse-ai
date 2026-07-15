@@ -3,21 +3,26 @@
 // report drawers, ConfirmDialog) import from here; the remaining overlays use
 // matching Tailwind classes, documented below so the whole scale stays legible:
 //
-//   pageDrawer   40   Home/Chat mobile history sidebars      (Tailwind z-40)
-//   drawer       50   shared Drawer default / centered Modal (Tailwind z-50)
-//   runFlowDrawer 80  Home run-flow drawer
-//   confirm      90   ConfirmDialog — always above drawers/modals
-//   reportDrawer 100  report markdown drawer
-//   dropdown     100  Select / autocomplete popovers         (Tailwind z-[100])
-//   tooltip      120  Tooltip / menus                        (Tailwind z-[120])
-//   settingsModal 140 Settings help modal                    (Tailwind z-[140])
+//   pageDrawer    60  Home/Chat mobile history drawers
+//   navigation    70  application navigation drawer
+//   drawer/modal  80  default content overlays
+//   runFlow      100  Home run-flow drawer
+//   report       110  report markdown drawer
+//   dropdown     140  Select / autocomplete popovers
+//   tooltip      160  Tooltip / menus
+//   settings     180  Settings help modal
+//   confirm      200  destructive/transaction confirmation
+//   toast        220  transient global feedback
 export const OVERLAY_Z = {
-  pageDrawer: 40,
-  drawer: 50,
-  runFlowDrawer: 80,
-  confirm: 90,
-  reportDrawer: 100,
-  dropdown: 100,
-  tooltip: 120,
-  settingsModal: 140,
+  pageDrawer: 60,
+  navigationDrawer: 70,
+  drawer: 80,
+  modal: 80,
+  runFlowDrawer: 100,
+  reportDrawer: 110,
+  dropdown: 140,
+  tooltip: 160,
+  settingsModal: 180,
+  confirm: 200,
+  toast: 220,
 } as const;

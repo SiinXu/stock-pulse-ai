@@ -4,6 +4,8 @@ import { BarChart3, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp,
 import { historyApi } from '../../api/history';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, UI_TEXT } from '../../i18n/uiText';
+import { MARKET_REVIEW_TEXT } from '../../locales/reportBody';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type {
   AnalysisReport,
   MarketReviewPayload,
@@ -104,12 +106,15 @@ const getSectionIcon = (title: string): typeof FileText => {
   return FileText;
 };
 
-const splitMarketReviewSections = (markdown: string): MarketReviewSection[] => {
+const splitMarketReviewSections = (
+  markdown: string,
+  text: (typeof MARKET_REVIEW_TEXT)[ReportLanguage],
+): MarketReviewSection[] => {
   const matches = Array.from(markdown.matchAll(SECTION_HEADING_PATTERN));
   if (matches.length === 0) {
     return [{
       id: 'full-review',
-      title: '复盘正文',
+      title: text.fullReview,
       content: markdown,
       icon: FileText,
     }];
@@ -119,7 +124,7 @@ const splitMarketReviewSections = (markdown: string): MarketReviewSection[] => {
   const sections: MarketReviewSection[] = intro
     ? [{
         id: 'overview',
-        title: '复盘概览',
+        title: text.overview,
         content: intro,
         icon: FileText,
       }]
@@ -259,100 +264,6 @@ const formatMarketHighLow = (high: unknown, low: unknown): string => {
   return highText === '-' && lowText === '-' ? '-' : `${highText} / ${lowText}`;
 };
 
-const MARKET_REVIEW_TEXT: Record<ReportLanguage, {
-  reviewSummary: string;
-  noReviewSummary: string;
-  noSentimentScore: string;
-  rotationAndFunds: string;
-  noRotationView: string;
-  riskAndWatch: string;
-  noRiskWatch: string;
-  structuredMarketData: string;
-  noBreadthData: string;
-  advancers: string;
-  decliners: string;
-  limitUpDown: string;
-  turnover: string;
-  index: string;
-  last: string;
-  change: string;
-  highLow: string;
-  industryBoards: string;
-  conceptBoards: string;
-  leading: string;
-  lagging: string;
-}> = {
-  zh: {
-    reviewSummary: '复盘摘要',
-    noReviewSummary: '暂无摘要',
-    noSentimentScore: '暂无评分',
-    rotationAndFunds: '轮动与资金',
-    noRotationView: '暂无轮动观点',
-    riskAndWatch: '风险与观察',
-    noRiskWatch: '暂无观察重点',
-    structuredMarketData: '结构化大盘数据',
-    noBreadthData: '暂无数据',
-    advancers: '上涨家数',
-    decliners: '下跌家数',
-    limitUpDown: '涨停/跌停',
-    turnover: '成交额',
-    index: '指数',
-    last: '最新',
-    change: '涨跌幅',
-    highLow: '高/低',
-    industryBoards: '行业板块',
-    conceptBoards: '概念板块',
-    leading: '领涨',
-    lagging: '领跌',
-  },
-  en: {
-    reviewSummary: 'Review Summary',
-    noReviewSummary: 'No review summary yet',
-    noSentimentScore: 'No score yet',
-    rotationAndFunds: 'Rotation & Funds',
-    noRotationView: 'No rotation view yet',
-    riskAndWatch: 'Risks & Watchlist',
-    noRiskWatch: 'No key observations yet',
-    structuredMarketData: 'Structured Market Data',
-    noBreadthData: 'No data',
-    advancers: 'Advancers',
-    decliners: 'Decliners',
-    limitUpDown: 'Limit Up/Down',
-    turnover: 'Turnover',
-    index: 'Index',
-    last: 'Last',
-    change: 'Change',
-    highLow: 'High/Low',
-    industryBoards: 'Industry Sectors',
-    conceptBoards: 'Concept Themes',
-    leading: 'Leading',
-    lagging: 'Lagging',
-  },
-  ko: {
-    reviewSummary: '리뷰 요약',
-    noReviewSummary: '요약 없음',
-    noSentimentScore: '점수 없음',
-    rotationAndFunds: '순환과 자금',
-    noRotationView: '순환 관점 없음',
-    riskAndWatch: '리스크와 관찰',
-    noRiskWatch: '관찰 포인트 없음',
-    structuredMarketData: '구조화 시장 데이터',
-    noBreadthData: '데이터 없음',
-    advancers: '상승 종목 수',
-    decliners: '하락 종목 수',
-    limitUpDown: '상한가/하한가',
-    turnover: '거래대금',
-    index: '지수',
-    last: '현재',
-    change: '등락률',
-    highLow: '고가/저가',
-    industryBoards: '업종 섹터',
-    conceptBoards: '테마 섹터',
-    leading: '강세',
-    lagging: '약세',
-  },
-};
-
 const formatRankingChange = (value: unknown): string => {
   const numeric = typeof value === 'number' ? value : Number(String(value ?? '').replace(/%$/, ''));
   if (!Number.isFinite(numeric)) {
@@ -374,7 +285,8 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   const { language: uiLanguage } = useUiLanguage();
   const normalizedReportLanguage = normalizeReportLanguage(reportLanguage);
   const text = getReportText(normalizedReportLanguage);
-  const runFlowText = UI_TEXT[normalizedReportLanguage === 'ko' ? 'en' : normalizedReportLanguage];
+  const chromeText = REPORT_CHROME_TEXT[uiLanguage];
+  const runFlowText = UI_TEXT[uiLanguage];
   const marketReviewText = MARKET_REVIEW_TEXT[normalizedReportLanguage];
   const [loadedMarkdown, setLoadedMarkdown] = useState<LoadedMarkdown | null>(null);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
@@ -396,9 +308,9 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   const sections = useMemo(
     () => {
       const payloadSections = getPayloadSections(marketReviewPayload);
-      return payloadSections.length > 0 ? payloadSections : splitMarketReviewSections(structuredContent);
+      return payloadSections.length > 0 ? payloadSections : splitMarketReviewSections(structuredContent, marketReviewText);
     },
-    [marketReviewPayload, structuredContent],
+    [marketReviewPayload, marketReviewText, structuredContent],
   );
   const structuredMarketData = useMemo(
     () => getStructuredMarketData(marketReviewPayload),
@@ -422,10 +334,11 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
         }
       })
       .catch((err: unknown) => {
+        console.error('Market review report load failed:', err);
         if (isMounted) {
           setLoadError({
             recordId,
-            message: err instanceof Error ? err.message : text.loadReportFailed,
+            message: chromeText.loadReportFailed,
           });
         }
       });
@@ -433,7 +346,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [hasStructuredContent, providedContent, recordId, text.loadReportFailed]);
+  }, [chromeText.loadReportFailed, hasStructuredContent, providedContent, recordId]);
 
   const handleCopy = useCallback(async (type: CopyType) => {
     if (!content) {
@@ -501,7 +414,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenRunFlow(recordId)}
-                    className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
+                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
                     aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
                   >
                     <Workflow className="h-5 w-5" aria-hidden="true" />
@@ -509,14 +422,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                 </span>
               </Tooltip>
             ) : null}
-            <Tooltip content={text.copyMarkdownSource}>
+            <Tooltip content={chromeText.copyMarkdownSource}>
               <span className="inline-flex">
                 <button
                   type="button"
                   onClick={() => void handleCopy('markdown')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                  aria-label={text.copyMarkdownSource}
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                  aria-label={chromeText.copyMarkdownSource}
                 >
                   {copiedType === 'markdown' ? (
                     <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -528,14 +441,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                 </button>
               </span>
             </Tooltip>
-            <Tooltip content={text.copyPlainText}>
+            <Tooltip content={chromeText.copyPlainText}>
               <span className="inline-flex">
                 <button
                   type="button"
                   onClick={() => void handleCopy('text')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
-                  aria-label={text.copyPlainText}
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                  aria-label={chromeText.copyPlainText}
                 >
                   {copiedType === 'text' ? (
                     <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -718,7 +631,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
         <Card variant="bordered" padding="md" className="home-panel-card text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
-            <p className="mt-4 text-sm text-secondary-text">{text.loadingReport}</p>
+            <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>
       ) : error ? (

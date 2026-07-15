@@ -111,6 +111,35 @@ def _get_task_trace_id(task: Any) -> Optional[str]:
     return None
 
 
+def _task_updated_at(task: Any) -> str:
+    updated_at = getattr(task, "updated_at", None) or getattr(task, "created_at", None)
+    if isinstance(updated_at, datetime):
+        return updated_at.isoformat()
+    if isinstance(updated_at, str) and updated_at:
+        return updated_at
+    return datetime.now().isoformat()
+
+
+def _task_text(task: Any, attribute: str, default: Optional[str] = None) -> Optional[str]:
+    """Read an optional task text field without leaking mock or legacy sentinel objects."""
+    value = getattr(task, attribute, None)
+    return value if isinstance(value, str) else default
+
+
+def _task_params(task: Any, attribute: str, default: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Normalize task protocol params at the API boundary."""
+    value = getattr(task, attribute, None)
+    if not isinstance(value, dict):
+        return dict(default or {})
+    return {str(key): item for key, item in value.items()}
+
+
+def _task_revision(task: Any) -> int:
+    """Return a valid positive task revision for current and legacy queue objects."""
+    value = getattr(task, "revision", None)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 1
+
+
 def _market_review_lock_path(config: Config) -> Path:
     return market_review_lock_path(config)
 
@@ -395,6 +424,10 @@ def _handle_async_analysis_batch(
             stock_code=task.stock_code,
             status="pending",
             message=f"分析任务已加入队列: {task.stock_code}",
+            message_code=_task_text(task, "message_code", "task_queued"),
+            message_params=_task_params(task, "message_params", {"stock_code": task.stock_code}),
+            revision=_task_revision(task),
+            updated_at=_task_updated_at(task),
             analysis_phase=task.analysis_phase,
         )
         for task in accepted_tasks
@@ -429,6 +462,10 @@ def _handle_async_analysis_batch(
             trace_id=accepted[0].trace_id,
             status="pending",
             message=accepted[0].message,
+            message_code=accepted[0].message_code,
+            message_params=accepted[0].message_params,
+            revision=accepted[0].revision,
+            updated_at=accepted[0].updated_at,
             analysis_phase=accepted[0].analysis_phase,
         )
         return JSONResponse(
@@ -631,16 +668,22 @@ def get_task_list(
             stock_name=t.stock_name,
             status=t.status.value,
             progress=t.progress,
-            message=t.message,
+            message=_task_text(t, "message"),
+            message_code=_task_text(t, "message_code"),
+            message_params=_task_params(t, "message_params"),
             report_type=t.report_type,
             created_at=t.created_at.isoformat(),
             started_at=t.started_at.isoformat() if t.started_at else None,
             completed_at=t.completed_at.isoformat() if t.completed_at else None,
-            error=t.error,
+            error=_task_text(t, "error"),
+            error_code=_task_text(t, "error_code"),
+            error_params=_task_params(t, "error_params"),
             original_query=t.original_query,
             selection_source=t.selection_source,
             analysis_phase=t.analysis_phase,
             skills=getattr(t, "skills", None),
+            revision=_task_revision(t),
+            updated_at=_task_updated_at(t),
         )
         for t in all_tasks
     ]
@@ -1073,15 +1116,22 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             trace_id=_get_task_trace_id(task),
             status=task.status.value,
             progress=task.progress,
+            message=_task_text(task, "message"),
+            message_code=_task_text(task, "message_code"),
+            message_params=_task_params(task, "message_params"),
             result=result,
             market_review_report=market_review_report,
             market_review_payload=market_review_payload,
-            error=task.error,
+            error=_task_text(task, "error"),
+            error_code=_task_text(task, "error_code"),
+            error_params=_task_params(task, "error_params"),
             stock_name=task.stock_name,
             original_query=task.original_query,
             selection_source=task.selection_source,
             analysis_phase=task.analysis_phase,
             skills=getattr(task, "skills", None),
+            revision=_task_revision(task),
+            updated_at=_task_updated_at(task),
         )
     
     # 2. 从数据库查询已完成的记录

@@ -27,6 +27,9 @@ from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 
 logger = logging.getLogger(__name__)
 
+_TASK_FAILED_MESSAGE = "Task failed"
+_TASK_FAILED_ERROR = "Task execution failed"
+
 
 class TaskService:
     """
@@ -116,6 +119,8 @@ class TaskService:
         return {
             "success": True,
             "message": "分析任务已提交，将异步执行并推送通知",
+            "message_code": "task_queued",
+            "message_params": {"stock_code": normalized_code},
             "code": normalized_code,
             "task_id": task_id,
             "report_type": report_type.value
@@ -164,11 +169,16 @@ class TaskService:
         with self._tasks_lock:
             self._tasks[task_id] = {
                 "task_id": task_id,
+                "trace_id": task_id,
                 "code": code,
                 "status": "running",
                 "start_time": datetime.now().isoformat(),
                 "result": None,
                 "error": None,
+                "error_code": None,
+                "error_params": {},
+                "message_code": "task_started",
+                "message_params": {"stock_code": code},
                 "report_type": report_type.value
             }
 
@@ -212,11 +222,20 @@ class TaskService:
                     self._tasks[task_id].update({
                         "status": "completed",
                         "end_time": datetime.now().isoformat(),
-                        "result": result_data
+                        "result": result_data,
+                        "message_code": "task_completed",
+                        "message_params": {"stock_code": code},
                     })
 
                 logger.info(f"[TaskService] 股票 {code} 分析完成: {result.operation_advice}")
-                return {"success": True, "task_id": task_id, "result": result_data}
+                return {
+                    "success": True,
+                    "task_id": task_id,
+                    "message": "Task completed",
+                    "message_code": "task_completed",
+                    "message_params": {"stock_code": code},
+                    "result": result_data,
+                }
             else:
                 fail_message = "分析返回空结果"
                 if result is not None:
@@ -225,24 +244,55 @@ class TaskService:
                     self._tasks[task_id].update({
                         "status": "failed",
                         "end_time": datetime.now().isoformat(),
-                        "error": fail_message
+                        "error": _TASK_FAILED_ERROR,
+                        "error_code": "task_execution_failed",
+                        "error_params": {},
+                        "message_code": "task_failed",
+                        "message_params": {"stock_code": code},
                     })
 
                 logger.warning(f"[TaskService] 股票 {code} 分析失败: {fail_message}")
-                return {"success": False, "task_id": task_id, "error": fail_message}
+                return {
+                    "success": False,
+                    "task_id": task_id,
+                    "message": _TASK_FAILED_MESSAGE,
+                    "message_code": "task_failed",
+                    "message_params": {"stock_code": code},
+                    "error": _TASK_FAILED_ERROR,
+                    "error_code": "task_execution_failed",
+                    "error_params": {},
+                }
 
         except Exception as e:
             error_msg = str(e)
-            logger.error(f"[TaskService] 股票 {code} 分析异常: {error_msg}")
+            logger.error(
+                "[TaskService] Analysis failed for %s: %s",
+                code,
+                error_msg,
+                exc_info=True,
+            )
 
             with self._tasks_lock:
                 self._tasks[task_id].update({
                     "status": "failed",
                     "end_time": datetime.now().isoformat(),
-                    "error": error_msg
+                    "error": _TASK_FAILED_ERROR,
+                    "error_code": "task_execution_failed",
+                    "error_params": {},
+                    "message_code": "task_failed",
+                    "message_params": {"stock_code": code},
                 })
 
-            return {"success": False, "task_id": task_id, "error": error_msg}
+            return {
+                "success": False,
+                "task_id": task_id,
+                "message": _TASK_FAILED_MESSAGE,
+                "message_code": "task_failed",
+                "message_params": {"stock_code": code},
+                "error": _TASK_FAILED_ERROR,
+                "error_code": "task_execution_failed",
+                "error_params": {},
+            }
 
 
 # ============================================================

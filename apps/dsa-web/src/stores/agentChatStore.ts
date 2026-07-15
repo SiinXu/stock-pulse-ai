@@ -47,12 +47,24 @@ export interface StreamMeta {
   skillName?: string;
 }
 
+type StreamStatus = 'idle' | 'streaming' | 'failed';
+
+type FailedStreamRequest = {
+  payload: ChatStreamRequest;
+  meta?: StreamMeta;
+  sessionId: string;
+  userMessageId: string;
+};
+
 type StreamFailureEvent = {
   type: string;
   success?: boolean;
   content?: string;
   error?: unknown;
   message?: unknown;
+  error_code?: unknown;
+  error_params?: unknown;
+  details?: unknown;
 };
 
 function getFirstMeaningfulStreamError(...candidates: Array<unknown>): unknown {
@@ -76,6 +88,18 @@ function getStreamFailureError(
   event: StreamFailureEvent,
   fallbackMessage: string,
 ): ParsedApiError {
+  if (typeof event.error_code === 'string' && event.error_code.trim()) {
+    return getParsedApiError({
+      response: {
+        data: {
+          error: event.error_code,
+          message: getFirstMeaningfulStreamError(event.message, fallbackMessage),
+          params: event.error_params,
+          details: event.details,
+        },
+      },
+    });
+  }
   return getParsedApiError(
     getFirstMeaningfulStreamError(
       event.error,
@@ -89,6 +113,7 @@ function getStreamFailureError(
 interface AgentChatState {
   messages: Message[];
   loading: boolean;
+  streamStatus: StreamStatus;
   progressSteps: ProgressStep[];
   sessionId: string;
   sessions: ChatSessionItem[];
@@ -98,16 +123,20 @@ interface AgentChatState {
   completionBadge: boolean;
   hasInitialLoad: boolean;
   abortController: AbortController | null;
+  failedStreamRequest: FailedStreamRequest | null;
+  sessionLoadRevision: number;
+  sessionsLoadRevision: number;
 }
 
 interface AgentChatActions {
   setCurrentRoute: (path: string) => void;
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
-  loadInitialSession: () => Promise<void>;
+  loadInitialSession: (preferredSessionId?: string) => Promise<void>;
   switchSession: (targetSessionId: string) => Promise<void>;
   startNewChat: () => void;
   startStream: (payload: ChatStreamRequest, meta?: StreamMeta) => Promise<void>;
+  retryLastFailedStream: () => Promise<void>;
   stopStream: () => void;
 }
 
@@ -119,6 +148,7 @@ const getInitialSessionId = (): string =>
 export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set, get) => ({
   messages: [],
   loading: false,
+  streamStatus: 'idle',
   progressSteps: [],
   sessionId: getInitialSessionId(),
   sessions: [],
@@ -128,58 +158,79 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   completionBadge: false,
   hasInitialLoad: false,
   abortController: null,
+  failedStreamRequest: null,
+  sessionLoadRevision: 0,
+  sessionsLoadRevision: 0,
 
   setCurrentRoute: (path) => set({ currentRoute: path }),
 
   clearCompletionBadge: () => set({ completionBadge: false }),
 
   loadSessions: async () => {
-    set({ sessionsLoading: true });
+    const requestRevision = get().sessionsLoadRevision + 1;
+    set({ sessionsLoadRevision: requestRevision, sessionsLoading: true });
     try {
       const sessions = await agentApi.getChatSessions();
-      set({ sessions });
+      if (get().sessionsLoadRevision === requestRevision) {
+        set({ sessions });
+      }
     } catch {
       // Ignore load errors
     } finally {
-      set({ sessionsLoading: false });
+      if (get().sessionsLoadRevision === requestRevision) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
-  loadInitialSession: async () => {
+  loadInitialSession: async (preferredSessionId) => {
     const { hasInitialLoad } = get();
     if (hasInitialLoad) return;
-    set({ hasInitialLoad: true, sessionsLoading: true });
+    const requestRevision = get().sessionLoadRevision + 1;
+    const savedId = localStorage.getItem(STORAGE_KEY_SESSION);
+    const initialSessionId = preferredSessionId || savedId || get().sessionId;
+    set({
+      hasInitialLoad: true,
+      sessionsLoading: true,
+      sessionLoadRevision: requestRevision,
+      sessionId: initialSessionId,
+      messages: [],
+      chatError: null,
+      failedStreamRequest: null,
+      streamStatus: 'idle',
+    });
+    localStorage.setItem(STORAGE_KEY_SESSION, initialSessionId);
 
     try {
       const sessionList = await agentApi.getChatSessions();
+      if (get().sessionLoadRevision !== requestRevision) return;
       set({ sessions: sessionList });
 
-      const savedId = localStorage.getItem(STORAGE_KEY_SESSION);
-      if (savedId) {
-        const sessionExists = sessionList.some((s) => s.session_id === savedId);
-        if (sessionExists) {
-          const msgs = await agentApi.getChatSessionMessages(savedId);
-          if (msgs.length > 0) {
-            set({
-              messages: msgs.map((m) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-              })),
-            });
-          }
-        } else {
-          const newId = generateUUID();
-          set({ sessionId: newId });
-          localStorage.setItem(STORAGE_KEY_SESSION, newId);
-        }
-      } else {
-        localStorage.setItem(STORAGE_KEY_SESSION, get().sessionId);
+      const shouldLoadHistory = Boolean(preferredSessionId)
+        || sessionList.some((session) => session.session_id === initialSessionId);
+      if (shouldLoadHistory) {
+        const msgs = await agentApi.getChatSessionMessages(initialSessionId);
+        if (get().sessionLoadRevision !== requestRevision || get().sessionId !== initialSessionId) return;
+        set({
+          messages: msgs.map((message) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+          })),
+        });
+      } else if (savedId && !preferredSessionId) {
+        const newId = generateUUID();
+        set({ sessionId: newId });
+        localStorage.setItem(STORAGE_KEY_SESSION, newId);
       }
-    } catch {
-      // Ignore
+    } catch (error) {
+      if (get().sessionLoadRevision === requestRevision && get().sessionId === initialSessionId) {
+        set({ chatError: getParsedApiError(error) });
+      }
     } finally {
-      set({ sessionsLoading: false });
+      if (get().sessionLoadRevision === requestRevision) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
@@ -188,19 +239,24 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     if (targetSessionId === sessionId && messages.length > 0) return;
 
     abortController?.abort();
+    const requestRevision = get().sessionLoadRevision + 1;
     set({
       messages: [],
       sessionId: targetSessionId,
       loading: false,
+      streamStatus: 'idle',
       progressSteps: [],
       chatError: null,
       abortController: null,
+      failedStreamRequest: null,
+      sessionsLoading: true,
+      sessionLoadRevision: requestRevision,
     });
     localStorage.setItem(STORAGE_KEY_SESSION, targetSessionId);
 
     try {
       const msgs = await agentApi.getChatSessionMessages(targetSessionId);
-      if (get().sessionId !== targetSessionId) {
+      if (get().sessionId !== targetSessionId || get().sessionLoadRevision !== requestRevision) {
         return;
       }
       set({
@@ -210,8 +266,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           content: m.content,
         })),
       });
-    } catch {
-      // Ignore
+    } catch (error) {
+      if (get().sessionId === targetSessionId && get().sessionLoadRevision === requestRevision) {
+        set({ chatError: getParsedApiError(error) });
+      }
+    } finally {
+      if (get().sessionId === targetSessionId && get().sessionLoadRevision === requestRevision) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
@@ -222,20 +284,30 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     const { abortController } = get();
     if (!abortController) return;
     abortController.abort();
-    set({ loading: false, progressSteps: [], abortController: null });
+    set({
+      loading: false,
+      streamStatus: 'idle',
+      progressSteps: [],
+      abortController: null,
+      failedStreamRequest: null,
+    });
   },
 
   startNewChat: () => {
     // Abort any in-flight stream so the old request does not keep running
     get().abortController?.abort();
+    const sessionLoadRevision = get().sessionLoadRevision + 1;
     const newId = generateUUID();
     set({
       sessionId: newId,
       messages: [],
       loading: false,
+      streamStatus: 'idle',
       progressSteps: [],
       chatError: null,
       abortController: null,
+      failedStreamRequest: null,
+      sessionLoadRevision,
     });
     localStorage.setItem(STORAGE_KEY_SESSION, newId);
   },
@@ -255,7 +327,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     const skillName = skillNames.join('、');
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: generateUUID(),
       role: 'user',
       content: payload.message,
       skills: payload.skills,
@@ -267,8 +339,10 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set((s) => ({
       messages: [...s.messages, userMessage],
       loading: true,
+      streamStatus: 'streaming',
       progressSteps: [],
       chatError: null,
+      failedStreamRequest: null,
       sessions: s.sessions.some((x) => x.session_id === streamSessionId)
         ? s.sessions
         : [
@@ -310,7 +384,10 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }
 
         currentProgressSteps.push(event);
-        set((s) => ({ progressSteps: [...s.progressSteps, event] }));
+        const current = get();
+        if (current.sessionId === streamSessionId && current.abortController === ac && !ac.signal.aborted) {
+          set((state) => ({ progressSteps: [...state.progressSteps, event] }));
+        }
       };
 
       while (true) {
@@ -347,6 +424,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
           message: 'Agent 流式响应在完成前中断，请重试。',
           rawMessage: 'Agent stream ended before a done event was received.',
           category: 'upstream_network',
+          code: 'agent_stream_failed',
         });
       }
 
@@ -369,6 +447,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
               thinkingSteps: [...currentProgressSteps],
             },
           ],
+          streamStatus: 'idle',
+          failedStreamRequest: null,
         }));
       }
 
@@ -378,8 +458,17 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         // User-initiated abort: silent, no badge
-      } else {
-        set({ chatError: getParsedApiError(error) });
+      } else if (get().sessionId === streamSessionId && get().abortController === ac) {
+        set({
+          chatError: getParsedApiError(error),
+          streamStatus: 'failed',
+          failedStreamRequest: {
+            payload: { ...payload, session_id: streamSessionId },
+            meta,
+            sessionId: streamSessionId,
+            userMessageId: userMessage.id,
+          },
+        });
         const { currentRoute } = get();
         if (currentRoute !== '/chat') {
           set({ completionBadge: true });
@@ -388,13 +477,26 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     } finally {
       const { abortController: currentAc } = get();
       if (currentAc === ac) {
-        set({
+        set((state) => ({
           loading: false,
+          streamStatus: state.streamStatus === 'failed' ? 'failed' : 'idle',
           progressSteps: [],
           abortController: null,
-        });
+        }));
       }
       await get().loadSessions();
     }
+  },
+
+  retryLastFailedStream: async () => {
+    const failed = get().failedStreamRequest;
+    if (!failed || get().loading || get().sessionId !== failed.sessionId) return;
+    set((state) => ({
+      messages: state.messages.filter((message) => message.id !== failed.userMessageId),
+      chatError: null,
+      failedStreamRequest: null,
+      streamStatus: 'idle',
+    }));
+    await get().startStream(failed.payload, failed.meta);
   },
 }));

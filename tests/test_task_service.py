@@ -43,6 +43,11 @@ class _FakePipeline:
         return _make_failed_result(kwargs["code"])
 
 
+class _ExplodingPipeline(_FakePipeline):
+    def process_single_stock(self, *args, **kwargs):
+        raise RuntimeError("provider token=super-secret")
+
+
 class TestTaskService(unittest.TestCase):
     def test_run_analysis_marks_failed_for_unsuccessful_result(self):
         service = TaskService()
@@ -58,12 +63,36 @@ class TestTaskService(unittest.TestCase):
             result = service._run_analysis(code="600519", task_id="task-1")
 
         self.assertFalse(result["success"])
-        self.assertEqual(result["error"], "JSON 解析失败")
+        self.assertEqual(result["error"], "Task execution failed")
+        self.assertEqual(result["error_code"], "task_execution_failed")
+        self.assertNotIn("JSON 解析失败", str(result))
         task = service.get_task_status("task-1")
         self.assertIsNotNone(task)
         self.assertEqual(task["status"], "failed")
-        self.assertEqual(task["error"], "JSON 解析失败")
+        self.assertEqual(task["error"], "Task execution failed")
+        self.assertEqual(task["error_code"], "task_execution_failed")
+        self.assertEqual(task["message_code"], "task_failed")
+        self.assertNotIn("JSON 解析失败", str(task))
         self.assertIsNone(task["result"])
+
+    def test_run_analysis_redacts_unhandled_exception_from_public_task(self):
+        service = TaskService()
+        service._tasks = {}
+        service._tasks_lock = threading.Lock()
+
+        fake_main = ModuleType("main")
+        fake_main.StockAnalysisPipeline = _ExplodingPipeline
+
+        with patch.dict("sys.modules", {"main": fake_main}), patch(
+            "src.config.get_config", return_value=SimpleNamespace()
+        ):
+            result = service._run_analysis(code="600519", task_id="task-secret")
+
+        task = service.get_task_status("task-secret")
+        self.assertEqual(result["error"], "Task execution failed")
+        self.assertEqual(task["error"], "Task execution failed")
+        self.assertNotIn("super-secret", str(result))
+        self.assertNotIn("super-secret", str(task))
 
     def test_submit_analysis_resolves_bare_jp_kr_code_before_submit(self):
         service = TaskService()

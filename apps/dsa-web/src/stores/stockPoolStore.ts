@@ -7,6 +7,9 @@ import type { AnalysisReport, AnalyzeAsyncResponse, HistoryItem, HistoryListResp
 import { getRecentStartDate, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { isObviouslyInvalidStockQuery, looksLikeStockCode, validateStockCode } from '../utils/validation';
+import { DISMISSED_TASK_TTL_MS, TASK_TERMINAL_RETENTION_MS } from '../utils/taskLifecycle';
+
+export { DISMISSED_TASK_TTL_MS, TASK_TERMINAL_RETENTION_MS } from '../utils/taskLifecycle';
 
 const PAGE_SIZE = 20;
 const STOCK_HISTORY_PAGE_SIZE = 20;
@@ -17,6 +20,7 @@ type SelectionSource = 'manual' | 'autocomplete' | 'import' | 'image';
 
 type FetchHistoryOptions = {
   autoSelectFirst?: boolean;
+  preferredRecordId?: number;
   reset?: boolean;
   silent?: boolean;
   selectLatestForStockCode?: string;
@@ -48,8 +52,67 @@ let activeTaskRequestSeq = 0;
 let activeTaskLocalRevision = 0;
 let manualSelectionRequestSeq = 0;
 let manualSelectionRequestId = 0;
-const dismissedTaskIds = new Set<string>();
+const dismissedTasks = new Map<string, { revision: number; expiresAt: number }>();
 const pendingCompletedTaskSelectionKeys = new Map<string, CompletedTaskSelectionIntent>();
+
+const isTerminalTask = (task: TaskInfo) => (
+  task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+);
+
+const getTaskRevision = (task: TaskInfo): number => task.revision ?? 0;
+
+const getTaskUpdatedTime = (task: TaskInfo): number => {
+  const value = task.updatedAt || task.completedAt || task.createdAt;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const isTaskWithinRetention = (task: TaskInfo, now = Date.now()): boolean => {
+  if (!isTerminalTask(task)) return true;
+  const updatedAt = getTaskUpdatedTime(task);
+  return updatedAt === 0 || now - updatedAt <= TASK_TERMINAL_RETENTION_MS;
+};
+
+const shouldAcceptTaskSnapshot = (current: TaskInfo, incoming: TaskInfo): boolean => {
+  const currentRevision = current.revision;
+  const incomingRevision = incoming.revision;
+  if (currentRevision !== undefined && incomingRevision !== undefined) {
+    if (incomingRevision !== currentRevision) return incomingRevision > currentRevision;
+    return getTaskUpdatedTime(incoming) >= getTaskUpdatedTime(current);
+  }
+  if (incomingRevision !== undefined) return true;
+  if (currentRevision !== undefined) return false;
+  const statusRank: Record<TaskInfo['status'], number> = {
+    pending: 0,
+    processing: 1,
+    cancel_requested: 1,
+    completed: 2,
+    failed: 2,
+    cancelled: 2,
+  };
+  if (statusRank[incoming.status] !== statusRank[current.status]) {
+    return statusRank[incoming.status] > statusRank[current.status];
+  }
+  const currentTime = getTaskUpdatedTime(current);
+  const incomingTime = getTaskUpdatedTime(incoming);
+  return incomingTime === 0 || currentTime === 0 || incomingTime >= currentTime;
+};
+
+type TaskDismissalState = 'none' | 'blocked' | 'released';
+
+const getTaskDismissalState = (task: TaskInfo, now = Date.now()): TaskDismissalState => {
+  const dismissed = dismissedTasks.get(task.taskId);
+  if (!dismissed) return 'none';
+  if (now >= dismissed.expiresAt || getTaskRevision(task) > dismissed.revision) {
+    dismissedTasks.delete(task.taskId);
+    return 'released';
+  }
+  return 'blocked';
+};
+
+const isTaskDismissed = (task: TaskInfo, now = Date.now()): boolean => (
+  getTaskDismissalState(task, now) === 'blocked'
+);
 
 export interface StockPoolState {
   query: string;
@@ -104,7 +167,7 @@ export interface StockPoolState {
   closeHistoryTrend: () => void;
   setStockHistoryRange: (range: StockHistoryRange) => Promise<void>;
   loadMoreStockHistory: () => Promise<void>;
-  loadInitialHistory: () => Promise<void>;
+  loadInitialHistory: (preferredRecordId?: number) => Promise<void>;
   refreshHistory: (silent?: boolean) => Promise<void>;
   refreshHistoryForCompletedTask: (task: TaskInfo) => Promise<void>;
   loadMoreHistory: () => Promise<void>;
@@ -126,7 +189,7 @@ export interface StockPoolState {
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
   refreshActiveTasks: () => Promise<void>;
-  removeTask: (taskId: string) => void;
+  removeTask: (taskId: string, revision?: number) => void;
   resetDashboardState: () => void;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
@@ -460,6 +523,7 @@ async function fetchHistory(
 ): Promise<HistoryListResponse | null> {
   const {
     autoSelectFirst = false,
+    preferredRecordId,
     reset = true,
     silent = false,
     selectLatestForStockCode,
@@ -516,7 +580,9 @@ async function fetchHistory(
     if (reset) {
       const latestCompletedTaskItem = consumeCompletedTaskSelection(response.items, get().selectedReport);
       const selectedReport = get().selectedReport;
-      if (latestCompletedTaskItem && latestCompletedTaskItem.id !== selectedReport?.meta.id) {
+      if (preferredRecordId !== undefined && preferredRecordId !== selectedReport?.meta.id) {
+        await get().selectHistoryItem(preferredRecordId, true);
+      } else if (latestCompletedTaskItem && latestCompletedTaskItem.id !== selectedReport?.meta.id) {
         await get().selectHistoryItem(latestCompletedTaskItem.id, false);
       } else if (autoSelectFirst && response.items.length > 0 && !selectedReport) {
         await get().selectHistoryItem(response.items[0].id, false);
@@ -665,8 +731,12 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     await fetchStockHistory(get, set, { reset: false });
   },
 
-  loadInitialHistory: async () => {
-    await fetchHistory(get, set, { autoSelectFirst: true, reset: true });
+  loadInitialHistory: async (preferredRecordId) => {
+    await fetchHistory(get, set, {
+      autoSelectFirst: preferredRecordId === undefined,
+      preferredRecordId,
+      reset: true,
+    });
   },
 
   refreshHistory: async (silent = false) => {
@@ -978,6 +1048,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         taskStockCode: string,
         status: TaskInfo['status'],
         analysisPhase?: TaskInfo['analysisPhase'],
+        protocol?: Pick<TaskInfo, 'traceId' | 'message' | 'messageCode' | 'messageParams' | 'revision' | 'updatedAt'>,
       ) => {
         get().syncTaskCreated({
           taskId,
@@ -989,6 +1060,12 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
           createdAt,
           originalQuery: originalQuery || stockCodeInput,
           selectionSource,
+          traceId: protocol?.traceId,
+          message: protocol?.message,
+          messageCode: protocol?.messageCode,
+          messageParams: protocol?.messageParams,
+          revision: protocol?.revision,
+          updatedAt: protocol?.updatedAt ?? createdAt,
           ...(analysisPhase !== undefined ? { analysisPhase } : {}),
           ...(skills && skills.length ? { skills } : {}),
         });
@@ -996,10 +1073,10 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
       const accepted: AnalyzeAsyncResponse | undefined = response;
       if (accepted && 'taskId' in accepted) {
-        registerTask(accepted.taskId, normalizedStockCode, accepted.status, accepted.analysisPhase);
+        registerTask(accepted.taskId, normalizedStockCode, accepted.status, accepted.analysisPhase, accepted);
       } else if (accepted && 'accepted' in accepted) {
         for (const item of accepted.accepted) {
-          registerTask(item.taskId, item.stockCode, item.status, item.analysisPhase);
+          registerTask(item.taskId, item.stockCode, item.status, item.analysisPhase, item);
         }
       }
 
@@ -1028,23 +1105,37 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   },
 
   syncTaskCreated: (task) => {
-    if (dismissedTaskIds.has(task.taskId)) {
+    if (isTaskDismissed(task)) {
       return;
     }
-    if (get().activeTasks.some((item) => item.taskId === task.taskId)) {
+    const currentTasks = get().activeTasks;
+    const index = currentTasks.findIndex((item) => item.taskId === task.taskId);
+    if (index >= 0 && !shouldAcceptTaskSnapshot(currentTasks[index], task)) {
       return;
     }
     activeTaskLocalRevision += 1;
-    set({ activeTasks: [...get().activeTasks, task] });
+    if (index < 0) {
+      set({ activeTasks: [...currentTasks, task] });
+      return;
+    }
+    const nextTasks = [...currentTasks];
+    nextTasks[index] = task;
+    set({ activeTasks: nextTasks });
   },
 
   syncTaskUpdated: (task) => {
-    if (dismissedTaskIds.has(task.taskId)) {
+    const dismissalState = getTaskDismissalState(task);
+    if (dismissalState === 'blocked') {
       return;
     }
     const nextTasks = [...get().activeTasks];
     const index = nextTasks.findIndex((item) => item.taskId === task.taskId);
-    if (index >= 0) {
+    if (index < 0 && dismissalState === 'released') {
+      activeTaskLocalRevision += 1;
+      set({ activeTasks: [...nextTasks, task] });
+      return;
+    }
+    if (index >= 0 && shouldAcceptTaskSnapshot(nextTasks[index], task)) {
       nextTasks[index] = task;
       activeTaskLocalRevision += 1;
       set({ activeTasks: nextTasks });
@@ -1053,7 +1144,22 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
   syncTaskFailed: (task) => {
     get().syncTaskUpdated(task);
-    set({ error: getParsedApiError(task.error || '分析失败') });
+    set({
+      error: {
+        title: '',
+        message: '',
+        rawMessage: task.error || task.message || '',
+        category: 'unknown',
+        code: task.errorCode || 'task_execution_failed',
+        params: task.errorParams,
+        details: {
+          message: task.message,
+          error: task.error,
+          traceId: task.traceId,
+        },
+        traceId: task.traceId,
+      },
+    });
   },
 
   refreshActiveTasks: async () => {
@@ -1061,7 +1167,6 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const localRevisionAtRequest = activeTaskLocalRevision;
     try {
       const response = await analysisApi.getTasks({
-        status: 'pending,processing,cancel_requested',
         limit: 100,
       });
       if (requestId !== activeTaskRequestSeq) {
@@ -1069,21 +1174,21 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       }
 
       const remoteTasks = response.tasks.filter(
-        (task) => !dismissedTaskIds.has(task.taskId),
+        (task) => isTaskWithinRetention(task) && !isTaskDismissed(task),
       );
       const remoteTaskIds = new Set(remoteTasks.map((task) => task.taskId));
       const remoteTaskById = new Map(remoteTasks.map((task) => [task.taskId, task]));
-      const activeTaskCount = response.pending
-        + response.processing
-        + response.tasks.filter((task) => task.status === 'cancel_requested').length;
-      const isCompleteSnapshot = response.tasks.length === activeTaskCount;
+      const isCompleteSnapshot = response.tasks.length === response.total;
       const canPruneLocalTasks = isCompleteSnapshot && activeTaskLocalRevision === localRevisionAtRequest;
 
       const currentTasks = get().activeTasks;
       const nextTasks = currentTasks
-        .filter((task) => !dismissedTaskIds.has(task.taskId))
+        .filter((task) => isTaskWithinRetention(task) && !isTaskDismissed(task))
         .filter((task) => !canPruneLocalTasks || remoteTaskIds.has(task.taskId))
-        .map((task) => remoteTaskById.get(task.taskId) ?? task);
+        .map((task) => {
+          const remote = remoteTaskById.get(task.taskId);
+          return remote && shouldAcceptTaskSnapshot(task, remote) ? remote : task;
+        });
 
       const localTaskIds = new Set(nextTasks.map((task) => task.taskId));
       for (const task of remoteTasks) {
@@ -1103,9 +1208,20 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
   },
 
-  removeTask: (taskId) => {
-    dismissedTaskIds.add(taskId);
+  removeTask: (taskId, revision) => {
     const currentTasks = get().activeTasks;
+    const current = currentTasks.find((task) => task.taskId === taskId);
+    if (
+      revision !== undefined
+      && current?.revision !== undefined
+      && current.revision > revision
+    ) {
+      return;
+    }
+    dismissedTasks.set(taskId, {
+      revision: revision ?? (current ? getTaskRevision(current) : 0),
+      expiresAt: Date.now() + DISMISSED_TASK_TTL_MS,
+    });
     const nextTasks = currentTasks.filter((task) => task.taskId !== taskId);
     if (nextTasks.length !== currentTasks.length) {
       activeTaskLocalRevision += 1;
@@ -1124,7 +1240,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     stockBarRequestSeq += 1;
     activeTaskRequestSeq += 1;
     activeTaskLocalRevision += 1;
-    dismissedTaskIds.clear();
+    dismissedTasks.clear();
     pendingCompletedTaskSelectionKeys.clear();
     set({ ...initialState });
   },

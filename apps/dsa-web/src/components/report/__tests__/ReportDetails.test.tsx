@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { ReportDetails } from '../ReportDetails';
 
 describe('ReportDetails', () => {
@@ -8,6 +10,7 @@ describe('ReportDetails', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    window.localStorage.clear();
     writeTextMock.mockClear();
     originalClipboard = navigator.clipboard;
     Object.defineProperty(navigator, 'clipboard', {
@@ -72,5 +75,17 @@ describe('ReportDetails', () => {
   it('does not render when details and record id are both absent', () => {
     const { container } = render(<ReportDetails />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('uses UI language for traceability controls independently of report language', () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    render(
+      <UiLanguageProvider>
+        <ReportDetails language="zh" recordId={7} details={{ rawResult: { score: 82 } }} />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByText('Data Traceability')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Raw Analysis Result' })).toBeInTheDocument();
   });
 });

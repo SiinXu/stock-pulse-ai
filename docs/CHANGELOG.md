@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Settings 在模型目录为空或失效时以 `runtime route · Connection` 展示已保存 ModelRef，不再向普通界面暴露 opaque 标识，同时保持原始引用不变；Decision Signals 将弹窗输入作为独立草稿，URL context 与延迟请求重放不会覆盖用户正在编辑的股票代码。
+- [修复] 生成后端冒烟测试正确接受 API Schema 规范化后的整数浮点超时值，不再把 `20.0` 误判为 `unsafe_config`；Playwright 后端固定以 LiteLLM production 模式运行，并在导入后恢复白名单环境，阻止父目录 `.env` 污染隔离测试。
+- [改进] Web 设置页最终切换为 800ms debounce 的分组自动保存：按原子字段组 FIFO 串行提交，分别展示 scheduled/saving/saved/failed/conflicted，失败保留草稿并支持重试或恢复服务器值，409 进入三方冲突处理；敏感字段仅在实际修改时提交，普通路径不再提供全局 Save。本条最终态取代本段较早关于显式全局 Save 的历史描述。
+- [修复] Web 核心页面补齐稳定 URL 恢复：Home 报告与 Run Flow、Chat session、Decision Signals 当前股票/信号/列表和时间线筛选、Backtest 参数/结果筛选/分页均支持刷新、分享及浏览器前进后退；路由写入使用 pending key 与 latest-request-wins，旧 URL render 或旧响应不能覆盖新状态。
+- [修复] Web 统一 Overlay stack、背景 inert、焦点圈定与恢复、顶层 Escape 和 pending 关闭策略；Home/Chat 移动历史复用公共 Drawer，并改善关键分页、输入与图标按钮的触控尺寸和可访问名称，补齐 320px/390px 布局护栏。
+- [修复] Portfolio trade、cash flow、corporate action 与 CSV commit 增加客户端 operation ID 和服务端幂等结果复用，超时重试不会重复落账；Web 按实体维护 pending/error 并保留失败输入。
+- [测试] CI 将 Web lint、i18n、全量 Vitest、build 与完整 Playwright 设为阻断门禁；Playwright 使用零重试、可移植 Python 发现、隔离运行数据和独立语义场景，每次上传验收截图与 HTML 报告，失败 artifact 另含后端/Vite/fake-provider 日志、video 与 trace。
+- [文档] 根 README 改为全英文 StockPulse 项目首页，明确项目拥有独立产品与发布方向、最初 fork 自 ZhuLinsen/daily_stock_analysis，并将详细配置收敛到专题文档；中英文贡献指南同步 GitHub 英文协作与语义 E2E 门禁。
+- [修复] 分析与 AlphaSift 任务统一输出可本地化的 message/error code+params、单调 revision 与 updated_at；Web 按 task ID+revision 合并 POST/SSE/轮询快照，SSE 断线后对已知任务定向轮询，刷新恢复近期结束任务，dismiss 具有 revision/TTL 生命周期，原始消息仅进入诊断详情。
 - [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
 - [修复] 移除上游 AIHubMix referral `APP-Code` 自动注入及 Anspire/AIHubMix/SerpAPI 推荐参数和优惠宣称；用户显式配置的自定义 headers 保持不变。
 - [改进] Workflow、邮件默认发件人、HTTP User-Agent、Web fallback 标题与 OpenAPI 标题统一使用 StockPulse；部署、桌面发布校验和远程股票索引切换到当前仓库。
@@ -20,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 硬编码文案守卫及 30 项 Playwright i18n 验收；CI `web-gate` 显式执行 i18n 门禁。
 - [文档] 新增中英文 Web 国际化开发约定，说明界面/报告语言边界、动态内容、错误码、locale-aware 格式化和验证命令。
 - [修复] 登录页品牌标题统一为可访问的 `StockPulse`，隔离 Playwright 登录 smoke 不再依赖旧 `DAILY STOCK / Analysis Engine` 文案。
-- [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测。
+- [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测；读取旧配置时由服务端返回不落盘的 Provider 兼容身份，Catalog 暂时失败也不会把已保存的官方连接误标为 Custom。
 - [修复] 删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 模型管理弹窗列出全部引用并支持在统一草稿中选择替代模型，后端以结构化 `model_in_use/details.referenced_by` 阻止 API 绕过；替换引用与删除可在同一事务原子成功，历史失效值仍保留并标记不可用。
 - [改进] Provider Catalog 成为模型接入业务元数据唯一来源：Custom、字段要求与 `supportsDiscovery` 均由后端返回，Ollama 使用 `/api/tags` 空 Key 发现；模型多选收起为可搜索 listbox，连接卡补齐 Provider 标识与组合状态，字段错误关联 `aria-invalid/aria-describedby`，模型接入页移除外层装饰卡片。
 - [测试] Playwright 使用隔离 `.env`、SQLite、密码哈希与 session secret，启动时确定性播种 Markdown 报告，结束后清理 runtime，并保留后端/Vite/fake-provider 服务日志；登录 smoke 按当前 StockPulse 首次设密/登录流程执行，不再依赖开发者状态或整套 skip。
@@ -45,9 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：主页只保留标题、一个「添加模型服务」主操作、紧凑连接卡片与空状态；添加、编辑和模型管理统一使用同一个 Modal（390px 下为底部面板），服务商选择、凭据、模型发现/多选与手动 token 添加不再平铺到主页；同一服务商可创建多条连接，底层存储格式与 YAML/Legacy 兼容不变。
 - [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，模型服务商元数据统一来自后端 Provider Catalog（AI 与模型的「高级」二级视图随后在本轮收敛中整体移除，最终态见上文四视图条目）。
 - [改进] Web 设置页任务模型选择（报告/Agent/Vision）改为真正的 `SearchableSelect`，仅可从后端可用模型目录中选择；无可用模型时不渲染空选择框，改为统一空状态与单一「前往模型接入」操作；可用模型目录加载失败时展示错误与重试，历史失效值继续保留并标注「当前配置不可用」。
+- [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，只保留 provider id/label/protocol/默认端点/是否需要凭据/是否需要 Base URL/是否支持发现/capabilities/是否本地/自定义。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
+- [修复] 修复全量测试在本地开发 `.env` 存在时的模型状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。
+- [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：移除并存的只读「模型接入」服务卡与旧渠道编辑器双结构，仅保留一套统一的连接管理界面；普通界面不再出现「AI 模型配置 / 快速添加渠道 / 添加渠道 / 渠道管理 / 渠道列表 / 渠道名称」等术语，统一使用「模型服务商 / 模型连接 / 可用模型」。连接卡片直接展示已添加模型 chip、被哪些任务使用、状态与测试结果，模型为 0 时提示「尚未添加可用模型」并引导发现/手动添加；「添加模型服务」使用连接内联创建流程（同一服务商可创建多条连接），不再复用首次配置向导。底层 `LLM_CHANNELS` 存储格式与 YAML/Legacy 兼容不变。
+- [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，高级视图仅保留 YAML/Legacy/原始配置与诊断；模型服务商元数据统一来自后端 Provider Catalog。
+- [改进] Web 设置页任务模型选择（报告/Agent/Vision）改为仅可从后端可用模型目录中选择，关闭自由输入（`allowCustom=false`）；无可用模型时任务路由不再渲染空选择框，改为展示明确空状态并提供「添加模型服务 / 管理模型」跳转到模型接入页；可用模型目录加载失败时展示错误与「重新加载」，不再静默折叠为「暂无模型」，可区分「未配置」与「加载失败」。
 - [改进] 后端 LLM 渠道校验的已知服务商列表由 `KNOWN_LLM_PROVIDER_CHANNEL_NAMES` 硬编码改为从 Provider Catalog 派生（单一权威源）；可用模型 API 每条模型补充 `provider_id/provider_label/connection_id/available` 字段，供 Web 选择器按服务商/连接分组而无需第二套前端清单。删除被引用连接会因任务模型引用失效被后端校验拒绝（`unknown_model`，直接调用 API 也无法绕过），需先改选替代模型再保存。
 - [测试] `test_daily_analysis_workflow_llm_env` 的服务商渠道清单来源由已收敛为纯展示层的前端 `llmProviderTemplates.ts`（不再声明 channelId/baseUrl）改为后端 Provider Catalog，使「每日分析 workflow env 与 `.env.example` 覆盖全部服务商渠道」的静态校验回到单一权威源。
-- [改进] Web 设置页 LLM 渠道编辑器的服务商业务元数据（标签、默认 Base URL、协议、示例模型、能力标签、是否已知服务商）改为统一从后端服务商目录（`GET /system/config/llm/providers`，经 useProviderCatalog）读取，删除前端并行维护的 `LLM_PROVIDER_TEMPLATES` 业务清单；仅保留能力显示文案、协议级占位与各服务商文档链接/配置提示等纯展示内容。前端不再维护第二套服务商业务源。
+- [改进] Web 设置页模型连接编辑器的服务商业务元数据（标签、默认 Base URL、协议、凭据要求、发现能力、凭据/控制台/模型/开发文档链接）统一从后端服务商目录（`GET /system/config/llm/providers`，经 useProviderCatalog）读取，删除前端并行维护的 Provider URL 与业务规则名单；前端只保留能力显示文案和少量配置提示等纯展示内容。
 - [改进] Web 设置页字段帮助弹窗新增「当前取值来源」说明：依据后端权威的 `raw_value_exists` 标识，明确该字段是「已显式设置」还是「未显式设置、使用内置默认值」（并展示默认值，敏感字段不展示），无内置默认值时提示「未设置」，帮助用户判断当前值来自显式配置还是默认回退。为字段帮助层展示，不改后端。
 - [新功能] Web 问股页支持中止生成：流式回复进行中时，发送按钮变为「停止生成」，点击立即中止当前请求并恢复输入框，已发出的用户消息与历史对话不受影响。
 - [修复] Web 问股页消息输入框在中文/日文等输入法组词过程中按 Enter 选词不再误发送消息：仅当不处于输入法组字状态（`isComposing`）且未按 Shift 时 Enter 才提交，Shift+Enter 仍为换行。
@@ -68,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 设置页统一保存成功副作用：保存按钮、保存失败后的重试以及 Legacy→Channels 迁移应用现在都会执行同一套 post-save 流程（通知配置变更、刷新首次配置检查、刷新调度状态、重载配置快照/版本并清理校验态），避免重试或迁移后状态面板与实际持久化配置不一致。
 - [改进] Web 设置页保存串行化并引入 409 三方冲突处理：同一时间只允许一个配置写事务，重复点击"保存配置"复用同一 in-flight 请求，不并发提交旧 `configVersion`；保存进行中产生的新编辑保留在下一份草稿，成功响应只清理本次已提交且值未再次变化的键。保存遇到版本冲突（409）时拉取最新快照，按 `base/server/local` 逐字段计算三方差异：服务器仅改动无关字段时自动 rebase 到新版本重放一次；存在真实冲突时展示冲突面板逐项"采用服务器值/保留本地草稿"，未解决前不覆盖任一方也不能继续保存，敏感字段只显示"已更新/已修改"状态、不泄露明文或 mask token，Channel 动态键与普通字段一同进入三方比较。
 - [改进] Web 设置页取消运行配置自动保存：编辑任何字段（含普通、敏感、Provider、调度）只更新本地草稿，需显式点击"保存配置"才校验并提交；离开/刷新未保存保护与 Reset 恢复已保存快照的语义保持不变。移除"自动保存中/已保存/失败"状态展示。
-- [新功能] 配置字段 Schema 引入条件契约（`contract.visibleWhen/enabledWhen/requiredWhen/requirement`，仅 AND、未知 operator fail-safe 保持可见）：后端注册表输出 `contract`、提供 `evaluate_config_conditions`，并按契约执行权威必填校验（隐藏字段不参与校验，`requirement=required` 或 `requiredWhen` 满足时必填、为空则拒绝保存）；Web 依据 `visibleWhen` 隐藏不适用字段、依据 `enabledWhen` 只读、并显示必填/选填/继承徽章，对未保存草稿实时生效。保留 `is_required` 兼容输出。
+- [新功能] 配置字段 Schema 引入条件契约（`contract.visibleWhen/enabledWhen/requiredWhen/requirement`，仅 AND）：后端注册表与 API 完整输出 `contract`，权威执行显隐、必填和只读校验；隐藏字段不参与当前校验，条件重新满足后立即恢复校验，`enabledWhen` 未满足时直接 API 修改也会被拒绝。未知/畸形条件保持可见但只读并显示稳定诊断；旧 Schema 的 AI 字段缺失或包含未知 `uiPlacement` 时仅进入 Advanced 只读诊断，不会重新暴露普通模型表单。`is_required` 仅作为 deprecated 兼容输出保留。
 - [新功能] 新增 `LLM_CONFIG_MODE=auto|channels|yaml|legacy` 显式模型配置来源模式并保留既有优先级与迁移 API；Web 模型接入在外部配置生效时仅显示简洁只读提示与「查看详情」，具体来源、覆盖关系和 Legacy 迁移只在顶层「高级 → 开发者诊断」中按需展开。
 - [改进] 后端配置校验对 LLM 渠道增加与前端一致的结构完整性权威门禁：启用渠道必须具备凭据（Ollama/本地端点免）、Base URL（官方 provider 免、自定义端点必填）和至少一个模型，直接调用配置 API 也无法绕过；仅对本次更新涉及、或由停用切为启用的渠道执行严格校验，历史不完整渠道不会阻断无关设置保存；校验失败时整个更新事务失败、不部分落库；已保存并被 mask 的密钥不会被误判为缺失；YAML 模式仍豁免。
 - [改进] Web 设置页模型连接完整性门禁与后端契约对齐：启用连接必须具备合法名称、必要凭据、必要服务地址和至少一个模型；Ollama 及后端允许的 localhost OpenAI-compatible 地址可免 Key；未启用连接可保存为未完成草稿，连通性测试不作为保存硬门禁。

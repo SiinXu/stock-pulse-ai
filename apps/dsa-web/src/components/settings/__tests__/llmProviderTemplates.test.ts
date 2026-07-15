@@ -31,20 +31,17 @@ describe('llmProviderTemplates (presentation-only)', () => {
     expect(PROVIDER_PRESENTATION_BY_ID.siliconflow.configHint).toContain('API 密钥');
     expect(PROVIDER_PRESENTATION_BY_ID.openrouter.configHint).toContain('API 密钥');
     expect(PROVIDER_PRESENTATION_BY_ID.volcengine.configHint).toContain('endpoint');
-    expect(PROVIDER_PRESENTATION_BY_ID.openai.configHint).toBeUndefined();
+    expect(getProviderPresentation('openai').configHint).toBeUndefined();
   });
 
-  it('keeps documentation links on non-custom providers', () => {
-    for (const [id, presentation] of Object.entries(PROVIDER_PRESENTATION_BY_ID)) {
-      if (id === 'custom') continue;
-      expect(presentation.officialSources.length).toBeGreaterThan(0);
-    }
+  it('does not duplicate provider URLs or business metadata', () => {
+    expect(JSON.stringify(PROVIDER_PRESENTATION_BY_ID)).not.toMatch(/https?:\/\//);
   });
 
   it('returns an empty presentation for unknown / custom provider ids', () => {
-    expect(getProviderPresentation('custom')).toEqual({ officialSources: [] });
-    expect(getProviderPresentation('minimax2')).toEqual({ officialSources: [] });
-    expect(getProviderPresentation('constructor')).toEqual({ officialSources: [] });
+    expect(getProviderPresentation('custom')).toEqual({});
+    expect(getProviderPresentation('minimax2')).toEqual({});
+    expect(getProviderPresentation('constructor')).toEqual({});
     expect(getProviderPresentation('openrouter').configHint).toContain('API 密钥');
   });
 

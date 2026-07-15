@@ -42,7 +42,7 @@ class HealthResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Error response."""
+    """Stable API error envelope."""
     
     error: str = Field(..., description="Error type", json_schema_extra={"example": "validation_error"})
     message: str = Field(
@@ -50,13 +50,17 @@ class ErrorResponse(BaseModel):
         description="Error details",
         json_schema_extra={"example": "Invalid request parameters"},
     )
-    detail: Optional[Any] = Field(None, description="Additional error information")
+    params: dict[str, Any] = Field(default_factory=dict, description="Localization interpolation parameters")
+    details: Any = Field(default_factory=dict, description="Diagnostic details; never primary UI copy")
+    trace_id: Optional[str] = Field(None, description="Server diagnostic trace identifier")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "error": "not_found",
             "message": "Resource not found",
-            "detail": None
+            "params": {},
+            "details": {},
+            "trace_id": "optional-trace-id",
         }
     })
 

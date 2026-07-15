@@ -27,6 +27,13 @@ export interface SkillInfo {
   id: string;
   name: string;
   description: string;
+  name_zh?: string;
+  name_en?: string;
+  description_zh?: string;
+  description_en?: string;
+  category?: string;
+  category_zh?: string;
+  category_en?: string;
 }
 
 export interface SkillsResponse {
@@ -65,11 +72,11 @@ export const agentApi = {
     return response.data.sessions;
   },
   async getChatSessionMessages(sessionId: string): Promise<ChatSessionMessage[]> {
-    const response = await apiClient.get<{ messages: ChatSessionMessage[] }>(`/api/v1/agent/chat/sessions/${sessionId}`);
+    const response = await apiClient.get<{ messages: ChatSessionMessage[] }>(`/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`);
     return response.data.messages;
   },
   async deleteChatSession(sessionId: string): Promise<void> {
-    await apiClient.delete(`/api/v1/agent/chat/sessions/${sessionId}`);
+    await apiClient.delete(`/api/v1/agent/chat/sessions/${encodeURIComponent(sessionId)}`);
   },
   async sendChat(content: string): Promise<{ success: boolean }> {
     const response = await apiClient.post<{

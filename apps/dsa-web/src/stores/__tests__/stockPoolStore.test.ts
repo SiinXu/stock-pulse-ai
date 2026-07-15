@@ -9,7 +9,11 @@ import type {
   TaskListResponse,
 } from '../../types/analysis';
 import { getRecentStartDate, getTodayInShanghai } from '../../utils/format';
-import { useStockPoolStore } from '../stockPoolStore';
+import {
+  DISMISSED_TASK_TTL_MS,
+  TASK_TERMINAL_RETENTION_MS,
+  useStockPoolStore,
+} from '../stockPoolStore';
 
 vi.mock('../../api/history', () => ({
   historyApi: {
@@ -140,6 +144,35 @@ describe('stockPoolStore', () => {
     expect(state.selectedReport?.meta.stockCode).toBe('600519');
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
+  });
+
+  it('restores an explicit route record instead of auto-selecting the first report', async () => {
+    const routedReport = {
+      ...historyReport,
+      meta: {
+        ...historyReport.meta,
+        id: 7,
+        queryId: 'q-route-7',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
+      },
+    };
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(routedReport);
+
+    await useStockPoolStore.getState().loadInitialHistory(7);
+
+    const state = useStockPoolStore.getState();
+    expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
+    expect(historyApi.getDetail).toHaveBeenCalledWith(7);
+    expect(state.selectedRecordId).toBe(7);
+    expect(state.pendingRecordId).toBeNull();
+    expect(state.selectedReport?.meta.id).toBe(7);
   });
 
   it('opens same-stock history trend and loads more records', async () => {
@@ -1060,7 +1093,6 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().refreshActiveTasks();
 
     expect(analysisApi.getTasks).toHaveBeenCalledWith({
-      status: 'pending,processing,cancel_requested',
       limit: 100,
     });
     expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
@@ -1126,6 +1158,93 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().refreshActiveTasks();
 
     expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
+  });
+
+  it('dismisses only the observed revision and allows a newer server revision', () => {
+    const terminal = createTask({
+      status: 'failed',
+      revision: 3,
+      updatedAt: '2026-03-18T08:00:03Z',
+    });
+    useStockPoolStore.getState().syncTaskCreated(terminal);
+    useStockPoolStore.getState().removeTask(terminal.taskId, terminal.revision);
+
+    useStockPoolStore.getState().syncTaskCreated(terminal);
+    expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
+
+    const retriedRevision = {
+      ...terminal,
+      status: 'processing' as const,
+      revision: 4,
+      updatedAt: '2026-03-18T08:00:04Z',
+    };
+    useStockPoolStore.getState().syncTaskUpdated(retriedRevision);
+    expect(useStockPoolStore.getState().activeTasks).toEqual([retriedRevision]);
+  });
+
+  it('expires dismissed task tombstones after the documented TTL', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T08:00:00Z'));
+    const task = createTask({ revision: 3 });
+    useStockPoolStore.getState().syncTaskCreated(task);
+    useStockPoolStore.getState().removeTask(task.taskId, task.revision);
+
+    vi.advanceTimersByTime(DISMISSED_TASK_TTL_MS + 1);
+    useStockPoolStore.getState().syncTaskCreated(task);
+
+    expect(useStockPoolStore.getState().activeTasks).toEqual([task]);
+    vi.useRealTimers();
+  });
+
+  it('ignores an older SSE or polling revision for an existing task', () => {
+    const newest = createTask({ revision: 5, progress: 80, updatedAt: '2026-03-18T08:00:05Z' });
+    useStockPoolStore.getState().syncTaskCreated(newest);
+
+    useStockPoolStore.getState().syncTaskUpdated({
+      ...newest,
+      revision: 4,
+      progress: 40,
+      updatedAt: '2026-03-18T08:00:04Z',
+    });
+
+    expect(useStockPoolStore.getState().activeTasks).toEqual([newest]);
+  });
+
+  it('does not let an old terminal cleanup remove a newer revision', () => {
+    const newer = createTask({ revision: 4, updatedAt: '2026-03-18T08:00:04Z' });
+    useStockPoolStore.getState().syncTaskCreated(newer);
+
+    useStockPoolStore.getState().removeTask(newer.taskId, 3);
+
+    expect(useStockPoolStore.getState().activeTasks).toEqual([newer]);
+  });
+
+  it('restores active and recent terminal tasks but drops expired terminal tasks', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-18T08:10:00Z'));
+    const active = createTask({ taskId: 'active', revision: 2 });
+    const recentTerminal = createTask({
+      taskId: 'recent',
+      status: 'completed',
+      progress: 100,
+      revision: 3,
+      updatedAt: new Date(Date.now() - TASK_TERMINAL_RETENTION_MS + 1000).toISOString(),
+    });
+    const expiredTerminal = createTask({
+      taskId: 'expired',
+      status: 'failed',
+      revision: 3,
+      updatedAt: new Date(Date.now() - TASK_TERMINAL_RETENTION_MS - 1000).toISOString(),
+    });
+    vi.mocked(analysisApi.getTasks).mockResolvedValue(
+      createTaskListResponse([active, recentTerminal, expiredTerminal]),
+    );
+
+    await useStockPoolStore.getState().refreshActiveTasks();
+
+    expect(analysisApi.getTasks).toHaveBeenCalledWith({ limit: 100 });
+    expect(useStockPoolStore.getState().activeTasks).toEqual([active, recentTerminal]);
+    vi.useRealTimers();
   });
 
   it('ignores late active-task snapshots from older refreshes', async () => {

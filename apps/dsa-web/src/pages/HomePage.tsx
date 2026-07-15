@@ -9,7 +9,6 @@ import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
-import { useDialogA11y } from '../components/common/useDialogA11y';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -39,6 +38,7 @@ import type {
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -49,6 +49,20 @@ type MarketReviewNotice = {
 type RunFlowDrawerState =
   | { open: false }
   | { open: true; source: RunFlowSnapshotSource; title: string };
+
+type HomeRunFlowRoute = 'history' | 'task';
+
+type HomeRouteState = {
+  recordId: number | null;
+  runFlow: HomeRunFlowRoute | null;
+  taskId: string | null;
+};
+
+type HomeRouteUpdate = {
+  recordId?: number | null;
+  runFlow?: HomeRunFlowRoute | null;
+  taskId?: string | null;
+};
 
 type StockAnalysisNavigationState = {
   stockCode?: string;
@@ -61,6 +75,22 @@ const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
 const BATCH_ANALYSIS_CHUNK_SIZE = 50;
 const TODAY_ANALYSIS_PAGE_SIZE = 100;
 const SERVER_LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/;
+
+function parseHomeRecordId(value: string | null): number | null {
+  if (!value || !/^[1-9]\d*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function parseHomeRouteState(search: string): HomeRouteState {
+  const params = new URLSearchParams(search);
+  const runFlow = params.get('runFlow');
+  return {
+    recordId: parseHomeRecordId(params.get('recordId')),
+    runFlow: runFlow === 'history' || runFlow === 'task' ? runFlow : null,
+    taskId: params.get('taskId')?.trim() || null,
+  };
+}
 
 type BatchAnalyzeStatus = {
   variant: 'success' | 'warning' | 'danger';
@@ -180,6 +210,17 @@ async function getTodayAnalysisItems(dateKey: string): Promise<StockBarItem[]> {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const homeRouteLocationRef = useRef({
+    pathname: location.pathname,
+    search: location.search,
+    state: location.state,
+  });
+  homeRouteLocationRef.current = {
+    pathname: location.pathname,
+    search: location.search,
+    state: location.state,
+  };
+  const homeRoute = useMemo(() => parseHomeRouteState(location.search), [location.search]);
   const { language: uiLanguage, t } = useUiLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSubmittingMarketReview, setIsSubmittingMarketReview] = useState(false);
@@ -190,7 +231,7 @@ const HomePage: React.FC = () => {
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
-  const [runFlowDrawer, setRunFlowDrawer] = useState<RunFlowDrawerState>({ open: false });
+  const [isInitialHistoryRouteReady, setIsInitialHistoryRouteReady] = useState(false);
   const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
   const [sidebarWorkspaceTab, setSidebarWorkspaceTab] = useState<HomeWorkspaceTab>('history');
   const [isBatchAnalyzingWatchlist, setIsBatchAnalyzingWatchlist] = useState(false);
@@ -209,15 +250,43 @@ const HomePage: React.FC = () => {
   const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
   const marketReviewPollGeneration = useRef(0);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  useDialogA11y({ isOpen: sidebarOpen, containerRef: sidebarRef, onEscape: closeSidebar });
   const stockBarLoadStartedRef = useRef(false);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const strategyInitialFocusIndexRef = useRef<number | null>(null);
+  const initialRouteRecordIdRef = useRef<number | undefined>(homeRoute.recordId ?? undefined);
+  const lastAppliedRouteRecordIdRef = useRef<number | null>(homeRoute.recordId);
+  const routeSelectionPendingRef = useRef(false);
+
+  const updateHomeRoute = useCallback((update: HomeRouteUpdate, replace = false) => {
+    const currentLocation = homeRouteLocationRef.current;
+    const params = new URLSearchParams(currentLocation.search);
+    if (update.recordId !== undefined) {
+      if (update.recordId === null) params.delete('recordId');
+      else params.set('recordId', String(update.recordId));
+    }
+    if (update.runFlow !== undefined) {
+      if (update.runFlow === null) params.delete('runFlow');
+      else params.set('runFlow', update.runFlow);
+    }
+    if (update.taskId !== undefined) {
+      if (update.taskId === null) params.delete('taskId');
+      else params.set('taskId', update.taskId);
+    }
+
+    const nextQuery = params.toString();
+    const currentQuery = currentLocation.search.replace(/^\?/, '');
+    if (nextQuery === currentQuery) return;
+    const nextSearch = nextQuery ? `?${nextQuery}` : '';
+    homeRouteLocationRef.current = { ...currentLocation, search: nextSearch };
+    navigate(
+      { pathname: currentLocation.pathname, search: nextSearch },
+      { replace, state: currentLocation.state },
+    );
+  }, [navigate]);
 
   const stopMarketReviewPolling = useCallback(() => {
     // Bump the generation so any in-flight poll from the previous run is
@@ -296,6 +365,14 @@ const HomePage: React.FC = () => {
     loadStockBar,
     refreshStockBar,
   } = useHomeDashboardState();
+
+  const loadInitialHistoryForRoute = useCallback(async () => {
+    try {
+      await loadInitialHistory(initialRouteRecordIdRef.current);
+    } finally {
+      setIsInitialHistoryRouteReady(true);
+    }
+  }, [loadInitialHistory]);
 
   const clearDuplicateBannerTimer = useCallback(() => {
     if (duplicateBannerTimer.current !== null) {
@@ -410,6 +487,10 @@ const HomePage: React.FC = () => {
     () => analysisSkills.find((skill) => skill.id === selectedStrategyId),
     [analysisSkills, selectedStrategyId],
   );
+  const selectedStrategyDisplay = useMemo(
+    () => (selectedStrategy ? getStrategyDisplay(selectedStrategy, uiLanguage) : null),
+    [selectedStrategy, uiLanguage],
+  );
   const selectedAnalysisSkills = useMemo(
     () => (selectedStrategyId ? [selectedStrategyId] : undefined),
     [selectedStrategyId],
@@ -417,13 +498,9 @@ const HomePage: React.FC = () => {
   const strategyOptions = useMemo(
     () => [
       { id: '', name: t('home.defaultStrategyName'), description: t('home.defaultStrategyDescription') },
-      ...analysisSkills.map((skill) => ({
-        id: skill.id,
-        name: skill.name,
-        description: skill.description,
-      })),
+      ...analysisSkills.map((skill) => ({ id: skill.id, ...getStrategyDisplay(skill, uiLanguage) })),
     ],
-    [analysisSkills, t],
+    [analysisSkills, t, uiLanguage],
   );
   const closeStrategyMenu = useCallback((restoreFocus = false) => {
     setStrategyMenuOpen(false);
@@ -531,7 +608,7 @@ const HomePage: React.FC = () => {
   }, []);
 
   useDashboardLifecycle({
-    loadInitialHistory,
+    loadInitialHistory: loadInitialHistoryForRoute,
     refreshHistory,
     refreshHistoryForCompletedTask,
     loadMarketReviewHistory,
@@ -545,6 +622,7 @@ const HomePage: React.FC = () => {
     removeTask,
     onDashboardDataRefresh: handleDashboardDataRefresh,
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
+    activeTasks,
   });
 
   useEffect(() => {
@@ -682,11 +760,63 @@ const HomePage: React.FC = () => {
     setMarketReviewError(null);
   }, [stopMarketReviewPolling]);
 
+  useEffect(() => {
+    if (!isInitialHistoryRouteReady) return;
+    const recordId = homeRoute.recordId;
+    if (recordId === null || lastAppliedRouteRecordIdRef.current === recordId) return;
+
+    lastAppliedRouteRecordIdRef.current = recordId;
+    routeSelectionPendingRef.current = true;
+    clearMarketReviewState();
+    void selectHistoryItem(recordId, true).finally(() => {
+      routeSelectionPendingRef.current = false;
+    });
+  }, [clearMarketReviewState, homeRoute.recordId, isInitialHistoryRouteReady, selectHistoryItem]);
+
+  useEffect(() => {
+    if (!isInitialHistoryRouteReady || routeSelectionPendingRef.current) return;
+
+    if (selectedRecordId === null && selectedReport === null) {
+      if (homeRoute.recordId === null) return;
+      lastAppliedRouteRecordIdRef.current = null;
+      updateHomeRoute({
+        recordId: null,
+        ...(homeRoute.runFlow === 'history' ? { runFlow: null } : {}),
+      }, true);
+      return;
+    }
+
+    const settledRecordId = selectedReport?.meta.id ?? null;
+    if (
+      settledRecordId === null
+      || selectedRecordId !== settledRecordId
+      || isLoadingReport
+      || homeRoute.recordId === settledRecordId
+    ) {
+      return;
+    }
+
+    lastAppliedRouteRecordIdRef.current = settledRecordId;
+    updateHomeRoute({ recordId: settledRecordId }, true);
+  }, [
+    homeRoute.recordId,
+    homeRoute.runFlow,
+    isInitialHistoryRouteReady,
+    isLoadingReport,
+    selectedRecordId,
+    selectedReport,
+    updateHomeRoute,
+  ]);
+
   const handleHistoryItemClick = useCallback((recordId: number) => {
     clearMarketReviewState();
-    void selectHistoryItem(recordId);
+    if (homeRoute.recordId === recordId) {
+      void selectHistoryItem(recordId, true);
+    } else {
+      updateHomeRoute({ recordId, runFlow: null, taskId: null });
+    }
     setSidebarOpen(false);
-  }, [clearMarketReviewState, selectHistoryItem]);
+  }, [clearMarketReviewState, homeRoute.recordId, selectHistoryItem, updateHomeRoute]);
 
   const [isDeletingStock, setIsDeletingStock] = useState(false);
   const handleDeleteStock = useCallback(async (stockCode: string) => {
@@ -732,11 +862,14 @@ const HomePage: React.FC = () => {
     }
     const stockName = typeof state?.stockName === 'string' ? state.stockName.trim() : '';
     setQuery(stockCode);
-    navigate(location.pathname, { replace: true, state: null });
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      { replace: true, state: null },
+    );
     if (state?.autoAnalyze) {
       handleSubmitAnalysis(stockCode, stockName || undefined, 'import');
     }
-  }, [handleSubmitAnalysis, location.pathname, location.state, navigate, setQuery]);
+  }, [handleSubmitAnalysis, location.pathname, location.search, location.state, navigate, setQuery]);
 
   const handleAskFollowUp = useCallback(() => {
     if (selectedReport?.meta.id === undefined || selectedReport.meta.reportType === 'market_review') {
@@ -764,28 +897,39 @@ const HomePage: React.FC = () => {
     });
   }, [selectedAnalysisSkills, selectedReport, submitAnalysis]);
 
+  const runFlowDrawer = useMemo<RunFlowDrawerState>(() => {
+    if (homeRoute.runFlow === 'history' && homeRoute.recordId !== null) {
+      const meta = selectedReport?.meta.id === homeRoute.recordId ? selectedReport.meta : null;
+      const stock = meta?.stockName || meta?.stockCode || String(homeRoute.recordId);
+      return {
+        open: true,
+        source: { type: 'history', recordId: homeRoute.recordId },
+        title: t('runFlow.historyDrawerTitle', { stock }),
+      };
+    }
+    if (homeRoute.runFlow === 'task' && homeRoute.taskId) {
+      const task = activeTasks.find((item) => item.taskId === homeRoute.taskId);
+      const stock = task?.stockName || task?.stockCode || homeRoute.taskId;
+      return {
+        open: true,
+        source: { type: 'task', taskId: homeRoute.taskId },
+        title: t('runFlow.taskDrawerTitle', { stock }),
+      };
+    }
+    return { open: false };
+  }, [activeTasks, homeRoute.recordId, homeRoute.runFlow, homeRoute.taskId, selectedReport, t]);
+
   const openTaskRunFlow = useCallback((task: TaskInfo) => {
-    const stock = task.stockName || task.stockCode || task.taskId;
-    setRunFlowDrawer({
-      open: true,
-      source: { type: 'task', taskId: task.taskId },
-      title: t('runFlow.taskDrawerTitle', { stock }),
-    });
-  }, [t]);
+    updateHomeRoute({ runFlow: 'task', taskId: task.taskId });
+  }, [updateHomeRoute]);
 
   const openHistoryRunFlow = useCallback((recordId: number) => {
-    const meta = selectedReport?.meta.id === recordId ? selectedReport.meta : null;
-    const stock = meta?.stockName || meta?.stockCode || String(recordId);
-    setRunFlowDrawer({
-      open: true,
-      source: { type: 'history', recordId },
-      title: t('runFlow.historyDrawerTitle', { stock }),
-    });
-  }, [selectedReport, t]);
+    updateHomeRoute({ recordId, runFlow: 'history', taskId: null });
+  }, [updateHomeRoute]);
 
   const closeRunFlowDrawer = useCallback(() => {
-    setRunFlowDrawer({ open: false });
-  }, []);
+    updateHomeRoute({ runFlow: null, taskId: null }, true);
+  }, [updateHomeRoute]);
 
   const pollMarketReviewStatus = useCallback(
     async (taskId: string) => {
@@ -1296,15 +1440,16 @@ const HomePage: React.FC = () => {
   return (
     <div
       data-testid="home-dashboard"
-      className="flex h-[calc(100vh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="flex h-[calc(100dvh-5rem)] w-full flex-col overflow-hidden sm:h-[calc(100dvh-5.5rem)] md:flex-row lg:h-[calc(100dvh-2rem)]"
     >
       <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full w-full">
         <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden -ml-1 flex-shrink-0 rounded-lg p-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('home.historyButton')}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1335,10 +1480,10 @@ const HomePage: React.FC = () => {
                     onClick={() => setStrategyMenuOpen((open) => !open)}
                     onKeyDown={handleStrategyButtonKeyDown}
                     disabled={isAnalyzing}
-                    className="home-surface-button flex h-10 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
+                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                   >
                     <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate">{selectedStrategy?.name || t('home.strategy')}</span>
+                    <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
                   </button>
                   {strategyMenuOpen ? (
                     <div
@@ -1346,7 +1491,8 @@ const HomePage: React.FC = () => {
                       role="menu"
                       aria-labelledby="strategy-menu-button"
                       onKeyDown={handleStrategyMenuKeyDown}
-                      className="absolute right-0 top-11 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-subtle bg-elevated p-1.5 text-sm text-foreground shadow-2xl"
+                      style={{ zIndex: OVERLAY_Z.dropdown }}
+                      className="absolute right-0 top-12 max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-subtle bg-elevated p-1.5 text-sm text-foreground shadow-2xl"
                     >
                       {strategyOptions.map((option, index) => {
                         const selected = selectedStrategyId === option.id;
@@ -1361,7 +1507,7 @@ const HomePage: React.FC = () => {
                             aria-checked={selected}
                             tabIndex={-1}
                             onClick={() => selectStrategy(option.id)}
-                            className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                            className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
                           >
                             <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
                             <span className="min-w-0">
@@ -1377,7 +1523,7 @@ const HomePage: React.FC = () => {
               ) : null}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2.5 md:flex-nowrap md:flex-shrink-0">
-              <label className="flex h-10 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
+              <label className="flex h-11 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
                 <input
                   type="checkbox"
                   checked={notify}
@@ -1393,7 +1539,7 @@ const HomePage: React.FC = () => {
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
-                className="h-10 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
+                className="h-11 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
@@ -1402,7 +1548,7 @@ const HomePage: React.FC = () => {
                 type="button"
                 onClick={() => handleSubmitAnalysis()}
                 disabled={!query || isAnalyzing}
-                className="btn-primary flex h-10 min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none md:basis-auto"
+                className="btn-primary flex h-11 min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none md:basis-auto"
               >
                 {isAnalyzing ? (
                   <>
@@ -1440,7 +1586,7 @@ const HomePage: React.FC = () => {
                     type="button"
                     onClick={dismissDuplicateBanner}
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -1481,22 +1627,19 @@ const HomePage: React.FC = () => {
             {sidebarContent}
           </div>
 
-          {sidebarOpen ? (
-            <div className="fixed inset-0 z-40 md:hidden" onClick={closeSidebar} role="presentation">
-              <div className="page-drawer-overlay absolute inset-0" />
-              <div
-                ref={sidebarRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label={t('home.historyButton')}
-                tabIndex={-1}
-                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col overflow-hidden !rounded-none !rounded-r-xl p-3 shadow-2xl focus:outline-none"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {sidebarContent}
-              </div>
-            </div>
-          ) : null}
+          <Drawer
+            isOpen={sidebarOpen}
+            onClose={closeSidebar}
+            title={t('home.historyButton')}
+            width="max-w-[18rem]"
+            zIndex={OVERLAY_Z.pageDrawer}
+            side="left"
+            showEyebrow={false}
+            overlayClassName="md:hidden"
+            contentClassName="overflow-hidden p-3"
+          >
+            {sidebarContent}
+          </Drawer>
 
           <section
             ref={dashboardScrollRef}
@@ -1629,7 +1772,7 @@ const HomePage: React.FC = () => {
                     onClose={closeHistoryTrend}
                     onRangeChange={(range) => void setStockHistoryRange(range)}
                     onLoadMore={() => void loadMoreStockHistory()}
-                    onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
+                    onSelectRecord={handleHistoryItemClick}
                     onRetry={() => void openHistoryTrend()}
                   />
                 ) : (

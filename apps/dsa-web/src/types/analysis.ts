@@ -422,6 +422,10 @@ export interface TaskAccepted {
   traceId?: string;
   status: 'pending' | 'processing';
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
+  revision?: number;
+  updatedAt?: string;
   analysisPhase?: AnalysisPhase;
 }
 
@@ -431,6 +435,10 @@ export interface BatchTaskAcceptedItem {
   stockCode: string;
   status: 'pending' | 'processing';
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
+  revision?: number;
+  updatedAt?: string;
   analysisPhase?: AnalysisPhase;
 }
 
@@ -456,10 +464,17 @@ export interface TaskStatus {
   traceId?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
   progress?: number;
+  message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   result?: AnalysisResult;
   marketReviewReport?: string;
   marketReviewPayload?: MarketReviewPayload;
   error?: string;
+  errorCode?: string;
+  errorParams?: Record<string, unknown>;
+  revision?: number;
+  updatedAt?: string;
   stockName?: string;
   originalQuery?: string;
   selectionSource?: string;
@@ -476,15 +491,21 @@ export interface TaskInfo {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
   progress: number;
   message?: string;
+  messageCode?: string;
+  messageParams?: Record<string, unknown>;
   reportType: string;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
   error?: string;
+  errorCode?: string;
+  errorParams?: Record<string, unknown>;
   originalQuery?: string;
   selectionSource?: string;
   analysisPhase?: AnalysisPhase;
   skills?: string[];
+  revision?: number;
+  updatedAt?: string;
 }
 
 /** Task list response */

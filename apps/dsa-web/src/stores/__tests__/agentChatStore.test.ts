@@ -43,6 +43,7 @@ beforeEach(() => {
   useAgentChatStore.setState({
     messages: [],
     loading: false,
+    streamStatus: 'idle',
     progressSteps: [],
     sessionId: 'session-test',
     sessions: [],
@@ -52,6 +53,9 @@ beforeEach(() => {
     completionBadge: false,
     hasInitialLoad: true,
     abortController: null,
+    failedStreamRequest: null,
+    sessionLoadRevision: 0,
+    sessionsLoadRevision: 0,
   });
   vi.clearAllMocks();
 });
@@ -146,9 +150,10 @@ describe('agentChatStore.startStream', () => {
       content: '分析茅台',
     });
     expect(state.chatError).toMatchObject({
-      title: '回复未完整返回',
-      message: 'Agent 流式响应在完成前中断，请重试。',
+      title: 'Agent 响应中断',
+      message: '流式响应未能完成，请重试。',
       category: 'upstream_network',
+      code: 'agent_stream_failed',
       rawMessage: 'Agent stream ended before a done event was received.',
     });
   });
@@ -217,6 +222,63 @@ describe('agentChatStore.startStream', () => {
       category: 'unknown',
       rawMessage: '分析出错',
     });
+  });
+
+  it('retries a failed stream without duplicating the user message', async () => {
+    vi.mocked(agentApi.chatStream)
+      .mockRejectedValueOnce(new Error('connect timeout while calling upstream provider'))
+      .mockResolvedValueOnce(createStreamResponse([
+        'data: {"type":"done","success":true,"content":"重试成功"}',
+      ]));
+
+    await useAgentChatStore.getState().startStream(
+      { message: '分析茅台', session_id: 'session-test' },
+      { skillName: '趋势技能' },
+    );
+
+    expect(useAgentChatStore.getState().messages).toHaveLength(1);
+    expect(useAgentChatStore.getState().streamStatus).toBe('failed');
+    expect(useAgentChatStore.getState().failedStreamRequest).not.toBeNull();
+
+    await useAgentChatStore.getState().retryLastFailedStream();
+
+    const state = useAgentChatStore.getState();
+    expect(agentApi.chatStream).toHaveBeenCalledTimes(2);
+    expect(state.messages).toHaveLength(2);
+    expect(state.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(state.messages[1].content).toBe('重试成功');
+    expect(state.chatError).toBeNull();
+    expect(state.failedStreamRequest).toBeNull();
+    expect(state.streamStatus).toBe('idle');
+  });
+
+  it('does not let a late stream update a newly selected session', async () => {
+    const deferredResponse = createDeferred<Response>();
+    vi.mocked(agentApi.chatStream).mockReturnValueOnce(deferredResponse.promise);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValueOnce([
+      { id: 'msg-new', role: 'assistant', content: '新会话内容', created_at: null },
+    ]);
+
+    const oldStream = useAgentChatStore.getState().startStream(
+      { message: '旧会话问题', session_id: 'session-test' },
+      { skillName: '趋势技能' },
+    );
+    await useAgentChatStore.getState().switchSession('session-new');
+
+    deferredResponse.resolve(createStreamResponse([
+      'data: {"type":"thinking","message":"旧进度"}',
+      'data: {"type":"error","message":"old stream failed"}',
+    ]));
+    await oldStream;
+
+    const state = useAgentChatStore.getState();
+    expect(state.sessionId).toBe('session-new');
+    expect(state.messages).toEqual([
+      { id: 'msg-new', role: 'assistant', content: '新会话内容' },
+    ]);
+    expect(state.progressSteps).toEqual([]);
+    expect(state.chatError).toBeNull();
+    expect(state.streamStatus).toBe('idle');
   });
 });
 
@@ -308,5 +370,38 @@ describe('agentChatStore.switchSession', () => {
     expect(state.messages).toEqual([
       { id: 'msg-b', role: 'assistant', content: 'B 回复' },
     ]);
+  });
+});
+
+describe('agentChatStore.loadInitialSession', () => {
+  it('prefers the URL session and hydrates it even when it is outside the recent list', async () => {
+    useAgentChatStore.setState({ hasInitialLoad: false });
+    vi.mocked(agentApi.getChatSessions).mockResolvedValueOnce([]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValueOnce([
+      { id: 'url-message', role: 'assistant', content: '深链会话', created_at: null },
+    ]);
+
+    await useAgentChatStore.getState().loadInitialSession('session-from-url');
+
+    const state = useAgentChatStore.getState();
+    expect(agentApi.getChatSessionMessages).toHaveBeenCalledWith('session-from-url');
+    expect(state.sessionId).toBe('session-from-url');
+    expect(state.messages).toEqual([
+      { id: 'url-message', role: 'assistant', content: '深链会话' },
+    ]);
+    expect(localStorage.getItem('dsa_chat_session_id')).toBe('session-from-url');
+  });
+
+  it('surfaces a failed URL-session hydration without replacing the requested session', async () => {
+    useAgentChatStore.setState({ hasInitialLoad: false });
+    vi.mocked(agentApi.getChatSessions).mockResolvedValueOnce([]);
+    vi.mocked(agentApi.getChatSessionMessages).mockRejectedValueOnce(new Error('session unavailable'));
+
+    await useAgentChatStore.getState().loadInitialSession('session-from-url');
+
+    const state = useAgentChatStore.getState();
+    expect(state.sessionId).toBe('session-from-url');
+    expect(state.messages).toEqual([]);
+    expect(state.chatError).toMatchObject({ rawMessage: 'session unavailable' });
   });
 });

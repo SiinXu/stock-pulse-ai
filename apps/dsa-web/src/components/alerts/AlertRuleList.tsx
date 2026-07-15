@@ -96,6 +96,7 @@ interface AlertRuleListProps {
   pageSize: number;
   className?: string;
   isLoading?: boolean;
+  showEmptyState?: boolean;
   enabledFilter: AlertRuleEnabledFilter;
   alertTypeFilter: AlertTypeFilter;
   onEnabledFilterChange: (value: AlertRuleEnabledFilter) => void;
@@ -104,6 +105,7 @@ interface AlertRuleListProps {
   onToggleEnabled: (rule: AlertRuleItem) => void;
   onDelete: (rule: AlertRuleItem) => void;
   onTest: (rule: AlertRuleItem) => void;
+  busyRules?: Readonly<Record<number, AlertRuleBusyAction>>;
   busyRule?: AlertRuleBusyState | null;
 }
 
@@ -114,6 +116,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   pageSize,
   className,
   isLoading = false,
+  showEmptyState = true,
   enabledFilter,
   alertTypeFilter,
   onEnabledFilterChange,
@@ -122,15 +125,19 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   onToggleEnabled,
   onDelete,
   onTest,
+  busyRules = {},
   busyRule = null,
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_LIST_TEXT[language];
   const [pendingDelete, setPendingDelete] = useState<AlertRuleItem | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const isRuleBusy = (rule: AlertRuleItem) => busyRule?.id === rule.id;
+  const getBusyAction = (rule: AlertRuleItem) => (
+    busyRules[rule.id] ?? (busyRule?.id === rule.id ? busyRule.action : undefined)
+  );
+  const isRuleBusy = (rule: AlertRuleItem) => getBusyAction(rule) != null;
   const isRuleActionBusy = (rule: AlertRuleItem, action: AlertRuleBusyAction) => (
-    busyRule?.id === rule.id && busyRule.action === action
+    getBusyAction(rule) === action
   );
 
   return (
@@ -160,7 +167,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         />
       </div>
 
-      {rules.length === 0 ? (
+      {rules.length === 0 && showEmptyState ? (
         <div className="flex min-h-[220px] flex-1 items-center justify-center">
           <EmptyState
             icon={<Bell className="h-6 w-6" />}
@@ -168,7 +175,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
             description={text.emptyDescription}
           />
         </div>
-      ) : (
+      ) : rules.length > 0 ? (
         <div className="min-h-0 flex-1 overflow-x-auto">
           <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
@@ -255,7 +262,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       <Pagination
         currentPage={page}

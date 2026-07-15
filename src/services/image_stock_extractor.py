@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple
 
 from src.config import Config, get_config
 from src.llm.hermes import route_has_hermes
+from src.llm.model_ref import is_model_ref
 
 logger = logging.getLogger(__name__)
 
@@ -246,11 +247,6 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
     if route_has_hermes(getattr(cfg, "llm_model_list", []) or [], model):
         raise ValueError("Hermes Vision 未验证：VISION_MODEL 不能选择包含 Hermes deployment 的 route。")
 
-    keys = _get_api_keys_for_model(model, cfg)
-    if not keys:
-        raise ValueError(f"No API key found for vision model {model}")
-    key = api_key if api_key and api_key in keys else random.choice(keys)
-
     data_url = f"data:{mime_type};base64,{image_b64}"
     call_kwargs: dict = {
         "model": model,
@@ -264,9 +260,30 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
             }
         ],
         "max_tokens": 1024,
-        "api_key": key,
         "timeout": VISION_API_TIMEOUT,
     }
+
+    if is_model_ref(model):
+        deployments = [
+            entry
+            for entry in (getattr(cfg, "llm_model_list", []) or [])
+            if str(entry.get("model_name") or "").strip() == model
+        ]
+        if not deployments:
+            raise ValueError(f"No configured deployment found for vision model {model}")
+        if getattr(litellm, "Router", None) is None:
+            import litellm as litellm_module
+            litellm = litellm_module
+        response = litellm.Router(model_list=deployments).completion(**call_kwargs)
+        if response and response.choices and response.choices[0].message.content:
+            return response.choices[0].message.content
+        raise ValueError("LiteLLM vision returned empty response")
+
+    keys = _get_api_keys_for_model(model, cfg)
+    if not keys:
+        raise ValueError(f"No API key found for vision model {model}")
+    key = api_key if api_key and api_key in keys else random.choice(keys)
+    call_kwargs["api_key"] = key
     # Add the configured Base URL for OpenAI-compatible providers.
     if not model.startswith("gemini/") and not model.startswith("anthropic/") and not model.startswith("vertex_ai/"):
         if cfg.openai_base_url:

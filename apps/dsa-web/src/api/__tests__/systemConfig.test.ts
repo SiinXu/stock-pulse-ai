@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { systemConfigApi } from '../systemConfig';
+import {
+  SystemConfigConflictError,
+  SystemConfigValidationError,
+  systemConfigApi,
+} from '../systemConfig';
 
 const get = vi.hoisted(() => vi.fn());
 const post = vi.hoisted(() => vi.fn());
+const put = vi.hoisted(() => vi.fn());
 
 vi.mock('../index', () => ({
   default: {
     get,
     post,
-    put: vi.fn(),
+    put,
   },
 }));
 
@@ -16,6 +21,7 @@ describe('systemConfigApi', () => {
   beforeEach(() => {
     get.mockReset();
     post.mockReset();
+    put.mockReset();
     post.mockResolvedValue({
       data: {
         success: true,
@@ -332,5 +338,62 @@ describe('systemConfigApi', () => {
     );
     expect(result.success).toBe(true);
     expect(result.status.healthStatus).toBe('passed');
+  });
+
+  it('reads validation issues from the canonical error details envelope', async () => {
+    put.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: {
+          error: 'validation_failed',
+          message: 'System configuration validation failed',
+          params: {},
+          details: {
+            issues: [{
+              key: 'STOCK_LIST',
+              code: 'invalid_value',
+              message: 'Invalid stock list',
+              severity: 'error',
+            }],
+          },
+          trace_id: 'trace-validation',
+        },
+      },
+    });
+
+    const request = systemConfigApi.update({
+      configVersion: 'version-1',
+      items: [{ key: 'STOCK_LIST', value: 'invalid' }],
+    });
+    await expect(request).rejects.toBeInstanceOf(SystemConfigValidationError);
+    await expect(request).rejects.toMatchObject({
+      name: 'SystemConfigValidationError',
+      issues: [expect.objectContaining({ key: 'STOCK_LIST', code: 'invalid_value' })],
+    });
+  });
+
+  it('reads the current version from the canonical conflict details envelope', async () => {
+    put.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: 'config_version_conflict',
+          message: 'Configuration has changed',
+          params: {},
+          details: { current_config_version: 'version-2' },
+          trace_id: 'trace-conflict',
+        },
+      },
+    });
+
+    const request = systemConfigApi.update({
+      configVersion: 'version-1',
+      items: [{ key: 'STOCK_LIST', value: '600519' }],
+    });
+    await expect(request).rejects.toBeInstanceOf(SystemConfigConflictError);
+    await expect(request).rejects.toMatchObject({
+      name: 'SystemConfigConflictError',
+      currentConfigVersion: 'version-2',
+    });
   });
 });

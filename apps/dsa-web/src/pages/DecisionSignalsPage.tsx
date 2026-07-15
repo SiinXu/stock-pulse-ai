@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, BarChart3, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
@@ -106,8 +107,11 @@ type PendingStatusChange = {
 
 type SelectedSignal = {
   item: DecisionSignalItem;
-  source: 'list' | 'latest' | 'timeline';
+  source: 'list' | 'latest' | 'timeline' | 'direct';
 };
+
+type RouteSyncDomain = 'list' | 'timeline' | 'stock' | 'signal';
+type RouteSyncState = 'pending' | 'changed' | 'unchanged';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -175,10 +179,35 @@ function parseSourceReportId(value: string): number | undefined {
 function getInitialFilters(search = typeof window === 'undefined' ? '' : window.location.search): ListFilters {
   const params = new URLSearchParams(search);
   const sourceReportId = parseSourceReportId(params.get('sourceReportId') ?? params.get('source_report_id') ?? '');
-  if (sourceReportId === undefined) return DEFAULT_LIST_FILTERS;
+  if (sourceReportId !== undefined) {
+    return {
+      ...DEFAULT_LIST_FILTERS,
+      sourceReportId: String(sourceReportId),
+    };
+  }
+  const market = params.get('market');
+  const action = params.get('action');
+  const marketPhase = params.get('marketPhase');
+  const sourceType = params.get('sourceType');
+  const status = params.get('status');
   return {
-    ...DEFAULT_LIST_FILTERS,
-    sourceReportId: String(sourceReportId),
+    market: MARKET_OPTIONS.includes(market as DecisionSignalMarket)
+      ? market as DecisionSignalMarket
+      : '',
+    stockCode: params.get('listStock')?.trim() ?? '',
+    action: ACTION_OPTIONS.includes(action as DecisionAction)
+      ? action as DecisionAction
+      : '',
+    marketPhase: PHASE_OPTIONS.includes(marketPhase as MarketPhaseValue)
+      ? marketPhase as MarketPhaseValue
+      : '',
+    sourceType: SOURCE_OPTIONS.includes(sourceType as DecisionSignalSourceType)
+      ? sourceType as DecisionSignalSourceType
+      : '',
+    sourceReportId: '',
+    status: STATUS_OPTIONS.includes(status as DecisionSignalStatus)
+      ? status as DecisionSignalStatus
+      : DEFAULT_LIST_FILTERS.status,
   };
 }
 
@@ -186,17 +215,88 @@ function getInitialStockCode(search = typeof window === 'undefined' ? '' : windo
   return new URLSearchParams(search).get('stock')?.trim() ?? '';
 }
 
-// Reflect the current-stock scope in the URL (without a new history entry) so
-// the page can be shared/refreshed and restore the same stock.
-function syncStockSearchParam(code: string | null): void {
-  if (typeof window === 'undefined') return;
-  const url = new URL(window.location.href);
-  if (code) {
-    url.searchParams.set('stock', code);
+function getInitialPage(search = typeof window === 'undefined' ? '' : window.location.search): number {
+  const value = Number(new URLSearchParams(search).get('page'));
+  return Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function getInitialTimelineFilters(
+  search = typeof window === 'undefined' ? '' : window.location.search,
+): TimelineFilters {
+  const params = new URLSearchParams(search);
+  const market = params.get('timelineMarket');
+  const range = params.get('timelineRange');
+  const status = params.get('timelineStatus');
+  const decisionProfile = params.get('timelineProfile');
+  return {
+    market: MARKET_OPTIONS.includes(market as DecisionSignalMarket)
+      ? market as DecisionSignalMarket
+      : '',
+    range: range === '30d' || range === '90d' || range === '180d'
+      ? range
+      : DEFAULT_TIMELINE_FILTERS.range,
+    status: status === 'active' || status === 'all'
+      ? status
+      : DEFAULT_TIMELINE_FILTERS.status,
+    decisionProfile: decisionProfile === 'unknown' || REASSESS_PROFILES.includes(decisionProfile as DecisionProfile)
+      ? decisionProfile as TimelineFilters['decisionProfile']
+      : '',
+  };
+}
+
+function getInitialSignalId(search = typeof window === 'undefined' ? '' : window.location.search): number | null {
+  const value = Number(new URLSearchParams(search).get('signal'));
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function listFiltersEqual(left: ListFilters, right: ListFilters): boolean {
+  return left.market === right.market
+    && left.stockCode === right.stockCode
+    && left.action === right.action
+    && left.marketPhase === right.marketPhase
+    && left.sourceType === right.sourceType
+    && left.sourceReportId === right.sourceReportId
+    && left.status === right.status;
+}
+
+function timelineFiltersEqual(left: TimelineFilters, right: TimelineFilters): boolean {
+  return left.market === right.market
+    && left.range === right.range
+    && left.status === right.status
+    && left.decisionProfile === right.decisionProfile;
+}
+
+function setOptionalParam(params: URLSearchParams, key: string, value: string, defaultValue = ''): void {
+  if (value && value !== defaultValue) {
+    params.set(key, value);
   } else {
-    url.searchParams.delete('stock');
+    params.delete(key);
   }
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function writeListRoute(params: URLSearchParams, filters: ListFilters, page: number): void {
+  const sourceReportId = parseSourceReportId(filters.sourceReportId);
+  if (sourceReportId !== undefined) {
+    params.set('sourceReportId', String(sourceReportId));
+    ['market', 'listStock', 'action', 'marketPhase', 'sourceType', 'status'].forEach((key) => params.delete(key));
+  } else {
+    params.delete('sourceReportId');
+    params.delete('source_report_id');
+    setOptionalParam(params, 'market', filters.market);
+    setOptionalParam(params, 'listStock', filters.stockCode.trim());
+    setOptionalParam(params, 'action', filters.action);
+    setOptionalParam(params, 'marketPhase', filters.marketPhase);
+    setOptionalParam(params, 'sourceType', filters.sourceType);
+    setOptionalParam(params, 'status', filters.status, DEFAULT_LIST_FILTERS.status);
+  }
+  setOptionalParam(params, 'page', page > 1 ? String(page) : '');
+}
+
+function writeTimelineRoute(params: URLSearchParams, filters: TimelineFilters): void {
+  setOptionalParam(params, 'timelineMarket', filters.market);
+  setOptionalParam(params, 'timelineRange', filters.range, DEFAULT_TIMELINE_FILTERS.range);
+  setOptionalParam(params, 'timelineStatus', filters.status, DEFAULT_TIMELINE_FILTERS.status);
+  setOptionalParam(params, 'timelineProfile', filters.decisionProfile);
 }
 
 function toListParams(filters: ListFilters, page: number): DecisionSignalListParams {
@@ -366,11 +466,14 @@ function formatStatPercent(value: number | null | undefined): string {
 
 const DecisionSignalsPage: React.FC = () => {
   const { t } = useUiLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
   const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
   const { index: stockIndex } = useStockIndex();
   const [filters, setFilters] = useState<ListFilters>(() => getInitialFilters());
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => getInitialFilters());
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => getInitialPage());
   const [items, setItems] = useState<DecisionSignalItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -390,7 +493,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [latestSearched, setLatestSearched] = useState(false);
   const [latestLoading, setLatestLoading] = useState(false);
   const [latestError, setLatestError] = useState<ParsedApiError | null>(null);
-  const [timelineFilters, setTimelineFilters] = useState<TimelineFilters>(DEFAULT_TIMELINE_FILTERS);
+  const [timelineFilters, setTimelineFilters] = useState<TimelineFilters>(() => getInitialTimelineFilters());
   const [appliedTimelineContext, setAppliedTimelineContext] = useState<AppliedTimelineContext | null>(null);
   const [timelineItems, setTimelineItems] = useState<DecisionSignalItem[]>([]);
   const [timelineSearched, setTimelineSearched] = useState(false);
@@ -417,6 +520,67 @@ const DecisionSignalsPage: React.FC = () => {
   const selectedSignalIdRef = useRef<number | null>(null);
   const statusUpdateInFlightRef = useRef(false);
   const timelineMarketSourceRef = useRef<TimelineMarketSource>(null);
+  const routeSelectionRequestIdRef = useRef(0);
+  const selectedRef = useRef<SelectedSignal | null>(null);
+  const routeSyncKeysRef = useRef({
+    list: '',
+    timeline: '',
+    stock: '',
+    signal: '',
+  });
+  const pendingRouteSyncKeysRef = useRef<Record<RouteSyncDomain, string | null>>({
+    list: null,
+    timeline: null,
+    stock: null,
+    signal: null,
+  });
+
+  const markPendingRouteKey = useCallback((domain: RouteSyncDomain, key: string) => {
+    routeSyncKeysRef.current[domain] = key;
+    pendingRouteSyncKeysRef.current[domain] = key;
+  }, []);
+
+  const consumeRouteKey = useCallback((domain: RouteSyncDomain, key: string): RouteSyncState => {
+    const pendingKey = pendingRouteSyncKeysRef.current[domain];
+    if (pendingKey !== null) {
+      if (pendingKey !== key) return 'pending';
+      pendingRouteSyncKeysRef.current[domain] = null;
+    }
+    if (routeSyncKeysRef.current[domain] === key) return 'unchanged';
+    routeSyncKeysRef.current[domain] = key;
+    return 'changed';
+  }, []);
+
+  const updateRoute = useCallback((
+    update: (params: URLSearchParams) => void,
+    options?: { replace?: boolean },
+  ) => {
+    setSearchParamsRef.current((current) => {
+      const next = new URLSearchParams(current);
+      update(next);
+      return next;
+    }, { replace: options?.replace ?? false });
+  }, []);
+
+  const updateSelection = useCallback((
+    update: SelectedSignal | null | ((current: SelectedSignal | null) => SelectedSignal | null),
+    options?: { syncRoute?: boolean; replace?: boolean },
+  ) => {
+    const current = selectedRef.current;
+    const next = typeof update === 'function' ? update(current) : update;
+    selectedRef.current = next;
+    setSelected(next);
+    if (options?.syncRoute === false || current?.item.id === next?.item.id) return;
+    routeSelectionRequestIdRef.current += 1;
+    markPendingRouteKey('signal', String(next?.item.id ?? ''));
+    updateRoute((params) => {
+      if (next) {
+        params.set('signal', String(next.item.id));
+      } else {
+        params.delete('signal');
+      }
+    }, { replace: options?.replace ?? true });
+  }, [markPendingRouteKey, updateRoute]);
 
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
@@ -471,13 +635,15 @@ const DecisionSignalsPage: React.FC = () => {
       if (requestIdRef.current !== requestId) return;
       const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
       if (response.total > 0 && nextPage > lastPage) {
+        markPendingRouteKey('list', JSON.stringify([appliedFilters, lastPage]));
         setPage(lastPage);
+        updateRoute((params) => writeListRoute(params, appliedFilters, lastPage), { replace: true });
         return;
       }
       setItems(response.items);
       setTotal(response.total);
       setError(null);
-      setSelected((current) => {
+      updateSelection((current) => {
         if (!current) return current;
         if (current.source !== 'list') return current;
         const refreshed = response.items.find((item) => item.id === current.item.id);
@@ -488,13 +654,13 @@ const DecisionSignalsPage: React.FC = () => {
       setError(getParsedApiError(err));
       setItems([]);
       setTotal(0);
-      setSelected((current) => (current?.source === 'list' ? null : current));
+      updateSelection((current) => (current?.source === 'list' ? null : current));
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false);
       }
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, markPendingRouteKey, updateRoute, updateSelection]);
 
   const loadSignals = useCallback(async () => {
     await loadSignalsForPage(page);
@@ -540,6 +706,10 @@ const DecisionSignalsPage: React.FC = () => {
 
   useEffect(() => () => {
     timelineRequestIdRef.current += 1;
+  }, []);
+
+  useEffect(() => () => {
+    routeSelectionRequestIdRef.current += 1;
   }, []);
 
   useEffect(() => {
@@ -638,8 +808,10 @@ const DecisionSignalsPage: React.FC = () => {
 
   const handleApplyFilters = (event: React.FormEvent) => {
     event.preventDefault();
+    markPendingRouteKey('list', JSON.stringify([filters, 1]));
     setAppliedFilters(filters);
     setPage(1);
+    updateRoute((params) => writeListRoute(params, filters, 1));
   };
 
   const resetLatestView = useCallback(() => {
@@ -648,8 +820,8 @@ const DecisionSignalsPage: React.FC = () => {
     setLatestSearched(false);
     setLatestLoading(false);
     setLatestError(null);
-    setSelected((current) => (current?.source === 'latest' ? null : current));
-  }, []);
+    updateSelection((current) => (current?.source === 'latest' ? null : current));
+  }, [updateSelection]);
 
   const loadLatestForContext = useCallback(async (context: StockContext) => {
     const stockCode = context.code.trim();
@@ -660,7 +832,7 @@ const DecisionSignalsPage: React.FC = () => {
     setLatestError(null);
     setLatestSearched(true);
     setLatestItems([]);
-    setSelected((current) => (current?.source === 'latest' ? null : current));
+    updateSelection((current) => (current?.source === 'latest' ? null : current));
     try {
       const response = await decisionSignalsApi.getLatest(stockCode, {
         market: context.market,
@@ -668,18 +840,18 @@ const DecisionSignalsPage: React.FC = () => {
       });
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems(response.items);
-      setSelected((current) => refreshLatestSelection(current, response.items));
+      updateSelection((current) => refreshLatestSelection(current, response.items));
     } catch (err) {
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems([]);
-      setSelected((current) => refreshLatestSelection(current, []));
+      updateSelection((current) => refreshLatestSelection(current, []));
       setLatestError(getParsedApiError(err));
     } finally {
       if (latestRequestIdRef.current === requestId) {
         setLatestLoading(false);
       }
     }
-  }, []);
+  }, [updateSelection]);
 
   const resetTimelineView = useCallback(() => {
     timelineRequestIdRef.current += 1;
@@ -689,8 +861,8 @@ const DecisionSignalsPage: React.FC = () => {
     setTimelineError(null);
     setTimelineTruncated(false);
     setAppliedTimelineContext(null);
-    setSelected((current) => (current?.source === 'timeline' ? null : current));
-  }, []);
+    updateSelection((current) => (current?.source === 'timeline' ? null : current));
+  }, [updateSelection]);
 
   const loadTimelineForContext = useCallback(async (
     context: StockContext,
@@ -706,7 +878,7 @@ const DecisionSignalsPage: React.FC = () => {
     setTimelineItems([]);
     setTimelineTruncated(false);
     setAppliedTimelineContext(null);
-    setSelected((current) => (current?.source === 'timeline' ? null : current));
+    updateSelection((current) => (current?.source === 'timeline' ? null : current));
     const nextAppliedContext: AppliedTimelineContext = {
       ...filtersSnapshot,
       stockCode,
@@ -717,35 +889,52 @@ const DecisionSignalsPage: React.FC = () => {
       setAppliedTimelineContext(nextAppliedContext);
       setTimelineItems(response.items);
       setTimelineTruncated(response.total > response.items.length);
-      setSelected((current) => refreshTimelineSelection(current, response.items));
+      updateSelection((current) => refreshTimelineSelection(current, response.items));
     } catch (err) {
       if (timelineRequestIdRef.current !== requestId) return;
       setTimelineItems([]);
       setTimelineTruncated(false);
-      setSelected((current) => refreshTimelineSelection(current, []));
+      updateSelection((current) => refreshTimelineSelection(current, []));
       setTimelineError(getParsedApiError(err));
     } finally {
       if (timelineRequestIdRef.current === requestId) {
         setTimelineLoading(false);
       }
     }
-  }, []);
+  }, [updateSelection]);
 
-  const applyStockContext = useCallback((nextContext: StockContext) => {
-    const nextTimeline = buildNextTimelineFilters(
-      timelineFilters,
-      activeStockContext,
-      nextContext,
-      timelineMarketSourceRef.current,
+  const applyStockContext = useCallback((
+    nextContext: StockContext,
+    options?: {
+      syncRoute?: boolean;
+      replace?: boolean;
+      timelineSnapshot?: TimelineFilters;
+      marketSource?: TimelineMarketSource;
+    },
+  ) => {
+    const nextTimeline = options?.timelineSnapshot
+      ? { filters: options.timelineSnapshot, marketSource: options.marketSource ?? timelineMarketSourceRef.current }
+      : buildNextTimelineFilters(
+        timelineFilters,
+        activeStockContext,
+        nextContext,
+        timelineMarketSourceRef.current,
     );
     timelineMarketSourceRef.current = nextTimeline.marketSource;
     setActiveStockContext(nextContext);
-    setStockDraft(nextContext.displayCode ?? nextContext.code);
     setTimelineFilters(nextTimeline.filters);
-    syncStockSearchParam(nextContext.code);
+    if (options?.syncRoute !== false) {
+      markPendingRouteKey('stock', JSON.stringify([nextContext.code, nextContext.market ?? '']));
+      markPendingRouteKey('timeline', JSON.stringify(nextTimeline.filters));
+      updateRoute((params) => {
+        params.set('stock', nextContext.code);
+        setOptionalParam(params, 'stockMarket', nextContext.market ?? '');
+        writeTimelineRoute(params, nextTimeline.filters);
+      }, { replace: options?.replace ?? false });
+    }
     void loadLatestForContext(nextContext);
     void loadTimelineForContext(nextContext, nextTimeline.filters);
-  }, [activeStockContext, loadLatestForContext, loadTimelineForContext, timelineFilters]);
+  }, [activeStockContext, loadLatestForContext, loadTimelineForContext, markPendingRouteKey, timelineFilters, updateRoute]);
 
   const handleStockSubmit = useCallback((
     code: string,
@@ -775,33 +964,129 @@ const DecisionSignalsPage: React.FC = () => {
     handleStockSubmit(code);
   }, [activeStockContext, applyStockContext, handleStockSubmit]);
 
-  const handleClearStockContext = useCallback(() => {
-    setStockDraft('');
+  const handleOpenStockContextModal = useCallback(() => {
+    setStockDraft(activeStockContext?.displayCode ?? activeStockContext?.code ?? '');
+    setStockContextModalOpen(true);
+  }, [activeStockContext]);
+
+  const handleClearStockContext = useCallback((options?: { syncRoute?: boolean; replace?: boolean }) => {
+    const nextTimelineFilters = { ...timelineFilters, market: '' as const };
     setActiveStockContext(null);
     timelineMarketSourceRef.current = null;
-    setTimelineFilters((current) => ({ ...current, market: '' }));
-    syncStockSearchParam(null);
+    setTimelineFilters(nextTimelineFilters);
+    if (options?.syncRoute !== false) {
+      markPendingRouteKey('stock', JSON.stringify(['', '']));
+      markPendingRouteKey('timeline', JSON.stringify(nextTimelineFilters));
+      updateRoute((params) => {
+        params.delete('stock');
+        params.delete('stockMarket');
+        writeTimelineRoute(params, nextTimelineFilters);
+      }, { replace: options?.replace ?? false });
+    }
     resetLatestView();
     resetTimelineView();
-  }, [resetLatestView, resetTimelineView]);
-
-  // Restore the current-stock scope from the URL once on mount so a shared or
-  // refreshed link reopens the same stock context.
-  const didRestoreStockFromUrlRef = useRef(false);
-  useEffect(() => {
-    if (didRestoreStockFromUrlRef.current) return;
-    didRestoreStockFromUrlRef.current = true;
-    const urlStock = getInitialStockCode();
-    if (urlStock) {
-      handleStockSubmit(urlStock);
-    }
-  }, [handleStockSubmit]);
+  }, [markPendingRouteKey, resetLatestView, resetTimelineView, timelineFilters, updateRoute]);
 
   const handleTimelineSearch = useCallback((event: React.FormEvent) => {
     event.preventDefault();
     if (!activeStockContext) return;
+    markPendingRouteKey('timeline', JSON.stringify(timelineFilters));
+    updateRoute((params) => writeTimelineRoute(params, timelineFilters));
     void loadTimelineForContext(activeStockContext, timelineFilters);
-  }, [activeStockContext, loadTimelineForContext, timelineFilters]);
+  }, [activeStockContext, loadTimelineForContext, markPendingRouteKey, timelineFilters, updateRoute]);
+
+  useEffect(() => {
+    const routeSearch = searchParams.toString();
+    const nextFilters = getInitialFilters(routeSearch);
+    const nextPage = getInitialPage(routeSearch);
+    const listKey = JSON.stringify([nextFilters, nextPage]);
+    if (consumeRouteKey('list', listKey) === 'changed') {
+      setFilters((current) => (listFiltersEqual(current, nextFilters) ? current : nextFilters));
+      setAppliedFilters((current) => (listFiltersEqual(current, nextFilters) ? current : nextFilters));
+      setPage((current) => (current === nextPage ? current : nextPage));
+    }
+
+    const nextStockCode = getInitialStockCode(routeSearch);
+    const rawStockMarket = searchParams.get('stockMarket');
+    const nextStockMarket = MARKET_OPTIONS.includes(rawStockMarket as DecisionSignalMarket)
+      ? rawStockMarket as DecisionSignalMarket
+      : undefined;
+    const stockKey = JSON.stringify([nextStockCode, nextStockMarket ?? '']);
+    const stockChanged = consumeRouteKey('stock', stockKey) === 'changed';
+
+    const nextTimelineFilters = getInitialTimelineFilters(routeSearch);
+    const timelineKey = JSON.stringify(nextTimelineFilters);
+    const timelineChanged = consumeRouteKey('timeline', timelineKey) === 'changed';
+    if (timelineChanged) {
+      setTimelineFilters((current) => (
+        timelineFiltersEqual(current, nextTimelineFilters) ? current : nextTimelineFilters
+      ));
+      timelineMarketSourceRef.current = nextTimelineFilters.market ? 'user' : null;
+      if (!stockChanged && activeStockContext) {
+        void loadTimelineForContext(activeStockContext, nextTimelineFilters);
+      }
+    }
+
+    if (stockChanged) {
+      if (nextStockCode) {
+        applyStockContext({ code: nextStockCode, market: nextStockMarket }, {
+          syncRoute: false,
+          timelineSnapshot: nextTimelineFilters,
+          marketSource: nextTimelineFilters.market ? 'user' : null,
+        });
+      } else if (activeStockContext) {
+        handleClearStockContext({ syncRoute: false });
+      }
+    }
+
+    const nextSignalId = getInitialSignalId(routeSearch);
+    const signalKey = String(nextSignalId ?? '');
+    if (consumeRouteKey('signal', signalKey) !== 'changed') return;
+    const requestId = routeSelectionRequestIdRef.current + 1;
+    routeSelectionRequestIdRef.current = requestId;
+    if (nextSignalId === null) {
+      updateSelection(null, { syncRoute: false });
+      return;
+    }
+    if (selectedRef.current?.item.id === nextSignalId) return;
+
+    const listItem = items.find((item) => item.id === nextSignalId);
+    const latestItem = latestItems.find((item) => item.id === nextSignalId);
+    const timelineItem = timelineItems.find((item) => item.id === nextSignalId);
+    if (listItem || latestItem || timelineItem) {
+      updateSelection({
+        item: listItem ?? latestItem ?? timelineItem!,
+        source: listItem ? 'list' : latestItem ? 'latest' : 'timeline',
+      }, { syncRoute: false });
+      return;
+    }
+
+    updateSelection(null, { syncRoute: false });
+    void decisionSignalsApi.get(nextSignalId)
+      .then((item) => {
+        if (routeSelectionRequestIdRef.current !== requestId) return;
+        updateSelection({ item, source: 'direct' }, { syncRoute: false });
+      })
+      .catch((err) => {
+        if (routeSelectionRequestIdRef.current !== requestId) return;
+        setError(getParsedApiError(err));
+        markPendingRouteKey('signal', '');
+        updateRoute((params) => params.delete('signal'), { replace: true });
+      });
+  }, [
+    activeStockContext,
+    applyStockContext,
+    consumeRouteKey,
+    handleClearStockContext,
+    items,
+    latestItems,
+    loadTimelineForContext,
+    markPendingRouteKey,
+    searchParams,
+    timelineItems,
+    updateRoute,
+    updateSelection,
+  ]);
 
   const handleStatusUpdate = async () => {
     if (!pendingStatus || statusUpdateInFlightRef.current) return;
@@ -820,7 +1105,7 @@ const DecisionSignalsPage: React.FC = () => {
         if (item.id !== updated.id) return [item];
         return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
       }));
-      setSelected((current) => {
+      updateSelection((current) => {
         if (!current || current.item.id !== updated.id) return current;
         if (current.source === 'latest') {
           return updated.status === 'active' ? { source: 'latest', item: updated } : null;
@@ -999,6 +1284,19 @@ const DecisionSignalsPage: React.FC = () => {
       activeStockContext.market,
     ].filter(Boolean).join(' / ')
     : null;
+  const hasAppliedListFilters = Boolean(
+    appliedFilters.market
+    || appliedFilters.stockCode.trim()
+    || appliedFilters.action
+    || appliedFilters.marketPhase
+    || appliedFilters.sourceType
+    || appliedFilters.status !== DEFAULT_LIST_FILTERS.status,
+  );
+  const appliedListScopeLabel = appliedSourceReportId
+    ? t('decisionSignals.scopeFromReport', { reportId: appliedSourceReportId })
+    : hasAppliedListFilters
+      ? t('decisionSignals.scopeFilteredSignals')
+      : t('decisionSignals.scopeActiveSignals');
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -1028,7 +1326,7 @@ const DecisionSignalsPage: React.FC = () => {
           <button
             type="button"
             className="btn-secondary inline-flex items-center gap-2"
-            onClick={() => setStockContextModalOpen(true)}
+            onClick={handleOpenStockContextModal}
           >
             <Search className="h-4 w-4" />
             {activeStockLabel
@@ -1071,7 +1369,10 @@ const DecisionSignalsPage: React.FC = () => {
             <button
               type="button"
               className="btn-secondary inline-flex h-11 items-center justify-center gap-2"
-              onClick={handleClearStockContext}
+              onClick={() => {
+                setStockDraft('');
+                handleClearStockContext();
+              }}
               disabled={!activeStockContext && !stockDraft}
             >
               {t('decisionSignals.stockContextClear')}
@@ -1116,9 +1417,15 @@ const DecisionSignalsPage: React.FC = () => {
           ) : null}
         </Modal>
 
-        <Card padding="md">
+        <Card
+          title={t('decisionSignals.signalListTitle')}
+          subtitle={t('decisionSignals.signalListDescription')}
+          padding="md"
+          headerRight={<Badge variant="default" size="sm">{appliedListScopeLabel}</Badge>}
+        >
           <form className="grid items-end gap-3 md:grid-cols-3 xl:grid-cols-8 [&>*]:min-w-0" onSubmit={handleApplyFilters}>
             <Select
+              className="w-full"
               label={t('decisionSignals.market')}
               value={filters.market}
               onChange={(value) => setFilters((current) => ({ ...current, market: value as ListFilters['market'] }))}
@@ -1130,7 +1437,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
               <input
-                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-8 w-full min-w-0 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.stockCode}
                 onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
                 placeholder={t('decisionSignals.stockCode')}
@@ -1138,6 +1445,7 @@ const DecisionSignalsPage: React.FC = () => {
               />
             </label>
             <Select
+              className="w-full"
               label={t('decisionSignals.action')}
               value={filters.action}
               onChange={(value) => setFilters((current) => ({ ...current, action: value as ListFilters['action'] }))}
@@ -1147,6 +1455,7 @@ const DecisionSignalsPage: React.FC = () => {
               ]}
             />
             <Select
+              className="w-full"
               label={t('decisionSignals.marketPhase')}
               value={filters.marketPhase}
               onChange={(value) => setFilters((current) => ({ ...current, marketPhase: value as ListFilters['marketPhase'] }))}
@@ -1156,6 +1465,7 @@ const DecisionSignalsPage: React.FC = () => {
               ]}
             />
             <Select
+              className="w-full"
               label={t('decisionSignals.source')}
               value={filters.sourceType}
               onChange={(value) => setFilters((current) => ({ ...current, sourceType: value as ListFilters['sourceType'] }))}
@@ -1167,7 +1477,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
               <input
-                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-8 w-full min-w-0 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.sourceReportId}
                 onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
                 placeholder={t('decisionSignals.sourceReportId')}
@@ -1179,6 +1489,7 @@ const DecisionSignalsPage: React.FC = () => {
               />
             </label>
             <Select
+              className="w-full"
               label={t('decisionSignals.status')}
               value={filters.status}
               onChange={(value) => setFilters((current) => ({ ...current, status: value as ListFilters['status'] }))}
@@ -1280,7 +1591,10 @@ const DecisionSignalsPage: React.FC = () => {
                 <DecisionSignalCard
                   key={item.id}
                   item={item}
-                  onSelect={(selectedItem) => setSelected({ source: 'latest', item: selectedItem })}
+                  onSelect={(selectedItem) => updateSelection(
+                    { source: 'latest', item: selectedItem },
+                    { replace: false },
+                  )}
                   selected={selected?.item.id === item.id}
                 />
               ))}
@@ -1293,7 +1607,28 @@ const DecisionSignalsPage: React.FC = () => {
           subtitle={t('decisionSignals.timelineDescription')}
           padding="md"
           headerRight={activeStockContext ? (
-            <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Badge variant="info" size="sm">
+                {t('decisionSignals.scopeCurrentStock', {
+                  stock: appliedTimelineContext?.stockCode ?? activeStockLabel ?? activeStockContext.code,
+                })}
+              </Badge>
+              {appliedTimelineContext ? (
+                <>
+                  <Badge variant="default" size="sm">
+                    {t(`decisionSignals.timelineRange.${appliedTimelineContext.range}` as UiTextKey)}
+                  </Badge>
+                  <Badge variant="default" size="sm">
+                    {t(`decisionSignals.timelineStatus.${appliedTimelineContext.status}` as UiTextKey)}
+                  </Badge>
+                  {appliedTimelineContext.market ? (
+                    <Badge variant="default" size="sm">
+                      {getDecisionSignalMarketLabel(appliedTimelineContext.market, t)}
+                    </Badge>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           ) : undefined}
         >
           <form className="grid items-end gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
@@ -1369,7 +1704,10 @@ const DecisionSignalsPage: React.FC = () => {
                 loading={timelineLoading}
                 error={timelineError?.message ?? null}
                 truncated={timelineTruncated}
-                onSelect={(selectedItem) => setSelected({ source: 'timeline', item: selectedItem })}
+                onSelect={(selectedItem) => updateSelection(
+                  { source: 'timeline', item: selectedItem },
+                  { replace: false },
+                )}
               />
             )}
           </div>
@@ -1387,9 +1725,7 @@ const DecisionSignalsPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <p className="text-sm text-secondary-text">{t('decisionSignals.total', { total })}</p>
             <Badge variant="default" size="sm">
-              {appliedSourceReportId
-                ? t('decisionSignals.scopeFromReport', { reportId: appliedSourceReportId })
-                : t('decisionSignals.scopeAllSignals')}
+              {appliedListScopeLabel}
             </Badge>
           </div>
           {loading ? <span className="text-xs text-secondary-text">{t('common.loading')}...</span> : null}
@@ -1407,19 +1743,30 @@ const DecisionSignalsPage: React.FC = () => {
               <DecisionSignalCard
                 key={item.id}
                 item={item}
-                onSelect={(selectedItem) => setSelected({ source: 'list', item: selectedItem })}
+                onSelect={(selectedItem) => updateSelection(
+                  { source: 'list', item: selectedItem },
+                  { replace: false },
+                )}
                 selected={selected?.item.id === item.id}
               />
             ))}
           </div>
         )}
 
-        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={(nextPage) => {
+            markPendingRouteKey('list', JSON.stringify([appliedFilters, nextPage]));
+            setPage(nextPage);
+            updateRoute((params) => writeListRoute(params, appliedFilters, nextPage));
+          }}
+        />
       </div>
 
       <Drawer
         isOpen={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={() => updateSelection(null, { replace: false })}
         title={t('decisionSignals.detailTitle')}
         width="max-w-3xl"
       >

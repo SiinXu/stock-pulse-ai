@@ -2,13 +2,15 @@ import { cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTaskStream } from '../useTaskStream';
 
-const { getTaskStreamUrl } = vi.hoisted(() => ({
+const { getTaskStreamUrl, getStatus } = vi.hoisted(() => ({
   getTaskStreamUrl: vi.fn(() => 'http://localhost/api/v1/analysis/tasks/stream'),
+  getStatus: vi.fn(),
 }));
 
 vi.mock('../../api/analysis', () => ({
   analysisApi: {
     getTaskStreamUrl,
+    getStatus,
   },
 }));
 
@@ -100,10 +102,14 @@ describe('useTaskStream', () => {
           status: 'processing',
           progress: 72,
           message: 'LLM 正在生成分析结果',
+          message_code: 'task_progress',
+          message_params: { progress: 72 },
           report_type: 'detailed',
           analysis_phase: 'intraday',
           created_at: '2026-03-29T08:00:00Z',
           skills: ['growth_quality'],
+          revision: 8,
+          updated_at: '2026-03-29T08:00:08Z',
           flow_event: {
             id: 'flow-1',
             timestamp: '2026-03-29T08:00:01Z',
@@ -133,15 +139,21 @@ describe('useTaskStream', () => {
       status: 'processing',
       progress: 72,
       message: 'LLM 正在生成分析结果',
+      messageCode: 'task_progress',
+      messageParams: { progress: 72 },
       reportType: 'detailed',
       createdAt: '2026-03-29T08:00:00Z',
       startedAt: undefined,
       completedAt: undefined,
       error: undefined,
+      errorCode: undefined,
+      errorParams: undefined,
       originalQuery: undefined,
       selectionSource: undefined,
       analysisPhase: 'intraday',
       skills: ['growth_quality'],
+      revision: 8,
+      updatedAt: '2026-03-29T08:00:08Z',
     });
     expect(onTaskFlowEvent).toHaveBeenCalledWith(
       expect.objectContaining({ taskId: 'task-1' }),
@@ -205,6 +217,37 @@ describe('useTaskStream', () => {
     expect(eventSourceInstance.close).toHaveBeenCalledTimes(1);
   });
 
+  it('does not dispatch an older SSE revision after a newer snapshot', async () => {
+    const onTaskProgress = vi.fn();
+    renderHook(() => useTaskStream({ enabled: true, onTaskProgress }));
+    await waitFor(() => expect(eventSourceInstance.listeners.task_progress).toBeDefined());
+
+    const emitRevision = (revision: number, progress: number) => {
+      eventSourceInstance.listeners.task_progress?.(
+        new MessageEvent('task_progress', {
+          data: JSON.stringify({
+            task_id: 'task-versioned',
+            stock_code: '600519',
+            status: 'processing',
+            progress,
+            message_code: 'task_progress',
+            message_params: { progress },
+            report_type: 'detailed',
+            created_at: '2026-03-29T08:00:00Z',
+            updated_at: `2026-03-29T08:00:0${revision}Z`,
+            revision,
+          }),
+        }),
+      );
+    };
+
+    emitRevision(5, 80);
+    emitRevision(4, 60);
+
+    expect(onTaskProgress).toHaveBeenCalledTimes(1);
+    expect(onTaskProgress).toHaveBeenCalledWith(expect.objectContaining({ revision: 5, progress: 80 }));
+  });
+
   it('reconnects the shared stream once after errors', async () => {
     vi.useFakeTimers();
     const firstError = vi.fn();
@@ -226,5 +269,88 @@ describe('useTaskStream', () => {
 
     expect(eventSourceInstances).toHaveLength(2);
     expect(getTaskStreamUrl).toHaveBeenCalledTimes(2);
+  });
+
+  it('immediately polls each known non-terminal task after the SSE stream disconnects', async () => {
+    const onTaskCompleted = vi.fn();
+    getStatus.mockResolvedValue({
+      taskId: 'task-1',
+      traceId: 'trace-task-1',
+      status: 'completed',
+      progress: 100,
+      message: '分析完成',
+      messageCode: 'task_completed',
+      messageParams: { stock_code: '600519' },
+      revision: 4,
+      updatedAt: '2026-03-29T08:00:04Z',
+    });
+
+    renderHook(() => useTaskStream({
+      enabled: true,
+      autoReconnect: false,
+      trackedTasks: [{
+        taskId: 'task-1',
+        traceId: 'trace-task-1',
+        stockCode: '600519',
+        stockName: '贵州茅台',
+        status: 'processing',
+        progress: 72,
+        messageCode: 'task_progress',
+        messageParams: { progress: 72 },
+        reportType: 'detailed',
+        createdAt: '2026-03-29T08:00:00Z',
+        revision: 3,
+        updatedAt: '2026-03-29T08:00:03Z',
+      }],
+      onTaskCompleted,
+    }));
+    await waitFor(() => expect(eventSourceInstance.listeners.task_progress).toBeDefined());
+
+    eventSourceInstance.onerror?.(new Event('error'));
+
+    await waitFor(() => expect(getStatus).toHaveBeenCalledWith('task-1'));
+    expect(onTaskCompleted).toHaveBeenCalledWith(expect.objectContaining({
+      taskId: 'task-1',
+      stockCode: '600519',
+      status: 'completed',
+      progress: 100,
+      messageCode: 'task_completed',
+      revision: 4,
+    }));
+  });
+
+  it('does not dispatch a targeted poll older than the tracked revision', async () => {
+    const onTaskProgress = vi.fn();
+    getStatus.mockResolvedValue({
+      taskId: 'task-newer-local',
+      status: 'processing',
+      progress: 40,
+      messageCode: 'task_progress',
+      messageParams: { progress: 40 },
+      revision: 4,
+      updatedAt: '2026-03-29T08:00:04Z',
+    });
+
+    renderHook(() => useTaskStream({
+      enabled: true,
+      autoReconnect: false,
+      trackedTasks: [{
+        taskId: 'task-newer-local',
+        stockCode: '600519',
+        status: 'processing',
+        progress: 80,
+        reportType: 'detailed',
+        createdAt: '2026-03-29T08:00:00Z',
+        revision: 5,
+        updatedAt: '2026-03-29T08:00:05Z',
+      }],
+      onTaskProgress,
+    }));
+    await waitFor(() => expect(eventSourceInstance.listeners.task_progress).toBeDefined());
+
+    eventSourceInstance.onerror?.(new Event('error'));
+
+    await waitFor(() => expect(getStatus).toHaveBeenCalledWith('task-newer-local'));
+    expect(onTaskProgress).not.toHaveBeenCalled();
   });
 });

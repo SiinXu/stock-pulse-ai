@@ -1,12 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
 import type { LlmProviderCatalogEntry } from '../types/systemConfig';
+import { createRequestKey, useAsyncResource, type AsyncResourceStatus } from './useAsyncResource';
+
+interface ProviderCatalogData {
+  providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts: string[];
+}
+
+const EMPTY_PROVIDER_CATALOG: ProviderCatalogData = {
+  providers: [],
+  emptyApiKeyHosts: [],
+};
 
 interface ProviderCatalogState {
   providers: LlmProviderCatalogEntry[];
   emptyApiKeyHosts: string[];
   isLoading: boolean;
+  isRefreshing: boolean;
+  isStale: boolean;
+  status: AsyncResourceStatus;
   error: string | null;
+  requestKey: string | null;
+  updatedAt: number | null;
   reload: () => void;
 }
 
@@ -17,42 +33,44 @@ interface ProviderCatalogState {
  * must not maintain a second hardcoded list.
  */
 export function useProviderCatalog(): ProviderCatalogState {
-  const [providers, setProviders] = useState<LlmProviderCatalogEntry[]>([]);
-  const [emptyApiKeyHosts, setEmptyApiKeyHosts] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const activeRef = useRef(true);
+  const [resource, requests] = useAsyncResource<ProviderCatalogData, string>({
+    initialData: EMPTY_PROVIDER_CATALOG,
+    isEmpty: (data) => data.providers.length === 0,
+  });
 
   const reload = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
     setReloadToken((token) => token + 1);
   }, []);
 
   useEffect(() => {
-    activeRef.current = true;
+    const request = requests.begin(
+      createRequestKey('provider-catalog', [reloadToken]),
+      { retainData: true },
+    );
     systemConfigApi
       .getLlmProviderCatalog()
       .then((response) => {
-        if (!activeRef.current) {
-          return;
-        }
-        setProviders(response.providers ?? []);
-        setEmptyApiKeyHosts(response.emptyApiKeyHosts ?? []);
-        setIsLoading(false);
+        requests.resolve(request, {
+          providers: response.providers ?? [],
+          emptyApiKeyHosts: response.emptyApiKeyHosts ?? [],
+        });
       })
       .catch((err: unknown) => {
-        if (!activeRef.current) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : 'Failed to load provider catalog');
-        setIsLoading(false);
+        requests.reject(request, err instanceof Error ? err.message : 'Failed to load provider catalog');
       });
-    return () => {
-      activeRef.current = false;
-    };
-  }, [reloadToken]);
+  }, [reloadToken, requests]);
 
-  return { providers, emptyApiKeyHosts, isLoading, error, reload };
+  return {
+    providers: resource.data.providers,
+    emptyApiKeyHosts: resource.data.emptyApiKeyHosts,
+    isLoading: resource.status === 'idle' || resource.status === 'loading',
+    isRefreshing: resource.status === 'refreshing',
+    isStale: resource.status === 'error' && resource.updatedAt != null,
+    status: resource.status,
+    error: resource.error,
+    requestKey: resource.requestKey,
+    updatedAt: resource.updatedAt,
+    reload,
+  };
 }

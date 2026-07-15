@@ -26,7 +26,7 @@ from fastapi import HTTPException, Request
 from pydantic import BaseModel, Field
 
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
-from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
+from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_model_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -3042,7 +3042,7 @@ def _resolve_dsa_llm_max_candidates(max_results: Optional[int]) -> int:
 
 def _resolve_alphasift_llm_models(config: Config) -> Tuple[str, List[str]]:
     primary = _env_text(config.litellm_model)
-    configured_models = get_configured_llm_models(config.llm_model_list or [])
+    configured_models = get_configured_llm_model_aliases(config.llm_model_list or [])
     configured_model_set = set(configured_models)
 
     if configured_models and (

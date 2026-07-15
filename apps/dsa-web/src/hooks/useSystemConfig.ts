@@ -11,6 +11,7 @@ import type {
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
 import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
+import { getSettingsSaveGroup } from '../components/settings/settingsSaveGroups';
 
 type ToastState = {
   type: 'success';
@@ -26,6 +27,7 @@ type SaveResult = {
   success: boolean;
   message?: string;
   issues?: ConfigValidationIssue[];
+  conflicted?: boolean;
 };
 
 const CATEGORY_DISPLAY_ORDER: Record<string, number> = {
@@ -76,10 +78,14 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
   const [serverItems, setServerItems] = useState<SystemConfigItem[]>([]);
+  const configVersionRef = useRef('');
+  const maskTokenRef = useRef('******');
 
   // UI state. The active tab may be seeded from the URL so deep links / refresh
   // restore the same category; applyServerPayload keeps it if the category loads.
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const draftValuesRef = useRef<Record<string, string>>({});
+  const touchedSensitiveKeysRef = useRef(new Set<string>());
   const [activeCategory, setActiveCategory] = useState<string>(initialTab?.category ?? 'base');
   const [activeSubCategory, setActiveSubCategory] = useState<string | null>(initialTab?.subCategory ?? null);
   const activeCategoryRef = useRef<string>(initialTab?.category ?? 'base');
@@ -205,6 +211,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       setServerItems(sorted);
       setConfigVersion(version);
       setMaskToken(token || '******');
+      configVersionRef.current = version;
+      maskTokenRef.current = token || '******';
 
       setDraftValues((prevDraft) => {
         const nextDraft: Record<string, string> = {};
@@ -241,6 +249,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
 
           nextDraft[item.key] = item.value;
         }
+        draftValuesRef.current = nextDraft;
         return nextDraft;
       });
 
@@ -296,6 +305,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       next[item.key] = item.value;
     }
     setDraftValues(next);
+    draftValuesRef.current = next;
+    touchedSensitiveKeysRef.current.clear();
     setValidationIssues([]);
     setSaveError(null);
     setConflictState(null);
@@ -306,7 +317,11 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       const nextDraft = { ...prevDraft };
       for (const item of updatedItems) {
         nextDraft[item.key] = item.value;
+        if (serverItemByKeyRef.current[item.key]?.schema?.isSensitive) {
+          touchedSensitiveKeysRef.current.add(item.key);
+        }
       }
+      draftValuesRef.current = nextDraft;
       return nextDraft;
     });
   }, []);
@@ -327,7 +342,35 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       ...previous,
       [key]: value,
     }));
+    draftValuesRef.current = { ...draftValuesRef.current, [key]: value };
+    if (serverItemByKeyRef.current[key]?.schema?.isSensitive) {
+      touchedSensitiveKeysRef.current.add(key);
+    }
   }, []);
+
+  const resetDraftGroup = useCallback((group: string) => {
+    const groupKeys = serverItems
+      .filter((item) => getSettingsSaveGroup(item) === group)
+      .map((item) => item.key);
+    if (groupKeys.length === 0) return;
+
+    setDraftValues((previous) => {
+      const next = { ...previous };
+      for (const key of groupKeys) {
+        next[key] = serverItemByKeyRef.current[key]?.value ?? '';
+        touchedSensitiveKeysRef.current.delete(key);
+      }
+      draftValuesRef.current = next;
+      return next;
+    });
+    setValidationIssues((previous) => previous.filter((issue) => !groupKeys.includes(issue.key)));
+    setSaveError(null);
+    setConflictState((previous) => {
+      if (!previous) return null;
+      const fields = previous.fields.filter((field) => !groupKeys.includes(field.key));
+      return fields.length > 0 ? { ...previous, fields } : null;
+    });
+  }, [serverItems]);
 
   const selectCategory = useCallback((category: string) => {
     const sub = getDefaultSubCategory(category);
@@ -361,6 +404,9 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       })
       .filter((item) => {
         const serverItem = serverItemByKey[item.key];
+        if (serverItem?.schema?.isSensitive && !touchedSensitiveKeysRef.current.has(item.key)) {
+          return false;
+        }
         const normalizedCurrent = normalizeFieldValue(serverItem?.value ?? '', serverItem?.schema);
         return item.value !== normalizedCurrent;
       });
@@ -382,19 +428,32 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         const serverItem = latestByKey.get(submitted.key);
         const server = serverItem?.value ?? '';
         const local = submitted.value;
+        const schema = serverItem?.schema ?? baseItem?.schema;
+        const isSensitive = Boolean(serverItem?.isMasked || baseItem?.isMasked || schema?.isSensitive);
+        if (isSensitive && local !== server) {
+          conflictFields.push({
+            key: submitted.key,
+            base,
+            server,
+            local,
+            isSensitive: true,
+            title: schema?.title,
+            category: schema?.category,
+          });
+          continue;
+        }
         if (server === base) {
           continue; // server did not touch this key -> safe to replay
         }
         if (local === server) {
           continue; // both sides converged on the same value
         }
-        const schema = serverItem?.schema ?? baseItem?.schema;
         conflictFields.push({
           key: submitted.key,
           base,
           server,
           local,
-          isSensitive: Boolean(serverItem?.isMasked || baseItem?.isMasked || schema?.isSensitive),
+          isSensitive: false,
           title: schema?.title,
           category: schema?.category,
         });
@@ -460,8 +519,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       }
 
       const updateResult = await systemConfigApi.update({
-        configVersion,
-        maskToken,
+        configVersion: configVersionRef.current,
+        maskToken: maskTokenRef.current,
         reloadNow: true,
         items: resolvedChangedItems,
       });
@@ -504,7 +563,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
             // forcing the user through a conflict panel with no conflicts.
             const rebasedResult = await systemConfigApi.update({
               configVersion: nextConflict.serverVersion,
-              maskToken,
+              maskToken: maskTokenRef.current,
               reloadNow: true,
               items: resolvedChangedItems,
             });
@@ -541,7 +600,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         if (!silent) {
           setToast({ type: 'error', error: getParsedApiError(error) });
         }
-        return { success: false, message: '配置版本冲突' };
+        return { success: false, message: '配置版本冲突', conflicted: true };
       }
 
       setSaveError(getParsedApiError(error));
@@ -556,10 +615,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   }, [
     applyServerPayload,
     buildConflictState,
-    configVersion,
     getChangedItems,
     hasDirty,
-    maskToken,
   ]);
 
   // Serialize writes: a second save() while one is in flight reuses the pending
@@ -616,8 +673,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setSaveError(null);
   }, []);
 
-  // Editing a field only updates the local draft; nothing persists until the
-  // user runs an explicit Save & Apply. There is no config autosave.
+  // The Settings page schedules grouped autosaves; save() remains available for
+  // explicit atomic workflows such as first-run setup and imports.
 
   const retry = useCallback(async () => {
     if (retryAction === 'load') {
@@ -672,6 +729,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     retry,
     save,
     resetDraft,
+    resetDraftGroup,
     setDraftValue,
     getChangedItems,
     applyPartialUpdate,

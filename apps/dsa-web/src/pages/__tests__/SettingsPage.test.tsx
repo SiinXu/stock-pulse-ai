@@ -12,6 +12,7 @@ const {
   exportEnv,
   getSchedulerStatus,
   getSetupStatus,
+  getLlmProviderCatalog,
   getLlmAvailableModels,
   importEnv,
   runSchedulerNow,
@@ -31,6 +32,7 @@ const {
   selectTab,
   save,
   resetDraft,
+  resetDraftGroup,
   setDraftValue,
   applyPartialUpdate,
   getChangedItems,
@@ -45,6 +47,7 @@ const {
   exportEnv: vi.fn(),
   getSchedulerStatus: vi.fn(),
   getSetupStatus: vi.fn(),
+  getLlmProviderCatalog: vi.fn(),
   getLlmAvailableModels: vi.fn(),
   importEnv: vi.fn(),
   runSchedulerNow: vi.fn(),
@@ -64,6 +67,7 @@ const {
   selectTab: vi.fn(),
   save: vi.fn(),
   resetDraft: vi.fn(),
+  resetDraftGroup: vi.fn(),
   setDraftValue: vi.fn(),
   applyPartialUpdate: vi.fn(),
   getChangedItems: vi.fn(),
@@ -123,11 +127,7 @@ vi.mock('../../api/systemConfig', () => ({
       overriddenSources: [],
       issues: [],
     }),
-    getLlmProviderCatalog: () => Promise.resolve({
-      providers: [
-        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
-      ],
-    }),
+    getLlmProviderCatalog: (...args: unknown[]) => getLlmProviderCatalog(...args),
     getLlmAvailableModels: (...args: unknown[]) => getLlmAvailableModels(...args),
     importEnv: (...args: unknown[]) => importEnv(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
@@ -162,6 +162,7 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
+  ModelFallbackEditor: (await import('../../components/settings/ModelFallbackEditor')).ModelFallbackEditor,
   isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
@@ -191,20 +192,27 @@ vi.mock('../../components/settings', async () => ({
     taskModelRefs,
     onReplaceModelReferences,
     focusFieldRequest,
+    catalogUnavailable,
   }: {
     items: Array<{ key: string; value: string }>;
     onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
     onValidityChange?: (valid: boolean) => void;
     taskModelRefs?: Array<{ key?: string; label: string; route: string }>;
     onReplaceModelReferences?: (replacements: Array<{
-      fromRoute: string;
-      toRoute: string;
+      fromModelRef: string;
+      fromRuntimeRoute: string;
+      toModelRef: string;
       references: Array<{ key?: string; label: string; route: string }>;
     }>) => void;
     focusFieldRequest?: { requestId: number; key: string } | null;
+    catalogUnavailable?: boolean;
   }) => (
     <div>
       <div data-testid="llm-channel-editor-items">{items.map((item) => item.key).join(',')}</div>
+      <div data-testid="llm-channel-provider-identity">
+        {items.find((item) => item.key.endsWith('_PROVIDER'))?.value ?? ''}
+      </div>
+      <div data-testid="llm-channel-catalog-unavailable">{String(Boolean(catalogUnavailable))}</div>
       <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
       <button
         type="button"
@@ -222,8 +230,9 @@ vi.mock('../../components/settings', async () => ({
       <button
         type="button"
         onClick={() => onReplaceModelReferences?.([{
-          fromRoute: 'deepseek/shared-model',
-          toRoute: 'openai/replacement-model',
+          fromModelRef: 'modelref:v1:deepseek:deepseek%2Fshared-model',
+          fromRuntimeRoute: 'deepseek/shared-model',
+          toModelRef: 'modelref:v1:openai:openai%2Freplacement-model',
           references: (taskModelRefs ?? []).filter((reference) => reference.route === 'deepseek/shared-model'),
         }])}
       >
@@ -232,8 +241,9 @@ vi.mock('../../components/settings', async () => ({
       <button
         type="button"
         onClick={() => onReplaceModelReferences?.([{
-          fromRoute: 'openai/gpt-4o-mini',
-          toRoute: 'openai/gpt-5.5',
+          fromModelRef: 'modelref:v1:openai:openai%2Fgpt-4o-mini',
+          fromRuntimeRoute: 'openai/gpt-4o-mini',
+          toModelRef: 'modelref:v1:openai:openai%2Fgpt-5.5',
           references: (taskModelRefs ?? []).filter((reference) => reference.key === 'AGENT_LITELLM_MODEL'),
         }])}
       >
@@ -277,6 +287,8 @@ vi.mock('../../components/settings', async () => ({
   ),
   SettingsField: ({
     item,
+    disabled,
+    issues = [],
   }: {
     item: {
       key: string;
@@ -285,10 +297,19 @@ vi.mock('../../components/settings', async () => ({
         options?: Array<string | { label: string; value: string }>;
       };
     };
+    disabled?: boolean;
+    issues?: Array<{ code: string; message: string }>;
   }) => (
-    <div data-testid={`settings-field-${item.key}`}>
+    <div data-testid={`settings-field-${item.key}`} data-disabled={disabled ? 'true' : 'false'}>
       <div>{item.key}</div>
       {item.schema?.description ? <p>{item.schema.description}</p> : null}
+      {issues
+        .filter((issue) => [
+          'missing_ai_ui_placement',
+          'unknown_ui_placement',
+          'unknown_condition',
+        ].includes(issue.code))
+        .map((issue) => <p key={issue.code}>{issue.message}</p>)}
       {item.schema?.options?.map((option) => {
         const label = typeof option === 'string' ? option : option.label;
         const value = typeof option === 'string' ? option : option.value;
@@ -416,6 +437,7 @@ type ConfigState = {
   retry: ReturnType<typeof vi.fn>;
   save: typeof save;
   resetDraft: typeof resetDraft;
+  resetDraftGroup: typeof resetDraftGroup;
   setDraftValue: typeof setDraftValue;
   applyPartialUpdate: typeof applyPartialUpdate;
   getChangedItems: () => Array<{ key: string; value: string }>;
@@ -561,6 +583,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
     retry: vi.fn(),
     save,
     resetDraft,
+    resetDraftGroup,
     setDraftValue,
     applyPartialUpdate,
     getChangedItems: () => [],
@@ -581,6 +604,54 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function modelSettingField(key: string, value: string, displayOrder = 1) {
+  return {
+    key,
+    value,
+    rawValueExists: Boolean(value),
+    isMasked: false,
+    schema: {
+      key,
+      category: 'ai_model',
+      dataType: 'string',
+      uiControl: 'text',
+      isSensitive: false,
+      isRequired: key === 'LITELLM_MODEL',
+      isEditable: true,
+      options: [],
+      validation: {},
+      displayOrder,
+      uiPlacement: 'task_routing' as const,
+    },
+  };
+}
+
+function fallbackSettingField(value: string, displayOrder = 2) {
+  return {
+    ...modelSettingField('LITELLM_FALLBACK_MODELS', value, displayOrder),
+    schema: {
+      ...modelSettingField('LITELLM_FALLBACK_MODELS', value, displayOrder).schema,
+      isRequired: false,
+      uiPlacement: 'reliability' as const,
+    },
+  };
+}
+
+function connectionModelEntry(connectionId: string, connectionName: string, route = 'openai/gpt-4o-mini') {
+  return {
+    modelRef: `modelref:v1:${connectionId}:${encodeURIComponent(route)}`,
+    route,
+    display: 'GPT 4o Mini',
+    connection: connectionId,
+    connectionId,
+    connectionName,
+    provider: 'openai',
+    providerId: 'openai',
+    providerLabel: 'OpenAI',
+    available: true,
+  };
+}
+
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -598,6 +669,7 @@ describe('SettingsPage', () => {
       isFallbackVersion: false,
     });
     load.mockResolvedValue(true);
+    save.mockResolvedValue({ success: true });
     exportEnv.mockResolvedValue({
       content: 'STOCK_LIST=600519\n',
       configVersion: 'v1',
@@ -647,10 +719,15 @@ describe('SettingsPage', () => {
         },
       ],
     });
+    getLlmProviderCatalog.mockResolvedValue({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+    });
     getLlmAvailableModels.mockResolvedValue({
       models: [
-        { route: 'deepseek/deepseek-v4-flash', display: 'deepseek-v4-flash', connection: 'deepseek', provider: 'deepseek' },
-        { route: 'deepseek/deepseek-v4-pro', display: 'deepseek-v4-pro', connection: 'deepseek', provider: 'deepseek' },
+        { modelRef: 'deepseek/deepseek-v4-flash', route: 'deepseek/deepseek-v4-flash', display: 'deepseek-v4-flash', connection: 'deepseek', provider: 'deepseek' },
+        { modelRef: 'deepseek/deepseek-v4-pro', route: 'deepseek/deepseek-v4-pro', display: 'deepseek-v4-pro', connection: 'deepseek', provider: 'deepseek' },
       ],
     });
     analyzeAsync.mockResolvedValue({
@@ -1056,8 +1133,12 @@ describe('SettingsPage', () => {
     expect(screen.getAllByText('build-20260329-021530Z')).toHaveLength(2);
   });
 
-  it('resets local drafts from the page header button', () => {
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+  it('resets only the active save group from the page header button', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'ADMIN_AUTH_ENABLED', value: 'false' }],
+    }));
 
     render(<SettingsPage />);
 
@@ -1065,11 +1146,11 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
 
     // Reset now asks for confirmation before discarding dirty drafts.
-    fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '重置当前分组' }));
     fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
-    // Reset should call resetDraft and NOT call load
-    expect(resetDraft).toHaveBeenCalledTimes(1);
+    expect(resetDraftGroup).toHaveBeenCalledWith('system.authentication');
+    expect(resetDraft).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
   });
 
@@ -1283,11 +1364,12 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
-  it('reset button semantic: discards local changes without network request', () => {
+  it('group reset discards local changes without a network request', () => {
     // Simulate user has unsaved drafts
     const dirtyState = buildSystemConfigState({
       hasDirty: true,
-      dirtyCount: 2,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'ADMIN_AUTH_ENABLED', value: 'false' }],
     });
 
     useSystemConfigMock.mockReturnValue(dirtyState);
@@ -1298,14 +1380,98 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
 
     // Click reset button, then confirm discarding drafts.
-    fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '重置当前分组' }));
     fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
     // Verify semantic: reset should only discard local changes
     // It should NOT trigger a network load
-    expect(resetDraft).toHaveBeenCalledTimes(1);
+    expect(resetDraftGroup).toHaveBeenCalledWith('system.authentication');
+    expect(resetDraft).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed autosave draft and retries only that group', async () => {
+    save
+      .mockResolvedValueOnce({ success: false, message: '保存失败' })
+      .mockResolvedValueOnce({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }],
+    }));
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(await screen.findByText('自动保存失败')).toBeInTheDocument();
+    expect(routerBlockerMock.shouldBlock?.({
+      currentLocation: { pathname: '/settings' },
+      nextLocation: { pathname: '/' },
+    })).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: '重试此分组' }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2), { timeout: 2000 });
+    expect(await screen.findByText('已自动保存')).toBeInTheDocument();
+  });
+
+  it('holds a 409 autosave in conflicted state without blind retry', async () => {
+    save.mockResolvedValueOnce({ success: false, message: '配置版本冲突', conflicted: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }],
+    }));
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(await screen.findByText('需要处理配置冲突')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重试此分组' })).not.toBeInTheDocument();
+  });
+
+  it('serializes different autosave groups through one FIFO', async () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      hasDirty: true,
+      dirtyCount: 2,
+      getChangedItems: () => [
+        { key: 'STOCK_LIST', value: 'SH600000,SH600519' },
+        { key: 'WECHAT_WEBHOOK_URL', value: 'https://example.test/new-hook' },
+      ],
+    }));
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2), { timeout: 3000 });
+    expect(save.mock.calls[0]).toEqual([
+      [{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }],
+      { silent: true },
+    ]);
+    expect(save.mock.calls[1]).toEqual([
+      [{ key: 'WECHAT_WEBHOOK_URL', value: 'https://example.test/new-hook' }],
+      { silent: true },
+    ]);
+  });
+
+  it('keeps fields editable while their autosave request is in flight', async () => {
+    let resolveSave!: (value: { success: boolean }) => void;
+    save.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'base',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }],
+    }));
+
+    render(<SettingsPage />);
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(screen.getByTestId('settings-field-STOCK_LIST')).toHaveAttribute('data-disabled', 'false');
+
+    await act(async () => resolveSave({ success: true }));
   });
 
   it('refreshes server state after intelligent import merges stock list', async () => {
@@ -1319,16 +1485,16 @@ describe('SettingsPage', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it('commits the llm channel draft through the unified save', async () => {
+  it('autosaves the llm channel draft as one model-graph transaction', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
     render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
 
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     const payload = save.mock.calls[0][0];
     expect(payload).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'LLM_CHANNELS', value: 'draft,backup' }),
@@ -1371,7 +1537,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('clears llm channel draft items after the unified save succeeds', async () => {
+  it('clears only submitted llm draft items after autosave succeeds', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
@@ -1384,12 +1550,10 @@ describe('SettingsPage', () => {
     rerender(<SettingsPage />);
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
     await waitFor(() => {
       expect(screen.getByTestId('generation-backend-status-items')).not.toHaveTextContent('LLM_CHANNELS=draft,backup');
-    });
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    }, { timeout: 2000 });
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
   });
 
   it('runs the unified post-save effects after a legacy migration applies', async () => {
@@ -1515,11 +1679,17 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'replace model references' }));
 
-    expect(setDraftValue).toHaveBeenCalledWith('LITELLM_MODEL', 'openai/replacement-model');
-    expect(setDraftValue).toHaveBeenCalledWith('AGENT_LITELLM_MODEL', 'openai/replacement-model');
+    expect(setDraftValue).toHaveBeenCalledWith(
+      'LITELLM_MODEL',
+      'modelref:v1:openai:openai%2Freplacement-model',
+    );
+    expect(setDraftValue).toHaveBeenCalledWith(
+      'AGENT_LITELLM_MODEL',
+      'modelref:v1:openai:openai%2Freplacement-model',
+    );
     expect(setDraftValue).toHaveBeenCalledWith(
       'LITELLM_FALLBACK_MODELS',
-      'openai/replacement-model,openai/backup-model',
+      'modelref:v1:openai:openai%2Freplacement-model,openai/backup-model',
     );
     expect(setDraftValue).not.toHaveBeenCalledWith('VISION_MODEL', expect.anything());
   });
@@ -1527,8 +1697,8 @@ describe('SettingsPage', () => {
   it('replaces a historical bare Agent reference using backend-equivalent route identity', async () => {
     getLlmAvailableModels.mockResolvedValue({
       models: [
-        { route: 'openai/gpt-4o-mini', display: 'gpt-4o-mini', connection: 'openai', provider: 'openai' },
-        { route: 'openai/gpt-5.5', display: 'gpt-5.5', connection: 'openai', provider: 'openai' },
+        { modelRef: 'modelref:v1:openai:openai%2Fgpt-4o-mini', route: 'openai/gpt-4o-mini', display: 'gpt-4o-mini', connection: 'openai', provider: 'openai' },
+        { modelRef: 'modelref:v1:openai:openai%2Fgpt-5.5', route: 'openai/gpt-5.5', display: 'gpt-5.5', connection: 'openai', provider: 'openai' },
       ],
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
@@ -1565,7 +1735,10 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'replace bare Agent reference' }));
 
-    expect(setDraftValue).toHaveBeenCalledWith('AGENT_LITELLM_MODEL', 'openai/gpt-5.5');
+    expect(setDraftValue).toHaveBeenCalledWith(
+      'AGENT_LITELLM_MODEL',
+      'modelref:v1:openai:openai%2Fgpt-5.5',
+    );
   });
 
   it('makes Task Routing the single editor for per-task models and links fallback out to Reliability', async () => {
@@ -1630,6 +1803,226 @@ describe('SettingsPage', () => {
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('ai_models');
     expect(nextParams?.get('view')).toBe('reliability');
+  });
+
+  it('stores the selected Connection-aware model reference when runtime routes match', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    const backup = connectionModelEntry('openai_backup', 'Backup Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary, backup] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField('LITELLM_MODEL', primary.modelRef),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '主要模型' }));
+    const options = within(screen.getByRole('listbox', { name: '主要模型' })).getAllByRole('option');
+    expect(options).toHaveLength(2);
+    expect(options[1]).toHaveTextContent('openai/gpt-4o-mini');
+    expect(options[1]).toHaveTextContent('Backup Connection');
+    fireEvent.click(options[1]);
+
+    expect(setDraftValue).toHaveBeenCalledWith('LITELLM_MODEL', backup.modelRef);
+  });
+
+  it.each([
+    ['AGENT_LITELLM_MODEL', 'Agent 主要模型'],
+    ['VISION_MODEL', 'Vision 模型'],
+  ])('stores a Connection-aware model reference for %s', async (key, label) => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    const backup = connectionModelEntry('openai_backup', 'Backup Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary, backup] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField(key, primary.modelRef),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: label }));
+    const options = within(screen.getByRole('listbox', { name: label })).getAllByRole('option');
+    fireEvent.click(options[1]);
+
+    expect(setDraftValue).toHaveBeenCalledWith(key, backup.modelRef);
+  });
+
+  it('resolves a unique legacy runtime route to its sole Connection without mutating the draft', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField('LITELLM_MODEL', 'openai/gpt-4o-mini'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveTextContent('GPT 4o Mini');
+    expect(trigger).toHaveTextContent('openai/gpt-4o-mini · Primary Connection');
+    expect(screen.queryByText(/当前配置不可用/)).not.toBeInTheDocument();
+    expect(setDraftValue).not.toHaveBeenCalled();
+  });
+
+  it('requires an explicit Connection choice for an ambiguous legacy runtime route', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    const backup = connectionModelEntry('openai_backup', 'Backup Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary, backup] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField('LITELLM_MODEL', 'openai/gpt-4o-mini'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveTextContent('openai/gpt-4o-mini');
+    expect(trigger).not.toHaveTextContent('Primary Connection');
+    expect(trigger).not.toHaveTextContent('Backup Connection');
+    expect(screen.getByText('多个 Connection 提供该 runtime route，请选择具体 Connection：openai/gpt-4o-mini')).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const options = within(screen.getByRole('listbox', { name: '主要模型' })).getAllByRole('option');
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveAttribute('aria-selected', 'false');
+    expect(options[1]).toHaveAttribute('aria-selected', 'false');
+    expect(options[0]).toHaveTextContent('Primary Connection');
+    expect(options[1]).toHaveTextContent('Backup Connection');
+    expect(setDraftValue).not.toHaveBeenCalled();
+  });
+
+  it('keeps a stale ModelRef stored while displaying its decoded route and Connection', async () => {
+    const available = connectionModelEntry('openai_primary', 'Primary Connection');
+    const staleModelRef = 'modelref:v1:retired_connection:openai%2Fretired-model';
+    getLlmAvailableModels.mockResolvedValue({ models: [available] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField('LITELLM_MODEL', staleModelRef),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveTextContent('openai/retired-model · retired_connection');
+    expect(trigger).toHaveAttribute('data-value', staleModelRef);
+    expect(screen.getByText('当前配置不可用：openai/retired-model · retired_connection')).toBeInTheDocument();
+    expect(screen.queryByText(staleModelRef)).not.toBeInTheDocument();
+    expect(setDraftValue).not.toHaveBeenCalled();
+  });
+
+  it('stores the selected Connection-aware model reference in fallback order', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    const backupModel = connectionModelEntry('openai_backup', 'Backup Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary, backupModel] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelSettingField('LITELLM_MODEL', primary.modelRef),
+          fallbackSettingField(''),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'reliability' });
+
+    render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '选择备用模型' }));
+    const listbox = screen.getByRole('listbox', { name: '可选模型' });
+    expect(within(listbox).queryByText(/Primary Connection/)).not.toBeInTheDocument();
+    const backup = within(listbox).getByRole('checkbox', { name: /openai\/gpt-4o-mini · Backup Connection/ });
+    fireEvent.click(backup);
+
+    expect(setDraftValue).toHaveBeenCalledWith('LITELLM_FALLBACK_MODELS', backupModel.modelRef);
+  });
+
+  it('resolves a unique legacy fallback route without mutating the draft', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          fallbackSettingField('openai/gpt-4o-mini'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'reliability' });
+
+    render(<SettingsPage />);
+
+    expect(await screen.findAllByText('GPT 4o Mini · openai/gpt-4o-mini · Primary Connection')).toHaveLength(2);
+    expect(screen.queryByText('当前配置不可用')).not.toBeInTheDocument();
+    expect(setDraftValue).not.toHaveBeenCalled();
+  });
+
+  it('replaces an ambiguous legacy fallback route with the explicitly chosen Connection', async () => {
+    const primary = connectionModelEntry('openai_primary', 'Primary Connection');
+    const backupModel = connectionModelEntry('openai_backup', 'Backup Connection');
+    getLlmAvailableModels.mockResolvedValue({ models: [primary, backupModel] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          fallbackSettingField('openai/gpt-4o-mini'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'reliability' });
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText('openai/gpt-4o-mini')).toBeInTheDocument();
+    expect(screen.getByText('请选择具体 Connection')).toBeInTheDocument();
+    expect(screen.queryByText('当前配置不可用')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
+    const backup = within(screen.getByRole('listbox', { name: '可选模型' }))
+      .getByRole('checkbox', { name: /openai\/gpt-4o-mini · Backup Connection/ });
+    fireEvent.click(backup);
+
+    expect(setDraftValue).toHaveBeenCalledWith('LITELLM_FALLBACK_MODELS', backupModel.modelRef);
   });
 
   it('splits notification fields so Reports and Alerts render independent field sets', () => {
@@ -1841,6 +2234,70 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('settings-field-LLM_USAGE_HMAC_KEY_VERSION')).toBeInTheDocument();
   });
 
+  it('fails safe for missing, unknown, and unsupported AI schema contracts', () => {
+    const aiField = (
+      key: string,
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      key,
+      value: 'legacy-value',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 50,
+        ...overrides,
+      },
+    });
+    const configState = buildSystemConfigState();
+    const withCompatibilityFields = () => buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          aiField('LLM_MISSING_PLACEMENT'),
+          aiField('LLM_UNKNOWN_PLACEMENT', { uiPlacement: 'future_surface' }),
+          aiField('LLM_UNKNOWN_CONDITION', {
+            uiPlacement: 'developer_diagnostics',
+            contract: {
+              requirement: 'optional',
+              visibleWhen: [{ key: 'MODE', operator: 'regex', value: '.*' }],
+            },
+          }),
+        ],
+      },
+    });
+
+    useSystemConfigMock.mockReturnValue(withCompatibilityFields());
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByTestId('settings-field-LLM_MISSING_PLACEMENT')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-LLM_UNKNOWN_PLACEMENT')).not.toBeInTheDocument();
+
+    useSystemConfigMock.mockReturnValue(withCompatibilityFields());
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+
+    const missing = screen.getByTestId('settings-field-LLM_MISSING_PLACEMENT');
+    const unknownPlacement = screen.getByTestId('settings-field-LLM_UNKNOWN_PLACEMENT');
+    const unknownCondition = screen.getByTestId('settings-field-LLM_UNKNOWN_CONDITION');
+    expect(missing).toHaveAttribute('data-disabled', 'true');
+    expect(unknownPlacement).toHaveAttribute('data-disabled', 'true');
+    expect(unknownCondition).toHaveAttribute('data-disabled', 'true');
+    expect(within(missing).getByText(/缺少 AI 字段归属/)).toBeInTheDocument();
+    expect(within(unknownPlacement).getByText(/无法识别后端字段归属/)).toBeInTheDocument();
+    expect(within(unknownCondition).getByText(/无法解释字段条件契约/)).toBeInTheDocument();
+  });
+
   it('opens the first-run wizard from Overview and saves its minimal config', async () => {
     save.mockResolvedValue({ success: true });
     // The wizard entry is only the first-time path when setup is incomplete.
@@ -1888,7 +2345,7 @@ describe('SettingsPage', () => {
       expect(screen.queryByRole('button', { name: '启动向导' })).not.toBeInTheDocument());
   });
 
-  it('keeps prompt cache settings collapsed and expandable at the bottom of AI model settings', () => {
+  it('keeps prompt cache diagnostics out of Connections and routes them to Advanced', () => {
     const aiField = (key: string, displayOrder: number, value = '') => ({
       key,
       value,
@@ -1905,6 +2362,7 @@ describe('SettingsPage', () => {
         options: key === 'LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL' ? ['off', 'basic', 'debug'] : [],
         validation: {},
         displayOrder,
+        uiPlacement: 'developer_diagnostics' as const,
       },
     });
     const configState = buildSystemConfigState();
@@ -1922,40 +2380,19 @@ describe('SettingsPage', () => {
       },
     }));
 
-    const { container } = render(<SettingsPage />);
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED')).not.toBeInTheDocument();
 
-    const promptCacheSummary = screen.getByText('Provider Prompt Cache 高级设置').closest('summary');
-    const promptCacheDetails = promptCacheSummary?.closest('details');
-    const telemetryField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED');
-    const hintsField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED');
-    const diagnosticsField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL');
-
-    expect(promptCacheSummary).toBeInTheDocument();
-    expect(promptCacheDetails).toBeInTheDocument();
-    expect(promptCacheDetails).not.toHaveAttribute('open');
-    expect(promptCacheDetails).toContainElement(telemetryField);
-    expect(promptCacheDetails).toContainElement(hintsField);
-    expect(promptCacheDetails).toContainElement(diagnosticsField);
-    expect(telemetryField).not.toBeVisible();
-    expect(hintsField).not.toBeVisible();
-    expect(diagnosticsField).not.toBeVisible();
-
-    fireEvent.click(promptCacheSummary as HTMLElement);
-
-    expect(promptCacheDetails).toHaveAttribute('open');
-    expect(telemetryField).toBeVisible();
-    expect(hintsField).toBeVisible();
-    expect(diagnosticsField).toBeVisible();
-
-    expect(Array.from(container.querySelectorAll('[data-testid^="settings-field-"]')).map((node) => node.getAttribute('data-testid'))).toEqual([
-      'settings-field-LITELLM_CONFIG',
-      'settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED',
-      'settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED',
-      'settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL',
-    ]);
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL')).toBeInTheDocument();
   });
 
-  it('notifies alphasift status update and skips install after generic save when ALPHASIFT_ENABLED is set false', async () => {
+  it('notifies alphasift status after its autosave group is disabled', async () => {
     save.mockResolvedValue({ success: true });
     getChangedItems.mockReturnValue([{ key: 'ALPHASIFT_ENABLED', value: 'false' }]);
 
@@ -1967,16 +2404,14 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
-    expect(notifyAlphaSiftConfigChanged).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    await waitFor(() => expect(notifyAlphaSiftConfigChanged).toHaveBeenCalledTimes(1));
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
     expect(alphasiftEnable).not.toHaveBeenCalled();
     expect(alphasiftInstall).not.toHaveBeenCalled();
   });
 
-  it('runs the AlphaSift enable flow after generic save when ALPHASIFT_ENABLED is set true', async () => {
+  it('runs the AlphaSift enable flow after its autosave succeeds', async () => {
     save.mockResolvedValue({ success: true });
     getChangedItems.mockReturnValue([{ key: 'ALPHASIFT_ENABLED', value: 'true' }]);
 
@@ -1988,16 +2423,14 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    await waitFor(() => expect(alphasiftEnable).toHaveBeenCalledTimes(1));
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
-    expect(alphasiftEnable).toHaveBeenCalledTimes(1);
     expect(alphasiftInstall).not.toHaveBeenCalled();
     expect(refreshAfterExternalSave).toHaveBeenCalledWith(['ALPHASIFT_ENABLED']);
   });
 
-  it('does not notify alphasift status when generic save updates other fields', async () => {
+  it('does not notify alphasift status when another group autosaves', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       hasDirty: true,
@@ -2007,9 +2440,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
     expect(notifyAlphaSiftConfigChanged).not.toHaveBeenCalled();
   });
@@ -2712,19 +3143,18 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const saveButton = screen.getByRole('button', { name: /保存配置/ });
-    expect(saveButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
     const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
     await waitFor(() => expect(enabledCheckbox).toBeChecked());
     fireEvent.click(enabledCheckbox);
 
     await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await waitFor(() => expect(saveButton).toHaveTextContent('保存配置 (1)'));
-
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(save).toHaveBeenCalledWith([{ key: 'SCHEDULE_ENABLED', value: 'false' }]));
+    expect(await screen.findByText('等待自动保存')).toBeInTheDocument();
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      [{ key: 'SCHEDULE_ENABLED', value: 'false' }],
+      { silent: true },
+    ), { timeout: 2000 });
   });
 
   it('can reconcile runtime scheduler state when runtime is disabled but saved value is enabled', async () => {
@@ -2790,19 +3220,18 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const saveButton = screen.getByRole('button', { name: /保存配置/ });
-    expect(saveButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
     const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
     await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
     fireEvent.click(enabledCheckbox);
 
     await waitFor(() => expect(enabledCheckbox).toBeChecked());
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await waitFor(() => expect(saveButton).toHaveTextContent('保存配置 (1)'));
-
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(save).toHaveBeenCalledWith([{ key: 'SCHEDULE_ENABLED', value: 'true' }]));
+    expect(await screen.findByText('等待自动保存')).toBeInTheDocument();
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      [{ key: 'SCHEDULE_ENABLED', value: 'true' }],
+      { silent: true },
+    ), { timeout: 2000 });
   });
 
   it('refreshes scheduler status after saving scheduler settings', async () => {
@@ -2880,9 +3309,8 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('未启用')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '保存配置 (1)' }));
-
-    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(2), { timeout: 2000 });
     expect(await screen.findByText('已启用')).toBeInTheDocument();
   });
 
@@ -3107,6 +3535,50 @@ describe('SettingsPage', () => {
       expect(screen.queryByTestId(`settings-field-${item.key}`)).not.toBeInTheDocument();
     }
     expect(screen.queryByText('模型供应商')).not.toBeInTheDocument();
+  });
+
+  it('passes the server compatibility Provider identity through a Catalog outage', async () => {
+    getLlmProviderCatalog.mockRejectedValueOnce(new Error('catalog unavailable'));
+    const modelAccessItem = (key: string, value: string) => ({
+      key,
+      value,
+      rawValueExists: key !== 'LLM_OPENAI_PROVIDER',
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        uiPlacement: 'model_access' as const,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          modelAccessItem('LLM_CHANNELS', 'openai'),
+          // Compatibility-only value injected by GET /system/config. It is not
+          // persisted, but remains authoritative when Catalog loading fails.
+          modelAccessItem('LLM_OPENAI_PROVIDER', 'openai'),
+          modelAccessItem('LLM_OPENAI_ENABLED', 'false'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText('模型服务商目录加载失败')).toBeInTheDocument();
+    expect(screen.getByTestId('llm-channel-provider-identity')).toHaveTextContent('openai');
+    expect(screen.getByTestId('llm-channel-catalog-unavailable')).toHaveTextContent('true');
   });
 
   it('renders notification test panel before notification fields', () => {

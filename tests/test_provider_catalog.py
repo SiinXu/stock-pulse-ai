@@ -63,10 +63,39 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
         allowed = {
             "id", "label", "protocol", "default_base_url", "capabilities",
             "requires_api_key", "requires_base_url", "supports_discovery",
-            "is_local", "is_custom",
+            "is_local", "is_custom", "credential_url", "console_url",
+            "models_url", "docs_url",
         }
         for entry in get_provider_catalog():
             self.assertEqual(set(entry.keys()), allowed)
+
+    def test_catalog_owns_provider_resource_links(self) -> None:
+        providers = {entry["id"]: entry for entry in get_provider_catalog()}
+
+        self.assertEqual(
+            providers["openai"]["credential_url"],
+            "https://platform.openai.com/api-keys",
+        )
+        self.assertEqual(
+            providers["openai"]["models_url"],
+            "https://platform.openai.com/docs/models",
+        )
+        self.assertEqual(
+            providers["anthropic"]["console_url"],
+            "https://console.anthropic.com/",
+        )
+        self.assertEqual(
+            providers["gemini"]["credential_url"],
+            "https://aistudio.google.com/app/apikey",
+        )
+        self.assertIsNone(providers["custom"]["credential_url"])
+        self.assertIsNone(providers["custom"]["models_url"])
+
+        for entry in providers.values():
+            for key in ("credential_url", "console_url", "models_url", "docs_url"):
+                value = entry[key]
+                if value is not None:
+                    self.assertRegex(value, r"^https://")
 
     def test_catalog_return_is_caller_immune(self) -> None:
         first = get_provider_catalog()

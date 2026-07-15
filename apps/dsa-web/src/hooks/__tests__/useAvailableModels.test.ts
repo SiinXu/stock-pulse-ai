@@ -108,4 +108,19 @@ describe('useAvailableModels', () => {
     });
     expect(result.current.models[0]?.route).toBe('openai/new-model');
   });
+
+  it('keeps loaded models and marks them stale when a refresh fails', async () => {
+    getLlmAvailableModels
+      .mockResolvedValueOnce({ models: [modelEntry('openai/gpt-4o-mini')] })
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    const { result } = renderHook(() => useAvailableModels());
+
+    await waitFor(() => expect(result.current.models).toHaveLength(1));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.error).toBe('refresh failed'));
+
+    expect(result.current.models[0]?.route).toBe('openai/gpt-4o-mini');
+    expect(result.current.isStale).toBe(true);
+    expect(result.current.status).toBe('error');
+  });
 });

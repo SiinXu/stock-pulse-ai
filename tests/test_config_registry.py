@@ -239,7 +239,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-07-15-connection-provider")
+        self.assertEqual(SCHEMA_VERSION, "2026-07-15-authoritative-config-contract")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -845,6 +845,33 @@ class TestConfigConditions(unittest.TestCase):
 
         self.assertEqual(evaluate_config_conditions([{"key": "X", "operator": "regex"}], {"X": "y"}), "unknown")
 
+    def test_unknown_condition_wins_over_an_earlier_false_condition(self) -> None:
+        from src.core.config_registry import evaluate_config_conditions
+
+        conditions = [
+            {"key": "A", "operator": "equals", "value": "enabled"},
+            {"key": "B", "operator": "regex", "value": "unsafe"},
+        ]
+        self.assertEqual(
+            evaluate_config_conditions(conditions, {"A": "disabled", "B": "unsafe"}),
+            "unknown",
+        )
+
+    def test_malformed_conditions_fail_safe(self) -> None:
+        from src.core.config_registry import evaluate_config_conditions
+
+        self.assertEqual(
+            evaluate_config_conditions(
+                [{"key": "MODE", "operator": "in", "value": "single"}],
+                {"MODE": "single"},
+            ),
+            "unknown",
+        )
+        self.assertEqual(
+            evaluate_config_conditions([{"key": "", "operator": "notEmpty"}], {}),
+            "unknown",
+        )
+
     def test_opencode_cli_model_has_visible_when_contract(self) -> None:
         from src.core.config_registry import get_field_definition
 
@@ -854,6 +881,23 @@ class TestConfigConditions(unittest.TestCase):
             contract["visible_when"],
             [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}],
         )
+
+    def test_every_ai_field_has_an_authoritative_requirement_contract(self) -> None:
+        from src.core.config_registry import build_schema_response
+
+        schema = build_schema_response()
+        ai_model = next(c for c in schema["categories"] if c["category"] == "ai_model")
+        for field in ai_model["fields"]:
+            self.assertIn(
+                field.get("contract", {}).get("requirement"),
+                {"required", "optional", "inherited"},
+                field["key"],
+            )
+        by_key = {field["key"]: field for field in ai_model["fields"]}
+        self.assertEqual(by_key["LITELLM_MODEL"]["contract"]["requirement"], "inherited")
+        self.assertEqual(by_key["AGENT_LITELLM_MODEL"]["contract"]["requirement"], "inherited")
+        self.assertEqual(by_key["VISION_MODEL"]["contract"]["requirement"], "inherited")
+        self.assertEqual(by_key["LITELLM_FALLBACK_MODELS"]["contract"]["requirement"], "optional")
 
 
 class TestUiPlacement(unittest.TestCase):
@@ -972,8 +1016,29 @@ class TestUiPlacement(unittest.TestCase):
         from src.core.config_registry import get_field_definition
 
         self.assertEqual(get_field_definition("LLM_MY_LOCAL_API_KEY")["ui_placement"], "model_access")
+        self.assertEqual(get_field_definition("LLM_MY_LOCAL_DISPLAY_NAME")["ui_placement"], "model_access")
+        self.assertEqual(
+            get_field_definition("LLM_UNKNOWN_LEGACY_SETTING")["ui_placement"],
+            "developer_diagnostics",
+        )
         self.assertEqual(get_field_definition("LITELLM_MODEL")["ui_placement"], "task_routing")
         self.assertEqual(get_field_definition("STOCK_LIST")["ui_placement"], None)
+
+    def test_save_groups_keep_the_model_graph_atomic(self):
+        from src.core.config_registry import derive_save_group
+
+        for key in (
+            "LLM_CHANNELS",
+            "LLM_OPENAI_API_KEY",
+            "LITELLM_MODEL",
+            "LITELLM_FALLBACK_MODELS",
+            "AGENT_LITELLM_MODEL",
+            "VISION_MODEL",
+        ):
+            self.assertEqual(derive_save_group(key), "ai.model_graph", key)
+
+        self.assertEqual(derive_save_group("SCHEDULE_TIMES"), "system.scheduler")
+        self.assertEqual(derive_save_group("STOCK_LIST"), "overview.watchlist")
 
 
 if __name__ == "__main__":

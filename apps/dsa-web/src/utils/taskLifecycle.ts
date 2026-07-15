@@ -1,0 +1,2 @@
+export const TASK_TERMINAL_RETENTION_MS = 5 * 60 * 1000;
+export const DISMISSED_TASK_TTL_MS = 15 * 60 * 1000;

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -42,6 +43,10 @@ class AlphaSiftScreenAccepted(BaseModel):
     trace_id: str
     status: str = "pending"
     message: str
+    message_code: Optional[str] = None
+    message_params: Dict[str, Any] = Field(default_factory=dict)
+    revision: int = 1
+    updated_at: Optional[str] = None
     strategy: str
     market: str
     max_results: int
@@ -53,12 +58,27 @@ class AlphaSiftScreenTaskStatus(BaseModel):
     status: str
     progress: int = 0
     message: Optional[str] = None
+    message_code: Optional[str] = None
+    message_params: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
+    error_code: Optional[str] = None
+    error_params: Dict[str, Any] = Field(default_factory=dict)
+    revision: int = 1
+    updated_at: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
 
 
 def _service(config: Config) -> AlphaSiftService:
     return AlphaSiftService(config=config)
+
+
+def _task_updated_at(task: Any) -> Optional[str]:
+    value = getattr(task, "updated_at", None) or getattr(task, "created_at", None)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str) and value:
+        return value
+    return None
 
 
 def _screening_task_not_found(task_id: str) -> HTTPException:
@@ -137,6 +157,8 @@ def alphasift_start_screen_task(
             task_id,
             20,
             "正在执行 AlphaSift 选股，外部数据源较慢时会持续后台运行",
+            message_code="alphasift_screen_running",
+            message_params={"strategy": request.strategy, "market": request.market},
         )
         result = _service(config).screen(
             strategy=request.strategy,
@@ -147,6 +169,8 @@ def alphasift_start_screen_task(
             task_id,
             90,
             f"选股已完成，正在整理 {result.get('candidate_count', 0)} 条候选",
+            message_code="alphasift_screen_formatting",
+            message_params={"candidate_count": result.get("candidate_count", 0)},
         )
         return result
 
@@ -156,6 +180,8 @@ def alphasift_start_screen_task(
         stock_name=f"{request.strategy} / {request.market}",
         report_type="alphasift_screen",
         message="AlphaSift 选股任务已提交",
+        message_code="alphasift_screen_queued",
+        message_params={"strategy": request.strategy, "market": request.market},
         task_id=task_id,
         trace_id=task_id,
     )
@@ -164,6 +190,10 @@ def alphasift_start_screen_task(
         trace_id=task.trace_id or task.task_id,
         status=task.status.value if isinstance(task.status, QueueTaskStatus) else str(task.status),
         message=task.message or "AlphaSift 选股任务已提交",
+        message_code=getattr(task, "message_code", None),
+        message_params=getattr(task, "message_params", {}) or {},
+        revision=getattr(task, "revision", 1),
+        updated_at=_task_updated_at(task),
         strategy=request.strategy,
         market=request.market,
         max_results=request.max_results,
@@ -183,7 +213,13 @@ def alphasift_screen_task_status(task_id: str) -> AlphaSiftScreenTaskStatus:
         status=task.status.value if isinstance(task.status, QueueTaskStatus) else str(task.status),
         progress=task.progress,
         message=task.message,
+        message_code=task.message_code,
+        message_params=task.message_params,
         error=task.error,
+        error_code=task.error_code,
+        error_params=task.error_params,
+        revision=task.revision,
+        updated_at=_task_updated_at(task),
         result=result,
     )
 

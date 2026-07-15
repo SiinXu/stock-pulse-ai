@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import StockScreeningPage from '../StockScreeningPage';
+import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
 
 // jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
 if (!HTMLElement.prototype.scrollIntoView) {
@@ -16,6 +17,7 @@ const {
   getScreenTask,
   navigate,
   resetLastScreenResult,
+  resetScreenTaskMock,
   screenStocks,
   startScreenTask,
 } = vi.hoisted(() => {
@@ -28,22 +30,31 @@ const {
       traceId: 'screen-task-1',
       status: 'pending',
       message: 'AlphaSift 选股任务已提交',
+      messageCode: 'alphasift_screen_queued',
+      messageParams: { strategy: 'dual_low', market: 'cn' },
+      revision: 1,
+      updatedAt: '2026-07-15T12:00:00Z',
       strategy: 'dual_low',
       market: 'cn',
       maxResults: 3,
     };
   });
-  const getScreenTask = vi.fn(async (taskId: string) => {
-    void taskId;
-    return {
-      taskId: 'screen-task-1',
-      traceId: 'screen-task-1',
-      status: 'completed',
-      progress: 100,
-      message: '任务执行完成',
-      result: lastScreenResult,
-    };
-  });
+  const getScreenTask = vi.fn();
+  const resetScreenTaskMock = () => {
+    getScreenTask.mockReset();
+    getScreenTask.mockImplementation(async (taskId: string) => {
+      void taskId;
+      return {
+        taskId: 'screen-task-1',
+        traceId: 'screen-task-1',
+        status: 'completed',
+        progress: 100,
+        message: '任务执行完成',
+        result: lastScreenResult,
+      };
+    });
+  };
+  resetScreenTaskMock();
   return {
     enableAlphaSift: vi.fn(),
     getAlphaSiftStatus: vi.fn(),
@@ -55,6 +66,7 @@ const {
     resetLastScreenResult: () => {
       lastScreenResult = null;
     },
+    resetScreenTaskMock,
     screenStocks,
     startScreenTask,
   };
@@ -108,6 +120,17 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+const ScreeningLanguageHarness = () => {
+  const { setLanguage } = useUiLanguage();
+  return (
+    <>
+      <button type="button" onClick={() => setLanguage('zh')}>中文</button>
+      <button type="button" onClick={() => setLanguage('en')}>English</button>
+      <StockScreeningPage />
+    </>
+  );
+};
+
 describe('StockScreeningPage', () => {
   beforeEach(() => {
     enableAlphaSift.mockReset();
@@ -115,7 +138,7 @@ describe('StockScreeningPage', () => {
     getHotspotDetail.mockReset();
     getHotspots.mockReset();
     getStrategies.mockReset();
-    getScreenTask.mockClear();
+    resetScreenTaskMock();
     navigate.mockReset();
     resetLastScreenResult();
     screenStocks.mockReset();
@@ -148,6 +171,101 @@ describe('StockScreeningPage', () => {
     });
     getHotspots.mockResolvedValue({ enabled: true, provider: 'akshare', hotspots: [], hotspotCount: 0 });
     window.sessionStorage.clear();
+  });
+
+  it('renders AlphaSift task codes in the current UI language and keeps raw text in diagnostics', async () => {
+    getAlphaSiftStatus.mockResolvedValue({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    const pendingStatus = createDeferred<never>();
+    getScreenTask.mockImplementation(() => pendingStatus.promise);
+    startScreenTask.mockResolvedValueOnce({
+      taskId: 'screen-task-coded',
+      traceId: 'trace-screen-task-coded',
+      status: 'pending',
+      message: '服务端中文原始任务消息',
+      messageCode: 'alphasift_screen_queued',
+      messageParams: { strategy: 'dual_low', market: 'cn' },
+      revision: 1,
+      updatedAt: '2026-07-15T12:00:00Z',
+      strategy: 'dual_low',
+      market: 'cn',
+      maxResults: 3,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <ScreeningLanguageHarness />
+      </UiLanguageProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '中文' }));
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+    expect((await screen.findAllByText(/选股任务已加入队列/)).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('alert').some((alert) => (
+      within(alert).queryByText('服务端中文原始任务消息') !== null
+    ))).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+    expect((await screen.findAllByText(/Screening task queued/)).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/选股任务已加入队列/)).toHaveLength(0);
+    expect(screen.getByText('服务端中文原始任务消息', { selector: 'span' })).toBeInTheDocument();
+  });
+
+  it('re-localizes an existing failed AlphaSift task without promoting its raw error', async () => {
+    getAlphaSiftStatus.mockResolvedValue({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    startScreenTask.mockResolvedValueOnce({
+      taskId: 'screen-task-failed',
+      traceId: 'trace-screen-task-failed',
+      status: 'pending',
+      message: '已提交',
+      messageCode: 'alphasift_screen_queued',
+      messageParams: { strategy: 'dual_low', market: 'cn' },
+      revision: 1,
+      updatedAt: '2026-07-15T12:00:00Z',
+      strategy: 'dual_low',
+      market: 'cn',
+      maxResults: 3,
+    });
+    getScreenTask.mockResolvedValue({
+      taskId: 'screen-task-failed',
+      traceId: 'trace-screen-task-failed',
+      status: 'failed',
+      progress: 80,
+      message: '服务端失败原文',
+      messageCode: 'task_failed',
+      error: '包含内部细节的原始异常',
+      errorCode: 'task_execution_failed',
+      revision: 3,
+      updatedAt: '2026-07-15T12:00:03Z',
+      result: null,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <ScreeningLanguageHarness />
+      </UiLanguageProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '中文' }));
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
+
+    expect(await screen.findByText('任务未能完成，请查看诊断后重试')).toBeInTheDocument();
+    expect(screen.getAllByRole('alert').some((alert) => (
+      within(alert).queryByText('包含内部细节的原始异常') !== null
+    ))).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+    expect(await screen.findByText('The task did not complete. Review diagnostics and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('任务未能完成，请查看诊断后重试')).not.toBeInTheDocument();
+    expect(screen.getByText('包含内部细节的原始异常', { selector: 'span' })).toBeInTheDocument();
   });
 
   it('re-syncs enabled state when AlphaSift availability check fails after config is enabled', async () => {
@@ -784,6 +902,34 @@ describe('StockScreeningPage', () => {
     });
   });
 
+  it('localizes built-in strategy IDs in English and preserves unknown third-party copy', async () => {
+    getStrategies.mockResolvedValueOnce({
+      enabled: true,
+      strategies: [
+        { id: 'dual_low', name: '双低选股', description: '服务端中文描述', category: '价值' },
+        { id: 'partner_custom', name: '第三方原始名称', description: '第三方原始描述', category: '第三方分类' },
+      ],
+      strategyCount: 2,
+    });
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+
+    render(
+      <UiLanguageProvider>
+        <ScreeningLanguageHarness />
+      </UiLanguageProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+
+    expect(await screen.findByText('Dual-Low Selection')).toBeInTheDocument();
+    expect(screen.getByText('Combines low valuation, activity, and pattern confirmation for defensive candidates.')).toBeInTheDocument();
+    expect(screen.getByText('第三方原始名称')).toBeInTheDocument();
+    expect(screen.getByText('第三方原始描述')).toBeInTheDocument();
+  });
+
   it('clears previous screening candidates when strategy changes', async () => {
     getStrategies.mockResolvedValueOnce({
       enabled: true,
@@ -963,6 +1109,10 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('本次 LLM 重排失败或未返回判断，当前展示的是本地因子评分结果。')).toBeInTheDocument();
     expect(screen.getByText('LLM 元数据未返回')).toBeInTheDocument();
     expect(screen.getAllByText('未返回（LLM 已降级）')).toHaveLength(2);
+    expect(screen.getByRole('region', { name: '选股结果' })).toHaveClass('overflow-x-auto');
+    const detailButton = screen.getByRole('button', { name: /^(展开|收起)$/ });
+    expect(detailButton).toHaveAttribute('aria-expanded');
+    expect(detailButton).toHaveClass('min-h-11');
   });
 
   it('deduplicates AlphaSift snapshot fallback warnings and source errors', async () => {

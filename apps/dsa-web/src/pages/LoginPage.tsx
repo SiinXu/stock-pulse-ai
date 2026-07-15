@@ -6,14 +6,14 @@ import { Button, Input, ParticleBackground } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
-import { isParsedApiError } from '../api/error';
+import { isParsedApiError, localizeParsedApiError } from '../api/error';
 import { useAuth } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { SettingsAlert } from '../components/settings';
 
 const LoginPage: React.FC = () => {
   const { login, passwordSet, setupState } = useAuth();
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const navigate = useNavigate();
 
   // Set page title
@@ -24,6 +24,7 @@ const LoginPage: React.FC = () => {
   const rawRedirect = searchParams.get('redirect') ?? '';
   const redirect =
     rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
+  const sessionExpired = searchParams.get('reason') === 'session_expired';
 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -176,6 +177,15 @@ const LoginPage: React.FC = () => {
               </p>
             </div>
 
+            {sessionExpired ? (
+              <SettingsAlert
+                title={t('login.sessionExpiredTitle')}
+                message={t('login.sessionExpiredDescription')}
+                variant="warning"
+                className="mb-6"
+              />
+            ) : null}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-4">
                 <Input
@@ -218,7 +228,7 @@ const LoginPage: React.FC = () => {
                 >
                   <SettingsAlert
                     title={isFirstTime ? t('login.setupFailed') : t('login.validationFailed')}
-                    message={isParsedApiError(error) ? error.message : error}
+                    message={isParsedApiError(error) ? localizeParsedApiError(error, language).message : error}
                     variant="error"
                     className="!border-[var(--login-error-border)] !bg-[var(--login-error-bg)] !text-[var(--login-error-text)]"
                   />

@@ -61,11 +61,24 @@ import {
   type SettingsSectionId,
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
+import {
+  getSettingsSaveGroup,
+  isBlockingSaveStatus,
+  mergeSaveGroupItems,
+  type SettingsSaveGroupState,
+} from '../components/settings/settingsSaveGroups';
 import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
 import { WEB_BUILD_INFO } from '../utils/constants';
+import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle, getFieldTitleZh } from '../utils/systemConfigI18n';
-import { isFieldVisibleByContract, isFieldEnabledByContract, resolveFieldRequirement } from '../utils/configConditions';
+import {
+  getConfigContractDiagnostic,
+  isFieldVisibleByContract,
+  isFieldEnabledByContract,
+  resolveFieldRequirement,
+} from '../utils/configConditions';
+import { resolveSystemConfigFieldPlacement } from '../utils/systemConfigSchemaCompatibility';
 import type {
   ConfigValidationIssue,
   LLMConfigModeStatus,
@@ -77,7 +90,13 @@ import type {
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
-import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
+import {
+  SETTINGS_PAGE_TEXT,
+  SETTINGS_SAVE_GROUP_LABELS,
+  SETTINGS_TASK_REFERENCE_LABELS,
+  SETTINGS_TASK_ROUTE_LABELS,
+} from '../locales/settingsPage';
+import { getSystemConfigContractDiagnosticText } from '../locales/systemConfigContract';
 
 type DesktopWindow = Window & {
   dsaDesktop?: {
@@ -88,6 +107,12 @@ type DesktopWindow = Window & {
     openReleasePage?: (releaseUrl?: string) => Promise<boolean>;
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
+};
+
+const formatConfiguredModelDisplay = (value: string): string => {
+  const normalized = value.trim();
+  const decoded = decodeModelRef(normalized);
+  return decoded ? `${decoded.runtimeRoute} · ${decoded.connectionId}` : normalized;
 };
 
 type DesktopUpdateState = {
@@ -149,7 +174,7 @@ const GENERATION_BACKEND_STATUS_KEYS = new Set([
   'LITELLM_MODEL',
   'LITELLM_FALLBACK_MODELS',
 ]);
-const LLM_CHANNEL_STATUS_KEY_PATTERN = /^LLM_[A-Z0-9_]+_(PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
+const LLM_CHANNEL_STATUS_KEY_PATTERN = /^LLM_[A-Z0-9_]+_(DISPLAY_NAME|PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
 
 function isLlmChannelEditorDraftKey(key: string): boolean {
   const normalized = key.trim().toUpperCase();
@@ -890,6 +915,9 @@ const SettingsPage: React.FC = () => {
   const [setupSmokeError, setSetupSmokeError] = useState<ParsedApiError | null>(null);
   const [setupSmokeSuccess, setSetupSmokeSuccess] = useState('');
   const [llmChannelDraftItems, setLlmChannelDraftItems] = useState<SystemConfigUpdateItem[]>([]);
+  const [saveGroupStates, setSaveGroupStates] = useState<Record<string, SettingsSaveGroupState>>({});
+  const saveGroupStatesRef = useRef<Record<string, SettingsSaveGroupState>>({});
+  const [autosaveRevision, setAutosaveRevision] = useState(0);
   // Structural completeness gate reported by the LLM channel editor; blocks the
   // unified Save & Apply while an enabled channel is incomplete.
   const [llmChannelDraftValid, setLlmChannelDraftValid] = useState(true);
@@ -899,6 +927,15 @@ const SettingsPage: React.FC = () => {
   const [llmChannelAddSignal, setLlmChannelAddSignal] = useState(0);
   const envBackupImportRef = useRef<HTMLInputElement | null>(null);
   const setupStatusRequestIdRef = useRef(0);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const autosaveInFlightRef = useRef(false);
+  const autosaveOrderRef = useRef(new Map<string, number>());
+  const autosaveOrderCounterRef = useRef(0);
+  const autosaveFailedFingerprintRef = useRef(new Map<string, string>());
+  const autosaveSavedFingerprintRef = useRef(new Map<string, string>());
+  const autosaveActiveGroupRef = useRef<string | null>(null);
+  const autosaveConflictGroupRef = useRef<string | null>(null);
+  const autosaveMountedRef = useRef(true);
   const desktopRuntimeApi = getDesktopRuntimeApi();
   const isDesktopRuntime = Boolean(desktopRuntimeApi);
   const canCheckDesktopUpdate = Boolean(
@@ -911,6 +948,17 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     document.title = t('settings.pageTitleDocument');
   }, [t]);
+
+  useEffect(() => {
+    autosaveMountedRef.current = true;
+    return () => {
+      autosaveMountedRef.current = false;
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Seed the active tab from the URL once so deep links / refresh restore it.
@@ -932,7 +980,6 @@ const SettingsPage: React.FC = () => {
     selectTab,
     hasDirty,
     dirtyKeys,
-    dirtyCount,
     toast,
     clearToast,
     isLoading,
@@ -947,6 +994,7 @@ const SettingsPage: React.FC = () => {
     retry,
     save,
     resetDraft,
+    resetDraftGroup,
     setDraftValue,
     getChangedItems,
     refreshAfterExternalSave,
@@ -1108,6 +1156,10 @@ const SettingsPage: React.FC = () => {
   const currentChangedItems = getChangedItems();
   const currentChangedItemsFingerprint = JSON.stringify(currentChangedItems);
   const llmChannelDraftItemsFingerprint = JSON.stringify(llmChannelDraftItems);
+  const configItemByKey = useMemo(
+    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key.toUpperCase(), item])),
+    [itemsByCategory],
+  );
   // The LLM channel draft feeds the same unified Save & Apply as normal fields;
   // switching tabs keeps it in this parent state and rehydrates on remount.
   const hasLlmChannelDraft = llmChannelDraftItems.length > 0;
@@ -1123,15 +1175,6 @@ const SettingsPage: React.FC = () => {
   const handleLlmChannelValidityChange = useCallback((valid: boolean) => {
     setLlmChannelDraftValid(valid);
   }, []);
-  // Discard reverts both the useSystemConfig draft and the LLM channel draft; the
-  // reset signal tells a mounted channel editor to re-sync to the saved snapshot.
-  const discardDraft = useCallback(() => {
-    resetDraft();
-    setLlmChannelDraftItems([]);
-    setLlmChannelDraftValid(true);
-    setLlmChannelResetSignal((current) => current + 1);
-  }, [resetDraft]);
-
   const resolveSettingsConflict = useCallback((key: string, choice: 'server' | 'local') => {
     if (choice === 'server' && llmChannelDraftItems.some((item) => item.key === key)) {
       setLlmChannelDraftItems((current) => current.filter((item) => item.key !== key));
@@ -1263,18 +1306,233 @@ const SettingsPage: React.FC = () => {
     && schedulerOverrideFromUi !== schedulerRuntimeEnabled;
   const hasRuntimeSchedulerMismatchInDraft = hasRuntimeSchedulerMismatch
     && !currentChangedItems.some((item) => item.key === 'SCHEDULE_ENABLED');
-  // The LLM channel draft is committed by the same Save & Apply, so it counts
-  // toward dirty state; an enabled-incomplete channel keeps Save disabled.
-  const effectiveHasDirty = hasDirty || hasRuntimeSchedulerMismatchInDraft || hasLlmChannelDraft;
-  const canSaveConfig = effectiveHasDirty
-    && (!hasLlmChannelDraft || llmChannelDraftValid)
-    && !conflictState;
-  const effectiveDirtyCount = dirtyCount
-    + (hasRuntimeSchedulerMismatchInDraft ? 1 : 0)
-    + llmChannelDraftItems.length;
-  const leaveGuardCount = effectiveDirtyCount;
-  // Guard leaving while there are unsaved edits (including the LLM channel draft).
-  const shouldGuardLeave = effectiveHasDirty;
+  const autosavePayloadMap = new Map<string, SystemConfigUpdateItem[]>();
+  for (const item of currentChangedItems) {
+    const configItem = configItemByKey.get(item.key.toUpperCase());
+    const group = getSettingsSaveGroup(configItem ?? item);
+    autosavePayloadMap.set(group, [...(autosavePayloadMap.get(group) ?? []), item]);
+  }
+  if (hasRuntimeSchedulerMismatchInDraft && schedulerOverrideFromUi !== null) {
+    const group = 'system.scheduler';
+    autosavePayloadMap.set(group, mergeSaveGroupItems(
+      autosavePayloadMap.get(group) ?? [],
+      [{ key: 'SCHEDULE_ENABLED', value: schedulerOverrideFromUi ? 'true' : 'false' }],
+    ));
+  }
+  if (hasLlmChannelDraft) {
+    autosavePayloadMap.set('ai.model_graph', mergeSaveGroupItems(
+      autosavePayloadMap.get('ai.model_graph') ?? [],
+      llmChannelDraftItems,
+    ));
+  }
+  const autosavePayloadEntries = [...autosavePayloadMap.entries()];
+  const autosavePayloadFingerprint = JSON.stringify(autosavePayloadEntries);
+  const effectiveDirtyCount = autosavePayloadEntries.reduce((count, [, items]) => count + items.length, 0);
+  const effectiveHasDirty = effectiveDirtyCount > 0 || hasDirty;
+  const hasBlockingSaveState = Object.values(saveGroupStates).some((state) => isBlockingSaveStatus(state.status));
+  const leaveGuardCount = Math.max(effectiveDirtyCount, hasBlockingSaveState ? 1 : 0);
+  const shouldGuardLeave = effectiveHasDirty || hasBlockingSaveState;
+  const activeSaveGroup = activeSection === 'ai_models'
+    ? 'ai.model_graph'
+    : rawActiveItems[0]
+      ? getSettingsSaveGroup(rawActiveItems[0])
+      : null;
+
+  const updateSaveGroupState = useCallback((group: string, nextState: SettingsSaveGroupState) => {
+    setSaveGroupStates((previous) => {
+      const next = { ...previous, [group]: nextState };
+      saveGroupStatesRef.current = next;
+      return next;
+    });
+  }, []);
+
+  // One global FIFO is required because every config write advances the same
+  // config version. Only the oldest dirty group is scheduled; after it settles,
+  // the next render schedules the next group against the refreshed version.
+  useEffect(() => {
+    const payloadEntries = JSON.parse(autosavePayloadFingerprint) as Array<[string, SystemConfigUpdateItem[]]>;
+    const activeGroups = new Set(payloadEntries.map(([group]) => group));
+    for (const [group] of payloadEntries) {
+      if (!autosaveOrderRef.current.has(group)) {
+        autosaveOrderCounterRef.current += 1;
+        autosaveOrderRef.current.set(group, autosaveOrderCounterRef.current);
+      }
+    }
+    for (const group of [...autosaveOrderRef.current.keys()]) {
+      if (!activeGroups.has(group)) {
+        autosaveOrderRef.current.delete(group);
+        autosaveSavedFingerprintRef.current.delete(group);
+      }
+    }
+
+    if (autosaveInFlightRef.current || autosaveTimerRef.current !== null || isLoading) return;
+
+    const validationError = t('settings.autosaveValidationFailed');
+    if (
+      llmChannelDraftValid
+      && saveGroupStatesRef.current['ai.model_graph']?.status === 'failed'
+      && saveGroupStatesRef.current['ai.model_graph']?.error === validationError
+    ) {
+      autosaveFailedFingerprintRef.current.delete('ai.model_graph');
+    }
+
+    const candidate = payloadEntries
+      .sort(([left], [right]) => (
+        (autosaveOrderRef.current.get(left) ?? 0) - (autosaveOrderRef.current.get(right) ?? 0)
+      ))
+      .find(([group, items]) => {
+        const fingerprint = JSON.stringify(items);
+        const state = saveGroupStatesRef.current[group]?.status;
+        return state !== 'conflicted'
+          && autosaveFailedFingerprintRef.current.get(group) !== fingerprint
+          && autosaveSavedFingerprintRef.current.get(group) !== fingerprint;
+      });
+    if (!candidate) return;
+
+    const [group, items] = candidate;
+    const fingerprint = JSON.stringify(items);
+    if (group === 'ai.model_graph' && hasLlmChannelDraft && !llmChannelDraftValid) {
+      autosaveFailedFingerprintRef.current.set(group, fingerprint);
+      updateSaveGroupState(group, { status: 'failed', error: t('settings.autosaveValidationFailed') });
+      return;
+    }
+    if (group === 'ai.model_graph' && llmChannelDraftValid) {
+      autosaveFailedFingerprintRef.current.delete(group);
+    }
+
+    updateSaveGroupState(group, { status: 'scheduled' });
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      autosaveInFlightRef.current = true;
+      autosaveActiveGroupRef.current = group;
+      updateSaveGroupState(group, { status: 'saving' });
+      const llmDraftSnapshot = JSON.parse(llmChannelDraftItemsFingerprint) as SystemConfigUpdateItem[];
+      const submittedLlmValues = new Map(llmDraftSnapshot.map((item) => [item.key.toUpperCase(), item.value]));
+
+      void save(items, { silent: true })
+        .then(async (result) => {
+          if (!autosaveMountedRef.current) return;
+          if (result.success) {
+            autosaveFailedFingerprintRef.current.delete(group);
+            autosaveSavedFingerprintRef.current.set(group, fingerprint);
+            updateSaveGroupState(group, { status: 'saved', updatedAt: Date.now() });
+            if (group === 'ai.model_graph') {
+              setLlmChannelDraftItems((current) => current.filter((item) => (
+                submittedLlmValues.get(item.key.toUpperCase()) !== item.value
+              )));
+              setLlmChannelDraftValid(true);
+            }
+            applyPostSaveEffects();
+            const alphaSiftItem = items.find((item) => item.key === 'ALPHASIFT_ENABLED');
+            if (alphaSiftItem) {
+              setAlphaSiftActionError(null);
+              setAlphaSiftActionSuccess('');
+              try {
+                if (alphaSiftItem.value.trim().toLowerCase() === 'true') {
+                  await alphasiftApi.enable();
+                  await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
+                  setAlphaSiftActionSuccess(t('settings.enabledAlphaSiftSuccess'));
+                } else {
+                  notifyAlphaSiftConfigChanged();
+                  setAlphaSiftActionSuccess(t('settings.disabledAlphaSiftSuccess'));
+                }
+              } catch (error: unknown) {
+                setAlphaSiftActionError(getParsedApiError(error, uiLanguage));
+                await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
+              }
+            }
+            return;
+          }
+
+          autosaveFailedFingerprintRef.current.set(group, fingerprint);
+          if (result.conflicted) autosaveConflictGroupRef.current = group;
+          updateSaveGroupState(group, {
+            status: result.conflicted ? 'conflicted' : 'failed',
+            error: result.message,
+          });
+        })
+        .catch((error: unknown) => {
+          if (!autosaveMountedRef.current) return;
+          autosaveFailedFingerprintRef.current.set(group, fingerprint);
+          updateSaveGroupState(group, {
+            status: 'failed',
+            error: getParsedApiError(error, uiLanguage).message,
+          });
+        })
+        .finally(() => {
+          autosaveInFlightRef.current = false;
+          autosaveActiveGroupRef.current = null;
+          if (autosaveMountedRef.current) setAutosaveRevision((current) => current + 1);
+        });
+    }, 800);
+
+    return () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [
+    applyPostSaveEffects,
+    autosavePayloadFingerprint,
+    autosaveRevision,
+    hasLlmChannelDraft,
+    isLoading,
+    llmChannelDraftItemsFingerprint,
+    llmChannelDraftValid,
+    save,
+    refreshAfterExternalSave,
+    t,
+    uiLanguage,
+    updateSaveGroupState,
+  ]);
+
+  useEffect(() => {
+    if (conflictState) {
+      const group = autosaveActiveGroupRef.current ?? autosaveConflictGroupRef.current;
+      if (group) {
+        autosaveConflictGroupRef.current = group;
+        updateSaveGroupState(group, { status: 'conflicted' });
+      }
+      return;
+    }
+
+    const resolvedGroup = autosaveConflictGroupRef.current;
+    if (!resolvedGroup) return;
+    autosaveConflictGroupRef.current = null;
+    autosaveFailedFingerprintRef.current.delete(resolvedGroup);
+    const remainingGroups = new Map(
+      (JSON.parse(autosavePayloadFingerprint) as Array<[string, SystemConfigUpdateItem[]]>),
+    );
+    updateSaveGroupState(resolvedGroup, {
+      status: remainingGroups.has(resolvedGroup) ? 'scheduled' : 'idle',
+    });
+    setAutosaveRevision((current) => current + 1);
+  }, [autosavePayloadFingerprint, conflictState, updateSaveGroupState]);
+
+  const retryAutosaveGroup = useCallback((group: string) => {
+    autosaveFailedFingerprintRef.current.delete(group);
+    autosaveSavedFingerprintRef.current.delete(group);
+    updateSaveGroupState(group, { status: 'scheduled' });
+    setAutosaveRevision((current) => current + 1);
+  }, [updateSaveGroupState]);
+
+  const restoreAutosaveGroup = useCallback((group: string) => {
+    if (typeof resetDraftGroup === 'function') {
+      resetDraftGroup(group);
+    } else {
+      resetDraft();
+    }
+    if (group === 'ai.model_graph') {
+      setLlmChannelDraftItems([]);
+      setLlmChannelDraftValid(true);
+      setLlmChannelResetSignal((current) => current + 1);
+    }
+    autosaveFailedFingerprintRef.current.delete(group);
+    autosaveSavedFingerprintRef.current.delete(group);
+    autosaveOrderRef.current.delete(group);
+    updateSaveGroupState(group, { status: 'idle' });
+  }, [resetDraft, resetDraftGroup, updateSaveGroupState]);
 
   // Warn before leaving/refreshing/closing the tab while there are unsaved config edits.
   useEffect(() => {
@@ -1322,7 +1580,41 @@ const SettingsPage: React.FC = () => {
   const DATA_SOURCE_HIDDEN_KEYS = new Set([
     'ALPHASIFT_ENABLED',
   ]);
-  const placementFilteredItems = rawActiveItems.filter((item) => !item.schema?.uiPlacement);
+  const resolveItemPlacement = (
+    item: SystemConfigItem,
+    fallbackCategory: SystemConfigCategory = activeCategory as SystemConfigCategory,
+  ) => resolveSystemConfigFieldPlacement({
+    category: item.schema?.category ?? fallbackCategory,
+    uiPlacement: item.schema?.uiPlacement,
+  });
+  const isItemContractReadOnly = (
+    item: SystemConfigItem,
+    fallbackCategory: SystemConfigCategory = activeCategory as SystemConfigCategory,
+  ) => (
+    resolveItemPlacement(item, fallbackCategory).readOnly
+    || Boolean(getConfigContractDiagnostic(item.schema?.contract))
+  );
+  const issuesForItem = (
+    item: SystemConfigItem,
+    fallbackCategory: SystemConfigCategory = activeCategory as SystemConfigCategory,
+  ): ConfigValidationIssue[] => {
+    const diagnostics = [
+      resolveItemPlacement(item, fallbackCategory).diagnostic,
+      getConfigContractDiagnostic(item.schema?.contract),
+    ].filter((diagnostic): diagnostic is NonNullable<typeof diagnostic> => Boolean(diagnostic));
+    return [
+      ...(issueByKey[item.key] || []),
+      ...diagnostics.map((diagnostic) => ({
+        key: item.key,
+        code: diagnostic,
+        severity: 'warning' as const,
+        message: getSystemConfigContractDiagnosticText(uiLanguage, diagnostic),
+      })),
+    ];
+  };
+  const placementFilteredItems = rawActiveItems.filter(
+    (item) => resolveItemPlacement(item).placement === 'generic',
+  );
   const activeItems =
     activeCategory === 'system'
       ? placementFilteredItems.filter((item) => !SYSTEM_HIDDEN_KEYS.has(item.key))
@@ -1446,23 +1738,87 @@ const SettingsPage: React.FC = () => {
     () => availableModels.map((entry) => {
       const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
       return {
-        value: entry.route,
+        value: entry.modelRef,
         label: entry.display,
-        sublabel: [entry.providerLabel ?? entry.provider, connectionLabel]
+        sublabel: [entry.route, connectionLabel]
           .filter((part): part is string => Boolean(part))
           .join(' · ') || undefined,
-        group: connectionLabel ?? entry.providerLabel ?? entry.provider ?? undefined,
-        keywords: [entry.route, entry.providerId, connectionLabel]
+        group: entry.providerLabel ?? entry.provider ?? connectionLabel ?? undefined,
+        keywords: [entry.route, entry.providerId, entry.providerLabel, connectionLabel]
           .filter((part): part is string => Boolean(part)),
       };
     }),
     [availableModels],
   );
-  // Authoritative routable route set for AI Overview Active/Unavailable status.
-  const availableRouteSet = useMemo(
-    () => new Set(availableModels.map((entry) => entry.route)),
+  const availableModelsByRoute = useMemo(() => {
+    const byRoute = new Map<string, typeof availableModels>();
+    for (const entry of availableModels) {
+      byRoute.set(entry.route, [...(byRoute.get(entry.route) ?? []), entry]);
+    }
+    return byRoute;
+  }, [availableModels]);
+  const availableModelRefSet = useMemo(
+    () => new Set(availableModels.map((entry) => entry.modelRef)),
     [availableModels],
   );
+  const configuredModelCandidates = useCallback((value: string, key?: string) => {
+    const configured = value.trim();
+    if (!configured || availableModelRefSet.has(configured)) {
+      return [];
+    }
+    const comparableRoute = key === 'AGENT_LITELLM_MODEL'
+      && !configured.includes('/')
+      && !availableModelsByRoute.has(configured)
+      ? `openai/${configured}`
+      : configured;
+    return availableModelsByRoute.get(comparableRoute) ?? [];
+  }, [availableModelRefSet, availableModelsByRoute]);
+  const resolveConfiguredModelValue = useCallback((value: string, key?: string) => {
+    const configured = value.trim();
+    if (!configured || availableModelRefSet.has(configured)) {
+      return configured;
+    }
+    const candidates = configuredModelCandidates(configured, key);
+    return candidates.length === 1 ? candidates[0].modelRef : configured;
+  }, [availableModelRefSet, configuredModelCandidates]);
+  const isAmbiguousLegacyModelValue = useCallback(
+    (value: string, key?: string) => configuredModelCandidates(value, key).length > 1,
+    [configuredModelCandidates],
+  );
+  const fallbackSelectorValue = useMemo(
+    () => (allValuesByKey.LITELLM_FALLBACK_MODELS || '')
+      .split(',')
+      .map((value) => resolveConfiguredModelValue(value))
+      .filter(Boolean)
+      .join(','),
+    [allValuesByKey.LITELLM_FALLBACK_MODELS, resolveConfiguredModelValue],
+  );
+  const primarySelectorValue = useMemo(
+    () => resolveConfiguredModelValue(allValuesByKey.LITELLM_MODEL || '', 'LITELLM_MODEL'),
+    [allValuesByKey.LITELLM_MODEL, resolveConfiguredModelValue],
+  );
+  const ambiguousFallbackCandidates = useMemo(() => {
+    const candidatesByLegacyRoute = new Map<string, string[]>();
+    for (const value of (allValuesByKey.LITELLM_FALLBACK_MODELS || '').split(',')) {
+      const configured = value.trim();
+      const candidates = configuredModelCandidates(configured);
+      if (configured && candidates.length > 1) {
+        candidatesByLegacyRoute.set(configured, candidates.map((entry) => entry.modelRef));
+      }
+    }
+    return candidatesByLegacyRoute;
+  }, [allValuesByKey.LITELLM_FALLBACK_MODELS, configuredModelCandidates]);
+  // ModelRefs are authoritative for new configuration. A legacy route is
+  // considered resolved only when it identifies exactly one Connection.
+  const availableConfiguredModelSet = useMemo(() => {
+    const values = new Set(availableModelRefSet);
+    for (const [route, candidates] of availableModelsByRoute) {
+      if (candidates.length === 1) {
+        values.add(route);
+      }
+    }
+    return values;
+  }, [availableModelRefSet, availableModelsByRoute]);
   // Task -> route references, used by the model-access manager to show which
   // tasks use each connection and to protect referenced connections on delete.
   const taskModelRefs = useMemo(() => {
@@ -1484,38 +1840,28 @@ const SettingsPage: React.FC = () => {
   const replaceModelReferences = useCallback((replacements: ModelReferenceReplacement[]) => {
     const nextValues = new Map<string, string>();
     for (const replacement of replacements) {
-      const referencedKeys = new Set(
-        replacement.references
-          .map((reference) => reference.key)
-          .filter((key): key is string => Boolean(key)),
-      );
-      for (const key of referencedKeys) {
+      for (const reference of replacement.references) {
+        const key = reference.key;
+        if (!key) {
+          continue;
+        }
         const currentValue = nextValues.get(key) ?? allValuesByKey[key] ?? '';
         if (key === 'LITELLM_FALLBACK_MODELS') {
           const nextRoutes = currentValue
             .split(',')
             .map((route) => route.trim())
             .filter(Boolean)
-            .map((route) => (route === replacement.fromRoute ? replacement.toRoute : route));
+            .map((route) => (route === reference.route ? replacement.toModelRef : route));
           nextValues.set(key, Array.from(new Set(nextRoutes)).join(','));
-        } else {
-          const configuredRoute = currentValue.trim();
-          const comparableRoute = key === 'AGENT_LITELLM_MODEL'
-            && configuredRoute
-            && !configuredRoute.includes('/')
-            && !availableRouteSet.has(configuredRoute)
-            ? `openai/${configuredRoute}`
-            : configuredRoute;
-          if (comparableRoute === replacement.fromRoute) {
-            nextValues.set(key, replacement.toRoute);
-          }
+        } else if (currentValue.trim() === reference.route) {
+          nextValues.set(key, replacement.toModelRef);
         }
       }
     }
     for (const [key, value] of nextValues) {
       setDraftValue(key, value);
     }
-  }, [allValuesByKey, availableRouteSet, setDraftValue]);
+  }, [allValuesByKey, setDraftValue]);
   // Reliability is the user-facing model fallback order. Execution-backend
   // failover is an implementation diagnostic and lives under Advanced only.
   const isAiReliability = activeSection === 'ai_models' && activeView === 'reliability';
@@ -1537,7 +1883,14 @@ const SettingsPage: React.FC = () => {
   const advancedSectionItems = useMemo(
     () => Object.entries(itemsByCategory)
       .flatMap(([category, categoryItems]) =>
-        categoryItems.filter((item) => placementForKey(category, item.key).section === 'advanced'))
+        categoryItems.filter((item) => {
+          const resolved = resolveSystemConfigFieldPlacement({
+            category: item.schema?.category ?? category as SystemConfigCategory,
+            uiPlacement: item.schema?.uiPlacement,
+          });
+          return resolved.placement === 'developer_diagnostics'
+            || (resolved.placement === 'generic' && placementForKey(category, item.key).section === 'advanced');
+        }))
       .filter((item) => isFieldVisibleByContract(item.schema?.contract, allValuesByKey))
       .sort((a, b) => (a.schema?.displayOrder ?? 0) - (b.schema?.displayOrder ?? 0)),
     [itemsByCategory, allValuesByKey],
@@ -1709,66 +2062,6 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSaveConfig = async () => {
-    const changedItems = getChangedItems();
-    const syncRuntimeSchedulerState =
-      schedulerOverrideFromUi !== null
-      && schedulerRuntimeEnabled !== null
-      && schedulerOverrideFromUi !== schedulerRuntimeEnabled
-      && !changedItems.some((item) => item.key === 'SCHEDULE_ENABLED');
-    const schedulerSyncItem: SystemConfigUpdateItem[] = syncRuntimeSchedulerState
-      ? [{ key: 'SCHEDULE_ENABLED', value: schedulerOverrideFromUi ? 'true' : 'false' }]
-      : [];
-    // Commit the LLM channel draft through the same transaction so channel and
-    // normal field edits are persisted atomically. Channel entries win on key
-    // collisions since the editor owns those keys.
-    const mergedByKey = new Map<string, SystemConfigUpdateItem>();
-    for (const item of [...changedItems, ...schedulerSyncItem]) {
-      mergedByKey.set(item.key.toUpperCase(), item);
-    }
-    for (const item of llmChannelDraftItems) {
-      mergedByKey.set(item.key.toUpperCase(), item);
-    }
-    const changedItemsToSave = Array.from(mergedByKey.values());
-    const changedAlphaSiftItem = changedItems.find((item) => item.key === 'ALPHASIFT_ENABLED');
-    const result = await save(changedItemsToSave);
-    if (!result.success) {
-      return;
-    }
-    const submittedLlmValues = new Map(
-      llmChannelDraftItems.map((item) => [item.key.toUpperCase(), item.value]),
-    );
-    // Clear only the exact channel values included in this transaction. If the
-    // user edited a channel again while Save was in flight, keep that newer
-    // draft for the next transaction.
-    setLlmChannelDraftItems((current) => current.filter((item) => (
-      submittedLlmValues.get(item.key.toUpperCase()) !== item.value
-    )));
-    setLlmChannelDraftValid(true);
-    applyPostSaveEffects();
-    if (!changedAlphaSiftItem) {
-      return;
-    }
-
-    setAlphaSiftActionError(null);
-    setAlphaSiftActionSuccess('');
-    try {
-      const isAlphaSiftEnabled = changedAlphaSiftItem.value.trim().toLowerCase() === 'true';
-      if (isAlphaSiftEnabled) {
-        await alphasiftApi.enable();
-        await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-        setAlphaSiftActionSuccess(t('settings.enabledAlphaSiftSuccess'));
-        return;
-      }
-
-      notifyAlphaSiftConfigChanged();
-      setAlphaSiftActionSuccess(t('settings.disabledAlphaSiftSuccess'));
-    } catch (error: unknown) {
-      setAlphaSiftActionError(getParsedApiError(error));
-      await refreshAfterExternalSave(['ALPHASIFT_ENABLED']);
-    }
-  };
-
   // First-run wizard commits its minimal config through the same save
   // transaction (validate + update + apply server payload), so channel keys are
   // persisted atomically and the normal post-save effects run. The result is
@@ -1925,14 +2218,14 @@ const SettingsPage: React.FC = () => {
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
           items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
-          disabled={isSaving}
+          disabled={isLoading}
           onChange={setDraftValue}
           issueByKey={issueByKey}
         />
       ) : isDataProvidersSub ? (
         <DataProvidersPanel
           items={subFilteredItems}
-          disabled={isSaving}
+          disabled={isLoading}
           onChange={setDraftValue}
           issueByKey={issueByKey}
           configuredOverrides={{ alphasift: alphasiftEnabled }}
@@ -1955,11 +2248,11 @@ const SettingsPage: React.FC = () => {
                       key={item.key}
                       item={item}
                       value={item.value}
-                      disabled={isSaving}
+                      disabled={isItemContractReadOnly(item)}
                       onChange={setDraftValue}
-                      issues={issueByKey[item.key] || []}
+                      issues={issuesForItem(item)}
                       requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                      dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                     />
                   ))}
                 </div>
@@ -1974,9 +2267,11 @@ const SettingsPage: React.FC = () => {
               key={item.key}
               item={item}
               value={item.value}
-              disabled={isSaving}
+              disabled={isItemContractReadOnly(item)}
               onChange={setDraftValue}
-              issues={issueByKey[item.key] || []}
+              issues={issuesForItem(item)}
+              requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+              dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
             />
           ))}
         </div>
@@ -2000,9 +2295,11 @@ const SettingsPage: React.FC = () => {
                 key={item.key}
                 item={item}
                 value={item.value}
-                disabled={isSaving}
+                disabled={isItemContractReadOnly(item)}
                 onChange={setDraftValue}
-                issues={issueByKey[item.key] || []}
+                issues={issuesForItem(item)}
+                requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
               />
             ))}
           </div>
@@ -2017,6 +2314,20 @@ const SettingsPage: React.FC = () => {
     />
   );
 
+  const visibleSaveGroupStates = Object.entries(saveGroupStates)
+    .filter(([, state]) => state.status !== 'idle');
+  const retryableSaveGroup = visibleSaveGroupStates.find(([, state]) => state.status === 'failed')?.[0];
+  const activeGroupHasDraft = activeSaveGroup ? autosavePayloadMap.has(activeSaveGroup) : false;
+  const activeGroupStatus = activeSaveGroup ? saveGroupStates[activeSaveGroup]?.status : undefined;
+  const autosaveStatusText = (state: SettingsSaveGroupState): string => {
+    if (state.status === 'scheduled') return t('settings.autosaveScheduled');
+    if (state.status === 'saving') return t('settings.autosaveSaving');
+    if (state.status === 'saved') return t('settings.autosaveSaved');
+    if (state.status === 'conflicted') return t('settings.autosaveConflicted');
+    if (state.status === 'failed') return t('settings.autosaveFailed');
+    return '';
+  };
+
   return (
     <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
       <div className="mb-4 px-1 py-1">
@@ -2029,49 +2340,54 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="settings-secondary"
-              size="sm"
-              className="px-2.5"
-              onClick={() => {
-                if (effectiveHasDirty) {
-                  setShowResetConfirm(true);
-                } else {
-                  discardDraft();
-                }
-              }}
-              disabled={isLoading || isSaving}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              {t('settings.reset')}
-            </Button>
-            <Button
-              type="button"
-              variant="settings-primary"
-              size="sm"
-              className="px-2.5"
-              onClick={() => void handleSaveConfig()}
-              disabled={!canSaveConfig || isSaving || isLoading}
-              isLoading={isSaving}
-              loadingText={t('settings.saving')}
-            >
-              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              {isSaving
-                ? t('settings.saving')
-                : effectiveDirtyCount
-                  ? t('settings.saveConfigWithCount', { count: effectiveDirtyCount })
-                  : t('settings.saveConfig')}
-            </Button>
+            {activeSaveGroup ? (
+              <Button
+                type="button"
+                variant="settings-secondary"
+                size="sm"
+                className="px-2.5"
+                onClick={() => setShowResetConfirm(true)}
+                disabled={isLoading || isSaving || (!activeGroupHasDraft && activeGroupStatus !== 'failed' && activeGroupStatus !== 'conflicted')}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                {t('settings.autosaveResetGroup')}
+              </Button>
+            ) : null}
           </div>
         </div>
+
+        {visibleSaveGroupStates.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
+            {visibleSaveGroupStates.map(([group, state]) => (
+              <div
+                key={group}
+                className="flex min-h-11 items-center gap-2 rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-xs text-secondary-text"
+              >
+                <span className="font-medium text-foreground">
+                  {SETTINGS_SAVE_GROUP_LABELS[uiLanguage][group] ?? t('settings.pageTitle')}
+                </span>
+                <span>{autosaveStatusText(state)}</span>
+                {state.status === 'failed' ? (
+                  <>
+                    <Button type="button" variant="settings-secondary" size="sm" onClick={() => retryAutosaveGroup(group)}>
+                      {t('settings.autosaveRetry')}
+                    </Button>
+                    <Button type="button" variant="settings-secondary" size="sm" onClick={() => restoreAutosaveGroup(group)}>
+                      {t('settings.autosaveRestore')}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {saveError ? (
           <ApiErrorAlert
             className="mt-3"
             error={saveError}
-            actionLabel={retryAction === 'save' ? t('settings.saveRetry') : undefined}
-            onAction={retryAction === 'save' ? () => void handleSaveConfig() : undefined}
+            actionLabel={retryableSaveGroup ? t('settings.autosaveRetry') : undefined}
+            onAction={retryableSaveGroup ? () => retryAutosaveGroup(retryableSaveGroup) : undefined}
           />
         ) : null}
 
@@ -2504,7 +2820,7 @@ const SettingsPage: React.FC = () => {
                     getValue={(key) => allValuesByKey[key.toUpperCase()] ?? ''}
                     language={uiLanguage}
                     onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
-                    availableRoutes={availableRouteSet}
+                    availableRoutes={availableConfiguredModelSet}
                   />
                 )}
               </SettingsSectionCard>
@@ -2547,7 +2863,9 @@ const SettingsPage: React.FC = () => {
                       <div className="mt-4 space-y-1 text-left text-xs text-warning">
                         {configuredTaskRoutes.map((route) => (
                           <p key={route.key}>
-                            {formatUiText(settingsText.staleValue, { value: route.value })}
+                            {formatUiText(settingsText.staleValue, {
+                              value: formatConfiguredModelDisplay(route.value),
+                            })}
                           </p>
                         ))}
                       </div>
@@ -2567,10 +2885,9 @@ const SettingsPage: React.FC = () => {
                           <div className="min-w-0">
                             <SearchableSelect
                               id={`setting-${item.key}`}
-                              value={item.value}
+                              value={resolveConfiguredModelValue(item.value, item.key)}
                               onChange={(next) => setDraftValue(item.key, next)}
                               options={modelSelectorOptions}
-                              disabled={isSaving}
                               ariaLabel={SETTINGS_TASK_ROUTE_LABELS[uiLanguage][item.key] ?? getFieldTitleZh(item.key, item.key)}
                               placeholder={item.key === 'LITELLM_MODEL'
                                 ? settingsText.selectModel
@@ -2581,7 +2898,13 @@ const SettingsPage: React.FC = () => {
                                 .join(' ') || undefined}
                               emptyText={settingsText.noModelOptions}
                               searchPlaceholder={settingsText.searchModels}
-                              staleValueLabel={formatUiText(settingsText.staleValue, { value: item.value })}
+                              staleValueText={formatConfiguredModelDisplay(item.value)}
+                              staleValueLabel={formatUiText(
+                                isAmbiguousLegacyModelValue(item.value, item.key)
+                                  ? settingsText.ambiguousLegacyRoute
+                                  : settingsText.staleValue,
+                                { value: formatConfiguredModelDisplay(item.value) },
+                              )}
                               clearable={item.key !== 'LITELLM_MODEL'}
                             />
                             {(issueByKey[item.key] || []).map((issue) => (
@@ -2600,11 +2923,11 @@ const SettingsPage: React.FC = () => {
                           key={item.key}
                           item={item}
                           value={item.value}
-                          disabled={isSaving}
+                          disabled={isItemContractReadOnly(item)}
                           onChange={setDraftValue}
-                          issues={issueByKey[item.key] || []}
+                          issues={issuesForItem(item)}
                           requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                          dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                         />
                       )
                     ))}
@@ -2638,12 +2961,12 @@ const SettingsPage: React.FC = () => {
                 description={settingsText.fallbackDescription}
               >
                 <ModelFallbackEditor
-                  value={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                  value={fallbackSelectorValue}
                   onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
                   options={modelSelectorOptions}
-                  primaryRoute={allValuesByKey.LITELLM_MODEL || ''}
+                  primaryRoute={primarySelectorValue}
+                  ambiguousLegacyCandidates={ambiguousFallbackCandidates}
                   language={uiLanguage}
-                  disabled={isSaving}
                 />
                 {(issueByKey.LITELLM_FALLBACK_MODELS || []).map((issue) => (
                   <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
@@ -2675,11 +2998,11 @@ const SettingsPage: React.FC = () => {
                             key={item.key}
                             item={item}
                             value={item.value}
-                            disabled={isSaving}
+                            disabled={isItemContractReadOnly(item)}
                             onChange={setDraftValue}
-                            issues={issueByKey[item.key] || []}
+                            issues={issuesForItem(item)}
                             requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                            dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                           />
                         ))}
                       </div>
@@ -2723,13 +3046,22 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-primary"
-                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || Boolean(channelsOverriddenByMode)}
+                      disabled={isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || Boolean(channelsOverriddenByMode)}
                       onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
                     >
                       {settingsText.addModelService}
                     </Button>
                   </div>
                 </div>
+                {providerCatalogError ? (
+                  <SettingsAlert
+                    variant="error"
+                    title={settingsText.providerCatalogFailed}
+                    message={settingsText.providerCatalogErrorDescription}
+                    actionLabel={settingsText.reloadProviderCatalog}
+                    onAction={() => reloadProviderCatalog()}
+                  />
+                ) : null}
                 <LLMChannelEditor
                   key={`llm-connections-${configVersion}`}
                   items={rawActiveItems}
@@ -2743,7 +3075,7 @@ const SettingsPage: React.FC = () => {
                   resetSignal={llmChannelResetSignal}
                   addSignal={llmChannelAddSignal}
                   focusFieldRequest={llmFocusFieldRequest}
-                  disabled={isSaving || isLoading}
+                  disabled={isLoading}
                   catalogUnavailable={Boolean(providerCatalogError)}
                   onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}
@@ -2790,11 +3122,11 @@ const SettingsPage: React.FC = () => {
                       key={item.key}
                       item={item}
                       value={item.value}
-                      disabled={isSaving}
+                      disabled={isItemContractReadOnly(item)}
                       onChange={setDraftValue}
-                      issues={issueByKey[item.key] || []}
+                      issues={issuesForItem(item)}
                       requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                      dependencyLocked={isItemContractReadOnly(item) || !isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                     />
                   ))}
                 </div>
@@ -2840,7 +3172,7 @@ const SettingsPage: React.FC = () => {
         cancelText={t('common.cancel')}
         onConfirm={() => {
           setShowResetConfirm(false);
-          discardDraft();
+          if (activeSaveGroup) restoreAutosaveGroup(activeSaveGroup);
         }}
         onCancel={() => {
           setShowResetConfirm(false);

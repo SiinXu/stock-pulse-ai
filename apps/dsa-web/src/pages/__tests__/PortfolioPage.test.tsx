@@ -1126,4 +1126,126 @@ describe('PortfolioPage FX refresh', () => {
     expect(within(accountListbox).getByRole('option', { name: 'Alt (#2)' })).toBeInTheDocument();
     expect(within(accountListbox).queryByRole('option', { name: 'Main (#1)' })).not.toBeInTheDocument();
   });
+
+  it('reuses the trade operation ID after a client timeout and preserves the form', async () => {
+    createTrade
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '请求超时', message: '服务端响应丢失' })),
+      )
+      .mockResolvedValueOnce({ id: 41 });
+
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    expect(await screen.findByText('请求超时')).toBeInTheDocument();
+    expect(screen.getByLabelText('股票代码')).toHaveValue('600519');
+    const firstOperationId = createTrade.mock.calls[0][0].operationId;
+    expect(firstOperationId).toEqual(expect.any(String));
+
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+    await waitFor(() => expect(createTrade).toHaveBeenCalledTimes(2));
+    expect(createTrade.mock.calls[1][0].operationId).toBe(firstOperationId);
+    await waitFor(() => expect(screen.queryByText('手工录入：交易')).not.toBeInTheDocument());
+  });
+
+  it('keeps the trade modal open and fields disabled while the write is pending', async () => {
+    const pending = deferredPromise<{ id: number }>();
+    createTrade.mockImplementationOnce(() => pending.promise);
+
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    await waitFor(() => expect(createTrade).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText('股票代码')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(screen.getByText('手工录入：交易')).toBeInTheDocument();
+
+    await act(async () => pending.resolve({ id: 42 }));
+    await waitFor(() => expect(screen.queryByText('手工录入：交易')).not.toBeInTheDocument());
+  });
+
+  it('uses a new trade operation ID after the failed form payload is edited', async () => {
+    createTrade
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '请求失败', message: '请修正后重试' })),
+      )
+      .mockResolvedValueOnce({ id: 43 });
+
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: '600519' } });
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+    await screen.findByText('请求失败');
+
+    const firstOperationId = createTrade.mock.calls[0][0].operationId;
+    fireEvent.change(screen.getByLabelText('数量'), { target: { value: '11' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交交易' }));
+
+    await waitFor(() => expect(createTrade).toHaveBeenCalledTimes(2));
+    expect(createTrade.mock.calls[1][0].operationId).not.toBe(firstOperationId);
+  });
+
+  it('reuses the CSV operation ID on retry and renders record-level commit errors', async () => {
+    commitCsvImport
+      .mockRejectedValueOnce(
+        createApiError(createParsedApiError({ title: '请求超时', message: '服务端响应丢失' })),
+      )
+      .mockResolvedValueOnce({
+        accountId: 1,
+        recordCount: 2,
+        insertedCount: 1,
+        duplicateCount: 0,
+        failedCount: 1,
+        dryRun: true,
+        errors: ['row=3: quantity and price must be > 0'],
+      });
+
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    const file = new File(['csv'], 'trades.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+
+    expect(await screen.findByText('请求超时')).toBeInTheDocument();
+    const firstOperationId = commitCsvImport.mock.calls[0][4];
+    fireEvent.click(screen.getByRole('button', { name: '提交导入' }));
+
+    await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
+    expect(commitCsvImport.mock.calls[1][4]).toBe(firstOperationId);
+    expect(await screen.findByText('row=3: quantity and price must be > 0')).toBeInTheDocument();
+    expect(screen.getByText('CSV 预演结果')).toBeInTheDocument();
+  });
+
+  it('keeps ledger filters labeled and single-column at the narrowest viewport', async () => {
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+
+    fireEvent.click(screen.getByRole('button', { name: '事件记录' }));
+    const dialog = screen.getByRole('dialog', { name: '事件记录' });
+    expect(within(dialog).getByRole('combobox', { name: '类型' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('combobox', { name: '买卖方向' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('开始日期').closest('.grid')).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: '刷新流水' })).toHaveClass('min-h-11'));
+  });
 });

@@ -16,6 +16,7 @@ type ResolveChatFollowUpContextParams = {
   stockCode: string;
   stockName: string | null;
   recordId?: number;
+  onHydrationFailure?: () => void;
 };
 
 const MAX_FOLLOW_UP_NAME_LENGTH = 80;
@@ -146,6 +147,7 @@ export async function resolveChatFollowUpContext({
   stockCode,
   stockName,
   recordId,
+  onHydrationFailure,
 }: ResolveChatFollowUpContextParams): Promise<ChatFollowUpContext> {
   if (!recordId) {
     return buildChatFollowUpContext(stockCode, stockName);
@@ -155,6 +157,7 @@ export async function resolveChatFollowUpContext({
     const report = await historyApi.getDetail(recordId);
     return buildChatFollowUpContext(stockCode, stockName, report);
   } catch {
+    onHydrationFailure?.();
     return buildChatFollowUpContext(stockCode, stockName);
   }
 }

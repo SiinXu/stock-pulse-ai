@@ -82,7 +82,7 @@ docs: update the README deployment guide
 |--------|------|:--------:|
 | backend-gate | `scripts/ci_gate.sh`（py_compile + flake8 严重错误 + 本地核心脚本 + offline pytest） | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
-| web-gate | 前端变更时执行 `npm run lint` + `npm run test` + `npm run build` | ✅（触发时） |
+| web-gate | 前端变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` | ✅（触发时） |
 | web-e2e | 前端变更时以隔离的临时 `ENV_FILE` 启动真实后端、Vite 与本地 fake 模型端点，并执行 `npm run test:smoke`（Playwright） | ✅（触发时） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
 
@@ -108,7 +108,9 @@ npm run test:smoke
 
 Web 界面文案、语言边界、领域字典和错误码约定见 [Web 国际化开发约定](web-i18n.md)。新增页面或语言时必须按领域扩展 `src/locales/`，不得在 JSX 中硬编码可见文案。
 
-Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/runtime/`；测试启动时播种确定性报告数据，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端、Vite 与 fake provider 日志保存在 `test-results/service-logs/`，失败时由 CI 连同截图、trace 和 video 上传。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/runtime/`；测试启动时播种确定性报告数据，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端、Vite 与 fake provider 日志保存在 `test-results/service-logs/`。CI 每次上传验收截图与 HTML 报告作为 PR 证据；失败时同一 artifact 还包含 trace、video 与服务日志。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+
+语义验收场景必须分别使用具有可读名称的独立 `test()`，并对该场景的关键结果做直接断言；循环、注释编号、重试或只断言页面可打开都不能替代独立覆盖。确定性竞态测试保持零重试，失败时应依靠 trace、video、截图和服务日志定位根因。
 
 前端本地联调：`npm run dev` 启动的 vite dev server 会把 `/api` 请求代理到 `DSA_WEB_DEV_API_PROXY`（默认 `http://127.0.0.1:8000`）；后端不在本机默认端口时，通过该环境变量指向实际后端地址。
 

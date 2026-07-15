@@ -45,7 +45,7 @@ export interface ConfigCondition {
 }
 
 export interface ConfigFieldContract {
-  requirement?: 'required' | 'optional' | 'inherited';
+  requirement: 'required' | 'optional' | 'inherited';
   requiredWhen?: ConfigCondition[];
   visibleWhen?: ConfigCondition[];
   enabledWhen?: ConfigCondition[];
@@ -90,6 +90,8 @@ export interface SystemConfigFieldSchema {
   warningCodes?: string[];
   contract?: ConfigFieldContract;
   uiPlacement?: SystemConfigUIPlacement | null;
+  /** Stable backend-authored atomic group for Settings autosave. */
+  saveGroup?: string;
 }
 
 export interface SystemConfigCategorySchema {
@@ -196,6 +198,10 @@ export interface LlmProviderCatalogEntry {
   supportsDiscovery: boolean;
   isLocal: boolean;
   isCustom: boolean;
+  credentialUrl?: string | null;
+  consoleUrl?: string | null;
+  modelsUrl?: string | null;
+  docsUrl?: string | null;
 }
 
 export interface LlmProviderCatalogResponse {
@@ -209,13 +215,15 @@ export interface LlmProviderCatalogResponse {
 }
 
 export interface AvailableModelEntry {
-  /** Canonical backend route stored on selection (e.g. deepseek/deepseek-v4-flash). */
+  /** Stable, connection-aware value stored by task routing and fallback fields. */
+  modelRef: string;
+  /** Canonical backend runtime route (e.g. deepseek/deepseek-v4-flash). */
   route: string;
   /** User-facing display name. */
   display: string;
   /** Owning connection name (best-effort grouping), null if unknown. */
   connection: string | null;
-  /** Stable connection id (equals the connection name), null if unknown. */
+  /** Stable connection id, null for non-Connection sources such as YAML. */
   connectionId: string | null;
   /** User-facing connection name returned by the backend. */
   connectionName: string | null;
@@ -465,11 +473,21 @@ export interface DiscoverLLMChannelModelsResponse {
 export interface SystemConfigValidationErrorResponse {
   error: string;
   message: string;
-  issues: ConfigValidationIssue[];
+  params?: Record<string, unknown>;
+  details: {
+    issues: ConfigValidationIssue[];
+  };
+  traceId?: string;
+  issues?: ConfigValidationIssue[];
 }
 
 export interface SystemConfigConflictResponse {
   error: string;
   message: string;
-  currentConfigVersion: string;
+  params?: Record<string, unknown>;
+  details: {
+    currentConfigVersion: string;
+  };
+  traceId?: string;
+  currentConfigVersion?: string;
 }

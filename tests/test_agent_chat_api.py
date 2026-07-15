@@ -129,3 +129,56 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["session_id"] == "s1"
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
+
+
+def test_agent_chat_disabled_uses_stable_error_envelope(tmp_path: Path) -> None:
+    config = SimpleNamespace(is_agent_available=lambda: False)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            client = TestClient(create_app(static_dir=tmp_path / "static"))
+            response = client.post("/api/v1/agent/chat", json={"message": "hello"})
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"] == "agent_disabled"
+    assert payload["params"] == {}
+    assert payload["details"] == {}
+    assert payload["trace_id"]
+
+
+def test_agent_chat_internal_error_does_not_expose_exception_text(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.side_effect = RuntimeError("provider token=super-secret")
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"), raise_server_exceptions=False)
+                response = client.post("/api/v1/agent/chat", json={"message": "hello"})
+
+    assert response.status_code == 500
+    assert response.json()["error"] == "agent_request_failed"
+    assert response.json()["message"] == "Internal server error"
+    assert "super-secret" not in response.text
+
+
+def test_agent_chat_stream_uses_error_code_without_exception_text(tmp_path: Path) -> None:
+    executor = MagicMock()
+    executor.chat.side_effect = RuntimeError("provider token=super-secret")
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={"message": "hello", "session_id": "s-error"},
+                )
+
+    assert response.status_code == 200
+    assert '"error_code": "agent_stream_failed"' in response.text
+    assert '"error_params": {}' in response.text
+    assert "super-secret" not in response.text

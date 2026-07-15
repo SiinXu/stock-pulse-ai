@@ -1,5 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import {
+  MemoryRouter,
+  useLocation,
+  useNavigate,
+  type NavigateOptions,
+  type To,
+} from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
@@ -19,7 +25,17 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => navigateMock,
+    useNavigate: () => {
+      const navigate = actual.useNavigate();
+      return (
+        to: To | number,
+        options?: NavigateOptions,
+      ) => {
+        if (options === undefined) navigateMock(to);
+        else navigateMock(to, options);
+        return typeof to === 'number' ? navigate(to) : navigate(to, options);
+      };
+    },
   };
 });
 
@@ -92,6 +108,31 @@ const historyReport = {
     operationAdvice: '继续观察买点',
     trendPrediction: '短线震荡偏强',
     sentimentScore: 78,
+  },
+};
+
+const secondHistoryItem = {
+  ...historyItem,
+  id: 2,
+  queryId: 'q-2',
+  stockCode: 'AAPL',
+  stockName: 'Apple',
+  createdAt: '2026-03-19T08:00:00Z',
+};
+
+const secondHistoryReport = {
+  ...historyReport,
+  meta: {
+    ...historyReport.meta,
+    id: 2,
+    queryId: 'q-2',
+    stockCode: 'AAPL',
+    stockName: 'Apple',
+    createdAt: '2026-03-19T08:00:00Z',
+  },
+  summary: {
+    ...historyReport.summary,
+    analysisSummary: 'Apple route report',
   },
 };
 
@@ -203,6 +244,32 @@ const runFlowSnapshot: RunFlowSnapshot = {
   ],
 };
 
+function HomeRouteProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <div>
+      <output data-testid="home-route">{`${location.pathname}${location.search}`}</output>
+      <button type="button" onClick={() => navigate(-1)}>test route back</button>
+      <button type="button" onClick={() => navigate(1)}>test route forward</button>
+    </div>
+  );
+}
+
+function renderRoutedHome(initialEntry = '/') {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <HomePage />
+      <HomeRouteProbe />
+    </MemoryRouter>,
+  );
+}
+
+function getCurrentHomeRoute(): URLSearchParams {
+  const route = screen.getByTestId('home-route').textContent || '/';
+  return new URLSearchParams(route.split('?')[1] || '');
+}
+
 describe('HomePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -217,6 +284,7 @@ describe('HomePage', () => {
     });
     vi.mocked(systemConfigApi.getWatchlist).mockResolvedValue([]);
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({ total: 0, items: [] });
     vi.mocked(historyApi.getDiagnostics).mockResolvedValue({
       status: 'unknown',
       statusLabel: '未知',
@@ -248,16 +316,12 @@ describe('HomePage', () => {
       status: 'pending',
     });
 
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
+    renderRoutedHome();
 
     const dashboard = await screen.findByTestId('home-dashboard');
     expect(dashboard).toBeInTheDocument();
-    expect(dashboard.className).toContain('h-[calc(100vh-5rem)]');
-    expect(dashboard.className).toContain('lg:h-[calc(100vh-2rem)]');
+    expect(dashboard.className).toContain('h-[calc(100dvh-5rem)]');
+    expect(dashboard.className).toContain('lg:h-[calc(100dvh-2rem)]');
     expect(dashboard.firstElementChild?.className).toContain('min-h-0');
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
@@ -269,6 +333,81 @@ describe('HomePage', () => {
       }),
     ).toBeInTheDocument();
     expect(historyApi.getMarkdown).not.toHaveBeenCalled();
+  });
+
+  it('restores a report record from the URL on initial load', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      Promise.resolve(recordId === 2 ? secondHistoryReport : historyReport)
+    ));
+
+    renderRoutedHome('/?recordId=2');
+
+    expect(await screen.findByText('Apple route report')).toBeInTheDocument();
+    expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
+    expect(historyApi.getDetail).toHaveBeenCalledWith(2);
+    expect(getCurrentHomeRoute().get('recordId')).toBe('2');
+  });
+
+  it('writes report selection to the URL and restores it across Back and Forward', async () => {
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 2,
+      items: [
+        {
+          id: 1,
+          stockCode: '600519',
+          stockName: '贵州茅台',
+          reportType: 'detailed',
+          sentimentScore: 78,
+          operationAdvice: '观察',
+          analysisCount: 1,
+          lastAnalysisTime: '2026-03-18T08:00:00Z',
+        },
+        {
+          id: 2,
+          stockCode: 'AAPL',
+          stockName: 'Apple',
+          reportType: 'detailed',
+          sentimentScore: 72,
+          operationAdvice: '观察',
+          analysisCount: 1,
+          lastAnalysisTime: '2026-03-19T08:00:00Z',
+        },
+      ],
+    });
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => (
+      Promise.resolve({
+        total: params.reportType === 'market_review' ? 0 : 2,
+        page: 1,
+        limit: params.reportType === 'market_review' ? 10 : 20,
+        items: params.reportType === 'market_review' ? [] : [historyItem, secondHistoryItem],
+      })
+    ));
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => (
+      Promise.resolve(recordId === 2 ? secondHistoryReport : historyReport)
+    ));
+
+    renderRoutedHome();
+
+    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
+    await waitFor(() => expect(getCurrentHomeRoute().get('recordId')).toBe('1'));
+
+    fireEvent.click(await screen.findByRole('button', { name: /AAPL/ }));
+    expect(await screen.findByText('Apple route report')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('recordId')).toBe('2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'test route back' }));
+    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('recordId')).toBe('1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'test route forward' }));
+    expect(await screen.findByText('Apple route report')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('recordId')).toBe('2');
   });
 
   it('loads markdown only after opening the full report drawer', async () => {
@@ -346,11 +485,7 @@ describe('HomePage', () => {
       ],
     });
 
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
+    renderRoutedHome();
 
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 运行流' }));
 
@@ -359,6 +494,8 @@ describe('HomePage', () => {
     });
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(screen.getByText('贵州茅台 运行流')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('runFlow')).toBe('task');
+    expect(getCurrentHomeRoute().get('taskId')).toBe('task-1');
   });
 
   it('opens the run-flow drawer from completed report diagnostics', async () => {
@@ -370,20 +507,47 @@ describe('HomePage', () => {
     });
     vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
 
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
-    );
+    renderRoutedHome();
 
+    const routeBackButton = screen.getByRole('button', { name: 'test route back' });
     fireEvent.click(await screen.findByText('运行状态'));
     fireEvent.click(screen.getByRole('button', { name: '查看历史记录 1 运行流' }));
 
+    await waitFor(() => expect(getCurrentHomeRoute().get('runFlow')).toBe('history'));
     await waitFor(() => {
       expect(historyApi.getRecordFlow).toHaveBeenCalledWith(1);
     });
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(screen.getByText('贵州茅台 历史运行流')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('recordId')).toBe('1');
+    expect(getCurrentHomeRoute().get('runFlow')).toBe('history');
+
+    fireEvent.click(routeBackButton);
+    await waitFor(() => expect(screen.queryByTestId('run-flow-panel')).not.toBeInTheDocument());
+    expect(getCurrentHomeRoute().get('recordId')).toBe('1');
+    expect(getCurrentHomeRoute().get('runFlow')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'test route forward' }));
+    expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('runFlow')).toBe('history');
+  });
+
+  it('restores a history Run Flow URL after a page refresh', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getDetail).mockResolvedValue(historyReport);
+
+    renderRoutedHome('/?recordId=1&runFlow=history');
+
+    await waitFor(() => expect(historyApi.getDetail).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(historyApi.getRecordFlow).toHaveBeenCalledWith(1));
+    expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
+    expect(getCurrentHomeRoute().get('recordId')).toBe('1');
+    expect(getCurrentHomeRoute().get('runFlow')).toBe('history');
   });
 
   it('shows market review history in the stock bar', async () => {
@@ -1548,7 +1712,7 @@ describe('HomePage', () => {
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).not.toHaveProperty('reportLanguage');
   });
 
-  it('uses the payload language for live market review controls', async () => {
+  it('keeps live market review controls in the UI language', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 0,
       page: 1,
@@ -1588,9 +1752,9 @@ describe('HomePage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
 
-    expect(await screen.findByRole('button', { name: 'Copy Markdown Source' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '复制 Markdown 源码' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '复制 Markdown 源码' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '复制纯文本' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy Markdown Source' })).not.toBeInTheDocument();
   });
 
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
@@ -1808,23 +1972,27 @@ describe('HomePage', () => {
       items: [],
     });
 
-    const { container } = render(
+    render(
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>,
     );
 
     const trigger = await screen.findByRole('button', { name: '历史记录' });
+    trigger.focus();
     fireEvent.click(trigger);
 
-    expect(container.querySelector('.page-drawer-overlay')).toBeTruthy();
-    expect(container.querySelector('.dashboard-card')).toBeTruthy();
+    const dialog = screen.getByRole('dialog', { name: '历史记录' });
+    const overlay = dialog.closest('[data-overlay-root="drawer"]') as HTMLElement;
+    expect(overlay).toBeInTheDocument();
+    expect(trigger.closest('[inert]')).toBeInTheDocument();
 
-    fireEvent.click(container.querySelector('.fixed.inset-0.z-40') as HTMLElement);
+    fireEvent.click(overlay.firstElementChild as HTMLElement);
 
     await waitFor(() => {
-      expect(container.querySelector('.page-drawer-overlay')).toBeFalsy();
+      expect(screen.queryByRole('dialog', { name: '历史记录' })).not.toBeInTheDocument();
     });
+    expect(trigger).toHaveFocus();
   });
 
   it('keeps same-stock history range controls in empty result state and allows switching back', async () => {
@@ -2103,7 +2271,9 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(navigateMock.mock.calls.some(([target]) => (
+      typeof target === 'string' && target.startsWith('/chat')
+    ))).toBe(false);
   });
 
   it('clears live market review output when switching to a history report', async () => {

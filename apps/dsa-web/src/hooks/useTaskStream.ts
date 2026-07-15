@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState, type MutableRefObject } from 'react';
 import { analysisApi } from '../api/analysis';
 import { toCamelCase } from '../api/utils';
-import type { TaskInfo } from '../types/analysis';
+import type { TaskInfo, TaskStatus } from '../types/analysis';
 import type { RunFlowEvent } from '../types/runFlow';
 
 /**
@@ -52,6 +52,10 @@ export interface UseTaskStreamOptions {
   reconnectDelay?: number;
   /** Whether the hook is enabled */
   enabled?: boolean;
+  /** Tasks that must remain recoverable while SSE is unavailable. */
+  trackedTasks?: readonly TaskInfo[];
+  /** Delay between targeted status polls while SSE is unavailable. */
+  pollingInterval?: number;
 }
 
 /**
@@ -88,13 +92,19 @@ type TaskStreamSubscriber = {
   setIsConnected: (value: boolean) => void;
   autoReconnect: boolean;
   reconnectDelay: number;
+  trackedTasksRef: MutableRefObject<readonly TaskInfo[]>;
+  pollingInterval: number;
 };
 
 let sharedEventSource: EventSource | null = null;
 let sharedReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+let sharedPollingTimeout: ReturnType<typeof setTimeout> | null = null;
+let sharedPollInFlight = false;
 let sharedConnected = false;
 let nextSubscriberId = 1;
 const subscribers = new Map<number, TaskStreamSubscriber>();
+const lastDeliveredSignatures = new Map<string, string>();
+const lastDeliveredRevisions = new Map<string, number>();
 
 // Convert snake_case payloads into camelCase TaskInfo objects.
 const toTaskInfo = (data: Record<string, unknown>): TaskInfo => {
@@ -105,15 +115,25 @@ const toTaskInfo = (data: Record<string, unknown>): TaskInfo => {
     status: data.status as TaskInfo['status'],
     progress: data.progress as number,
     message: data.message as string | undefined,
+    messageCode: data.message_code as string | undefined,
+    messageParams: data.message_params && typeof data.message_params === 'object'
+      ? data.message_params as Record<string, unknown>
+      : undefined,
     reportType: data.report_type as string,
     createdAt: data.created_at as string,
     startedAt: data.started_at as string | undefined,
     completedAt: data.completed_at as string | undefined,
     error: data.error as string | undefined,
+    errorCode: data.error_code as string | undefined,
+    errorParams: data.error_params && typeof data.error_params === 'object'
+      ? data.error_params as Record<string, unknown>
+      : undefined,
     originalQuery: data.original_query as string | undefined,
     selectionSource: data.selection_source as string | undefined,
     analysisPhase: data.analysis_phase as TaskInfo['analysisPhase'],
     skills: Array.isArray(data.skills) ? data.skills.map(String) : undefined,
+    revision: typeof data.revision === 'number' ? data.revision : undefined,
+    updatedAt: data.updated_at as string | undefined,
   };
 
   if (typeof data.trace_id === 'string' && data.trace_id.trim()) {
@@ -146,6 +166,155 @@ const forEachSubscriber = (notify: (callbacks: TaskStreamCallbacks) => void) => 
   subscribers.forEach((subscriber) => notify(subscriber.callbacksRef.current));
 };
 
+const isTerminalTask = (task: TaskInfo) => (
+  task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+);
+
+const isNewerTask = (candidate: TaskInfo, current: TaskInfo): boolean => {
+  if (candidate.revision !== undefined && current.revision !== undefined) {
+    return candidate.revision > current.revision;
+  }
+  const candidateTime = candidate.updatedAt ? Date.parse(candidate.updatedAt) : Number.NaN;
+  const currentTime = current.updatedAt ? Date.parse(current.updatedAt) : Number.NaN;
+  return Number.isFinite(candidateTime) && (!Number.isFinite(currentTime) || candidateTime > currentTime);
+};
+
+const getTrackedNonTerminalTasks = (): TaskInfo[] => {
+  const byId = new Map<string, TaskInfo>();
+  subscribers.forEach((subscriber) => {
+    subscriber.trackedTasksRef.current.forEach((task) => {
+      if (isTerminalTask(task)) return;
+      const existing = byId.get(task.taskId);
+      if (!existing || isNewerTask(task, existing)) {
+        byId.set(task.taskId, task);
+      }
+    });
+  });
+  return Array.from(byId.values());
+};
+
+const mergePolledStatus = (task: TaskInfo, status: TaskStatus): TaskInfo => ({
+  ...task,
+  traceId: status.traceId ?? task.traceId,
+  stockName: status.stockName ?? task.stockName,
+  status: status.status,
+  progress: status.progress ?? task.progress,
+  message: status.message ?? task.message,
+  messageCode: status.messageCode ?? task.messageCode,
+  messageParams: status.messageParams ?? task.messageParams,
+  error: status.error ?? task.error,
+  errorCode: status.errorCode ?? task.errorCode,
+  errorParams: status.errorParams ?? task.errorParams,
+  originalQuery: status.originalQuery ?? task.originalQuery,
+  selectionSource: status.selectionSource ?? task.selectionSource,
+  analysisPhase: status.analysisPhase ?? task.analysisPhase,
+  skills: status.skills ?? task.skills,
+  revision: status.revision ?? task.revision,
+  updatedAt: status.updatedAt ?? task.updatedAt,
+  completedAt: isTerminalTask({ ...task, status: status.status })
+    ? (status.updatedAt ?? task.completedAt ?? task.updatedAt)
+    : task.completedAt,
+});
+
+const pollSignature = (task: TaskInfo): string => (
+  `${task.updatedAt ?? ''}:${task.startedAt ?? ''}:${task.completedAt ?? ''}:${task.status}:${task.progress}:${task.messageCode ?? ''}:${task.message ?? ''}`
+);
+
+const shouldDeliverTask = (task: TaskInfo): boolean => {
+  if (task.revision !== undefined) {
+    const deliveredRevision = lastDeliveredRevisions.get(task.taskId);
+    if (deliveredRevision !== undefined && task.revision <= deliveredRevision) {
+      return false;
+    }
+    lastDeliveredRevisions.set(task.taskId, task.revision);
+    lastDeliveredSignatures.set(task.taskId, pollSignature(task));
+    return true;
+  }
+  if (lastDeliveredRevisions.has(task.taskId)) {
+    return false;
+  }
+  const signature = pollSignature(task);
+  if (lastDeliveredSignatures.get(task.taskId) === signature) {
+    return false;
+  }
+  lastDeliveredSignatures.set(task.taskId, signature);
+  return true;
+};
+
+const deliverTask = (task: TaskInfo, notify: (callbacks: TaskStreamCallbacks) => void): boolean => {
+  if (!shouldDeliverTask(task)) return false;
+  forEachSubscriber(notify);
+  return true;
+};
+
+const dispatchPolledTask = (task: TaskInfo) => {
+  deliverTask(task, (callbacks) => {
+    if (task.status === 'completed') {
+      callbacks.onTaskCompleted?.(task);
+    } else if (task.status === 'failed') {
+      callbacks.onTaskFailed?.(task);
+    } else {
+      callbacks.onTaskProgress?.(task);
+    }
+  });
+};
+
+function stopSharedPolling() {
+  if (sharedPollingTimeout) {
+    clearTimeout(sharedPollingTimeout);
+    sharedPollingTimeout = null;
+  }
+}
+
+function scheduleSharedPolling() {
+  stopSharedPolling();
+  if (sharedConnected || subscribers.size === 0 || getTrackedNonTerminalTasks().length === 0) {
+    return;
+  }
+  const delay = Math.min(...Array.from(subscribers.values()).map((subscriber) => subscriber.pollingInterval));
+  sharedPollingTimeout = setTimeout(() => {
+    sharedPollingTimeout = null;
+    void pollTrackedTasks();
+  }, delay);
+}
+
+async function pollTrackedTasks() {
+  if (sharedPollInFlight || sharedConnected || subscribers.size === 0) {
+    return;
+  }
+  const tasks = getTrackedNonTerminalTasks();
+  if (tasks.length === 0) {
+    return;
+  }
+
+  sharedPollInFlight = true;
+  try {
+    await Promise.all(tasks.map(async (task) => {
+      try {
+        const status = await analysisApi.getStatus(task.taskId);
+        if (
+          task.revision !== undefined
+          && status.revision !== undefined
+          && status.revision < task.revision
+        ) {
+          return;
+        }
+        dispatchPolledTask(mergePolledStatus(task, status));
+      } catch {
+        // Keep polling the other known tasks; one expired task must not stop recovery.
+      }
+    }));
+  } finally {
+    sharedPollInFlight = false;
+    scheduleSharedPolling();
+  }
+}
+
+function startSharedPolling() {
+  stopSharedPolling();
+  void pollTrackedTasks();
+}
+
 const clearSharedReconnect = () => {
   if (sharedReconnectTimeout) {
     clearTimeout(sharedReconnectTimeout);
@@ -155,11 +324,16 @@ const clearSharedReconnect = () => {
 
 const closeSharedConnection = () => {
   clearSharedReconnect();
+  stopSharedPolling();
   if (sharedEventSource) {
     sharedEventSource.close();
     sharedEventSource = null;
   }
   notifyConnectionState(false);
+  if (subscribers.size === 0) {
+    lastDeliveredSignatures.clear();
+    lastDeliveredRevisions.clear();
+  }
 };
 
 const scheduleSharedReconnect = () => {
@@ -186,6 +360,7 @@ function connectSharedStream() {
 
   if (typeof window.EventSource !== 'function') {
     notifyConnectionState(false);
+    startSharedPolling();
     return;
   }
 
@@ -194,6 +369,7 @@ function connectSharedStream() {
   sharedEventSource = eventSource;
 
   eventSource.addEventListener('connected', () => {
+    stopSharedPolling();
     notifyConnectionState(true);
     forEachSubscriber((callbacks) => callbacks.onConnected?.());
   });
@@ -201,21 +377,21 @@ function connectSharedStream() {
   eventSource.addEventListener('task_created', (e) => {
     const payload = parseEventData((e as MessageEvent<string>).data);
     if (payload) {
-      forEachSubscriber((callbacks) => callbacks.onTaskCreated?.(payload.task));
+      deliverTask(payload.task, (callbacks) => callbacks.onTaskCreated?.(payload.task));
     }
   });
 
   eventSource.addEventListener('task_started', (e) => {
     const payload = parseEventData((e as MessageEvent<string>).data);
     if (payload) {
-      forEachSubscriber((callbacks) => callbacks.onTaskStarted?.(payload.task));
+      deliverTask(payload.task, (callbacks) => callbacks.onTaskStarted?.(payload.task));
     }
   });
 
   eventSource.addEventListener('task_progress', (e) => {
     const payload = parseEventData((e as MessageEvent<string>).data);
     if (payload) {
-      forEachSubscriber((callbacks) => {
+      deliverTask(payload.task, (callbacks) => {
         callbacks.onTaskProgress?.(payload.task);
         if (payload.flowEvent) {
           callbacks.onTaskFlowEvent?.(payload.task, payload.flowEvent);
@@ -227,14 +403,14 @@ function connectSharedStream() {
   eventSource.addEventListener('task_completed', (e) => {
     const payload = parseEventData((e as MessageEvent<string>).data);
     if (payload) {
-      forEachSubscriber((callbacks) => callbacks.onTaskCompleted?.(payload.task));
+      deliverTask(payload.task, (callbacks) => callbacks.onTaskCompleted?.(payload.task));
     }
   });
 
   eventSource.addEventListener('task_failed', (e) => {
     const payload = parseEventData((e as MessageEvent<string>).data);
     if (payload) {
-      forEachSubscriber((callbacks) => callbacks.onTaskFailed?.(payload.task));
+      deliverTask(payload.task, (callbacks) => callbacks.onTaskFailed?.(payload.task));
     }
   });
 
@@ -249,6 +425,7 @@ function connectSharedStream() {
       eventSource.close();
       sharedEventSource = null;
     }
+    startSharedPolling();
     scheduleSharedReconnect();
   };
 }
@@ -274,11 +451,14 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
     autoReconnect = true,
     reconnectDelay = 3000,
     enabled = true,
+    trackedTasks = [],
+    pollingInterval = 2000,
   } = options;
 
   const [isConnected, setIsConnected] = useState(false);
   const subscriberIdRef = useRef<number | null>(null);
   const connectTimerRef = useRef<number | null>(null);
+  const trackedTasksRef = useRef<readonly TaskInfo[]>(trackedTasks);
 
   // Store callbacks in a ref to avoid reconnecting on every render.
   const callbacksRef = useRef<TaskStreamCallbacks>({
@@ -306,6 +486,10 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
     };
   });
 
+  useEffect(() => {
+    trackedTasksRef.current = trackedTasks;
+  }, [trackedTasks]);
+
   // Disconnect and defer the state update to avoid nested renders.
   const disconnect = useCallback(() => {
     if (connectTimerRef.current) {
@@ -332,10 +516,12 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
         setIsConnected,
         autoReconnect,
         reconnectDelay,
+        trackedTasksRef,
+        pollingInterval,
       });
     }
     reconnectSharedStream();
-  }, [autoReconnect, reconnectDelay]);
+  }, [autoReconnect, pollingInterval, reconnectDelay]);
 
   // Connect or disconnect when the hook is enabled or disabled.
   useEffect(() => {
@@ -347,6 +533,8 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
         setIsConnected,
         autoReconnect,
         reconnectDelay,
+        trackedTasksRef,
+        pollingInterval,
       });
       setIsConnected(sharedConnected);
       connectTimerRef.current = window.setTimeout(() => {
@@ -362,7 +550,7 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
     return () => {
       disconnect();
     };
-  }, [autoReconnect, disconnect, enabled, reconnectDelay]);
+  }, [autoReconnect, disconnect, enabled, pollingInterval, reconnectDelay]);
 
   return {
     isConnected,

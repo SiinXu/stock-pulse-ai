@@ -20,7 +20,7 @@ from src.config import (
     extra_litellm_params,
     get_api_keys_for_model,
     get_config,
-    get_configured_llm_models,
+    get_configured_llm_model_aliases,
     get_effective_agent_primary_model,
 )
 from src.agent.litellm_route_resolution import (
@@ -710,7 +710,7 @@ class LLMToolAdapter:
         # Use Router for primary model (multi-key), direct litellm for others
         use_channel_router = self._has_channel_config()
         resolution = getattr(self, "_route_resolution", None) or resolve_agent_litellm_route(self._config)
-        _router_model_names = set(get_configured_llm_models(resolution.model_list))
+        _router_model_names = set(get_configured_llm_model_aliases(resolution.model_list))
         agent_primary_model = resolution.primary_model or get_effective_agent_primary_model(self._config)
         uses_router = (
             bool(use_channel_router and self._router and model in _router_model_names)

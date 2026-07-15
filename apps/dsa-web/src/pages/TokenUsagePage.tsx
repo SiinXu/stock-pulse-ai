@@ -75,16 +75,16 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
           <p className="mt-1 text-xs text-secondary-text">{t('usage.calls', { count: formatNumber(model.calls, language) })}</p>
         </div>
         <span className="rounded-full border border-cyan/20 bg-cyan/10 px-2 py-1 text-xs text-cyan">
-          {formatNumber(model.totalTokens, language)} tokens
+          {t('usage.tokens', { count: formatNumber(model.totalTokens, language) })}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
         <div>
-          <p className="text-xs text-secondary-text">Prompt</p>
+          <p className="text-xs text-secondary-text">{t('usage.promptTokens')}</p>
           <p className="mt-1 font-medium text-foreground">{formatNumber(model.promptTokens, language)}</p>
         </div>
         <div>
-          <p className="text-xs text-secondary-text">Completion</p>
+          <p className="text-xs text-secondary-text">{t('usage.completionTokens')}</p>
           <p className="mt-1 font-medium text-foreground">{formatNumber(model.completionTokens, language)}</p>
         </div>
         <div>
@@ -222,7 +222,9 @@ const TokenUsagePage: React.FC = () => {
                         <div key={item.callType}>
                           <div className="flex items-center justify-between gap-3 text-sm">
                             <span className="font-medium text-foreground">{getCallTypeLabel(item.callType, t)}</span>
-                            <span className="text-secondary-text">{formatNumber(item.totalTokens, language)} tokens</span>
+                            <span className="text-secondary-text">
+                              {t('usage.tokens', { count: formatNumber(item.totalTokens, language) })}
+                            </span>
                           </div>
                           <div className="mt-2 h-2 overflow-hidden rounded-full bg-border/70">
                             <div
@@ -261,9 +263,9 @@ const TokenUsagePage: React.FC = () => {
                         <th className="px-4 py-3 font-medium">{t('usage.table.time')}</th>
                         <th className="px-4 py-3 font-medium">{t('usage.table.type')}</th>
                         <th className="px-4 py-3 font-medium">{t('usage.table.model')}</th>
-                        <th className="px-4 py-3 text-right font-medium">Prompt</th>
-                        <th className="px-4 py-3 text-right font-medium">Completion</th>
-                        <th className="px-4 py-3 text-right font-medium">Total</th>
+                        <th className="px-4 py-3 text-right font-medium">{t('usage.promptTokens')}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t('usage.completionTokens')}</th>
+                        <th className="px-4 py-3 text-right font-medium">{t('usage.totalTokens')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">

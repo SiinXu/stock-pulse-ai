@@ -42,15 +42,20 @@ function renderPhaseQuality(trigger: AlertTriggerItem, language: 'zh' | 'en'): R
 interface AlertTriggerHistoryProps {
   triggers: AlertTriggerItem[];
   isLoading?: boolean;
+  showEmptyState?: boolean;
 }
 
-export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({ triggers, isLoading = false }) => {
+export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
+  triggers,
+  isLoading = false,
+  showEmptyState = true,
+}) => {
   const { language } = useUiLanguage();
   const text = ALERT_TRIGGER_TEXT[language];
   return (
     <Card title={text.title} subtitle={text.subtitle} variant="bordered" padding="md">
       {isLoading ? <Loading label={text.loading} /> : null}
-      {!isLoading && triggers.length === 0 ? (
+      {!isLoading && showEmptyState && triggers.length === 0 ? (
         <EmptyState
           icon={<Activity className="h-6 w-6" />}
           title={text.emptyTitle}

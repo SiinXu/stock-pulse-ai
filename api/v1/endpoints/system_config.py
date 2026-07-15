@@ -8,6 +8,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from api.deps import get_runtime_scheduler_service, get_system_config_service
+from api.v1.errors import api_error
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
@@ -347,11 +348,18 @@ def apply_legacy_channels_migration(
     try:
         return service.apply_legacy_channels_migration(config_version=payload.config_version)
     except ConfigValidationError as exc:
-        raise HTTPException(status_code=400, detail={"error": "validation_error", "issues": exc.issues})
+        raise api_error(
+            400,
+            "validation_error",
+            "System configuration validation failed",
+            details={"issues": exc.issues},
+        )
     except ConfigConflictError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={"error": "config_conflict", "current_config_version": exc.current_version},
+        raise api_error(
+            409,
+            "config_conflict",
+            "Configuration has changed, please reload and retry",
+            details={"current_config_version": exc.current_version},
         )
     except Exception as exc:
         logger.error("Failed to apply legacy channel migration: %s", exc, exc_info=True)
@@ -384,13 +392,11 @@ def preview_generation_backend_status(
         )
         return GenerationBackendStatusResponse.model_validate(payload)
     except ConfigValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_failed",
-                "message": "System configuration validation failed",
-                "issues": exc.issues,
-            },
+        raise api_error(
+            400,
+            "validation_failed",
+            "System configuration validation failed",
+            details={"issues": exc.issues},
         )
     except Exception as exc:
         logger.error("Failed to preview generation backend status: %s", exc, exc_info=True)
@@ -430,13 +436,11 @@ def test_generation_backend(
         )
         return TestGenerationBackendResponse.model_validate(payload)
     except ConfigValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_failed",
-                "message": "System configuration validation failed",
-                "issues": exc.issues,
-            },
+        raise api_error(
+            400,
+            "validation_failed",
+            "System configuration validation failed",
+            details={"issues": exc.issues},
         )
     except (ValueError, TypeError) as exc:
         raise HTTPException(
@@ -483,22 +487,18 @@ def update_system_config(
         )
         return UpdateSystemConfigResponse.model_validate(payload)
     except ConfigValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_failed",
-                "message": "System configuration validation failed",
-                "issues": exc.issues,
-            },
+        raise api_error(
+            400,
+            "validation_failed",
+            "System configuration validation failed",
+            details={"issues": exc.issues},
         )
     except ConfigConflictError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": "config_version_conflict",
-                "message": "Configuration has changed, please reload and retry",
-                "current_config_version": exc.current_version,
-            },
+        raise api_error(
+            409,
+            "config_version_conflict",
+            "Configuration has changed, please reload and retry",
+            details={"current_config_version": exc.current_version},
         )
     except Exception as exc:
         logger.error("Failed to update system configuration: %s", exc, exc_info=True)
@@ -602,22 +602,18 @@ def import_system_config(
             },
         )
     except ConfigValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "validation_failed",
-                "message": "System configuration validation failed",
-                "issues": exc.issues,
-            },
+        raise api_error(
+            400,
+            "validation_failed",
+            "System configuration validation failed",
+            details={"issues": exc.issues},
         )
     except ConfigConflictError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": "config_version_conflict",
-                "message": "Configuration has changed, please reload and retry",
-                "current_config_version": exc.current_version,
-            },
+        raise api_error(
+            409,
+            "config_version_conflict",
+            "Configuration has changed, please reload and retry",
+            details={"current_config_version": exc.current_version},
         )
     except Exception as exc:
         logger.error("Failed to import system configuration: %s", exc, exc_info=True)

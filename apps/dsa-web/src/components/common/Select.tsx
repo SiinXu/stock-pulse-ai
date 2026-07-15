@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { OVERLAY_Z } from './overlayZ';
 
 interface SelectOption {
   value: string;
@@ -161,7 +162,7 @@ export const Select: React.FC<SelectProps> = ({
           onClick={() => (isOpen ? setIsOpen(false) : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground max-sm:h-11',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
@@ -186,14 +187,16 @@ export const Select: React.FC<SelectProps> = ({
             ref={listRef}
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
+            data-dialog-popup="true"
             style={{
+              zIndex: OVERLAY_Z.dropdown,
               top: triggerRect.bottom + 4,
               minWidth: triggerRect.width,
               ...(menuAlign === 'end'
                 ? { right: Math.max(document.documentElement.clientWidth - triggerRect.right, 0) }
                 : { left: triggerRect.left }),
             }}
-            className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
+            className="fixed max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
               <li
@@ -205,7 +208,7 @@ export const Select: React.FC<SelectProps> = ({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => commitOption(index)}
                 className={cn(
-                  'flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
+                  'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
                   index === activeIndex && 'bg-hover',
                 )}
               >

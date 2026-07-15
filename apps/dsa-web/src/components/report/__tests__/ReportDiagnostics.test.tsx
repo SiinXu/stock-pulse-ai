@@ -2,7 +2,9 @@ import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { RunDiagnosticSummary } from '../../../types/analysis';
+import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { ReportDiagnostics } from '../ReportDiagnostics';
 
 vi.mock('../../../api/history', () => ({
@@ -44,6 +46,7 @@ const diagnosticSummary: RunDiagnosticSummary = {
 describe('ReportDiagnostics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
       value: {
@@ -79,13 +82,19 @@ describe('ReportDiagnostics', () => {
     });
   });
 
-  it('uses the provided summary without fetching history diagnostics', () => {
-    render(<ReportDiagnostics summary={diagnosticSummary} language="en" />);
+  it('uses UI language for diagnostics even when the report language differs', () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    render(
+      <UiLanguageProvider>
+        <ReportDiagnostics summary={diagnosticSummary} language="zh" />
+      </UiLanguageProvider>,
+    );
 
     expect(historyApi.getDiagnostics).not.toHaveBeenCalled();
     expect(screen.getByText('Run Status')).toBeInTheDocument();
     expect(screen.getByText('Degraded')).toBeInTheDocument();
     expect(screen.getByText('Fetch / LLM / save / notification path')).toBeInTheDocument();
+    expect(screen.getByText('Real-time quote')).toBeInTheDocument();
   });
 
   it('opens historical run flow from the diagnostics body', async () => {

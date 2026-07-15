@@ -3735,50 +3735,140 @@
           "issues"
         ]
       },
-      "SystemConfigValidationErrorResponse": {
-        "type": "object",
-        "description": "配置更新校验失败响应",
+      "SystemConfigValidationErrorDetails": {
         "properties": {
-          "error": {
-            "type": "string",
-            "example": "validation_failed"
-          },
-          "message": {
-            "type": "string"
-          },
           "issues": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ConfigValidationIssue"
-            }
+            },
+            "title": "Issues"
           }
         },
-        "required": [
-          "error",
-          "message",
-          "issues"
-        ]
-      },
-      "SystemConfigConflictResponse": {
         "type": "object",
-        "description": "配置版本冲突响应",
+        "required": [
+          "issues"
+        ],
+        "title": "SystemConfigValidationErrorDetails",
+        "description": "Field-level diagnostics for a rejected configuration update."
+      },
+      "SystemConfigValidationErrorResponse": {
         "properties": {
           "error": {
             "type": "string",
-            "example": "config_version_conflict"
+            "title": "Error",
+            "description": "Error type",
+            "example": "validation_error"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "title": "Message",
+            "description": "Error details",
+            "example": "Invalid request parameters"
           },
-          "current_config_version": {
-            "type": "string"
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Localization interpolation parameters"
+          },
+          "details": {
+            "$ref": "#/components/schemas/SystemConfigValidationErrorDetails"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "Server diagnostic trace identifier"
           }
         },
+        "type": "object",
         "required": [
           "error",
           "message",
+          "details"
+        ],
+        "title": "SystemConfigValidationErrorResponse",
+        "description": "Error payload for failed update validation.",
+        "example": {
+          "details": {},
+          "error": "not_found",
+          "message": "Resource not found",
+          "params": {},
+          "trace_id": "optional-trace-id"
+        }
+      },
+      "SystemConfigConflictDetails": {
+        "properties": {
+          "current_config_version": {
+            "type": "string",
+            "title": "Current Config Version"
+          }
+        },
+        "type": "object",
+        "required": [
           "current_config_version"
-        ]
+        ],
+        "title": "SystemConfigConflictDetails",
+        "description": "Current version returned after an optimistic-lock conflict."
+      },
+      "SystemConfigConflictResponse": {
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "Error type",
+            "example": "validation_error"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Error details",
+            "example": "Invalid request parameters"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Localization interpolation parameters"
+          },
+          "details": {
+            "$ref": "#/components/schemas/SystemConfigConflictDetails"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "Server diagnostic trace identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error",
+          "message",
+          "details"
+        ],
+        "title": "SystemConfigConflictResponse",
+        "description": "Error payload for optimistic lock conflict.",
+        "example": {
+          "details": {},
+          "error": "not_found",
+          "message": "Resource not found",
+          "params": {},
+          "trace_id": "optional-trace-id"
+        }
       },
       "DecisionAction": {
         "type": "string",
@@ -4606,15 +4696,27 @@
             "description": "Error details",
             "example": "Invalid request parameters"
           },
-          "detail": {
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Localization interpolation parameters"
+          },
+          "details": {
+            "title": "Details",
+            "description": "Diagnostic details; never primary UI copy"
+          },
+          "trace_id": {
             "anyOf": [
-              {},
+              {
+                "type": "string"
+              },
               {
                 "type": "null"
               }
             ],
-            "title": "Detail",
-            "description": "Additional error information"
+            "title": "Trace Id",
+            "description": "Server diagnostic trace identifier"
           }
         },
         "type": "object",
@@ -4623,10 +4725,13 @@
           "message"
         ],
         "title": "ErrorResponse",
-        "description": "Error response.",
+        "description": "Stable API error envelope.",
         "example": {
+          "details": {},
           "error": "not_found",
-          "message": "Resource not found"
+          "message": "Resource not found",
+          "params": {},
+          "trace_id": "optional-trace-id"
         }
       },
       "RunFlowLane": {

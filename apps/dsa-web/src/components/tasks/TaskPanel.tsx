@@ -5,6 +5,7 @@ import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { localizeTaskMessage } from '../../utils/taskMessage';
 
 /**
  * 任务项组件属性
@@ -12,7 +13,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 interface TaskItemProps {
   task: TaskInfo;
   onOpenRunFlow?: (task: TaskInfo) => void;
-  onDismiss?: (taskId: string) => void;
+  onDismiss?: (taskId: string, revision?: number) => void;
 }
 
 /**
@@ -50,6 +51,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
   const requestedPhaseVariant = task.analysisPhase === 'auto' ? 'default' : 'info';
+  const localizedMessage = localizeTaskMessage(task, t);
+  const rawMessage = (task.message || '').trim();
+  const rawError = (task.error || '').trim();
+  const errorCode = (task.errorCode || '').trim();
+  const hasDiagnostics = Boolean(traceId || rawMessage || rawError || errorCode);
 
   return (
     <div className="home-subpanel grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
@@ -85,7 +91,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
                   type="button"
                   variant="ghost"
                   size="xsm"
-                  className="h-8 w-8 px-0"
+                  className="h-11 w-11 px-0"
                   onClick={(event) => {
                     event.stopPropagation();
                     onOpenRunFlow(task);
@@ -112,10 +118,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               type="button"
               variant="ghost"
               size="xsm"
-              className="h-8 w-8 px-0"
+              className="h-11 w-11 px-0"
               onClick={(event) => {
                 event.stopPropagation();
-                onDismiss(task.taskId);
+                onDismiss(task.taskId, task.revision);
               }}
               aria-label={t('taskPanel.dismissAria', { stock: task.stockName || task.stockCode })}
             >
@@ -125,9 +131,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
         </div>
       </div>
 
-      {task.message ? (
+      {localizedMessage ? (
         <p className="min-w-0 truncate text-xs text-secondary-text">
-          {task.message}
+          {localizedMessage}
         </p>
       ) : null}
 
@@ -147,29 +153,49 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="shrink-0 text-[11px] text-muted-text tabular-nums">
+          <span className="shrink-0 text-xs text-muted-text tabular-nums">
             {progress}%
           </span>
         </div>
       ) : null}
 
-      {traceId ? (
+      {hasDiagnostics ? (
         <details className="group/task text-xs">
           <summary
             className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-muted-text"
             data-testid="task-panel-diagnostics-summary"
           >
             <span className="whitespace-nowrap">{t('taskPanel.diagnostics')}</span>
-            <span className="min-w-0 truncate font-mono text-[11px] text-secondary-text">
-              {traceId.length > 18 ? `${traceId.slice(0, 10)}...` : traceId}
+            <span className="min-w-0 truncate font-mono text-xs text-secondary-text">
+              {traceId ? (traceId.length > 18 ? `${traceId.slice(0, 10)}...` : traceId) : (errorCode || task.taskId)}
             </span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open/task:rotate-180" aria-hidden="true" />
           </summary>
-          <div className="mt-1 rounded-lg border border-subtle bg-base/50 px-2 py-1.5 text-muted-text">
-            <span className="mr-1">Trace:</span>
-            <code className="break-all font-mono text-[11px] text-secondary-text">
-              {traceId}
-            </code>
+          <div className="mt-1 grid gap-1 rounded-lg border border-subtle bg-base/50 px-2 py-1.5 text-muted-text">
+            {traceId ? (
+              <div>
+                <span className="mr-1">{t('taskPanel.trace')}:</span>
+                <code className="break-all font-mono text-xs text-secondary-text">{traceId}</code>
+              </div>
+            ) : null}
+            {errorCode ? (
+              <div>
+                <span className="mr-1">{t('taskPanel.errorCode')}:</span>
+                <code className="break-all font-mono text-xs text-secondary-text">{errorCode}</code>
+              </div>
+            ) : null}
+            {rawMessage ? (
+              <div>
+                <span className="mr-1">{t('taskPanel.rawMessage')}:</span>
+                <span className="break-words text-secondary-text">{rawMessage}</span>
+              </div>
+            ) : null}
+            {rawError ? (
+              <div>
+                <span className="mr-1">{t('taskPanel.rawError')}:</span>
+                <span className="break-words text-secondary-text">{rawError}</span>
+              </div>
+            ) : null}
           </div>
         </details>
       ) : null}
@@ -192,7 +218,7 @@ interface TaskPanelProps {
   /** 打开运行流面板 */
   onOpenRunFlow?: (task: TaskInfo) => void;
   /** 关闭（移除）一个已结束的任务 */
-  onDismiss?: (taskId: string) => void;
+  onDismiss?: (taskId: string, revision?: number) => void;
 }
 
 /**
@@ -245,13 +271,13 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
             <div className="flex items-center gap-2 text-xs text-muted-text">
               {processingCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <StatusDot tone="info" pulse className="h-1.5 w-1.5" aria-label="进行中任务" />
+                  <StatusDot tone="info" pulse className="h-1.5 w-1.5" aria-label={t('taskPanel.processingCountAria')} />
                   {t('taskPanel.processingTasks', { count: processingCount })}
                 </span>
               )}
               {pendingCount > 0 ? (
                 <span className="flex items-center gap-1">
-                  <StatusDot tone="neutral" className="h-1.5 w-1.5" aria-label="等待中任务" />
+                  <StatusDot tone="neutral" className="h-1.5 w-1.5" aria-label={t('taskPanel.pendingCountAria')} />
                   {t('taskPanel.pendingTasks', { count: pendingCount })}
                 </span>
               ) : null}

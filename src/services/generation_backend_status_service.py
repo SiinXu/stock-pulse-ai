@@ -16,6 +16,7 @@ from src.config import (
     _get_litellm_provider,
     _uses_direct_env_provider,
     channel_allows_empty_api_key,
+    get_configured_llm_model_aliases,
     get_configured_llm_models,
     normalize_llm_channel_model,
     parse_env_bool,
@@ -160,12 +161,15 @@ def _parse_smoke_timeout(value: Optional[float], *, backend_id: str) -> int:
     )
     if value is None:
         return spec.default
-    if isinstance(value, float) and not value.is_integer():
-        raise _numeric_config_error(backend_id=backend_id, spec=spec, value=value, reason="invalid_integer")
-    error = _validate_int_config_value(backend_id=backend_id, value=value, spec=spec)
+    normalized_value: Any = value
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise _numeric_config_error(backend_id=backend_id, spec=spec, value=value, reason="invalid_integer")
+        normalized_value = int(value)
+    error = _validate_int_config_value(backend_id=backend_id, value=normalized_value, spec=spec)
     if error is not None:
         raise error
-    return int(value)
+    return int(normalized_value)
 
 
 class GenerationBackendStatusService:
@@ -531,7 +535,7 @@ class GenerationBackendStatusService:
     def _litellm_route_error(self, config: Any) -> Optional[GenerationError]:
         model = str(getattr(config, "litellm_model", "") or "").strip()
         model_list = getattr(config, "llm_model_list", []) or []
-        route_models = set(get_configured_llm_models(model_list))
+        route_models = set(get_configured_llm_model_aliases(model_list))
         uses_legacy_router = any(str(route).startswith("__legacy_") for route in route_models)
         fallback_models = self._split_csv(self._effective_map.get("LITELLM_FALLBACK_MODELS") or "")
 

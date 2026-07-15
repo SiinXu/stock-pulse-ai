@@ -173,6 +173,24 @@ def test_decision_signal_static_api_spec_matches_runtime_paths() -> None:
     assert status_schema["enum"] == ["active", "expired", "invalidated", "closed", "archived"]
 
 
+def test_static_api_spec_matches_runtime_error_contract_schemas() -> None:
+    static_spec_path = Path(__file__).resolve().parents[1] / "docs" / "architecture" / "api_spec.json"
+    static_spec = json.loads(static_spec_path.read_text(encoding="utf-8"))
+    runtime_spec = create_app().openapi()
+
+    for schema_name in (
+        "ErrorResponse",
+        "SystemConfigValidationErrorDetails",
+        "SystemConfigValidationErrorResponse",
+        "SystemConfigConflictDetails",
+        "SystemConfigConflictResponse",
+    ):
+        assert (
+            static_spec["components"]["schemas"][schema_name]
+            == runtime_spec["components"]["schemas"][schema_name]
+        )
+
+
 def test_v1_prefix_is_applied_at_app_mount_level() -> None:
     assert api_v1_router.prefix == ""
 

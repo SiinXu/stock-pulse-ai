@@ -31,6 +31,7 @@ const zh = {
   connectFirst: '请先接入模型服务并添加至少一个模型。',
   goModelAccess: '前往模型接入',
   staleValue: '当前配置不可用：{value}',
+  ambiguousLegacyRoute: '多个 Connection 提供该 runtime route，请选择具体 Connection：{value}',
   selectModel: '选择模型',
   inheritReportModel: '跟随报告主要模型（默认）',
   noModelOptions: '暂无可用模型，请先添加模型服务',
@@ -48,6 +49,9 @@ const zh = {
   modelAccessDescription: '连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。',
   returnTaskRouting: '返回任务路由',
   addModelService: '＋ 添加模型服务',
+  providerCatalogFailed: '模型服务商目录加载失败',
+  providerCatalogErrorDescription: '无法加载模型服务商目录，暂时无法新增模型服务。这是加载失败，并非“暂无模型服务”；下方已有连接在恢复前保持只读。',
+  reloadProviderCatalog: '重新加载',
   eventMonitor: '事件监控',
   eventMonitorDescription: '按计划轮询市场事件并按规则触发告警。与其他告警设置一起集中在此。',
   routeReport: '报告',
@@ -91,6 +95,7 @@ const en: Record<keyof typeof zh, string> = {
   connectFirst: 'Connect a model service and add at least one model first.',
   goModelAccess: 'Go to model access',
   staleValue: 'Current value unavailable: {value}',
+  ambiguousLegacyRoute: 'Multiple Connections provide this runtime route. Choose a Connection: {value}',
   selectModel: 'Select a model',
   inheritReportModel: 'Inherit report model',
   noModelOptions: 'No available models. Add a model service first.',
@@ -108,6 +113,9 @@ const en: Record<keyof typeof zh, string> = {
   modelAccessDescription: 'Connect model services and manage models for reports, Agent, and vision tasks.',
   returnTaskRouting: 'Return to task routing',
   addModelService: '+ Add model service',
+  providerCatalogFailed: 'Failed to load the model-service catalog',
+  providerCatalogErrorDescription: 'Could not load the provider catalog, so new model services cannot be added right now. This is a load failure, not "no model services". Existing connections below stay read-only until it reloads.',
+  reloadProviderCatalog: 'Reload',
   eventMonitor: 'Event Monitor',
   eventMonitorDescription: 'Poll for market events on a schedule and route alerts by rule alongside the other alert settings.',
   routeReport: 'Report',
@@ -130,4 +138,27 @@ export const SETTINGS_TASK_ROUTE_LABELS: Record<UiLanguage, Record<string, strin
 export const SETTINGS_TASK_REFERENCE_LABELS: Record<UiLanguage, Record<string, string>> = {
   zh: { LITELLM_MODEL: zh.routeReport, MARKET_REVIEW_MODEL: zh.routeMarketReview, AGENT_LITELLM_MODEL: zh.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: '备用' },
   en: { LITELLM_MODEL: en.routeReport, MARKET_REVIEW_MODEL: en.routeMarketReview, AGENT_LITELLM_MODEL: en.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: 'Fallback' },
+};
+
+export const SETTINGS_SAVE_GROUP_LABELS: Record<UiLanguage, Record<string, string>> = {
+  zh: {
+    'ai.model_graph': 'AI 与模型',
+    'overview.watchlist': '自选股',
+    'system.scheduler': '任务调度',
+    'system.authentication': '系统认证',
+    'notifications.channels': '通知渠道',
+    'reports.generation': '报告生成',
+    'agent.behavior': 'Agent 行为',
+    'backtest.defaults': '回测设置',
+  },
+  en: {
+    'ai.model_graph': 'AI and models',
+    'overview.watchlist': 'Watchlist',
+    'system.scheduler': 'Scheduling',
+    'system.authentication': 'Authentication',
+    'notifications.channels': 'Notification channels',
+    'reports.generation': 'Report generation',
+    'agent.behavior': 'Agent behavior',
+    'backtest.defaults': 'Backtest settings',
+  },
 };

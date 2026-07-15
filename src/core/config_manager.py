@@ -8,12 +8,23 @@ import logging
 import os
 import re
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Literal, Optional, Set, Tuple
+from typing import Dict, Iterable, Iterator, List, Literal, Optional, Set, Tuple
 
 from dotenv import dotenv_values
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows only
+    fcntl = None
+
+try:
+    import msvcrt
+except ImportError:  # pragma: no cover - POSIX only
+    msvcrt = None
 
 _ASSIGNMENT_PATTERN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 _FALLBACK_REWRITE_ERRNOS = {errno.EBUSY, errno.EXDEV}
@@ -32,6 +43,14 @@ _ESCAPED_APPLICATION_TEMPLATE_PLACEHOLDER_PATTERN = re.compile(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigVersionConflictError(Exception):
+    """Raised when an atomic update sees a stale expected config version."""
+
+    def __init__(self, current_version: str):
+        super().__init__("Configuration version conflict")
+        self.current_version = current_version
 
 
 def escape_compose_sensitive_env_value(key: str, value: str) -> str:
@@ -112,9 +131,22 @@ class ConfigLineEntry:
 class ConfigManager:
     """Manage `.env` read/write operations with optimistic versioning."""
 
+    _path_locks_guard = threading.Lock()
+    _path_locks = {}
+
     def __init__(self, env_path: Optional[Path] = None):
         self._env_path = env_path or self._resolve_env_path()
-        self._lock = threading.RLock()
+        self._lock = self._lock_for_path(self._env_path)
+
+    @classmethod
+    def _lock_for_path(cls, env_path: Path):
+        path_key = str(env_path.expanduser().resolve())
+        with cls._path_locks_guard:
+            lock = cls._path_locks.get(path_key)
+            if lock is None:
+                lock = threading.RLock()
+                cls._path_locks[path_key] = lock
+            return lock
 
     @property
     def env_path(self) -> Path:
@@ -179,40 +211,85 @@ class ConfigManager:
         updates: Iterable[Tuple[str, str]],
         sensitive_keys: Set[str],
         mask_token: str,
+        expected_version: Optional[str] = None,
     ) -> Tuple[List[str], List[str], str]:
         """Apply updates into `.env` file using atomic replace when possible."""
         with self._lock:
-            current_values = self.read_config_map()
-            stored_values = self._read_config_map(normalize_values=False)
-            mutable_updates: Dict[str, str] = {}
-            skipped_masked: List[str] = []
-
-            for key, value in updates:
-                key_upper = key.upper()
-                current_value = current_values.get(key_upper)
-
-                if key_upper in sensitive_keys and value == mask_token:
-                    if current_value not in (None, ""):
-                        skipped_masked.append(key_upper)
-                    continue
-
-                stored_value = stored_values.get(key_upper)
-                canonical_stored_value = escape_compose_sensitive_env_value(
-                    key_upper,
-                    value.replace("\n", ""),
+            with self._exclusive_file_lock():
+                return self._apply_updates_locked(
+                    updates=updates,
+                    sensitive_keys=sensitive_keys,
+                    mask_token=mask_token,
+                    expected_version=expected_version,
                 )
-                if current_value == value and (
-                    key_upper not in _COMPOSE_ESCAPED_ENV_VALUE_KEYS
-                    or stored_value == canonical_stored_value
-                ):
-                    continue
 
-                mutable_updates[key_upper] = value
+    @contextmanager
+    def _exclusive_file_lock(self) -> Iterator[None]:
+        """Serialize config writes across processes that share the same path."""
+        lock_path = Path(f"{self._env_path}.lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a+b") as handle:
+            if fcntl is not None:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            elif msvcrt is not None:  # pragma: no cover - Windows only
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                if fcntl is not None:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                elif msvcrt is not None:  # pragma: no cover - Windows only
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
-            if mutable_updates:
-                self._atomic_upsert(mutable_updates)
+    def _apply_updates_locked(
+        self,
+        *,
+        updates: Iterable[Tuple[str, str]],
+        sensitive_keys: Set[str],
+        mask_token: str,
+        expected_version: Optional[str],
+    ) -> Tuple[List[str], List[str], str]:
+        current_version = self.get_config_version()
+        if expected_version is not None and current_version != expected_version:
+            raise ConfigVersionConflictError(current_version=current_version)
 
-            return list(mutable_updates.keys()), skipped_masked, self.get_config_version()
+        current_values = self.read_config_map()
+        stored_values = self._read_config_map(normalize_values=False)
+        mutable_updates: Dict[str, str] = {}
+        skipped_masked: List[str] = []
+
+        for key, value in updates:
+            key_upper = key.upper()
+            current_value = current_values.get(key_upper)
+
+            if key_upper in sensitive_keys and value == mask_token:
+                if current_value not in (None, ""):
+                    skipped_masked.append(key_upper)
+                continue
+
+            stored_value = stored_values.get(key_upper)
+            canonical_stored_value = escape_compose_sensitive_env_value(
+                key_upper,
+                value.replace("\n", ""),
+            )
+            if current_value == value and (
+                key_upper not in _COMPOSE_ESCAPED_ENV_VALUE_KEYS
+                or stored_value == canonical_stored_value
+            ):
+                continue
+
+            mutable_updates[key_upper] = value
+
+        if mutable_updates:
+            self._atomic_upsert(mutable_updates)
+
+        return list(mutable_updates.keys()), skipped_masked, self.get_config_version()
 
     def _atomic_upsert(self, updates: Dict[str, str]) -> None:
         """Write updates with atomic rename and in-place fallback for mounted files."""

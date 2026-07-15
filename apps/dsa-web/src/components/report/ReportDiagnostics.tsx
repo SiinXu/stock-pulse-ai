@@ -10,7 +10,6 @@ import type {
   RunDiagnosticStatus,
   RunDiagnosticSummary,
 } from '../../types/analysis';
-import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Button, Card, StatusDot } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
@@ -74,13 +73,11 @@ const getOrderedComponents = (
 export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   recordId,
   summary,
-  language: reportLanguageValue,
   onOpenRunFlow,
 }) => {
   const { language: uiLanguage } = useUiLanguage();
-  const reportLanguage = normalizeReportLanguage(reportLanguageValue ?? uiLanguage);
-  const text = REPORT_CHROME_TEXT[reportLanguage];
-  const runFlowText = UI_TEXT[reportLanguage === 'ko' ? 'en' : reportLanguage];
+  const text = REPORT_CHROME_TEXT[uiLanguage];
+  const runFlowText = UI_TEXT[uiLanguage];
   const [fetchState, setFetchState] = useState<{
     recordId?: number;
     summary: RunDiagnosticSummary | null;
@@ -286,11 +283,11 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                 size="xsm"
                 disabled={!hasCopyText}
                 onClick={() => void copyDiagnostics()}
-                aria-label={copied ? text.copied : text.copy}
+                aria-label={copied ? text.copied : text.copyDiagnostics}
                 className="shrink-0"
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? text.copied : text.copy}
+                {copied ? text.copied : text.copyDiagnostics}
               </Button>
             </div>
           </div>
@@ -301,12 +298,13 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
               {components.length > 0 ? components.map((component) => {
                 const componentStyle = COMPONENT_STATUS_STYLE[component.status] || COMPONENT_STATUS_STYLE.unknown;
                 const componentLabel = text.component[component.status] || component.status;
+                const componentName = (text.componentName as Record<string, string>)[component.key] || component.label;
                 return (
                   <div key={component.key} className="home-subpanel p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground">
-                          {component.label}
+                          {componentName}
                         </p>
                         <p className="mt-1 text-xs leading-5 text-secondary-text">
                           {component.message}

@@ -32,10 +32,14 @@ import type {
 } from '../types/systemConfig';
 
 export class SystemConfigValidationError extends Error {
-  issues: SystemConfigValidationErrorResponse['issues'];
+  issues: NonNullable<SystemConfigValidationErrorResponse['issues']>;
   parsedError: ParsedApiError;
 
-  constructor(message: string, issues: SystemConfigValidationErrorResponse['issues'], parsedError?: ParsedApiError) {
+  constructor(
+    message: string,
+    issues: NonNullable<SystemConfigValidationErrorResponse['issues']>,
+    parsedError?: ParsedApiError,
+  ) {
     super(message);
     this.name = 'SystemConfigValidationError';
     this.issues = issues;
@@ -328,7 +332,7 @@ export const systemConfigApi = {
           const validationError = toCamelCase<SystemConfigValidationErrorResponse>(payloadData ?? {});
           throw new SystemConfigValidationError(
             parsed.message || validationError.message || '配置校验失败',
-            validationError.issues || [],
+            validationError.details?.issues || validationError.issues || [],
             parsed,
           );
         }
@@ -337,7 +341,7 @@ export const systemConfigApi = {
           const conflict = toCamelCase<SystemConfigConflictResponse>(payloadData ?? {});
           throw new SystemConfigConflictError(
             parsed.message || conflict.message || '配置版本冲突',
-            conflict.currentConfigVersion,
+            conflict.details?.currentConfigVersion || conflict.currentConfigVersion,
             parsed,
           );
         }

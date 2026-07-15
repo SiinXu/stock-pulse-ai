@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
@@ -84,6 +85,33 @@ const baseResultItem = {
   simulatedReturnPct: 3.8,
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
+function renderBacktestPage(initialEntry = '/backtest', language: 'zh' | 'en' = 'zh') {
+  window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, language);
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/backtest',
+        element: (
+          <UiLanguageProvider>
+            <BacktestPage />
+          </UiLanguageProvider>
+        ),
+      },
+    ],
+    { initialEntries: [initialEntry] },
+  );
+  render(<RouterProvider router={router} />);
+  return router;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
@@ -106,16 +134,11 @@ beforeEach(() => {
 
 describe('BacktestPage', () => {
   function renderEnglishPage() {
-    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
-    render(
-      <UiLanguageProvider>
-        <BacktestPage />
-      </UiLanguageProvider>,
-    );
+    return renderBacktestPage('/backtest', 'en');
   }
 
   it('renders shared surface inputs and prediction tracking outputs', async () => {
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -158,7 +181,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -210,7 +233,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -236,8 +259,78 @@ describe('BacktestPage', () => {
     expect(screen.queryByText('窗口收益')).not.toBeInTheDocument();
   });
 
+  it('hydrates filters and requests from the initial URL', async () => {
+    mockGetResults.mockResolvedValueOnce({
+      total: 61,
+      page: 3,
+      limit: 20,
+      items: [baseResultItem],
+    });
+    mockGetStockPerformance.mockResolvedValueOnce({
+      ...basePerformance,
+      scope: 'stock',
+      code: 'AAPL',
+    });
+
+    const router = renderBacktestPage(
+      '/backtest?code=aapl&window=20&from=2026-03-01&to=2026-03-31&phase=intraday&page=3',
+    );
+
+    expect(await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）')).toHaveValue('AAPL');
+    expect(screen.getByPlaceholderText('10')).toHaveValue(20);
+    expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-03-01');
+    expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-03-31');
+    expect(screen.getByLabelText('结果筛选 · 阶段')).toHaveTextContent('盘中');
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenCalledWith({
+        code: 'AAPL',
+        evalWindowDays: 20,
+        analysisDateFrom: '2026-03-01',
+        analysisDateTo: '2026-03-31',
+        analysisPhase: 'intraday',
+        page: 3,
+        limit: 20,
+      });
+      expect(mockGetStockPerformance).toHaveBeenCalledWith('AAPL', {
+        evalWindowDays: 20,
+        analysisDateFrom: '2026-03-01',
+        analysisDateTo: '2026-03-31',
+        analysisPhase: 'intraday',
+      });
+      expect(new URLSearchParams(router.state.location.search).get('code')).toBe('AAPL');
+    });
+  });
+
+  it('replaces invalid route values with the canonical default state', async () => {
+    mockGetOverallPerformance.mockResolvedValueOnce(null);
+    const router = renderBacktestPage(
+      '/backtest?code=aapl&window=121&from=2026-02-30&to=bad&phase=closing&page=0',
+    );
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenCalledWith({
+        code: 'AAPL',
+        evalWindowDays: undefined,
+        analysisDateFrom: undefined,
+        analysisDateTo: undefined,
+        analysisPhase: undefined,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('code')).toBe('AAPL');
+    expect(params.has('window')).toBe(false);
+    expect(params.has('from')).toBe(false);
+    expect(params.has('to')).toBe(false);
+    expect(params.has('phase')).toBe(false);
+    expect(params.has('page')).toBe(false);
+  });
+
   it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
-    render(<BacktestPage />);
+    const router = renderBacktestPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -275,10 +368,18 @@ describe('BacktestPage', () => {
         analysisPhase: 'intraday',
       });
     });
+
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('code')).toBe('AAPL');
+    expect(params.get('window')).toBe('20');
+    expect(params.get('from')).toBe('2026-03-01');
+    expect(params.get('to')).toBe('2026-03-31');
+    expect(params.get('phase')).toBe('intraday');
+    expect(params.has('page')).toBe(false);
   });
 
   it('applies the phase filter immediately without waiting for Filter or Run', async () => {
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
@@ -312,7 +413,7 @@ describe('BacktestPage', () => {
       message: '未找到符合条件的历史分析记录',
       diagnostics: { emptyReason: 'no_matching_analysis' },
     });
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -370,7 +471,7 @@ describe('BacktestPage', () => {
       message: '未找到符合条件的历史分析记录',
       diagnostics: { emptyReason: 'no_matching_analysis' },
     });
-    render(<BacktestPage />);
+    renderBacktestPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -423,7 +524,7 @@ describe('BacktestPage', () => {
   });
 
   it('switches to next-day validation with the 1D shortcut', async () => {
-    render(<BacktestPage />);
+    const router = renderBacktestPage();
 
     await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     fireEvent.click(screen.getByRole('button', { name: '1 日验证' }));
@@ -449,5 +550,217 @@ describe('BacktestPage', () => {
     expect(screen.getByText('实际表现')).toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
+    expect(new URLSearchParams(router.state.location.search).get('window')).toBe('1');
+  });
+
+  it('paginates with applied URL filters instead of unsubmitted drafts', async () => {
+    mockGetResults.mockImplementation(async (params: { page?: number }) => ({
+      total: 60,
+      page: params.page ?? 1,
+      limit: 20,
+      items: [baseResultItem],
+    }));
+    const router = renderBacktestPage(
+      '/backtest?code=MSFT&window=10&from=2026-02-01&to=2026-02-28&phase=premarket',
+    );
+
+    const codeInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    const windowInput = screen.getByPlaceholderText('10');
+    await screen.findByRole('button', { name: '下一页' });
+
+    fireEvent.change(codeInput, { target: { value: 'AAPL' } });
+    fireEvent.change(windowInput, { target: { value: '30' } });
+    fireEvent.change(screen.getByLabelText('分析开始日期'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText('分析结束日期'), { target: { value: '2026-03-31' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenLastCalledWith({
+        code: 'MSFT',
+        evalWindowDays: 10,
+        analysisDateFrom: '2026-02-01',
+        analysisDateTo: '2026-02-28',
+        analysisPhase: 'premarket',
+        page: 2,
+        limit: 20,
+      });
+    });
+
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('code')).toBe('MSFT');
+    expect(params.get('page')).toBe('2');
+    expect(codeInput).toHaveValue('MSFT');
+    expect(windowInput).toHaveValue(10);
+  });
+
+  it('restores applied filters and requests across browser back and forward', async () => {
+    mockGetResults.mockImplementation(async (params: { code?: string; page?: number }) => ({
+      total: 1,
+      page: params.page ?? 1,
+      limit: 20,
+      items: [{ ...baseResultItem, code: params.code ?? 'ALL' }],
+    }));
+    const router = renderBacktestPage('/backtest?code=BASE&window=10');
+    const codeInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    const windowInput = screen.getByPlaceholderText('10');
+    const filterButton = screen.getByRole('button', { name: '筛选' });
+
+    fireEvent.change(codeInput, { target: { value: 'AAPL' } });
+    fireEvent.change(windowInput, { target: { value: '20' } });
+    fireEvent.click(filterButton);
+    await waitFor(() => expect(router.state.location.search).toContain('code=AAPL'));
+    await waitFor(() => expect(filterButton).not.toBeDisabled());
+
+    fireEvent.change(codeInput, { target: { value: 'MSFT' } });
+    fireEvent.change(windowInput, { target: { value: '30' } });
+    fireEvent.click(filterButton);
+    await waitFor(() => expect(router.state.location.search).toContain('code=MSFT'));
+
+    mockGetResults.mockClear();
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => {
+      expect(codeInput).toHaveValue('AAPL');
+      expect(windowInput).toHaveValue(20);
+      expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+        code: 'AAPL',
+        evalWindowDays: 20,
+        page: 1,
+      }));
+    });
+
+    mockGetResults.mockClear();
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => {
+      expect(codeInput).toHaveValue('MSFT');
+      expect(windowInput).toHaveValue(30);
+      expect(mockGetResults).toHaveBeenLastCalledWith(expect.objectContaining({
+        code: 'MSFT',
+        evalWindowDays: 30,
+        page: 1,
+      }));
+    });
+  });
+
+  it('refreshes an unchanged applied route after a run without sending phase', async () => {
+    const router = renderBacktestPage('/backtest?code=AAPL&window=10&phase=intraday');
+    await screen.findByText('贵州茅台');
+    const searchBeforeRun = router.state.location.search;
+    mockGetResults.mockClear();
+    mockGetOverallPerformance.mockClear();
+    mockGetStockPerformance.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
+
+    await waitFor(() => {
+      expect(mockRun).toHaveBeenCalledWith({
+        code: 'AAPL',
+        force: undefined,
+        minAgeDays: undefined,
+        evalWindowDays: 10,
+        analysisDateFrom: undefined,
+        analysisDateTo: undefined,
+      });
+      expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({
+        code: 'AAPL',
+        evalWindowDays: 10,
+        analysisPhase: 'intraday',
+        page: 1,
+      }));
+      expect(mockGetOverallPerformance).toHaveBeenCalledWith(expect.objectContaining({
+        evalWindowDays: 10,
+        analysisPhase: 'intraday',
+      }));
+    });
+    expect(router.state.location.search).toBe(searchBeforeRun);
+  });
+
+  it('keeps the latest results and performance when filters resolve out of order', async () => {
+    renderBacktestPage('/backtest?window=10');
+    const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    await screen.findByText('贵州茅台');
+
+    const staleResults = createDeferred<{
+      total: number;
+      page: number;
+      limit: number;
+      items: Array<typeof baseResultItem>;
+    }>();
+    const latestResults = createDeferred<{
+      total: number;
+      page: number;
+      limit: number;
+      items: Array<typeof baseResultItem>;
+    }>();
+    const stalePerformance = createDeferred<typeof basePerformance>();
+    const latestPerformance = createDeferred<typeof basePerformance>();
+    mockGetResults
+      .mockReset()
+      .mockReturnValueOnce(staleResults.promise)
+      .mockReturnValueOnce(latestResults.promise);
+    mockGetOverallPerformance
+      .mockReset()
+      .mockReturnValueOnce(stalePerformance.promise)
+      .mockReturnValueOnce(latestPerformance.promise);
+    mockGetStockPerformance.mockResolvedValue({
+      ...basePerformance,
+      scope: 'stock',
+      code: 'AAPL',
+      directionAccuracyPct: 99,
+    });
+
+    fireEvent.change(filterInput, { target: { value: 'aapl' } });
+    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
+    chooseOption(phaseSelect, 'intraday');
+    chooseOption(phaseSelect, 'postmarket');
+
+    await waitFor(() => {
+      expect(mockGetResults).toHaveBeenCalledTimes(2);
+      expect(mockGetOverallPerformance).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      latestResults.resolve({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [{ ...baseResultItem, code: 'LATEST', stockName: '最新结果' }],
+      });
+      latestPerformance.resolve({ ...basePerformance, directionAccuracyPct: 88 });
+      await Promise.all([latestResults.promise, latestPerformance.promise]);
+    });
+    expect(await screen.findByText('LATEST')).toBeInTheDocument();
+    expect(await screen.findByText('88.0%')).toBeInTheDocument();
+
+    await act(async () => {
+      staleResults.resolve({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [{ ...baseResultItem, code: 'STALE', stockName: '旧结果' }],
+      });
+      stalePerformance.resolve({ ...basePerformance, directionAccuracyPct: 1 });
+      await Promise.all([staleResults.promise, stalePerformance.promise]);
+    });
+
+    expect(screen.getByText('LATEST')).toBeInTheDocument();
+    expect(screen.getByText('88.0%')).toBeInTheDocument();
+    expect(screen.queryByText('STALE')).not.toBeInTheDocument();
+    expect(screen.queryByText('1.0%')).not.toBeInTheDocument();
+    expect(mockGetStockPerformance).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads results independently when the initial performance request fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockGetOverallPerformance.mockRejectedValueOnce(new Error('performance unavailable'));
+
+    renderBacktestPage();
+
+    expect(await screen.findByText('贵州茅台')).toBeInTheDocument();
+    expect(mockGetResults).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 20 }));
+    consoleError.mockRestore();
   });
 });

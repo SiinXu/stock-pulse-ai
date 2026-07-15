@@ -29,6 +29,15 @@ describe('Pagination', () => {
 
     const other = screen.getByRole('button', { name: '2' });
     expect(other).not.toHaveAttribute('aria-current');
+    expect(current).toHaveClass('h-11', 'min-w-11');
+  });
+
+  it('uses a compact current-page summary for narrow viewports', () => {
+    render(<Pagination currentPage={12} totalPages={40} onPageChange={vi.fn()} />);
+
+    expect(screen.getByText('12 / 40')).toHaveClass('sm:hidden');
+    expect(screen.getByRole('button', { name: '上一页' })).toHaveClass('h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '下一页' })).toHaveClass('h-11', 'min-w-11');
   });
 
   it('disables prev on the first page and next on the last page', () => {

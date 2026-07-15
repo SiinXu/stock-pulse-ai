@@ -5,7 +5,7 @@ import { useUiLanguage, UiLanguageProvider } from '../../../contexts/UiLanguageC
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { NotificationTestPanel } from '../NotificationTestPanel';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, which Select uses for its active option.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -91,12 +91,10 @@ describe('NotificationTestPanel', () => {
     const SwitchHarness = ({ children }: { children: ReactNode }) => {
       const { setLanguage } = useUiLanguage();
       return (
-        <div>
-          <button type="button" onClick={() => setLanguage('en')}>
-            switch-en
-          </button>
+        <>
+          <button type="button" data-testid="switch-to-english" onClick={() => setLanguage('en')} />
           {children}
-        </div>
+        </>
       );
     };
 
@@ -118,7 +116,7 @@ describe('NotificationTestPanel', () => {
     expect(titleInput).toHaveValue('DSA 通知测试');
     expect(contentInput).toHaveValue('这是一条来自 DSA Web 设置页的通知测试消息。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'switch-en' }));
+    fireEvent.click(screen.getByTestId('switch-to-english'));
 
     await waitFor(() => {
       expect(titleInput).toHaveValue('DSA notification test');
@@ -139,12 +137,10 @@ describe('NotificationTestPanel', () => {
     const SwitchHarness = ({ children }: { children: ReactNode }) => {
       const { setLanguage } = useUiLanguage();
       return (
-        <div>
-          <button type="button" onClick={() => setLanguage('en')}>
-            switch-en
-          </button>
+        <>
+          <button type="button" data-testid="switch-to-english" onClick={() => setLanguage('en')} />
           {children}
-        </div>
+        </>
       );
     };
 
@@ -166,7 +162,7 @@ describe('NotificationTestPanel', () => {
     fireEvent.change(titleInput, { target: { value: '自定义标题' } });
     fireEvent.change(contentInput, { target: { value: '自定义正文' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'switch-en' }));
+    fireEvent.click(screen.getByTestId('switch-to-english'));
     expect(titleInput).toHaveValue('自定义标题');
     expect(contentInput).toHaveValue('自定义正文');
   });

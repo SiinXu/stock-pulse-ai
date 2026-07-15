@@ -1,4 +1,5 @@
 export const CHANNEL_FIELD_SUFFIXES = [
+  'DISPLAY_NAME',
   'PROVIDER',
   'PROTOCOL',
   'BASE_URL',
@@ -21,7 +22,7 @@ export interface ModelAccessFieldFocusRequest {
 }
 
 export interface ParsedChannelFieldKey {
-  connectionName: string;
+  connectionId: string;
   suffix: ChannelFieldSuffix;
 }
 
@@ -31,7 +32,7 @@ export function parseModelAccessFieldKey(key: string): ParsedChannelFieldKey | n
     return null;
   }
   return {
-    connectionName: match[1].toLowerCase(),
+    connectionId: match[1].toLowerCase(),
     suffix: match[2] as ChannelFieldSuffix,
   };
 }

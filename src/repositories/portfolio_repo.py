@@ -21,6 +21,7 @@ from src.storage import (
     PortfolioCorporateAction,
     PortfolioDailySnapshot,
     PortfolioFxRate,
+    PortfolioIdempotencyRecord,
     PortfolioPosition,
     PortfolioPositionLot,
     PortfolioTrade,
@@ -40,6 +41,10 @@ class DuplicateTradeDedupHashError(Exception):
 
 class PortfolioBusyError(Exception):
     """Raised when SQLite write serialization cannot acquire the ledger lock."""
+
+
+class PortfolioIdempotencyClaimConflict(Exception):
+    """Raised when another transaction already claimed an operation ID."""
 
 
 class PortfolioRepository:
@@ -157,6 +162,79 @@ class PortfolioRepository:
             raise
         finally:
             session.close()
+
+    def get_idempotency_record(
+        self,
+        *,
+        operation_kind: str,
+        account_id: int,
+        operation_id: str,
+    ) -> Optional[PortfolioIdempotencyRecord]:
+        with self.db.get_session() as session:
+            row = self.get_idempotency_record_in_session(
+                session=session,
+                operation_kind=operation_kind,
+                account_id=account_id,
+                operation_id=operation_id,
+            )
+            if row is not None:
+                session.expunge(row)
+            return row
+
+    def get_idempotency_record_in_session(
+        self,
+        *,
+        session: Any,
+        operation_kind: str,
+        account_id: int,
+        operation_id: str,
+    ) -> Optional[PortfolioIdempotencyRecord]:
+        return session.execute(
+            select(PortfolioIdempotencyRecord)
+            .where(
+                and_(
+                    PortfolioIdempotencyRecord.operation_kind == operation_kind,
+                    PortfolioIdempotencyRecord.account_id == account_id,
+                    PortfolioIdempotencyRecord.operation_id == operation_id,
+                )
+            )
+            .limit(1)
+        ).scalar_one_or_none()
+
+    def claim_idempotency_in_session(
+        self,
+        *,
+        session: Any,
+        operation_kind: str,
+        account_id: int,
+        operation_id: str,
+        payload_hash: str,
+    ) -> PortfolioIdempotencyRecord:
+        row = PortfolioIdempotencyRecord(
+            operation_kind=operation_kind,
+            account_id=account_id,
+            operation_id=operation_id,
+            payload_hash=payload_hash,
+            # The claim and business write commit in the same transaction, so
+            # this placeholder is never observable after a successful commit.
+            response_json="null",
+        )
+        session.add(row)
+        try:
+            session.flush()
+        except IntegrityError as exc:
+            raise PortfolioIdempotencyClaimConflict(operation_id) from exc
+        return row
+
+    @staticmethod
+    def complete_idempotency_in_session(
+        *,
+        session: Any,
+        row: PortfolioIdempotencyRecord,
+        response_json: str,
+    ) -> None:
+        row.response_json = response_json
+        session.flush()
 
     def add_trade(
         self,

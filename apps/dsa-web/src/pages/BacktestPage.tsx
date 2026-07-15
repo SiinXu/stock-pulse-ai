@@ -1,11 +1,13 @@
 import type React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, Minus, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
 import { ApiErrorAlert, Card, Badge, EmptyState, Pagination, Select, StatusDot, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { createRequestKey, useAsyncResource } from '../hooks/useAsyncResource';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
   BACKTEST_DIRECTION_EXPECTED_LABELS,
@@ -30,6 +32,32 @@ const BACKTEST_INPUT_CLASS =
 const BACKTEST_COMPACT_INPUT_CLASS =
   'h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
+
+interface BacktestResultsResourceData {
+  items: BacktestResultItem[];
+  total: number;
+  page: number;
+}
+
+interface BacktestPerformanceResourceData {
+  overall: PerformanceMetrics | null;
+  stock: PerformanceMetrics | null;
+}
+
+const EMPTY_BACKTEST_RESULTS: BacktestResultsResourceData = { items: [], total: 0, page: 1 };
+const EMPTY_BACKTEST_PERFORMANCE: BacktestPerformanceResourceData = { overall: null, stock: null };
+const BACKTEST_PHASE_FILTERS = new Set<BacktestPhaseFilter>(['all', 'premarket', 'intraday', 'postmarket', 'unknown']);
+const BACKTEST_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const BACKTEST_MAX_WINDOW_DAYS = 120;
+
+interface BacktestRouteState {
+  code?: string;
+  evalWindowDays?: number;
+  analysisDateFrom?: string;
+  analysisDateTo?: string;
+  phase: BacktestPhaseFilter;
+  page: number;
+}
 
 // ============ Helpers ============
 
@@ -61,13 +89,67 @@ function parseEvalWindowDays(value: string): number | undefined {
     return undefined;
   }
 
-  const parsed = parseInt(trimmed, 10);
-  if (Number.isNaN(parsed) || parsed < 1) {
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > BACKTEST_MAX_WINDOW_DAYS) {
     return undefined;
   }
 
   return parsed;
 }
+
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  const raw = String(value ?? '');
+  if (!/^\d+$/.test(raw)) return fallback;
+  const parsed = Number(raw);
+  return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : fallback;
+}
+
+function parseBacktestDate(value: string | null): string | undefined {
+  if (!value || !BACKTEST_DATE_PATTERN.test(value)) return undefined;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+    ? value
+    : undefined;
+}
+
+function parseBacktestRoute(searchParams: URLSearchParams): BacktestRouteState {
+  const rawPhase = searchParams.get('phase') as BacktestPhaseFilter | null;
+  return {
+    code: normalizeBacktestCode(searchParams.get('code') ?? ''),
+    evalWindowDays: parseEvalWindowDays(searchParams.get('window') ?? ''),
+    analysisDateFrom: parseBacktestDate(searchParams.get('from')),
+    analysisDateTo: parseBacktestDate(searchParams.get('to')),
+    phase: rawPhase && BACKTEST_PHASE_FILTERS.has(rawPhase) ? rawPhase : 'all',
+    page: parsePositiveInteger(searchParams.get('page'), 1),
+  };
+}
+
+function writeBacktestRoute(current: URLSearchParams, state: BacktestRouteState): URLSearchParams {
+  const next = new URLSearchParams(current);
+  const write = (key: string, value: string | number | undefined, omit?: boolean) => {
+    if (value === undefined || value === '' || omit) {
+      next.delete(key);
+    } else {
+      next.set(key, String(value));
+    }
+  };
+  write('code', state.code);
+  write('window', state.evalWindowDays);
+  write('from', state.analysisDateFrom);
+  write('to', state.analysisDateTo);
+  write('phase', state.phase, state.phase === 'all');
+  write('page', state.page, state.page === 1);
+  return next;
+}
+
+const backtestRouteKey = (state: BacktestRouteState): string => JSON.stringify([
+  state.code ?? '',
+  state.evalWindowDays ?? null,
+  state.analysisDateFrom ?? '',
+  state.analysisDateTo ?? '',
+  state.phase,
+  state.page,
+]);
 
 function labelFromMap(value: string | null | undefined, labels: Record<string, string>): string {
   if (!value) return '--';
@@ -244,10 +326,19 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 // ============ Main Page ============
 
 const BacktestPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { language, t } = useUiLanguage();
   const text = BACKTEST_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
+  const initialRouteStateRef = useRef<BacktestRouteState | null>(null);
+  if (initialRouteStateRef.current === null) {
+    initialRouteStateRef.current = parseBacktestRoute(searchParams);
+  }
+  const initialRouteState = initialRouteStateRef.current;
+  const appliedRouteState = parseBacktestRoute(searchParams);
+  const routeSearch = searchParams.toString();
+  const preserveDraftRouteSyncRef = useRef<string | null>(null);
 
   // Set page title
   useEffect(() => {
@@ -255,29 +346,38 @@ const BacktestPage: React.FC = () => {
   }, [text.documentTitle]);
 
   // Input state
-  const [codeFilter, setCodeFilter] = useState('');
-  const [analysisDateFrom, setAnalysisDateFrom] = useState('');
-  const [analysisDateTo, setAnalysisDateTo] = useState('');
-  const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>('all');
-  const [evalDays, setEvalDays] = useState('');
+  const [codeFilter, setCodeFilter] = useState(initialRouteState.code ?? '');
+  const [analysisDateFrom, setAnalysisDateFrom] = useState(initialRouteState.analysisDateFrom ?? '');
+  const [analysisDateTo, setAnalysisDateTo] = useState(initialRouteState.analysisDateTo ?? '');
+  const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialRouteState.phase);
+  const [evalDays, setEvalDays] = useState(
+    initialRouteState.evalWindowDays === undefined ? '' : String(initialRouteState.evalWindowDays),
+  );
   const [forceRerun, setForceRerun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
-  const [pageError, setPageError] = useState<ParsedApiError | null>(null);
 
   // Results state
-  const [results, setResults] = useState<BacktestResultItem[]>([]);
-  const [totalResults, setTotalResults] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isLoadingResults, setIsLoadingResults] = useState(false);
+  const [resultsResource, resultsRequests] = useAsyncResource<BacktestResultsResourceData, ParsedApiError>({
+    initialData: EMPTY_BACKTEST_RESULTS,
+    isEmpty: (data) => data.items.length === 0,
+  });
+  const results = resultsResource.data.items;
+  const totalResults = resultsResource.data.total;
+  const currentPage = resultsResource.data.page;
+  const isLoadingResults = resultsResource.status === 'idle' || resultsResource.status === 'loading';
   const pageSize = 20;
 
   // Performance state
-  const [overallPerf, setOverallPerf] = useState<PerformanceMetrics | null>(null);
-  const [stockPerf, setStockPerf] = useState<PerformanceMetrics | null>(null);
-  const [isLoadingPerf, setIsLoadingPerf] = useState(false);
-  const effectiveWindowDays = parseEvalWindowDays(evalDays) ?? overallPerf?.evalWindowDays;
+  const [performanceResource, performanceRequests] = useAsyncResource<BacktestPerformanceResourceData, ParsedApiError>({
+    initialData: EMPTY_BACKTEST_PERFORMANCE,
+    isEmpty: (data) => data.overall == null && data.stock == null,
+  });
+  const overallPerf = performanceResource.data.overall;
+  const stockPerf = performanceResource.data.stock;
+  const isLoadingPerf = performanceResource.status === 'idle' || performanceResource.status === 'loading';
+  const effectiveWindowDays = appliedRouteState.evalWindowDays ?? overallPerf?.evalWindowDays;
   const isNextDayValidation = effectiveWindowDays === 1;
   const showNextDayActualColumns = isNextDayValidation;
 
@@ -290,28 +390,41 @@ const BacktestPage: React.FC = () => {
     endDate?: string,
     phase?: BacktestPhaseFilter,
   ) => {
-    setIsLoadingResults(true);
+    const query = {
+      code: code || undefined,
+      evalWindowDays: windowDays,
+      analysisDateFrom: startDate || undefined,
+      analysisDateTo: endDate || undefined,
+      analysisPhase: phase && phase !== 'all' ? phase : undefined,
+      page,
+      limit: pageSize,
+    };
+    const request = resultsRequests.begin(
+      createRequestKey('backtest-results', [
+        query.code ?? null,
+        query.evalWindowDays ?? null,
+        query.analysisDateFrom ?? null,
+        query.analysisDateTo ?? null,
+        query.analysisPhase ?? null,
+        query.page,
+        query.limit,
+      ]),
+      { retainData: false },
+    );
     try {
-      const response = await backtestApi.getResults({
-        code: code || undefined,
-        evalWindowDays: windowDays,
-        analysisDateFrom: startDate || undefined,
-        analysisDateTo: endDate || undefined,
-        analysisPhase: phase && phase !== 'all' ? phase : undefined,
-        page,
-        limit: pageSize,
+      const response = await backtestApi.getResults(query);
+      resultsRequests.resolve(request, {
+        items: response.items,
+        total: response.total,
+        page: response.page,
       });
-      setResults(response.items);
-      setTotalResults(response.total);
-      setCurrentPage(response.page);
-      setPageError(null);
+      return resultsRequests.isCurrent(request) ? response : null;
     } catch (err) {
       console.error('Failed to fetch backtest results:', err);
-      setPageError(getParsedApiError(err));
-    } finally {
-      setIsLoadingResults(false);
+      resultsRequests.reject(request, getParsedApiError(err));
+      return null;
     }
-  }, []);
+  }, [resultsRequests]);
 
   // Fetch performance
   const fetchPerformance = useCallback(async (
@@ -321,51 +434,116 @@ const BacktestPage: React.FC = () => {
     endDate?: string,
     phase?: BacktestPhaseFilter,
   ) => {
-    setIsLoadingPerf(true);
+    const query = {
+      evalWindowDays: windowDays,
+      analysisDateFrom: startDate || undefined,
+      analysisDateTo: endDate || undefined,
+      analysisPhase: phase && phase !== 'all' ? phase : undefined,
+    };
+    const request = performanceRequests.begin(
+      createRequestKey('backtest-performance', [
+        code ?? null,
+        query.evalWindowDays ?? null,
+        query.analysisDateFrom ?? null,
+        query.analysisDateTo ?? null,
+        query.analysisPhase ?? null,
+      ]),
+      { retainData: false },
+    );
     try {
-      const overall = await backtestApi.getOverallPerformance({
-        evalWindowDays: windowDays,
-        analysisDateFrom: startDate || undefined,
-        analysisDateTo: endDate || undefined,
-        analysisPhase: phase && phase !== 'all' ? phase : undefined,
-      });
-      setOverallPerf(overall);
-
-      if (code) {
-        const stock = await backtestApi.getStockPerformance(code, {
-          evalWindowDays: windowDays,
-          analysisDateFrom: startDate || undefined,
-          analysisDateTo: endDate || undefined,
-          analysisPhase: phase && phase !== 'all' ? phase : undefined,
-        });
-        setStockPerf(stock);
-      } else {
-        setStockPerf(null);
+      const overall = await backtestApi.getOverallPerformance(query);
+      if (!performanceRequests.isCurrent(request)) {
+        return null;
       }
-      setPageError(null);
+
+      let stock: PerformanceMetrics | null = null;
+      if (code) {
+        stock = await backtestApi.getStockPerformance(code, query);
+      }
+      const data = { overall, stock };
+      return performanceRequests.resolve(request, data) ? data : null;
     } catch (err) {
       console.error('Failed to fetch performance:', err);
-      setPageError(getParsedApiError(err));
-    } finally {
-      setIsLoadingPerf(false);
+      return performanceRequests.reject(request, getParsedApiError(err))
+        ? EMPTY_BACKTEST_PERFORMANCE
+        : null;
     }
-  }, []);
+  }, [performanceRequests]);
 
-  // Initial load — fetch performance first, then filter results by its window
-  useEffect(() => {
-    const init = async () => {
-      // Get latest performance (unfiltered returns most recent summary)
-      const overall = await backtestApi.getOverallPerformance();
-      setOverallPerf(overall);
-      // Use the summary's eval_window_days to filter results consistently
-      const windowDays = overall?.evalWindowDays;
-      if (windowDays && !evalDays) {
-        setEvalDays(String(windowDays));
-      }
-      fetchResults(1, undefined, windowDays, undefined, undefined, 'all');
+  const loadAppliedRoute = useCallback((state: BacktestRouteState) => {
+    void fetchResults(
+      state.page,
+      state.code,
+      state.evalWindowDays,
+      state.analysisDateFrom,
+      state.analysisDateTo,
+      state.phase,
+    );
+    void fetchPerformance(
+      state.code,
+      state.evalWindowDays,
+      state.analysisDateFrom,
+      state.analysisDateTo,
+      state.phase,
+    ).then((performance) => {
+      const backendWindowDays = performance?.overall?.evalWindowDays;
+      if (state.evalWindowDays !== undefined || backendWindowDays === undefined) return;
+
+      setEvalDays((current) => current || String(backendWindowDays));
+      setSearchParams((current) => {
+        if (backtestRouteKey(parseBacktestRoute(current)) !== backtestRouteKey(state)) {
+          return current;
+        }
+        const next = writeBacktestRoute(current, { ...state, evalWindowDays: backendWindowDays });
+        if (next.toString() === current.toString()) return current;
+        preserveDraftRouteSyncRef.current = next.toString();
+        return next;
+      }, { replace: true });
+    });
+  }, [fetchPerformance, fetchResults, setSearchParams]);
+
+  const applyRoute = useCallback((state: BacktestRouteState, options?: { replace?: boolean }) => {
+    const normalizedState: BacktestRouteState = {
+      ...state,
+      code: normalizeBacktestCode(state.code ?? ''),
+      phase: BACKTEST_PHASE_FILTERS.has(state.phase) ? state.phase : 'all',
+      page: Math.max(1, Math.trunc(state.page)),
     };
-    init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setCodeFilter(normalizedState.code ?? '');
+    setEvalDays(normalizedState.evalWindowDays === undefined ? '' : String(normalizedState.evalWindowDays));
+    setAnalysisDateFrom(normalizedState.analysisDateFrom ?? '');
+    setAnalysisDateTo(normalizedState.analysisDateTo ?? '');
+    setPhaseFilter(normalizedState.phase);
+    const next = writeBacktestRoute(searchParams, normalizedState);
+    if (next.toString() === routeSearch) {
+      loadAppliedRoute(normalizedState);
+      return;
+    }
+    setSearchParams(next, { replace: options?.replace ?? false });
+  }, [loadAppliedRoute, routeSearch, searchParams, setSearchParams]);
+
+  // URL search is the applied filter state. Browser navigation restores both
+  // form controls and independently guarded results/performance resources.
+  useEffect(() => {
+    const current = new URLSearchParams(routeSearch);
+    const state = parseBacktestRoute(current);
+    const canonical = writeBacktestRoute(current, state);
+    if (canonical.toString() !== routeSearch) {
+      preserveDraftRouteSyncRef.current = null;
+      setSearchParams(canonical, { replace: true });
+      return;
+    }
+    const preserveDraft = preserveDraftRouteSyncRef.current === routeSearch;
+    preserveDraftRouteSyncRef.current = null;
+    if (!preserveDraft) {
+      setCodeFilter(state.code ?? '');
+      setEvalDays(state.evalWindowDays === undefined ? '' : String(state.evalWindowDays));
+      setAnalysisDateFrom(state.analysisDateFrom ?? '');
+      setAnalysisDateTo(state.analysisDateTo ?? '');
+      setPhaseFilter(state.phase);
+    }
+    loadAppliedRoute(state);
+  }, [loadAppliedRoute, routeSearch, setSearchParams]);
 
   // Run backtest
   const handleRun = async () => {
@@ -388,15 +566,15 @@ const BacktestPage: React.FC = () => {
       setRunResult(response);
       const effectiveEvalWindowDays =
         response.appliedEvalWindowDays
-        ?? requestedEvalWindowDays
-        ?? parseEvalWindowDays(evalDays)
-        ?? overallPerf?.evalWindowDays;
-      if (effectiveEvalWindowDays != null) {
-        setEvalDays(String(effectiveEvalWindowDays));
-      }
-      // Refresh data with same eval_window_days
-      fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
-      fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
+        ?? requestedEvalWindowDays;
+      applyRoute({
+        code,
+        evalWindowDays: effectiveEvalWindowDays,
+        analysisDateFrom: dateFrom,
+        analysisDateTo: dateTo,
+        phase: phaseFilter,
+        page: 1,
+      });
     } catch (err) {
       setRunError(getParsedApiError(err));
     } finally {
@@ -407,21 +585,26 @@ const BacktestPage: React.FC = () => {
   // Phase is a result-only filter (backtestApi.run never receives it), so apply
   // it immediately to the fetched results/performance rather than on Run.
   const handlePhaseChange = (value: BacktestPhaseFilter) => {
-    setPhaseFilter(value);
-    const code = normalizeBacktestCode(codeFilter);
-    const windowDays = parseEvalWindowDays(evalDays);
-    setCurrentPage(1);
-    fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, value);
-    fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, value);
+    applyRoute({
+      code: normalizeBacktestCode(codeFilter),
+      evalWindowDays: parseEvalWindowDays(evalDays),
+      analysisDateFrom: analysisDateFrom || undefined,
+      analysisDateTo: analysisDateTo || undefined,
+      phase: value,
+      page: 1,
+    });
   };
 
   // Filter by code
   const handleFilter = () => {
-    const code = normalizeBacktestCode(codeFilter);
-    const windowDays = parseEvalWindowDays(evalDays);
-    setCurrentPage(1);
-    fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
-    fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    applyRoute({
+      code: normalizeBacktestCode(codeFilter),
+      evalWindowDays: parseEvalWindowDays(evalDays),
+      analysisDateFrom: analysisDateFrom || undefined,
+      analysisDateTo: analysisDateTo || undefined,
+      phase: phaseFilter,
+      page: 1,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -431,18 +614,20 @@ const BacktestPage: React.FC = () => {
   };
 
   const handleShowNextDay = () => {
-    const code = normalizeBacktestCode(codeFilter);
-    setEvalDays('1');
-    setCurrentPage(1);
-    fetchResults(1, code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
-    fetchPerformance(code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
+    applyRoute({
+      code: normalizeBacktestCode(codeFilter),
+      evalWindowDays: 1,
+      analysisDateFrom: analysisDateFrom || undefined,
+      analysisDateTo: analysisDateTo || undefined,
+      phase: phaseFilter,
+      page: 1,
+    });
   };
 
   // Pagination
   const totalPages = Math.ceil(totalResults / pageSize);
   const handlePageChange = (page: number) => {
-    const windowDays = parseEvalWindowDays(evalDays);
-    fetchResults(page, normalizeBacktestCode(codeFilter), windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    applyRoute({ ...appliedRouteState, page });
   };
 
   return (
@@ -474,7 +659,7 @@ const BacktestPage: React.FC = () => {
             <input
               type="number"
               min={1}
-              max={120}
+              max={BACKTEST_MAX_WINDOW_DAYS}
               value={evalDays}
               onChange={(e) => setEvalDays(e.target.value)}
               placeholder="10"
@@ -562,22 +747,25 @@ const BacktestPage: React.FC = () => {
       <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
         {/* Left sidebar - Performance */}
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
-          {isLoadingPerf ? (
+          {performanceResource.status === 'error' && performanceResource.error ? (
+            <ApiErrorAlert error={performanceResource.error} />
+          ) : isLoadingPerf ? (
             <div className="flex items-center justify-center py-8">
               <div className="backtest-spinner sm" />
             </div>
           ) : overallPerf ? (
-            <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
+            <>
+              <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
+              {stockPerf ? (
+                <PerformanceCard metrics={stockPerf} title={`${stockPerf.code || appliedRouteState.code || ''}`} language={language} />
+              ) : null}
+            </>
           ) : (
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
               className="h-full min-h-[12rem] border-dashed bg-card/45 shadow-none"
             />
-          )}
-
-          {stockPerf && (
-            <PerformanceCard metrics={stockPerf} title={`${stockPerf.code || codeFilter}`} language={language} />
           )}
         </div>
 
@@ -594,10 +782,9 @@ const BacktestPage: React.FC = () => {
             />
             <span className="pb-1.5 text-xs text-muted-text">{text.resultPhaseHint}</span>
           </div>
-          {pageError ? (
-            <ApiErrorAlert error={pageError} className="mb-3" />
-          ) : null}
-          {isLoadingResults ? (
+          {resultsResource.status === 'error' && resultsResource.error ? (
+            <ApiErrorAlert error={resultsResource.error} className="mb-3" />
+          ) : isLoadingResults ? (
             <div className="flex flex-col items-center justify-center h-64">
               <div className="backtest-spinner md" />
               <p className="mt-3 text-secondary-text text-sm">{text.loadingResults}</p>
@@ -619,11 +806,11 @@ const BacktestPage: React.FC = () => {
                 <div className="backtest-table-toolbar-meta">
                   <span className="label-uppercase">{isNextDayValidation ? text.nextDayValidation : text.resultSet}</span>
                   <span className="text-xs text-secondary-text">
-                    {codeFilter.trim() ? formatUiText(text.filteredStock, { code: codeFilter.trim() }) : text.allStocks}
-                    {evalDays ? ` · ${formatUiText(text.dayWindow, { days: evalDays })}` : ''}
-                    {phaseFilter !== 'all' ? ` · ${phaseFilterOptions.find((item) => item.value === phaseFilter)?.label ?? phaseFilter}` : ''}
-                    {analysisDateFrom ? ` · ${formatUiText(text.fromDate, { date: analysisDateFrom })}` : ''}
-                    {analysisDateTo ? ` · ${formatUiText(text.toDate, { date: analysisDateTo })}` : ''}
+                    {appliedRouteState.code ? formatUiText(text.filteredStock, { code: appliedRouteState.code }) : text.allStocks}
+                    {appliedRouteState.evalWindowDays ? ` · ${formatUiText(text.dayWindow, { days: appliedRouteState.evalWindowDays })}` : ''}
+                    {appliedRouteState.phase !== 'all' ? ` · ${phaseFilterOptions.find((item) => item.value === appliedRouteState.phase)?.label ?? appliedRouteState.phase}` : ''}
+                    {appliedRouteState.analysisDateFrom ? ` · ${formatUiText(text.fromDate, { date: appliedRouteState.analysisDateFrom })}` : ''}
+                    {appliedRouteState.analysisDateTo ? ` · ${formatUiText(text.toDate, { date: appliedRouteState.analysisDateTo })}` : ''}
                   </span>
                 </div>
                 <span className="backtest-table-scroll-hint">{text.scrollHint}</span>

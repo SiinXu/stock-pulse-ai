@@ -64,6 +64,7 @@ describe('StockHistoryTrendDrawer', () => {
 
     expect(screen.getAllByText('回避').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('买入')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '历史分析记录' })).toHaveClass('overflow-x-auto');
   });
 
   it('keeps full legacy operation advice when structured action is absent', () => {

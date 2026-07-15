@@ -13,9 +13,11 @@ interface ConfirmDialogProps {
   cancelText?: string;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
+  cancelDisabledReason?: string;
   isDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  onCancelBlocked?: () => void;
 }
 
 /**
@@ -30,35 +32,41 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelText,
   confirmDisabled = false,
   cancelDisabled = false,
+  cancelDisabledReason,
   isDanger = false,
   onConfirm,
   onCancel,
+  onCancelBlocked,
 }) => {
   const { t } = useUiLanguage();
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const messageId = useId();
+  const dismissStatusId = useId();
+  const resolvedDismissReason = cancelDisabledReason ?? t('common.processing');
 
-  useDialogA11y({
+  const { requestClose } = useDialogA11y({
     isOpen,
     containerRef: dialogRef,
+    overlayRef,
     onEscape: onCancel,
-    closeOnEscape: !cancelDisabled,
+    onCloseBlocked: onCancelBlocked,
+    dismissDisabled: cancelDisabled,
+    zIndex: OVERLAY_Z.confirm,
   });
 
   if (!isOpen) return null;
 
   const dialog = (
     <div
+      ref={overlayRef}
+      data-overlay-root="confirm"
       // Confirmations sit above drawers/modals so a confirm opened from inside a
       // drawer is never hidden (see OVERLAY_Z).
       style={{ zIndex: OVERLAY_Z.confirm }}
       className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
-      onClick={() => {
-        if (!cancelDisabled) {
-          onCancel();
-        }
-      }}
+      onClick={requestClose}
       role="presentation"
     >
       <div
@@ -66,7 +74,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={messageId}
+        aria-describedby={`${messageId}${cancelDisabled ? ` ${dismissStatusId}` : ''}`}
         tabIndex={-1}
         className="mx-4 w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200 focus:outline-none"
         onClick={(e) => e.stopPropagation()}
@@ -75,12 +83,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <p id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
           {message}
         </p>
+        {cancelDisabled ? (
+          <p id={dismissStatusId} role="status" className="mb-4 text-xs text-warning">
+            {resolvedDismissReason}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-3">
           <button
             type="button"
-            onClick={onCancel}
+            onClick={requestClose}
             disabled={cancelDisabled}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelText ?? t('common.cancel')}
           </button>
@@ -88,7 +101,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
+            className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
               isDanger
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-foreground text-background'

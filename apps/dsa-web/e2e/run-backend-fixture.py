@@ -18,6 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 WEB_ROOT = REPO_ROOT / "apps" / "dsa-web"
 OUTPUT_ROOT = WEB_ROOT / "test-results"
 REPORT_MARKER = "E2E_MARKDOWN_FIXTURE"
+REPORT_ZH_MARKER = "E2E_ZH_REPORT_BODY_MARKER"
+REPORT_EN_MARKER = "E2E_EN_REPORT_BODY_MARKER"
 
 # The fixture imports the real application in-process to seed a report. Build a
 # controlled environment before those imports so developer credentials and
@@ -79,6 +81,9 @@ def _runtime_values(runtime_dir: Path, log_dir: Path) -> Dict[str, str]:
     return {
         "ADMIN_AUTH_ENABLED": "true",
         "DATABASE_PATH": str(runtime_dir / "stock_analysis.db"),
+        # LiteLLM DEV mode implicitly searches parent directories for `.env`.
+        # The fixture owns its complete environment, so disable that side effect.
+        "LITELLM_MODE": "PRODUCTION",
         "LOG_DIR": str(log_dir / "backend-app"),
         "LLM_CONFIG_MODE": "auto",
         "PREFETCH_REALTIME_QUOTES": "false",
@@ -169,36 +174,71 @@ def _prepare_runtime(runtime_dir: Path, log_dir: Path, log: IO[str]) -> Dict[str
     Config._instance = None
     DatabaseManager.reset_instance()
     db = DatabaseManager.get_instance()
-    result = AnalysisResult(
-        code="AAPL",
-        name="E2E Fixture",
-        sentiment_score=62,
-        trend_prediction="震荡",
-        operation_advice="观望",
-        analysis_summary=f"{REPORT_MARKER}: deterministic report content.",
-        report_language="zh",
-        model_used="e2e/fake-report-model",
-    )
-    record_id = db.save_analysis_history(
-        result=result,
-        query_id="e2e-report-markdown",
-        report_type="full",
-        news_content="E2E fixture news",
-        context_snapshot=None,
-        save_snapshot=False,
-    )
+    seeded_reports = [
+        AnalysisResult(
+            code="600519",
+            name="E2E Chinese Report",
+            sentiment_score=66,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            analysis_summary=f"{REPORT_ZH_MARKER}: 中文报告正文。",
+            report_language="zh",
+            model_used="e2e/fake-report-model",
+        ),
+        AnalysisResult(
+            code="MSFT",
+            name="E2E English Report",
+            sentiment_score=68,
+            trend_prediction="Range-bound",
+            operation_advice="Hold",
+            analysis_summary=f"{REPORT_EN_MARKER}: deterministic English report body.",
+            report_language="en",
+            model_used="e2e/fake-report-model",
+        ),
+        # Keep the Markdown fixture last so existing tests that select the
+        # newest history item continue to exercise the same report.
+        AnalysisResult(
+            code="AAPL",
+            name="E2E Fixture",
+            sentiment_score=62,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            analysis_summary=f"{REPORT_MARKER}: deterministic report content.",
+            report_language="zh",
+            model_used="e2e/fake-report-model",
+        ),
+    ]
+    record_ids = []
+    for index, result in enumerate(seeded_reports, start=1):
+        record_ids.append(db.save_analysis_history(
+            result=result,
+            query_id=f"e2e-report-{index}",
+            report_type="full",
+            news_content="E2E fixture news",
+            context_snapshot=None,
+            save_snapshot=False,
+        ))
+    record_id = record_ids[-1]
     if record_id <= 0:
         raise RuntimeError("Failed to seed the Playwright report fixture")
 
-    markdown = HistoryService(db).get_markdown_report(str(record_id)) or ""
-    if REPORT_MARKER not in markdown:
-        raise RuntimeError("Seeded Playwright report cannot be rendered as Markdown")
+    expected_markers = (REPORT_ZH_MARKER, REPORT_EN_MARKER, REPORT_MARKER)
+    for seeded_record_id, expected_marker in zip(record_ids, expected_markers):
+        markdown = HistoryService(db).get_markdown_report(str(seeded_record_id)) or ""
+        if expected_marker not in markdown:
+            raise RuntimeError(
+                f"Seeded Playwright report {seeded_record_id} cannot render {expected_marker}"
+            )
 
     DatabaseManager.reset_instance()
     Config._instance = None
+    # Imports must not be allowed to extend the environment passed to the real
+    # backend process. Reapply the pre-import allowlist after fixture seeding.
+    os.environ.clear()
+    os.environ.update(child_env)
     print(
         (
-            f"[e2e-backend] prepared isolated runtime and report record {record_id}; "
+            f"[e2e-backend] prepared isolated runtime and report records {record_ids}; "
             f"environment keys={len(child_env)}"
         ),
         file=log,
