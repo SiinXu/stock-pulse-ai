@@ -38,6 +38,10 @@ async function login(page: Page) {
 
   await expect(passwordInput).toBeVisible({ timeout: 10_000 });
   await passwordInput.fill(smokePassword!);
+  const confirmInput = page.locator('#passwordConfirm');
+  if (await confirmInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await confirmInput.fill(smokePassword!);
+  }
   await Promise.all([
     page.waitForResponse(
       (response) => response.url().includes('/api/v1/auth/login') && response.status() === 200,
@@ -62,6 +66,28 @@ async function openAiSection(page: Page) {
   await expect(page.getByRole('tab', { name: '连接' })).toBeVisible({ timeout: 10_000 });
 }
 
+/**
+ * On the connections view: pick a provider in the catalog Select, then click
+ * the "+ 添加模型服务" button. The new channel row auto-expands.
+ */
+async function addModelService(page: Page, providerLabel: RegExp) {
+  const providerSelect = page
+    .getByRole('combobox')
+    .filter({ hasText: /选择服务商|AIHubmix|官方|（本地）|（聚合平台）/ })
+    .first();
+  await expect(providerSelect).toBeVisible({ timeout: 10_000 });
+  // The listbox opens downward with a fixed position; park the trigger near the
+  // top of the viewport so deep options (e.g. Ollama) stay clickable.
+  await providerSelect.evaluate((element) => element.scrollIntoView({ block: 'start' }));
+  await providerSelect.click();
+  const option = page.getByRole('option', { name: providerLabel }).first();
+  await expect(option).toBeVisible({ timeout: 5_000 });
+  await option.scrollIntoViewIfNeeded();
+  await option.click();
+  await page.getByRole('button', { name: '+ 添加模型服务' }).click();
+  await page.waitForTimeout(400);
+}
+
 test.describe('model access remediation', () => {
   test.use({ locale: 'zh-CN' });
 
@@ -78,7 +104,7 @@ test.describe('model access remediation', () => {
   test('scenario 2: connections view is the single model-access entry without legacy terms', async ({ page }, testInfo) => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
-    await expect(page.getByRole('heading', { name: 'AI 模型接入' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 10_000 });
 
     const content = await page.locator('main, body').first().innerText();
     for (const term of LEGACY_TERMS) {
@@ -105,13 +131,20 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
 
-    const addService = page.getByRole('button', { name: /添加模型服务/ }).first();
-    await expect(addService).toBeVisible({ timeout: 10_000 });
-    await addService.click();
+    const providerSelect = page
+      .getByRole('combobox')
+      .filter({ hasText: /选择服务商|AIHubmix|官方|（本地）|（聚合平台）/ })
+      .first();
+    await expect(providerSelect).toBeVisible({ timeout: 10_000 });
+    await providerSelect.click();
 
-    const content = await page.locator('main, body').first().innerText();
-    for (const provider of ['DeepSeek', 'OpenAI', 'Ollama']) {
-      expect(content, `provider catalog should list ${provider}`).toContain(provider);
+    const listbox = page.getByRole('listbox');
+    await expect(listbox).toBeVisible({ timeout: 5_000 });
+    for (const provider of [/DeepSeek/, /OpenAI/, /Ollama/]) {
+      await expect(
+        listbox.getByRole('option', { name: provider }).first(),
+        `provider catalog should list ${provider}`,
+      ).toBeVisible();
     }
     await capture(page, testInfo, 'remediation-provider-catalog');
   });
@@ -120,12 +153,11 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
 
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    await page.getByText('Ollama', { exact: false }).first().click();
-    await page.waitForTimeout(400);
+    await addModelService(page, /Ollama/);
 
-    const content = await page.locator('main, body').first().innerText();
-    expect(content).toMatch(/API 密钥（可选）|无需密钥|可留空/);
+    await expect(
+      page.getByPlaceholder('本地 Ollama 可留空').first(),
+    ).toBeVisible({ timeout: 5_000 });
     await capture(page, testInfo, 'remediation-ollama-optional-key');
   });
 
@@ -133,13 +165,13 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
 
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    await page.getByText('DeepSeek', { exact: false }).first().click();
-    await page.waitForTimeout(400);
+    await addModelService(page, /DeepSeek/);
 
     const content = await page.locator('main, body').first().innerText();
     expect(content).toContain('服务地址');
     expect(content).toContain('API 密钥');
+    // Value example surfaces as the base-URL placeholder (a plain URL).
+    await expect(page.getByPlaceholder(/^https?:\/\//).first()).toBeVisible({ timeout: 5_000 });
     // Examples are plain values, not KEY=value env lines.
     expect(content).not.toMatch(/LLM_[A-Z0-9_]+_BASE_URL=/);
     expect(content).not.toMatch(/LLM_[A-Z0-9_]+_API_KEY=/);
@@ -150,9 +182,7 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
 
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    await page.getByText('DeepSeek', { exact: false }).first().click();
-    await page.waitForTimeout(400);
+    await addModelService(page, /DeepSeek/);
 
     await expect(
       page.getByText(/尚未添加模型|尚未添加可用模型/).first(),
@@ -164,9 +194,7 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '连接' }).click();
 
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    await page.getByText('DeepSeek', { exact: false }).first().click();
-    await page.waitForTimeout(400);
+    await addModelService(page, /DeepSeek/);
 
     const modelInput = page.getByPlaceholder(/输入模型|模型 ID/).first();
     await expect(modelInput).toBeVisible({ timeout: 5_000 });
@@ -179,7 +207,8 @@ test.describe('model access remediation', () => {
     await modelInput.press('Enter');
     await expect(page.getByText('model-beta', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('model-gamma', { exact: true }).first()).toBeVisible();
-    // Dedupe: model-alpha appears once as a token chip.
+    // Dedupe: model-alpha appears exactly once as a removable token chip.
+    await expect(page.getByRole('button', { name: '移除模型 model-alpha' })).toHaveCount(1);
     await capture(page, testInfo, 'remediation-token-model-entry');
   });
 
@@ -191,7 +220,7 @@ test.describe('model access remediation', () => {
     const addButton = page.getByRole('button', { name: '添加模型服务' }).first();
     await expect(addButton).toBeVisible();
     await addButton.click();
-    await expect(page.getByRole('heading', { name: 'AI 模型接入' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 10_000 });
     await capture(page, testInfo, 'remediation-task-routing-empty');
   });
 
@@ -218,8 +247,9 @@ test.describe('model access remediation', () => {
     await openAiSection(page);
     await page.getByRole('tab', { name: '总览' }).click();
 
-    const content = await page.locator('main, body').first().innerText();
-    expect(content).toMatch(/待配置|未配置/);
+    await expect(
+      page.getByText(/待配置|未配置/).first(),
+    ).toBeVisible({ timeout: 10_000 });
     await capture(page, testInfo, 'remediation-overview-matrix');
   });
 
@@ -274,10 +304,15 @@ test.describe('model access remediation', () => {
 
     await page.getByRole('button', { name: 'AI & Models' }).click();
     await expect(page.getByRole('tab', { name: 'Connections' })).toBeVisible({ timeout: 10_000 });
+
+    // Overview view describes the entry with "model connections" terminology.
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    await expect(page.getByText(/model connections/i).first()).toBeVisible({ timeout: 10_000 });
+
     await page.getByRole('tab', { name: 'Connections' }).click();
+    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 10_000 });
 
     const content = await page.locator('main, body').first().innerText();
-    expect(content).toContain('model connections');
     expect(content).not.toContain('model channels');
     await capture(page, testInfo, 'remediation-english-terminology');
   });
@@ -286,21 +321,18 @@ test.describe('model access remediation', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
 
-    const menuButton = page.getByRole('button', { name: /打开导航|菜单/i });
-    if (await menuButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await menuButton.click();
-    }
-    await page.getByRole('link', { name: '设置' }).click();
+    const menuButton = page.getByRole('button', { name: '打开导航菜单' });
+    await expect(menuButton).toBeVisible({ timeout: 10_000 });
+    await menuButton.click();
+    // The hidden desktop sidebar keeps its links in the DOM, so scope to the drawer.
+    await page.getByRole('dialog').getByRole('link', { name: '设置' }).click();
     await page.waitForLoadState('domcontentloaded');
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15_000 });
 
-    // Mobile uses a compact section selector; fall back to the button list.
-    const sectionSelect = page.locator('select').first();
-    if (await sectionSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
-      await sectionSelect.selectOption({ label: 'AI 与模型' });
-    } else {
-      await page.getByRole('button', { name: 'AI 与模型' }).click();
-    }
+    // Mobile always renders the compact native section selector at 390px.
+    const sectionSelect = page.locator('#settings-section-select');
+    await expect(sectionSelect).toBeVisible({ timeout: 15_000 });
+    await sectionSelect.selectOption('ai_models');
     await expect(page.getByRole('tab', { name: '连接' })).toBeVisible({ timeout: 10_000 });
     await capture(page, testInfo, 'remediation-mobile-connections');
   });
@@ -308,10 +340,11 @@ test.describe('model access remediation', () => {
   test('scenario 18: first-run wizard opens with catalog-driven provider list', async ({ page }, testInfo) => {
     await openSettings(page);
 
+    // On the plain path setup is never complete, so the quick-setup banner
+    // (settings overview -> base category) must expose the wizard entry.
     const wizardButton = page.getByRole('button', { name: /启动向导/ }).first();
-    if (!(await wizardButton.isVisible({ timeout: 3_000 }).catch(() => false))) {
-      test.skip(true, 'First-run wizard entry not visible in current readiness state.');
-    }
+    await expect(wizardButton).toBeVisible({ timeout: 15_000 });
+    await expect(wizardButton).toBeEnabled({ timeout: 10_000 });
     await wizardButton.click();
     await page.waitForTimeout(500);
 
