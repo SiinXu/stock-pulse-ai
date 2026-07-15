@@ -107,7 +107,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             <div className="mt-1 flex items-center gap-2" data-testid="history-card-meta">
               {item.lastAnalysisTime && (
                 <span className="text-[11px] text-muted-text">
-                  {formatDateTime(item.lastAnalysisTime)}
+                  {formatDateTime(item.lastAnalysisTime, language)}
                 </span>
               )}
               {item.analysisCount > 1 && (

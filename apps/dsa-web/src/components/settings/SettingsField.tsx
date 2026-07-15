@@ -85,6 +85,8 @@ function renderFieldControl(
   isPasswordEditable: boolean,
   onPasswordFocus: () => void,
   controlId: string,
+  hasError: boolean,
+  ariaDescribedBy: string | undefined,
   language: UiLanguage,
   t: (key: UiTextKey) => string,
 ) {
@@ -120,6 +122,9 @@ function renderFieldControl(
 
     return (
       <div
+        role="group"
+        aria-invalid={hasError || undefined}
+        aria-describedby={ariaDescribedBy}
         className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3"
         data-testid={`multi-enum-${item.key}`}
       >
@@ -164,6 +169,8 @@ function renderFieldControl(
           options={normalizeSelectOptions(item.key, schema.options, language)}
           disabled={disabled || !schema.isEditable}
           placeholder={t('common.selectPlaceholder')}
+          error={hasError}
+          ariaDescribedBy={ariaDescribedBy}
           className="md:ml-auto"
           menuAlign="end"
         />
@@ -174,7 +181,9 @@ function renderFieldControl(
     return (
       <textarea
         id={controlId}
-        className={`${commonClass} min-h-[92px] resize-y py-2`}
+        aria-invalid={hasError || undefined}
+        aria-describedby={ariaDescribedBy}
+        className={cn(commonClass, 'min-h-[92px] resize-y py-2', hasError && 'border-danger')}
         value={value}
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}
@@ -192,6 +201,8 @@ function renderFieldControl(
           type="button"
           role="switch"
           aria-checked={checked}
+          aria-invalid={hasError || undefined}
+          aria-describedby={ariaDescribedBy}
           disabled={isDisabled}
           onClick={() => onChange(checked ? 'false' : 'true')}
           className={cn(
@@ -229,6 +240,8 @@ function renderFieldControl(
                   allowTogglePassword
                   iconType={iconType}
                   id={index === 0 ? controlId : `${controlId}-${index}`}
+                  aria-invalid={hasError || undefined}
+                  aria-describedby={ariaDescribedBy}
                   readOnly={!isPasswordEditable}
                   onFocus={onPasswordFocus}
                   value={entry}
@@ -279,6 +292,8 @@ function renderFieldControl(
         allowTogglePassword
         iconType={iconType}
         id={controlId}
+        aria-invalid={hasError || undefined}
+        aria-describedby={ariaDescribedBy}
         readOnly={!isPasswordEditable}
         onFocus={onPasswordFocus}
         value={value}
@@ -302,7 +317,9 @@ function renderFieldControl(
     <input
       id={controlId}
       type={inputType}
-      className={cn(commonClass, 'block h-8 md:ml-auto md:w-44')}
+      aria-invalid={hasError || undefined}
+      aria-describedby={ariaDescribedBy}
+      className={cn(commonClass, 'block h-8 md:ml-auto md:w-44', hasError && 'border-danger')}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
@@ -335,6 +352,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   const hasError = issues.some((issue) => issue.severity === 'error');
   const [isPasswordEditable, setIsPasswordEditable] = useState(false);
   const controlId = `setting-${item.key}`;
+  const issueDescriptionIds = issues.map((_, index) => `${controlId}-issue-${index}`);
+  const ariaDescribedBy = issueDescriptionIds.join(' ') || undefined;
   const displayValue = resolveDisplayValue(item, value);
 
   return (
@@ -397,6 +416,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           isPasswordEditable,
           () => setIsPasswordEditable(true),
           controlId,
+          hasError,
+          ariaDescribedBy,
           language,
           t,
         )}
@@ -405,6 +426,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           <div className="mt-2 space-y-1">
             {issues.map((issue, index) => (
               <p
+                id={issueDescriptionIds[index]}
                 key={`${issue.code}-${issue.key}-${index}`}
                 className={issue.severity === 'error' ? 'text-xs text-danger' : 'text-xs text-warning'}
               >

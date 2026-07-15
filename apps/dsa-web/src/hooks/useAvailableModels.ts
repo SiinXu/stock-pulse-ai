@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
 import type { AvailableModelEntry } from '../types/systemConfig';
 
@@ -24,7 +24,6 @@ export function useAvailableModels(reloadKey?: string | number): AvailableModels
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const activeRef = useRef(true);
 
   const reload = useCallback(() => {
     setIsLoading(true);
@@ -33,11 +32,11 @@ export function useAvailableModels(reloadKey?: string | number): AvailableModels
   }, []);
 
   useEffect(() => {
-    activeRef.current = true;
+    let cancelled = false;
     systemConfigApi
       .getLlmAvailableModels()
       .then((response) => {
-        if (!activeRef.current) {
+        if (cancelled) {
           return;
         }
         setModels(response.models ?? []);
@@ -45,7 +44,7 @@ export function useAvailableModels(reloadKey?: string | number): AvailableModels
         setIsLoading(false);
       })
       .catch((err: unknown) => {
-        if (!activeRef.current) {
+        if (cancelled) {
           return;
         }
         // Do NOT fold the failure into an empty list — surface it so the UI can
@@ -55,7 +54,7 @@ export function useAvailableModels(reloadKey?: string | number): AvailableModels
         setIsLoading(false);
       });
     return () => {
-      activeRef.current = false;
+      cancelled = true;
     };
   }, [reloadKey, reloadToken]);
 

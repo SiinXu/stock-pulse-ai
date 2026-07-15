@@ -144,6 +144,49 @@ class LLMChannelConfigTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_runtime_channel_preserves_explicit_provider_identity(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        env = {
+            "LLM_CHANNELS": "openai_team",
+            "LLM_OPENAI_TEAM_PROVIDER": "openai",
+            "LLM_OPENAI_TEAM_PROTOCOL": "openai",
+            "LLM_OPENAI_TEAM_API_KEY": "sk-test-value",
+            "LLM_OPENAI_TEAM_MODELS": "gpt-5.5",
+        }
+
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+
+        self.assertEqual(config.llm_channels[0]["name"], "openai_team")
+        self.assertEqual(config.llm_channels[0]["provider_id"], "openai")
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_runtime_channel_uses_provider_protocol_for_renamed_connection(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        env = {
+            "LLM_CHANNELS": "writing_team",
+            "LLM_WRITING_TEAM_PROVIDER": "anthropic",
+            "LLM_WRITING_TEAM_API_KEY": "sk-test-value",
+            "LLM_WRITING_TEAM_MODELS": "claude-test",
+        }
+
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+
+        channel = config.llm_channels[0]
+        self.assertEqual(channel["provider_id"], "anthropic")
+        self.assertEqual(channel["protocol"], "anthropic")
+        self.assertEqual(channel["models"], ["anthropic/claude-test"])
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
     def test_hermes_channel_adds_deployment_marker(self, _mock_parse_yaml, _mock_setup_env) -> None:
         env = {
             "LLM_CHANNELS": "hermes",

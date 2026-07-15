@@ -2,7 +2,7 @@
 
 欢迎！无论你是刚接触 AI 的新手小白，还是精通各种 API 的高玩老手，这份指南都能帮你快速把大模型（LLM）跑起来。
 
-本项目对外提供统一的 AI 模型接入体验，支持主流官方 API、OpenAI 兼容平台以及本地模型。底层由 [LiteLLM](https://docs.litellm.ai/) 驱动，但大多数用户只需要理解“选服务商、填 API Key、选主模型/渠道”这条默认路径。为了照顾不同阶段的用户，我们设计了“三层优先级”配置，按需选择最适合你的方式即可。
+本项目对外提供统一的 AI 模型接入体验，支持主流官方 API、OpenAI 兼容平台以及本地模型。底层由 [LiteLLM](https://docs.litellm.ai/) 驱动，但大多数用户只需要理解模型服务商（Provider）、模型连接（Connection）、可用模型（Model）和任务模型（Task Assignment）四个概念。Connection 是可重命名的账号、网关或本地实例，同一 Provider 可以创建多条 Connection。为了照顾不同阶段的用户，我们设计了“三层优先级”配置，按需选择最适合你的方式即可。
 
 如果你正在选择具体服务商、配置 GitHub Actions Secrets / Variables、排查 `details.reason` 错误或准备回滚配置，请优先查看 [LLM 服务商配置指南](./llm-providers.md)。该文档集中维护 provider 预设、Actions 变量对照、运行时能力检测边界和常见错误处理建议。
 
@@ -125,7 +125,7 @@ LITELLM_MODEL=openai/deepseek-ai/DeepSeek-V3
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
 ```
 *兼容提示：仅填这一行时，系统仍会默认使用 `deepseek/deepseek-chat` 并在日志提示迁移。*
-`deepseek-chat` / `deepseek-reasoner` 仍可用于兼容旧配置，但 DeepSeek 官方已标记为 2026/07/24 后废弃；新配置建议在 Web「设置 → AI 与模型 → 连接（模型接入）」中添加模型服务，或显式 `LITELLM_MODEL=deepseek/deepseek-v4-flash` 迁移到 `deepseek-v4-flash` / `deepseek-v4-pro`。
+`deepseek-chat` / `deepseek-reasoner` 仍可用于兼容旧配置，但 DeepSeek 官方已标记为 2026/07/24 后废弃；新配置建议在 Web「设置 → AI 与模型 → 模型接入」中添加模型服务，或显式 `LITELLM_MODEL=deepseek/deepseek-v4-flash` 迁移到 `deepseek-v4-flash` / `deepseek-v4-pro`。
 
 ### 示例 3：使用 Gemini 免费 API
 ```env
@@ -151,22 +151,22 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **目标：** 我有多个不同平台的 Key 想要混着用，如果主模型卡了/网络挂了，我希望它能自动切换到备用模型。
 
-**网页端可以直接配：** 你可以启动程序后，在 **Web UI 的“系统设置 -> AI 与模型 -> 连接（模型接入）”** 中非常直观地进行可视化配置！
+**网页端可以直接配：** 你可以启动程序后，在 **Web UI 的“系统设置 -> AI 与模型 -> 模型接入”** 中非常直观地进行可视化配置！
 
-> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型”组织。新建连接不会预填示例模型（模型名会过期，不再作为默认写入配置）：对于 DeepSeek、阿里百炼（DashScope）以及其他兼容 OpenAI `/v1/models` 的连接，点击“获取模型”从 `{base_url}/models` 拉取可用模型并多选，或逐个手动添加；每个模型是独立可删除的 token，底层仍保存为原来的 `LLM_{CONNECTION}_MODELS=model1,model2` 逗号格式（读取旧逗号配置会自动解析为 token）。若连接不支持该接口、鉴权失败或暂时不可达，可继续手动添加模型，不影响保存。任务路由中的报告 / Agent / Vision / 备用模型只能从“已接入模型”中选择，不支持任意输入。
+> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型 / 任务模型”组织。Provider Catalog 决定字段要求和是否显示“获取模型”；OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`，不支持发现或发现失败时可逐个手动添加。发现结果不会自动全选。每个模型是独立 token，底层仍保存为 `LLM_{CONNECTION}_MODELS=model1,model2`；Provider 身份另存为 `LLM_{CONNECTION}_PROVIDER=<provider_id>`，不会再从可重命名的 Connection 名称猜测。任务路由中的报告 / Agent / Vision / 备用模型只能从可用模型目录选择，不支持任意输入；历史失效值会保留并标记“当前配置不可用”，保存不会静默清理。
 
 ### 首次启动配置状态
 
-后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主渠道、Agent 渠道、自选股、通知渠道和本地存储。这个接口只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件；前端向导和后续 smoke run 可以基于该接口逐步接入。
+后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用 Provider Catalog 的凭据、Base URL 和发现能力契约；Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
 
 ### Web 模型连接编辑器的兼容性 / 迁移 / 回退规则
 
-- 预设里的 provider / Base URL 只用于**初始化表单**（新建连接不再预填示例模型，见上方“新版编辑体验补充”）；真正落盘时仍是你当前输入的 `LLM_{CHANNEL}_PROTOCOL`、`LLM_{CHANNEL}_BASE_URL`、`LLM_{CHANNEL}_MODELS`、`LLM_{CHANNEL}_API_KEY(S)`，不会在后台偷偷改成别的 provider 名或 URL。
-- 设置页的“获取模型”只对 `OpenAI Compatible` / `DeepSeek` 连接调用 `{base_url}/models`；“测试连接”默认只对模型列表首项发起一次最小聊天请求，并在结果中展示后端规范化后的 `resolved_model`。若返回 `details.reason=model_access_denied`（例如 Issue #1208 中已观测到的 SiliconFlow / OpenAI Compatible 经 LiteLLM 返回 `Model disabled`），请把它视为基于 provider 文案的 best-effort 模型可用性诊断，优先确认该模型是否已在当前账号/key 下开通，必要时调整模型顺序或移除不可用模型后重试；未覆盖或语义不同的 provider 文案会继续走兜底诊断。可选的“运行时能力检测”必须由用户显式选择后触发，会额外发起 JSON / tools / stream / vision smoke 请求，结果仅代表当前账号、模型和 endpoint 的一次 best-effort 检测。上述检测返回的 `stage / error_code / details / latency_ms / capability_results` 仅用于结构化诊断提示，**不会写回** `.env`，也不会阻止保存。
+- Provider / Base URL 只用于**初始化表单**；真正落盘时包含 `LLM_{CONNECTION}_PROVIDER`、`LLM_{CONNECTION}_PROTOCOL`、`LLM_{CONNECTION}_BASE_URL`、`LLM_{CONNECTION}_MODELS` 和 `LLM_{CONNECTION}_API_KEY(S)`。Provider ID 与 Connection 名称分离；旧配置只在名称精确等于 Catalog ID 时兼容推断，不按 `openai2` 等前缀猜测，也不静默迁移。
+- “获取模型”是否可用由 Provider Catalog 的 `supports_discovery` 决定；OpenAI-compatible / DeepSeek 使用模型列表接口，Ollama 使用 `{base_url}/api/tags` 并允许空 Key。“测试连接”默认只对模型列表首项发起一次最小聊天请求，并在结果中展示后端规范化后的 `resolved_model`。若返回 `details.reason=model_access_denied`，请优先确认该模型是否已在当前账号/key 下开通；未覆盖或语义不同的 provider 文案会继续走兜底诊断。可选的“运行时能力检测”必须由用户显式选择后触发，会额外发起 JSON / tools / stream / vision smoke 请求；诊断不会写回 `.env`，也不会阻止保存。
 - 若返回 `details.reason=provider_blocked`，表示服务商或中转网关明确拦截了本次请求；它区别于本地网络 / TLS 异常和 `model_access_denied`，应优先检查账号风控、地域或请求来源限制、模型权限、代理商网关策略和内容安全策略。
 - 运行时能力检测会产生真实 LLM 请求，可能带来 token / 图像输入费用、RPM/TPM 限流、余额不足或超时。检测失败可能来自账号权限、模型未开通、endpoint 区域、余额、服务商兼容层或 LiteLLM 转换路径，不等于该 provider 全局不支持对应能力。P3 未对所有真实 provider 做在线 smoke；兼容依据来自当前依赖约束 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` 下的 LiteLLM `completion()` / OpenAI I/O format / streaming / exception mapping，以及 OpenAI Chat Completions 的 JSON mode、tool calling、streaming 和 vision input 形状。
 - 相关外部来源：LiteLLM Python SDK / OpenAI I/O format / streaming / exception mapping：<https://docs.litellm.ai/>；LiteLLM OpenAI-compatible 路由：<https://docs.litellm.ai/docs/providers/openai_compatible>；OpenAI Chat Completions：<https://platform.openai.com/docs/api-reference/chat/create>；JSON mode：<https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat>；tool calling：<https://platform.openai.com/docs/guides/function-calling?api-mode=chat>；streaming：<https://platform.openai.com/docs/guides/streaming-responses?api-mode=chat>；vision input：<https://platform.openai.com/docs/guides/images-vision?api-mode=chat>。
-- 保存连接时，只会更新这次提交的 key；不会因为切换配置模式而静默迁移整个旧配置。运行时模型引用（`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`VISION_MODEL`、`LITELLM_FALLBACK_MODELS`）受后端权威校验保护：如果本次修改（删除/停用连接、调整模型列表）会让这些引用指向已启用连接中不存在的模型，保存会被后端直接拒绝（`unknown_model`，直接调用 API 也无法绕过），需要先在“任务路由 / 可靠性”视图改选替代模型或清空引用再保存；Web 端删除被任务引用的连接时会就地提示被哪些任务使用，并提供“前往任务路由替换”。`cohere/*`、`google/*`、`xai/*` 这类直连模型仅用于说明历史 `direct-env` 兼容保留语义，不等于可用性承诺，是否可用请按各厂商官方模型/API 文档再做实际验证。
+- 保存连接时，只会更新这次提交的 key；不会因为切换配置模式而静默迁移整个旧配置。删除仍被报告、Agent、Vision 或 fallback 引用的单个模型会返回 `model_in_use` 与全部 `details.referenced_by`；Web 可在模型管理弹窗中选择替代模型，使引用替换与删除进入同一页面草稿并原子保存。未替换的历史失效引用仍以 `unknown_model` 拒绝，且不会被静默清理。`cohere/*`、`google/*`、`xai/*` 这类直连模型仅用于说明历史 `direct-env` 兼容保留语义，不等于可用性承诺。
 - 后端一致性依据：配置校验链路在 `SystemConfigService._validate_llm_runtime_selection`（`src/services/system_config_service.py`）中通过 `_uses_direct_env_provider`（`src/config.py`）判断运行时来源；当前仅 `gemini`、`vertex_ai`、`anthropic`、`openai`、`deepseek` 属于托管 key provider，`cohere`、`google`、`xai` 不在该白名单中，因此会保留为直连模型。
 - 回退方式也保持最小：把对应连接的模型列表改回去后重新选择主模型 / 备用模型，或直接用桌面端导出备份 / 手动 `.env` 还原之前的 `LLM_*`、`LITELLM_MODEL`、`AGENT_LITELLM_MODEL`、`VISION_MODEL`、`LLM_TEMPERATURE`、`LLM_USAGE_HMAC_*` 即可，不需要额外跑迁移脚本。Web 端如需恢复配置，也可在启用管理员鉴权（`ADMIN_AUTH_ENABLED=true`）后通过 `POST /api/v1/system/config/import` 回滚。
 - 当前仓库对此链路的依赖约束是 `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`（见 `requirements.txt`）；回归覆盖包括 `tests/test_system_config_service.py`、`tests/test_system_config_api.py` 和 `apps/dsa-web/src/components/settings/__tests__/LLMChannelEditor.test.tsx`。
@@ -212,12 +212,14 @@ LITELLM_MODEL=ollama/qwen3:8b
 LLM_CHANNELS=deepseek,aihubmix
 
 # 2. 渠道一：配置 DeepSeek 官方
+LLM_DEEPSEEK_PROVIDER=deepseek
 LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com
 LLM_DEEPSEEK_API_KEY=sk-1111111111111
 LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro
 
 # 3. 渠道二：配置一个常用的聚合中转 API
-LLM_AIHUBMIX_BASE_URL=https://api.aihubmix.com/v1
+LLM_AIHUBMIX_PROVIDER=aihubmix
+LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1
 LLM_AIHUBMIX_API_KEY=sk-2222222222222
 LLM_AIHUBMIX_MODELS=gpt-5.5,claude-sonnet-4-6
 
@@ -227,13 +229,14 @@ LITELLM_MODEL=deepseek/deepseek-v4-flash
 # 可选：Agent 问股单独指定主模型（留空则继承主模型）
 AGENT_LITELLM_MODEL=deepseek/deepseek-v4-pro
 # 主模型崩了立刻挨个尝试下面这俩备用模型：
-LITELLM_FALLBACK_MODELS=openai/gpt-5.4-mini,anthropic/claude-sonnet-4-6
+LITELLM_FALLBACK_MODELS=openai/gpt-5.5,openai/claude-sonnet-4-6
 ```
 
 ### 示例：Ollama 渠道模式（本地模型，无需 API Key）
 ```env
 # 1. 开启渠道模式，声明 ollama 渠道
 LLM_CHANNELS=ollama
+LLM_OLLAMA_PROVIDER=ollama
 
 # 2. 配置 Ollama 地址（本地默认 11434 端口）
 LLM_OLLAMA_BASE_URL=http://localhost:11434
@@ -246,6 +249,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 ### 示例：Hermes 本地 HTTP Generation（Phase 3）
 ```env
 LLM_CHANNELS=hermes
+LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
 LLM_HERMES_API_KEY=sk-local-hermes

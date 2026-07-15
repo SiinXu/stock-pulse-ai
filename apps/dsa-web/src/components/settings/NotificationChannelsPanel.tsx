@@ -6,6 +6,8 @@ import { Badge, Modal } from '../common';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
 import { NOTIFICATION_CHANNELS } from './notificationChannels';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { getNotificationChannelLabel, SETTINGS_NOTIFICATION_TEXT } from '../../locales/settingsNotifications';
 
 interface NotificationChannelsPanelProps {
   items: SystemConfigItem[];
@@ -27,6 +29,8 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   onChange,
   issueByKey,
 }) => {
+  const { language } = useUiLanguage();
+  const text = SETTINGS_NOTIFICATION_TEXT[language];
   const [openChannelId, setOpenChannelId] = useState<string | null>(null);
 
   const itemsByChannel = useMemo(() => {
@@ -63,10 +67,10 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Bell className="h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
-                <span className="truncate text-sm font-medium text-foreground">{channel.label}</span>
+                <span className="truncate text-sm font-medium text-foreground">{getNotificationChannelLabel(channel.id, language)}</span>
               </span>
               <Badge variant={configured ? 'success' : 'default'} size="sm" className="shrink-0">
-                {configured ? '已配置' : '未配置'}
+                {configured ? text.configured : text.unconfigured}
               </Badge>
             </button>
           );
@@ -76,7 +80,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
       <Modal
         isOpen={Boolean(openChannel)}
         onClose={() => setOpenChannelId(null)}
-        title={openChannel ? openChannel.label : undefined}
+        title={openChannel ? getNotificationChannelLabel(openChannel.id, language) : undefined}
         className="max-w-2xl"
       >
         <div className="divide-y divide-transparent">

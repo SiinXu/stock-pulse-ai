@@ -7,6 +7,7 @@ import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { historyApi } from '../../api/history';
 import type { NewsIntelItem, ReportLanguage } from '../../types/analysis';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
 interface ReportNewsProps {
   recordId?: number;  // 分析历史记录主键 ID
@@ -35,6 +36,7 @@ const NEWS_SOURCE_TEXT = {
 export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, language = 'zh' }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
+  const { language: uiLanguage, t } = useUiLanguage();
   const sourceText = NEWS_SOURCE_TEXT[reportLanguage];
   const [isLoading, setIsLoading] = useState(false);
   const [items, setItems] = useState<NewsIntelItem[]>([]);
@@ -49,11 +51,11 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
       const response = await historyApi.getNews(recordId, limit);
       setItems(response.items || []);
     } catch (err) {
-      setError(getParsedApiError(err));
+      setError(getParsedApiError(err, uiLanguage));
     } finally {
       setIsLoading(false);
     }
-  }, [recordId, limit]);
+  }, [recordId, limit, uiLanguage]);
 
   useEffect(() => {
     setItems([]);
@@ -85,9 +87,9 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
               type="button"
               onClick={() => void fetchNews()}
               className="home-accent-link text-xs"
-              aria-label={text.refresh}
+              aria-label={t('usage.refresh')}
             >
-              {text.refresh}
+              {t('usage.refresh')}
             </button>
           </div>
         )}
@@ -99,9 +101,9 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
       {error && !isLoading && (
         <ApiErrorAlert
           error={error}
-          actionLabel={text.retry}
+          actionLabel={t('common.retry')}
           onAction={() => void fetchNews()}
-          dismissLabel={text.dismiss}
+          dismissLabel={t('taskPanel.dismiss')}
         />
       )}
 

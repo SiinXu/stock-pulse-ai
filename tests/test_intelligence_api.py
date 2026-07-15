@@ -24,6 +24,9 @@ class IntelligenceApiTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
         os.environ["DATABASE_PATH"] = os.path.join(self._temp_dir.name, "api_intel.db")
+        self._auth_patcher = patch("api.middlewares.auth.is_auth_enabled", return_value=False)
+        self._auth_patcher.start()
+        self.addCleanup(self._auth_patcher.stop)
         Config._instance = None
         DatabaseManager.reset_instance()
         self._dns_patcher = patch(

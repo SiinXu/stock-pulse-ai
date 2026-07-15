@@ -158,10 +158,10 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '从可用模型中选择一个或多个，按顺序尝试。',
     valueNotes: [
       '备用模型只在主要模型失败、超时或响应不可用时使用。',
-      '保存时会自动清理已不可用的模型引用。',
+      '不在当前可用模型目录中的历史值会保留并标记为当前配置不可用；保存不会静默清理。',
     ],
     impact: ['提升模型调用失败时的可用性，但可能增加跨服务商成本和响应差异。'],
-    notes: ['不要把主要模型重复加入备用模型列表。'],
+    notes: ['不要把主要模型重复加入备用模型列表；不可用值需要由用户显式替换或删除。'],
   },
   'settings.ai_model.LITELLM_CONFIG': {
     title: '高级模型路由 YAML',
@@ -758,7 +758,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     summary: '声明该连接可供运行时选择的模型。',
     usage: '可点击“获取模型”从支持 /models 的连接拉取，也可手动填写逗号分隔列表。',
     valueNotes: ['主要模型、Agent 模型、视觉模型和备用模型都会引用这里的模型。'],
-    impact: ['影响可选择模型、保存前失效模型清理和运行时模型路由。'],
+    impact: ['影响可选择模型和运行时模型路由；失效引用会保留并标记不可用，需由用户显式替换或删除。'],
     notes: ['模型是否真正可用仍取决于服务商权限和运行时连接测试。'],
   },
   'settings.llm_channel.capability_checks': {
@@ -1346,10 +1346,13 @@ const settingsHelpEnUS: SettingsHelpMap = {
   'settings.ai_model.LITELLM_FALLBACK_MODELS': {
     title: 'Fallback Models',
     summary: 'Models tried in order when the primary model fails.',
-    usage: 'Use comma-separated provider/model values.',
-    valueNotes: ['Fallbacks run only after primary model failures.', 'The channel editor removes unreachable managed-provider references on save.'],
+    usage: 'Select one or more available models and arrange them in retry order.',
+    valueNotes: [
+      'Fallbacks run only after primary model failures.',
+      'Historical values outside the available-model catalog remain marked unavailable; saving never removes them silently.',
+    ],
     impact: ['Improves LLM availability, but can change cost, latency, and provider behavior.'],
-    notes: ['Do not duplicate the primary model in the fallback list.'],
+    notes: ['Do not duplicate the primary model in the fallback list. Replace or remove unavailable values explicitly.'],
   },
   'settings.ai_model.LITELLM_CONFIG': {
     title: 'Advanced Routing YAML',
@@ -1915,7 +1918,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     summary: 'Declares models available for runtime selection.',
     usage: 'Use model discovery when /models is supported, or manually enter comma-separated model names.',
     valueNotes: ['Runtime primary, Agent, Vision, and fallback choices reference this list.'],
-    impact: ['Affects selectable models, stale-model cleanup, and routing.'],
+    impact: ['Affects selectable models and routing; stale references remain marked unavailable until the user explicitly replaces or removes them.'],
     notes: ['Actual availability still depends on provider permissions and runtime tests.'],
   },
   'settings.llm_channel.capability_checks': {

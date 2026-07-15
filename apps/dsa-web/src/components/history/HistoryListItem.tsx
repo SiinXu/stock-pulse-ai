@@ -100,7 +100,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
               </span>
               <span className="w-1 h-1 rounded-full bg-subtle-hover" />
               <span className="text-[11px] text-muted-text">
-                {formatDateTime(item.createdAt)}
+                {formatDateTime(item.createdAt, language)}
               </span>
               {phaseLabel ? (
                 <>

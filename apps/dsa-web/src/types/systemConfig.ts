@@ -217,6 +217,8 @@ export interface AvailableModelEntry {
   connection: string | null;
   /** Stable connection id (equals the connection name), null if unknown. */
   connectionId: string | null;
+  /** User-facing connection name returned by the backend. */
+  connectionName: string | null;
   /** Protocol of the owning connection, null if unknown (back-compat). */
   provider: string | null;
   /** Authoritative catalog provider id of the owning connection. */
@@ -353,6 +355,7 @@ export interface SchedulerRunNowResponse {
 
 export interface TestLLMChannelRequest {
   name: string;
+  providerId: string;
   protocol: string;
   baseUrl?: string;
   apiKey?: string;
@@ -437,6 +440,7 @@ export interface TestNotificationChannelResponse {
 
 export interface DiscoverLLMChannelModelsRequest {
   name: string;
+  providerId: string;
   protocol: string;
   baseUrl?: string;
   apiKey?: string;

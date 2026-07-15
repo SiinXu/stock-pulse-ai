@@ -18,11 +18,22 @@ function modelEntry(route: string) {
     display: route.split('/').pop() || route,
     connection: 'openai',
     connectionId: 'openai',
+    connectionName: 'openai',
     provider: 'openai',
     providerId: 'openai',
     providerLabel: 'OpenAI 官方',
     available: true,
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 describe('useAvailableModels', () => {
@@ -71,5 +82,30 @@ describe('useAvailableModels', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.models).toHaveLength(1);
     expect(result.current.error).toBeNull();
+  });
+
+  it('does not let an older request overwrite a newer reload result', async () => {
+    const first = createDeferred<{ models: ReturnType<typeof modelEntry>[] }>();
+    const second = createDeferred<{ models: ReturnType<typeof modelEntry>[] }>();
+    getLlmAvailableModels
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useAvailableModels());
+
+    await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalledTimes(1));
+    act(() => result.current.reload());
+    await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      second.resolve({ models: [modelEntry('openai/new-model')] });
+      await second.promise;
+    });
+    expect(result.current.models[0]?.route).toBe('openai/new-model');
+
+    await act(async () => {
+      first.resolve({ models: [modelEntry('openai/stale-model')] });
+      await first.promise;
+    });
+    expect(result.current.models[0]?.route).toBe('openai/new-model');
   });
 });

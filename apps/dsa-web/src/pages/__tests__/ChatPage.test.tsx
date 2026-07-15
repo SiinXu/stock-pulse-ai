@@ -356,7 +356,7 @@ describe('ChatPage', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '导出会话为 Markdown 文件' }));
 
-    expect(mockDownloadSession).toHaveBeenCalledWith(mockStoreState.messages);
+    expect(mockDownloadSession).toHaveBeenCalledWith(mockStoreState.messages, 'zh');
     expect(mockFormatSessionAsMarkdown).not.toHaveBeenCalled();
   });
 
@@ -684,7 +684,7 @@ describe('ChatPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '发送到已配置的通知机器人/邮箱' }));
 
     await waitFor(() => {
-      expect(mockFormatSessionAsMarkdown).toHaveBeenCalledWith(mockStoreState.messages);
+      expect(mockFormatSessionAsMarkdown).toHaveBeenCalledWith(mockStoreState.messages, 'zh');
       expect(mockSendChat).toHaveBeenCalledWith('# exported markdown');
     });
 

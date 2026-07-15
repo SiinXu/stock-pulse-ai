@@ -19,7 +19,7 @@ from src.config import (
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
-SCHEMA_VERSION = "2026-07-14-ui-placement"
+SCHEMA_VERSION = "2026-07-15-connection-provider"
 
 _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
     {
@@ -4957,7 +4957,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
 )
 
 

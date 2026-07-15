@@ -14,9 +14,9 @@ import {
   ALERT_SEVERITY_LABELS,
   ALERT_TYPE_FILTER_OPTIONS,
   ALERT_TYPE_LABELS,
-} from '../../locales/featureText';
+} from '../../locales/alerts';
 import type { AlertRuleItem, AlertType, MarketRegion } from '../../types/alerts';
-import { formatDateTime } from '../../utils/format';
+import { formatUiDateTime } from '../../utils/uiLocale';
 
 export type AlertRuleEnabledFilter = 'all' | 'enabled' | 'disabled';
 export type AlertTypeFilter = 'all' | AlertType;
@@ -210,12 +210,12 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                   </td>
                   <td className="px-3 py-3 text-xs text-secondary-text">
                     <div>{isCoolingDown(rule) ? text.coolingDown : text.notCoolingDown}</div>
-                    <div className="mt-1">{formatDateTime(rule.cooldownUntil)}</div>
+                    <div className="mt-1">{formatUiDateTime(rule.cooldownUntil, language, { dateStyle: 'medium', timeStyle: 'short' })}</div>
                     {hasChildTargetCooldown(rule) ? (
                       <div className="mt-1 text-muted-text">{text.childTargetCooldown}</div>
                     ) : null}
                   </td>
-                  <td className="px-3 py-3 text-xs text-secondary-text">{formatDateTime(rule.updatedAt ?? rule.createdAt)}</td>
+                  <td className="px-3 py-3 text-xs text-secondary-text">{formatUiDateTime(rule.updatedAt ?? rule.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
                       <Button

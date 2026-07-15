@@ -1077,7 +1077,7 @@ describe('StockScreeningPage', () => {
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
-    expect(await screen.findByText('DSA增强：1 / 1')).toBeInTheDocument();
+    expect(await screen.findByText('DSA 增强：1 / 1')).toBeInTheDocument();
 
     expect(screen.getByText('DSA 增强摘要')).toBeInTheDocument();
     expect(screen.getByText(/DSA行情：现价 1688/)).toBeInTheDocument();

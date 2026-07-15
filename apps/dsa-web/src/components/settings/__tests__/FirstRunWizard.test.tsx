@@ -37,7 +37,7 @@ const CATALOG = [
   { id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: ['official-api'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
   { id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', capabilities: ['official-api', 'vision'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: false, isLocal: false, isCustom: false },
   { id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', capabilities: ['local-runtime'], requiresApiKey: false, requiresBaseUrl: false, supportsDiscovery: true, isLocal: true, isCustom: false },
-  { id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', capabilities: [], requiresApiKey: true, requiresBaseUrl: true, supportsDiscovery: true, isLocal: false, isCustom: false },
+  { id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', capabilities: [], requiresApiKey: true, requiresBaseUrl: true, supportsDiscovery: true, isLocal: false, isCustom: true },
 ];
 
 const okComplete = () => vi.fn().mockResolvedValue({ success: true });
@@ -97,15 +97,59 @@ describe('FirstRunWizard', () => {
     expect(byKey.get('LITELLM_MODEL')).toBe('deepseek/deepseek-v4-flash');
   });
 
+  it('creates a second connection for the same provider without overwriting the existing one', async () => {
+    const onComplete = okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        existingChannelNames={['deepseek']}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'deepseek');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-second' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['deepseek-v4-flash']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    const items: Array<{ key: string; value: string }> = onComplete.mock.calls[0][0];
+    const byKey = new Map(items.map((item) => [item.key, item.value]));
+    expect(byKey.get('LLM_CHANNELS')).toBe('deepseek,deepseek2');
+    expect(byKey.get('LLM_DEEPSEEK2_PROVIDER')).toBe('deepseek');
+    expect(byKey.get('LLM_DEEPSEEK2_MODELS')).toBe('deepseek-v4-flash');
+    expect(items.some((item) => item.key === 'LLM_DEEPSEEK_MODELS')).toBe(false);
+  });
+
   it('does not require a Base URL for Gemini (SDK default endpoint)', () => {
     render(<FirstRunWizard onComplete={okComplete()} onClose={() => {}} isSaving={false} language="zh" providers={CATALOG} />);
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'gemini');
-    // Gemini template has a blank Base URL; entering only the key must be enough.
-    expect(screen.getByLabelText('服务地址')).toHaveValue('');
+    // Official SDK endpoints stay out of the first-run form.
+    expect(screen.queryByLabelText('服务地址')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'gm-key' } });
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
+  });
+
+  it('uses supportsDiscovery and goes straight to manual models when unsupported', () => {
+    render(<FirstRunWizard onComplete={okComplete()} onClose={() => {}} isSaving={false} language="zh" providers={CATALOG} />);
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'gemini');
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'gm-key' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.queryByRole('button', { name: '自动发现模型' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('添加模型')).toBeInTheDocument();
+    expect(screen.getByText(/不支持自动发现/)).toBeInTheDocument();
   });
 
   it('does not require an API key for Ollama (local runtime) and omits an empty key', async () => {
@@ -114,7 +158,8 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'ollama');
-    // No API key entered, but Ollama is key-exempt so we can proceed.
+    // Key-exempt providers do not expose a misleading credential field.
+    expect(screen.queryByLabelText(/API 密钥/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
     addWizardModels(['llama3.2']);
@@ -135,10 +180,34 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'custom');
+    expect(screen.getByLabelText('协议')).toHaveAttribute('role', 'combobox');
     fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-custom' } });
     expect(screen.getByLabelText('服务地址')).toHaveValue('');
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('服务地址'), { target: { value: 'https://my-proxy.example.com/v1' } });
+    expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
+  });
+
+  it('allows a Custom localhost connection with an empty API key when the backend exempts that host', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        emptyApiKeyHosts={['localhost']}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'custom');
+
+    expect(screen.getByLabelText('API 密钥')).toHaveValue('');
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('服务地址'), {
+      target: { value: 'http://localhost:8001/v1' },
+    });
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
   });
 
@@ -164,6 +233,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: '自动发现模型' }));
     // Candidates land in the searchable multi-select, unchecked — nothing is
     // enabled until the user confirms each model.
+    fireEvent.click(await screen.findByRole('button', { name: '选择模型' }));
     const checkboxA = await screen.findByLabelText('model-a');
     expect(checkboxA).not.toBeChecked();
     expect(screen.getByLabelText('model-b')).not.toBeChecked();
@@ -171,7 +241,7 @@ describe('FirstRunWizard', () => {
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
     fireEvent.click(checkboxA);
     // Only the confirmed model becomes an enabled token chip.
-    expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument();
+    expect(screen.getAllByLabelText('移除模型 model-a').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('移除模型 model-b')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
     // The candidate list is searchable.
@@ -191,8 +261,7 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     chooseOption(screen.getByLabelText('服务商'), 'ollama');
-    // The key field is explicitly marked optional for key-exempt providers.
-    expect(screen.getByLabelText('API 密钥（可选）')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/API 密钥/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '下一步' })); // -> models
     const discoverButton = screen.getByRole('button', { name: '自动发现模型' });
     expect(discoverButton).toBeEnabled();
@@ -203,6 +272,7 @@ describe('FirstRunWizard', () => {
       baseUrl: 'http://127.0.0.1:11434',
       apiKey: '',
     })));
+    fireEvent.click(await screen.findByRole('button', { name: '选择模型' }));
     expect(await screen.findByLabelText('llama3.2')).not.toBeChecked();
   });
 

@@ -253,6 +253,7 @@ class ConfigValidationIssue(BaseModel):
     severity: Literal["error", "warning"]
     expected: Optional[str] = None
     actual: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ValidateSystemConfigResponse(BaseModel):
@@ -266,6 +267,7 @@ class TestLLMChannelRequest(BaseModel):
     """Request payload for testing one LLM channel."""
 
     name: str = "channel"
+    provider_id: Optional[str] = None
     protocol: str = "openai"
     base_url: str = ""
     api_key: str = ""
@@ -345,6 +347,7 @@ class DiscoverLLMChannelModelsRequest(BaseModel):
     """Request payload for discovering models from one LLM channel."""
 
     name: str = "channel"
+    provider_id: Optional[str] = None
     protocol: str = "openai"
     base_url: str = ""
     api_key: str = ""

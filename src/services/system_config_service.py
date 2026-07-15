@@ -179,6 +179,7 @@ class SystemConfigService:
 
     _LLM_CAPABILITY_ORDER: Tuple[str, ...] = ("json", "tools", "stream", "vision")
     _LLM_STREAM_CHUNK_LIMIT = 8
+    _LLM_EMPTY_API_KEY_ADAPTER_SENTINEL = "dsa-local-no-key"
     _WEB_SETTINGS_LLM_CHANNEL_SUPPORT_KEY_RE = LLM_CHANNEL_FIELD_KEY_RE
     _LLM_CAPABILITY_PROBE_IMAGE = (
         "data:image/png;base64,"
@@ -662,7 +663,10 @@ class SystemConfigService:
         }
 
         def _resolve_provider(connection_name: str) -> Tuple[str, str]:
-            pid = connection_name.lower()
+            _provider, pid, _explicit = self._resolve_connection_provider(
+                effective_map,
+                connection_name,
+            )
             if pid not in provider_label_by_id:
                 pid = "custom"
             return pid, provider_label_by_id.get(pid, pid)
@@ -679,8 +683,11 @@ class SystemConfigService:
                 enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
             if not parse_env_bool(enabled_raw, default=True):
                 continue
-            protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip() or "openai"
-            base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+            protocol, base_url = self._resolve_connection_transport(
+                effective_map,
+                name,
+            )
+            protocol = protocol or "openai"
             provider_id, provider_label = _resolve_provider(name)
             for raw_model in (effective_map.get(f"{prefix}_MODELS") or "").split(","):
                 model = raw_model.strip()
@@ -705,6 +712,7 @@ class SystemConfigService:
                 # `connection` is the channel name, which is also its stable id.
                 "connection": meta["connection"] if meta else None,
                 "connection_id": meta["connection"] if meta else None,
+                "connection_name": meta["connection"] if meta else None,
                 # `provider` stays the protocol for back-compat; provider_id/label
                 # are the authoritative catalog provider for display/grouping.
                 "provider": meta["provider"] if meta else None,
@@ -715,6 +723,88 @@ class SystemConfigService:
                 "available": True,
             })
         return {"models": models}
+
+    @staticmethod
+    def _resolve_connection_provider(
+        effective_map: Dict[str, str],
+        connection_name: str,
+    ) -> Tuple[Optional[Dict[str, Any]], str, bool]:
+        """Resolve explicit Provider identity, with exact-name legacy fallback."""
+        from src.llm.provider_catalog import get_provider
+
+        prefix = f"LLM_{connection_name.upper()}"
+        explicit_id = (effective_map.get(f"{prefix}_PROVIDER") or "").strip().lower()
+        if explicit_id:
+            return get_provider(explicit_id), explicit_id, True
+
+        inferred_id = connection_name.strip().lower()
+        inferred = get_provider(inferred_id)
+        if inferred is not None and inferred_id != "custom":
+            return inferred, inferred_id, False
+        custom = get_provider("custom")
+        return custom, "custom", False
+
+    @staticmethod
+    def _resolve_connection_transport(
+        effective_map: Dict[str, str],
+        connection_name: str,
+    ) -> Tuple[str, str]:
+        """Resolve a Connection's protocol and endpoint from explicit Provider identity."""
+        prefix = f"LLM_{connection_name.upper()}"
+        protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+        base_url = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
+        provider, _provider_id, provider_is_explicit = (
+            SystemConfigService._resolve_connection_provider(
+                effective_map,
+                connection_name,
+            )
+        )
+        if (
+            provider_is_explicit
+            and provider is not None
+            and not provider["is_custom"]
+        ):
+            protocol = str(provider["protocol"])
+            if not base_url:
+                base_url = str(provider["default_base_url"])
+        if connection_name.lower() == "anspire":
+            protocol = protocol or "openai"
+            base_url = base_url or str(
+                effective_map.get("ANSPIRE_LLM_BASE_URL")
+                or ANSPIRE_LLM_BASE_URL_DEFAULT
+            ).strip()
+        return protocol, base_url
+
+    @staticmethod
+    def _resolve_request_provider(
+        *,
+        provider_id: Optional[str],
+        protocol: str,
+        base_url: str,
+    ) -> Tuple[Optional[Dict[str, Any]], str, str, Optional[Dict[str, Any]]]:
+        """Apply explicit Catalog identity to an unsaved Connection request."""
+        normalized_provider_id = str(provider_id or "").strip().lower()
+        if not normalized_provider_id:
+            return None, protocol, base_url, None
+
+        from src.llm.provider_catalog import get_provider
+
+        provider = get_provider(normalized_provider_id)
+        if provider is None:
+            return None, protocol, base_url, {
+                "key": "provider_id",
+                "code": "invalid_provider",
+                "message": "The model connection references an unknown Provider",
+                "severity": "error",
+                "expected": "provider id from the model provider catalog",
+                "actual": normalized_provider_id,
+            }
+
+        if not provider["is_custom"]:
+            protocol = str(provider["protocol"])
+            if not base_url.strip():
+                base_url = str(provider["default_base_url"])
+        return provider, protocol, base_url, None
 
     _LEGACY_LLM_PROVIDER_KEYS = (
         "OPENAI_API_KEY", "OPENAI_API_KEYS", "ANTHROPIC_API_KEY", "ANTHROPIC_API_KEYS",
@@ -786,6 +876,7 @@ class SystemConfigService:
             prefix = f"LLM_{name.upper()}"
             base_url = ((raw_map.get(base_url_key) if base_url_key else "") or "").strip() or default_base_url
             model = ((raw_map.get(model_field) if model_field else "") or "").strip() or default_model
+            items.append({"key": f"{prefix}_PROVIDER", "value": name})
             items.append({"key": f"{prefix}_PROTOCOL", "value": protocol})
             if base_url:
                 items.append({"key": f"{prefix}_BASE_URL", "value": base_url})
@@ -1111,6 +1202,7 @@ class SystemConfigService:
         self,
         *,
         name: str,
+        provider_id: Optional[str] = None,
         protocol: str,
         base_url: str,
         api_key: str,
@@ -1118,8 +1210,30 @@ class SystemConfigService:
         timeout_seconds: float = 20.0,
         use_saved_secret: bool = False,
     ) -> Dict[str, Any]:
-        """Discover available models from an OpenAI-compatible `/models` endpoint."""
+        """Discover available models through the Provider's Catalog contract."""
         channel_name = name.strip() or "channel"
+        provider, protocol, base_url, provider_issue = self._resolve_request_provider(
+            provider_id=provider_id,
+            protocol=protocol,
+            base_url=base_url,
+        )
+        if provider_issue is not None:
+            return self._build_llm_channel_result(
+                success=False,
+                message="LLM channel configuration is invalid",
+                error=provider_issue["message"],
+                stage="model_discovery",
+                error_code="invalid_config",
+                retryable=False,
+                details={
+                    "issue_key": provider_issue["key"],
+                    "issue_code": provider_issue["code"],
+                    "reason": provider_issue["code"],
+                },
+                resolved_protocol=None,
+                models=[],
+                latency_ms=None,
+            )
         resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
             channel_name=channel_name,
             protocol=protocol,
@@ -1170,7 +1284,11 @@ class SystemConfigService:
             api_key_value=api_key,
             model_values=existing_models,
             field_prefix="discover_channel",
-            require_base_url=True,
+            require_base_url=(
+                bool(provider["requires_base_url"])
+                if provider is not None
+                else True
+            ),
         )
         if not resolved_protocol and existing_models:
             resolved_protocol = resolve_llm_channel_protocol(
@@ -1199,7 +1317,12 @@ class SystemConfigService:
                 redaction_values=redaction_values,
             )
 
-        if resolved_protocol not in {"openai", "deepseek"}:
+        from src.llm.provider_catalog import supports_model_discovery
+
+        if not supports_model_discovery(
+            provider_id=str(provider_id or ""),
+            protocol=resolved_protocol,
+        ):
             return self._build_llm_channel_result(
                 success=False,
                 message="Model discovery is not supported for this protocol",
@@ -1225,7 +1348,10 @@ class SystemConfigService:
             request_headers["Authorization"] = f"Bearer {selected_api_key}"
 
         try:
-            models_url = self._build_llm_models_url(base_url)
+            models_url = self._build_llm_models_url(
+                base_url,
+                protocol=resolved_protocol,
+            )
         except ValueError as exc:
             return self._build_llm_channel_result(
                 success=False,
@@ -1377,6 +1503,7 @@ class SystemConfigService:
         self,
         *,
         name: str,
+        provider_id: Optional[str] = None,
         protocol: str,
         base_url: str,
         api_key: str,
@@ -1390,6 +1517,33 @@ class SystemConfigService:
         requested_capabilities = self._normalize_llm_capability_checks(capability_checks)
         raw_models = [str(model).strip() for model in models if str(model).strip()]
         channel_name = name.strip() or "channel"
+        provider, protocol, base_url, provider_issue = self._resolve_request_provider(
+            provider_id=provider_id,
+            protocol=protocol,
+            base_url=base_url,
+        )
+        if provider_issue is not None:
+            return self._build_llm_channel_result(
+                success=False,
+                message="LLM channel configuration is invalid",
+                error=provider_issue["message"],
+                stage="chat_completion",
+                error_code="invalid_config",
+                retryable=False,
+                details={
+                    "issue_key": provider_issue["key"],
+                    "issue_code": provider_issue["code"],
+                    "reason": provider_issue["code"],
+                },
+                resolved_protocol=None,
+                resolved_model=None,
+                latency_ms=None,
+                capability_results=self._build_skipped_capability_results(
+                    requested_capabilities,
+                    "base_test_failed",
+                    "Skipped because the base channel test did not pass",
+                ),
+            )
         resolved_secret, secret_error, redaction_values = self._resolve_hermes_saved_secret(
             channel_name=channel_name,
             protocol=protocol,
@@ -1455,6 +1609,11 @@ class SystemConfigService:
             enabled=enabled,
             field_prefix="test_channel",
             require_complete=True,
+            require_base_url=(
+                bool(provider["requires_base_url"])
+                if provider is not None
+                else False
+            ),
         )
         errors = [issue for issue in validation_issues if issue["severity"] == "error"]
         if errors:
@@ -1497,8 +1656,17 @@ class SystemConfigService:
             "max_tokens": 256,  # Increased to allow MiniMax-M3 thinking process + response
             "timeout": max(5.0, float(timeout_seconds)),
         }
-        if selected_api_key:
-            call_kwargs["api_key"] = selected_api_key
+        adapter_api_key = selected_api_key
+        if (
+            not adapter_api_key
+            and resolved_protocol == "openai"
+            and channel_allows_empty_api_key(resolved_protocol, base_url)
+        ):
+            # The OpenAI SDK requires a non-empty constructor value even when a
+            # trusted local endpoint does not authenticate requests.
+            adapter_api_key = self._LLM_EMPTY_API_KEY_ADAPTER_SENTINEL
+        if adapter_api_key:
+            call_kwargs["api_key"] = adapter_api_key
         if base_url.strip():
             call_kwargs["api_base"] = base_url.strip()
         call_kwargs = apply_litellm_generation_params(
@@ -2541,6 +2709,7 @@ class SystemConfigService:
             **runtime_config_map,
             **display_config_map,
         }
+        previous_effective_map = dict(effective_map)
         issues: List[Dict[str, Any]] = []
         updated_map: Dict[str, str] = {}
 
@@ -2557,7 +2726,13 @@ class SystemConfigService:
             effective_map[key] = value
             issues.extend(self._validate_value(key=key, value=value, field_schema=field_schema))
 
-        issues.extend(self._validate_cross_field(effective_map=effective_map, updated_keys=set(updated_map.keys())))
+        issues.extend(
+            self._validate_cross_field(
+                effective_map=effective_map,
+                updated_keys=set(updated_map.keys()),
+                previous_effective_map=previous_effective_map,
+            )
+        )
         issues.extend(self._validate_field_contracts(effective_map))
         return issues
 
@@ -4079,8 +4254,8 @@ class SystemConfigService:
         return True
 
     @staticmethod
-    def _build_llm_models_url(base_url: str) -> str:
-        """Convert a channel base URL into a `/models` endpoint."""
+    def _build_llm_models_url(base_url: str, protocol: str = "openai") -> str:
+        """Convert a Connection base URL into its model discovery endpoint."""
         if not SystemConfigService._is_valid_llm_base_url(base_url):
             raise ValueError("LLM channel base URL must be a valid absolute URL")
         if not SystemConfigService._is_safe_base_url(base_url):
@@ -4088,14 +4263,31 @@ class SystemConfigService:
 
         parsed = urlparse(base_url)
         normalized = (parsed.path or "").rstrip("/")
-        for suffix in ("/chat/completions", "/completions"):
-            if normalized.endswith(suffix):
-                normalized = normalized[: -len(suffix)]
-                break
-        if normalized.endswith("/models"):
-            models_path = normalized or "/models"
+        if str(protocol or "").strip().lower() == "ollama":
+            if normalized.endswith("/api/tags"):
+                models_path = normalized
+            else:
+                for suffix in (
+                    "/v1/chat/completions",
+                    "/v1/completions",
+                    "/chat/completions",
+                    "/completions",
+                    "/v1",
+                    "/api",
+                ):
+                    if normalized.endswith(suffix):
+                        normalized = normalized[: -len(suffix)]
+                        break
+                models_path = f"{normalized}/api/tags" if normalized else "/api/tags"
         else:
-            models_path = f"{normalized}/models" if normalized else "/models"
+            for suffix in ("/chat/completions", "/completions"):
+                if normalized.endswith(suffix):
+                    normalized = normalized[: -len(suffix)]
+                    break
+            if normalized.endswith("/models"):
+                models_path = normalized or "/models"
+            else:
+                models_path = f"{normalized}/models" if normalized else "/models"
         models_url = urlunparse(parsed._replace(path=models_path, params="", query="", fragment=""))
         if not SystemConfigService._is_valid_llm_base_url(models_url):
             raise ValueError("LLM channel models URL must be a valid absolute URL")
@@ -4576,7 +4768,11 @@ class SystemConfigService:
         return models
 
     @staticmethod
-    def _validate_cross_field(effective_map: Dict[str, str], updated_keys: Set[str]) -> List[Dict[str, Any]]:
+    def _validate_cross_field(
+        effective_map: Dict[str, str],
+        updated_keys: Set[str],
+        previous_effective_map: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
         """Validate dependencies across multiple keys."""
         issues: List[Dict[str, Any]] = []
 
@@ -4663,6 +4859,7 @@ class SystemConfigService:
             SystemConfigService._validate_llm_runtime_selection(
                 effective_map=effective_map,
                 updated_keys=updated_keys,
+                previous_effective_map=previous_effective_map,
             )
         )
 
@@ -4739,15 +4936,51 @@ class SystemConfigService:
             touched = llm_channels_touched or any(
                 updated_key.startswith(f"{prefix}_") for updated_key in updated_keys
             )
-            protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
-            if name.lower() == "anspire" and not protocol_value:
-                protocol_value = "openai"
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
-            if name.lower() == "anspire" and not base_url_value:
-                base_url_value = (
-                    effective_map.get("ANSPIRE_LLM_BASE_URL")
-                    or ANSPIRE_LLM_BASE_URL_DEFAULT
-                ).strip()
+            provider, _provider_id, provider_is_explicit = (
+                SystemConfigService._resolve_connection_provider(effective_map, name)
+            )
+            if provider_is_explicit and provider is None and touched:
+                provider_value = (effective_map.get(f"{prefix}_PROVIDER") or "").strip()
+                issues.append(
+                    {
+                        "key": f"{prefix}_PROVIDER",
+                        "code": "invalid_provider",
+                        "message": (
+                            f"LLM connection '{name}' references an unknown model provider"
+                        ),
+                        "severity": "error",
+                        "expected": "provider id from the model provider catalog",
+                        "actual": provider_value,
+                    }
+                )
+            submitted_protocol = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+            protocol_value, base_url_value = (
+                SystemConfigService._resolve_connection_transport(
+                    effective_map,
+                    name,
+                )
+            )
+            if (
+                touched
+                and submitted_protocol
+                and provider_is_explicit
+                and provider is not None
+                and not provider["is_custom"]
+                and canonicalize_llm_channel_protocol(submitted_protocol)
+                != canonicalize_llm_channel_protocol(str(provider["protocol"]))
+            ):
+                issues.append(
+                    {
+                        "key": f"{prefix}_PROTOCOL",
+                        "code": "provider_protocol_mismatch",
+                        "message": (
+                            f"LLM connection '{name}' protocol must match its Provider"
+                        ),
+                        "severity": "error",
+                        "expected": str(provider["protocol"]),
+                        "actual": submitted_protocol,
+                    }
+                )
             api_key_value = (
                 (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
                 or (effective_map.get(f"{prefix}_API_KEY") or "").strip()
@@ -4802,11 +5035,14 @@ class SystemConfigService:
                 models=models_value or None,
                 channel_name=name,
             )
-            is_custom_endpoint = name.lower() not in known_llm_provider_channel_names()
-            require_base_url = is_custom_endpoint and not channel_allows_empty_api_key(
-                resolved_gate_protocol,
-                base_url_value,
-            )
+            if provider_is_explicit and provider is not None:
+                require_base_url = bool(provider["requires_base_url"])
+            else:
+                is_custom_endpoint = name.lower() not in known_llm_provider_channel_names()
+                require_base_url = is_custom_endpoint and not channel_allows_empty_api_key(
+                    resolved_gate_protocol,
+                    base_url_value,
+                )
             issues.extend(
                 SystemConfigService._validate_llm_channel_definition(
                     channel_name=name,
@@ -4845,15 +5081,12 @@ class SystemConfigService:
             if not enabled:
                 continue
 
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
-            if name.lower() == "anspire" and not base_url_value:
-                base_url_value = (
-                    effective_map.get("ANSPIRE_LLM_BASE_URL")
-                    or ANSPIRE_LLM_BASE_URL_DEFAULT
-                ).strip()
-            protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
-            if name.lower() == "anspire" and not protocol_value:
-                protocol_value = "openai"
+            protocol_value, base_url_value = (
+                SystemConfigService._resolve_connection_transport(
+                    effective_map,
+                    name,
+                )
+            )
             raw_models = [
                 model.strip()
                 for model in (effective_map.get(f"{prefix}_MODELS") or "").split(",")
@@ -4946,15 +5179,12 @@ class SystemConfigService:
                 enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
             if not parse_env_bool(enabled_raw, default=True):
                 continue
-            base_url_value = (effective_map.get(f"{prefix}_BASE_URL") or "").strip()
-            if name.lower() == "anspire" and not base_url_value:
-                base_url_value = (
-                    effective_map.get("ANSPIRE_LLM_BASE_URL")
-                    or ANSPIRE_LLM_BASE_URL_DEFAULT
-                ).strip()
-            protocol_value = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
-            if name.lower() == "anspire" and not protocol_value:
-                protocol_value = "openai"
+            protocol_value, base_url_value = (
+                SystemConfigService._resolve_connection_transport(
+                    effective_map,
+                    name,
+                )
+            )
             raw_models = SystemConfigService._split_csv(effective_map.get(f"{prefix}_MODELS") or "")
             if name.lower() == "anspire" and not raw_models:
                 raw_models = [
@@ -5049,12 +5279,154 @@ class SystemConfigService:
         return SystemConfigService._has_legacy_key_for_provider(provider, effective_map)
 
     @staticmethod
+    def _collect_llm_route_references(
+        effective_map: Dict[str, str],
+        known_routes: Set[str],
+    ) -> Dict[str, List[Dict[str, str]]]:
+        """Collect explicit task assignments by exact model route."""
+        references: Dict[str, List[Dict[str, str]]] = {}
+
+        def add(route: str, task: str, key: str) -> None:
+            normalized = str(route or "").strip()
+            if not normalized:
+                return
+            entry = {"task": task, "key": key}
+            route_references = references.setdefault(normalized, [])
+            if entry not in route_references:
+                route_references.append(entry)
+
+        add(effective_map.get("LITELLM_MODEL", ""), "report", "LITELLM_MODEL")
+        raw_agent_model = (effective_map.get("AGENT_LITELLM_MODEL") or "").strip()
+        if raw_agent_model:
+            add(
+                normalize_agent_litellm_model(
+                    raw_agent_model,
+                    configured_models=known_routes,
+                ),
+                "agent",
+                "AGENT_LITELLM_MODEL",
+            )
+        add(effective_map.get("VISION_MODEL", ""), "vision", "VISION_MODEL")
+        for fallback in SystemConfigService._split_csv(
+            effective_map.get("LITELLM_FALLBACK_MODELS") or ""
+        ):
+            add(fallback, "fallback", "LITELLM_FALLBACK_MODELS")
+        return references
+
+    @staticmethod
+    def _collect_llm_route_connection_ids(
+        effective_map: Dict[str, str],
+    ) -> Dict[str, List[str]]:
+        """Map each enabled channel route to its owning Connection ids."""
+        owners: Dict[str, List[str]] = {}
+        for raw_name in (effective_map.get("LLM_CHANNELS") or "").split(","):
+            connection_id = raw_name.strip()
+            if not connection_id:
+                continue
+            connection_map = dict(effective_map)
+            connection_map["LLM_CHANNELS"] = connection_id
+            for route in SystemConfigService._collect_llm_channel_models_from_map(
+                connection_map
+            ):
+                route_owners = owners.setdefault(route, [])
+                if connection_id not in route_owners:
+                    route_owners.append(connection_id)
+        return owners
+
+    @staticmethod
+    def _model_removal_issue_key(
+        connection_ids: Sequence[str],
+        updated_keys: Set[str],
+    ) -> str:
+        """Choose the submitted Connection field that removed a model route."""
+        for suffix in ("MODELS", "ENABLED"):
+            for connection_id in connection_ids:
+                key = f"LLM_{connection_id.upper()}_{suffix}"
+                if key in updated_keys:
+                    return key
+        if "LITELLM_CONFIG" in updated_keys:
+            return "LITELLM_CONFIG"
+        return "LLM_CHANNELS"
+
+    @staticmethod
+    def _collect_removed_model_in_use_issues(
+        effective_map: Dict[str, str],
+        previous_effective_map: Optional[Dict[str, str]],
+        updated_keys: Set[str],
+    ) -> List[Dict[str, Any]]:
+        """Reject routes removed by this draft while task assignments still use them."""
+        if previous_effective_map is None or not updated_keys:
+            return []
+
+        previous_models = (
+            SystemConfigService._collect_yaml_models_from_map(previous_effective_map)
+            or SystemConfigService._collect_llm_channel_models_from_map(previous_effective_map)
+        )
+        current_models = (
+            SystemConfigService._collect_yaml_models_from_map(effective_map)
+            or SystemConfigService._collect_llm_channel_models_from_map(effective_map)
+        )
+        current_model_set = set(current_models)
+        removed_models = [
+            route for route in previous_models if route not in current_model_set
+        ]
+        if not removed_models:
+            return []
+
+        known_routes = set(previous_models) | current_model_set
+        references = SystemConfigService._collect_llm_route_references(
+            effective_map,
+            known_routes,
+        )
+        connection_ids_by_route = (
+            SystemConfigService._collect_llm_route_connection_ids(previous_effective_map)
+        )
+
+        issues: List[Dict[str, Any]] = []
+        for route in removed_models:
+            referenced_by = references.get(route, [])
+            if not referenced_by:
+                continue
+            connection_ids = connection_ids_by_route.get(route, [])
+            issues.append(
+                {
+                    "key": SystemConfigService._model_removal_issue_key(
+                        connection_ids,
+                        updated_keys,
+                    ),
+                    "code": "model_in_use",
+                    "message": (
+                        f"Model route '{route}' is still assigned to one or more tasks. "
+                        "Replace or clear those assignments in the same update before removing it."
+                    ),
+                    "severity": "error",
+                    "expected": "all task references replaced or cleared atomically",
+                    "actual": route,
+                    "details": {
+                        "route": route,
+                        "connection_ids": connection_ids,
+                        "referenced_by": referenced_by,
+                    },
+                }
+            )
+        return issues
+
+    @staticmethod
     def _validate_llm_runtime_selection(
         effective_map: Dict[str, str],
         updated_keys: Optional[Set[str]] = None,
+        previous_effective_map: Optional[Dict[str, str]] = None,
     ) -> List[Dict[str, Any]]:
         """Validate selected primary/fallback/vision models against configured channels."""
-        issues: List[Dict[str, Any]] = []
+        removal_issues = SystemConfigService._collect_removed_model_in_use_issues(
+            effective_map=effective_map,
+            previous_effective_map=previous_effective_map,
+            updated_keys=updated_keys or set(),
+        )
+        issues: List[Dict[str, Any]] = list(removal_issues)
+        removed_routes_in_use = {
+            issue["details"]["route"] for issue in removal_issues
+        }
 
         # Vision references normally degrade to warnings so historical breakage
         # never blocks unrelated saves; but when this very update reshapes the
@@ -5093,7 +5465,11 @@ class SystemConfigService:
                 configured_models=available_model_set,
             )
             primary_model = (effective_map.get("LITELLM_MODEL") or "").strip()
-            if primary_model and not SystemConfigService._has_runtime_source_for_model(primary_model, effective_map):
+            if (
+                primary_model
+                and primary_model not in removed_routes_in_use
+                and not SystemConfigService._has_runtime_source_for_model(primary_model, effective_map)
+            ):
                 issues.append(
                     {
                         "key": "LITELLM_MODEL",
@@ -5112,6 +5488,7 @@ class SystemConfigService:
             if (
                 configured_agent_model_raw
                 and configured_agent_model
+                and configured_agent_model not in removed_routes_in_use
                 and not SystemConfigService._has_runtime_source_for_model(
                     configured_agent_model,
                     effective_map,
@@ -5158,6 +5535,7 @@ class SystemConfigService:
             ]
             invalid_fallbacks = [
                 model for model in fallback_models
+                if model not in removed_routes_in_use
                 if not SystemConfigService._has_runtime_source_for_model(model, effective_map)
             ]
             if invalid_fallbacks:
@@ -5190,7 +5568,11 @@ class SystemConfigService:
                         "actual": vision_model,
                     }
                 )
-            elif vision_model and not SystemConfigService._has_runtime_source_for_model(vision_model, effective_map):
+            elif (
+                vision_model
+                and vision_model not in removed_routes_in_use
+                and not SystemConfigService._has_runtime_source_for_model(vision_model, effective_map)
+            ):
                 issues.append(
                     {
                         "key": "VISION_MODEL",
@@ -5224,6 +5606,7 @@ class SystemConfigService:
             )
         if (
             primary_model
+            and primary_model not in removed_routes_in_use
             and not SystemConfigService._matches_exact_route(primary_model, available_model_set)
             and not _uses_direct_env_provider(primary_model)
         ):
@@ -5250,6 +5633,7 @@ class SystemConfigService:
         if (
             configured_agent_model_raw
             and configured_agent_model
+            and configured_agent_model not in removed_routes_in_use
             and not SystemConfigService._matches_exact_route(configured_agent_model, available_model_set)
             and not _uses_direct_env_provider(configured_agent_model)
         ):
@@ -5311,6 +5695,7 @@ class SystemConfigService:
             )
         invalid_fallbacks = [
             model for model in fallback_models
+            if model not in removed_routes_in_use
             if not SystemConfigService._matches_exact_route(model, available_model_set)
             and not _uses_direct_env_provider(model)
         ]
@@ -5346,6 +5731,7 @@ class SystemConfigService:
             )
         elif (
             vision_model
+            and vision_model not in removed_routes_in_use
             and not SystemConfigService._matches_exact_route(vision_model, available_model_set)
             and not _uses_direct_env_provider(vision_model)
         ):

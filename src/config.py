@@ -2192,12 +2192,29 @@ class Config:
             ch_lower = ch_name.lower()
             ch_upper = ch_name.upper()
 
+            explicit_provider_id = os.getenv(f'LLM_{ch_upper}_PROVIDER', '').strip().lower()
+            provider_id = explicit_provider_id
+            provider = None
+            if provider_id:
+                from src.llm.provider_catalog import get_provider
+
+                provider = get_provider(provider_id)
+            else:
+                from src.llm.provider_catalog import get_provider_ids
+
+                provider_ids = set(get_provider_ids())
+                provider_id = ch_lower if ch_lower in provider_ids and ch_lower != "custom" else "custom"
+
             base_url = os.getenv(f'LLM_{ch_upper}_BASE_URL', '').strip() or None
             if ch_lower == "anspire" and not base_url:
                 base_url = (
                     os.getenv('ANSPIRE_LLM_BASE_URL') or ANSPIRE_LLM_BASE_URL_DEFAULT
                 ).strip() or None
             protocol_raw = os.getenv(f'LLM_{ch_upper}_PROTOCOL', '').strip()
+            if provider is not None and not provider["is_custom"]:
+                protocol_raw = str(provider["protocol"])
+                if not base_url:
+                    base_url = str(provider["default_base_url"]).strip() or None
             if ch_lower == "anspire" and not protocol_raw:
                 protocol_raw = "openai"
             enabled_raw = os.getenv(f'LLM_{ch_upper}_ENABLED')
@@ -2249,6 +2266,7 @@ class Config:
                     else:
                         _logger.warning("LLM channel '%s': invalid reserved Hermes channel, skipped", ch_name)
                     continue
+                result.channel["provider_id"] = provider_id
                 channels.append(result.channel)
                 _logger.info("LLM channel '%s': Hermes preset with %d model(s)", ch_name, len(result.channel["models"]))
                 continue
@@ -2289,6 +2307,7 @@ class Config:
 
             channels.append({
                 'name': ch_name.lower(),
+                'provider_id': provider_id,
                 'protocol': protocol,
                 'enabled': enabled,
                 'base_url': base_url,

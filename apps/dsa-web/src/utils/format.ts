@@ -1,9 +1,12 @@
-export const formatDateTime = (value?: string | null): string => {
+import type { UiLanguage } from '../i18n/uiText';
+import { getUiLocale } from './uiLocale';
+
+export const formatDateTime = (value?: string | null, language: UiLanguage = 'zh'): string => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -12,12 +15,12 @@ export const formatDateTime = (value?: string | null): string => {
   }).format(date);
 };
 
-export const formatDate = (value?: string): string => {
+export const formatDate = (value?: string, language: UiLanguage = 'zh'): string => {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat('zh-CN', {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -49,12 +52,11 @@ export const getRecentStartDate = (days: number): string => {
 export const getTodayInShanghai = (): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
 
-export const formatReportType = (value?: string): string => {
+export const formatReportType = (value?: string, language: UiLanguage = 'zh'): string => {
   if (!value) return '—';
-  if (value === 'simple') return '普通';
-  if (value === 'detailed') return '标准';
-  if (value === 'full') return '完整';
-  if (value === 'brief') return '简版';
-  if (value === 'market_review') return '大盘';
+  const labels = language === 'en'
+    ? { simple: 'Standard', detailed: 'Detailed', full: 'Full', brief: 'Brief', market_review: 'Market review' }
+    : { simple: '普通', detailed: '标准', full: '完整', brief: '简版', market_review: '大盘' };
+  if (value in labels) return labels[value as keyof typeof labels];
   return value;
 };

@@ -834,6 +834,19 @@ class GenerationBackendStatusService:
                 continue
             lower = name.lower()
             prefix = f"LLM_{name.upper()}"
+            from src.llm.provider_catalog import get_provider
+
+            provider_id = (effective_map.get(f"{prefix}_PROVIDER") or "").strip().lower()
+            provider = None
+            if provider_id:
+                provider = get_provider(provider_id)
+            else:
+                inferred_provider = get_provider(lower)
+                provider_id = (
+                    lower
+                    if inferred_provider is not None and lower != "custom"
+                    else "custom"
+                )
             enabled_raw = effective_map.get(f"{prefix}_ENABLED")
             if lower == "anspire" and not (enabled_raw or "").strip():
                 enabled_raw = effective_map.get("ANSPIRE_LLM_ENABLED")
@@ -844,6 +857,10 @@ class GenerationBackendStatusService:
             if lower == "anspire" and not base_url:
                 base_url = (effective_map.get("ANSPIRE_LLM_BASE_URL") or ANSPIRE_LLM_BASE_URL_DEFAULT).strip() or None
             protocol_raw = (effective_map.get(f"{prefix}_PROTOCOL") or "").strip()
+            if provider is not None and not provider["is_custom"]:
+                protocol_raw = str(provider["protocol"])
+                if not base_url:
+                    base_url = str(provider["default_base_url"]).strip() or None
             if lower == "anspire" and not protocol_raw:
                 protocol_raw = "openai"
 
@@ -883,6 +900,7 @@ class GenerationBackendStatusService:
             channels.append(
                 {
                     "name": lower,
+                    "provider_id": provider_id,
                     "protocol": protocol,
                     "enabled": True,
                     "base_url": base_url,

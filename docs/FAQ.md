@@ -143,7 +143,7 @@ PROXY_PORT=10809
 
 **Q: 如何同时使用多个模型（如 AIHubmix + DeepSeek + Gemini）？**
 
-使用渠道模式：设置 `LLM_CHANNELS=aihubmix,deepseek,gemini`，并配置各渠道的 `LLM_{NAME}_BASE_URL`、`LLM_{NAME}_API_KEY`、`LLM_{NAME}_MODELS`。也可在 Web 设置页 → AI 与模型 → 连接（模型接入） 中可视化配置。
+使用 Channels 模式：设置 `LLM_CHANNELS=aihubmix,deepseek,gemini`，并为每条连接配置 `LLM_{NAME}_PROVIDER`、`LLM_{NAME}_BASE_URL`、`LLM_{NAME}_API_KEY`、`LLM_{NAME}_MODELS`。也可在 Web 设置页 → AI 与模型 → 模型接入 中可视化配置；同一 Provider 可以创建多条 Connection。
 
 **Q: 问股/Agent 提示未配置可用 LLM，但我只有旧的 `GEMINI_*` / `OPENAI_*` / `ANTHROPIC_*` 配置，怎么办？**
 
@@ -342,6 +342,14 @@ OPENAI_MODEL=deepseek-v4-flash
 3. **如果只是想确认前端是否更新到新构建**：可以打开 WebUI 的“系统设置”页查看 `构建标识` / `构建时间`；这能帮助确认静态资源是否刷新，但不等同于 Docker 镜像发布版本。
 
 **建议**：如果你想避免重复更新，部署时尽量固定使用明确的版本 tag（如 `v3.12.0`），不要长期依赖 `latest`。
+
+---
+
+### Q14.3: 为什么切换英文界面后，报告正文或新闻仍然是中文？
+
+WebUI 的**界面语言**与**报告语言**相互独立：界面语言控制导航、按钮、表单、错误提示和日期/数字格式；报告语言控制模型生成的报告正文和导出内容。请在设置中分别调整两项。
+
+用户输入、股票/公司名称、新闻原文、模型 ID、第三方返回文本和原始诊断不会自动翻译。因此英文界面查看中文报告时，正文保留中文是正常的，但复制、刷新、关闭和诊断等外围操作仍会保持英文。
 
 ---
 

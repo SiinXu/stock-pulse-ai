@@ -1,5 +1,6 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import {
   SETTINGS_SECTIONS,
   getSectionViews,
@@ -38,17 +39,18 @@ function statusDotClass(status: SectionStatus | undefined): string | null {
 }
 
 function statusLabel(status: SectionStatus | undefined, language: UiLang): string | null {
+  const text = SETTINGS_MISC_TEXT[language];
   const dot = statusDotClass(status);
   if (!dot || !status) {
     return null;
   }
   if (status.hasError) {
-    return language === 'en' ? 'has errors' : '有错误';
+    return text.statusError;
   }
   if (status.needsAction) {
-    return language === 'en' ? 'needs action' : '需要操作';
+    return text.statusAction;
   }
-  return language === 'en' ? 'unsaved changes' : '有未保存修改';
+  return text.statusDirty;
 }
 
 interface SettingsSectionNavProps {

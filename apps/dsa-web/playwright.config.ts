@@ -11,22 +11,8 @@ const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101
 const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
 process.env.DSA_WEB_SMOKE_PASSWORD = smokePassword;
 
-// Every run gets an isolated config file. This keeps Playwright deterministic,
-// avoids reading or overwriting a developer's .env, and lets first-login setup
-// persist its throwaway password for the rest of the suite.
 const runtimeDir = path.join(currentDir, 'test-results', 'runtime');
-const e2eEnvFile = path.join(runtimeDir, 'playwright.env');
-fs.mkdirSync(runtimeDir, { recursive: true });
-fs.writeFileSync(
-  e2eEnvFile,
-  [
-    'ADMIN_AUTH_ENABLED=true',
-    'WEBUI_AUTO_BUILD=false',
-    'SCHEDULE_ENABLED=false',
-    '',
-  ].join('\n'),
-  'utf8',
-);
+const serviceLogDir = path.join(currentDir, 'test-results', 'service-logs');
 
 function findVenvPython() {
   let directory = repoRoot;
@@ -48,16 +34,13 @@ function findVenvPython() {
 }
 
 function resolveBackendCommand() {
-  if (process.env.DSA_WEB_SMOKE_BACKEND_CMD) {
-    return process.env.DSA_WEB_SMOKE_BACKEND_CMD;
-  }
-
-  return `${findVenvPython()} main.py --webui-only --host 127.0.0.1 --port ${backendPort}`;
+  return `${findVenvPython()} apps/dsa-web/e2e/run-backend-fixture.py --port ${backendPort}`;
 }
 
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
@@ -69,33 +52,43 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `node e2e/fake-openai-server.mjs ${fakeProviderPort}`,
-      cwd: currentDir,
-      url: `http://127.0.0.1:${fakeProviderPort}/health`,
-      reuseExistingServer: false,
-      timeout: 30_000,
-    },
-    {
       command: resolveBackendCommand(),
       cwd: repoRoot,
       env: {
         ...process.env,
-        ENV_FILE: e2eEnvFile,
+        DSA_WEB_E2E_LOG_DIR: serviceLogDir,
+        DSA_WEB_E2E_RUNTIME_DIR: runtimeDir,
+        DSA_WEB_SMOKE_PASSWORD: smokePassword,
       },
       url: `http://127.0.0.1:${backendPort}/api/v1/auth/status`,
       reuseExistingServer: false,
       timeout: 120_000,
+      gracefulShutdown: { signal: 'SIGTERM', timeout: 10_000 },
     },
     {
-      command: `npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
+      command: `node e2e/run-logged-service.mjs node e2e/fake-openai-server.mjs ${fakeProviderPort}`,
+      cwd: currentDir,
+      env: {
+        ...process.env,
+        DSA_WEB_E2E_SERVICE_LOG: path.join(serviceLogDir, 'fake-provider.log'),
+      },
+      url: `http://127.0.0.1:${fakeProviderPort}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+      gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
+    },
+    {
+      command: `node e2e/run-logged-service.mjs npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
       cwd: currentDir,
       env: {
         ...process.env,
         DSA_WEB_DEV_API_PROXY: `http://127.0.0.1:${backendPort}`,
+        DSA_WEB_E2E_SERVICE_LOG: path.join(serviceLogDir, 'vite.log'),
       },
       url: `http://127.0.0.1:${frontendPort}`,
       reuseExistingServer: false,
       timeout: 120_000,
+      gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
     },
   ],
   projects: [

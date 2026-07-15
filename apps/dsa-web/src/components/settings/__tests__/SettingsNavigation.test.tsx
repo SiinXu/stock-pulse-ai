@@ -108,7 +108,7 @@ describe('SettingsViewTabs', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       'Overview',
-      'Connections',
+      'Model Access',
       'Task Routing',
       'Reliability',
     ]);

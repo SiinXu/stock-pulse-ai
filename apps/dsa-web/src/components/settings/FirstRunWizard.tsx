@@ -5,6 +5,13 @@ import { systemConfigApi } from '../../api/systemConfig';
 import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
 import type { UiLang } from './settingsInformationArchitecture';
+import {
+  canonicalModelRoute,
+  resolveConnectionRequirements,
+  suggestConnectionName,
+} from './llmConnectionContract';
+import { formatUiText } from '../../i18n/uiText';
+import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
 
 export interface WizardDraftItem {
   key: string;
@@ -37,6 +44,7 @@ interface FirstRunWizardProps {
    * second hardcoded business list.
    */
   providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts?: string[];
 }
 
 type WizardMode = 'cloud' | 'cli';
@@ -52,10 +60,6 @@ const STEP_ORDER: Record<WizardMode, StepId[]> = {
   cloud: ['mode', 'connection', 'models', 'model', 'review'],
   cli: ['mode', 'connection', 'review'],
 };
-
-function tx(language: UiLang, zh: string, en: string): string {
-  return language === 'en' ? en : zh;
-}
 
 function parseModels(models: string): string[] {
   return models
@@ -77,10 +81,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   language,
   existingChannelNames = [],
   providers,
+  emptyApiKeyHosts = [],
 }) => {
+  const text = SETTINGS_WIZARD_TEXT[language];
   const [step, setStep] = useState<StepId>('mode');
   const [mode, setMode] = useState<WizardMode | null>(null);
   const [providerId, setProviderId] = useState<string>(providers[0]?.id ?? '');
+  const [protocol, setProtocol] = useState(providers[0]?.protocol ?? 'openai');
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [models, setModels] = useState('');
@@ -103,6 +110,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     [providers, providerId],
   );
   const modelOptions = useMemo(() => parseModels(models), [models]);
+  const requirements = useMemo(() => provider ? resolveConnectionRequirements({
+    provider,
+    protocol,
+    baseUrl,
+    emptyApiKeyHosts,
+  }) : null, [provider, protocol, baseUrl, emptyApiKeyHosts]);
+  const protocolOptions = useMemo(() => Array.from(
+    new Map(providers.map((entry) => [entry.protocol, entry.protocol])).entries(),
+  ).map(([value, label]) => ({ value, label })), [providers]);
 
   // One model per Enter/click, but pasted comma/whitespace-separated lists are
   // split, trimmed and deduped in one pass.
@@ -122,7 +138,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const applyProvider = (nextProviderId: string) => {
     setProviderId(nextProviderId);
     const nextProvider = providers.find((entry) => entry.id === nextProviderId);
+    setProtocol(nextProvider?.protocol ?? 'openai');
     setBaseUrl(nextProvider?.defaultBaseUrl ?? '');
+    setApiKey('');
     // Do not seed example model IDs: models come from discovery or manual entry.
     setModels('');
     setReportModel('');
@@ -132,7 +150,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleDiscover = async () => {
-    if (!provider) {
+    if (!provider || requirements?.supportsDiscovery === false) {
       return;
     }
     setIsDiscovering(true);
@@ -140,7 +158,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     try {
       const result = await systemConfigApi.discoverLLMChannelModels({
         name: provider.id,
-        protocol: provider.protocol,
+        providerId: provider.id,
+        protocol,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
       });
@@ -148,19 +167,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         // Present the results for explicit confirmation — never enable all of
         // them automatically.
         setDiscoveredModels(result.models);
-        setDiscoverNote({
-          ok: true,
-          message: tx(
-            language,
-            `发现 ${result.models.length} 个模型，请勾选要启用的模型`,
-            `Found ${result.models.length} models — pick the ones to enable`,
-          ),
-        });
+        setDiscoverNote({ ok: true, message: formatUiText(text.discovered, { count: result.models.length }) });
       } else {
-        setDiscoverNote({ ok: false, message: result.message || tx(language, '未发现模型，可手动逐个添加。', 'No models found — add them manually.') });
+        setDiscoverNote({ ok: false, message: text.noDiscovered });
       }
     } catch {
-      setDiscoverNote({ ok: false, message: tx(language, '发现失败，可手动逐个添加。', 'Discovery failed — add them manually.') });
+      setDiscoverNote({ ok: false, message: text.discoveryFailed });
     } finally {
       setIsDiscovering(false);
     }
@@ -175,14 +187,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     try {
       const result = await systemConfigApi.testLLMChannel({
         name: provider.id,
-        protocol: provider.protocol,
+        providerId: provider.id,
+        protocol,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
         models: modelOptions,
       });
-      setTestResult({ ok: result.success, message: result.message });
+      setTestResult({ ok: result.success, message: result.success ? text.testSucceeded : text.testFailed });
     } catch {
-      setTestResult({ ok: false, message: tx(language, '连接测试失败。', 'Connection test failed.') });
+      setTestResult({ ok: false, message: text.testFailed });
     } finally {
       setIsTesting(false);
     }
@@ -206,8 +219,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         // Official providers use their SDK default / prefilled endpoint, so Base
         // URL is never a blocker here; the API key is required unless the
         // provider is key-exempt (e.g. Ollama).
-        const keyOk = !provider?.requiresApiKey || apiKey.trim().length > 0;
-        const baseUrlOk = !provider?.requiresBaseUrl || baseUrl.trim().length > 0;
+        const keyOk = !requirements?.apiKeyRequired || apiKey.trim().length > 0;
+        const baseUrlOk = !requirements?.baseUrlRequired || baseUrl.trim().length > 0;
         return Boolean(provider && keyOk && baseUrlOk);
       }
       case 'models':
@@ -240,7 +253,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     const result = await onComplete(buildItems());
     if (!result.success) {
       // Keep the modal open and surface the failure in place.
-      setSaveError(result.error || tx(language, '保存失败，请检查配置后重试。', 'Save failed. Check the config and try again.'));
+      setSaveError(language === 'zh' && result.error ? result.error : text.saveFailedMessage);
     }
   };
 
@@ -251,12 +264,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (!provider) {
       return [];
     }
-    const name = provider.id;
+    const name = suggestConnectionName(existingChannelNames, provider.id);
     const up = name.toUpperCase();
     const primaryModel = reportModel || modelOptions[0] || '';
     // The backend routes channel models as `<protocol>/<model>` and rejects a
     // bare model name; the user only ever sees/selects the display model.
-    const primaryRoute = primaryModel ? `${provider.protocol}/${primaryModel}` : '';
+    const primaryRoute = canonicalModelRoute(protocol, primaryModel);
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
     const items: WizardDraftItem[] = [
@@ -265,7 +278,8 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       { key: 'LLM_CONFIG_MODE', value: 'channels' },
       { key: 'GENERATION_BACKEND', value: 'litellm' },
       { key: 'LLM_CHANNELS', value: mergedChannels },
-      { key: `LLM_${up}_PROTOCOL`, value: provider.protocol },
+      { key: `LLM_${up}_PROVIDER`, value: provider.id },
+      { key: `LLM_${up}_PROTOCOL`, value: protocol },
       { key: `LLM_${up}_MODELS`, value: modelOptions.join(',') },
       { key: `LLM_${up}_ENABLED`, value: 'true' },
       { key: 'LITELLM_MODEL', value: primaryRoute },
@@ -282,21 +296,17 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     return items;
   };
 
-  const stepLabel = tx(
-    language,
-    `第 ${stepIndex + 1} / ${order.length} 步`,
-    `Step ${stepIndex + 1} of ${order.length}`,
-  );
+  const stepLabel = formatUiText(text.step, { current: stepIndex + 1, total: order.length });
 
   return (
-    <Modal isOpen onClose={onClose} title={tx(language, '快速配置向导', 'Quick setup wizard')}>
+    <Modal isOpen onClose={onClose} title={text.title}>
       <div data-testid="first-run-wizard" className="space-y-5">
         <p className="text-xs text-muted-text">{stepLabel}</p>
 
         {step === 'mode' ? (
           <div className="space-y-3">
             <p className="text-sm text-foreground">
-              {tx(language, '选择模型的运行方式：', 'How do you want to run the model?')}
+              {text.chooseMode}
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {(['cloud', 'cli'] as WizardMode[]).map((value) => (
@@ -312,12 +322,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   }`}
                 >
                   <span className="block font-medium text-foreground">
-                    {value === 'cloud' ? tx(language, '云 API', 'Cloud API') : tx(language, '本机 CLI', 'Local CLI')}
+                    {value === 'cloud' ? text.cloudApi : text.localCli}
                   </span>
                   <span className="mt-1 block text-xs text-muted-text">
                     {value === 'cloud'
-                      ? tx(language, '使用云端模型服务（OpenAI 兼容等）。', 'Use a cloud model service (OpenAI-compatible, etc.).')
-                      : tx(language, '使用本机命令行后端（实验性）。', 'Use a local CLI backend (experimental).')}
+                      ? text.cloudDescription
+                      : text.cliDescription}
                   </span>
                 </button>
               ))}
@@ -329,7 +339,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           <div className="space-y-3">
             <div>
               <label htmlFor="wizard-provider" className="mb-1 block text-sm text-foreground">
-                {tx(language, '服务商', 'Provider')}
+                {text.provider}
               </label>
               <Select
                 id="wizard-provider"
@@ -338,46 +348,63 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 options={providers.map((entry) => ({ value: entry.id, label: entry.label }))}
               />
             </div>
-            <div>
-              <label htmlFor="wizard-api-key" className="mb-1 block text-sm text-foreground">
-                {provider && !provider.requiresApiKey
-                  ? tx(language, 'API 密钥（可选）', 'API Key (optional)')
-                  : tx(language, 'API 密钥', 'API Key')}
-              </label>
-              <Input
-                id="wizard-api-key"
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder={provider && !provider.requiresApiKey
-                  ? tx(language, '该服务无需密钥，可留空', 'This service needs no key — leave blank')
-                  : tx(language, '填写服务商密钥', 'Enter the provider API key')}
-              />
-            </div>
-            <div>
-              <label htmlFor="wizard-base-url" className="mb-1 block text-sm text-foreground">
-                {tx(language, '服务地址', 'Base URL')}
-              </label>
-              <Input
-                id="wizard-base-url"
-                value={baseUrl}
-                onChange={(event) => setBaseUrl(event.target.value)}
-              />
-            </div>
+            {requirements?.showProtocol ? (
+              <div>
+                <label htmlFor="wizard-protocol" className="mb-1 block text-sm text-foreground">
+                  {text.protocol}
+                </label>
+                <Select
+                  id="wizard-protocol"
+                  value={protocol}
+                  onChange={setProtocol}
+                  options={protocolOptions}
+                />
+              </div>
+            ) : null}
+            {requirements?.showApiKey ? (
+              <div>
+                <label htmlFor="wizard-api-key" className="mb-1 block text-sm text-foreground">
+                  {requirements.apiKeyRequired
+                    ? text.apiKey
+                    : text.apiKeyOptional}
+                </label>
+                <Input
+                  id="wizard-api-key"
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  placeholder={requirements.apiKeyRequired
+                    ? text.apiKeyPlaceholder
+                    : text.localKeyPlaceholder}
+                />
+              </div>
+            ) : null}
+            {requirements?.showBaseUrl ? (
+              <div>
+                <label htmlFor="wizard-base-url" className="mb-1 block text-sm text-foreground">
+                  {text.baseUrl}
+                </label>
+                <Input
+                  id="wizard-base-url"
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {step === 'connection' && mode === 'cli' ? (
           <div className="space-y-2">
             <label htmlFor="wizard-cli" className="block text-sm text-foreground">
-              {tx(language, '选择本机 CLI 后端', 'Choose a local CLI backend')}
+              {text.chooseCli}
             </label>
             <Select
               id="wizard-cli"
               value={cliBackend}
               onChange={setCliBackend}
               options={CLI_BACKENDS}
-              placeholder={tx(language, '请选择', 'Select…')}
+              placeholder={text.select}
             />
           </div>
         ) : null}
@@ -386,21 +413,26 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="block text-sm text-foreground">
-                {tx(language, '可用模型', 'Available models')}
+                {text.availableModels}
               </span>
-              <Button
-                type="button"
-                variant="settings-secondary"
-                size="xsm"
-                onClick={() => void handleDiscover()}
-                // Key-exempt providers (e.g. Ollama) can discover with an empty
-                // key; only key-required providers gate on it.
-                disabled={isDiscovering || (Boolean(provider?.requiresApiKey) && !apiKey.trim())}
-                isLoading={isDiscovering}
-              >
-                {tx(language, '自动发现模型', 'Discover models')}
-              </Button>
+              {requirements?.supportsDiscovery !== false ? (
+                <Button
+                  type="button"
+                  variant="settings-secondary"
+                  size="xsm"
+                  onClick={() => void handleDiscover()}
+                  disabled={isDiscovering || (Boolean(requirements?.apiKeyRequired) && !apiKey.trim())}
+                  isLoading={isDiscovering}
+                >
+                  {text.discoverModels}
+                </Button>
+              ) : null}
             </div>
+            {requirements?.supportsDiscovery === false ? (
+              <p className="text-xs text-muted-text">
+                {text.discoveryUnsupported}
+              </p>
+            ) : null}
             {discoveredModels.length > 0 ? (
               <ModelMultiSelect
                 options={discoveredModels}
@@ -419,7 +451,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     <span className="truncate">{model}</span>
                     <button
                       type="button"
-                      aria-label={tx(language, `移除模型 ${model}`, `Remove model ${model}`)}
+                      aria-label={formatUiText(text.removeModel, { model })}
                       onClick={() => removeModelToken(model)}
                       className="shrink-0 text-muted-text hover:text-danger"
                     >
@@ -430,15 +462,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               </div>
             ) : (
               <p className="text-xs text-muted-text">
-                {tx(language, '尚未添加模型，请自动发现或逐个手动添加。', 'No models yet — discover them or add each manually.')}
+                {text.noModels}
               </p>
             )}
             <div className="flex items-center gap-2">
               <Input
                 id="wizard-models"
                 value={modelDraft}
-                aria-label={tx(language, '添加模型', 'Add model')}
-                placeholder={tx(language, '输入模型 ID 后回车或点“添加”', 'Enter a model ID, then press Enter or “Add”')}
+                aria-label={text.addModel}
+                placeholder={text.addModelPlaceholder}
                 onChange={(event) => setModelDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -464,18 +496,14 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 disabled={!modelDraft.trim()}
                 onClick={() => addModelToken(modelDraft)}
               >
-                {tx(language, '添加', 'Add')}
+                {text.add}
               </Button>
             </div>
             {discoverNote ? (
               <p className={`text-xs ${discoverNote.ok ? 'text-success' : 'text-warning'}`}>{discoverNote.message}</p>
             ) : null}
             <p className="text-xs text-muted-text">
-              {tx(
-                language,
-                '模型来自自动发现或手动逐个添加；不预填示例模型。发现失败时可手动添加。',
-                'Models come from auto-discovery or manual entry — no example models are prefilled. Add them manually if discovery fails.',
-              )}
+              {text.modelSourceHint}
             </p>
           </div>
         ) : null}
@@ -483,7 +511,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         {step === 'model' ? (
           <div className="space-y-2">
             <label htmlFor="wizard-report-model" className="block text-sm text-foreground">
-              {tx(language, '报告主要模型', 'Report primary model')}
+              {text.reportModel}
             </label>
             <Select
               id="wizard-report-model"
@@ -492,11 +520,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               options={modelOptions.map((model) => ({ value: model, label: model }))}
             />
             <p className="text-xs text-muted-text">
-              {tx(
-                language,
-                'Agent、Vision 与备用模型默认继承报告主要模型，可稍后在任务路由与可靠性中单独调整。',
-                'Agent, Vision and fallback models inherit this by default; adjust them later in Task Routing and Reliability.',
-              )}
+              {text.inheritanceHint}
             </p>
           </div>
         ) : null}
@@ -505,42 +529,38 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           <div className="space-y-3">
             <InlineAlert
               variant="info"
-              message={tx(
-                language,
-                '将应用以下最小可运行配置，保存后可继续在设置中完善。',
-                'The following minimal runnable config will be applied. You can refine it later in Settings.',
-              )}
+              message={text.reviewDescription}
             />
             {/* User-facing summary only — no internal keys such as LLM_CHANNELS. */}
             <dl className="space-y-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm">
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-text">{tx(language, '执行方式', 'Execution')}</dt>
+                <dt className="text-muted-text">{text.execution}</dt>
                 <dd className="font-medium text-foreground">
                   {mode === 'cli'
-                    ? CLI_BACKENDS.find((entry) => entry.value === cliBackend)?.label ?? tx(language, '本机 CLI', 'Local CLI')
-                    : tx(language, '云 API', 'Cloud API')}
+                    ? CLI_BACKENDS.find((entry) => entry.value === cliBackend)?.label ?? text.localCli
+                    : text.cloudApi}
                 </dd>
               </div>
               {mode === 'cloud' ? (
                 <>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-text">{tx(language, '模型服务', 'Model service')}</dt>
+                    <dt className="text-muted-text">{text.modelService}</dt>
                     <dd className="min-w-0 truncate font-medium text-foreground">{provider?.label ?? '—'}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-text">{tx(language, '可用模型', 'Available models')}</dt>
+                    <dt className="text-muted-text">{text.availableModels}</dt>
                     <dd className="min-w-0 truncate font-medium text-foreground">
-                      {tx(language, `${modelOptions.length} 个`, `${modelOptions.length}`)}
+                      {formatUiText(text.modelCount, { count: modelOptions.length })}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-muted-text">{tx(language, '报告主要模型', 'Report primary model')}</dt>
+                    <dt className="text-muted-text">{text.reportModel}</dt>
                     <dd className="min-w-0 truncate font-medium text-foreground">{reportModel || modelOptions[0] || '—'}</dd>
                   </div>
                 </>
               ) : null}
             </dl>
-            {saveError ? <InlineAlert variant="danger" title={tx(language, '保存失败', 'Save failed')} message={saveError} /> : null}
+            {saveError ? <InlineAlert variant="danger" title={text.saveFailedTitle} message={saveError} /> : null}
             {mode === 'cloud' ? (
               <div className="space-y-1.5">
                 <Button
@@ -551,14 +571,10 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   disabled={isTesting}
                   isLoading={isTesting}
                 >
-                  {tx(language, '测试连接（可选）', 'Test connection (optional)')}
+                  {text.testOptional}
                 </Button>
                 <p className="text-xs text-muted-text">
-                  {tx(
-                    language,
-                    '连接测试为可选诊断，可能访问外部服务或产生费用，不影响保存。',
-                    'The connection test is an optional diagnostic that may reach external services or incur costs; it does not gate saving.',
-                  )}
+                  {text.testHint}
                 </p>
                 {testResult ? (
                   <p className={`text-xs ${testResult.ok ? 'text-success' : 'text-warning'}`}>{testResult.message}</p>
@@ -570,12 +586,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
 
         <div className="flex items-center justify-between gap-2 border-t border-[var(--settings-border)] pt-4">
           <Button type="button" variant="settings-secondary" size="sm" onClick={onClose}>
-            {tx(language, '取消', 'Cancel')}
+            {text.cancel}
           </Button>
           <div className="flex items-center gap-2">
             {stepIndex > 0 ? (
               <Button type="button" variant="settings-secondary" size="sm" onClick={goBack} disabled={isSaving}>
-                {tx(language, '上一步', 'Back')}
+                {text.back}
               </Button>
             ) : null}
             {step === 'review' ? (
@@ -587,7 +603,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 disabled={isSaving}
                 isLoading={isSaving}
               >
-                {tx(language, '保存并应用', 'Save & Apply')}
+                {text.saveApply}
               </Button>
             ) : (
               <Button
@@ -597,7 +613,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 onClick={goNext}
                 disabled={!canAdvance}
               >
-                {tx(language, '下一步', 'Next')}
+                {text.next}
               </Button>
             )}
           </div>

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { UiLanguage } from '../i18n/uiText';
 
 export type ApiErrorCategory =
   | 'agent_disabled'
@@ -21,6 +22,33 @@ export interface ParsedApiError {
   rawMessage: string;
   status?: number;
   category: ApiErrorCategory;
+  code?: string;
+}
+
+const EN_ERROR_TEXT: Record<ApiErrorCategory, { title: string; message: string }> = {
+  agent_disabled: { title: 'Agent mode is disabled', message: 'Enable Agent mode, then try again.' },
+  missing_params: { title: 'Required input is missing', message: 'Provide the required stock code or input, then try again.' },
+  llm_not_configured: { title: 'No LLM model is configured', message: 'Configure a primary model, connection, or API key in Settings, then try again.' },
+  model_tool_incompatible: { title: 'The model does not support tool calls', message: 'Choose a model that supports Agent tool calls, then try again.' },
+  invalid_tool_call: { title: 'The model returned an invalid tool call', message: 'Choose another model or disable the incompatible reasoning mode, then try again.' },
+  portfolio_oversell: { title: 'Sell quantity exceeds available holdings', message: 'Correct or remove the related sell entry, then try again.' },
+  portfolio_busy: { title: 'The portfolio ledger is busy', message: 'Another portfolio change is being processed. Try again shortly.' },
+  upstream_llm_400: { title: 'The model provider rejected the request', message: 'Check the model name, request parameters, and tool-call compatibility.' },
+  upstream_timeout: { title: 'The upstream service timed out', message: 'Try again later, or check the network and proxy settings.' },
+  upstream_network: { title: 'The server cannot reach an external dependency', message: 'Check proxy, DNS, and outbound network settings, then try again.' },
+  local_connection_failed: { title: 'Cannot connect to the local service', message: 'Check that the Web service is running and that its address and port are reachable.' },
+  http_error: { title: 'Request failed', message: 'The request could not be completed. Review the details and try again.' },
+  unknown: { title: 'Request failed', message: 'The request could not be completed. Try again later.' },
+};
+
+export function localizeParsedApiError(error: ParsedApiError, language: UiLanguage): ParsedApiError {
+  if (language !== 'en') return error;
+  const localized = EN_ERROR_TEXT[error.category] ?? EN_ERROR_TEXT.unknown;
+  return {
+    ...error,
+    title: localized.title,
+    message: localized.message,
+  };
 }
 
 type ResponseLike = {
@@ -43,6 +71,7 @@ type CreateParsedApiErrorOptions = {
   rawMessage?: string;
   status?: number;
   category?: ApiErrorCategory;
+  code?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -211,6 +240,7 @@ export function createParsedApiError(options: CreateParsedApiErrorOptions): Pars
     rawMessage: options.rawMessage?.trim() || options.message,
     status: options.status,
     category: options.category ?? 'unknown',
+    code: options.code,
   };
 }
 
@@ -240,14 +270,14 @@ export function formatParsedApiError(parsed: ParsedApiError): string {
   return `${parsed.title}：${parsed.message}`;
 }
 
-export function getParsedApiError(error: unknown): ParsedApiError {
+export function getParsedApiError(error: unknown, language: UiLanguage = 'zh'): ParsedApiError {
   if (isParsedApiError(error)) {
-    return error;
+    return localizeParsedApiError(error, language);
   }
   if (isRecord(error) && isParsedApiError((error as ErrorCarrier).parsedError)) {
-    return (error as ErrorCarrier).parsedError as ParsedApiError;
+    return localizeParsedApiError((error as ErrorCarrier).parsedError as ParsedApiError, language);
   }
-  return parseApiError(error);
+  return localizeParsedApiError(parseApiError(error), language);
 }
 
 export function createApiError(
@@ -400,6 +430,7 @@ export function parseApiError(error: unknown): ParsedApiError {
       rawMessage,
       status,
       category: 'http_error',
+      code: errorCode,
     });
   }
 
@@ -410,6 +441,7 @@ export function parseApiError(error: unknown): ParsedApiError {
       rawMessage,
       status,
       category: 'upstream_network',
+      code: errorCode,
     });
   }
 
@@ -546,8 +578,8 @@ export function parseApiError(error: unknown): ParsedApiError {
   });
 }
 
-export function toApiErrorMessage(error: unknown, fallback = '请求未成功完成，请稍后重试。'): string {
-  const parsed = getParsedApiError(error);
+export function toApiErrorMessage(error: unknown, fallback = '请求未成功完成，请稍后重试。', language: UiLanguage = 'zh'): string {
+  const parsed = getParsedApiError(error, language);
   const message = formatParsedApiError(parsed);
   return message.trim() || fallback;
 }

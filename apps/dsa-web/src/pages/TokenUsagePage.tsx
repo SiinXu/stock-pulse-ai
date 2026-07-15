@@ -6,6 +6,7 @@ import { ApiErrorAlert, AppPage, Card, EmptyState, PageHeader, StatCard } from '
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { cn } from '../utils/cn';
+import { getUiLocale } from '../utils/uiLocale';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
 
@@ -23,12 +24,8 @@ const CALL_TYPE_LABEL_KEYS: Record<string, UiTextKey> = {
   market_review: 'usage.callType.marketReview',
 };
 
-function getLocale(language: UiLanguage): string {
-  return language === 'en' ? 'en-US' : 'zh-CN';
-}
-
 function formatNumber(value: number | null | undefined, language: UiLanguage): string {
-  return new Intl.NumberFormat(getLocale(language)).format(value ?? 0);
+  return new Intl.NumberFormat(getUiLocale(language)).format(value ?? 0);
 }
 
 function formatDateTime(value: string, language: UiLanguage): string {
@@ -39,7 +36,7 @@ function formatDateTime(value: string, language: UiLanguage): string {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return new Intl.DateTimeFormat(getLocale(language), {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -101,6 +98,9 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
 
 const TokenUsagePage: React.FC = () => {
   const { language, t } = useUiLanguage();
+  useEffect(() => {
+    document.title = `${t('usage.title')} - DSA`;
+  }, [t]);
   const [period, setPeriod] = useState<UsagePeriod>('month');
   const [dashboard, setDashboard] = useState<UsageDashboard | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);

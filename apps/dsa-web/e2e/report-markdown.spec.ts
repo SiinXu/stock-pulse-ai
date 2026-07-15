@@ -1,47 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD;
-
-if (!smokePassword) {
-  test.skip(true, 'Set DSA_WEB_SMOKE_PASSWORD to run report markdown smoke tests.');
-}
+import { loginAsE2eAdmin } from './auth-fixture';
 
 test.use({ locale: 'zh-CN' });
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
+const REPORT_MARKER = 'E2E_MARKDOWN_FIXTURE';
 
 async function login(page: Page) {
-  test.skip(!smokePassword, 'Set DSA_WEB_SMOKE_PASSWORD to run report markdown tests.');
-
   await page.addInitScript((storageKey) => {
     window.localStorage.setItem(storageKey, 'zh');
   }, UI_LANGUAGE_STORAGE_KEY);
-
-  // Navigate to login page
-  await page.goto('/login');
-  await page.waitForLoadState('domcontentloaded');
-
-  // Wait for password input to be visible
-  await expect(page.locator('#password')).toBeVisible({ timeout: 10_000 });
-
-  // Fill password and submit
-  await page.locator('#password').fill(smokePassword!);
-
-  // Wait for and click the submit button
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
-  await expect(submitButton).toBeVisible();
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) => response.url().includes('/api/v1/auth/login') && response.status() === 200,
-      { timeout: 15_000 }
-    ),
-    submitButton.click(),
-  ]);
-
-  // Wait for navigation to home page after login
-  await page.waitForURL('/', { timeout: 15_000 });
-  await page.waitForLoadState('domcontentloaded');
+  await loginAsE2eAdmin(page);
   // Wait for page to stabilize by checking for stock input
   const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
   await expect(stockInput).toBeVisible({ timeout: 10_000 });
@@ -57,12 +26,13 @@ test.describe('ReportMarkdown component', () => {
     // Navigate to history page
     await page.getByRole('link', { name: '首页' }).click();
     await page.waitForLoadState('domcontentloaded');
-    // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    // Wait for the current history workspace to load.
+    await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
+    await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
@@ -84,6 +54,7 @@ test.describe('ReportMarkdown component', () => {
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toBeTruthy();
     expect(clipboardText.length).toBeGreaterThan(0);
+    expect(clipboardText).toContain(REPORT_MARKER);
 
     // Verify checkmark icon is shown
     const checkmarkIcon = page.locator('button[aria-label="复制 Markdown 源码"] svg.text-success');
@@ -102,12 +73,13 @@ test.describe('ReportMarkdown component', () => {
     // Navigate to history page
     await page.getByRole('link', { name: '首页' }).click();
     await page.waitForLoadState('domcontentloaded');
-    // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    // Wait for the current history workspace to load.
+    await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
+    await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
@@ -129,6 +101,7 @@ test.describe('ReportMarkdown component', () => {
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toBeTruthy();
     expect(clipboardText.length).toBeGreaterThan(0);
+    expect(clipboardText).toContain(REPORT_MARKER);
 
     // Verify it's plain text (no markdown symbols like #, **, >, etc.)
     expect(clipboardText).not.toMatch(/^#{1,6}\s+/m); // No headers
@@ -178,18 +151,19 @@ test.describe('ReportMarkdown component', () => {
     await expect(copyPlainTextButton).toBeEnabled();
   });
 
-  test('buttons are disabled during loading', async ({ page }) => {
+  test('copy buttons become enabled after report loading', async ({ page }) => {
     await login(page);
 
     // Navigate to history page
     await page.getByRole('link', { name: '首页' }).click();
     await page.waitForLoadState('domcontentloaded');
-    // Wait for history panel to load
-    await expect(page.getByText('历史分析')).toBeVisible({ timeout: 10_000 });
+    // Wait for the current history workspace to load.
+    await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
     const firstHistoryItem = page.locator('.home-history-item').first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
+    await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();
     // Wait for detailed report button to be enabled (indicates selection is complete)
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });

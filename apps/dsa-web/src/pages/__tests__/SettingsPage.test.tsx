@@ -12,6 +12,7 @@ const {
   exportEnv,
   getSchedulerStatus,
   getSetupStatus,
+  getLlmAvailableModels,
   importEnv,
   runSchedulerNow,
   updateSystemConfig,
@@ -44,6 +45,7 @@ const {
   exportEnv: vi.fn(),
   getSchedulerStatus: vi.fn(),
   getSetupStatus: vi.fn(),
+  getLlmAvailableModels: vi.fn(),
   importEnv: vi.fn(),
   runSchedulerNow: vi.fn(),
   updateSystemConfig: vi.fn(),
@@ -126,12 +128,7 @@ vi.mock('../../api/systemConfig', () => ({
         { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
       ],
     }),
-    getLlmAvailableModels: () => Promise.resolve({
-      models: [
-        { route: 'deepseek/deepseek-v4-flash', display: 'deepseek-v4-flash', connection: 'deepseek', provider: 'deepseek' },
-        { route: 'deepseek/deepseek-v4-pro', display: 'deepseek-v4-pro', connection: 'deepseek', provider: 'deepseek' },
-      ],
-    }),
+    getLlmAvailableModels: (...args: unknown[]) => getLlmAvailableModels(...args),
     importEnv: (...args: unknown[]) => importEnv(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
     update: (...args: unknown[]) => updateSystemConfig(...args),
@@ -191,13 +188,24 @@ vi.mock('../../components/settings', async () => ({
     items,
     onDraftItemsChange,
     onValidityChange,
+    taskModelRefs,
+    onReplaceModelReferences,
+    focusFieldRequest,
   }: {
     items: Array<{ key: string; value: string }>;
     onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
     onValidityChange?: (valid: boolean) => void;
+    taskModelRefs?: Array<{ key?: string; label: string; route: string }>;
+    onReplaceModelReferences?: (replacements: Array<{
+      fromRoute: string;
+      toRoute: string;
+      references: Array<{ key?: string; label: string; route: string }>;
+    }>) => void;
+    focusFieldRequest?: { requestId: number; key: string } | null;
   }) => (
     <div>
       <div data-testid="llm-channel-editor-items">{items.map((item) => item.key).join(',')}</div>
+      <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
       <button
         type="button"
         onClick={() => onDraftItemsChange?.([
@@ -210,6 +218,26 @@ vi.mock('../../components/settings', async () => ({
       </button>
       <button type="button" onClick={() => onValidityChange?.(false)}>
         mark llm draft invalid
+      </button>
+      <button
+        type="button"
+        onClick={() => onReplaceModelReferences?.([{
+          fromRoute: 'deepseek/shared-model',
+          toRoute: 'openai/replacement-model',
+          references: (taskModelRefs ?? []).filter((reference) => reference.route === 'deepseek/shared-model'),
+        }])}
+      >
+        replace model references
+      </button>
+      <button
+        type="button"
+        onClick={() => onReplaceModelReferences?.([{
+          fromRoute: 'openai/gpt-4o-mini',
+          toRoute: 'openai/gpt-5.5',
+          references: (taskModelRefs ?? []).filter((reference) => reference.key === 'AGENT_LITELLM_MODEL'),
+        }])}
+      >
+        replace bare Agent reference
       </button>
     </div>
   ),
@@ -238,7 +266,8 @@ vi.mock('../../components/settings', async () => ({
     onAction?: () => void;
   }) => (
     <div>
-      {title}:{message}
+      <span>{title}</span>
+      <span>{message}</span>
       {actionLabel ? (
         <button type="button" onClick={onAction}>
           {actionLabel}
@@ -616,6 +645,12 @@ describe('SettingsPage', () => {
           message: '通知可选。',
           nextStep: null,
         },
+      ],
+    });
+    getLlmAvailableModels.mockResolvedValue({
+      models: [
+        { route: 'deepseek/deepseek-v4-flash', display: 'deepseek-v4-flash', connection: 'deepseek', provider: 'deepseek' },
+        { route: 'deepseek/deepseek-v4-pro', display: 'deepseek-v4-pro', connection: 'deepseek', provider: 'deepseek' },
       ],
     });
     analyzeAsync.mockResolvedValue({
@@ -1328,9 +1363,9 @@ describe('SettingsPage', () => {
       expect(statusItems).toHaveTextContent('GENERATION_BACKEND=litellm');
       expect(statusItems).toHaveTextContent('LLM_CHANNELS=draft,backup');
       expect(statusItems).toHaveTextContent('LITELLM_MODEL=openai/draft-model');
-      expect(statusItems).toHaveTextContent('OPENAI_MODEL=gpt-draft');
-      expect(statusItems).toHaveTextContent('GEMINI_MODEL=gemini-draft');
-      expect(statusItems).toHaveTextContent('OLLAMA_API_BASE=http://localhost:11434');
+      expect(statusItems).not.toHaveTextContent('OPENAI_MODEL=gpt-draft');
+      expect(statusItems).not.toHaveTextContent('GEMINI_MODEL=gemini-draft');
+      expect(statusItems).not.toHaveTextContent('OLLAMA_API_BASE=http://localhost:11434');
       expect(statusItems).not.toHaveTextContent('GENERATION_BACKEND=codex_cli');
       expect(statusItems).not.toHaveTextContent('WECHAT_WEBHOOK_URL=not-a-url');
     });
@@ -1384,7 +1419,7 @@ describe('SettingsPage', () => {
 
     // The AI & Models section is active and its second-level view tabs render.
     expect(screen.getByRole('button', { name: /AI 与模型/ })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('tab', { name: '连接' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '模型接入' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: '任务路由' })).toBeInTheDocument();
 
     // Clicking a first-level section pushes the canonical section/view URL
@@ -1396,6 +1431,141 @@ describe('SettingsPage', () => {
     expect(nextParams?.has('sub')).toBe(false);
     // Normal navigation must push history (not replace) so Back returns here.
     expect(options?.replace).toBe(false);
+  });
+
+  it('round-trips from empty Task Routing through Model Access with an explicit origin', async () => {
+    getLlmAvailableModels.mockResolvedValue({ models: [] });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+
+    const { rerender } = render(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '前往模型接入' }));
+    const [modelAccessParams, modelAccessOptions] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(modelAccessParams?.get('section')).toBe('ai_models');
+    expect(modelAccessParams?.get('view')).toBe('connections');
+    expect(modelAccessParams?.get('from')).toBe('task_routing');
+    expect(modelAccessOptions?.replace).toBe(false);
+
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'ai_models',
+      view: 'connections',
+      from: 'task_routing',
+    });
+    rerender(<SettingsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '返回任务路由' }));
+    const [returnParams, returnOptions] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(returnParams?.get('section')).toBe('ai_models');
+    expect(returnParams?.get('view')).toBe('task_routing');
+    expect(returnParams?.has('from')).toBe(false);
+    expect(returnOptions?.replace).toBe(false);
+  });
+
+  it('does not report task routes as unavailable while the available-model catalog failed', async () => {
+    getLlmAvailableModels.mockRejectedValue(new Error('catalog unavailable'));
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'overview' });
+
+    render(<SettingsPage />);
+
+    expect(screen.getByRole('tab', { name: '总览' })).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalledTimes(1));
+    await expect(getLlmAvailableModels.mock.results[0]?.value).rejects.toThrow('catalog unavailable');
+    expect(await screen.findByText('可用模型加载失败')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument();
+    expect(screen.queryByText('当前配置不可用')).not.toBeInTheDocument();
+  });
+
+  it('moves every referenced task route into the unified draft when replacing a model', async () => {
+    const modelField = (key: string, value: string, displayOrder: number) => ({
+      key,
+      value,
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key,
+        category: 'ai_model',
+        dataType: 'string',
+        uiControl: 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder,
+        uiPlacement: key === 'LITELLM_FALLBACK_MODELS' ? 'reliability' as const : 'task_routing' as const,
+      },
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          modelField('LITELLM_MODEL', 'deepseek/shared-model', 2),
+          modelField('AGENT_LITELLM_MODEL', 'deepseek/shared-model', 3),
+          modelField('VISION_MODEL', 'openai/vision-model', 4),
+          modelField('LITELLM_FALLBACK_MODELS', 'deepseek/shared-model,openai/backup-model', 5),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'replace model references' }));
+
+    expect(setDraftValue).toHaveBeenCalledWith('LITELLM_MODEL', 'openai/replacement-model');
+    expect(setDraftValue).toHaveBeenCalledWith('AGENT_LITELLM_MODEL', 'openai/replacement-model');
+    expect(setDraftValue).toHaveBeenCalledWith(
+      'LITELLM_FALLBACK_MODELS',
+      'openai/replacement-model,openai/backup-model',
+    );
+    expect(setDraftValue).not.toHaveBeenCalledWith('VISION_MODEL', expect.anything());
+  });
+
+  it('replaces a historical bare Agent reference using backend-equivalent route identity', async () => {
+    getLlmAvailableModels.mockResolvedValue({
+      models: [
+        { route: 'openai/gpt-4o-mini', display: 'gpt-4o-mini', connection: 'openai', provider: 'openai' },
+        { route: 'openai/gpt-5.5', display: 'gpt-5.5', connection: 'openai', provider: 'openai' },
+      ],
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...defaultItemsByCategory,
+        ai_model: [
+          ...defaultItemsByCategory.ai_model,
+          {
+            key: 'AGENT_LITELLM_MODEL',
+            value: 'gpt-4o-mini',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_LITELLM_MODEL',
+              category: 'ai_model',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 3,
+              uiPlacement: 'task_routing' as const,
+            },
+          },
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(getLlmAvailableModels).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'replace bare Agent reference' }));
+
+    expect(setDraftValue).toHaveBeenCalledWith('AGENT_LITELLM_MODEL', 'openai/gpt-5.5');
   });
 
   it('makes Task Routing the single editor for per-task models and links fallback out to Reliability', async () => {
@@ -1533,6 +1703,55 @@ describe('SettingsPage', () => {
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
+  });
+
+  it('routes a dynamic connection error to Model Access and sends an explicit field-focus request', async () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: [
+          ...configState.itemsByCategory.ai_model,
+          {
+            key: 'LLM_OPENAI_API_KEY',
+            value: '******',
+            rawValueExists: true,
+            isMasked: true,
+            schema: {
+              key: 'LLM_OPENAI_API_KEY',
+              category: 'ai_model',
+              dataType: 'string',
+              uiControl: 'password',
+              isSensitive: true,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 9000,
+              uiPlacement: 'model_access' as const,
+            },
+          },
+        ],
+      },
+      issueByKey: {
+        LLM_OPENAI_API_KEY: [
+          { key: 'LLM_OPENAI_API_KEY', code: 'invalid', message: 'API 密钥无效', severity: 'error' },
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'runtime' });
+
+    const { rerender } = render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: /前往修正/ }));
+
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('ai_models');
+    expect(nextParams?.get('view')).toBe('connections');
+
+    routerSearchParamsMock.params = nextParams;
+    rerender(<SettingsPage />);
+    expect(await screen.findByTestId('llm-channel-focus-request')).toHaveTextContent('LLM_OPENAI_API_KEY');
   });
 
   it('warns that changed restart-required settings need a restart to take effect', () => {
@@ -3150,7 +3369,8 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByText(/发现新版本:当前 3\.12\.0，最新 3\.13\.0/)).toBeInTheDocument();
+    expect(await screen.findByText('发现新版本')).toBeInTheDocument();
+    expect(screen.getByText(/当前 3\.12\.0，最新 3\.13\.0/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '前往下载' })).toBeInTheDocument();
   });
 
@@ -3162,7 +3382,8 @@ describe('SettingsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '检查更新' }));
 
     await waitFor(() => expect(desktopCheckForUpdates).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText('已是最新版本:当前桌面端已是最新版本。')).toBeInTheDocument();
+    expect(await screen.findByText('已是最新版本')).toBeInTheDocument();
+    expect(screen.getByText('当前桌面端已是最新版本。')).toBeInTheDocument();
   });
 
   it('opens GitHub release page from desktop update notice', async () => {
@@ -3200,7 +3421,8 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByText('更新已下载:新版本 3.13.0 已下载，可重启应用完成安装。')).toBeInTheDocument();
+    expect(await screen.findByText('更新已下载')).toBeInTheDocument();
+    expect(screen.getByText('新版本 3.13.0 已下载，可重启应用完成安装。')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '重启安装' }));
 

@@ -65,6 +65,7 @@ def test_daily_analysis_maps_all_provider_template_channels() -> None:
     for channel in templates:
         prefix = f"LLM_{channel.upper()}_"
         for suffix in (
+            "PROVIDER",
             "PROTOCOL",
             "BASE_URL",
             "API_KEY",
@@ -78,6 +79,26 @@ def test_daily_analysis_maps_all_provider_template_channels() -> None:
     assert not any(key.startswith("LLM_ARK_") for key in env)
 
 
+def test_daily_analysis_maps_fixed_named_connections_with_provider_identity() -> None:
+    env = _load_daily_analysis_env()
+
+    for connection in ("PRIMARY", "SECONDARY"):
+        for suffix in (
+            "PROVIDER",
+            "PROTOCOL",
+            "BASE_URL",
+            "API_KEY",
+            "API_KEYS",
+            "MODELS",
+            "ENABLED",
+            "EXTRA_HEADERS",
+        ):
+            assert f"LLM_{connection}_{suffix}" in env
+
+    for suffix in ("PROVIDER", "PROTOCOL", "BASE_URL", "API_KEY", "MODELS", "ENABLED"):
+        assert f"LLM_HERMES_{suffix}" in env
+
+
 def test_daily_analysis_keeps_channel_secrets_in_secrets_context() -> None:
     templates = _extract_provider_templates()
     env = _load_daily_analysis_env()
@@ -88,7 +109,7 @@ def test_daily_analysis_keeps_channel_secrets_in_secrets_context() -> None:
             key = f"LLM_{upper}_{suffix}"
             assert env[key] == f"${{{{ secrets.{key} }}}}"
 
-        for suffix in ("PROTOCOL", "BASE_URL", "MODELS", "ENABLED", "EXTRA_HEADERS"):
+        for suffix in ("PROVIDER", "PROTOCOL", "BASE_URL", "MODELS", "ENABLED", "EXTRA_HEADERS"):
             key = f"LLM_{upper}_{suffix}"
             assert f"vars.{key}" in env[key]
             assert f"secrets.{key}" in env[key]
@@ -150,6 +171,7 @@ def test_env_example_includes_provider_template_channel_examples() -> None:
     for channel, base_url in templates.items():
         upper = channel.upper()
         assert f"LLM_CHANNELS={channel}" in env_example
+        assert f"LLM_{upper}_PROVIDER={channel}" in env_example
         assert f"LLM_{upper}_MODELS=" in env_example
 
         if channel != "ollama":

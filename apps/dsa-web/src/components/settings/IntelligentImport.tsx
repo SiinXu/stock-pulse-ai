@@ -7,6 +7,7 @@ import { Badge, Button, InlineAlert } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../i18n/uiText';
 import { parseStockListValue } from '../../utils/stockList';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 
 const IMG_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 const IMG_MAX = 5 * 1024 * 1024; // 5MB
@@ -24,13 +25,14 @@ interface IntelligentImportProps {
 type ItemWithChecked = ExtractItem & { id: string; checked: boolean };
 
 function getConfidenceMeta(confidence: 'high' | 'medium' | 'low', language: UiLanguage) {
+  const text = SETTINGS_MISC_TEXT[language];
   if (confidence === 'high') {
-    return { label: language === 'en' ? 'High' : '高', badge: 'success' as const };
+    return { label: text.confidenceHigh, badge: 'success' as const };
   }
   if (confidence === 'low') {
-    return { label: language === 'en' ? 'Low' : '低', badge: 'warning' as const };
+    return { label: text.confidenceLow, badge: 'warning' as const };
   }
-  return { label: language === 'en' ? 'Medium' : '中', badge: 'default' as const };
+  return { label: text.confidenceMedium, badge: 'default' as const };
 }
 
 function normalizeConfidence(confidence?: string | null): 'high' | 'medium' | 'low' {

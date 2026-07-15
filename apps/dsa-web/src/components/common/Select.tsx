@@ -15,9 +15,11 @@ interface SelectProps {
   options: SelectOption[];
   label?: string;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  error?: boolean;
   menuAlign?: 'start' | 'end';
 }
 
@@ -32,9 +34,11 @@ export const Select: React.FC<SelectProps> = ({
   options,
   label,
   ariaLabel,
+  ariaDescribedBy,
   placeholder,
   disabled = false,
   className = '',
+  error = false,
   menuAlign = 'start',
 }) => {
   const { t } = useUiLanguage();
@@ -150,13 +154,16 @@ export const Select: React.FC<SelectProps> = ({
           aria-expanded={isOpen}
           aria-controls={isOpen ? listboxId : undefined}
           aria-label={ariaLabel}
+          aria-invalid={error || undefined}
+          aria-describedby={ariaDescribedBy}
           aria-activedescendant={isOpen ? `${resolvedId}-option-${activeIndex}` : undefined}
           data-value={value}
           onClick={() => (isOpen ? setIsOpen(false) : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
+            error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           )}
         >

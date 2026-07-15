@@ -979,6 +979,13 @@ describe('HomePage', () => {
     const startDate = rangeStart.toISOString().slice(0, 10);
     const endDate = rangeEnd.toISOString().slice(0, 10);
     let taskCompleted = false;
+    const signalTodayRefreshRequested = vi.fn();
+    let resolveRefreshedTodayHistory!: (
+      response: Awaited<ReturnType<typeof historyApi.getList>>,
+    ) => void;
+    const refreshedTodayHistory = new Promise<Awaited<ReturnType<typeof historyApi.getList>>>((resolve) => {
+      resolveRefreshedTodayHistory = resolve;
+    });
     vi.mocked(historyApi.getStockBarList).mockImplementation(() => Promise.resolve({
       total: 1,
       items: [{
@@ -999,19 +1006,23 @@ describe('HomePage', () => {
       limit?: number;
     } = {}) => {
       if (params.startDate === startDate && params.endDate === endDate) {
+        if (taskCompleted) {
+          signalTodayRefreshRequested();
+          return refreshedTodayHistory;
+        }
         return Promise.resolve({
           total: 1,
           page: 1,
           limit: 100,
           items: [{
-            id: taskCompleted ? 12 : 11,
-            queryId: taskCompleted ? 'q-nvda-today' : 'q-aapl-today',
-            stockCode: taskCompleted ? 'NVDA' : 'AAPL',
-            stockName: taskCompleted ? 'NVIDIA' : 'Apple',
+            id: 11,
+            queryId: 'q-aapl-today',
+            stockCode: 'AAPL',
+            stockName: 'Apple',
             reportType: 'detailed' as const,
-            sentimentScore: taskCompleted ? 93 : 72,
-            operationAdvice: taskCompleted ? '买入' : '观察',
-            createdAt: `${todayInShanghai}T${taskCompleted ? '11' : '10'}:00:00`,
+            sentimentScore: 72,
+            operationAdvice: '观察',
+            createdAt: `${todayInShanghai}T10:00:00`,
           }],
         });
       }
@@ -1048,8 +1059,30 @@ describe('HomePage', () => {
         completedAt: `${todayInShanghai}T11:00:00`,
       });
     });
+    await waitFor(() => {
+      expect(signalTodayRefreshRequested).toHaveBeenCalledTimes(1);
+    });
 
-    expect(await screen.findByRole('button', { name: /NVIDIA/ })).toBeInTheDocument();
+    await act(async () => {
+      resolveRefreshedTodayHistory({
+        total: 1,
+        page: 1,
+        limit: 100,
+        items: [{
+          id: 12,
+          queryId: 'q-nvda-today',
+          stockCode: 'NVDA',
+          stockName: 'NVIDIA',
+          reportType: 'detailed' as const,
+          sentimentScore: 93,
+          operationAdvice: '买入',
+          createdAt: `${todayInShanghai}T11:00:00`,
+        }],
+      });
+      await refreshedTodayHistory;
+    });
+
+    expect(screen.getByRole('button', { name: /NVIDIA/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Apple/ })).not.toBeInTheDocument();
   });
 

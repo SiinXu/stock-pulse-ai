@@ -14,6 +14,8 @@ import { useAutocomplete } from '../../hooks/useAutocomplete';
 import { SuggestionsList } from './SuggestionsList';
 import { cn } from '../../utils/cn';
 import type { Market } from '../../types/stockIndex';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
 
 const AUTOCOMPLETE_INPUT_CLASS =
   'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
@@ -45,10 +47,12 @@ function FallbackInput({
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = '输入股票代码或名称',
+  placeholder,
   ariaLabel,
   className,
 }: StockAutocompleteProps) {
+  const { language } = useUiLanguage();
+  const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   return (
     <input
       type="text"
@@ -60,7 +64,7 @@ function FallbackInput({
           onSubmit(value);
         }
       }}
-      placeholder={placeholder}
+      placeholder={resolvedPlaceholder}
       aria-label={ariaLabel}
       disabled={disabled}
       className={cn(AUTOCOMPLETE_INPUT_CLASS, className)}
@@ -107,10 +111,12 @@ function StockAutocompleteInner({
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = '输入股票代码或名称',
+  placeholder,
   ariaLabel,
   className,
 }: StockAutocompleteProps) {
+  const { language } = useUiLanguage();
+  const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   const { index, loading, fallback } = useStockIndex();
   const {
     // query,
@@ -244,7 +250,7 @@ function StockAutocompleteInner({
         onChange={onChange}
         onSubmit={onSubmit}
         disabled={disabled}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         ariaLabel={ariaLabel}
         className={className}
       />
@@ -267,7 +273,7 @@ function StockAutocompleteInner({
           }
         }}
         onBlur={handleBlur}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         aria-label={ariaLabel}
         disabled={disabled}
         className={cn(

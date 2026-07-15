@@ -13,13 +13,17 @@ from src.core.config_manager import ConfigManager
 
 class ConfigManagerTestCase(unittest.TestCase):
     def setUp(self) -> None:
+        self.original_env_file = os.environ.get("ENV_FILE")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.env_path = Path(self.temp_dir.name) / ".env"
         os.environ["ENV_FILE"] = str(self.env_path)
         self.manager = ConfigManager(env_path=self.env_path)
 
     def tearDown(self) -> None:
-        os.environ.pop("ENV_FILE", None)
+        if self.original_env_file is None:
+            os.environ.pop("ENV_FILE", None)
+        else:
+            os.environ["ENV_FILE"] = self.original_env_file
         self.temp_dir.cleanup()
 
     def test_apply_updates_preserves_comments_blank_lines_and_raw_lines(self) -> None:

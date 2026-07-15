@@ -43,7 +43,7 @@ describe('SearchableSelect', () => {
       <SearchableSelect value="" onChange={() => {}} options={options} ariaLabel="主要模型" />,
     );
     fireEvent.click(screen.getByRole('button', { name: '主要模型' }));
-    const search = screen.getByRole('combobox', { name: '主要模型 搜索' });
+    const search = screen.getByRole('combobox', { name: '搜索选项: 主要模型' });
     fireEvent.change(search, { target: { value: 'backup' } });
     const listbox = screen.getByRole('listbox');
     expect(within(listbox).getByRole('option', { name: /DeepSeek V4/ })).toBeInTheDocument();
@@ -80,9 +80,31 @@ describe('SearchableSelect', () => {
         staleValueLabel="当前配置不可用"
       />,
     );
-    expect(screen.getByRole('button', { name: '主要模型' })).toHaveTextContent('legacy/retired-model');
-    expect(screen.getByText('当前配置不可用')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: '主要模型' });
+    const staleMessage = screen.getByText('当前配置不可用');
+    expect(trigger).toHaveTextContent('legacy/retired-model');
+    expect(trigger).toHaveAttribute('aria-describedby', staleMessage.id);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('associates validation errors with the trigger', () => {
+    render(
+      <>
+        <SearchableSelect
+          value=""
+          onChange={() => {}}
+          options={options}
+          ariaLabel="主要模型"
+          ariaDescribedBy="primary-model-error"
+          error
+        />
+        <p id="primary-model-error">请选择主要模型</p>
+      </>,
+    );
+
+    const trigger = screen.getByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger).toHaveAttribute('aria-describedby', 'primary-model-error');
   });
 
   it('renders the popup inside a modal so focus stays within the focus trap', () => {

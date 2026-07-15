@@ -141,7 +141,7 @@ Start with one provider and its API key. If you want to pin a primary model, add
 
 **Q: How to use multiple models at once (e.g. AIHubmix + DeepSeek + Gemini)?**
 
-Use channel mode: set `LLM_CHANNELS=aihubmix,deepseek,gemini` and configure each channel's `LLM_{NAME}_BASE_URL`, `LLM_{NAME}_API_KEY`, `LLM_{NAME}_MODELS`. You can also configure this visually in Web Settings → AI & Models → Connections (Model Access).
+Use Channels mode: set `LLM_CHANNELS=aihubmix,deepseek,gemini` and configure each Connection's `LLM_{NAME}_PROVIDER`, `LLM_{NAME}_BASE_URL`, `LLM_{NAME}_API_KEY`, and `LLM_{NAME}_MODELS`. You can also configure this visually in Web Settings → AI & Models → Model Access; one Provider may have multiple Connections.
 
 **Q: The ask-stock / Agent page says no usable LLM is configured, but I only use legacy `GEMINI_*` / `OPENAI_*` / `ANTHROPIC_*` settings. What should I check?**
 
@@ -317,6 +317,14 @@ Work through the following 5 checkpoints in order:
 3. **If you only want to confirm the frontend was refreshed**, open WebUI → Settings and inspect `Build ID` / `Build Time`; that confirms static asset freshness, not the Docker release version.
 
 **Recommendation**: To avoid repeated updates, prefer a pinned version tag such as `v3.12.0` instead of relying on `latest`.
+
+---
+
+### Q14.2: Why is report content or news still Chinese after switching the UI to English?
+
+The WebUI treats **UI language** and **report language** as separate settings. UI language controls navigation, actions, forms, errors, and date/number formatting. Report language controls generated report content and exports. Configure them independently in Settings.
+
+User input, stock and company names, original news, model IDs, third-party text, and raw diagnostics are not translated automatically. An English UI may therefore display a Chinese report body, while surrounding copy, refresh, close, and diagnostic actions remain English.
 
 ---
 

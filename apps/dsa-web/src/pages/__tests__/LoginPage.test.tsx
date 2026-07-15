@@ -77,4 +77,18 @@ describe('LoginPage', () => {
     expect(pageRoot).not.toBeNull();
     expect(pageRoot?.getAttribute('style') ?? '').not.toContain('--login-bg-main');
   });
+
+  it('presents the current StockPulse brand as an accessible heading', () => {
+    useAuthMock.mockReturnValue({
+      login: vi.fn(),
+      passwordSet: true,
+      setupState: 'enabled',
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByRole('heading', { name: 'StockPulse' })).toBeInTheDocument();
+    expect(screen.queryByText('DAILY STOCK')).not.toBeInTheDocument();
+    expect(screen.queryByText('Analysis Engine')).not.toBeInTheDocument();
+  });
 });

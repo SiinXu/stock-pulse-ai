@@ -2,7 +2,7 @@
 
 Welcome! Whether you are a beginner newly exposed to AI or a veteran skilled with various APIs, this guide will help you set up Large Language Models (LLMs) quickly.
 
-This project exposes a unified AI model access flow that supports official APIs, OpenAI-compatible platforms, and local models. Under the hood it is powered by [LiteLLM](https://docs.litellm.ai/), but most users only need to think in terms of picking a provider, adding an API key, and optionally choosing a primary model or channels. To cater to different experience levels, we provide a three-tier configuration hierarchy. Choose the method that fits you best.
+This project exposes a unified AI model access flow that supports official APIs, OpenAI-compatible platforms, and local models. Under the hood it is powered by [LiteLLM](https://docs.litellm.ai/), but most users only need four concepts: Provider, Connection, Model, and Task Assignment. A Connection is a renameable account, gateway, or local instance, and one Provider can own multiple Connections. To cater to different experience levels, we provide a three-tier configuration hierarchy. Choose the method that fits you best.
 
 If you are choosing a concrete provider, setting up GitHub Actions Secrets / Variables, troubleshooting a `details.reason` error, or rolling back an LLM configuration, start with the [Provider Configuration Guide](./llm-providers.md). It is the maintained reference for provider presets, Actions variable mapping, runtime capability-check boundaries, and common error handling.
 
@@ -105,7 +105,7 @@ LITELLM_MODEL=openai/deepseek-ai/DeepSeek-V3
 DEEPSEEK_API_KEY=sk-xxxxxxxxxxxxxxxx
 ```
 *Compatibility note: with only this line, the system still defaults to `deepseek/deepseek-chat` and logs a migration warning.*
-`deepseek-chat` / `deepseek-reasoner` still work for compatibility with old configs, but DeepSeek marks them deprecated after 2026/07/24. New configs should add a model service under Web "Settings -> AI & Models -> Connections (Model access)" or explicitly set `LITELLM_MODEL=deepseek/deepseek-v4-flash` for `deepseek-v4-flash` / `deepseek-v4-pro`.
+`deepseek-chat` / `deepseek-reasoner` still work for compatibility with old configs, but DeepSeek marks them deprecated after 2026/07/24. New configs should add a model service under Web "Settings -> AI & Models -> Model Access" or explicitly set `LITELLM_MODEL=deepseek/deepseek-v4-flash` for `deepseek-v4-flash` / `deepseek-v4-pro`.
 
 ### Example 3: Using the Free Gemini API
 ```env
@@ -131,22 +131,22 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **Goal:** I have Keys from multiple different platforms and want to use them together. If my primary model fails or the network drops, I want it to automatically switch to fallback models.
 
-**Configure via Web UI directly:** After starting the application, you can do this visually under **Settings -> AI & Models -> Connections (Model Access)** in the Web UI.
+**Configure via Web UI directly:** After starting the application, you can do this visually under **Settings -> AI & Models -> Model Access** in the Web UI.
 
-> **New editor behavior**: Model access is organized as Provider / Connection / Model. A new connection is NOT prefilled with example models (model names age quickly and are never written as defaults): for DeepSeek, DashScope, and other OpenAI-compatible connections that expose `/v1/models`, click "Discover models" to fetch from `{base_url}/models` and multi-select, or add each model manually. Every model is an independent, removable token; the underlying storage format is still the comma-separated `LLM_{CONNECTION}_MODELS=model1,model2` value (an existing comma config is parsed back into tokens). If a connection does not support `/models`, authentication fails, or the endpoint is temporarily unavailable, you can still add models manually and save normally. In Task Routing, the report / Agent / Vision / fallback models can only be selected from already-onboarded models — free-text input is disabled.
+> **New editor behavior**: Model access is organized as Provider / Connection / Model / Task Assignment. The Provider Catalog controls field requirements and whether discovery is offered. OpenAI-compatible providers use their model-list endpoint, Ollama uses `/api/tags`, and unsupported or failed discovery falls back to manual model-ID entry; discovery never auto-selects results. Models remain independent tokens stored in `LLM_{CONNECTION}_MODELS`, while Provider identity is stored separately in `LLM_{CONNECTION}_PROVIDER=<provider_id>` and is never guessed from a renameable Connection name. Task Routing only accepts the available-model catalog. Historical unavailable values remain visibly marked until the user replaces or removes them; saving does not silently clean them.
 
 ### First-run Setup Status
 
-The backend exposes a read-only status endpoint at `GET /api/v1/system/config/setup/status`. It reports whether the minimum first-run pieces are present: primary LLM, Agent model inheritance/configuration, stock list, optional notification channel, and local storage. The endpoint only reads the saved `.env` plus the current process environment; it does not reload runtime config, write `.env`, test a real model, or create a database file. Frontend onboarding and later smoke-run flows can build on this endpoint incrementally.
+The backend exposes a read-only status endpoint at `GET /api/v1/system/config/setup/status`. It reports whether the minimum first-run pieces are present: primary LLM Connection, Agent model inheritance/configuration, stock list, optional notification channel, and local storage. The first-run wizard shares the same Provider Catalog requirements and discovery contract as regular Model Access: Ollama needs no key, official default endpoints need no manual Base URL, and Custom requires one. It writes the explicit `_PROVIDER` field, preserves existing Connections, never saves a bare model name, and never auto-selects discovery results. The status endpoint itself only reads saved configuration and does not mutate or test it.
 
 ### Web model connection editor: compatibility, migration, and rollback rules
 
-- The preset provider / Base URL are **form defaults only** (a new connection is no longer prefilled with sample models; see "New editor behavior" above). What gets persisted is still exactly what you submit in `LLM_{CHANNEL}_PROTOCOL`, `LLM_{CHANNEL}_BASE_URL`, `LLM_{CHANNEL}_MODELS`, and `LLM_{CHANNEL}_API_KEY(S)`; the editor does not silently rewrite them to a different provider name or URL.
-- "Discover models" only calls `{base_url}/models` for `OpenAI Compatible` / `DeepSeek` connections, and the default "Test connection" action sends one minimal chat completion request against the first model in the list and shows the backend-normalized `resolved_model` in the result. If the response includes `details.reason=model_access_denied` (for example, the observed Issue #1208 SiliconFlow / OpenAI Compatible sample returned `Model disabled` through LiteLLM), treat it as a best-effort model availability diagnostic based on provider wording: first confirm that the tested model is enabled for the current account/key, then adjust the model order or remove unavailable models before retrying. Provider messages not covered by this conservative rule, or provider messages with different semantics, continue to use the fallback diagnostic path. Optional runtime capability checks must be explicitly selected by the user and send additional JSON / tools / stream / vision smoke requests; the result only represents a best-effort check for the current account, model, and endpoint at that moment. The returned `stage / error_code / details / latency_ms / capability_results` fields are for structured diagnostics only, are **never persisted** back into `.env`, and do not block saving.
+- Provider / Base URL values are **form defaults only**. Persisted fields include `LLM_{CONNECTION}_PROVIDER`, `LLM_{CONNECTION}_PROTOCOL`, `LLM_{CONNECTION}_BASE_URL`, `LLM_{CONNECTION}_MODELS`, and `LLM_{CONNECTION}_API_KEY(S)`. Provider ID is separate from the Connection name. Legacy configs infer it only from an exact Catalog-ID name, never from prefixes such as `openai2`, and are not silently migrated.
+- "Discover models" is shown only when the Provider Catalog reports `supports_discovery`. OpenAI-compatible / DeepSeek providers use their model-list endpoint; Ollama calls `{base_url}/api/tags` with an empty key allowed. The default "Test connection" action sends one minimal chat completion request against the first configured model and shows the backend-normalized `resolved_model`. Capability diagnostics never write back into `.env` and do not block saving.
 - If the response includes `details.reason=provider_blocked`, the provider or relay gateway explicitly blocked this request. This is distinct from local network / TLS failures and `model_access_denied`; first check account risk controls, region or request-source restrictions, model entitlement, relay gateway policy, and content-safety policy.
 - Runtime capability checks send real LLM requests and may incur token / image-input cost, RPM/TPM rate limiting, insufficient balance errors, or timeouts. A failed check may come from account permissions, model entitlement, endpoint region, balance, provider compatibility layers, or LiteLLM translation behavior; it does not prove that the provider globally lacks that capability. P3 does not include online smoke coverage for every real provider. Its compatibility basis is the repository dependency constraint `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0`, LiteLLM `completion()` / OpenAI I/O format / streaming / exception mapping, and the OpenAI Chat Completions shapes for JSON mode, tool calling, streaming, and vision input.
 - External references: LiteLLM Python SDK / OpenAI I/O format / streaming / exception mapping: <https://docs.litellm.ai/>; LiteLLM OpenAI-compatible routing: <https://docs.litellm.ai/docs/providers/openai_compatible>; OpenAI Chat Completions: <https://platform.openai.com/docs/api-reference/chat/create>; JSON mode: <https://platform.openai.com/docs/guides/structured-outputs?api-mode=chat>; tool calling: <https://platform.openai.com/docs/guides/function-calling?api-mode=chat>; streaming: <https://platform.openai.com/docs/guides/streaming-responses?api-mode=chat>; vision input: <https://platform.openai.com/docs/guides/images-vision?api-mode=chat>.
-- Saving a connection only updates the keys submitted in that save operation; there is no whole-config silent migration when you switch config-source modes. Runtime model references (`LITELLM_MODEL`, `AGENT_LITELLM_MODEL`, `VISION_MODEL`, `LITELLM_FALLBACK_MODELS`) are protected by authoritative backend validation: if this save (deleting/disabling a connection, changing its model list) would leave any of them pointing at a model no longer declared by the enabled connections, the backend rejects the save (`unknown_model`; calling the API directly cannot bypass it). Re-select a replacement model or clear the reference in the Task Routing / Reliability views first; when deleting a connection that tasks still reference, the Web UI lists the referencing tasks in place and offers a "Go to Task Routing" shortcut. `cohere/*`, `google/*`, and `xai/*` are kept as explicit direct-env compatibility examples for legacy retention behavior only, and are not a runtime availability guarantee.
+- Saving a connection only updates the submitted keys; there is no whole-config silent migration. Deleting one model still referenced by Report, Agent, Vision, or fallback returns `model_in_use` with every `details.referenced_by` entry. The model manager can replace those references and remove the model in the same page draft so one update commits atomically. Unreplaced historical unavailable references still fail as `unknown_model` and are never silently removed. `cohere/*`, `google/*`, and `xai/*` remain direct-env compatibility examples only.
 - Backend consistency basis: runtime validation in `SystemConfigService._validate_llm_runtime_selection` (`src/services/system_config_service.py`) relies on `_uses_direct_env_provider` (`src/config.py`). Only `gemini`, `vertex_ai`, `anthropic`, `openai`, and `deepseek` are treated as managed key-backed providers; `cohere`, `google`, and `xai` are not in that allowlist, so they remain valid direct provider runtime entries.
 - Rollback stays minimal: restore the previous connection model list and re-select the runtime models, or restore the previous `LLM_*`, `LITELLM_MODEL`, `AGENT_LITELLM_MODEL`, `VISION_MODEL`, `LLM_TEMPERATURE`, and `LLM_USAGE_HMAC_*` values from your desktop export / manual `.env` backup. No extra migration script is required.
 - The current dependency constraint for this flow in the repository is `litellm>=1.80.10,!=1.82.7,!=1.82.8,<2.0.0` (see `requirements.txt`). Regression coverage for it lives in `tests/test_system_config_service.py`, `tests/test_system_config_api.py`, and `apps/dsa-web/src/components/settings/__tests__/LLMChannelEditor.test.tsx`.
@@ -192,12 +192,14 @@ If you prefer modifying files, configuring this in the `.env` file is also very 
 LLM_CHANNELS=deepseek,aihubmix
 
 # 2. Channel 1: Configure Official DeepSeek
+LLM_DEEPSEEK_PROVIDER=deepseek
 LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com
 LLM_DEEPSEEK_API_KEY=sk-1111111111111
 LLM_DEEPSEEK_MODELS=deepseek-v4-flash,deepseek-v4-pro
 
 # 3. Channel 2: Configure a common relay/proxy API
-LLM_AIHUBMIX_BASE_URL=https://api.aihubmix.com/v1
+LLM_AIHUBMIX_PROVIDER=aihubmix
+LLM_AIHUBMIX_BASE_URL=https://aihubmix.com/v1
 LLM_AIHUBMIX_API_KEY=sk-2222222222222
 LLM_AIHUBMIX_MODELS=gpt-5.5,claude-sonnet-4-6
 
@@ -207,13 +209,14 @@ LITELLM_MODEL=deepseek/deepseek-v4-flash
 # Optional: set an Agent-only primary model (empty = inherit the primary model)
 AGENT_LITELLM_MODEL=deepseek/deepseek-v4-pro
 # If the primary model crashes, try these fallbacks sequentially:
-LITELLM_FALLBACK_MODELS=openai/gpt-5.4-mini,anthropic/claude-sonnet-4-6
+LITELLM_FALLBACK_MODELS=openai/gpt-5.5,openai/claude-sonnet-4-6
 ```
 
 ### Example: Ollama Channel Mode (Local Models, No API Key)
 ```env
 # 1. Enable channel mode, declare ollama channel
 LLM_CHANNELS=ollama
+LLM_OLLAMA_PROVIDER=ollama
 
 # 2. Configure Ollama address (default local port 11434)
 LLM_OLLAMA_BASE_URL=http://localhost:11434
@@ -226,6 +229,7 @@ LITELLM_MODEL=ollama/qwen3:8b
 ### Example: Hermes Local HTTP Generation (Phase 3)
 ```env
 LLM_CHANNELS=hermes
+LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
 LLM_HERMES_API_KEY=sk-local-hermes

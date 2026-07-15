@@ -16,7 +16,7 @@ here, so there is a single authority for "does this provider need a key".
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 # Static provider metadata. ``default_base_url == ""`` means the provider either
 # uses its SDK default endpoint (official Gemini / Anthropic) or must have a
@@ -102,6 +102,34 @@ _PROVIDERS: List[Dict[str, Any]] = [
 _DISCOVERY_PROTOCOLS = {"openai", "deepseek", "ollama"}
 
 
+def _provider_supports_model_discovery(provider: Dict[str, Any]) -> bool:
+    """Return whether one raw Catalog entry supports model discovery."""
+    return (
+        "model-discovery" in provider["capabilities"]
+        or str(provider["protocol"]).strip().lower() in _DISCOVERY_PROTOCOLS
+    )
+
+
+def supports_model_discovery(
+    *,
+    provider_id: str = "",
+    protocol: str = "",
+) -> bool:
+    """Return the Catalog's discovery capability for a Provider or protocol."""
+    normalized_provider_id = str(provider_id or "").strip().lower()
+    if normalized_provider_id:
+        provider = next(
+            (
+                entry
+                for entry in _PROVIDERS
+                if entry["id"] == normalized_provider_id
+            ),
+            None,
+        )
+        return bool(provider and _provider_supports_model_discovery(provider))
+    return str(protocol or "").strip().lower() in _DISCOVERY_PROTOCOLS
+
+
 def get_provider_catalog() -> List[Dict[str, Any]]:
     """Return provider metadata enriched with derived requirement flags.
 
@@ -120,9 +148,7 @@ def get_provider_catalog() -> List[Dict[str, Any]]:
         # Custom endpoints are dynamic: assume a key is needed by default, but a
         # local base URL still exempts it at validate time.
         requires_api_key = not channel_allows_empty_api_key(protocol, default_base_url)
-        supports_discovery = (
-            "model-discovery" in provider["capabilities"] or protocol in _DISCOVERY_PROTOCOLS
-        )
+        supports_discovery = _provider_supports_model_discovery(provider)
         catalog.append({
             "id": provider["id"],
             "label": provider["label"],
@@ -141,7 +167,19 @@ def get_provider_catalog() -> List[Dict[str, Any]]:
 
 
 def get_provider_ids() -> List[str]:
+    """Return every canonical Provider ID in catalog order."""
     return [provider["id"] for provider in _PROVIDERS]
+
+
+def get_provider(provider_id: str) -> Optional[Dict[str, Any]]:
+    """Return fresh metadata for one catalog provider id."""
+    normalized = str(provider_id or "").strip().lower()
+    if not normalized:
+        return None
+    return next(
+        (provider for provider in get_provider_catalog() if provider["id"] == normalized),
+        None,
+    )
 
 
 def get_empty_api_key_hosts() -> List[str]:

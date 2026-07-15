@@ -677,6 +677,7 @@ def test_llm_channel(
     try:
         payload = service.test_llm_channel(
             name=request.name,
+            provider_id=request.provider_id,
             protocol=request.protocol,
             base_url=request.base_url,
             api_key=request.api_key,
@@ -768,6 +769,7 @@ def discover_llm_channel_models(
     try:
         payload = service.discover_llm_channel_models(
             name=request.name,
+            provider_id=request.provider_id,
             protocol=request.protocol,
             base_url=request.base_url,
             api_key=request.api_key,

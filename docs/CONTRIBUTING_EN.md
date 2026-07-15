@@ -82,7 +82,8 @@ After opening a PR, CI will automatically run the following PR checks:
 |-------|-------------|:--------:|
 | `backend-gate` | `scripts/ci_gate.sh` — py_compile + flake8 critical errors + `./scripts/test.sh code` + `./scripts/test.sh yfinance` + offline pytest | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
-| `web-gate` | `npm run lint` + `npm run build` (triggered when `apps/dsa-web/` changes) | ✅ (when triggered) |
+| `web-gate` | `npm run lint` + `npm run test` + `npm run build` (triggered when `apps/dsa-web/` changes) | ✅ (when triggered) |
+| `web-e2e` | Starts the real backend, Vite, and a local fake model endpoint in an isolated runtime, then runs `npm run test:smoke` (Playwright) | ✅ (when triggered) |
 
 Separately, the repository also has a non-blocking `network-smoke` workflow in `.github/workflows/network-smoke.yml`, but it is only triggered by `schedule` and `workflow_dispatch`, not by pull requests.
 
@@ -98,12 +99,23 @@ pip install flake8 pytest
 cd apps/dsa-web
 npm ci
 npm run lint
+npm run test:i18n
+npm run test
 npm run build
+
+# Frontend E2E (starts the isolated backend, Vite, and fake provider)
+npm run test:smoke
 ```
+
+See [Web Internationalization Conventions](web-i18n_EN.md) for UI/report-language boundaries, domain registries, and error-code handling. New pages and languages must extend the relevant `src/locales/` domain instead of hardcoding visible JSX copy.
+
+Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. It seeds deterministic report data at startup and removes runtime state when the suite ends, without reading or modifying the developer's `.env`, database, or auth files. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`; CI uploads them with screenshots, traces, and videos on failure. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+
+For local frontend/backend integration, `npm run dev` proxies `/api` to `DSA_WEB_DEV_API_PROXY` (default `http://127.0.0.1:8000`). Set it when the backend is running elsewhere; this variable only affects the Vite development server.
 
 ### Documentation Sync Rule
 
-When modifying a Chinese-language core document (e.g., `docs/full-guide.md`), your PR description **must state** whether the corresponding English document has been updated. If not updated, explain why.
+When modifying either language of a bilingual core document (for example, `docs/full-guide.md` / `docs/full-guide_EN.md`), evaluate and normally update its counterpart. If the counterpart is not updated, the PR description must explain why.
 
 ## 📋 Priority Areas for Contribution
 

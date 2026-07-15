@@ -36,6 +36,7 @@ describe('systemConfigApi', () => {
   it('omits capability_checks from basic LLM channel test payloads', async () => {
     await systemConfigApi.testLLMChannel({
       name: 'openai',
+      providerId: 'openai',
       protocol: 'openai',
       baseUrl: 'https://api.openai.com/v1',
       apiKey: 'sk-test',
@@ -48,9 +49,68 @@ describe('systemConfigApi', () => {
     );
   });
 
+  it('sends explicit provider identity for channel tests', async () => {
+    await systemConfigApi.testLLMChannel({
+      name: 'production',
+      providerId: 'openai',
+      protocol: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: 'sk-test',
+      models: ['gpt-4o-mini'],
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/system/config/llm/test-channel',
+      expect.objectContaining({ name: 'production', provider_id: 'openai' }),
+    );
+  });
+
+  it('sends explicit provider identity for model discovery', async () => {
+    await systemConfigApi.discoverLLMChannelModels({
+      name: 'production',
+      providerId: 'openai',
+      protocol: 'openai',
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: 'sk-test',
+    });
+
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/system/config/llm/discover-models',
+      expect.objectContaining({ name: 'production', provider_id: 'openai' }),
+    );
+  });
+
+  it('maps available-model connection metadata from the backend', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        models: [{
+          route: 'openai/gpt-4o-mini',
+          display: 'gpt-4o-mini',
+          connection: 'production',
+          connection_id: 'production',
+          connection_name: 'Production gateway',
+          provider: 'openai',
+          provider_id: 'openai',
+          provider_label: 'OpenAI',
+          available: true,
+        }],
+      },
+    });
+
+    const result = await systemConfigApi.getLlmAvailableModels();
+
+    expect(result.models[0]).toMatchObject({
+      connectionId: 'production',
+      connectionName: 'Production gateway',
+      providerId: 'openai',
+      providerLabel: 'OpenAI',
+    });
+  });
+
   it('sends capability_checks only for explicit runtime capability checks', async () => {
     await systemConfigApi.testLLMChannel({
       name: 'openai',
+      providerId: 'openai',
       protocol: 'openai',
       baseUrl: 'https://api.openai.com/v1',
       apiKey: 'sk-test',

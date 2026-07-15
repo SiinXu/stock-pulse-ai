@@ -131,6 +131,8 @@ jobs:
         run: npm ci
       - name: 🔎 Lint
         run: npm run lint
+      - name: 🌐 i18n guards
+        run: npm run test:i18n
       - name: 🧪 Unit tests
         run: npm run test
       - name: 🏗️ Build
@@ -178,7 +180,7 @@ jobs:
       - name: 🎭 Install Playwright browsers
         working-directory: apps/dsa-web
         run: npx playwright install --with-deps chromium
-      - name: 🎭 Playwright e2e
+      - name: 🎭 Playwright e2e (including i18n acceptance)
         working-directory: apps/dsa-web
         env:
           # First-run password for Playwright's isolated ENV_FILE; not a real

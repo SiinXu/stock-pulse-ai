@@ -99,6 +99,7 @@ function toSnakeImportPayload(payload: ImportSystemConfigRequest): Record<string
 function toSnakeTestChannelPayload(payload: TestLLMChannelRequest): Record<string, unknown> {
   const request: Record<string, unknown> = {
     name: payload.name,
+    provider_id: payload.providerId,
     protocol: payload.protocol,
     base_url: payload.baseUrl ?? '',
     api_key: payload.apiKey ?? '',
@@ -130,6 +131,7 @@ function toSnakeNotificationTestPayload(payload: TestNotificationChannelRequest)
 function toSnakeDiscoverModelsPayload(payload: DiscoverLLMChannelModelsRequest): Record<string, unknown> {
   return {
     name: payload.name,
+    provider_id: payload.providerId,
     protocol: payload.protocol,
     base_url: payload.baseUrl ?? '',
     api_key: payload.apiKey ?? '',

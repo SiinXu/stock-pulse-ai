@@ -148,7 +148,7 @@ describe('AlertsPage', () => {
     await waitFor(() => expect(testRule).toHaveBeenCalledWith(1));
     expect(await screen.findByText('测试结果')).toBeInTheDocument();
     expect(screen.getByText(/600519 price above 1800/)).toBeInTheDocument();
-    expect(screen.getByText(/观察值：1801/)).toBeInTheDocument();
+    expect(screen.getByText(/观察值: 1801/)).toBeInTheDocument();
     expect(screen.queryByText(/realtime_quote/)).not.toBeInTheDocument();
   });
 

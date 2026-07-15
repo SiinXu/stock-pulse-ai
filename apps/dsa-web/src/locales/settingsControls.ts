@@ -1,0 +1,68 @@
+import type { UiLanguage } from '../i18n/uiText';
+
+const zh = {
+  selectModels: '选择模型',
+  selectedModels: '已选 {selected} / {total}',
+  removeModel: '移除模型 {model}',
+  searchModels: '搜索模型',
+  searchModelsPlaceholder: '搜索模型…',
+  availableModels: '可选模型',
+  noMatchingModels: '无匹配模型',
+  noFallbacks: '未启用备用模型',
+  unavailable: '当前配置不可用',
+  moveUp: '上移 {model}',
+  moveDown: '下移 {model}',
+  removeFallback: '移除 {model}',
+  selectFallbacks: '选择备用模型',
+  noModelSource: '尚未配置模型来源',
+  effectiveSource: '当前生效模型配置来源',
+  requestedMode: '请求模式：{mode}',
+  migrateToChannels: '迁移到 Channels',
+  overriddenSources: '已配置但被覆盖（不生效）：{sources}',
+  migrationTitle: '迁移旧版 Provider 到 Channels',
+  migrationDescription: '将根据旧版 Provider 凭据创建以下模型连接，并把配置来源设为 channels。旧版 keys 会保留，不会删除。',
+  cancel: '取消',
+  migrate: '确认迁移',
+  sourceAuto: '自动（兼容）',
+  sourceChannels: 'Web 连接',
+  sourceLegacy: 'Legacy Provider',
+  configModeIssue: '请求的配置来源 {mode} 尚未配置。',
+  unknownConfigIssue: '模型配置来源存在需要处理的问题。',
+} as const;
+
+const en: Record<keyof typeof zh, string> = {
+  selectModels: 'Select models',
+  selectedModels: '{selected} of {total} selected',
+  removeModel: 'Remove model {model}',
+  searchModels: 'Search models',
+  searchModelsPlaceholder: 'Search models…',
+  availableModels: 'Available models',
+  noMatchingModels: 'No matching models',
+  noFallbacks: 'No fallback models enabled',
+  unavailable: 'Currently unavailable',
+  moveUp: 'Move {model} up',
+  moveDown: 'Move {model} down',
+  removeFallback: 'Remove {model}',
+  selectFallbacks: 'Select fallback models',
+  noModelSource: 'No model source configured',
+  effectiveSource: 'Effective model config source',
+  requestedMode: 'Requested: {mode}',
+  migrateToChannels: 'Migrate to Channels',
+  overriddenSources: 'Present but overridden (not active): {sources}',
+  migrationTitle: 'Migrate legacy providers to Channels',
+  migrationDescription: 'The following channels will be created from your legacy provider keys, and LLM_CONFIG_MODE will be set to channels. Legacy keys are kept.',
+  cancel: 'Cancel',
+  migrate: 'Migrate',
+  sourceAuto: 'Auto (compatible)',
+  sourceChannels: 'Web Connections',
+  sourceLegacy: 'Legacy provider keys',
+  configModeIssue: 'The requested {mode} configuration source is not configured.',
+  unknownConfigIssue: 'The model configuration source needs attention.',
+};
+
+export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+
+export const SETTINGS_SOURCE_LABELS: Record<UiLanguage, Record<string, string>> = {
+  zh: { auto: zh.sourceAuto, channels: zh.sourceChannels, yaml: 'YAML', legacy: zh.sourceLegacy },
+  en: { auto: en.sourceAuto, channels: en.sourceChannels, yaml: 'YAML', legacy: en.sourceLegacy },
+};

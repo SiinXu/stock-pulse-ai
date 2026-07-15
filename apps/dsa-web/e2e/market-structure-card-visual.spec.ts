@@ -239,10 +239,6 @@ async function installApiMocks(page: Page): Promise<void> {
   });
 }
 
-function isMissingPlaywrightBrowser(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("Executable doesn't exist");
-}
-
 interface Scenario {
   id: string;
   theme: 'light' | 'dark';
@@ -282,15 +278,7 @@ test.describe('MarketStructureCard on the real market review page', () => {
   let appUrl = '';
 
   test.beforeAll(async () => {
-    try {
-      browser = await chromium.launch();
-    } catch (error) {
-      if (!isMissingPlaywrightBrowser(error)) {
-        throw error;
-      }
-      browser = null;
-      return;
-    }
+    browser = await chromium.launch();
 
     viteServer = await createViteServer({
       configFile: path.join(webRoot, 'vite.config.ts'),
@@ -326,10 +314,6 @@ test.describe('MarketStructureCard on the real market review page', () => {
   for (const scenario of SCENARIOS) {
     test(`renders inside MarketReviewReportView (${scenario.id})`, async ({ browser: _unused }, testInfo) => {
       void _unused;
-      test.skip(
-        !browser,
-        'Playwright Chromium is not installed in this environment; skip visual smoke check.',
-      );
       test.setTimeout(180_000);
 
       const context = await browser!.newContext({
@@ -370,10 +354,6 @@ test.describe('MarketStructureCard on the real market review page', () => {
   test('legacy market review reports without marketStructure render without the card', async ({ browser: _unused }, testInfo) => {
     void _unused;
     void testInfo;
-    test.skip(
-      !browser,
-      'Playwright Chromium is not installed in this environment; skip visual smoke check.',
-    );
     test.setTimeout(180_000);
 
     const context = await browser!.newContext({

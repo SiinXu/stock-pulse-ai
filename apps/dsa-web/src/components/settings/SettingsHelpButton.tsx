@@ -4,6 +4,8 @@ import type React from 'react';
 import { createPortal } from 'react-dom';
 import type { SystemConfigFieldSchema } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { formatUiText } from '../../i18n/uiText';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
 import { cn } from '../../utils/cn';
 import { Tooltip } from '../common';
@@ -132,9 +134,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
   const examples = providedExamples ?? help?.examples ?? schema?.examples ?? [];
   const docs = providedDocs?.length ? providedDocs : schema?.docs?.length ? schema.docs : help?.docs ?? [];
   const showFieldKey = help?.showFieldKey ?? true;
-  const helpButtonLabel = language === 'en'
-    ? `View ${title} configuration help`
-    : `查看 ${title} 配置说明`;
+  const helpButtonLabel = formatUiText(SETTINGS_MISC_TEXT[language].helpLabel, { title });
 
   useEffect(() => {
     if (!open) {

@@ -1,6 +1,9 @@
 import type React from 'react';
-import { SearchableSelect, type SearchableSelectOption } from '../common';
+import type { SearchableSelectOption } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
+import { ModelMultiSelect } from './ModelMultiSelect';
+import { formatUiText } from '../../i18n/uiText';
+import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
 
 interface ModelFallbackEditorProps {
   /** Comma-separated list of fallback model routes. */
@@ -31,7 +34,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
   language,
   disabled = false,
 }) => {
-  const tx = (zh: string, en: string) => (language === 'en' ? en : zh);
+  const text = SETTINGS_CONTROLS_TEXT[language];
   const routes = splitRoutes(value);
   const labelFor = (route: string) => options.find((option) => option.value === route)?.label ?? route;
   // A configured route that is no longer in the available catalog is kept (never
@@ -56,22 +59,21 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     [next[index], next[index + 1]] = [next[index + 1], next[index]];
     setRoutes(next);
   };
-  const addRoute = (route: string) => {
-    if (route && !routes.includes(route)) {
-      setRoutes([...routes, route]);
+  const selectableOptions = options.filter((option) => option.value !== primaryRoute);
+  const optionLabelByRoute = new Map(selectableOptions.map((option) => [option.value, option.label]));
+  const toggleRoute = (route: string) => {
+    if (routes.includes(route)) {
+      setRoutes(routes.filter((entry) => entry !== route));
+      return;
     }
+    setRoutes([...routes, route]);
   };
-
-  // Only offer models that are not the primary and not already picked.
-  const addOptions = options.filter(
-    (option) => option.value !== primaryRoute && !routes.includes(option.value),
-  );
 
   return (
     <div className="space-y-2" data-testid="model-fallback-editor">
       {routes.length === 0 ? (
         <p className="text-xs text-muted-text">
-          {tx('未启用备用模型', 'No fallback models enabled')}
+          {text.noFallbacks}
         </p>
       ) : (
         <ul className="space-y-1.5">
@@ -85,7 +87,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                 <span className="truncate font-medium text-foreground">{labelFor(route)}</span>
                 {isStale(route) ? (
                   <span className="shrink-0 text-xs text-warning">
-                    {tx('当前配置不可用', 'Currently unavailable')}
+                    {text.unavailable}
                   </span>
                 ) : null}
               </span>
@@ -93,7 +95,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                 <button
                   type="button"
                   disabled={disabled || index === 0}
-                  aria-label={tx(`上移 ${labelFor(route)}`, `Move ${labelFor(route)} up`)}
+                  aria-label={formatUiText(text.moveUp, { model: labelFor(route) })}
                   onClick={() => moveUp(index)}
                   className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
@@ -102,7 +104,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                 <button
                   type="button"
                   disabled={disabled || index === routes.length - 1}
-                  aria-label={tx(`下移 ${labelFor(route)}`, `Move ${labelFor(route)} down`)}
+                  aria-label={formatUiText(text.moveDown, { model: labelFor(route) })}
                   onClick={() => moveDown(index)}
                   className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
@@ -111,7 +113,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                 <button
                   type="button"
                   disabled={disabled}
-                  aria-label={tx(`移除 ${labelFor(route)}`, `Remove ${labelFor(route)}`)}
+                  aria-label={formatUiText(text.removeFallback, { model: labelFor(route) })}
                   onClick={() => removeAt(index)}
                   className="rounded-full px-1 text-secondary-text hover:text-danger"
                 >
@@ -122,15 +124,14 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
           ))}
         </ul>
       )}
-      <SearchableSelect
-        value=""
-        onChange={addRoute}
-        options={addOptions}
+      <ModelMultiSelect
+        options={selectableOptions.map((option) => option.value)}
+        isSelected={(route) => routes.includes(route)}
+        onToggle={toggleRoute}
         disabled={disabled}
-        ariaLabel={tx('添加备用模型', 'Add a fallback model')}
-        placeholder={tx('添加备用模型…', 'Add a fallback model…')}
-        emptyText={tx('暂无可添加的模型', 'No models to add')}
-        searchPlaceholder={tx('搜索模型', 'Search models')}
+        language={language}
+        getOptionLabel={(route) => optionLabelByRoute.get(route) ?? route}
+        ariaLabel={text.selectFallbacks}
       />
     </div>
   );

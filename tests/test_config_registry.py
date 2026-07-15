@@ -239,7 +239,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-07-14-ui-placement")
+        self.assertEqual(SCHEMA_VERSION, "2026-07-15-connection-provider")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -859,6 +859,7 @@ class TestUiPlacement(unittest.TestCase):
 
         self.assertEqual(derive_ui_placement("LLM_CHANNELS"), "model_access")
         for key in (
+            "LLM_OPENAI_PROVIDER",
             "LLM_OPENAI_PROTOCOL",
             "LLM_MY_CHANNEL_BASE_URL",
             "LLM_DEEPSEEK_API_KEY",

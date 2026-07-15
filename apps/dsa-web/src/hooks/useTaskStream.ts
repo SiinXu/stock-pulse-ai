@@ -278,7 +278,7 @@ export function useTaskStream(options: UseTaskStreamOptions = {}): UseTaskStream
 
   const [isConnected, setIsConnected] = useState(false);
   const subscriberIdRef = useRef<number | null>(null);
-  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimerRef = useRef<number | null>(null);
 
   // Store callbacks in a ref to avoid reconnecting on every render.
   const callbacksRef = useRef<TaskStreamCallbacks>({

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 
 export interface SearchableSelectOption {
@@ -24,6 +25,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  ariaDescribedBy?: string;
   className?: string;
   error?: boolean;
   emptyText?: string;
@@ -51,6 +53,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   placeholder,
   disabled = false,
   ariaLabel,
+  ariaDescribedBy,
   className = '',
   error = false,
   emptyText,
@@ -58,9 +61,11 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   staleValueLabel,
   clearable = false,
 }) => {
+  const { t } = useUiLanguage();
   const reactId = useId();
   const resolvedId = id ?? reactId;
   const listboxId = `${resolvedId}-listbox`;
+  const staleValueId = `${resolvedId}-stale-value`;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -226,6 +231,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           aria-expanded={isOpen}
           aria-controls={isOpen ? listboxId : undefined}
           aria-invalid={error || undefined}
+          aria-describedby={[
+            ariaDescribedBy,
+            valueIsStale ? staleValueId : undefined,
+          ].filter(Boolean).join(' ') || undefined}
           data-value={value}
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
@@ -244,7 +253,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               ) : null}
             </span>
           ) : (
-            <span className="truncate text-muted-text">{placeholder ?? '请选择'}</span>
+            <span className="truncate text-muted-text">{placeholder ?? t('common.selectPlaceholder')}</span>
           )}
           <svg className="h-3.5 w-3.5 shrink-0 text-secondary-text" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -253,7 +262,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         {clearable && value && !disabled ? (
           <button
             type="button"
-            aria-label={ariaLabel ? `${ariaLabel} clear` : 'clear'}
+            aria-label={ariaLabel ? `${t('common.clear')} ${ariaLabel}` : t('common.clear')}
             onClick={() => onChange('')}
             className="absolute right-8 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-secondary-text hover:text-foreground"
           >
@@ -265,7 +274,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       </div>
 
       {valueIsStale ? (
-        <span className="mt-1 text-xs text-warning">{staleValueLabel ?? '当前配置不可用'}</span>
+        <span id={staleValueId} className="mt-1 text-xs text-warning">{staleValueLabel ?? t('common.staleValue')}</span>
       ) : null}
 
       {isOpen && triggerRect && portalHost
@@ -286,9 +295,9 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 aria-controls={listboxId}
                 aria-autocomplete="list"
                 aria-activedescendant={navItems[activeIndex] ? `${resolvedId}-option-${activeIndex}` : undefined}
-                aria-label={ariaLabel ? `${ariaLabel} 搜索` : '搜索选项'}
+                aria-label={ariaLabel ? `${t('common.searchOptions')}: ${ariaLabel}` : t('common.searchOptions')}
                 value={query}
-                placeholder={searchPlaceholder ?? '搜索…'}
+                placeholder={searchPlaceholder ?? t('common.searchPlaceholder')}
                 onChange={(event) => {
                   setQuery(event.target.value);
                   setActiveIndex(0);
@@ -300,7 +309,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="max-h-60 overflow-auto p-1">
               {navItems.length === 0 ? (
                 <li role="presentation" className="px-3 py-1.5 text-xs text-muted-text">
-                  {emptyText ?? '无匹配项'}
+                  {emptyText ?? t('common.noMatches')}
                 </li>
               ) : null}
               {navItems.map((item, index) => (

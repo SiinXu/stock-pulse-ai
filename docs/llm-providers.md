@@ -8,17 +8,19 @@
 > - 验证闭环：系统配置链路回归见 `tests/test_system_config_service.py` 与 `tests/test_system_config_api.py`，`Web` 侧配置页交互回归见现有组件测试用例。
 > - 回退路径：保留旧变量不做自动迁移；可通过 Web/桌面导出备份后 `POST /api/v1/system/config/import` 回滚，或手动恢复历史 `LLM_*` / `LITELLM_*` / `AGENT_*` / `VISION_MODEL` 配置。
 
-实际可用模型、额度、区域限制和价格以各服务商控制台为准；如果模型列表拉取失败，可在 Web 中手动填写模型名。Web 设置页展示的服务商元数据（标签、默认 Base URL、协议、示例模型、能力标识）统一来自后端服务商目录 `GET /api/v1/system/config/llm/providers`（单一权威源，前端不再维护并行清单）；能力显示文案、官方来源链接与配置注意事项属前端 curated 展示内容，仅用于配置参考，不代表运行时能力已验证通过。
+实际可用模型、额度、区域限制和价格以各服务商控制台为准；如果模型发现失败，可在“模型接入”的连接模型管理中手动添加模型 ID。Web 设置页展示的服务商元数据（标签、默认 Base URL、协议、凭据与地址要求、发现能力、能力标识）统一来自后端服务商目录 `GET /api/v1/system/config/llm/providers`（单一权威源，前端不再维护并行清单）；能力显示文案、官方来源链接与配置注意事项属前端 curated 展示内容，仅用于配置参考，不代表运行时能力已验证通过。
 
 ## 先选配置方式
 
 | 方式 | 适合谁 | 主要变量 | 说明 |
 | --- | --- | --- | --- |
 | 极简 legacy | 只想快速跑通一个模型的用户 | `LITELLM_MODEL` + 对应 provider key | 最少变量，适合本地快速开始；不适合复杂 fallback。 |
-| Channels | 需要多个 provider、多个 key 或 fallback 的用户 | `LLM_CHANNELS` + `LLM_<CHANNEL>_*` | 推荐默认路径；Web 设置页保存的也是这一层配置。 |
+| Channels | 需要多个 provider、同一 provider 多连接、多个 key 或 fallback 的用户 | `LLM_CHANNELS` + `LLM_<CONNECTION>_*` | 推荐默认路径；Web 设置页保存的也是这一层配置。 |
 | YAML | 熟悉 LiteLLM 路由、负载均衡和企业网关的用户 | `LITELLM_CONFIG` / `LITELLM_CONFIG_YAML` | 优先级最高；一旦有效生效，Channels 和 legacy 不再参与本次请求。 |
 
 优先级保持不变：`LITELLM_CONFIG` / `LITELLM_CONFIG_YAML` > `LLM_CHANNELS` > legacy provider keys。P4 只补文档，不迁移、不清空、不静默改写旧配置。
+
+Channels 中连接名与 Provider 身份是两个字段。新配置使用 `LLM_<CONNECTION>_PROVIDER=<provider_id>` 保存后端 Provider Catalog ID，因此 `openai_work` 和 `openai_personal` 可以同时属于 OpenAI，重命名连接也不会改变服务商身份。旧配置没有该字段时，仅当连接名精确等于 Catalog ID 才兼容识别；系统不会按 `openai2` 等名称前缀猜测，也不会静默回写旧配置。无法可靠识别的旧连接按 Custom 处理。
 
 Generation backend 配置是更外层的运行时选择契约。Phase 4 支持 `GENERATION_BACKEND=litellm|codex_cli|claude_code_cli|opencode_cli`，但本地 CLI backend 不是 LiteLLM provider；不要配置成 `LITELLM_MODEL=codex_cli/...`、`LITELLM_MODEL=claude_code_cli/...` 或 `LITELLM_MODEL=opencode_cli/...`。`codex_cli` preset 使用 `codex exec --output-last-message <temp-file> -` 读取最终响应；`claude_code_cli` preset 使用 `claude --safe-mode --tools "" --disallowedTools "mcp__*" --strict-mcp-config --no-session-persistence --output-format json -p <static instruction>`，完整 DSA prompt 走 stdin，并只从 JSON envelope 的 `result/success` 字段提取最终文本，参数依据见 [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference)；`opencode_cli` preset 使用 `opencode --pure run --format json [--model <OPENCODE_CLI_MODEL>] <static instruction> --file <temp prompt file>`，仅在显式配置 `OPENCODE_CLI_MODEL` 时追加 `--model`，完整 DSA prompt 走权限受控的临时文件，并只从无工具事件的 JSON event text 输出提取最终文本，参数依据见 [OpenCode CLI reference](https://opencode.ai/docs/cli)，配置合并语义见 [OpenCode config reference](https://opencode.ai/docs/config)。诊断 stdout/stderr 与最终响应一起受 `GENERATION_BACKEND_MAX_OUTPUT_BYTES` 总上限约束，超限时返回结构化 `output_too_large`。`GENERATION_FALLBACK_BACKEND=` 空值会在本地 `.env` 禁用 backend-level fallback，未配置时默认回退到 `litellm`；默认 GitHub Actions workflow 未配置该变量时会显式使用 `litellm`，如需禁用 fallback 可设为 primary backend 走 self no-op。Agent 工具调用仍使用 LiteLLM；Web 设置页只暴露 `AGENT_GENERATION_BACKEND=auto|litellm`，手写 `codex_cli|claude_code_cli|opencode_cli` 不会启用 text-only Agent mode，只会返回明确 unsupported tool-calling 诊断。
 
@@ -39,12 +41,14 @@ Phase 6a Tool Surface 只补充 AgentBackend 前置的内部工具面：统一 D
 1. 打开设置页的「AI 与模型 → 模型接入」（模型服务商 / 模型连接 / 可用模型的唯一入口）。
 2. 点击「添加模型服务」，选择模型服务商并创建一条连接（同一服务商可创建多条连接）。
 3. 填入 API Key（官方服务商默认端点无需填写 Base URL；自定义兼容服务需填写 Base URL；Ollama/localhost 免 Key）。
-4. 新建连接不会预填示例模型（模型名会过期，不作为默认写入配置）：点击「获取模型」自动发现模型并多选，或逐个手动添加模型；没有模型时该连接保持“未完成”状态。
+4. 新建连接不会预填示例模型（模型名会过期，不作为默认写入配置）。只有 Provider Catalog 标记支持发现时才显示「获取模型」；OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`。不支持发现或发现失败时逐个手动添加模型；发现结果不会自动全选，没有模型时连接保持“未完成”状态。
 5. 点击「测试连接」确认鉴权、模型名、额度和响应格式正常。
 6. 在「任务路由」为报告 / Agent / Vision 等任务从已接入模型中选择模型（底层 route 由系统生成，无需手写 `provider/model`）。
 7. 如需确认 JSON / tools / stream / vision 能力，手动勾选「运行时能力检测」后再触发；该检测会产生真实 LLM 请求，结果只代表当前账号、模型和 endpoint 的一次 best-effort 检测，不会写回 `.env`，也不会阻止保存。
 
-> 底层仍以 `LLM_CHANNELS` + `LLM_<CONNECTION>_*` 存储（“渠道/channel”是底层兼容字段与开发者术语）；普通界面统一使用「模型服务商 / 模型连接 / 可用模型」。
+> 底层仍以 `LLM_CHANNELS` + `LLM_<CONNECTION>_*` 存储，其中 `LLM_<CONNECTION>_PROVIDER` 保存服务商身份（“渠道/channel”是底层兼容字段与开发者术语）；普通界面统一使用「模型服务商 / 模型连接 / 可用模型 / 任务模型」。
+
+任务路由中的历史值如果不在当前可用模型目录中会保留并标记“当前配置不可用”，保存不会静默删除。删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 会列出全部引用并允许在同一草稿中选择替代模型；直接 API 请求会返回 `model_in_use` 和 `details.referenced_by`。替换引用与删除模型在同一次更新中可原子成功，未替换的历史失效值仍按 `unknown_model` 处理。
 
 ## Channels 示例
 
@@ -52,6 +56,7 @@ Phase 6a Tool Surface 只补充 AgentBackend 前置的内部工具面：统一 D
 
 ```env
 LLM_CHANNELS=deepseek
+LLM_DEEPSEEK_PROVIDER=deepseek
 LLM_DEEPSEEK_PROTOCOL=deepseek
 LLM_DEEPSEEK_BASE_URL=https://api.deepseek.com
 LLM_DEEPSEEK_API_KEY=sk-xxx
@@ -63,6 +68,7 @@ LITELLM_MODEL=deepseek/deepseek-v4-flash
 
 ```env
 LLM_CHANNELS=my_proxy
+LLM_MY_PROXY_PROVIDER=custom
 LLM_MY_PROXY_PROTOCOL=openai
 LLM_MY_PROXY_BASE_URL=https://your-proxy.example.com/v1
 LLM_MY_PROXY_API_KEY=sk-xxx
@@ -128,6 +134,7 @@ OpenAI-compatible Base URL 只填到服务商兼容入口，不额外拼接 `/ch
 | 字段 | 建议位置 | 说明 |
 | --- | --- | --- |
 | `LLM_CHANNELS` | Variables 或 Secrets | 逗号分隔渠道名，例如 `deepseek,minimax,volcengine`。 |
+| `LLM_<CHANNEL>_PROVIDER` | Variables 或 Secrets | Provider Catalog ID；与可重命名的连接名分离，新配置应显式填写。 |
 | `LLM_<CHANNEL>_PROTOCOL` | Variables 或 Secrets | 非敏感，通常为 `openai`、`deepseek`、`gemini`、`anthropic` 或 `ollama`。 |
 | `LLM_<CHANNEL>_BASE_URL` | Variables 或 Secrets | 非敏感时优先放 Variables；私有网关地址可放 Secrets。 |
 | `LLM_<CHANNEL>_MODELS` | Variables 或 Secrets | 非敏感模型列表，逗号分隔。 |
@@ -151,6 +158,7 @@ Hermes 是 reserved 本地 HTTP generation preset，只通过 `LLM_CHANNELS=herm
 
 ```env
 LLM_CHANNELS=hermes
+LLM_HERMES_PROVIDER=custom
 LLM_HERMES_PROTOCOL=openai
 LLM_HERMES_BASE_URL=http://127.0.0.1:8642/v1
 LLM_HERMES_API_KEY=sk-local-hermes

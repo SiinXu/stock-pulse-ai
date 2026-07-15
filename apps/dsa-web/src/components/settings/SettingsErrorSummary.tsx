@@ -1,6 +1,8 @@
 import type React from 'react';
 import { InlineAlert } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
+import { formatUiText } from '../../i18n/uiText';
+import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 
 export interface ErrorSummaryEntry {
   /** Config key with the validation error. */
@@ -33,10 +35,12 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
   if (entries.length === 0) {
     return null;
   }
-  const title = language === 'en'
-    ? `${entries.length} setting${entries.length > 1 ? 's' : ''} ${entries.length > 1 ? 'need' : 'needs'} attention`
-    : `有 ${entries.length} 项配置需要修正`;
-  const jumpHint = language === 'en' ? 'Go to field' : '前往修正';
+  const text = SETTINGS_MISC_TEXT[language];
+  const title = formatUiText(
+    entries.length === 1 ? text.errorSummaryOne : text.errorSummary,
+    { count: entries.length },
+  );
+  const jumpHint = text.jumpToField;
   return (
     <InlineAlert
       variant="danger"

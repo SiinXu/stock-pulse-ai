@@ -31,6 +31,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         # import) must not bleed LLM config into these tests; the temp .env below
         # is the authoritative source. Restored in tearDown.
         self._saved_llm_env = strip_ambient_llm_env()
+        self._orig_env_file = os.environ.get("ENV_FILE")
         self.temp_dir = tempfile.TemporaryDirectory()
         self.env_path = Path(self.temp_dir.name) / ".env"
         self.env_path.write_text(
@@ -53,7 +54,10 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def tearDown(self) -> None:
         Config.reset_instance()
-        os.environ.pop("ENV_FILE", None)
+        if self._orig_env_file is None:
+            os.environ.pop("ENV_FILE", None)
+        else:
+            os.environ["ENV_FILE"] = self._orig_env_file
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 
@@ -67,6 +71,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def _wizard_channel_items(
         *,
         name: str,
+        provider_id: str,
         protocol: str,
         models: str,
         primary_route: str,
@@ -81,6 +86,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             {"key": "LLM_CONFIG_MODE", "value": "channels"},
             {"key": "GENERATION_BACKEND", "value": "litellm"},
             {"key": "LLM_CHANNELS", "value": ",".join(channels)},
+            {"key": f"LLM_{up}_PROVIDER", "value": provider_id},
             {"key": f"LLM_{up}_PROTOCOL", "value": protocol},
             {"key": f"LLM_{up}_MODELS", "value": models},
             {"key": f"LLM_{up}_ENABLED", "value": "true"},
@@ -141,6 +147,170 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(entry["provider_id"], "custom")
         self.assertTrue(entry["available"])
 
+    def test_legacy_provider_like_prefix_is_not_inferred_as_provider_identity(self) -> None:
+        """A legacy Connection name prefix is insufficient evidence of Provider identity."""
+        self._rewrite_env(
+            "LLM_CHANNELS=openai2",
+            "LLM_OPENAI2_PROTOCOL=openai",
+            "LLM_OPENAI2_BASE_URL=https://proxy.example.com/v1",
+            "LLM_OPENAI2_API_KEY=sk-x",
+            "LLM_OPENAI2_MODELS=gpt-5.5",
+            "LLM_OPENAI2_ENABLED=true",
+        )
+
+        entry = self.service.get_available_models()["models"][0]
+
+        self.assertEqual(entry["connection_id"], "openai2")
+        self.assertEqual(entry["provider_id"], "custom")
+
+    def test_explicit_provider_identity_survives_renamed_connection_round_trip(self) -> None:
+        response = self.service.update(
+            config_version=self.manager.get_config_version(),
+            reload_now=False,
+            items=[
+                {"key": "LLM_CHANNELS", "value": "openai_team"},
+                {"key": "LLM_OPENAI_TEAM_PROVIDER", "value": "openai"},
+                {"key": "LLM_OPENAI_TEAM_PROTOCOL", "value": "openai"},
+                {"key": "LLM_OPENAI_TEAM_API_KEY", "value": "sk-team"},
+                {"key": "LLM_OPENAI_TEAM_MODELS", "value": "gpt-5.5"},
+                {"key": "LLM_OPENAI_TEAM_ENABLED", "value": "true"},
+            ],
+        )
+
+        self.assertTrue(response["success"])
+        item_map = {
+            item["key"]: item
+            for item in self.service.get_config(include_schema=True)["items"]
+        }
+        provider_item = item_map["LLM_OPENAI_TEAM_PROVIDER"]
+        self.assertEqual(provider_item["value"], "openai")
+        self.assertEqual(provider_item["schema"]["ui_placement"], "model_access")
+
+        model = self.service.get_available_models()["models"][0]
+        self.assertEqual(model["provider_id"], "openai")
+        self.assertEqual(model["provider_label"], "OpenAI 官方")
+        self.assertEqual(model["connection_id"], "openai_team")
+        self.assertEqual(model["connection_name"], "openai_team")
+
+    def test_update_rejects_unknown_explicit_provider_without_partial_write(self) -> None:
+        before = self.env_path.read_bytes()
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                reload_now=False,
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "research"},
+                    {"key": "LLM_RESEARCH_PROVIDER", "value": "not-a-provider"},
+                    {"key": "LLM_RESEARCH_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_RESEARCH_BASE_URL", "value": "https://models.example.com/v1"},
+                    {"key": "LLM_RESEARCH_API_KEY", "value": "sk-research"},
+                    {"key": "LLM_RESEARCH_MODELS", "value": "research-model"},
+                    {"key": "LLM_RESEARCH_ENABLED", "value": "true"},
+                ],
+            )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "LLM_RESEARCH_PROVIDER"
+                and issue["code"] == "invalid_provider"
+                for issue in context.exception.issues
+            ),
+            context.exception.issues,
+        )
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_update_rejects_official_provider_protocol_mismatch_without_partial_write(self) -> None:
+        before = self.env_path.read_bytes()
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                reload_now=False,
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "writing_team"},
+                    {"key": "LLM_WRITING_TEAM_PROVIDER", "value": "anthropic"},
+                    {"key": "LLM_WRITING_TEAM_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_WRITING_TEAM_API_KEY", "value": "sk-writing"},
+                    {"key": "LLM_WRITING_TEAM_MODELS", "value": "claude-test"},
+                    {"key": "LLM_WRITING_TEAM_ENABLED", "value": "true"},
+                ],
+            )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "LLM_WRITING_TEAM_PROTOCOL"
+                and issue["code"] == "provider_protocol_mismatch"
+                for issue in context.exception.issues
+            ),
+            context.exception.issues,
+        )
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_multiple_connections_can_share_one_explicit_provider(self) -> None:
+        items = [
+            {"key": "LLM_CHANNELS", "value": "personal,work"},
+            {"key": "LLM_PERSONAL_PROVIDER", "value": "openai"},
+            {"key": "LLM_PERSONAL_PROTOCOL", "value": "openai"},
+            {"key": "LLM_PERSONAL_API_KEY", "value": "sk-personal"},
+            {"key": "LLM_PERSONAL_MODELS", "value": "gpt-personal"},
+            {"key": "LLM_PERSONAL_ENABLED", "value": "true"},
+            {"key": "LLM_WORK_PROVIDER", "value": "openai"},
+            {"key": "LLM_WORK_PROTOCOL", "value": "openai"},
+            {"key": "LLM_WORK_API_KEY", "value": "sk-work"},
+            {"key": "LLM_WORK_MODELS", "value": "gpt-work"},
+            {"key": "LLM_WORK_ENABLED", "value": "true"},
+        ]
+
+        validation = self.service.validate(items=items)
+        self.assertTrue(validation["valid"], validation["issues"])
+        self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=items,
+            reload_now=False,
+        )
+
+        models = self.service.get_available_models()["models"]
+        self.assertEqual({model["provider_id"] for model in models}, {"openai"})
+        self.assertEqual(
+            {model["connection_name"] for model in models},
+            {"personal", "work"},
+        )
+
+    def test_anthropic_and_gemini_each_support_multiple_connections(self) -> None:
+        for provider_id, protocol in (
+            ("anthropic", "anthropic"),
+            ("gemini", "gemini"),
+        ):
+            with self.subTest(provider_id=provider_id):
+                connection_ids = [f"{provider_id}_personal", f"{provider_id}_work"]
+                items = [
+                    {"key": "LLM_CHANNELS", "value": ",".join(connection_ids)},
+                ]
+                for index, connection_id in enumerate(connection_ids, start=1):
+                    prefix = f"LLM_{connection_id.upper()}"
+                    items.extend(
+                        [
+                            {"key": f"{prefix}_PROVIDER", "value": provider_id},
+                            {"key": f"{prefix}_PROTOCOL", "value": protocol},
+                            {"key": f"{prefix}_API_KEY", "value": f"sk-{provider_id}-{index}"},
+                            {"key": f"{prefix}_MODELS", "value": f"model-{index}"},
+                            {"key": f"{prefix}_ENABLED", "value": "true"},
+                        ]
+                    )
+
+                validation = self.service.validate(items=items)
+                self.assertTrue(validation["valid"], validation["issues"])
+                models = self.service.get_available_models(items=items)["models"]
+                self.assertEqual(
+                    {model["provider_id"] for model in models},
+                    {provider_id},
+                )
+                self.assertEqual(
+                    {model["connection_name"] for model in models},
+                    set(connection_ids),
+                )
+
     def test_deleting_referenced_connection_is_rejected_by_validation(self) -> None:
         # Authoritative reference protection: a task model that references a
         # removed connection's route can no longer be resolved, so the save is
@@ -161,6 +331,113 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         cleared = SystemConfigService._validate_llm_runtime_selection(effective)
         self.assertFalse(
             any(i["key"] == "LITELLM_MODEL" and i["severity"] == "error" for i in cleared)
+        )
+
+    def test_update_reports_aggregated_model_in_use_without_partial_write(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=used-model,spare-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/used-model",
+            "AGENT_LITELLM_MODEL=openai/used-model",
+            "VISION_MODEL=openai/used-model",
+            "LITELLM_FALLBACK_MODELS=openai/used-model,openai/spare-model",
+        )
+        before = self.env_path.read_bytes()
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                reload_now=False,
+                items=[
+                    {"key": "LLM_PRIMARY_MODELS", "value": "spare-model"},
+                ],
+            )
+
+        in_use_issues = [
+            issue for issue in context.exception.issues
+            if issue["code"] == "model_in_use"
+        ]
+        self.assertEqual(len(in_use_issues), 1, context.exception.issues)
+        issue = in_use_issues[0]
+        self.assertEqual(issue["key"], "LLM_PRIMARY_MODELS")
+        self.assertEqual(issue["details"]["route"], "openai/used-model")
+        self.assertEqual(issue["details"]["connection_ids"], ["primary"])
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [
+                {"task": "report", "key": "LITELLM_MODEL"},
+                {"task": "agent", "key": "AGENT_LITELLM_MODEL"},
+                {"task": "vision", "key": "VISION_MODEL"},
+                {"task": "fallback", "key": "LITELLM_FALLBACK_MODELS"},
+            ],
+        )
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_update_atomically_replaces_references_and_removes_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=used-model,spare-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/used-model",
+            "AGENT_LITELLM_MODEL=openai/used-model",
+            "VISION_MODEL=openai/used-model",
+            "LITELLM_FALLBACK_MODELS=openai/used-model,openai/spare-model",
+        )
+
+        result = self.service.update(
+            config_version=self.manager.get_config_version(),
+            reload_now=False,
+            items=[
+                {"key": "LLM_PRIMARY_MODELS", "value": "spare-model"},
+                {"key": "LITELLM_MODEL", "value": "openai/spare-model"},
+                {"key": "AGENT_LITELLM_MODEL", "value": "openai/spare-model"},
+                {"key": "VISION_MODEL", "value": "openai/spare-model"},
+                {"key": "LITELLM_FALLBACK_MODELS", "value": "openai/spare-model"},
+            ],
+        )
+
+        self.assertTrue(result["success"])
+        saved = self.manager.read_config_map()
+        self.assertEqual(saved["LLM_PRIMARY_MODELS"], "spare-model")
+        self.assertEqual(saved["LITELLM_MODEL"], "openai/spare-model")
+        self.assertEqual(saved["AGENT_LITELLM_MODEL"], "openai/spare-model")
+        self.assertEqual(saved["VISION_MODEL"], "openai/spare-model")
+        self.assertEqual(saved["LITELLM_FALLBACK_MODELS"], "openai/spare-model")
+
+    def test_validate_keeps_existing_stale_model_as_unknown_model(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=spare-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/stale-model",
+            "STOCK_LIST=600519",
+        )
+
+        validation = self.service.validate(
+            items=[{"key": "STOCK_LIST", "value": "600519,000001"}],
+        )
+
+        self.assertTrue(
+            any(
+                issue["key"] == "LITELLM_MODEL"
+                and issue["code"] == "unknown_model"
+                for issue in validation["issues"]
+            ),
+            validation["issues"],
+        )
+        self.assertFalse(
+            any(issue["code"] == "model_in_use" for issue in validation["issues"]),
+            validation["issues"],
         )
 
     def test_known_provider_channel_names_derive_from_catalog(self) -> None:
@@ -196,6 +473,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_first_run_wizard_deepseek_route_config_validates(self) -> None:
         items = self._wizard_channel_items(
             name="deepseek",
+            provider_id="deepseek",
             protocol="deepseek",
             models="deepseek-v4-flash,deepseek-v4-pro",
             primary_route="deepseek/deepseek-v4-flash",
@@ -210,6 +488,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         # exact P1 regression that a mocked validate had hidden.
         items = self._wizard_channel_items(
             name="deepseek",
+            provider_id="deepseek",
             protocol="deepseek",
             models="deepseek-v4-flash,deepseek-v4-pro",
             primary_route="deepseek-v4-flash",
@@ -226,6 +505,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_first_run_wizard_gemini_without_base_url_validates(self) -> None:
         items = self._wizard_channel_items(
             name="gemini",
+            provider_id="gemini",
             protocol="gemini",
             models="gemini-3.1-pro-preview,gemini-3-flash-preview",
             primary_route="gemini/gemini-3.1-pro-preview",
@@ -237,6 +517,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_first_run_wizard_ollama_without_key_validates(self) -> None:
         items = self._wizard_channel_items(
             name="ollama",
+            provider_id="ollama",
             protocol="ollama",
             models="llama3.2",
             primary_route="ollama/llama3.2",
@@ -257,6 +538,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         )
         items = self._wizard_channel_items(
             name="deepseek",
+            provider_id="deepseek",
             protocol="deepseek",
             models="deepseek-v4-flash",
             primary_route="deepseek/deepseek-v4-flash",
@@ -268,6 +550,46 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(channels, "openai,deepseek")
         result = self.service.validate(items=items)
         self.assertTrue(result["valid"], result["issues"])
+
+    def test_first_run_wizard_adds_second_connection_with_explicit_provider(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=openai",
+            "LLM_OPENAI_PROTOCOL=openai",
+            "LLM_OPENAI_BASE_URL=https://api.openai.com/v1",
+            "LLM_OPENAI_API_KEY=sk-openai",
+            "LLM_OPENAI_MODELS=gpt-existing",
+            "LLM_OPENAI_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-existing",
+        )
+        items = self._wizard_channel_items(
+            name="openai2",
+            provider_id="openai",
+            protocol="openai",
+            models="gpt-second",
+            primary_route="openai/gpt-second",
+            api_key="sk-openai-second",
+            base_url="https://api.openai.com/v1",
+            existing_channels=["openai"],
+        )
+
+        validation = self.service.validate(items=items)
+        self.assertTrue(validation["valid"], validation["issues"])
+        result = self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=items,
+            reload_now=False,
+        )
+
+        self.assertTrue(result["success"])
+        saved = self.manager.read_config_map()
+        self.assertEqual(saved["LLM_OPENAI2_PROVIDER"], "openai")
+        model = next(
+            model
+            for model in self.service.get_available_models()["models"]
+            if model["connection_id"] == "openai2"
+        )
+        self.assertEqual(model["provider_id"], "openai")
+        self.assertEqual(model["connection_name"], "openai2")
 
     @staticmethod
     def _mock_completion_response(content: str = "OK", tool_calls=None):
@@ -2302,12 +2624,16 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 ],
             )
 
-        self.assertTrue(
-            any(
-                issue["key"] == "VISION_MODEL" and issue["code"] == "unknown_model"
-                for issue in ctx.exception.issues
-            ),
-            ctx.exception.issues,
+        issue = next(
+            issue
+            for issue in ctx.exception.issues
+            if issue["code"] == "model_in_use"
+        )
+        self.assertEqual(issue["key"], "LLM_ALPHA_MODELS")
+        self.assertEqual(issue["details"]["connection_ids"], ["alpha"])
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [{"task": "vision", "key": "VISION_MODEL"}],
         )
 
     def test_update_blocks_disabling_channel_referenced_by_vision_model(self) -> None:
@@ -2331,12 +2657,16 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 items=[{"key": "LLM_ALPHA_ENABLED", "value": "false"}],
             )
 
-        self.assertTrue(
-            any(
-                issue["key"] == "VISION_MODEL" and issue["code"] == "unknown_model"
-                for issue in ctx.exception.issues
-            ),
-            ctx.exception.issues,
+        issue = next(
+            issue
+            for issue in ctx.exception.issues
+            if issue["code"] == "model_in_use"
+        )
+        self.assertEqual(issue["key"], "LLM_ALPHA_ENABLED")
+        self.assertEqual(issue["details"]["connection_ids"], ["alpha"])
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [{"task": "vision", "key": "VISION_MODEL"}],
         )
 
     def test_update_allows_unrelated_save_with_stale_vision_reference(self) -> None:
@@ -2385,12 +2715,16 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 ],
             )
 
-        self.assertTrue(
-            any(
-                issue["key"] == "LITELLM_MODEL" and issue["code"] == "unknown_model"
-                for issue in ctx.exception.issues
-            ),
-            ctx.exception.issues,
+        issue = next(
+            issue
+            for issue in ctx.exception.issues
+            if issue["code"] == "model_in_use"
+        )
+        self.assertEqual(issue["key"], "LLM_ALPHA_MODELS")
+        self.assertEqual(issue["details"]["connection_ids"], ["alpha"])
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [{"task": "report", "key": "LITELLM_MODEL"}],
         )
 
     def test_validate_accepts_deepseek_v4_primary_model_for_channel(self) -> None:
@@ -2629,6 +2963,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         saved = self.manager.read_config_map()
         self.assertEqual(saved.get("LLM_CONFIG_MODE"), "channels")
         self.assertIn("openai", saved.get("LLM_CHANNELS") or "")
+        self.assertEqual(saved.get("LLM_OPENAI_PROVIDER"), "openai")
         self.assertEqual(saved.get("LLM_OPENAI_API_KEY"), "sk-openai-secret")
 
     def test_apply_legacy_channels_migration_without_legacy_config_raises(self) -> None:
@@ -4204,6 +4539,102 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertEqual(payload["error_code"], "invalid_config")
         self.assertEqual(payload["details"]["reason"], "missing_api_key")
 
+    @patch("litellm.completion")
+    def test_local_openai_compatible_empty_key_still_runs_completion(
+        self,
+        mock_completion,
+    ) -> None:
+        mock_completion.return_value = self._mock_completion_response("OK")
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=False):
+            payload = self.service.test_llm_channel(
+                name="local_proxy",
+                provider_id="custom",
+                protocol="openai",
+                base_url="http://127.0.0.1:18000/v1",
+                api_key="",
+                models=["local-model"],
+            )
+
+        self.assertTrue(payload["success"], payload)
+        self.assertEqual(
+            mock_completion.call_args.kwargs["api_base"],
+            "http://127.0.0.1:18000/v1",
+        )
+        self.assertTrue(mock_completion.call_args.kwargs["api_key"])
+
+    @patch("src.services.system_config_service.requests.get")
+    @patch("litellm.completion")
+    def test_test_and_discovery_reject_unknown_explicit_provider(
+        self,
+        mock_completion,
+        mock_get,
+    ) -> None:
+        test_payload = self.service.test_llm_channel(
+            name="research",
+            provider_id="not-a-provider",
+            protocol="openai",
+            base_url="https://models.example.com/v1",
+            api_key="sk-test-value",
+            models=["research-model"],
+        )
+        discovery_payload = self.service.discover_llm_channel_models(
+            name="research",
+            provider_id="not-a-provider",
+            protocol="openai",
+            base_url="https://models.example.com/v1",
+            api_key="sk-test-value",
+        )
+
+        for payload in (test_payload, discovery_payload):
+            self.assertFalse(payload["success"])
+            self.assertEqual(payload["error_code"], "invalid_config")
+            self.assertEqual(payload["details"]["issue_key"], "provider_id")
+            self.assertEqual(payload["details"]["reason"], "invalid_provider")
+        mock_completion.assert_not_called()
+        mock_get.assert_not_called()
+
+    @patch("litellm.completion")
+    def test_test_channel_uses_explicit_provider_for_renamed_connection(
+        self,
+        mock_completion,
+    ) -> None:
+        mock_completion.return_value = self._mock_completion_response("OK")
+
+        payload = self.service.test_llm_channel(
+            name="writing_team",
+            provider_id="anthropic",
+            protocol="openai",
+            base_url="",
+            api_key="sk-anthropic",
+            models=["claude-test"],
+        )
+
+        self.assertTrue(payload["success"], payload)
+        self.assertEqual(payload["resolved_protocol"], "anthropic")
+        self.assertEqual(payload["resolved_model"], "anthropic/claude-test")
+        self.assertEqual(mock_completion.call_args.kwargs["model"], "anthropic/claude-test")
+        self.assertNotIn("api_base", mock_completion.call_args.kwargs)
+
+    @patch("litellm.completion")
+    def test_explicit_custom_provider_requires_base_url_for_official_looking_name(
+        self,
+        mock_completion,
+    ) -> None:
+        payload = self.service.test_llm_channel(
+            name="openai",
+            provider_id="custom",
+            protocol="openai",
+            base_url="",
+            api_key="sk-custom",
+            models=["custom-model"],
+        )
+
+        self.assertFalse(payload["success"])
+        self.assertEqual(payload["error_code"], "invalid_config")
+        self.assertEqual(payload["details"]["reason"], "missing_base_url")
+        mock_completion.assert_not_called()
+
     @patch("src.services.system_config_service.requests.get")
     def test_discover_llm_channel_models_returns_deduped_ids(self, mock_get) -> None:
         mock_response = Mock()
@@ -4238,6 +4669,35 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             "Bearer sk-test-value",
         )
         self.assertFalse(mock_get.call_args.kwargs["allow_redirects"])
+
+    @patch("src.services.system_config_service.requests.get")
+    def test_discover_ollama_models_uses_api_tags_without_authorization(
+        self,
+        mock_get,
+    ) -> None:
+        mock_response = Mock(ok=True, status_code=200)
+        mock_response.json.return_value = {
+            "models": [{"name": "llama3.2:latest"}],
+        }
+        mock_get.return_value = mock_response
+
+        payload = self.service.discover_llm_channel_models(
+            name="local_lab",
+            provider_id="ollama",
+            protocol="ollama",
+            base_url="http://127.0.0.1:11434",
+            api_key="",
+        )
+
+        self.assertTrue(payload["success"], payload)
+        self.assertEqual(payload["resolved_protocol"], "ollama")
+        self.assertEqual(payload["models"], ["llama3.2:latest"])
+        mock_get.assert_called_once()
+        self.assertEqual(
+            mock_get.call_args.args[0],
+            "http://127.0.0.1:11434/api/tags",
+        )
+        self.assertNotIn("Authorization", mock_get.call_args.kwargs["headers"])
 
     @patch("src.services.system_config_service.requests.get")
     def test_discover_llm_channel_models_classifies_error_scenarios(self, mock_get) -> None:
@@ -4345,6 +4805,44 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         models_url = SystemConfigService._build_llm_models_url("https://api.deepseek.com")
 
         self.assertEqual(models_url, "https://api.deepseek.com/models")
+
+    def test_build_llm_models_url_normalizes_ollama_inputs(self) -> None:
+        for base_url in (
+            "http://127.0.0.1:11434",
+            "http://127.0.0.1:11434/v1",
+            "http://127.0.0.1:11434/api/tags?refresh=true#models",
+        ):
+            with self.subTest(base_url=base_url):
+                self.assertEqual(
+                    SystemConfigService._build_llm_models_url(
+                        base_url,
+                        protocol="ollama",
+                    ),
+                    "http://127.0.0.1:11434/api/tags",
+                )
+
+    def test_provider_catalog_discovery_contract_is_consistent_and_immutable(self) -> None:
+        from src.llm.provider_catalog import (
+            get_provider,
+            get_provider_catalog,
+            supports_model_discovery,
+        )
+
+        catalog = get_provider_catalog()
+        for provider in catalog:
+            self.assertEqual(
+                provider["supports_discovery"],
+                supports_model_discovery(provider_id=provider["id"]),
+                provider["id"],
+            )
+
+        ollama = get_provider("ollama")
+        self.assertIsNotNone(ollama)
+        ollama["label"] = "mutated"
+        ollama["capabilities"].append("mutated")
+        fresh_ollama = get_provider("ollama")
+        self.assertNotEqual(fresh_ollama["label"], "mutated")
+        self.assertNotIn("mutated", fresh_ollama["capabilities"])
 
     def test_validate_reports_invalid_event_rule_semantics(self) -> None:
         validation = self.service.validate(items=[{

@@ -82,64 +82,6 @@ const AI_MODEL_GROUPS: CategoryFieldGroup[] = [
     ],
   },
   {
-    id: 'openai',
-    titleKey: 'settings.aiGroupOpenai',
-    keys: [
-      'OPENAI_API_KEY',
-      'OPENAI_API_KEYS',
-      'OPENAI_BASE_URL',
-      'OPENAI_MODEL',
-      'OPENAI_VISION_MODEL',
-      'OPENAI_TEMPERATURE',
-    ],
-  },
-  {
-    id: 'anthropic',
-    titleKey: 'settings.aiGroupAnthropic',
-    keys: [
-      'ANTHROPIC_API_KEY',
-      'ANTHROPIC_API_KEYS',
-      'ANTHROPIC_MODEL',
-      'ANTHROPIC_TEMPERATURE',
-      'ANTHROPIC_MAX_TOKENS',
-    ],
-  },
-  {
-    id: 'gemini',
-    titleKey: 'settings.aiGroupGemini',
-    keys: [
-      'GEMINI_API_KEY',
-      'GEMINI_API_KEYS',
-      'GEMINI_MODEL',
-      'GEMINI_MODEL_FALLBACK',
-      'GEMINI_TEMPERATURE',
-    ],
-  },
-  {
-    id: 'deepseek',
-    titleKey: 'settings.aiGroupDeepseek',
-    keys: [
-      'DEEPSEEK_API_KEY',
-      'DEEPSEEK_API_KEYS',
-    ],
-  },
-  {
-    id: 'anspire',
-    titleKey: 'settings.aiGroupAnspire',
-    keys: [
-      'ANSPIRE_LLM_ENABLED',
-      'ANSPIRE_LLM_BASE_URL',
-      'ANSPIRE_LLM_MODEL',
-    ],
-  },
-  {
-    id: 'aihubmix',
-    titleKey: 'settings.aiGroupAihubmix',
-    keys: [
-      'AIHUBMIX_KEY',
-    ],
-  },
-  {
     id: 'cache',
     titleKey: 'settings.aiGroupCache',
     keys: [

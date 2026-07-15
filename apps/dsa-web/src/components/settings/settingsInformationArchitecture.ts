@@ -60,7 +60,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: { zh: 'AI 与模型', en: 'AI & Models' },
     views: [
       { id: 'overview', label: { zh: '总览', en: 'Overview' } },
-      { id: 'connections', label: { zh: '连接', en: 'Connections' } },
+      { id: 'connections', label: { zh: '模型接入', en: 'Model Access' } },
       { id: 'task_routing', label: { zh: '任务路由', en: 'Task Routing' } },
       { id: 'reliability', label: { zh: '可靠性', en: 'Reliability' } },
     ],

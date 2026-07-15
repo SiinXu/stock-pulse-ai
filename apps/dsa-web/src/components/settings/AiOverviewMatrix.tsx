@@ -1,6 +1,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { resolveAiTaskMatrix, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
+import { SETTINGS_MISC_TEXT, SETTINGS_OVERVIEW_STATUS } from '../../locales/settingsMisc';
 
 interface AiOverviewMatrixProps {
   /** Config value accessor (draft-applied), used to resolve effective routing. */
@@ -12,39 +13,23 @@ interface AiOverviewMatrixProps {
   availableRoutes?: Set<string>;
 }
 
-const STATUS_META: Record<AiTaskStatus, { zh: string; en: string; dot: string; text: string }> = {
-  active: { zh: '生效', en: 'Active', dot: 'bg-success', text: 'text-foreground' },
-  unavailable: { zh: '当前配置不可用', en: 'Unavailable', dot: 'bg-danger', text: 'text-danger' },
-  unconfigured: { zh: '待配置', en: 'Needs config', dot: 'bg-warning', text: 'text-warning' },
+const STATUS_META: Record<AiTaskStatus, { dot: string; text: string }> = {
+  active: { dot: 'bg-success', text: 'text-foreground' },
+  unavailable: { dot: 'bg-danger', text: 'text-danger' },
+  unconfigured: { dot: 'bg-warning', text: 'text-warning' },
 };
-
-const T = {
-  title: { zh: '任务路由总览', en: 'Task routing overview' },
-  description: {
-    zh: '每个任务当前的执行方式与生效模型，无需查看环境变量即可判断实际路径。',
-    en: 'The execution backend and effective model for each task — no env vars needed.',
-  },
-  colTask: { zh: '任务', en: 'Task' },
-  colBackend: { zh: '执行方式', en: 'Execution backend' },
-  colPrimary: { zh: '主要模型', en: 'Primary model' },
-  colFallback: { zh: '备用模型', en: 'Fallback models' },
-  colStatus: { zh: '状态', en: 'Status' },
-  inherited: { zh: '继承报告模型', en: 'inherits report model' },
-  none: { zh: '未配置', en: 'not configured' },
-  failover: { zh: '失败切换', en: 'failover' },
-  edit: { zh: '前往任务路由', en: 'Edit task routing' },
-} as const;
 
 export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, language, onEditRouting, availableRoutes }) => {
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
   const tx = (entry: { zh: string; en: string }) => entry[language];
+  const text = SETTINGS_MISC_TEXT[language];
 
   return (
     <section aria-labelledby="ai-overview-title" className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 id="ai-overview-title" className="text-sm font-semibold text-foreground">{tx(T.title)}</h2>
-          <p className="mt-1 text-xs leading-5 text-secondary-text">{tx(T.description)}</p>
+          <h2 id="ai-overview-title" className="text-sm font-semibold text-foreground">{text.overviewTitle}</h2>
+          <p className="mt-1 text-xs leading-5 text-secondary-text">{text.overviewDescription}</p>
         </div>
         {onEditRouting ? (
           <button
@@ -52,7 +37,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
             className="whitespace-nowrap rounded-md border border-[var(--settings-border)] px-3 py-1.5 text-xs text-secondary-text transition-colors hover:border-foreground hover:text-foreground"
             onClick={onEditRouting}
           >
-            {tx(T.edit)}
+            {text.editRouting}
           </button>
         ) : null}
       </div>
@@ -61,11 +46,11 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
         <table className="w-full min-w-[560px] border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-[var(--settings-border)] text-xs uppercase tracking-wide text-muted-text">
-              <th scope="col" className="px-3 py-2 font-medium">{tx(T.colTask)}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{tx(T.colBackend)}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{tx(T.colPrimary)}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{tx(T.colFallback)}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{tx(T.colStatus)}</th>
+              <th scope="col" className="px-3 py-2 font-medium">{text.colTask}</th>
+              <th scope="col" className="px-3 py-2 font-medium">{text.colBackend}</th>
+              <th scope="col" className="px-3 py-2 font-medium">{text.colPrimary}</th>
+              <th scope="col" className="px-3 py-2 font-medium">{text.colFallback}</th>
+              <th scope="col" className="px-3 py-2 font-medium">{text.colStatus}</th>
             </tr>
           </thead>
           <tbody>
@@ -76,7 +61,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                   {tx(row.backendLabel)}
                   {row.fallbackBackendId ? (
                     <span className="ml-1 text-xs text-muted-text">
-                      · {tx(T.failover)}: {row.fallbackBackendId}
+                      · {text.failover}: {row.fallbackBackendId}
                     </span>
                   ) : null}
                 </td>
@@ -84,15 +69,15 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                   {row.primaryModel ? (
                     <span className="break-all text-foreground">{row.primaryModel}</span>
                   ) : (
-                    <span className="text-muted-text">{tx(T.none)}</span>
+                    <span className="text-muted-text">{text.none}</span>
                   )}
                   {row.primaryInherited && row.primaryModel ? (
-                    <span className="ml-1 text-xs text-muted-text">（{tx(T.inherited)}）</span>
+                    <span className="ml-1 text-xs text-muted-text">({text.inherited})</span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2.5 text-secondary-text">
                   {row.fallbackModels.length > 0 ? (
-                    <span className="break-all">{row.fallbackModels.join('、')}</span>
+                    <span className="break-all">{row.fallbackModels.join(language === 'en' ? ', ' : '、')}</span>
                   ) : (
                     <span className="text-muted-text">—</span>
                   )}
@@ -101,7 +86,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                   <span className="inline-flex items-center gap-1.5">
                     <span className={cn('h-2 w-2 rounded-full', STATUS_META[row.status].dot)} aria-hidden="true" />
                     <span className={STATUS_META[row.status].text}>
-                      {tx(STATUS_META[row.status])}
+                      {SETTINGS_OVERVIEW_STATUS[language][row.status]}
                     </span>
                   </span>
                 </td>

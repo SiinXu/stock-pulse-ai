@@ -28,6 +28,7 @@ from api.v1.schemas.system_config import (
     TestLLMChannelRequest,
     TestNotificationChannelRequest,
     UpdateSystemConfigRequest,
+    ValidateSystemConfigRequest,
 )
 import src.auth as auth
 from src.config import Config
@@ -42,6 +43,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         # Keep ambient developer LLM env (e.g. litellm's load_dotenv at import)
         # from bleeding into config validation; the temp .env is authoritative.
         self._saved_llm_env = strip_ambient_llm_env()
+        self._orig_env_file = os.environ.get("ENV_FILE")
         auth._auth_enabled = None
         auth._session_secret = None
         auth._password_hash_salt = None
@@ -77,7 +79,15 @@ class SystemConfigApiTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         Config.reset_instance()
         self._verify_session_patch.stop()
-        os.environ.pop("ENV_FILE", None)
+        auth._auth_enabled = None
+        auth._session_secret = None
+        auth._password_hash_salt = None
+        auth._password_hash_stored = None
+        auth._rate_limit = {}
+        if self._orig_env_file is None:
+            os.environ.pop("ENV_FILE", None)
+        else:
+            os.environ["ENV_FILE"] = self._orig_env_file
         if self._orig_dsa_desktop_mode is None:
             os.environ.pop("DSA_DESKTOP_MODE", None)
         else:
@@ -827,6 +837,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             payload = system_config.test_llm_channel(
                 request=TestLLMChannelRequest(
                     name="primary",
+                    provider_id="openai",
                     protocol="openai",
                     base_url="https://api.example.com/v1",
                     api_key="sk-test",
@@ -841,6 +852,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["stage"], "chat_completion")
         self.assertEqual(payload["capability_results"], {})
         mock_test.assert_called_once()
+        self.assertEqual(mock_test.call_args.kwargs["provider_id"], "openai")
         self.assertEqual(mock_test.call_args.kwargs["capability_checks"], ["json", "stream"])
 
     def test_test_notification_channel_endpoint_returns_service_payload(self) -> None:
@@ -926,6 +938,104 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertNotIn("LITELLM_MODEL", issue["message"])
         self.assertIn("primary model", issue["message"].lower())
 
+    def test_validate_endpoint_preserves_model_in_use_details(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=used-model,spare-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/used-model",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+
+        payload = system_config.validate_system_config(
+            request=ValidateSystemConfigRequest(
+                items=[{"key": "LLM_PRIMARY_MODELS", "value": "spare-model"}],
+            ),
+            service=self.service,
+        ).model_dump()
+
+        issue = next(
+            issue for issue in payload["issues"] if issue["code"] == "model_in_use"
+        )
+        self.assertEqual(issue["details"]["route"], "openai/used-model")
+        self.assertEqual(issue["details"]["connection_ids"], ["primary"])
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [{"task": "report", "key": "LITELLM_MODEL"}],
+        )
+
+    def test_update_endpoint_cannot_bypass_model_in_use_protection(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=primary",
+            "LLM_PRIMARY_PROVIDER=openai",
+            "LLM_PRIMARY_PROTOCOL=openai",
+            "LLM_PRIMARY_API_KEY=sk-primary",
+            "LLM_PRIMARY_MODELS=used-model,spare-model",
+            "LLM_PRIMARY_ENABLED=true",
+            "LITELLM_MODEL=openai/used-model",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+        before = self.env_path.read_bytes()
+
+        with self.assertRaises(HTTPException) as context:
+            system_config.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=self.manager.get_config_version(),
+                    items=[
+                        {"key": "LLM_PRIMARY_MODELS", "value": "spare-model"},
+                    ],
+                    reload_now=False,
+                ),
+                service=self.service,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        issue = next(
+            issue
+            for issue in context.exception.detail["issues"]
+            if issue["code"] == "model_in_use"
+        )
+        self.assertEqual(issue["details"]["route"], "openai/used-model")
+        self.assertEqual(
+            issue["details"]["referenced_by"],
+            [{"task": "report", "key": "LITELLM_MODEL"}],
+        )
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_provider_identity_round_trips_through_config_and_available_models_api(self) -> None:
+        response = system_config.update_system_config(
+            request=UpdateSystemConfigRequest(
+                config_version=self.manager.get_config_version(),
+                reload_now=False,
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "openai_team"},
+                    {"key": "LLM_OPENAI_TEAM_PROVIDER", "value": "openai"},
+                    {"key": "LLM_OPENAI_TEAM_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_OPENAI_TEAM_API_KEY", "value": "sk-team"},
+                    {"key": "LLM_OPENAI_TEAM_MODELS", "value": "gpt-test"},
+                    {"key": "LLM_OPENAI_TEAM_ENABLED", "value": "true"},
+                ],
+            ),
+            service=self.service,
+        )
+        self.assertTrue(response.success)
+
+        config = system_config.get_system_config(
+            include_schema=True,
+            service=self.service,
+        ).model_dump(by_alias=True)
+        item_map = {item["key"]: item for item in config["items"]}
+        self.assertEqual(item_map["LLM_OPENAI_TEAM_PROVIDER"]["value"], "openai")
+
+        model = system_config.get_llm_available_models(service=self.service)["models"][0]
+        self.assertEqual(model["provider_id"], "openai")
+        self.assertEqual(model["provider_label"], "OpenAI 官方")
+        self.assertEqual(model["connection_id"], "openai_team")
+        self.assertEqual(model["connection_name"], "openai_team")
+
     def test_discover_llm_channel_models_endpoint_returns_service_payload(self) -> None:
         with patch.object(
             self.service,
@@ -946,6 +1056,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             payload = system_config.discover_llm_channel_models(
                 request=DiscoverLLMChannelModelsRequest(
                     name="dashscope",
+                    provider_id="dashscope",
                     protocol="openai",
                     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
                     api_key="sk-test",
@@ -957,6 +1068,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["models"], ["qwen-plus", "qwen-turbo"])
         self.assertEqual(payload["stage"], "model_discovery")
         mock_discover.assert_called_once()
+        self.assertEqual(mock_discover.call_args.kwargs["provider_id"], "dashscope")
 
 
 if __name__ == "__main__":

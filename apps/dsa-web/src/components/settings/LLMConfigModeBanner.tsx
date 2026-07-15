@@ -9,13 +9,8 @@ import type {
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { ApiErrorAlert, Badge, Button, InlineAlert, Modal } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-
-const SOURCE_LABEL: Record<string, { zh: string; en: string }> = {
-  auto: { zh: '自动（兼容）', en: 'Auto (compatible)' },
-  channels: { zh: 'Web 连接', en: 'Web Connections' },
-  yaml: { zh: 'YAML', en: 'YAML' },
-  legacy: { zh: 'Legacy Provider', en: 'Legacy provider keys' },
-};
+import { formatUiText } from '../../i18n/uiText';
+import { SETTINGS_CONTROLS_TEXT, SETTINGS_SOURCE_LABELS } from '../../locales/settingsControls';
 
 interface LLMConfigModeBannerProps {
   status: LLMConfigModeStatus | null;
@@ -25,6 +20,7 @@ interface LLMConfigModeBannerProps {
 
 export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status, configVersion, onMigrated }) => {
   const { language } = useUiLanguage();
+  const text = SETTINGS_CONTROLS_TEXT[language];
   const [preview, setPreview] = useState<LegacyChannelsMigrationPreview | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -35,16 +31,15 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
     return null;
   }
 
-  const en = language === 'en';
   const label = (source: LLMConfigModeSource | null): string => {
     if (!source) {
-      return en ? 'No model source configured' : '尚未配置模型来源';
+      return text.noModelSource;
     }
-    return SOURCE_LABEL[source]?.[en ? 'en' : 'zh'] ?? source;
+    return SETTINGS_SOURCE_LABELS[language][source] ?? source;
   };
   const overridden = status.overriddenSources
-    .map((source) => SOURCE_LABEL[source]?.[en ? 'en' : 'zh'] ?? source)
-    .join(en ? ', ' : '、');
+    .map((source) => SETTINGS_SOURCE_LABELS[language][source] ?? source)
+    .join(language === 'en' ? ', ' : '、');
   const canMigrate = Boolean(configVersion) && status.detectedSources.includes('legacy') && status.effectiveMode !== 'channels';
 
   const openPreview = async () => {
@@ -81,14 +76,14 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
     <div className="rounded-xl border settings-border bg-card/70 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-foreground">
-          {en ? 'Effective model config source' : '当前生效模型配置来源'}
+          {text.effectiveSource}
         </span>
         <Badge variant={status.effectiveMode ? 'success' : 'warning'} size="sm">
           {label(status.effectiveMode)}
         </Badge>
         {status.requestedMode !== 'auto' ? (
           <Badge variant="default" size="sm">
-            {en ? `Requested: ${status.requestedMode}` : `请求模式：${status.requestedMode}`}
+            {formatUiText(text.requestedMode, { mode: status.requestedMode })}
           </Badge>
         ) : null}
         {canMigrate ? (
@@ -100,15 +95,13 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
             isLoading={isLoadingPreview}
             onClick={() => void openPreview()}
           >
-            {en ? 'Migrate to Channels' : '迁移到 Channels'}
+            {text.migrateToChannels}
           </Button>
         ) : null}
       </div>
       {overridden ? (
         <p className="mt-1.5 text-xs text-muted-text">
-          {en
-            ? `Present but overridden (not active): ${overridden}`
-            : `已配置但被覆盖（不生效）：${overridden}`}
+          {formatUiText(text.overriddenSources, { sources: overridden })}
         </p>
       ) : null}
       {status.issues.length > 0 ? (
@@ -117,7 +110,9 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
             <InlineAlert
               key={`${issue.code}-${issue.key}`}
               variant="warning"
-              message={issue.message}
+              message={issue.code === 'forced_mode_no_config'
+                ? formatUiText(text.configModeIssue, { mode: status.requestedMode })
+                : text.unknownConfigIssue}
               className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ))}
@@ -128,13 +123,11 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
       <Modal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
-        title={en ? 'Migrate legacy providers to Channels' : '迁移旧版 Provider 到 Channels'}
+        title={text.migrationTitle}
       >
         <div className="space-y-3">
           <p className="text-xs text-muted-text">
-            {en
-              ? 'The following channels will be created from your legacy provider keys, and LLM_CONFIG_MODE will be set to channels. Legacy keys are kept.'
-              : '将根据旧版 Provider 凭据创建以下模型连接，并把配置来源设为 channels。旧版 keys 会保留，不会删除。'}
+            {text.migrationDescription}
           </p>
           <div className="overflow-hidden rounded-lg border border-[var(--settings-border)]">
             {(preview?.channels ?? []).map((channel) => (
@@ -149,7 +142,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           {error ? <ApiErrorAlert error={error} /> : null}
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsPreviewOpen(false)}>
-              {en ? 'Cancel' : '取消'}
+              {text.cancel}
             </Button>
             <Button
               type="button"
@@ -159,7 +152,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
               disabled={(preview?.channels ?? []).length === 0}
               onClick={() => void applyMigration()}
             >
-              {en ? 'Migrate' : '确认迁移'}
+              {text.migrate}
             </Button>
           </div>
         </div>

@@ -12,6 +12,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:i18n": "vitest run src/locales/__tests__/localeConsistency.test.ts src/locales/__tests__/hardcodedUiStrings.test.ts",
     "test:smoke": "playwright test",
     "preview": "vite preview"
   },

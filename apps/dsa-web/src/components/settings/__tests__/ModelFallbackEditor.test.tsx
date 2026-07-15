@@ -24,8 +24,8 @@ describe('ModelFallbackEditor', () => {
         language="zh"
       />,
     );
-    expect(screen.getByText('deepseek-v4-pro')).toBeInTheDocument();
-    expect(screen.getByText('gpt-5.5')).toBeInTheDocument();
+    expect(screen.getAllByText('deepseek-v4-pro').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('gpt-5.5').length).toBeGreaterThan(0);
   });
 
   it('appends a selected model to the list via the selector', () => {
@@ -39,12 +39,13 @@ describe('ModelFallbackEditor', () => {
         language="zh"
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '添加备用模型' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
     const listbox = screen.getByRole('listbox');
-    // The primary model and already-picked model are excluded from the add list.
+    // The primary model is excluded; selected fallbacks remain visible and
+    // checked so the same collapsed control can add and remove values.
     expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();
-    expect(within(listbox).queryByText('deepseek-v4-pro')).not.toBeInTheDocument();
-    fireEvent.click(within(listbox).getByText('gpt-5.5'));
+    expect(within(listbox).getByRole('checkbox', { name: 'deepseek-v4-pro' })).toBeChecked();
+    fireEvent.click(within(listbox).getByRole('checkbox', { name: 'gpt-5.5' }));
     expect(onChange).toHaveBeenCalledWith('deepseek/deepseek-v4-pro,openai/gpt-5.5');
   });
 
@@ -52,8 +53,8 @@ describe('ModelFallbackEditor', () => {
     render(
       <ModelFallbackEditor value="" onChange={() => {}} options={options} language="zh" />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '添加备用模型' }));
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'gpt' } });
+    fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
+    fireEvent.change(screen.getByLabelText('搜索模型'), { target: { value: 'gpt' } });
     const listbox = screen.getByRole('listbox');
     expect(within(listbox).getByText('gpt-5.5')).toBeInTheDocument();
     expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();

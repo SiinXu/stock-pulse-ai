@@ -15,7 +15,7 @@ import {
   BACKTEST_PHASE_LABELS,
   BACKTEST_STATUS_LABELS,
   BACKTEST_TEXT,
-} from '../locales/featureText';
+} from '../locales/backtest';
 import type {
   BacktestResultItem,
   BacktestRunResponse,

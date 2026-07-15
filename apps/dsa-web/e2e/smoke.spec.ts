@@ -1,10 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD;
-
-if (!smokePassword) {
-  test.skip(true, 'Set DSA_WEB_SMOKE_PASSWORD to run authenticated smoke tests.');
-}
+import { getE2eAuthStatus, loginAsE2eAdmin } from './auth-fixture';
 
 
 async function captureSmokeScreenshot(page: Page, testInfo: { outputPath: (name: string) => string }, name: string, options: { fullPage?: boolean } = {}) {
@@ -20,38 +15,7 @@ async function captureSmokeScreenshot(page: Page, testInfo: { outputPath: (name:
 }
 
 async function login(page: Page) {
-  test.skip(!smokePassword, 'Set DSA_WEB_SMOKE_PASSWORD to run authenticated smoke tests.');
-
-  await page.goto('/login');
-  await page.waitForLoadState('domcontentloaded');
-
-  const passwordInput = page.locator('#password');
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
-  const homeLink = page.getByRole('link', { name: '首页' });
-
-  const isAlreadyAuthenticated =
-    page.url().endsWith('/') ||
-    await homeLink.isVisible({ timeout: 2_000 }).catch(() => false);
-
-  if (isAlreadyAuthenticated) {
-    await page.waitForLoadState('domcontentloaded');
-    return;
-  }
-
-  await expect(passwordInput).toBeVisible({ timeout: 10_000 });
-  await passwordInput.fill(smokePassword!);
-  await expect(submitButton).toBeVisible();
-
-  await Promise.all([
-    page.waitForResponse(
-      (response) => response.url().includes('/api/v1/auth/login') && response.status() === 200,
-      { timeout: 15_000 }
-    ),
-    submitButton.click(),
-  ]);
-
-  await page.waitForURL('/', { timeout: 15_000 });
-  await page.waitForLoadState('domcontentloaded');
+  await loginAsE2eAdmin(page);
   await page.waitForTimeout(1000);
 }
 
@@ -59,12 +23,15 @@ test.describe('web smoke', () => {
   test.use({ locale: 'zh-CN' });
 
   test('login page renders password form', async ({ page }, testInfo) => {
+    const status = await getE2eAuthStatus(page);
+    expect(status.loggedIn).toBe(false);
     await page.goto('/login');
     await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+    await expect(page.getByRole('heading', { name: 'StockPulse', exact: true })).toBeVisible();
 
-    // Check for branding
-    await expect(page.getByText('DAILY STOCK').first()).toBeVisible();
-    await expect(page.getByText('Analysis Engine')).toBeVisible();
+    const expectedHeading = status.passwordSet ? '管理员登录' : '设置初始密码';
+    await expect(page.getByRole('heading', { name: expectedHeading })).toBeVisible();
 
     // Check for password input
     await expect(page.locator('#password')).toBeVisible();
@@ -82,7 +49,8 @@ test.describe('web smoke', () => {
     await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: '问股' })).toBeVisible();
-    await expect(page.getByText('历史分析')).toBeVisible();
+    await expect(page.getByRole('button', { name: '历史', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible();
 
     await stockInput.fill('600519');
     const analyzeButton = page.getByRole('button', { name: '分析', exact: true });
@@ -193,8 +161,7 @@ test.describe('web smoke', () => {
     await page.waitForTimeout(1000);
 
     await expect(page.getByRole('heading', { name: 'System settings' })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Send test' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('DSA notification test');
+    await expect(page.getByRole('button', { name: 'Save configuration' })).toBeVisible();
 
     await captureSmokeScreenshot(page, testInfo, 'smoke-settings-page-en');
   });

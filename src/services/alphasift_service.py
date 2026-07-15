@@ -1923,6 +1923,7 @@ def _build_alphasift_runtime_env(config: Config, *, max_results: Optional[int] =
         for channel in channels:
             prefix = channel["name"].upper()
             put(f"LLM_{prefix}_ENABLED", "true")
+            put(f"LLM_{prefix}_PROVIDER", channel.get("provider_id"))
             put(f"LLM_{prefix}_PROTOCOL", channel.get("protocol"))
             put(f"LLM_{prefix}_BASE_URL", channel.get("base_url"))
             put(f"LLM_{prefix}_API_KEYS", ",".join(channel.get("api_keys") or []))

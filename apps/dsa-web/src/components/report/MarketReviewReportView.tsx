@@ -2,6 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
 import { historyApi } from '../../api/history';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, UI_TEXT } from '../../i18n/uiText';
 import type {
   AnalysisReport,
@@ -11,6 +12,7 @@ import type {
 } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { getUiLocale } from '../../utils/uiLocale';
 import { Card } from '../common';
 import { Tooltip } from '../common/Tooltip';
 import { MarketStructureCard } from './MarketStructureCard';
@@ -369,6 +371,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   className = '',
   onOpenRunFlow,
 }) => {
+  const { language: uiLanguage } = useUiLanguage();
   const normalizedReportLanguage = normalizeReportLanguage(reportLanguage);
   const text = getReportText(normalizedReportLanguage);
   const runFlowText = UI_TEXT[normalizedReportLanguage === 'ko' ? 'en' : normalizedReportLanguage];
@@ -487,7 +490,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
               {meta?.stockCode ? (
                 <span className="home-accent-chip px-2 py-0.5 font-mono">{meta.stockCode}</span>
               ) : null}
-              {meta?.createdAt ? <span>{new Date(meta.createdAt).toLocaleString()}</span> : null}
+              {meta?.createdAt ? <span>{new Date(meta.createdAt).toLocaleString(getUiLocale(uiLanguage))}</span> : null}
             </div>
           </div>
 

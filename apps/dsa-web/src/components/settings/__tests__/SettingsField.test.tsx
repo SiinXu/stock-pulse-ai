@@ -210,9 +210,12 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getByText('API Key 必填')).toBeInTheDocument();
+    const issue = screen.getByText('API Key 必填');
+    expect(issue).toBeInTheDocument();
 
     const input = screen.getByLabelText('OpenAI API Key');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAttribute('aria-describedby', issue.id);
     fireEvent.focus(input);
     fireEvent.change(input, {
       target: { value: 'updated-secret' },

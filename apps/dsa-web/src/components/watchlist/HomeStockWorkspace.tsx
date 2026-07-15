@@ -113,7 +113,7 @@ const WatchlistRowItem: React.FC<{
   onRemove: (code: string) => Promise<void>;
   disabled: boolean;
 }> = ({ row, onRemove, disabled }) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const taskLabel = getTaskStatusLabel(row.activeTask, t);
   const item = row.latestItem;
   const stockName = item?.stockName || row.code;
@@ -141,7 +141,7 @@ const WatchlistRowItem: React.FC<{
             {item?.lastAnalysisTime ? (
               <>
                 <span className="h-1 w-1 rounded-full bg-subtle-hover" />
-                <span className="text-xs text-muted-text">{formatDateTime(item.lastAnalysisTime)}</span>
+                <span className="text-xs text-muted-text">{formatDateTime(item.lastAnalysisTime, language)}</span>
               </>
             ) : null}
           </div>
