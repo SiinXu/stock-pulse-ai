@@ -201,7 +201,7 @@ jobs:
           DSA_WEB_SMOKE_PASSWORD: dsa-ci-smoke
         run: npm run test:smoke
       - name: 📤 Upload Playwright artifacts
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: playwright-artifacts

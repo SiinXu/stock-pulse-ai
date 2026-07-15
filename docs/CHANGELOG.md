@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] 后端配置 Schema 新增 `ui_placement` 标记（model_access/task_routing/developer_diagnostics/hidden_legacy）作为字段 UI 归属唯一权威源：Web 通用分类视图按该标记排除专属界面字段与隐藏 legacy Provider 字段，删除前端手写的 legacy Provider 分组名单（`LEGACY_MODEL_PROVIDER_GROUP_IDS`）；不改配置保存/读取契约。
 - [改进] Web 设置页普通路径术语与设计收敛：运行时注入密钥的提示不再引用 `.env`/内部变量名，模型备用顺序说明去除内部实现名词；设置面与基础控件清理魔法字号/圆角（`text-[11px]`→`text-xs`、`rounded-[10px]`→`rounded-lg`、`rounded-[6px]`→`rounded-md`）。
 - [改进] Web 的 Modal、Drawer、ConfirmDialog 与移动历史面板统一使用 Overlay stack：只允许顶层响应 Escape/Tab，背景 inert、滚动锁定、打开聚焦和关闭焦点恢复行为一致，Confirm 层级高于 Drawer/Modal，Home/Chat 不再保留自制移动侧栏。
-- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`，失败通过 artifact v6 上传截图、trace、video 与服务日志。
+- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`，每次运行通过 artifact v6 保留 7 天的截图、trace、video 与服务日志，用于 PR 可视验收与失败诊断。
 - [文档] 补充前端开发代理变量 `DSA_WEB_DEV_API_PROXY` 到 `.env.example` 与贡献指南；修正本段中「模型供应商面板/高级视图」删除与保留的矛盾描述，统一为最终四视图状态；LLM 配置指南（中英）的旧术语统一为「设置 → AI 与模型 → 模型接入」。
 - [改进] Web 设置页「AI 与模型」收敛为 总览/模型接入/任务路由/可靠性 四个视图：删除「高级」二级视图与遗留「模型供应商」子页映射，legacy Provider 凭据键保持后端（env/YAML）兼容但不再形成 Web 第二编辑入口；模型接入页只展示紧凑连接卡片，内部配置来源、生成后端、CLI 与冒烟测试统一移入顶层「高级 → 开发者诊断」并默认折叠。
 - [改进] Web 设置页模型输入全面改为选择器交互：新增 `ModelMultiSelect` 多选组件，连接编辑器「发现的模型」改为搜索并勾选启用；手动添加模型改为每次回车/点击添加一项，粘贴逗号/空白分隔列表自动拆分去重；模型下拉搜索同时匹配显示名/模型路由/所属连接/服务商；可靠性页备用模型列表支持上移/下移排序，目录外的已配置路由保留并标注「当前配置不可用」而不静默清除。
