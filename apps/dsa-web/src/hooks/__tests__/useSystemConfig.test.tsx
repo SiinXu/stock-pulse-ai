@@ -491,6 +491,24 @@ describe('useSystemConfig', () => {
     expect(update).toHaveBeenCalledTimes(1);
   });
 
+  it('adopts a committed value supplied by a dedicated editor outside draftValues', async () => {
+    const savedConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600000,SH600519' })),
+    };
+    getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    await act(async () => {
+      await result.current.save([{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }]);
+    });
+
+    expect(result.current.itemsByCategory.base[0]?.value).toBe('SH600000,SH600519');
+    expect(result.current.hasDirty).toBe(false);
+  });
+
   it('preserves a newer edit made while the submitted value is saving', async () => {
     let resolveUpdate: ((value: { warnings: string[] }) => void) | undefined;
     const pendingUpdate = new Promise<{ warnings: string[] }>((resolve) => {

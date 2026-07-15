@@ -141,7 +141,7 @@ export const Input = ({
           className={cn(
             isLoginAppearance
               ? 'input-surface input-focus-glow input-appearance-login h-10 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
-              : 'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text',
+              : 'h-8 w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text',
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
             finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',

@@ -145,6 +145,13 @@ const settingsHelpZhCN: SettingsHelpMap = {
     impact: ['影响 Agent 问答、策略选择和相关工具调用的模型选择。'],
     notes: ['请确认该模型在已启用的模型连接或高级路由配置中可用。'],
   },
+  'settings.ai_model.VISION_MODEL': {
+    title: 'Vision 模型',
+    summary: '为图片理解任务选择模型。',
+    usage: '从可用模型中选择；留空时使用系统默认策略。',
+    valueNotes: ['历史值不在当前可用模型目录中时会保留，并标注为当前配置不可用。'],
+    impact: ['影响图片识别与视觉分析任务，不改变报告或 Agent 的主要模型。'],
+  },
   'settings.ai_model.LITELLM_FALLBACK_MODELS': {
     title: '备用模型',
     summary: '主要模型失败时按顺序尝试的备用模型列表。',
@@ -1328,6 +1335,13 @@ const settingsHelpEnUS: SettingsHelpMap = {
     valueNotes: ['Useful when Agent needs stronger reasoning or longer context.', 'Only affects Agent flows.'],
     impact: ['Affects Agent chat, strategy selection, and Agent tool calls.'],
     notes: ['Make sure the model is reachable through enabled channels, YAML routing, or legacy provider keys.'],
+  },
+  'settings.ai_model.VISION_MODEL': {
+    title: 'Vision Model',
+    summary: 'Selects the model used for image-understanding tasks.',
+    usage: 'Choose from available models; leave empty to use the system default behavior.',
+    valueNotes: ['A historical value outside the current model catalog is preserved and marked unavailable.'],
+    impact: ['Affects vision analysis only; it does not change the report or Agent primary model.'],
   },
   'settings.ai_model.LITELLM_FALLBACK_MODELS': {
     title: 'Fallback Models',

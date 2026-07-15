@@ -2,13 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { LLMCapabilityCheck, LLMCapabilityCheckResult, LlmProviderCatalogEntry } from '../../types/systemConfig';
-import { Badge, Button, ConfirmDialog, InlineAlert, Input, Select, StatusDot, Tooltip } from '../common';
+import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
+import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
+import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
-import {
-  getCapabilityLabel,
-  getProviderPresentation,
-} from './llmProviderTemplates';
+import { getProviderPresentation } from './llmProviderTemplates';
 
 // Provider *business* metadata comes from the backend catalog (passed as a
 // prop). These helpers resolve an entry by channel/provider id; "known" excludes
@@ -23,7 +21,6 @@ function findCatalogProvider(
 function isKnownCatalogProvider(providers: LlmProviderCatalogEntry[], id: string): boolean {
   return id !== 'custom' && providers.some((provider) => provider.id === id);
 }
-import { SettingsHelpButton } from './SettingsHelpButton';
 import { ModelMultiSelect } from './ModelMultiSelect';
 
 const PROTOCOL_OPTIONS: Array<{ value: ChannelProtocol; label: string }> = [
@@ -65,19 +62,6 @@ const FALSEY_VALUES = new Set(['0', 'false', 'no', 'off']);
 const HERMES_CHANNEL_NAME = 'hermes';
 const HERMES_DEFAULT_MODEL = 'hermes-agent';
 
-const RUNTIME_CAPABILITY_OPTIONS: Array<{ value: LLMCapabilityCheck; label: string; hint: string }> = [
-  { value: 'json', label: 'JSON', hint: '检测 response_format JSON 输出是否可用。' },
-  { value: 'tools', label: 'Tools', hint: '检测 function/tool calling 是否可用。' },
-  { value: 'stream', label: 'Stream', hint: '检测流式输出是否能返回有效 chunk。' },
-  { value: 'vision', label: 'Vision', hint: '检测当前模型是否接受 image_url 输入。' },
-];
-
-const CAPABILITY_STATUS_LABELS: Record<LLMCapabilityCheckResult['status'], string> = {
-  passed: '通过',
-  failed: '失败',
-  skipped: '跳过',
-};
-
 const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
   channel.name.trim().toLowerCase() === HERMES_CHANNEL_NAME
 );
@@ -85,27 +69,6 @@ const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
 function canonicalizeHermesRouteModel(model: string): string {
   const trimmed = model.trim() || HERMES_DEFAULT_MODEL;
   return trimmed.startsWith('openai/') ? trimmed : `openai/${trimmed}`;
-}
-
-function routeIdentityCandidates(model: string): Set<string> {
-  const trimmed = model.trim();
-  if (!trimmed) return new Set();
-  const candidates = new Set<string>([trimmed]);
-  if (!trimmed.startsWith('openai/') && !trimmed.includes('/')) {
-    candidates.add(`openai/${trimmed}`);
-  }
-  return candidates;
-}
-
-function getRouteProvenance(
-  routeProvenanceMap: Map<string, RouteProvenance>,
-  model: string,
-): RouteProvenance | undefined {
-  for (const candidate of routeIdentityCandidates(model)) {
-    const origin = routeProvenanceMap.get(candidate);
-    if (origin) return origin;
-  }
-  return undefined;
 }
 
 const shouldUseSavedHermesSecret = (
@@ -124,7 +87,7 @@ const hasRuntimeOnlyMaskedHermesSecret = (
   isHermesChannel(channel) && channel.apiKey === maskToken && !hasPersistedSecret
 );
 
-const RUNTIME_ONLY_HERMES_SECRET_MESSAGE = '运行时注入的 Hermes Key 不会回传；如需在设置页测试，请重新输入 Key 或保存到 .env。';
+const RUNTIME_ONLY_HERMES_SECRET_MESSAGE = '运行时注入的密钥不会显示；如需在设置页测试，请重新输入 API 密钥。';
 
 interface ChannelConfig {
   id: string;
@@ -149,14 +112,6 @@ interface ChannelDiscoveryState {
   models: string[];
 }
 
-interface ChannelCapabilityState {
-  selected: LLMCapabilityCheck[];
-  status: 'idle' | 'loading' | 'success' | 'error';
-  text?: string;
-  hint?: string;
-  results: Partial<Record<LLMCapabilityCheck, LLMCapabilityCheckResult>>;
-}
-
 interface RuntimeConfig {
   primaryModel: string;
   agentPrimaryModel: string;
@@ -169,6 +124,8 @@ interface LLMChannelEditorProps {
   items: Array<{ key: string; value: string; rawValueExists?: boolean }>;
   /** Authoritative provider catalog (business metadata) from the backend. */
   providers: LlmProviderCatalogEntry[];
+  /** Hosts the backend exempts from API-key requirements (local endpoints). */
+  emptyApiKeyHosts?: string[];
   maskToken: string;
   /** Parent-held channel draft, used to rehydrate after a tab-switch remount. */
   persistedDraftItems?: Array<{ key: string; value: string }>;
@@ -177,6 +134,8 @@ interface LLMChannelEditorProps {
   onValidityChange?: (valid: boolean) => void;
   /** Bumped by the parent to discard the local draft back to the saved snapshot. */
   resetSignal?: number;
+  /** Bumped by the parent to open the "add connection" dialog. */
+  addSignal?: number;
   disabled?: boolean;
   /**
    * The provider catalog failed to load. Existing connections stay editable/
@@ -184,74 +143,16 @@ interface LLMChannelEditorProps {
    * blank custom-like connection from a transient catalog outage.
    */
   catalogUnavailable?: boolean;
+  /** Retry loading the provider catalog after a failure. */
+  onReloadCatalog?: () => void;
   /** When a non-channels config source is effective, the editor is read-only. */
   overriddenByMode?: 'yaml' | 'legacy' | null;
-  /**
-   * Whether this editor also owns the runtime routing block (primary / agent /
-   * vision / fallback / temperature). Defaults to true for standalone use; the
-   * settings Connections view passes false so Task Routing and Reliability are
-   * the single canonical editors for those keys.
-   */
-  showRuntimeConfig?: boolean;
+  /** Jump to the developer diagnostics area for details on the config source. */
+  onViewDiagnostics?: () => void;
   /** Task -> route references, to show which tasks use each connection. */
   taskModelRefs?: Array<{ label: string; route: string }>;
   /** Jump to the task-routing view to assign models to tasks. */
   onManageModels?: () => void;
-}
-
-interface ChannelRowProps {
-  channel: ChannelConfig;
-  providers: LlmProviderCatalogEntry[];
-  /** Task -> route references, to show which tasks use this connection. */
-  taskModelRefs: Array<{ label: string; route: string }>;
-  index: number;
-  busy: boolean;
-  visibleKey: boolean;
-  expanded: boolean;
-  testState?: ChannelTestState;
-  discoveryState?: ChannelDiscoveryState;
-  capabilityState?: ChannelCapabilityState;
-  onUpdate: (index: number, field: keyof ChannelConfig, value: string | boolean) => void;
-  onRemove: (index: number) => void;
-  onToggleExpand: (index: number) => void;
-  onToggleKeyVisibility: (index: number, nextVisible: boolean) => void;
-  onTest: (channel: ChannelConfig, index: number) => void;
-  onDiscoverModels: (channel: ChannelConfig) => void;
-  onToggleCapability: (channel: ChannelConfig, capability: LLMCapabilityCheck) => void;
-  onCheckCapabilities: (channel: ChannelConfig) => void;
-}
-
-function HelpLabel({
-  htmlFor,
-  label,
-  fieldKey,
-  helpKey,
-  examples,
-  compact = false,
-}: {
-  htmlFor?: string;
-  label: string;
-  fieldKey: string;
-  helpKey: string;
-  examples?: string[];
-  compact?: boolean;
-}) {
-  return (
-    <div className={compact ? 'mb-1 flex items-center gap-1.5' : 'mb-2 flex items-center gap-1.5'}>
-      <label
-        htmlFor={htmlFor}
-        className={compact ? 'text-xs text-muted-text' : 'text-sm font-medium text-foreground'}
-      >
-        {label}
-      </label>
-      <SettingsHelpButton
-        fieldKey={fieldKey}
-        title={label}
-        helpKey={helpKey}
-        examples={examples}
-      />
-    </div>
-  );
 }
 
 function parseChannelFieldKeys(channel: ChannelConfig): string[] {
@@ -424,40 +325,177 @@ function buildChangedItemKeys(
   return changedKeys;
 }
 
-const ChannelRow: React.FC<ChannelRowProps> = ({
+// A connection belongs to a catalog provider when its name is the provider id
+// optionally followed by a numeric suffix (the auto-naming scheme used when
+// adding a connection: "openai", "openai2", ...).
+function matchProviderIdForChannelName(
+  providers: LlmProviderCatalogEntry[],
+  name: string,
+): string | undefined {
+  const lower = name.trim().toLowerCase();
+  let best: string | undefined;
+  for (const provider of providers) {
+    if (provider.id === 'custom') {
+      continue;
+    }
+    const id = provider.id.toLowerCase();
+    const matches = lower === id || (lower.startsWith(id) && /^\d+$/.test(lower.slice(id.length)));
+    if (matches && (!best || id.length > best.length)) {
+      best = provider.id;
+    }
+  }
+  return best;
+}
+
+function countChannelsForProvider(
+  providers: LlmProviderCatalogEntry[],
+  channels: ChannelConfig[],
+  providerId: string,
+): number {
+  return channels.filter((channel) => {
+    const matched = matchProviderIdForChannelName(providers, channel.name);
+    if (providerId === 'custom') {
+      return matched === undefined;
+    }
+    return matched === providerId;
+  }).length;
+}
+
+// Suggest a unique connection name for a provider: the provider id itself,
+// then a numeric suffix ("openai", "openai2", ...).
+function suggestChannelName(existingNames: string[], providerId: string): string {
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
+  const base = providerId === 'custom' ? 'custom' : providerId.toLowerCase();
+  if (!taken.has(base)) {
+    return base;
+  }
+  let counter = 2;
+  while (taken.has(`${base}${counter}`)) {
+    counter += 1;
+  }
+  return `${base}${counter}`;
+}
+
+function describeProviderOption(entry: LlmProviderCatalogEntry, connectedCount: number): string {
+  const protocol = normalizeProtocol(entry.protocol);
+  const protocolLabel = PROTOCOL_OPTIONS.find((option) => option.value === protocol)?.label ?? entry.protocol;
+  const purpose = entry.isLocal
+    ? '连接本地模型服务'
+    : entry.isCustom
+      ? '接入兼容的自定义模型服务'
+      : entry.capabilities.includes('aggregator')
+        ? '接入聚合模型平台'
+        : '接入云端模型服务';
+  return `${protocolLabel} · ${purpose}${connectedCount > 0 ? ` · 已接入 ${connectedCount} 条` : ''}`;
+}
+
+// Shared connectivity-test runner used by the card quick action and the
+// connection dialog (the dialog must keep failures inline without closing).
+async function runChannelConnectionTest(
+  channel: ChannelConfig,
+  useSavedSecret: boolean,
+): Promise<ChannelTestState> {
+  try {
+    const result = await systemConfigApi.testLLMChannel({
+      name: channel.name,
+      protocol: channel.protocol,
+      baseUrl: channel.baseUrl,
+      apiKey: channel.apiKey,
+      models: splitModels(channel.models),
+      enabled: channel.enabled,
+      useSavedSecret,
+    });
+    if (result.success) {
+      return {
+        status: 'success',
+        text: `连接成功${result.resolvedModel ? ` · ${result.resolvedModel}` : ''}${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`,
+      };
+    }
+    return { status: 'error', text: buildLlmFailureText(result), hint: buildLlmTestHint(result) };
+  } catch (error: unknown) {
+    const parsed = getParsedApiError(error);
+    return { status: 'error', text: parsed.message || '测试失败' };
+  }
+}
+
+// Shared model-discovery runner. A successful call with an empty list is a
+// distinct outcome (endpoint reachable but no model IDs) — not an error.
+async function runChannelModelDiscovery(
+  channel: ChannelConfig,
+  useSavedSecret: boolean,
+): Promise<ChannelDiscoveryState> {
+  try {
+    const result = await systemConfigApi.discoverLLMChannelModels({
+      name: channel.name,
+      protocol: channel.protocol,
+      baseUrl: channel.baseUrl,
+      apiKey: channel.apiKey,
+      models: splitModels(channel.models),
+      useSavedSecret,
+    });
+    if (result.success) {
+      if (result.models.length === 0) {
+        return {
+          status: 'success',
+          text: '服务已连通，但没有返回可用模型',
+          hint: '请确认服务地址指向兼容的模型列表接口，或在下方手动添加模型。',
+          models: [],
+        };
+      }
+      return {
+        status: 'success',
+        text: `已获取 ${result.models.length} 个模型${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`,
+        models: result.models,
+      };
+    }
+    return {
+      status: 'error',
+      text: buildLlmFailureText(result),
+      hint: getLlmTroubleshootingHint(result.errorCode, result.stage, 'discovery', result.details),
+      models: [],
+    };
+  } catch (error: unknown) {
+    const parsed = getParsedApiError(error);
+    return { status: 'error', text: parsed.message || '获取模型失败', models: [] };
+  }
+}
+
+interface ConnectionCardProps {
+  channel: ChannelConfig;
+  providers: LlmProviderCatalogEntry[];
+  taskModelRefs: Array<{ label: string; route: string }>;
+  unsaved: boolean;
+  busy: boolean;
+  testState?: ChannelTestState;
+  issues: string[];
+  onTest: () => void;
+  onEdit: () => void;
+  onManageModels: () => void;
+  onToggleEnabled: () => void;
+  onRemove: () => void;
+}
+
+// Compact connection card: provider, connection name, status, model chips and
+// task usage plus quick actions. Credentials/endpoints/diagnostics live in the
+// connection dialog, never on the card.
+const ConnectionCard: React.FC<ConnectionCardProps> = ({
   channel,
   providers,
   taskModelRefs,
-  index,
+  unsaved,
   busy,
-  visibleKey,
-  expanded,
   testState,
-  discoveryState,
-  capabilityState,
-  onUpdate,
-  onRemove,
-  onToggleExpand,
-  onToggleKeyVisibility,
+  issues,
   onTest,
-  onDiscoverModels,
-  onToggleCapability,
-  onCheckCapabilities,
+  onEdit,
+  onManageModels,
+  onToggleEnabled,
+  onRemove,
 }) => {
-  const preset = findCatalogProvider(providers, channel.name);
-  const showProviderTemplateDetails = isKnownCatalogProvider(providers, channel.name);
-  const displayName = preset?.label || channel.name;
-  const providerCapabilities = showProviderTemplateDetails ? (preset?.capabilities || []) : [];
-  const presentation = getProviderPresentation(channel.name);
-  const providerSources = showProviderTemplateDetails ? presentation.officialSources : [];
-  const providerHint = showProviderTemplateDetails ? presentation.configHint : undefined;
+  const providerId = matchProviderIdForChannelName(providers, channel.name);
+  const provider = providerId ? findCatalogProvider(providers, providerId) : undefined;
+  const displayLabel = provider?.label ?? '自定义服务';
   const selectedModels = splitModels(channel.models);
-  const runtimeCapabilityOptions = isHermesChannel(channel)
-    ? RUNTIME_CAPABILITY_OPTIONS.filter((option) => option.value === 'json')
-    : RUNTIME_CAPABILITY_OPTIONS;
-  const discoveredModels = discoveryState?.models || [];
-  const modelCount = selectedModels.length;
-  // Which tasks reference a model this connection provides (for the card).
   const channelRouteModels = resolveChannelRouteModels(channel);
   const usedByTasks = Array.from(
     new Set(
@@ -466,126 +504,40 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
         .map((ref) => ref.label),
     ),
   );
-  const [modelDraft, setModelDraft] = useState('');
-  // Manual entry accepts one model per Enter/click, but pasted text may carry a
-  // comma/whitespace-separated list — split, trim and dedupe it in one pass.
-  const addModelToken = (raw: string) => {
-    const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
-    if (tokens.length === 0) {
+  const isComplete = issues.length === 0;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) {
       return;
     }
-    let next = selectedModels;
-    for (const token of tokens) {
-      if (!next.some((existing) => areModelsEquivalent(existing, token, channel.protocol))) {
-        next = [...next, token];
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
       }
-    }
-    if (next !== selectedModels) {
-      onUpdate(index, 'models', next.join(','));
-    }
-    setModelDraft('');
-  };
-  const removeModelToken = (model: string) => {
-    const next = selectedModels.filter((existing) => existing !== model).join(',');
-    onUpdate(index, 'models', next);
-  };
-  const nameIssues = getChannelNameIssues(channel);
-  const completenessIssues = getChannelCompletenessIssues(channel, providers);
-  const isComplete = nameIssues.length === 0 && completenessIssues.length === 0;
-  const missingIssues = [...nameIssues, ...completenessIssues];
-  const selectedCapabilities = capabilityState?.selected || [];
-  const capabilityResults = capabilityState?.results || {};
-  const capabilityBusy = capabilityState?.status === 'loading';
-  const channelNameInputId = `llm-channel-${channel.id}-name`;
-  const protocolInputId = `llm-channel-${channel.id}-protocol`;
-  const baseUrlInputId = `llm-channel-${channel.id}-base-url`;
-  const apiKeyInputId = `llm-channel-${channel.id}-api-key`;
-  const modelsInputId = `llm-channel-${channel.id}-models`;
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [menuOpen]);
 
   return (
-    <div className="mb-2 overflow-hidden rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-soft-card transition-[background-color,border-color,box-shadow] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]">
-      <div className="flex select-none items-center gap-2.5 px-4 py-3">
-        <input
-          type="checkbox"
-          checked={channel.enabled}
-          disabled={busy}
-          aria-label={`启用连接 ${displayName}`}
-          className="settings-input-checkbox h-4 w-4 shrink-0 rounded border-border/70 bg-base"
-          onChange={(e) => {
-            // Enabling requires a complete channel; keep it disabled and reveal
-            // the missing fields instead of silently accepting an unusable one.
-            if (e.target.checked && !isComplete) {
-              if (!expanded) {
-                onToggleExpand(index);
-              }
-              return;
-            }
-            onUpdate(index, 'enabled', e.target.checked);
-          }}
-        />
-
-        <button
-          type="button"
-          onClick={() => onToggleExpand(index)}
-          aria-expanded={expanded}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left transition-colors"
-        >
-          <span aria-hidden="true" className={`w-4 shrink-0 text-[11px] text-muted-text transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
-              <span className="truncate text-[11px] text-muted-text">{channel.name}</span>
-              <Badge variant="info" className="hidden sm:inline-flex">
-                {channel.protocol}
-              </Badge>
-            </div>
-            {modelCount > 0 ? (
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                {selectedModels.slice(0, 4).map((model) => (
-                  <span
-                    key={model}
-                    className="max-w-[12rem] truncate rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-[10px] text-secondary-text"
-                  >
-                    {model}
-                  </span>
-                ))}
-                {modelCount > 4 ? (
-                  <span className="text-[10px] text-muted-text">+{modelCount - 4} · 展开查看全部</span>
-                ) : null}
-              </div>
-            ) : (
-              <p className="mt-1 text-[11px] text-warning">尚未添加可用模型，展开以发现或手动添加模型</p>
-            )}
-            {usedByTasks.length > 0 ? (
-              <p className="mt-0.5 truncate text-[10px] text-muted-text">被以下任务使用：{usedByTasks.join('、')}</p>
-            ) : null}
-          </div>
-
-          <span className="flex shrink-0 items-center gap-2">
-            {testState?.status === 'success' ? (
-              <Tooltip content="连接正常">
-                <span className="inline-flex">
-                  <StatusDot tone="success" />
-                </span>
-              </Tooltip>
-            ) : null}
-            {testState?.status === 'error' ? (
-              <Tooltip content="连接失败">
-                <span className="inline-flex">
-                  <StatusDot tone="danger" />
-                </span>
-              </Tooltip>
-            ) : null}
-            {testState?.status === 'loading' ? (
-              <Tooltip content="测试中">
-                <span className="inline-flex">
-                  <StatusDot tone="warning" pulse />
-                </span>
-              </Tooltip>
-            ) : null}
+    <div
+      data-testid={`connection-card-${channel.name}`}
+      className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-3 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)]"
+    >
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-semibold text-foreground">{displayLabel}</span>
+            <span className="truncate text-xs text-muted-text">{channel.name}</span>
+            {unsaved ? <Badge variant="warning">未保存</Badge> : null}
             {!isComplete ? (
-              <Badge variant="warning">草稿 · 未完成</Badge>
+              <Tooltip content={issues.join('、')}>
+                <span className="inline-flex">
+                  <Badge variant="warning">草稿 · 未完成</Badge>
+                </span>
+              </Tooltip>
             ) : testState?.status === 'success' ? (
               <Badge variant="success">测试通过</Badge>
             ) : testState?.status === 'error' ? (
@@ -593,130 +545,485 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
             ) : testState?.status === 'loading' ? (
               <Badge variant="warning">测试中</Badge>
             ) : channel.enabled ? (
-              <Badge variant="info">已启用 · 未测试</Badge>
+              <Badge variant="success">已启用</Badge>
             ) : (
-              <Badge variant="default">结构校验通过 · 未测试</Badge>
+              <Badge variant="default">已停用</Badge>
             )}
-          </span>
-        </button>
+          </div>
+          {selectedModels.length > 0 ? (
+            <button
+              type="button"
+              aria-label={`管理模型 ${channel.name}`}
+              onClick={onManageModels}
+              disabled={busy}
+              className="mt-1.5 flex max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+              data-testid={`connection-models-${channel.id}`}
+            >
+              {selectedModels.slice(0, 4).map((model) => (
+                <span
+                  key={model}
+                  className="max-w-48 truncate rounded-full border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-1.5 py-0.5 text-xs text-secondary-text"
+                >
+                  {model}
+                </span>
+              ))}
+              {selectedModels.length > 4 ? (
+                <span className="text-xs text-muted-text">+{selectedModels.length - 4}</span>
+              ) : null}
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={`管理模型 ${channel.name}`}
+              onClick={onManageModels}
+              disabled={busy}
+              className="mt-1.5 rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+            >
+              尚未添加可用模型，点击此处获取或手动添加模型
+            </button>
+          )}
+          {usedByTasks.length > 0 ? (
+            <p className="mt-1 truncate text-xs text-muted-text">被以下任务使用：{usedByTasks.join('、')}</p>
+          ) : null}
+        </div>
 
-        <Tooltip content="删除连接">
-          <span className="inline-flex">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            type="button"
+            variant="settings-secondary"
+            size="sm"
+            className="px-3 text-xs shadow-none"
+            disabled={busy || testState?.status === 'loading'}
+            onClick={onTest}
+          >
+            {testState?.status === 'loading' ? '测试中…' : '测试'}
+          </Button>
+          <Button
+            type="button"
+            variant="settings-secondary"
+            size="sm"
+            className="px-3 text-xs shadow-none"
+            disabled={busy}
+            onClick={onEdit}
+          >
+            编辑
+          </Button>
+          <div className="relative" ref={menuRef}>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 shrink-0 px-2 text-xs text-muted-text hover:text-danger"
+              className="h-8 px-2 text-xs text-muted-text"
               disabled={busy}
-              aria-label="删除连接"
-              onClick={() => onRemove(index)}
+              aria-label={`更多操作 ${channel.name}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((previous) => !previous)}
             >
-              ✕
+              ⋮
             </Button>
-          </span>
-        </Tooltip>
+            {menuOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-border bg-elevated p-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full rounded-full px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onToggleEnabled();
+                  }}
+                >
+                  {channel.enabled ? '停用连接' : '启用连接'}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full rounded-full px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onRemove();
+                  }}
+                >
+                  删除连接
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      {expanded ? (
-        <div className="settings-surface-overlay-soft space-y-4 px-4 py-4">
-          {missingIssues.length > 0 ? (
-            <InlineAlert
-              variant="warning"
-              title={channel.enabled ? '启用连接前需补齐以下字段' : '草稿未完成（不会进入运行时路由，需补齐后才能启用）'}
-              message={(
-                <ul className="ml-4 list-disc space-y-0.5">
-                  {missingIssues.map((issue) => (
-                    <li key={issue}>{issue}</li>
-                  ))}
-                </ul>
-              )}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
+      {testState?.text ? (
+        <div className="mt-2 flex items-start gap-1.5">
+          <span className="mt-0.5 inline-flex">
+            <StatusDot
+              tone={testState.status === 'success' ? 'success' : testState.status === 'error' ? 'danger' : 'warning'}
+              pulse={testState.status === 'loading'}
             />
-          ) : null}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div>
-              <HelpLabel
-                htmlFor={channelNameInputId}
-                label="连接名称"
-                fieldKey="LLM_CHANNEL_NAME"
-                helpKey="settings.llm_channel.channel_name"
-                examples={['deepseek', 'my_proxy']}
-              />
-            <Input
-              id={channelNameInputId}
-              value={channel.name}
-              disabled={busy}
-              onChange={(e) => onUpdate(index, 'name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-              placeholder="primary"
-            />
-            </div>
-            <div className="space-y-2">
-              <HelpLabel
-                htmlFor={protocolInputId}
-                label="协议"
-                fieldKey="LLM_CHANNEL_PROTOCOL"
-                helpKey="settings.llm_channel.protocol"
-                examples={['DeepSeek 官方服务选 deepseek', '中转/聚合服务通常选 openai']}
-              />
-              <Select
-                id={protocolInputId}
-                value={channel.protocol}
-                onChange={(v) => onUpdate(index, 'protocol', normalizeProtocol(v))}
-                options={PROTOCOL_OPTIONS}
-                disabled={busy}
-                placeholder="选择协议"
-              />
-            </div>
+          </span>
+          <div className="min-w-0">
+            <p className={`text-xs ${testState.status === 'success' ? 'text-success' : testState.status === 'error' ? 'text-danger' : 'text-muted-text'}`}>
+              {testState.text}
+            </p>
+            {testState.hint ? <p className="text-xs text-secondary-text">{testState.hint}</p> : null}
           </div>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
-          <div>
-            <HelpLabel
-              htmlFor={baseUrlInputId}
-              label="服务地址"
-              fieldKey="LLM_CHANNEL_BASE_URL"
-              helpKey="settings.llm_channel.base_url"
-              examples={['https://api.deepseek.com', 'https://openrouter.ai/api/v1']}
-            />
-          <Input
-            id={baseUrlInputId}
-            value={channel.baseUrl}
-            disabled={busy}
-            onChange={(e) => onUpdate(index, 'baseUrl', e.target.value)}
-            placeholder={
-              channel.protocol === 'gemini' || channel.protocol === 'anthropic'
-                ? '官方接口可留空'
-                : preset?.defaultBaseUrl || 'https://api.example.com/v1'
-            }
-          />
-          </div>
+interface ConnectionModalProps {
+  mode: 'add' | 'edit';
+  /** The channel being edited; null starts the add flow at the provider step. */
+  initialChannel: ChannelConfig | null;
+  focusModels?: boolean;
+  channels: ChannelConfig[];
+  providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts: string[];
+  maskToken: string;
+  hermesSecretPersisted: boolean;
+  catalogUnavailable: boolean;
+  onReloadCatalog?: () => void;
+  onSubmit: (channel: ChannelConfig) => void;
+  onClose: () => void;
+}
 
-          {showProviderTemplateDetails ? (
-            <div className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-medium text-muted-text">配置参考</span>
-                {providerCapabilities.map((capability) => {
-                  const capabilityMeta = getCapabilityLabel(capability);
-                  if (!capabilityMeta) {
-                    return null;
-                  }
-                  return (
-                    <Tooltip key={capability} content={capabilityMeta.hint}>
-                      <span className="inline-flex">
-                        <Badge variant="default" className="border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text">
-                          {capabilityMeta.label}
-                        </Badge>
-                      </span>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-              {providerHint ? (
-                <p className="text-[11px] leading-5 text-secondary-text">{providerHint}</p>
+// Two-step connection dialog: pick a provider from the catalog, then fill in
+// only the fields that provider actually needs. Test / discovery failures stay
+// inline — the dialog never closes on error.
+const ConnectionModal: React.FC<ConnectionModalProps> = ({
+  mode,
+  initialChannel,
+  focusModels = false,
+  channels,
+  providers,
+  emptyApiKeyHosts,
+  maskToken,
+  hermesSecretPersisted,
+  catalogUnavailable,
+  onReloadCatalog,
+  onSubmit,
+  onClose,
+}) => {
+  const [draft, setDraft] = useState<ChannelConfig | null>(initialChannel);
+  const [providerId, setProviderId] = useState<string | undefined>(() => (
+    initialChannel ? matchProviderIdForChannelName(providers, initialChannel.name) : undefined
+  ));
+  const provider = providerId ? findCatalogProvider(providers, providerId) : undefined;
+  const isCustomService = !provider || provider.isCustom;
+  const [customBaseUrl, setCustomBaseUrl] = useState<boolean>(() => {
+    if (!initialChannel) {
+      return false;
+    }
+    const matched = matchProviderIdForChannelName(providers, initialChannel.name);
+    const matchedProvider = matched ? findCatalogProvider(providers, matched) : undefined;
+    if (!matchedProvider || matchedProvider.isCustom) {
+      return true;
+    }
+    if (matchedProvider.defaultBaseUrl) {
+      return initialChannel.baseUrl.trim() !== '' && initialChannel.baseUrl !== matchedProvider.defaultBaseUrl;
+    }
+    return matchedProvider.requiresBaseUrl ? true : initialChannel.baseUrl.trim() !== '';
+  });
+  const [showManualModelInput, setShowManualModelInput] = useState(false);
+  const [modelDraft, setModelDraft] = useState('');
+  const [keyVisible, setKeyVisible] = useState(false);
+  const [test, setTest] = useState<ChannelTestState | null>(null);
+  const [discovery, setDiscovery] = useState<ChannelDiscoveryState | null>(null);
+  const testNonceRef = useRef(0);
+  const discoveryNonceRef = useRef(0);
+
+  const existingNames = useMemo(() => {
+    const excluded = initialChannel?.name.trim().toLowerCase();
+    return channels
+      .map((channel) => channel.name.trim().toLowerCase())
+      .filter((name) => name && name !== excluded);
+  }, [channels, initialChannel]);
+
+  const providerOptions = useMemo<SearchableSelectOption[]>(() => {
+    const options: SearchableSelectOption[] = [];
+    for (const entry of providers) {
+      if (entry.id === 'custom') {
+        continue;
+      }
+      const count = countChannelsForProvider(providers, channels, entry.id);
+      options.push({
+        value: entry.id,
+        label: entry.label,
+        sublabel: describeProviderOption(entry, count),
+        keywords: [entry.protocol, ...entry.capabilities],
+      });
+    }
+    const customCount = countChannelsForProvider(providers, channels, 'custom');
+    options.push({
+      value: 'custom',
+      label: '自定义服务',
+      sublabel: `兼容服务 · 接入自定义模型服务${customCount > 0 ? ` · 已接入 ${customCount} 条` : ''}`,
+    });
+    return options;
+  }, [providers, channels]);
+
+  const chooseProvider = (id: string) => {
+    if (!id) {
+      return;
+    }
+    const chosen = findCatalogProvider(providers, id);
+    setProviderId(id);
+    setDraft({
+      id: `modal:${id}`,
+      name: suggestChannelName(existingNames, id),
+      protocol: normalizeProtocol(chosen?.protocol ?? 'openai'),
+      baseUrl: chosen?.defaultBaseUrl ?? '',
+      apiKey: '',
+      models: '',
+      enabled: true,
+    });
+    setCustomBaseUrl(!chosen || chosen.isCustom === true);
+    testNonceRef.current += 1;
+    discoveryNonceRef.current += 1;
+    setTest(null);
+    setDiscovery(null);
+  };
+
+  const updateDraft = (field: keyof ChannelConfig, value: string | boolean) => {
+    setDraft((previous) => (previous ? { ...previous, [field]: value } : previous));
+    if (field === 'protocol' || field === 'baseUrl' || field === 'apiKey' || field === 'name') {
+      // Bump nonces so in-flight test/discovery responses for the
+      // previous connection parameters are discarded instead of re-filling state.
+      testNonceRef.current += 1;
+      discoveryNonceRef.current += 1;
+      setTest(null);
+      setDiscovery(null);
+    }
+  };
+
+  const selectedModels = draft ? splitModels(draft.models) : [];
+  const addModelToken = (raw: string) => {
+    if (!draft) {
+      return;
+    }
+    const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
+    if (tokens.length === 0) {
+      return;
+    }
+    let next = selectedModels;
+    for (const token of tokens) {
+      if (!next.some((existing) => areModelsEquivalent(existing, token, draft.protocol))) {
+        next = [...next, token];
+      }
+    }
+    if (next !== selectedModels) {
+      updateDraft('models', next.join(','));
+    }
+    setModelDraft('');
+  };
+
+  const handleTest = async () => {
+    if (!draft) {
+      return;
+    }
+    if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
+      setTest({ status: 'error', text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE });
+      return;
+    }
+    const nonce = testNonceRef.current + 1;
+    testNonceRef.current = nonce;
+    setTest({ status: 'loading', text: '测试中…' });
+    const result = await runChannelConnectionTest(
+      draft,
+      shouldUseSavedHermesSecret(draft, maskToken, hermesSecretPersisted),
+    );
+    if (testNonceRef.current === nonce) {
+      setTest(result);
+    }
+  };
+
+  const handleDiscover = async () => {
+    if (!draft) {
+      return;
+    }
+    if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
+      setDiscovery({ status: 'error', text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE, models: discovery?.models || [] });
+      return;
+    }
+    const nonce = discoveryNonceRef.current + 1;
+    discoveryNonceRef.current = nonce;
+    setDiscovery({ status: 'loading', text: '正在获取模型列表…', models: discovery?.models || [] });
+    const result = await runChannelModelDiscovery(
+      draft,
+      shouldUseSavedHermesSecret(draft, maskToken, hermesSecretPersisted),
+    );
+    if (discoveryNonceRef.current === nonce) {
+      setDiscovery(result.status === 'error' && (discovery?.models.length || 0) > 0
+        ? { ...result, models: discovery?.models || [] }
+        : result);
+    }
+  };
+
+  const nameIssues = draft ? getChannelNameIssues(draft) : [];
+  const nameConflict = draft && existingNames.includes(draft.name.trim().toLowerCase())
+    ? ['连接名称已存在，请更换']
+    : [];
+  const completenessIssues = draft ? getChannelCompletenessIssues(draft, providers, emptyApiKeyHosts) : [];
+  const blockingIssues = [...nameIssues, ...nameConflict, ...(draft?.enabled ? completenessIssues : [])];
+
+  const allowsEmptyKey = draft ? channelAllowsEmptyApiKey(draft, emptyApiKeyHosts) : false;
+  const showApiKeyField = Boolean(draft) && provider?.requiresApiKey !== false;
+  const presentation = providerId ? getProviderPresentation(providerId) : undefined;
+  const showBaseUrlSummary = !isCustomService && !customBaseUrl;
+  const discoveredModels = discovery?.models || [];
+  const providerSelectId = 'connection-modal-provider';
+  const nameInputId = 'connection-modal-name';
+  const protocolInputId = 'connection-modal-protocol';
+  const baseUrlInputId = 'connection-modal-base-url';
+  const apiKeyInputId = 'connection-modal-api-key';
+  const modelsInputId = 'connection-modal-models';
+  const discoverButtonId = 'connection-modal-discover-models';
+
+  // A11y: focus the first form field (not the dialog close button) when the
+  // dialog opens and when advancing from the provider step to the form step.
+  // This child effect runs after the Modal's own focus move-in, so it wins.
+  const focusStep = draft ? 'form' : 'provider';
+  useEffect(() => {
+    document.getElementById(
+      focusStep === 'provider'
+        ? providerSelectId
+        : focusModels
+          ? discoverButtonId
+          : nameInputId,
+    )?.focus();
+  }, [focusStep, focusModels]);
+
+  return (
+    <Modal isOpen onClose={onClose} title={mode === 'edit' ? '编辑模型服务' : '添加模型服务'} className="max-w-xl">
+      {!draft ? (
+        <div className="space-y-3">
+          <p className="text-sm text-secondary-text">选择要接入的模型服务商，下一步填写凭据并选择可用模型。</p>
+          {catalogUnavailable || providers.length === 0 ? (
+            <div className="flex items-center gap-2 text-xs text-danger">
+              <span>模型服务列表加载失败</span>
+              {onReloadCatalog ? (
+                <button type="button" className="underline underline-offset-2" onClick={onReloadCatalog}>
+                  重试
+                </button>
               ) : null}
-              {providerSources.length > 0 ? (
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-5 text-secondary-text">
-                  <span>官方来源：</span>
-                  {providerSources.map((source) => (
+            </div>
+          ) : (
+            <SearchableSelect
+              id={providerSelectId}
+              ariaLabel="选择模型服务商"
+              value=""
+              onChange={chooseProvider}
+              options={providerOptions}
+              placeholder="搜索或选择服务商"
+              searchPlaceholder="输入服务商名称搜索"
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label htmlFor={nameInputId} className="mb-2 block text-sm font-medium text-foreground">
+              连接名称
+            </label>
+            <Input
+              id={nameInputId}
+              value={draft.name}
+              onChange={(e) => updateDraft('name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              placeholder="连接名称"
+            />
+          </div>
+
+          {isCustomService ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor={protocolInputId} className="mb-2 block text-sm font-medium text-foreground">
+                  协议
+                </label>
+                <Select
+                  id={protocolInputId}
+                  value={draft.protocol}
+                  onChange={(v) => updateDraft('protocol', normalizeProtocol(v))}
+                  options={PROTOCOL_OPTIONS}
+                  placeholder="选择协议"
+                />
+              </div>
+              <div>
+                <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
+                  服务地址
+                </label>
+                <Input
+                  id={baseUrlInputId}
+                  value={draft.baseUrl}
+                  onChange={(e) => updateDraft('baseUrl', e.target.value)}
+                  placeholder="https://api.example.com/v1"
+                />
+              </div>
+            </div>
+          ) : showBaseUrlSummary ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary-text">
+              <span className="truncate">
+                {provider?.defaultBaseUrl
+                  ? '使用服务商官方地址'
+                  : '使用官方接口地址，无需填写。'}
+              </span>
+              <button
+                type="button"
+                className="settings-accent-text shrink-0 underline-offset-2 hover:underline"
+                onClick={() => setCustomBaseUrl(true)}
+              >
+                使用自定义服务地址
+              </button>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
+                服务地址
+              </label>
+              <Input
+                id={baseUrlInputId}
+                value={draft.baseUrl}
+                onChange={(e) => updateDraft('baseUrl', e.target.value)}
+                placeholder={provider?.defaultBaseUrl || 'https://api.example.com/v1'}
+              />
+              {provider?.defaultBaseUrl ? (
+                <button
+                  type="button"
+                  className="settings-accent-text mt-1 text-xs underline-offset-2 hover:underline"
+                  onClick={() => {
+                    updateDraft('baseUrl', provider.defaultBaseUrl);
+                    setCustomBaseUrl(false);
+                  }}
+                >
+                  恢复官方默认地址
+                </button>
+              ) : null}
+            </div>
+          )}
+
+          {showApiKeyField ? (
+            <div>
+              <label htmlFor={apiKeyInputId} className="mb-2 block text-sm font-medium text-foreground">
+                API 密钥
+              </label>
+              <Input
+                id={apiKeyInputId}
+                type="password"
+                allowTogglePassword
+                iconType="key"
+                passwordVisible={keyVisible}
+                onPasswordVisibleChange={setKeyVisible}
+                value={draft.apiKey}
+                onChange={(e) => updateDraft('apiKey', e.target.value)}
+                placeholder={allowsEmptyKey ? '本地服务可留空' : '支持多个密钥，用逗号分隔'}
+              />
+              {presentation && presentation.officialSources.length > 0 ? (
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-text">
+                  <span>获取密钥：</span>
+                  {presentation.officialSources.map((source) => (
                     <a
                       key={source.url}
                       href={source.url}
@@ -729,273 +1036,205 @@ const ChannelRow: React.FC<ChannelRowProps> = ({
                   ))}
                 </p>
               ) : null}
-              <p className="text-[11px] leading-5 text-muted-text">
-                能力标签仅用于配置参考，不代表运行时能力已验证通过。
-              </p>
             </div>
           ) : null}
 
-          <div>
-            <HelpLabel
-              htmlFor={apiKeyInputId}
-              label="API 密钥"
-              fieldKey="LLM_CHANNEL_API_KEY"
-              helpKey="settings.llm_channel.api_key"
-              examples={['sk-xxxx', '多个 Key 用逗号分隔：sk-key-1,sk-key-2']}
-            />
-          <Input
-            id={apiKeyInputId}
-            type="password"
-            allowTogglePassword
-            iconType="key"
-            passwordVisible={visibleKey}
-            onPasswordVisibleChange={(nextVisible) => onToggleKeyVisibility(index, nextVisible)}
-            value={channel.apiKey}
-            disabled={busy}
-            onChange={(e) => onUpdate(index, 'apiKey', e.target.value)}
-            placeholder={channel.protocol === 'ollama' ? '本地 Ollama 可留空' : '支持多个 Key 逗号分隔'}
-          />
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="settings-secondary"
-                size="sm"
-                className="px-3 text-[11px] shadow-none"
-                disabled={busy}
-                onClick={() => onDiscoverModels(channel)}
-              >
-                {discoveryState?.status === 'loading' ? '获取中...' : '获取模型'}
-              </Button>
-              <span className={`text-xs ${
-                discoveryState?.status === 'success'
-                  ? 'text-success'
-                  : discoveryState?.status === 'error'
-                    ? 'text-danger'
-                    : 'text-muted-text'
-              }`}
-              >
-                {discoveryState?.text || '支持 `/models` 的 OpenAI Compatible 连接可自动拉取模型。'}
-              </span>
-            </div>
-            {discoveryState?.hint ? (
-              <p className="text-[11px] text-secondary-text">
-                {discoveryState.hint}
-              </p>
-            ) : null}
-
-            {discoveredModels.length > 0 ? (
-              <div>
-                <HelpLabel
-                  label="发现的模型（搜索并勾选启用）"
-                  fieldKey="LLM_CHANNEL_DISCOVERED_MODELS"
-                  helpKey="settings.llm_channel.models"
-                />
-                <ModelMultiSelect
-                  options={discoveredModels}
-                  isSelected={(model) => selectedModels.some((selectedModel) => (
-                    areModelsEquivalent(selectedModel, model, channel.protocol)
-                  ))}
-                  onToggle={(model) => onUpdate(index, 'models', toggleModelSelection(channel.models, model, channel.protocol))}
-                  disabled={busy}
-                />
-              </div>
-            ) : null}
-
-            <div>
-              <HelpLabel
-                htmlFor={modelsInputId}
-                label="可用模型"
-                fieldKey="LLM_CHANNEL_MODELS"
-                helpKey="settings.llm_channel.models"
-                examples={['deepseek-v4-flash', 'qwen3:8b']}
-              />
+          <div className="space-y-2">
+            <label htmlFor={modelsInputId} className="block text-sm font-medium text-foreground">
+              可用模型
+            </label>
             {selectedModels.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-1.5" data-testid={`connection-models-${channel.id}`}>
+              <div className="flex flex-wrap gap-1.5">
                 {selectedModels.map((model) => (
                   <span
                     key={model}
-                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-[11px] text-secondary-text"
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
                     <button
                       type="button"
-                      disabled={busy}
                       aria-label={`移除模型 ${model}`}
-                      onClick={() => removeModelToken(model)}
-                      className="shrink-0 text-muted-text hover:text-danger"
+                      onClick={() => updateDraft('models', selectedModels.filter((existing) => existing !== model).join(','))}
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
                     >
                       ×
                     </button>
                   </span>
                 ))}
               </div>
-            ) : (
-              <p className="mb-2 text-[11px] text-muted-text">
-                尚未添加模型。使用上方“获取模型”自动发现并勾选，或在下方输入模型 ID 后逐个添加。
-              </p>
-            )}
+            ) : null}
             <div className="flex items-center gap-2">
-              <Input
-                id={modelsInputId}
-                value={modelDraft}
-                disabled={busy}
-                onChange={(e) => setModelDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addModelToken(modelDraft);
-                  }
-                }}
-                onPaste={(e) => {
-                  const text = e.clipboardData.getData('text');
-                  // A pasted list (comma/whitespace separated) becomes tokens
-                  // immediately; a single id falls through to the normal input.
-                  if (/[,\s]/.test(text.trim())) {
-                    e.preventDefault();
-                    addModelToken(`${modelDraft} ${text}`);
-                  }
-                }}
-                aria-label="添加模型"
-                placeholder="输入模型 ID 后回车或点“添加”"
-              />
               <Button
+                id={discoverButtonId}
                 type="button"
                 variant="settings-secondary"
                 size="sm"
-                className="shrink-0 px-3 text-[11px] shadow-none"
-                disabled={busy || !modelDraft.trim()}
-                onClick={() => addModelToken(modelDraft)}
+                className="px-3 text-xs shadow-none"
+                disabled={discovery?.status === 'loading'}
+                onClick={() => void handleDiscover()}
               >
-                添加
+                {discovery?.status === 'loading' ? '获取中…' : '获取模型'}
               </Button>
+              <span className={`text-xs ${
+                discovery?.status === 'success'
+                  ? 'text-success'
+                  : discovery?.status === 'error'
+                    ? 'text-danger'
+                    : 'text-muted-text'
+              }`}
+              >
+                {discovery?.text || '自动拉取该服务的可用模型，确认后再加入连接。'}
+              </span>
             </div>
-            </div>
+            {discovery?.hint ? <p className="text-xs text-secondary-text">{discovery.hint}</p> : null}
+            {discoveredModels.length > 0 ? (
+              <ModelMultiSelect
+                options={discoveredModels}
+                isSelected={(model) => selectedModels.some((selectedModel) => (
+                  areModelsEquivalent(selectedModel, model, draft.protocol)
+                ))}
+                onToggle={(model) => updateDraft('models', toggleModelSelection(draft.models, model, draft.protocol))}
+              />
+            ) : null}
+            {showManualModelInput ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  id={modelsInputId}
+                  value={modelDraft}
+                  onChange={(e) => setModelDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addModelToken(modelDraft);
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData('text');
+                    if (/[,\s]/.test(text.trim())) {
+                      e.preventDefault();
+                      addModelToken(`${modelDraft} ${text}`);
+                    }
+                  }}
+                  aria-label="手动添加模型"
+                  placeholder="输入模型 ID 后回车添加"
+                />
+                <Button
+                  type="button"
+                  variant="settings-secondary"
+                  size="sm"
+                  className="shrink-0 px-3 text-xs shadow-none"
+                  disabled={!modelDraft.trim()}
+                  onClick={() => addModelToken(modelDraft)}
+                >
+                  添加
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="settings-accent-text text-xs underline-offset-2 hover:underline"
+                onClick={() => setShowManualModelInput(true)}
+              >
+                没有找到需要的模型？手动添加模型
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-start gap-2">
             <Button
               type="button"
               variant="settings-secondary"
               size="sm"
-              className="px-3 text-[11px] shadow-none"
-              disabled={busy}
-              onClick={() => onTest(channel, index)}
+              className="shrink-0 px-3 text-xs shadow-none"
+              disabled={test?.status === 'loading'}
+              onClick={() => void handleTest()}
             >
-              {testState?.status === 'loading' ? '测试中...' : '测试连接'}
+              {test?.status === 'loading' ? '测试中…' : '测试连接'}
             </Button>
-            {testState?.text ? (
-              <div className="space-y-1">
-                <span className={`block text-xs ${
-                  testState.status === 'success'
-                    ? 'text-success'
-                    : testState.status === 'error'
-                      ? 'text-danger'
-                      : 'text-muted-text'
+            {test?.text ? (
+              <div className="min-w-0 space-y-0.5">
+                <p className={`text-xs ${
+                  test.status === 'success' ? 'text-success' : test.status === 'error' ? 'text-danger' : 'text-muted-text'
                 }`}
                 >
-                  {testState.text}
-                </span>
-                {selectedModels[0] ? (
-                  <p className="text-[11px] text-secondary-text">
-                    基础连接测试默认使用模型列表首项：{selectedModels[0]}
-                  </p>
-                ) : null}
-                {testState.hint ? (
-                  <p className="text-[11px] text-secondary-text">
-                    {testState.hint}
-                  </p>
-                ) : null}
+                  {test.text}
+                </p>
+                {test.hint ? <p className="text-xs text-secondary-text">{test.hint}</p> : null}
               </div>
             ) : null}
           </div>
 
-          <div className="space-y-3 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-[11px] font-medium text-muted-text">运行时能力检测（可选）</p>
-                  <SettingsHelpButton
-                    fieldKey="LLM_CHANNEL_CAPABILITY_CHECKS"
-                    title="运行时能力检测"
-                    helpKey="settings.llm_channel.capability_checks"
-                    examples={['JSON / Tools / Stream / Vision']}
-                  />
-                </div>
-                <p className="mt-0.5 text-[11px] text-secondary-text">
-                  仅在手动触发时发起真实 LLM 请求；多选可能需要 20-40 秒。
-                </p>
-              </div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-2.5">
+            <div>
+              <p className="text-sm text-foreground">启用此连接</p>
+              <p className="text-xs text-muted-text">停用的连接会保留为草稿，不参与任务路由。</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={draft.enabled}
+              aria-label="启用此连接"
+              onClick={() => updateDraft('enabled', !draft.enabled)}
+              className={`relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                draft.enabled ? 'bg-foreground' : 'bg-border'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                  draft.enabled ? 'translate-x-3' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {blockingIssues.length > 0 ? (
+            <InlineAlert
+              variant="warning"
+              title={draft.enabled ? '启用前需补齐以下内容' : '连接名称需要修正'}
+              message={(
+                <ul className="ml-4 list-disc space-y-0.5">
+                  {blockingIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              )}
+              className="rounded-lg px-3 py-2 text-xs shadow-none"
+            />
+          ) : null}
+          {!draft.enabled && completenessIssues.length > 0 ? (
+            <p className="text-xs text-muted-text">未补齐的内容会以草稿保存：{completenessIssues.join('、')}</p>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+            {mode === 'add' ? (
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="ghost"
                 size="sm"
-                className="px-3 text-[11px] shadow-none"
-                disabled={busy || capabilityBusy || selectedCapabilities.length === 0}
-                onClick={() => onCheckCapabilities(channel)}
+                onClick={() => {
+                  setDraft(null);
+                  setProviderId(undefined);
+                  setTest(null);
+                  setDiscovery(null);
+                }}
               >
-                {capabilityBusy ? '检测中...' : '检测能力'}
+                上一步
               </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {runtimeCapabilityOptions.map((option) => (
-                <Tooltip key={option.value} content={option.hint}>
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-2 py-1 text-[11px] text-secondary-text">
-                    <input
-                      type="checkbox"
-                      checked={selectedCapabilities.includes(option.value)}
-                      disabled={busy || capabilityBusy}
-                      onChange={() => onToggleCapability(channel, option.value)}
-                      className="settings-input-checkbox h-3.5 w-3.5 rounded border-border/70 bg-base"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                </Tooltip>
-              ))}
-            </div>
-
-            {capabilityState?.text ? (
-              <div className="space-y-1">
-                <p className={`text-xs ${
-                  capabilityState.status === 'success'
-                    ? 'text-success'
-                    : capabilityState.status === 'error'
-                      ? 'text-danger'
-                      : 'text-muted-text'
-                }`}
-                >
-                  {capabilityState.text}
-                </p>
-                {capabilityState.hint ? (
-                  <p className="text-[11px] text-secondary-text">{capabilityState.hint}</p>
-                ) : null}
-              </div>
             ) : null}
-
-            {Object.keys(capabilityResults).length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {RUNTIME_CAPABILITY_OPTIONS.map((option) => {
-                  const result = capabilityResults[option.value];
-                  if (!result) return null;
-                  return (
-                    <Tooltip key={option.value} content={result.message}>
-                      <span className="inline-flex">
-                        <Badge variant={getCapabilityResultVariant(result.status)}>
-                          {option.label} {CAPABILITY_STATUS_LABELS[result.status]}
-                        </Badge>
-                      </span>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            ) : null}
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>取消</Button>
+            <Button
+              type="button"
+              variant="settings-primary"
+              size="sm"
+              disabled={blockingIssues.length > 0}
+              onClick={() => onSubmit(draft)}
+            >
+              {mode === 'edit' ? '保存修改' : '添加到配置'}
+            </Button>
           </div>
         </div>
-      ) : null}
-    </div>
+      )}
+    </Modal>
   );
 };
 
@@ -1150,53 +1389,12 @@ function resolveModelPreview(models: string, protocol: ChannelProtocol): string[
   return splitModels(models).map((model) => normalizeModelForRuntime(model, protocol));
 }
 
-interface RouteProvenance {
-  routeName: string;
-  hasHermes: boolean;
-  hasNonHermes: boolean;
-}
-
 function resolveChannelRouteModels(channel: ChannelConfig): string[] {
   if (isHermesChannel(channel)) {
     const models = splitModels(channel.models);
     return (models.length > 0 ? models : [HERMES_DEFAULT_MODEL]).map(canonicalizeHermesRouteModel);
   }
   return resolveModelPreview(channel.models, channel.protocol);
-}
-
-function buildRouteProvenanceMap(channels: ChannelConfig[]): Map<string, RouteProvenance> {
-  const provenance = new Map<string, RouteProvenance>();
-  for (const channel of channels) {
-    if (!channel.enabled || !channel.name.trim()) {
-      continue;
-    }
-    const hermes = isHermesChannel(channel);
-    for (const routeName of resolveChannelRouteModels(channel)) {
-      if (!routeName) continue;
-      const existing = provenance.get(routeName) || {
-        routeName,
-        hasHermes: false,
-        hasNonHermes: false,
-      };
-      provenance.set(routeName, {
-        ...existing,
-        hasHermes: existing.hasHermes || hermes,
-        hasNonHermes: existing.hasNonHermes || !hermes,
-      });
-    }
-  }
-  return provenance;
-}
-
-function buildModelOptions(models: string[], selectedModel: string, autoLabel: string): Array<{ value: string; label: string }> {
-  const options: Array<{ value: string; label: string }> = [{ value: '', label: autoLabel }];
-  if (selectedModel && !models.includes(selectedModel)) {
-    options.push({ value: selectedModel, label: `${selectedModel}（当前配置）` });
-  }
-  for (const model of models) {
-    options.push({ value: model, label: model });
-  }
-  return options;
 }
 
 const LLM_STAGE_LABELS: Record<string, string> = {
@@ -1312,31 +1510,6 @@ function buildLlmFailureText(result: {
     return `${prefix}：${summary}（原始摘要：${result.error}）`;
   }
   return `${prefix}：${summary}`;
-}
-
-function getCapabilityResultVariant(status: LLMCapabilityCheckResult['status']): 'success' | 'danger' | 'warning' {
-  if (status === 'passed') return 'success';
-  if (status === 'skipped') return 'warning';
-  return 'danger';
-}
-
-function summarizeCapabilityResults(results: Partial<Record<LLMCapabilityCheck, LLMCapabilityCheckResult>>): string {
-  const values = Object.values(results);
-  const passed = values.filter((result) => result?.status === 'passed').length;
-  const failed = values.filter((result) => result?.status === 'failed').length;
-  const skipped = values.filter((result) => result?.status === 'skipped').length;
-  return `能力检测完成：${passed} 通过 / ${failed} 失败 / ${skipped} 跳过`;
-}
-
-function getFirstCapabilityHint(
-  results: Partial<Record<LLMCapabilityCheck, LLMCapabilityCheckResult>>,
-): string | undefined {
-  for (const result of Object.values(results)) {
-    if (!result || result.status === 'passed') continue;
-    const hint = getLlmTroubleshootingHint(result.errorCode, result.stage, 'test', result.details);
-    if (hint) return hint;
-  }
-  return undefined;
 }
 
 function runtimeConfigChangedKeys(left: RuntimeConfig, right: RuntimeConfig): Set<string> {
@@ -1508,10 +1681,35 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
   return [];
 }
 
+// Mirrors the backend `channel_allows_empty_api_key` contract: ollama never
+// needs a key, and OpenAI-compatible endpoints on a backend-exempted local
+// host (emptyApiKeyHosts) may leave it empty too.
+function channelAllowsEmptyApiKey(
+  channel: Pick<ChannelConfig, 'protocol' | 'baseUrl'>,
+  emptyApiKeyHosts: string[],
+): boolean {
+  if (channel.protocol === 'ollama') {
+    return true;
+  }
+  const baseUrl = channel.baseUrl.trim();
+  if (!baseUrl) {
+    return false;
+  }
+  try {
+    return emptyApiKeyHosts.includes(new URL(baseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Fields required to run the channel; surfaced as "未完成" while missing.
-function getChannelCompletenessIssues(channel: ChannelConfig, providers: LlmProviderCatalogEntry[]): string[] {
+function getChannelCompletenessIssues(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+): string[] {
   const issues: string[] = [];
-  if (channel.protocol !== 'ollama' && !channel.apiKey.trim()) {
+  if (!channelAllowsEmptyApiKey(channel, emptyApiKeyHosts) && !channel.apiKey.trim()) {
     issues.push('缺少 API 密钥');
   }
   // Known providers ship a default Base URL, and ollama/local endpoints have a
@@ -1532,12 +1730,16 @@ function getChannelCompletenessIssues(channel: ChannelConfig, providers: LlmProv
 
 // Issues that block saving: names must always be valid; enabled channels must
 // additionally be complete. Disabled channels may be saved as drafts.
-function getChannelSaveIssues(channel: ChannelConfig, providers: LlmProviderCatalogEntry[]): string[] {
+function getChannelSaveIssues(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+): string[] {
   const nameIssues = getChannelNameIssues(channel);
   if (nameIssues.length > 0) {
     return nameIssues;
   }
-  return channel.enabled ? getChannelCompletenessIssues(channel, providers) : [];
+  return channel.enabled ? getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts) : [];
 }
 
 function buildFilteredChannelUpdateItems({
@@ -1677,15 +1879,18 @@ function applyChannelDraftItems(
 export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   items,
   providers,
+  emptyApiKeyHosts = [],
   maskToken,
   persistedDraftItems,
   onDraftItemsChange,
   onValidityChange,
   resetSignal = 0,
+  addSignal = 0,
   disabled = false,
   catalogUnavailable = false,
+  onReloadCatalog,
   overriddenByMode = null,
-  showRuntimeConfig = true,
+  onViewDiagnostics,
   taskModelRefs = [],
   onManageModels,
 }) => {
@@ -1697,21 +1902,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
   const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
   const savedItemMap = useMemo(() => new Map(items.map((item) => [item.key.toUpperCase(), item.value])), [items]);
-  const hasPersistedHermesSecret = (channel: ChannelConfig): boolean => (
-    isHermesChannel(channel) && initialItemSourceByKey.get('LLM_HERMES_API_KEY') === true
-  );
-  const hasLitellmConfig = useMemo(
-    () => items.some((item) => item.key === 'LITELLM_CONFIG' && item.value.trim().length > 0),
-    [items],
-  );
-  const managesRuntimeConfig = !hasLitellmConfig;
-  // Only this editor emits the runtime routing keys when it also renders that
-  // block. In the Connections view (showRuntimeConfig=false) Task Routing and
-  // Reliability own those keys, so the channel draft must not touch them.
-  const emitsRuntimeConfig = managesRuntimeConfig && showRuntimeConfig;
+  const hermesSecretPersisted = initialItemSourceByKey.get('LLM_HERMES_API_KEY') === true;
 
   const channelsFingerprint = useMemo(() => JSON.stringify(initialChannels), [initialChannels]);
-  const runtimeFingerprint = useMemo(() => JSON.stringify(initialRuntimeConfig), [initialRuntimeConfig]);
+  const persistedDraftFingerprint = useMemo(
+    () => JSON.stringify(persistedDraftItems ?? []),
+    [persistedDraftItems],
+  );
 
   const hydratedItems = useMemo(
     () => applyChannelDraftItems(items, persistedDraftItems),
@@ -1721,124 +1918,64 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     () => parseChannelsFromItems(hydratedItems, buildItemSourceByKey(hydratedItems)),
     [hydratedItems],
   );
-  const hydratedRuntimeConfig = useMemo(
-    () => parseRuntimeConfigFromItems(hydratedItems),
-    [hydratedItems],
-  );
 
   const [channels, setChannels] = useState<ChannelConfig[]>(hydratedChannels);
-  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig>(hydratedRuntimeConfig);
-  const [visibleKeys, setVisibleKeys] = useState<Record<number, boolean>>({});
-  const [testStates, setTestStates] = useState<Record<number, ChannelTestState>>({});
-  const [discoveryStates, setDiscoveryStates] = useState<Record<string, ChannelDiscoveryState>>({});
-  const [capabilityStates, setCapabilityStates] = useState<Record<string, ChannelCapabilityState>>({});
-  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [addPreset, setAddPreset] = useState('aihubmix');
+  const [testStates, setTestStates] = useState<Record<string, ChannelTestState>>({});
+  const [modal, setModal] = useState<null | { mode: 'add' } | { mode: 'edit'; index: number; focusModels?: boolean }>(null);
   const [pendingRemove, setPendingRemove] = useState<{ index: number; name: string; referencedBy: string[] } | null>(null);
   const addChannelIdRef = useRef(0);
+  const testNonceRef = useRef<Record<string, number>>({});
+  const testRequestIdRef = useRef(0);
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
-  const discoveryNonceRef = useRef<Record<string, number>>({});
-  const discoveryRequestIdRef = useRef(0);
-  const capabilityNonceRef = useRef<Record<string, number>>({});
-  const capabilityRequestIdRef = useRef(0);
+
+  const busy = disabled || Boolean(overriddenByMode);
 
   // Re-sync local state to the saved snapshot when it actually changes. Two
   // triggers: the saved config reloaded (typically after a successful Save &
-  // Apply) so channelsFingerprint/runtimeFingerprint change, or the parent
-  // bumped resetSignal on Discard. This uses React's sanctioned "adjust state
-  // during render" reset-on-prop-change pattern with prev-state, not an effect.
-  const resetKey = `${channelsFingerprint}::${runtimeFingerprint}::${resetSignal}`;
+  // Apply), the parent draft was committed/rehydrated (important when a saved
+  // secret returns masked), or the parent bumped resetSignal on Discard. This
+  // uses React's sanctioned "adjust state during render" reset-on-prop-change
+  // pattern with prev-state, not an effect.
+  const resetKey = `${channelsFingerprint}::${persistedDraftFingerprint}::${resetSignal}`;
   const [prevResetKey, setPrevResetKey] = useState(resetKey);
   if (prevResetKey !== resetKey) {
     setPrevResetKey(resetKey);
     setChannels(hydratedChannels);
-    setRuntimeConfig(hydratedRuntimeConfig);
-    setVisibleKeys({});
     setTestStates({});
-    setDiscoveryStates({});
-    setCapabilityStates({});
-    setExpandedRows({});
-    setIsCollapsed(false);
+    setModal(null);
+    setPendingRemove(null);
   }
 
-  // Nonce refs are diagnostic-only; clearing them alongside a reset is done in
-  // an effect so render stays free of ref mutations.
-  useEffect(() => {
-    discoveryNonceRef.current = {};
-    capabilityNonceRef.current = {};
-  }, [resetKey]);
-
-  const routeProvenanceMap = useMemo(() => {
-    if (!managesRuntimeConfig) {
-      return new Map<string, RouteProvenance>();
+  // The page-level "＋添加模型服务" button lives in the parent header; it bumps
+  // addSignal to open the add dialog here (same adjust-during-render pattern).
+  const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
+  if (prevAddSignal !== addSignal) {
+    setPrevAddSignal(addSignal);
+    if (!busy && !catalogUnavailable) {
+      setModal({ mode: 'add' });
     }
-    return buildRouteProvenanceMap(channels);
-  }, [channels, managesRuntimeConfig]);
-
-  const availableModels = useMemo(
-    () => Array.from(routeProvenanceMap.values())
-      .filter((origin) => !(origin.hasHermes && origin.hasNonHermes))
-      .map((origin) => origin.routeName),
-    [routeProvenanceMap],
-  );
-
-  const agentSafeModels = useMemo(
-    () => Array.from(routeProvenanceMap.values())
-      .filter((origin) => !origin.hasHermes || origin.hasNonHermes)
-      .map((origin) => origin.routeName),
-    [routeProvenanceMap],
-  );
-
-  const visionSafeModels = useMemo(
-    () => Array.from(routeProvenanceMap.values())
-      .filter((origin) => !origin.hasHermes)
-      .map((origin) => origin.routeName),
-    [routeProvenanceMap],
-  );
-
-  const agentSelectedModelForOptions = useMemo(() => {
-    if (!runtimeConfig.agentPrimaryModel || agentSafeModels.includes(runtimeConfig.agentPrimaryModel)) {
-      return runtimeConfig.agentPrimaryModel;
-    }
-    const origin = getRouteProvenance(routeProvenanceMap, runtimeConfig.agentPrimaryModel);
-    return origin?.hasHermes && !origin.hasNonHermes ? '' : runtimeConfig.agentPrimaryModel;
-  }, [agentSafeModels, routeProvenanceMap, runtimeConfig.agentPrimaryModel]);
-
-  const visionSelectedModelForOptions = useMemo(() => {
-    if (!runtimeConfig.visionModel || visionSafeModels.includes(runtimeConfig.visionModel)) {
-      return runtimeConfig.visionModel;
-    }
-    const origin = getRouteProvenance(routeProvenanceMap, runtimeConfig.visionModel);
-    return origin?.hasHermes ? '' : runtimeConfig.visionModel;
-  }, [routeProvenanceMap, runtimeConfig.visionModel, visionSafeModels]);
+  }
 
   const hasChanges = useMemo(() => {
-    const runtimeChanged = emitsRuntimeConfig && (
-      runtimeConfig.primaryModel !== initialRuntimeConfig.primaryModel
-      || runtimeConfig.agentPrimaryModel !== initialRuntimeConfig.agentPrimaryModel
-      || runtimeConfig.visionModel !== initialRuntimeConfig.visionModel
-      || runtimeConfig.temperature !== initialRuntimeConfig.temperature
-      || runtimeConfig.fallbackModels.join(',') !== initialRuntimeConfig.fallbackModels.join(',')
-    );
-
-    if (runtimeChanged || channels.length !== initialChannels.length) {
+    if (channels.length !== initialChannels.length) {
       return true;
     }
     return channels.some((channel, index) => !channelsAreEqual(channel, initialChannels[index]));
-  }, [channels, emitsRuntimeConfig, initialChannels, initialRuntimeConfig, runtimeConfig]);
+  }, [channels, initialChannels]);
 
   // Structural gate: names must be valid for every channel and every enabled
   // channel must be complete before the draft can be saved.
   const blockingChannels = useMemo(
     () => channels
-      .map((channel, index) => ({ channel, index, issues: getChannelSaveIssues(channel, providers) }))
+      .map((channel, index) => ({ channel, index, issues: getChannelSaveIssues(channel, providers, emptyApiKeyHosts) }))
       .filter((entry) => entry.issues.length > 0),
-    [channels, providers],
+    [channels, providers, emptyApiKeyHosts],
   );
   const draftValid = blockingChannels.length === 0;
 
+  // Task Routing / Reliability own the runtime routing keys in this IA, so the
+  // channel draft never emits them (managesRuntimeConfig: false).
   const draftItems = useMemo(() => buildChannelDraftItems({
     hasChanges,
     channels,
@@ -1846,18 +1983,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     initialNames,
     initialItemSourceByKey,
     savedItemMap,
-    runtimeConfig,
+    runtimeConfig: initialRuntimeConfig,
     initialRuntimeConfig,
-    managesRuntimeConfig: emitsRuntimeConfig,
+    managesRuntimeConfig: false,
   }), [
     channels,
-    emitsRuntimeConfig,
     hasChanges,
     initialChannels,
     initialItemSourceByKey,
     initialNames,
     initialRuntimeConfig,
-    runtimeConfig,
     savedItemMap,
   ]);
   const draftFingerprint = useMemo(() => JSON.stringify(draftItems), [draftItems]);
@@ -1890,690 +2025,224 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     onValidityChangeRef.current?.(true);
   }, []);
 
-  const busy = disabled || Boolean(overriddenByMode);
+  const initialChannelsByName = useMemo(
+    () => new Map(initialChannels.map((channel) => [channel.name, channel])),
+    [initialChannels],
+  );
+  const isChannelUnsaved = (channel: ChannelConfig): boolean => {
+    const saved = initialChannelsByName.get(channel.name);
+    return !saved || !channelsAreEqual(channel, saved);
+  };
 
-  const updateChannel = (index: number, field: keyof ChannelConfig, value: string | boolean) => {
-    const currentChannel = channels[index];
-    setChannels((previous) => previous.map((channel, rowIndex) => {
-      if (rowIndex !== index) return channel;
-      const updated = { ...channel, [field]: value };
-
-      if (field === 'name' && typeof value === 'string') {
-        const newPreset = findCatalogProvider(providers, value);
-        if (newPreset) {
-          const oldPreset = findCatalogProvider(providers, channel.name);
-          if (!updated.baseUrl || updated.baseUrl === (oldPreset?.defaultBaseUrl ?? '')) {
-            updated.baseUrl = newPreset.defaultBaseUrl;
-          }
-          updated.protocol = normalizeProtocol(newPreset.protocol);
-          // Models are never auto-seeded from a provider preset: they come from
-          // discovery or manual entry, so switching provider keeps the user's
-          // current models untouched.
-        }
-      }
-
-      return updated;
+  const handleTest = async (channel: ChannelConfig) => {
+    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
+      setTestStates((previous) => ({
+        ...previous,
+        [channel.id]: { status: 'error', text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE },
+      }));
+      return;
+    }
+    const requestId = testRequestIdRef.current + 1;
+    testRequestIdRef.current = requestId;
+    testNonceRef.current[channel.id] = requestId;
+    setTestStates((previous) => ({
+      ...previous,
+      [channel.id]: { status: 'loading', text: '测试中…' },
     }));
+    const result = await runChannelConnectionTest(
+      channel,
+      shouldUseSavedHermesSecret(channel, maskToken, hermesSecretPersisted),
+    );
+    if (testNonceRef.current[channel.id] !== requestId) {
+      return;
+    }
+    setTestStates((previous) => ({ ...previous, [channel.id]: result }));
+  };
+
+  const clearTestState = (channelId: string) => {
+    delete testNonceRef.current[channelId];
     setTestStates((previous) => {
-      if (!(index in previous)) {
+      if (!(channelId in previous)) {
         return previous;
       }
       const next = { ...previous };
-      delete next[index];
+      delete next[channelId];
       return next;
     });
-    if (field !== 'models' && field !== 'enabled') {
-      setDiscoveryStates((previous) => {
-        const channel = channels.find((_, itemIndex) => itemIndex === index);
-        if (!channel || !(channel.id in previous)) {
-          return previous;
-        }
-        const next = { ...previous };
-        delete next[channel.id];
-        delete discoveryNonceRef.current[channel.id];
-        return next;
-      });
-    }
-    if (currentChannel) {
-      delete capabilityNonceRef.current[currentChannel.id];
-      setCapabilityStates((previous) => {
-        const current = previous[currentChannel.id];
-        if (!current) {
-          return previous;
-        }
-        return {
-          ...previous,
-          [currentChannel.id]: {
-            ...current,
-            status: 'idle',
-            text: undefined,
-            hint: undefined,
-            results: {},
-          },
-        };
-      });
-    }
   };
 
   const removeChannel = (index: number) => {
     const removedChannelId = channels[index]?.id || '';
     setChannels((previous) => previous.filter((_, rowIndex) => rowIndex !== index));
-    setVisibleKeys({});
-    setTestStates({});
-    setDiscoveryStates((previous) => {
-      if (!removedChannelId) {
-        return previous;
-      }
-      const next = { ...previous };
-      delete next[removedChannelId];
-      return next;
-    });
-    setCapabilityStates((previous) => {
-      if (!removedChannelId || !(removedChannelId in previous)) {
-        return previous;
-      }
-      const next = { ...previous };
-      delete next[removedChannelId];
-      return next;
-    });
     if (removedChannelId) {
-      const nextNonce = { ...discoveryNonceRef.current };
-      delete nextNonce[removedChannelId];
-      discoveryNonceRef.current = nextNonce;
-      delete capabilityNonceRef.current[removedChannelId];
+      clearTestState(removedChannelId);
     }
-    setExpandedRows({});
   };
 
-  // Deleting a channel drops its draft immediately, so confirm first and warn
-  // when the channel still backs a selected runtime model / fallback.
+  // Deleting a channel drops its draft immediately, so confirm first. A
+  // connection still backing a task-routing selection cannot be deleted here:
+  // the confirm action becomes "go to Task Routing to replace" instead.
   const requestRemoveChannel = (index: number) => {
     const channel = channels[index];
     if (!channel) {
       return;
     }
-    const referencedBy: string[] = [];
-    if (managesRuntimeConfig) {
-      const routes = new Set(resolveChannelRouteModels(channel));
-      if (runtimeConfig.primaryModel && routes.has(runtimeConfig.primaryModel)) {
-        referencedBy.push('主要模型');
-      }
-      if (runtimeConfig.agentPrimaryModel && routes.has(runtimeConfig.agentPrimaryModel)) {
-        referencedBy.push('Agent 主要模型');
-      }
-      if (runtimeConfig.visionModel && routes.has(runtimeConfig.visionModel)) {
-        referencedBy.push('Vision 模型');
-      }
-      if (runtimeConfig.fallbackModels.some((model) => routes.has(model))) {
-        referencedBy.push('模型回退');
-      }
-    }
+    const routes = new Set(resolveChannelRouteModels(channel));
+    const referencedBy = Array.from(new Set(
+      taskModelRefs
+        .filter((ref) => routes.has(ref.route))
+        .map((ref) => ref.label),
+    ));
     setPendingRemove({ index, name: channel.name.trim() || `#${index + 1}`, referencedBy });
   };
 
-  const addChannel = () => {
-    // Prefer the catalog preset; fall back to a minimal blank custom channel so
-    // the editor stays usable even if the provider catalog failed to load.
-    const preset = findCatalogProvider(providers, addPreset) || findCatalogProvider(providers, 'custom');
-    setChannels((previous) => {
-      const existingNames = new Set(previous.map((channel) => channel.name));
-      const baseName = addPreset && addPreset !== 'custom' ? addPreset : 'custom';
-      let nextName = baseName;
-      let counter = 2;
-      while (existingNames.has(nextName)) {
-        nextName = `${baseName}${counter}`;
-        counter += 1;
-      }
-
-      return [
-        ...previous,
-        {
-          id: `added:${addChannelIdRef.current += 1}`,
-          name: nextName,
-          protocol: normalizeProtocol(preset?.protocol ?? 'openai'),
-          baseUrl: preset?.defaultBaseUrl ?? '',
-          apiKey: '',
-          // No default models: a new connection starts explicitly incomplete
-          // until the user discovers or manually adds models.
-          models: '',
-          enabled: true,
-        },
+  // Enabling an incomplete connection opens the edit dialog instead of letting
+  // an unusable connection go live.
+  const toggleEnabled = (index: number) => {
+    const channel = channels[index];
+    if (!channel) {
+      return;
+    }
+    if (!channel.enabled) {
+      const issues = [
+        ...getChannelNameIssues(channel),
+        ...getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts),
       ];
-    });
-    setTestStates({});
-    setDiscoveryStates({});
-    setCapabilityStates({});
-    discoveryNonceRef.current = {};
-    capabilityNonceRef.current = {};
-    setExpandedRows((prev) => ({ ...prev, [channels.length]: true }));
-    setIsCollapsed(false);
+      if (issues.length > 0) {
+        setModal({ mode: 'edit', index });
+        return;
+      }
+    }
+    setChannels((previous) => previous.map((item, rowIndex) => (
+      rowIndex === index ? { ...item, enabled: !item.enabled } : item
+    )));
   };
 
-  const handleTest = async (channel: ChannelConfig, index: number) => {
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel))) {
-      setTestStates((previous) => ({
-        ...previous,
-        [index]: { status: 'error', text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE },
-      }));
+  const handleModalSubmit = (channel: ChannelConfig) => {
+    if (!modal) {
       return;
     }
-
-    setTestStates((previous) => ({
-      ...previous,
-      [index]: { status: 'loading', text: '测试中...' },
-    }));
-
-    try {
-      const result = await systemConfigApi.testLLMChannel({
-        name: channel.name,
-        protocol: channel.protocol,
-        baseUrl: channel.baseUrl,
-        apiKey: channel.apiKey,
-        models: splitModels(channel.models),
-        enabled: channel.enabled,
-        useSavedSecret: shouldUseSavedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel)),
-      });
-
-      const text = result.success
-        ? `连接成功${result.resolvedModel ? ` · ${result.resolvedModel}` : ''}${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`
-        : buildLlmFailureText(result);
-      const hint = result.success ? undefined : buildLlmTestHint(result);
-
-      setTestStates((previous) => ({
-        ...previous,
-        [index]: {
-          status: result.success ? 'success' : 'error',
-          text,
-          hint,
-        },
-      }));
-    } catch (error: unknown) {
-      const parsed = getParsedApiError(error);
-      setTestStates((previous) => ({
-        ...previous,
-        [index]: { status: 'error', text: parsed.message || '测试失败' },
-      }));
+    if (modal.mode === 'add') {
+      setChannels((previous) => [...previous, { ...channel, id: `added:${addChannelIdRef.current += 1}` }]);
+    } else {
+      const { index } = modal;
+      const previousChannel = channels[index];
+      if (previousChannel) {
+        setChannels((previous) => previous.map((item, rowIndex) => (
+          rowIndex === index ? { ...channel, id: item.id } : item
+        )));
+        const connectionChanged = previousChannel.name !== channel.name
+          || previousChannel.protocol !== channel.protocol
+          || previousChannel.baseUrl !== channel.baseUrl
+          || previousChannel.apiKey !== channel.apiKey
+          || previousChannel.models !== channel.models;
+        if (connectionChanged) {
+          clearTestState(previousChannel.id);
+        }
+      }
     }
-  };
-
-  const handleDiscoverModels = async (channel: ChannelConfig) => {
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel))) {
-      setDiscoveryStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          status: 'error',
-          text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE,
-          hint: undefined,
-          models: previous[channel.id]?.models || [],
-        },
-      }));
-      return;
-    }
-
-    const requestId = discoveryRequestIdRef.current + 1;
-    discoveryRequestIdRef.current = requestId;
-    discoveryNonceRef.current[channel.id] = requestId;
-    const nonce = requestId;
-
-    setDiscoveryStates((previous) => ({
-      ...previous,
-      [channel.id]: {
-        status: 'loading',
-        text: '正在获取模型列表...',
-        hint: undefined,
-        models: previous[channel.id]?.models || [],
-      },
-    }));
-
-    try {
-      const result = await systemConfigApi.discoverLLMChannelModels({
-        name: channel.name,
-        protocol: channel.protocol,
-        baseUrl: channel.baseUrl,
-        apiKey: channel.apiKey,
-        models: splitModels(channel.models),
-        useSavedSecret: shouldUseSavedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel)),
-      });
-
-      if (discoveryNonceRef.current[channel.id] !== nonce) return;
-
-      setDiscoveryStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          status: result.success ? 'success' : 'error',
-          text: result.success
-            ? `已获取 ${result.models.length} 个模型${result.latencyMs ? ` · ${result.latencyMs} ms` : ''}`
-            : buildLlmFailureText(result),
-          hint: result.success ? undefined : getLlmTroubleshootingHint(result.errorCode, result.stage, 'discovery', result.details),
-          models: result.success ? result.models : (previous[channel.id]?.models || []),
-        },
-      }));
-    } catch (error: unknown) {
-      if (discoveryNonceRef.current[channel.id] !== nonce) return;
-
-      const parsed = getParsedApiError(error);
-      setDiscoveryStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          status: 'error',
-          text: parsed.message || '获取模型失败',
-          hint: undefined,
-          models: previous[channel.id]?.models || [],
-        },
-      }));
-    }
-  };
-
-  const toggleCapability = (channel: ChannelConfig, capability: LLMCapabilityCheck) => {
-    setCapabilityStates((previous) => {
-      const current = previous[channel.id] || { selected: [], status: 'idle', results: {} };
-      const selected = current.selected.includes(capability)
-        ? current.selected.filter((item) => item !== capability)
-        : [...current.selected, capability];
-      return {
-        ...previous,
-        [channel.id]: {
-          ...current,
-          selected,
-          status: current.status === 'loading' ? current.status : 'idle',
-          text: current.status === 'loading' ? current.text : undefined,
-          hint: current.status === 'loading' ? current.hint : undefined,
-          results: current.status === 'loading' ? current.results : {},
-        },
-      };
-    });
-  };
-
-  const handleCapabilityCheck = async (channel: ChannelConfig) => {
-    const selected = (capabilityStates[channel.id]?.selected || []).filter(
-      (capability) => !isHermesChannel(channel) || capability === 'json',
-    );
-    if (selected.length === 0) return;
-
-    if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel))) {
-      setCapabilityStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          selected,
-          status: 'error',
-          text: RUNTIME_ONLY_HERMES_SECRET_MESSAGE,
-          hint: undefined,
-          results: {},
-        },
-      }));
-      return;
-    }
-
-    const requestId = capabilityRequestIdRef.current + 1;
-    capabilityRequestIdRef.current = requestId;
-    capabilityNonceRef.current[channel.id] = requestId;
-    const nonce = requestId;
-
-    setCapabilityStates((previous) => ({
-      ...previous,
-      [channel.id]: {
-        selected,
-        status: 'loading',
-        text: '正在检测运行时能力...',
-        hint: undefined,
-        results: {},
-      },
-    }));
-
-    try {
-      const result = await systemConfigApi.testLLMChannel({
-        name: channel.name,
-        protocol: channel.protocol,
-        baseUrl: channel.baseUrl,
-        apiKey: channel.apiKey,
-        models: splitModels(channel.models),
-        enabled: channel.enabled,
-        capabilityChecks: selected,
-        useSavedSecret: shouldUseSavedHermesSecret(channel, maskToken, hasPersistedHermesSecret(channel)),
-      });
-
-      if (capabilityNonceRef.current[channel.id] !== nonce) return;
-
-      const capabilityResults = result.capabilityResults || {};
-      const hasFailure = Object.values(capabilityResults).some((item) => item?.status === 'failed');
-      const hasSkipped = Object.values(capabilityResults).some((item) => item?.status === 'skipped');
-      setCapabilityStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          selected,
-          status: hasFailure || hasSkipped || !result.success ? 'error' : 'success',
-          text: Object.keys(capabilityResults).length > 0
-            ? summarizeCapabilityResults(capabilityResults)
-            : result.success
-              ? '未返回能力检测结果'
-              : buildLlmFailureText(result),
-          hint: getFirstCapabilityHint(capabilityResults)
-            || (!result.success ? buildLlmTestHint(result) : undefined),
-          results: capabilityResults,
-        },
-      }));
-    } catch (error: unknown) {
-      if (capabilityNonceRef.current[channel.id] !== nonce) return;
-
-      const parsed = getParsedApiError(error);
-      setCapabilityStates((previous) => ({
-        ...previous,
-        [channel.id]: {
-          selected,
-          status: 'error',
-          text: parsed.message || '能力检测失败',
-          hint: undefined,
-          results: {},
-        },
-      }));
-    }
-  };
-
-  const toggleKeyVisibility = (index: number, nextVisible: boolean) => {
-    setVisibleKeys((previous) => ({ ...previous, [index]: nextVisible }));
-  };
-
-  const toggleExpand = (index: number) => {
-    setExpandedRows((previous) => ({ ...previous, [index]: !previous[index] }));
-  };
-
-  const setPrimaryModel = (value: string) => {
-    setRuntimeConfig((previous) => ({
-      ...previous,
-      primaryModel: value,
-      fallbackModels: previous.fallbackModels.filter((model) => model !== value),
-    }));
-  };
-
-  const toggleFallbackModel = (model: string) => {
-    setRuntimeConfig((previous) => {
-      const alreadySelected = previous.fallbackModels.includes(model);
-      return {
-        ...previous,
-        fallbackModels: alreadySelected
-          ? previous.fallbackModels.filter((item) => item !== model)
-          : [...previous.fallbackModels, model],
-      };
-    });
+    setModal(null);
   };
 
   return (
     <div className="space-y-4">
       {overriddenByMode ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-2.5 text-xs text-secondary-text">
+          <span>当前模型配置由外部配置管理，网页暂时只读。</span>
+          {onViewDiagnostics ? (
+            <button
+              type="button"
+              className="settings-accent-text underline-offset-2 hover:underline"
+              onClick={onViewDiagnostics}
+            >
+              查看详情
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {catalogUnavailable ? (
+        <div className="flex items-center gap-2 px-1 text-xs text-danger">
+          <span>模型服务列表加载失败</span>
+          {onReloadCatalog ? (
+            <button type="button" className="underline underline-offset-2" onClick={onReloadCatalog}>
+              重试
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {channels.length === 0 ? (
+        <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
+          <p className="text-sm font-medium text-secondary-text">还没有接入模型服务</p>
+          <p className="mt-1 text-xs text-muted-text">接入后即可在任务路由中为报告、Agent 和视觉任务选择模型。</p>
+          <Button
+            type="button"
+            variant="settings-primary"
+            className="mt-4"
+            disabled={busy || catalogUnavailable}
+            onClick={() => setModal({ mode: 'add' })}
+          >
+            + 添加模型服务
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {channels.map((channel, index) => (
+            <ConnectionCard
+              key={channel.id}
+              channel={channel}
+              providers={providers}
+              taskModelRefs={taskModelRefs}
+              unsaved={isChannelUnsaved(channel)}
+              busy={busy}
+              testState={testStates[channel.id]}
+              issues={[
+                ...getChannelNameIssues(channel),
+                ...getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts),
+              ]}
+              onTest={() => void handleTest(channel)}
+              onEdit={() => setModal({ mode: 'edit', index })}
+              onManageModels={() => setModal({ mode: 'edit', index, focusModels: true })}
+              onToggleEnabled={() => toggleEnabled(index)}
+              onRemove={() => requestRemoveChannel(index)}
+            />
+          ))}
+        </div>
+      )}
+
+      {!draftValid ? (
         <InlineAlert
           variant="warning"
-          title="模型连接当前只读"
-          message={
-            overriddenByMode === 'yaml'
-              ? '当前生效来源为 YAML（LITELLM_CONFIG），模型连接不生效，暂为只读。要用连接配置，请把配置来源改为 channels 或 auto。'
-              : '当前生效来源为 Legacy Provider keys，模型连接不生效，暂为只读。要用连接配置，请把配置来源改为 channels 或 auto。'
-          }
-          className="rounded-[1.35rem] px-4 py-3 text-xs shadow-none"
+          title="有模型服务未完成，无法保存"
+          message={(
+            <>
+              <p className="mb-1">以下模型服务需补全后才能保存（点击顶部“保存并应用”统一提交）：</p>
+              <ul className="ml-4 list-disc space-y-0.5">
+                {blockingChannels.map(({ channel, index, issues }) => (
+                  <li key={channel.id || index}>
+                    {`${channel.name.trim() || `连接 #${index + 1}`}：${issues.join('、')}`}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          className="rounded-lg px-3 py-2 text-xs shadow-none"
         />
       ) : null}
-      <button
-        type="button"
-        className="flex w-full items-center justify-between rounded-[1.35rem] border border-[var(--settings-border)] bg-[var(--settings-surface)] px-5 py-4 text-left shadow-soft-card transition-[background-color,border-color,box-shadow] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface-hover)]"
-        onClick={() => setIsCollapsed((previous) => !previous)}
-      >
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-foreground">已接入的模型服务</h3>
-          </div>
-          <p className="text-xs text-muted-text">
-            接入模型服务后可自动获取模型列表并多选，也可手动添加模型；配置会同步到 .env。
-          </p>
-        </div>
-        <span className="text-xs text-muted-text">{isCollapsed ? '▶ 展开' : '▼ 收起'}</span>
-      </button>
 
-      {!isCollapsed ? (
-        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="rounded-[1.35rem] border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-medium text-foreground">添加模型服务</h4>
-                <p className="mt-1 text-xs text-secondary-text">先选择模型服务商，再创建一条连接（同一服务商可创建多条）。</p>
-              </div>
-              <Badge variant="default" className="border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-muted-text">{channels.length} 个连接</Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="settings-primary" className="whitespace-nowrap" disabled={busy || catalogUnavailable} onClick={addChannel}>
-                + 添加模型服务
-              </Button>
-              <Select
-                value={addPreset}
-                onChange={setAddPreset}
-                options={providers.map((provider) => ({
-                  value: provider.id,
-                  label: provider.label,
-                }))}
-                disabled={busy || catalogUnavailable}
-                placeholder="选择服务商"
-                className="flex-1"
-              />
-            </div>
-            {catalogUnavailable ? (
-              <p className="mt-2 text-[11px] text-danger">模型服务商目录暂时不可用，无法新增连接；请先点击上方“重新加载”。</p>
-            ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-text">已配置的连接</span>
-              {channels.length > 0 ? (
-                <span className="text-[10px] text-muted-text">{channels.filter((c) => c.enabled).length}/{channels.length} 已启用</span>
-              ) : null}
-            </div>
-
-            {channels.length === 0 ? (
-              <div className="settings-surface-overlay-muted rounded-[1.35rem] border border-dashed settings-border-strong px-4 py-10 text-center">
-                <p className="text-sm font-medium text-secondary-text">还没有模型服务</p>
-                <p className="mt-1 text-xs text-muted-text">选择模型服务商后点击“添加模型服务”即可开始配置。</p>
-              </div>
-            ) : channels.map((channel, index) => (
-              <ChannelRow
-                key={channel.id}
-                channel={channel}
-                providers={providers}
-                taskModelRefs={taskModelRefs}
-                index={index}
-                busy={busy}
-                visibleKey={Boolean(visibleKeys[index])}
-                expanded={Boolean(expandedRows[index])}
-                testState={testStates[index]}
-                discoveryState={discoveryStates[channel.id]}
-                capabilityState={capabilityStates[channel.id]}
-                onUpdate={updateChannel}
-                onRemove={requestRemoveChannel}
-                onToggleExpand={toggleExpand}
-                onToggleKeyVisibility={toggleKeyVisibility}
-                onTest={(ch, idx) => void handleTest(ch, idx)}
-                onDiscoverModels={(channel) => void handleDiscoverModels(channel)}
-                onToggleCapability={toggleCapability}
-                onCheckCapabilities={(channel) => void handleCapabilityCheck(channel)}
-              />
-            ))}
-          </div>
-
-          {showRuntimeConfig && managesRuntimeConfig ? (
-            <div className="rounded-[1.35rem] border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 shadow-soft-card">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <span className="settings-accent-text text-xs font-medium uppercase tracking-wider">运行时参数</span>
-                  <p className="mt-1 text-[11px] text-muted-text">主要模型、备用模型、Vision 与 Temperature 会直接写入运行时配置。</p>
-                </div>
-                <Badge variant="default" className="border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-muted-text">Runtime</Badge>
-              </div>
-              <div className="mb-4">
-                <HelpLabel
-                  label="Temperature"
-                  fieldKey="LLM_TEMPERATURE"
-                  helpKey="settings.llm_channel.temperature"
-                  examples={['LLM_TEMPERATURE=0.2', 'LLM_TEMPERATURE=0.7']}
-                  compact
-                />
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={runtimeConfig.temperature}
-                    disabled={busy}
-                    onChange={(event) => setRuntimeConfig((previous) => ({ ...previous, temperature: event.target.value }))}
-                    className="settings-input-checkbox h-1.5 flex-1 cursor-pointer rounded-full bg-border/60"
-                  />
-                  <span className="w-8 text-right text-sm text-secondary-text">{runtimeConfig.temperature}</span>
-                </div>
-                <p className="mt-1 text-[11px] text-secondary-text">
-                  控制模型输出随机性，0 为确定性输出，2 为最大随机性，推荐 0.7。
-                </p>
-              </div>
-
-              {availableModels.length === 0 ? (
-                <div className="rounded-xl border border-dashed settings-border-strong settings-surface-overlay-soft px-3 py-2 text-xs text-muted-text">
-                  先添加至少一个已启用连接并填写模型，下面的主要模型 / 备用模型 / Vision 选项才会出现。
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <HelpLabel
-                      htmlFor="runtime-primary-model"
-                      label="主要模型"
-                      fieldKey="LITELLM_MODEL"
-                      helpKey="settings.llm_channel.primary_model"
-                      examples={['LITELLM_MODEL=deepseek/deepseek-v4-flash']}
-                      compact
-                    />
-                    <Select
-                      id="runtime-primary-model"
-                      value={runtimeConfig.primaryModel}
-                      onChange={setPrimaryModel}
-                      options={buildModelOptions(availableModels, runtimeConfig.primaryModel, '自动（使用第一个可用模型）')}
-                      disabled={busy}
-                      placeholder=""
-                    />
-                  </div>
-
-                  <div>
-                    <HelpLabel
-                      htmlFor="runtime-agent-primary-model"
-                      label="Agent 主要模型"
-                      fieldKey="AGENT_LITELLM_MODEL"
-                      helpKey="settings.llm_channel.agent_primary_model"
-                      examples={['AGENT_LITELLM_MODEL=deepseek/deepseek-v4-pro']}
-                      compact
-                    />
-                    <Select
-                      id="runtime-agent-primary-model"
-                      value={runtimeConfig.agentPrimaryModel}
-                      onChange={(value) => setRuntimeConfig((previous) => ({
-                        ...previous,
-                        agentPrimaryModel: normalizeAgentPrimaryModel(value),
-                      }))}
-                      options={buildModelOptions(
-                        agentSafeModels,
-                        agentSelectedModelForOptions,
-                        '自动（继承普通分析主要模型）',
-                      )}
-                      disabled={busy}
-                      placeholder=""
-                    />
-                  </div>
-
-                  <div>
-                    <HelpLabel
-                      label="备用模型"
-                      fieldKey="LITELLM_FALLBACK_MODELS"
-                      helpKey="settings.llm_channel.fallback_models"
-                      examples={['LITELLM_FALLBACK_MODELS=deepseek/deepseek-v4-pro,gemini/gemini-3-flash-preview']}
-                      compact
-                    />
-                    <div className="space-y-2 rounded-xl border settings-border-strong settings-surface-overlay-soft p-3">
-                      {availableModels.map((model) => (
-                        <label key={model} className="flex items-center gap-2 text-sm text-secondary-text">
-                          <input
-                            type="checkbox"
-                            checked={runtimeConfig.fallbackModels.includes(model)}
-                            disabled={busy || model === runtimeConfig.primaryModel}
-                            onChange={() => toggleFallbackModel(model)}
-                            className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                          />
-                          <span>{model}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <p className="mt-1 text-[11px] text-secondary-text">
-                      备用模型只会在主要模型失败时使用。主要模型不会重复加入备用模型。
-                    </p>
-                  </div>
-
-                  <div>
-                    <HelpLabel
-                      htmlFor="runtime-vision-model"
-                      label="Vision 模型"
-                      fieldKey="VISION_MODEL"
-                      helpKey="settings.llm_channel.vision_model"
-                      examples={['VISION_MODEL=gemini/gemini-3.1-pro-preview']}
-                      compact
-                    />
-                    <Select
-                      id="runtime-vision-model"
-                      value={runtimeConfig.visionModel}
-                      onChange={(value) => setRuntimeConfig((previous) => ({ ...previous, visionModel: value }))}
-                      options={buildModelOptions(
-                        visionSafeModels,
-                        visionSelectedModelForOptions,
-                        '自动（跟随 Vision 默认逻辑）',
-                      )}
-                      disabled={busy}
-                      placeholder=""
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : showRuntimeConfig ? (
-            <InlineAlert
-              variant="warning"
-              message="检测到已配置高级模型路由 YAML：此处仅管理连接条目和基础连接信息。运行时主要模型 / 备用模型 / Vision / Temperature 仍由下方通用字段决定；若 YAML 解析成功，则以其中的路由与可用模型声明为准，本配置不会覆盖 YAML 文件本身。"
-              className="rounded-[1.35rem] px-4 py-3 text-xs shadow-none"
-            />
-          ) : null}
-
-          {!draftValid ? (
-            <InlineAlert
-              variant="warning"
-              title="有模型服务未完成，无法保存"
-              message={(
-                <>
-                  <p className="mb-1">以下模型服务需补全后才能保存（点击顶部“保存并应用”统一提交）：</p>
-                  <ul className="ml-4 list-disc space-y-0.5">
-                    {blockingChannels.map(({ channel, index, issues }) => (
-                      <li key={channel.id || index}>
-                        {`${channel.name.trim() || `连接 #${index + 1}`}：${issues.join('、')}`}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
-            />
-          ) : null}
-          {onManageModels && channels.some((channel) => channel.enabled) ? (
-            <div className="flex items-center justify-end px-1">
-              <button
-                type="button"
-                className="settings-accent-text text-xs underline-offset-2 hover:underline"
-                onClick={onManageModels}
-              >
-                前往任务路由分配模型 →
-              </button>
-            </div>
-          ) : null}
+      {onManageModels && channels.some((channel) => channel.enabled) ? (
+        <div className="flex items-center justify-end px-1">
+          <button
+            type="button"
+            className="settings-accent-text text-xs underline-offset-2 hover:underline"
+            onClick={onManageModels}
+          >
+            前往任务路由分配模型 →
+          </button>
         </div>
       ) : null}
+
       <ConfirmDialog
         isOpen={pendingRemove !== null}
         title={pendingRemove && pendingRemove.referencedBy.length > 0 ? '无法直接删除连接' : '删除连接？'}
@@ -2582,9 +2251,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
             ? `模型服务「${pendingRemove.name}」正被以下任务引用：${pendingRemove.referencedBy.join('、')}。请先在任务路由为这些任务改选其它模型，再回来删除该连接（替换与删除会在同一次保存中一起提交）。`
             : `将从当前草稿中移除模型服务「${pendingRemove.name}」，保存后才生效。`)
           : ''}
-        // A referenced connection cannot be deleted directly: the confirm action
-        // becomes "go to Task Routing to replace" instead of a destructive delete,
-        // so we never delete-then-rely-on-a-generic-save-error.
         confirmText={pendingRemove && pendingRemove.referencedBy.length > 0 ? '前往任务路由替换' : '删除连接'}
         cancelText="取消"
         onConfirm={() => {
@@ -2599,6 +2265,23 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         }}
         onCancel={() => setPendingRemove(null)}
       />
+
+      {modal ? (
+        <ConnectionModal
+          mode={modal.mode}
+          initialChannel={modal.mode === 'edit' ? channels[modal.index] ?? null : null}
+          focusModels={modal.mode === 'edit' ? modal.focusModels : false}
+          channels={channels}
+          providers={providers}
+          emptyApiKeyHosts={emptyApiKeyHosts}
+          maskToken={maskToken}
+          hermesSecretPersisted={hermesSecretPersisted}
+          catalogUnavailable={catalogUnavailable}
+          onReloadCatalog={onReloadCatalog}
+          onSubmit={handleModalSubmit}
+          onClose={() => setModal(null)}
+        />
+      ) : null}
     </div>
   );
 };

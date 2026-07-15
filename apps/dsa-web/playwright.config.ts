@@ -5,24 +5,54 @@ import { fileURLToPath } from 'node:url';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../..');
-const shouldRunWebSmoke = !!process.env.DSA_WEB_SMOKE_PASSWORD;
+const backendPort = Number(process.env.DSA_WEB_SMOKE_BACKEND_PORT || 18100);
+const frontendPort = Number(process.env.DSA_WEB_SMOKE_FRONTEND_PORT || 14173);
+const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
+const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
+process.env.DSA_WEB_SMOKE_PASSWORD = smokePassword;
+
+// Every run gets an isolated config file. This keeps Playwright deterministic,
+// avoids reading or overwriting a developer's .env, and lets first-login setup
+// persist its throwaway password for the rest of the suite.
+const runtimeDir = path.join(currentDir, 'test-results', 'runtime');
+const e2eEnvFile = path.join(runtimeDir, 'playwright.env');
+fs.mkdirSync(runtimeDir, { recursive: true });
+fs.writeFileSync(
+  e2eEnvFile,
+  [
+    'ADMIN_AUTH_ENABLED=true',
+    'WEBUI_AUTO_BUILD=false',
+    'SCHEDULE_ENABLED=false',
+    '',
+  ].join('\n'),
+  'utf8',
+);
+
+function findVenvPython() {
+  let directory = repoRoot;
+  while (true) {
+    const unixPython = path.join(directory, '.venv', 'bin', 'python');
+    if (fs.existsSync(unixPython)) {
+      return `"${unixPython}"`;
+    }
+    const windowsPython = path.join(directory, '.venv', 'Scripts', 'python.exe');
+    if (fs.existsSync(windowsPython)) {
+      return `"${windowsPython}"`;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      return 'python';
+    }
+    directory = parent;
+  }
+}
 
 function resolveBackendCommand() {
   if (process.env.DSA_WEB_SMOKE_BACKEND_CMD) {
     return process.env.DSA_WEB_SMOKE_BACKEND_CMD;
   }
 
-  const unixVenvPython = path.join(repoRoot, '.venv', 'bin', 'python');
-  if (fs.existsSync(unixVenvPython)) {
-    return `${unixVenvPython} main.py --webui-only --host 127.0.0.1 --port 8000`;
-  }
-
-  const windowsVenvPython = path.join(repoRoot, '.venv', 'Scripts', 'python.exe');
-  if (fs.existsSync(windowsVenvPython)) {
-    return `"${windowsVenvPython}" main.py --webui-only --host 127.0.0.1 --port 8000`;
-  }
-
-  return 'python main.py --webui-only --host 127.0.0.1 --port 8000';
+  return `${findVenvPython()} main.py --webui-only --host 127.0.0.1 --port ${backendPort}`;
 }
 
 export default defineConfig({
@@ -31,30 +61,43 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: `http://127.0.0.1:${frontendPort}`,
     locale: 'zh-CN',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: shouldRunWebSmoke
-    ? [
-        {
-          command: resolveBackendCommand(),
-          cwd: repoRoot,
-          url: 'http://127.0.0.1:8000/api/v1/auth/status',
-          reuseExistingServer: !process.env.CI,
-          timeout: 120_000,
-        },
-        {
-          command: 'npm run dev -- --host 127.0.0.1 --port 4173',
-          cwd: currentDir,
-          url: 'http://127.0.0.1:4173',
-          reuseExistingServer: !process.env.CI,
-          timeout: 120_000,
-        },
-      ]
-    : undefined,
+  webServer: [
+    {
+      command: `node e2e/fake-openai-server.mjs ${fakeProviderPort}`,
+      cwd: currentDir,
+      url: `http://127.0.0.1:${fakeProviderPort}/health`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
+      command: resolveBackendCommand(),
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        ENV_FILE: e2eEnvFile,
+      },
+      url: `http://127.0.0.1:${backendPort}/api/v1/auth/status`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: `npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
+      cwd: currentDir,
+      env: {
+        ...process.env,
+        DSA_WEB_DEV_API_PROXY: `http://127.0.0.1:${backendPort}`,
+      },
+      url: `http://127.0.0.1:${frontendPort}`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
   projects: [
     {
       name: 'chromium',

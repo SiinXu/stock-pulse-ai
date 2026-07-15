@@ -80,7 +80,8 @@ docs: 更新 README 部署说明
 |--------|------|:--------:|
 | backend-gate | `scripts/ci_gate.sh`（py_compile + flake8 严重错误 + 本地核心脚本 + offline pytest） | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
-| web-gate | 前端变更时执行 `npm run lint` + `npm run build` | ✅（触发时） |
+| web-gate | 前端变更时执行 `npm run lint` + `npm run test` + `npm run build` | ✅（触发时） |
+| web-e2e | 前端变更时以隔离的临时 `ENV_FILE` 启动真实后端、Vite 与本地 fake 模型端点，并执行 `npm run test:smoke`（Playwright） | ✅（触发时） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
 
 **本地运行检查：**
@@ -95,8 +96,16 @@ pip install flake8 pytest
 cd apps/dsa-web
 npm ci
 npm run lint
+npm run test
 npm run build
+
+# 前端 e2e（可选；自动启动真实后端、Vite 与本地 fake 模型端点）
+npm run test:smoke
 ```
+
+Playwright 默认使用一次性密码与 `test-results/runtime/` 下的隔离配置文件，不读取或改写开发者 `.env`；如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+
+前端本地联调：`npm run dev` 启动的 vite dev server 会把 `/api` 请求代理到 `DSA_WEB_DEV_API_PROXY`（默认 `http://127.0.0.1:8000`）；后端不在本机默认端口时，通过该环境变量指向实际后端地址。
 
 ## 📋 优先贡献方向
 

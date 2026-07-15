@@ -142,3 +142,14 @@ def get_provider_catalog() -> List[Dict[str, Any]]:
 
 def get_provider_ids() -> List[str]:
     return [provider["id"] for provider in _PROVIDERS]
+
+
+def get_empty_api_key_hosts() -> List[str]:
+    """Return the hostnames whose endpoints may run without an API key.
+
+    Mirrors the backend validation contract (``channel_allows_empty_api_key``)
+    so the Web can apply the same exemption without hardcoding a host list.
+    """
+    from src.config import LLM_EMPTY_API_KEY_HOSTNAMES
+
+    return sorted(LLM_EMPTY_API_KEY_HOSTNAMES)

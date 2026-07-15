@@ -1,5 +1,5 @@
 import type React from 'react';
-import { CreatableCombobox, type ComboboxOption } from '../common';
+import { SearchableSelect, type SearchableSelectOption } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
 
 interface ModelFallbackEditorProps {
@@ -7,7 +7,7 @@ interface ModelFallbackEditorProps {
   value: string;
   onChange: (value: string) => void;
   /** Available model routes (grouped) offered when adding a fallback. */
-  options: ComboboxOption[];
+  options: SearchableSelectOption[];
   /** The primary model route — excluded from the add list (it's the primary). */
   primaryRoute?: string;
   language: UiLang;
@@ -95,7 +95,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === 0}
                   aria-label={tx(`上移 ${labelFor(route)}`, `Move ${labelFor(route)} up`)}
                   onClick={() => moveUp(index)}
-                  className="rounded px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↑
                 </button>
@@ -104,7 +104,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === routes.length - 1}
                   aria-label={tx(`下移 ${labelFor(route)}`, `Move ${labelFor(route)} down`)}
                   onClick={() => moveDown(index)}
-                  className="rounded px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↓
                 </button>
@@ -113,7 +113,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled}
                   aria-label={tx(`移除 ${labelFor(route)}`, `Remove ${labelFor(route)}`)}
                   onClick={() => removeAt(index)}
-                  className="rounded px-1 text-secondary-text hover:text-danger"
+                  className="rounded-full px-1 text-secondary-text hover:text-danger"
                 >
                   ✕
                 </button>
@@ -122,15 +122,15 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
           ))}
         </ul>
       )}
-      <CreatableCombobox
+      <SearchableSelect
         value=""
         onChange={addRoute}
         options={addOptions}
-        allowCustom={false}
         disabled={disabled}
         ariaLabel={tx('添加备用模型', 'Add a fallback model')}
         placeholder={tx('添加备用模型…', 'Add a fallback model…')}
         emptyText={tx('暂无可添加的模型', 'No models to add')}
+        searchPlaceholder={tx('搜索模型', 'Search models')}
       />
     </div>
   );

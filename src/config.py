@@ -385,6 +385,12 @@ def canonicalize_llm_channel_protocol(value: Optional[str]) -> str:
     return aliases.get(candidate, candidate)
 
 
+# Local endpoint hostnames that exempt a channel from requiring an API key.
+# Exposed via the provider-catalog API so the Web derives the same rule from
+# this single authority instead of hardcoding its own host list.
+LLM_EMPTY_API_KEY_HOSTNAMES = frozenset({"127.0.0.1", "localhost", "0.0.0.0"})
+
+
 def resolve_llm_channel_protocol(
     protocol: Optional[str],
     *,
@@ -412,7 +418,7 @@ def resolve_llm_channel_protocol(
 
     if base_url:
         parsed = urlparse(base_url)
-        if parsed.hostname in {"127.0.0.1", "localhost", "0.0.0.0"}:
+        if parsed.hostname in LLM_EMPTY_API_KEY_HOSTNAMES:
             # Default to openai for local servers (vLLM, LM Studio, LocalAI, etc.).
             # Ollama users should set PROTOCOL=ollama explicitly or name the channel "ollama".
             return "openai"
@@ -427,7 +433,7 @@ def channel_allows_empty_api_key(protocol: Optional[str], base_url: Optional[str
     if resolved_protocol == "ollama":
         return True
     parsed = urlparse(base_url or "")
-    return parsed.hostname in {"127.0.0.1", "localhost", "0.0.0.0"}
+    return parsed.hostname in LLM_EMPTY_API_KEY_HOSTNAMES
 
 
 def normalize_llm_channel_model(model: str, protocol: Optional[str], base_url: Optional[str] = None) -> str:

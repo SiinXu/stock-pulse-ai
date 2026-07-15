@@ -61,6 +61,17 @@ class SystemConfigFieldSchema(BaseModel):
     examples: List[str] = Field(default_factory=list, description="Safe example values for help panels")
     docs: List[SystemConfigDocLink] = Field(default_factory=list, description="Related documentation links")
     warning_codes: List[str] = Field(default_factory=list, description="Stable warning identifiers for help panels")
+    ui_placement: Optional[
+        Literal[
+            "model_access",
+            "task_routing",
+            "developer_diagnostics",
+            "hidden_legacy",
+        ]
+    ] = Field(
+        None,
+        description="Dedicated settings surface that owns this field; null means generic rendering",
+    )
 
 
 class SystemConfigCategorySchema(BaseModel):

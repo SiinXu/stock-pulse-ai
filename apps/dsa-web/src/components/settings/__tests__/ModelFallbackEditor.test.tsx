@@ -1,13 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ModelFallbackEditor } from '../ModelFallbackEditor';
-import type { ComboboxOption } from '../../common';
+import type { SearchableSelectOption } from '../../common';
 
-if (!HTMLElement.prototype.scrollIntoView) {
-  HTMLElement.prototype.scrollIntoView = () => {};
-}
-
-const options: ComboboxOption[] = [
+const options: SearchableSelectOption[] = [
   { value: 'deepseek/deepseek-v4-flash', label: 'deepseek-v4-flash', group: 'deepseek' },
   { value: 'deepseek/deepseek-v4-pro', label: 'deepseek-v4-pro', group: 'deepseek' },
   { value: 'openai/gpt-5.5', label: 'gpt-5.5', group: 'openai' },
@@ -43,14 +39,24 @@ describe('ModelFallbackEditor', () => {
         language="zh"
       />,
     );
-    const combobox = screen.getByRole('combobox');
-    fireEvent.focus(combobox);
-    const listbox = document.getElementById(combobox.getAttribute('aria-controls')!)!;
+    fireEvent.click(screen.getByRole('button', { name: '添加备用模型' }));
+    const listbox = screen.getByRole('listbox');
     // The primary model and already-picked model are excluded from the add list.
     expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();
     expect(within(listbox).queryByText('deepseek-v4-pro')).not.toBeInTheDocument();
     fireEvent.click(within(listbox).getByText('gpt-5.5'));
     expect(onChange).toHaveBeenCalledWith('deepseek/deepseek-v4-pro,openai/gpt-5.5');
+  });
+
+  it('filters the add list by search query', () => {
+    render(
+      <ModelFallbackEditor value="" onChange={() => {}} options={options} language="zh" />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '添加备用模型' }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'gpt' } });
+    const listbox = screen.getByRole('listbox');
+    expect(within(listbox).getByText('gpt-5.5')).toBeInTheDocument();
+    expect(within(listbox).queryByText('deepseek-v4-flash')).not.toBeInTheDocument();
   });
 
   it('removes and reorders tokens', () => {

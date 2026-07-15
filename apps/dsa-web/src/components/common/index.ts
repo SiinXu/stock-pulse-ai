@@ -20,7 +20,7 @@ export * from './Collapsible';
 export * from './ScoreGauge';
 export * from './JsonViewer';
 export * from './Select';
-export * from './CreatableCombobox';
+export * from './SearchableSelect';
 export * from './Badge';
 export * from './StatusDot';
 export * from './Tooltip';

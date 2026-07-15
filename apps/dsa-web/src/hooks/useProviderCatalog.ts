@@ -4,6 +4,7 @@ import type { LlmProviderCatalogEntry } from '../types/systemConfig';
 
 interface ProviderCatalogState {
   providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts: string[];
   isLoading: boolean;
   error: string | null;
   reload: () => void;
@@ -17,6 +18,7 @@ interface ProviderCatalogState {
  */
 export function useProviderCatalog(): ProviderCatalogState {
   const [providers, setProviders] = useState<LlmProviderCatalogEntry[]>([]);
+  const [emptyApiKeyHosts, setEmptyApiKeyHosts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -37,6 +39,7 @@ export function useProviderCatalog(): ProviderCatalogState {
           return;
         }
         setProviders(response.providers ?? []);
+        setEmptyApiKeyHosts(response.emptyApiKeyHosts ?? []);
         setIsLoading(false);
       })
       .catch((err: unknown) => {
@@ -51,5 +54,5 @@ export function useProviderCatalog(): ProviderCatalogState {
     };
   }, [reloadToken]);
 
-  return { providers, isLoading, error, reload };
+  return { providers, emptyApiKeyHosts, isLoading, error, reload };
 }

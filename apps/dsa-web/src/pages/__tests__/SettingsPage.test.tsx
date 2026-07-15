@@ -1315,9 +1315,13 @@ describe('SettingsPage', () => {
       ],
     }));
 
-    render(<SettingsPage />);
+    const { rerender } = render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
+
+    // The status panel now lives in the top-level Advanced diagnostics area.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
+    rerender(<SettingsPage />);
 
     const statusItems = await screen.findByTestId('generation-backend-status-items');
     await waitFor(() => {
@@ -1336,9 +1340,13 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
+    const { rerender } = render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
+
+    // The status panel now lives in the top-level Advanced diagnostics area.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
+    rerender(<SettingsPage />);
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
 
     fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
@@ -1351,6 +1359,8 @@ describe('SettingsPage', () => {
 
   it('runs the unified post-save effects after a legacy migration applies', async () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+    // The migration banner lives in the top-level Advanced diagnostics area.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
 
     render(<SettingsPage />);
 
@@ -1405,6 +1415,9 @@ describe('SettingsPage', () => {
         options: [],
         validation: {},
         displayOrder,
+        // Mirrors the backend registry: task-model keys are owned by the
+        // Task Routing surface.
+        uiPlacement: 'task_routing' as const,
       },
     });
     const configState = buildSystemConfigState();
@@ -1428,15 +1441,15 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    // Per-task model fields render as searchable model selectors (comboboxes),
-    // not raw text inputs; temperature stays a plain field.
-    const comboboxes = await screen.findAllByRole('combobox');
-    expect(comboboxes.length).toBeGreaterThanOrEqual(3);
-    // Current routes (not in the available catalog here) are preserved as-is,
-    // never silently dropped.
-    expect(screen.getByDisplayValue('openai/gpt-4o-mini')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('openai/gpt-4o')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('gemini/gemini-3-pro')).toBeInTheDocument();
+    // Per-task model fields render as strict list selectors (SearchableSelect
+    // trigger buttons opening a listbox), not raw text inputs; temperature
+    // stays a plain field. Current routes not present in the available-model
+    // catalog are surfaced as "unavailable" instead of being silently dropped.
+    expect(await screen.findByText('当前配置不可用：openai/gpt-4o-mini')).toBeInTheDocument();
+    expect(screen.getByText('当前配置不可用：openai/gpt-4o')).toBeInTheDocument();
+    expect(screen.getByText('当前配置不可用：gemini/gemini-3-pro')).toBeInTheDocument();
+    const modelTriggers = document.querySelectorAll('button[aria-haspopup="listbox"]');
+    expect(modelTriggers.length).toBeGreaterThanOrEqual(3);
     expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
     // Fallback order is NOT an editable field here; it is a read-only summary.
     expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();
@@ -2717,6 +2730,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 1,
+              uiPlacement: 'model_access' as const,
             },
           },
           {
@@ -2735,6 +2749,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 2,
+              uiPlacement: 'task_routing' as const,
             },
           },
           {
@@ -2753,6 +2768,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 3,
+              uiPlacement: 'hidden_legacy' as const,
             },
           },
           {
@@ -2771,6 +2787,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 4,
+              uiPlacement: 'hidden_legacy' as const,
             },
           },
           {
@@ -2789,6 +2806,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 9000,
+              uiPlacement: 'model_access' as const,
             },
           },
           {
@@ -2807,6 +2825,7 @@ describe('SettingsPage', () => {
               options: [],
               validation: {},
               displayOrder: 9000,
+              uiPlacement: 'model_access' as const,
             },
           },
         ],
@@ -2849,6 +2868,9 @@ describe('SettingsPage', () => {
         options: [],
         validation: {},
         displayOrder: index + 1,
+        // Mirrors the backend registry: legacy provider keys stay
+        // backend-compatible but are never rendered as generic fields.
+        uiPlacement: 'hidden_legacy' as const,
       },
     }));
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({

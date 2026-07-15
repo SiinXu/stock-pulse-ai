@@ -7,6 +7,7 @@ validation hints, and category grouping.
 
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +19,7 @@ from src.config import (
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
-SCHEMA_VERSION = "2026-06-29-claude-code-cli-backend"
+SCHEMA_VERSION = "2026-07-14-ui-placement"
 
 _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
     {
@@ -376,6 +377,29 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             },
         ],
         "warning_codes": ["inherits_primary_when_empty"],
+    },
+    "VISION_MODEL": {
+        "title": "Vision Model",
+        "description": "Optional model used for image understanding. When empty, vision tasks follow the configured default behavior.",
+        "category": "ai_model",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": None,
+        "options": [],
+        "validation": {},
+        "display_order": 3,
+        "help_key": "settings.ai_model.VISION_MODEL",
+        "examples": ["VISION_MODEL=openai/gpt-5.4-mini"],
+        "docs": [
+            {
+                "label": "LLM 配置指南",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/LLM_CONFIG_GUIDE.md",
+            },
+        ],
+        "warning_codes": ["vision_model_must_be_available"],
     },
     "LITELLM_FALLBACK_MODELS": {
         "title": "Fallback Models",
@@ -4890,6 +4914,73 @@ def _extract_option_values(options: List[Any]) -> List[str]:
     return values
 
 
+# UI ownership/placement for AI-model related fields. The Web renders each
+# field only in the surface its placement declares, instead of maintaining its
+# own provider/field lists:
+#   - model_access: edited exclusively by the model-access connection manager
+#   - task_routing: task model selectors (report / agent / vision) and routing
+#   - developer_diagnostics: advanced diagnostics, collapsed by default
+#   - hidden_legacy: legacy provider keys kept for back-compat; readable through
+#     the API but never rendered as a generic editable settings field
+#   - None: regular field, rendered by its category page as usual
+_UI_PLACEMENT_TASK_ROUTING_KEYS = frozenset({
+    "LITELLM_MODEL",
+    "AGENT_LITELLM_MODEL",
+    "VISION_MODEL",
+    "LITELLM_FALLBACK_MODELS",
+    "LLM_TEMPERATURE",
+})
+
+_UI_PLACEMENT_DIAGNOSTICS_KEYS = frozenset({
+    "LLM_CONFIG_MODE",
+    "LITELLM_CONFIG",
+    "GENERATION_BACKEND",
+    "GENERATION_FALLBACK_BACKEND",
+    "GENERATION_BACKEND_MAX_CONCURRENCY",
+    "GENERATION_BACKEND_MAX_OUTPUT_BYTES",
+    "GENERATION_BACKEND_TIMEOUT_SECONDS",
+    "LOCAL_CLI_BACKEND_MAX_CONCURRENCY",
+    "OPENCODE_CLI_MODEL",
+})
+_UI_PLACEMENT_DIAGNOSTICS_PREFIXES = ("LLM_PROMPT_CACHE_", "LLM_USAGE_HMAC_")
+
+_UI_PLACEMENT_HIDDEN_LEGACY_KEYS = frozenset({
+    "AIHUBMIX_KEY",
+    "DEEPSEEK_API_KEY",
+    "DEEPSEEK_API_KEYS",
+    "OLLAMA_API_BASE",
+    "OLLAMA_MODEL",
+})
+_UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANSPIRE_LLM_")
+
+# Canonical shape of dynamic per-channel config keys (LLM_<NAME>_API_KEY, ...).
+# group(1) captures the channel name. Shared with the service layer so "what is
+# a channel field key" has a single definition.
+LLM_CHANNEL_FIELD_KEY_RE = re.compile(
+    r"^LLM_([A-Z0-9_]+)_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+)
+
+
+def derive_ui_placement(key: str) -> Optional[str]:
+    """Return the UI placement for a config key (None = regular field)."""
+    key_upper = key.upper()
+    if key_upper == "LLM_CHANNELS":
+        return "model_access"
+    if key_upper in _UI_PLACEMENT_TASK_ROUTING_KEYS:
+        return "task_routing"
+    if key_upper in _UI_PLACEMENT_DIAGNOSTICS_KEYS or key_upper.startswith(
+        _UI_PLACEMENT_DIAGNOSTICS_PREFIXES
+    ):
+        return "developer_diagnostics"
+    if key_upper in _UI_PLACEMENT_HIDDEN_LEGACY_KEYS or key_upper.startswith(
+        _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES
+    ):
+        return "hidden_legacy"
+    if LLM_CHANNEL_FIELD_KEY_RE.match(key_upper):
+        return "model_access"
+    return None
+
+
 def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str, Any]:
     """Return field definition for key, including inferred fallback metadata."""
     key_upper = key.upper()
@@ -4903,6 +4994,7 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
         if field.get("ui_control") == "select" and option_values and "enum" not in validation:
             validation["enum"] = option_values
         field["validation"] = validation
+        field["ui_placement"] = derive_ui_placement(key_upper)
         return field
 
     category = _infer_category(key_upper)
@@ -4921,6 +5013,7 @@ def get_field_definition(key: str, value_hint: Optional[str] = None) -> Dict[str
         "options": [],
         "validation": {},
         "display_order": 9000,
+        "ui_placement": derive_ui_placement(key_upper),
     }
     return field
 

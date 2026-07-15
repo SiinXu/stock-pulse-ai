@@ -23,9 +23,10 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from src.config import Config  # noqa: E402
+from src.config import Config, channel_allows_empty_api_key  # noqa: E402
 from src.core.config_manager import ConfigManager  # noqa: E402
 from src.llm.provider_catalog import (  # noqa: E402
+    get_empty_api_key_hosts,
     get_provider_catalog,
     get_provider_ids,
 )
@@ -80,6 +81,23 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
         self.assertNotIn("injected", [entry["id"] for entry in second])
         # get_provider_ids stays authoritative too.
         self.assertNotIn("injected", get_provider_ids())
+
+    def test_empty_api_key_hosts_mirror_backend_exemption_contract(self) -> None:
+        # The catalog API exposes the exact host list the backend validator
+        # exempts, so the Web can apply the same rule without hardcoding one.
+        hosts = get_empty_api_key_hosts()
+        self.assertTrue(hosts)
+        self.assertEqual(hosts, sorted(hosts))
+        for host in hosts:
+            self.assertTrue(
+                channel_allows_empty_api_key("openai", f"http://{host}:8000/v1"),
+                f"{host} advertised as exempt but backend still requires a key",
+            )
+        # A remote OpenAI-compatible endpoint still requires a key.
+        self.assertNotIn("api.example.com", hosts)
+        self.assertFalse(channel_allows_empty_api_key("openai", "https://api.example.com/v1"))
+        # Ollama stays exempt regardless of endpoint host.
+        self.assertTrue(channel_allows_empty_api_key("ollama", "https://ollama.remote.example/v1"))
 
     def test_catalog_use_does_not_pollute_later_config_validation(self) -> None:
         # Ordering isolation: touch the catalog / available-models path, then a

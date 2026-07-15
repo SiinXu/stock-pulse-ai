@@ -89,7 +89,7 @@ function renderFieldControl(
   t: (key: UiTextKey) => string,
 ) {
   const schema = item.schema;
-  const commonClass = 'w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
 
@@ -120,7 +120,7 @@ function renderFieldControl(
 
     return (
       <div
-        className="max-h-48 space-y-2 overflow-y-auto rounded-[10px] border border-border p-3"
+        className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3"
         data-testid={`multi-enum-${item.key}`}
       >
         {normalizedOptions.map((option, index) => (
@@ -195,17 +195,17 @@ function renderFieldControl(
           disabled={isDisabled}
           onClick={() => onChange(checked ? 'false' : 'true')}
           className={cn(
-            'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+            'relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors',
             checked
-              ? 'bg-[linear-gradient(211.26deg,#ffff7f_0%,#7fff7f_101.17%)]'
+              ? 'bg-foreground'
               : 'bg-border',
             isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           )}
         >
           <span
             className={cn(
-              'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-              checked ? 'translate-x-[18px]' : 'translate-x-0.5',
+              'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+              checked ? 'translate-x-3' : 'translate-x-0.5',
             )}
           />
         </button>

@@ -52,7 +52,7 @@ const BackendStatusRow: React.FC<{ title: string; status: GenerationBackendStatu
             <Badge variant={status.available ? 'success' : 'warning'} size="sm">
               {getHealthLabel(status, t)}
             </Badge>
-            <Badge variant="history" size="sm">
+            <Badge variant="default" size="sm">
               {status.backendId}
             </Badge>
           </div>
@@ -74,7 +74,7 @@ const BackendStatusRow: React.FC<{ title: string; status: GenerationBackendStatu
           <Badge variant={status.supportsTools ? 'success' : 'warning'} size="sm">
             {status.supportsTools ? t('settings.generationBackendToolsSupported') : t('settings.generationBackendGenerationOnly')}
           </Badge>
-          <Badge variant="history" size="sm">{t('settings.generationBackendConcurrency', { count: status.maxConcurrency })}</Badge>
+          <Badge variant="default" size="sm">{t('settings.generationBackendConcurrency', { count: status.maxConcurrency })}</Badge>
         </div>
       </div>
     </div>

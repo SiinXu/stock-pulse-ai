@@ -87,7 +87,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           {label(status.effectiveMode)}
         </Badge>
         {status.requestedMode !== 'auto' ? (
-          <Badge variant="history" size="sm">
+          <Badge variant="default" size="sm">
             {en ? `Requested: ${status.requestedMode}` : `请求模式：${status.requestedMode}`}
           </Badge>
         ) : null}
@@ -140,7 +140,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
             {(preview?.channels ?? []).map((channel) => (
               <div key={channel.name} className="flex flex-wrap items-center gap-2 border-b border-[var(--settings-border)] px-3 py-2 text-xs last:border-b-0">
                 <span className="font-medium text-foreground">{channel.name}</span>
-                <Badge variant="info" size="sm">{channel.protocol}</Badge>
+                <Badge variant="default" size="sm">{channel.protocol}</Badge>
                 <span className="text-muted-text">{channel.model}</span>
                 {channel.baseUrl ? <span className="text-muted-text">{channel.baseUrl}</span> : null}
               </div>

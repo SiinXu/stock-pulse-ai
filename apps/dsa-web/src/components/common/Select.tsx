@@ -155,7 +155,7 @@ export const Select: React.FC<SelectProps> = ({
           onClick={() => (isOpen ? setIsOpen(false) : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex h-8 w-full items-center justify-between gap-2 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground',
+            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           )}
@@ -198,7 +198,7 @@ export const Select: React.FC<SelectProps> = ({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => commitOption(index)}
                 className={cn(
-                  'flex cursor-pointer items-center justify-between gap-3 rounded-[6px] px-3 py-1.5 text-xs text-foreground',
+                  'flex cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
                   index === activeIndex && 'bg-hover',
                 )}
               >

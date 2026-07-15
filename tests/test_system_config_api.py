@@ -236,6 +236,28 @@ class SystemConfigApiTestCase(unittest.TestCase):
         # Only custom needs a user-supplied endpoint.
         self.assertTrue(providers["custom"]["is_custom"])
         self.assertTrue(providers["custom"]["requires_base_url"])
+        # The endpoint also exposes the backend's empty-API-key host contract so
+        # the Web applies the same localhost exemption without hardcoding it.
+        from src.config import LLM_EMPTY_API_KEY_HOSTNAMES
+
+        self.assertEqual(
+            payload["empty_api_key_hosts"], sorted(LLM_EMPTY_API_KEY_HOSTNAMES)
+        )
+
+    def test_config_schema_preserves_ui_placement_metadata(self) -> None:
+        payload = system_config.get_system_config_schema(service=self.service).model_dump()
+        fields = {
+            field["key"]: field
+            for category in payload["categories"]
+            for field in category["fields"]
+        }
+
+        self.assertEqual(fields["LLM_CHANNELS"]["ui_placement"], "model_access")
+        self.assertEqual(fields["LITELLM_MODEL"]["ui_placement"], "task_routing")
+        self.assertEqual(fields["VISION_MODEL"]["ui_placement"], "task_routing")
+        self.assertEqual(fields["GENERATION_BACKEND"]["ui_placement"], "developer_diagnostics")
+        self.assertEqual(fields["OPENAI_API_KEY"]["ui_placement"], "hidden_legacy")
+        self.assertIsNone(fields["STOCK_LIST"]["ui_placement"])
 
     def test_get_generation_backend_status_uses_saved_config_only(self) -> None:
         self._rewrite_env(

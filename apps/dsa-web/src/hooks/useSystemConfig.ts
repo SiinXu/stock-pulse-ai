@@ -212,9 +212,18 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
           if (committedKeys.has(item.key)) {
             // A key we just committed. If the user re-edited it while the save
             // was in flight, keep the newer edit; otherwise sync to the server.
+            // Callers may also submit a value owned by a dedicated editor that
+            // is not mirrored into draftValues. In that case currentDraft still
+            // equals the old server value and must not overwrite the commit.
             const submitted = committedValues?.[item.key];
             const currentDraft = prevDraft[item.key];
-            if (submitted !== undefined && currentDraft !== undefined && currentDraft !== submitted) {
+            const previousServerValue = previousServerMap[item.key]?.value;
+            if (
+              submitted !== undefined
+              && currentDraft !== undefined
+              && currentDraft !== submitted
+              && currentDraft !== previousServerValue
+            ) {
               nextDraft[item.key] = currentDraft;
             } else {
               nextDraft[item.key] = item.value;

@@ -239,7 +239,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-06-29-claude-code-cli-backend")
+        self.assertEqual(SCHEMA_VERSION, "2026-07-14-ui-placement")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -848,6 +848,125 @@ class TestConfigConditions(unittest.TestCase):
             contract["visible_when"],
             [{"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}],
         )
+
+
+class TestUiPlacement(unittest.TestCase):
+    """The backend declares which UI surface owns each AI-model field so the
+    Web never maintains a second provider/key list."""
+
+    def test_model_access_keys(self):
+        from src.core.config_registry import derive_ui_placement
+
+        self.assertEqual(derive_ui_placement("LLM_CHANNELS"), "model_access")
+        for key in (
+            "LLM_OPENAI_PROTOCOL",
+            "LLM_MY_CHANNEL_BASE_URL",
+            "LLM_DEEPSEEK_API_KEY",
+            "LLM_DEEPSEEK_API_KEYS",
+            "LLM_OLLAMA_MODELS",
+            "LLM_HERMES_EXTRA_HEADERS",
+            "LLM_CUSTOM01_ENABLED",
+        ):
+            self.assertEqual(derive_ui_placement(key), "model_access", key)
+
+    def test_task_routing_keys(self):
+        from src.core.config_registry import derive_ui_placement
+
+        for key in (
+            "LITELLM_MODEL",
+            "AGENT_LITELLM_MODEL",
+            "VISION_MODEL",
+            "LITELLM_FALLBACK_MODELS",
+            "LLM_TEMPERATURE",
+        ):
+            self.assertEqual(derive_ui_placement(key), "task_routing", key)
+
+    def test_developer_diagnostics_keys(self):
+        from src.core.config_registry import derive_ui_placement
+
+        for key in (
+            "LLM_CONFIG_MODE",
+            "LITELLM_CONFIG",
+            "GENERATION_BACKEND",
+            "GENERATION_FALLBACK_BACKEND",
+            "GENERATION_BACKEND_MAX_CONCURRENCY",
+            "GENERATION_BACKEND_MAX_OUTPUT_BYTES",
+            "GENERATION_BACKEND_TIMEOUT_SECONDS",
+            "LOCAL_CLI_BACKEND_MAX_CONCURRENCY",
+            "OPENCODE_CLI_MODEL",
+            "LLM_PROMPT_CACHE_HINTS_ENABLED",
+            "LLM_PROMPT_CACHE_TELEMETRY_ENABLED",
+            "LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL",
+            "LLM_USAGE_HMAC_SECRET",
+            "LLM_USAGE_HMAC_KEY_VERSION",
+        ):
+            self.assertEqual(derive_ui_placement(key), "developer_diagnostics", key)
+
+    def test_prompt_cache_enabled_is_diagnostics_not_a_channel_field(self):
+        # LLM_PROMPT_CACHE_HINTS_ENABLED also matches the LLM_<NAME>_ENABLED
+        # shape; the diagnostics prefix must win over the channel pattern.
+        from src.core.config_registry import derive_ui_placement
+
+        self.assertEqual(
+            derive_ui_placement("LLM_PROMPT_CACHE_HINTS_ENABLED"),
+            "developer_diagnostics",
+        )
+
+    def test_hidden_legacy_keys(self):
+        from src.core.config_registry import derive_ui_placement
+
+        for key in (
+            "OPENAI_API_KEY",
+            "OPENAI_API_KEYS",
+            "OPENAI_BASE_URL",
+            "OPENAI_MODEL",
+            "OPENAI_VISION_MODEL",
+            "OPENAI_TEMPERATURE",
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_MODEL",
+            "ANTHROPIC_MAX_TOKENS",
+            "ANTHROPIC_TEMPERATURE",
+            "GEMINI_API_KEY",
+            "GEMINI_MODEL",
+            "GEMINI_MODEL_FALLBACK",
+            "DEEPSEEK_API_KEY",
+            "DEEPSEEK_API_KEYS",
+            "AIHUBMIX_KEY",
+            "OLLAMA_API_BASE",
+            "OLLAMA_MODEL",
+            "ANSPIRE_LLM_BASE_URL",
+            "ANSPIRE_LLM_MODEL",
+            "ANSPIRE_LLM_ENABLED",
+        ):
+            self.assertEqual(derive_ui_placement(key), "hidden_legacy", key)
+
+    def test_regular_fields_have_no_placement(self):
+        from src.core.config_registry import derive_ui_placement
+
+        for key in ("STOCK_LIST", "LOG_LEVEL", "TAVILY_API_KEYS", "ANSPIRE_API_KEYS"):
+            self.assertIsNone(derive_ui_placement(key), key)
+
+    def test_every_registered_ai_model_field_declares_a_placement(self):
+        # A None placement on an ai_model field would fall back to the generic
+        # category page and silently recreate a second edit entry.
+        from src.core.config_registry import build_schema_response
+
+        schema = build_schema_response()
+        ai_model = next(c for c in schema["categories"] if c["category"] == "ai_model")
+        self.assertTrue(ai_model["fields"])
+        for field in ai_model["fields"]:
+            self.assertIn(
+                field.get("ui_placement"),
+                {"model_access", "task_routing", "developer_diagnostics", "hidden_legacy"},
+                f"{field['key']} has no ui_placement",
+            )
+
+    def test_field_definition_exposes_placement_for_dynamic_keys(self):
+        from src.core.config_registry import get_field_definition
+
+        self.assertEqual(get_field_definition("LLM_MY_LOCAL_API_KEY")["ui_placement"], "model_access")
+        self.assertEqual(get_field_definition("LITELLM_MODEL")["ui_placement"], "task_routing")
+        self.assertEqual(get_field_definition("STOCK_LIST")["ui_placement"], None)
 
 
 if __name__ == "__main__":

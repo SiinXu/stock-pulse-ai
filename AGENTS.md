@@ -154,7 +154,8 @@ gh run view <run_id> --log-failed
 | `ai-governance` | `.github/workflows/ci.yml` | 校验 `AGENTS.md` / `CLAUDE.md` / `.github` 指令 / `.claude/skills` 关系 | 是 |
 | `backend-gate` | `.github/workflows/ci.yml` | 执行 `./scripts/ci_gate.sh` | 是 |
 | `docker-build` | `.github/workflows/ci.yml` | Docker 构建与关键模块导入 smoke | 是 |
-| `web-gate` | `.github/workflows/ci.yml` | 前端改动时执行 `npm run lint` + `npm run build` | 是（触发时） |
+| `web-gate` | `.github/workflows/ci.yml` | 前端改动时执行 `npm run lint` + `npm run test` + `npm run build` | 是（触发时） |
+| `web-e2e` | `.github/workflows/ci.yml` | 前端改动时以隔离的临时 `ENV_FILE` 启动真实后端、Vite 与本地 fake 模型端点，并执行 `npm run test:smoke`（Playwright） | 是（触发时） |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | 否，观测项 |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR 静态检查 + AI 审查 + 自动标签 | 否，辅助项 |
 

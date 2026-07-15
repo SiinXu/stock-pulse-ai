@@ -1,19 +1,35 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 
-/**
- * Remediation E2E: model-access UX on the real app against a real backend
- * started without any LLM_* configuration ("plain path"). Requires
- * DSA_WEB_SMOKE_PASSWORD (same contract as smoke.spec.ts).
- */
+const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
+const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
+const fakeProviderBaseUrl = `http://127.0.0.1:${fakeProviderPort}/v1`;
 
-const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD;
-
-if (!smokePassword) {
-  test.skip(true, 'Set DSA_WEB_SMOKE_PASSWORD to run authenticated remediation tests.');
-}
-
-const LEGACY_TERMS = ['模型供应商', '快速添加渠道', '渠道管理', '渠道列表', '添加渠道'];
-const RAW_KEY_PATTERNS = [/LLM_CHANNELS/, /LLM_[A-Z0-9_]+_API_KEY/, /LITELLM_MODEL/];
+const MODEL_KEYS_TO_RESET = [
+  'LLM_CONFIG_MODE',
+  'LLM_CHANNELS',
+  'LLM_E2E_PROTOCOL',
+  'LLM_E2E_BASE_URL',
+  'LLM_E2E_API_KEY',
+  'LLM_E2E_API_KEYS',
+  'LLM_E2E_MODELS',
+  'LLM_E2E_ENABLED',
+  'LLM_OPENAI_PROTOCOL',
+  'LLM_OPENAI_BASE_URL',
+  'LLM_OPENAI_API_KEY',
+  'LLM_OPENAI_API_KEYS',
+  'LLM_OPENAI_MODELS',
+  'LLM_OPENAI_ENABLED',
+  'LLM_OLLAMA_PROTOCOL',
+  'LLM_OLLAMA_BASE_URL',
+  'LLM_OLLAMA_API_KEY',
+  'LLM_OLLAMA_API_KEYS',
+  'LLM_OLLAMA_MODELS',
+  'LLM_OLLAMA_ENABLED',
+  'LITELLM_MODEL',
+  'AGENT_LITELLM_MODEL',
+  'VISION_MODEL',
+  'LITELLM_FALLBACK_MODELS',
+];
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
   const path = testInfo.outputPath(`${name}.png`);
@@ -21,335 +37,495 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, { path, contentType: 'image/png' });
 }
 
+async function selectTheme(page: Page, theme: '浅色' | '深色') {
+  await page.getByRole('button', { name: '切换主题' }).first().click();
+  await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
+  if (theme === '深色') {
+    await expect(page.locator('html')).toHaveClass(/dark/);
+  } else {
+    await expect(page.locator('html')).not.toHaveClass(/dark/);
+  }
+}
+
 async function login(page: Page) {
   await page.goto('/login');
   await page.waitForLoadState('domcontentloaded');
-
-  const passwordInput = page.locator('#password');
-  const submitButton = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
-  const homeLink = page.getByRole('link', { name: '首页' });
-
-  const isAlreadyAuthenticated =
-    page.url().endsWith('/') ||
-    (await homeLink.isVisible({ timeout: 2_000 }).catch(() => false));
-  if (isAlreadyAuthenticated) {
+  const settingsLink = page.getByRole('link', { name: '设置' });
+  if (
+    page.url().endsWith('/')
+    || await settingsLink.isVisible({ timeout: 2_000 }).catch(() => false)
+  ) {
     return;
   }
 
-  await expect(passwordInput).toBeVisible({ timeout: 10_000 });
-  await passwordInput.fill(smokePassword!);
-  const confirmInput = page.locator('#passwordConfirm');
-  if (await confirmInput.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await confirmInput.fill(smokePassword!);
+  const password = page.locator('#password');
+  // Auth-disabled developer builds redirect /login to the workspace without a
+  // password field. The isolated CI env enables auth, so this branch remains a
+  // real first-login flow there while local runs stay independent of user state.
+  if (!await password.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    return;
+  }
+  await password.fill(smokePassword);
+  const confirmation = page.locator('#passwordConfirm');
+  if (await confirmation.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await confirmation.fill(smokePassword);
   }
   await Promise.all([
     page.waitForResponse(
       (response) => response.url().includes('/api/v1/auth/login') && response.status() === 200,
-      { timeout: 15_000 },
+      { timeout: 20_000 },
     ),
-    submitButton.click(),
+    page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ }).click(),
   ]);
-  await page.waitForURL('/', { timeout: 15_000 });
-  await page.waitForLoadState('domcontentloaded');
+  await page.waitForURL('/', { timeout: 20_000 });
+}
+
+async function resetModelConfig(page: Page) {
+  const result = await page.evaluate(async (keys) => {
+    const configResponse = await fetch('/api/v1/system/config');
+    const config = await configResponse.json();
+    const response = await fetch('/api/v1/system/config', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        config_version: config.config_version,
+        mask_token: config.mask_token || '******',
+        reload_now: true,
+        items: keys.map((key) => ({
+          key,
+          value: key === 'LLM_CONFIG_MODE' ? 'auto' : '',
+        })),
+      }),
+    });
+    return { ok: response.ok, status: response.status, text: await response.text() };
+  }, MODEL_KEYS_TO_RESET);
+  expect(result.ok, `reset failed (${result.status}): ${result.text}`).toBe(true);
 }
 
 async function openSettings(page: Page) {
   await login(page);
-  await page.getByRole('link', { name: '设置' }).click();
-  await page.waitForLoadState('domcontentloaded');
+  await page.goto('/settings');
   await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15_000 });
 }
 
-async function openAiSection(page: Page) {
-  await openSettings(page);
-  await page.getByRole('button', { name: 'AI 与模型' }).click();
-  await expect(page.getByRole('tab', { name: '连接' })).toBeVisible({ timeout: 10_000 });
+async function openConnections(page: Page, reset = true) {
+  await login(page);
+  if (reset) {
+    await resetModelConfig(page);
+  }
+  await page.goto('/settings?section=ai_models&view=connections');
+  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
 }
 
-/**
- * On the connections view: pick a provider in the catalog Select, then click
- * the "+ 添加模型服务" button. The new channel row auto-expands.
- */
-async function addModelService(page: Page, providerLabel: RegExp) {
-  const providerSelect = page
-    .getByRole('combobox')
-    .filter({ hasText: /选择服务商|AIHubmix|官方|（本地）|（聚合平台）/ })
-    .first();
-  await expect(providerSelect).toBeVisible({ timeout: 10_000 });
-  // The listbox opens downward with a fixed position; park the trigger near the
-  // top of the viewport so deep options (e.g. Ollama) stay clickable.
-  await providerSelect.evaluate((element) => element.scrollIntoView({ block: 'start' }));
-  await providerSelect.click();
-  const option = page.getByRole('option', { name: providerLabel }).first();
-  await expect(option).toBeVisible({ timeout: 5_000 });
-  await option.scrollIntoViewIfNeeded();
-  await option.click();
-  await page.getByRole('button', { name: '+ 添加模型服务' }).click();
-  await page.waitForTimeout(400);
+async function openAddDialog(page: Page) {
+  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  await expect(dialog).toBeVisible();
+  return dialog;
 }
 
-test.describe('model access remediation', () => {
+async function chooseProvider(page: Page, id: string) {
+  await page.getByLabel('选择模型服务商').click();
+  const option = page.getByRole('option').filter({ has: page.locator(`[data-value="${id}"]`) });
+  if (await option.count()) {
+    await option.first().click();
+    return;
+  }
+  await page.locator(`[role="option"][data-value="${id}"]`).click();
+}
+
+async function chooseProviderBySearch(page: Page, query: string, id: string) {
+  await page.getByLabel('选择模型服务商').click();
+  await page.getByRole('combobox', { name: '选择模型服务商 搜索' }).fill(query);
+  await page.locator(`[role="option"][data-value="${id}"]`).click();
+}
+
+async function addManualModel(page: Page, model: string) {
+  const button = page.getByRole('button', { name: /手动添加模型/ });
+  if (await button.isVisible().catch(() => false)) {
+    await button.click();
+  }
+  const input = page.getByLabel('手动添加模型');
+  await input.fill(model);
+  await input.press('Enter');
+}
+
+async function configureCustomDraft(page: Page, selectedModels = ['fake-report-model']) {
+  const dialog = await openAddDialog(page);
+  await chooseProviderBySearch(page, '自定义', 'custom');
+  await page.getByLabel('连接名称').fill('e2e');
+  await page.getByLabel('服务地址').fill(fakeProviderBaseUrl);
+  await page.getByRole('button', { name: '获取模型' }).click();
+  await expect(page.getByText(/已获取 3 个模型/)).toBeVisible({ timeout: 20_000 });
+  for (const model of selectedModels) {
+    await page.getByRole('checkbox', { name: model }).check();
+  }
+  await page.getByRole('button', { name: '添加到配置' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+}
+
+async function saveDraft(page: Page) {
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT',
+    { timeout: 20_000 },
+  );
+  const refreshPromise = page.waitForResponse(
+    (response) => response.url().includes('/api/v1/system/config?include_schema=true') && response.request().method() === 'GET',
+    { timeout: 20_000 },
+  );
+  await page.getByRole('button', { name: /保存配置/ }).click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(200);
+  const refreshResponse = await refreshPromise;
+  expect(refreshResponse.status()).toBe(200);
+  const refreshed = await refreshResponse.json();
+  expect(refreshed.items.find((item: { key: string }) => item.key === 'LLM_CHANNELS')?.value).toBe('e2e');
+  if (await page.getByTestId('connection-card-e2e').count()) {
+    await expect(page.getByTestId('connection-card-e2e')).not.toContainText('未保存', { timeout: 15_000 });
+  }
+}
+
+async function createSavedConnection(page: Page, selectedModels = ['fake-report-model', 'fake-agent-model', 'fake-vision-model']) {
+  await openConnections(page, true);
+  await configureCustomDraft(page, selectedModels);
+  await saveDraft(page);
+}
+
+async function selectStrictModel(page: Page, label: string, route: string) {
+  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.locator(`[role="option"][data-value="${route}"]`).click();
+}
+
+test.describe('model access product convergence', () => {
   test.use({ locale: 'zh-CN' });
 
-  test('scenario 1: AI & Models exposes exactly overview/connections/task-routing/reliability views', async ({ page }, testInfo) => {
-    await openAiSection(page);
-
+  test('01 AI & Models exposes exactly four product views', async ({ page }) => {
+    await openConnections(page);
     for (const label of ['总览', '连接', '任务路由', '可靠性']) {
       await expect(page.getByRole('tab', { name: label })).toBeVisible();
     }
     await expect(page.getByRole('tab', { name: '高级' })).toHaveCount(0);
-    await capture(page, testInfo, 'remediation-ai-views');
   });
 
-  test('scenario 2: connections view is the single model-access entry without legacy terms', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 10_000 });
-
-    const content = await page.locator('main, body').first().innerText();
-    for (const term of LEGACY_TERMS) {
-      expect(content, `page should not contain legacy term ${term}`).not.toContain(term);
-    }
-    await capture(page, testInfo, 'remediation-connections-entry');
+  test('02 legacy provider URLs replace-redirect to Connections', async ({ page }) => {
+    await login(page);
+    await page.goto('/settings?category=ai_model&sub=providers');
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
+    await expect.poll(() => page.url()).toContain('section=ai_models');
+    expect(page.url()).toContain('view=connections');
+    expect(page.url()).not.toContain('sub=providers');
   });
 
-  test('scenario 3: plain path renders no raw LLM_* keys across AI views', async ({ page }, testInfo) => {
-    await openAiSection(page);
+  test('03 Connections has the concise title, description, and one primary action', async ({ page }, testInfo) => {
+    await openConnections(page);
+    await selectTheme(page, '浅色');
+    await expect(page.getByText('连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。')).toBeVisible();
+    await expect(page.getByRole('button', { name: /添加模型服务/ })).toHaveCount(2);
+    await capture(page, testInfo, 'connections-empty-light');
+  });
 
+  test('04 Connections removes generation-backend diagnostics from the first screen', async ({ page }) => {
+    await openConnections(page);
+    const main = page.locator('main');
+    await expect(main.getByText('生成后端状态')).toHaveCount(0);
+    await expect(main.getByText('主后端')).toHaveCount(0);
+    await expect(main.getByText('备用后端')).toHaveCount(0);
+  });
+
+  test('05 Connections never lays credential fields out on the page', async ({ page }) => {
+    await createSavedConnection(page);
+    await expect(page.getByLabel('API 密钥')).toHaveCount(0);
+    await expect(page.getByLabel('服务地址')).toHaveCount(0);
+    await expect(page.getByTestId('connection-card-e2e')).toContainText('fake-report-model');
+  });
+
+  test('06 normal AI views contain no raw config keys or legacy terminology', async ({ page }) => {
+    await openConnections(page);
     for (const label of ['总览', '连接', '任务路由', '可靠性']) {
       await page.getByRole('tab', { name: label }).click();
-      await page.waitForTimeout(400);
-      const content = await page.locator('main, body').first().innerText();
-      for (const pattern of RAW_KEY_PATTERNS) {
-        expect(content, `${label} view should not expose ${pattern}`).not.toMatch(pattern);
-      }
+      const text = await page.locator('main').innerText();
+      expect(text).not.toMatch(/LLM_|LITELLM_|GENERATION_BACKEND|模型供应商|快速添加渠道|渠道管理|Legacy Provider/);
     }
-    await capture(page, testInfo, 'remediation-no-raw-llm-keys');
   });
 
-  test('scenario 4: add model service lists providers from the backend catalog', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
+  test('07 Add opens one modal with backend-catalog and custom providers', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await page.getByLabel('选择模型服务商').click();
+    await expect(page.locator('[role="option"][data-value="openai"]')).toContainText('OpenAI 官方');
+    await expect(page.locator('[role="option"][data-value="ollama"]')).toContainText('Ollama');
+    await expect(page.locator('[role="option"][data-value="custom"]')).toContainText('自定义服务');
+    await expect(dialog).toBeVisible();
+  });
 
-    const providerSelect = page
-      .getByRole('combobox')
-      .filter({ hasText: /选择服务商|AIHubmix|官方|（本地）|（聚合平台）/ })
-      .first();
-    await expect(providerSelect).toBeVisible({ timeout: 10_000 });
-    await providerSelect.click();
+  test('08 provider picker is searchable by provider metadata', async ({ page }) => {
+    await openConnections(page);
+    await openAddDialog(page);
+    await page.getByLabel('选择模型服务商').click();
+    await page.getByRole('combobox', { name: '选择模型服务商 搜索' }).fill('local-runtime');
+    await expect(page.locator('[role="option"][data-value="ollama"]')).toBeVisible();
+    await expect(page.locator('[role="option"][data-value="openai"]')).toHaveCount(0);
+  });
 
-    const listbox = page.getByRole('listbox');
-    await expect(listbox).toBeVisible({ timeout: 5_000 });
-    for (const provider of [/DeepSeek/, /OpenAI/, /Ollama/]) {
-      await expect(
-        listbox.getByRole('option', { name: provider }).first(),
-        `provider catalog should list ${provider}`,
-      ).toBeVisible();
+  test('09 official providers hide protocol and default Base URL', async ({ page }, testInfo) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'openai');
+    await expect(dialog.getByLabel('协议')).toHaveCount(0);
+    await expect(dialog.getByLabel('服务地址')).toHaveCount(0);
+    await expect(dialog.getByText('使用服务商官方地址')).toBeVisible();
+    await expect(dialog.getByLabel('API 密钥')).toBeVisible();
+    await capture(page, testInfo, 'add-openai-modal');
+  });
+
+  test('10 Ollama hides API key and can reveal an address override', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'ollama');
+    await expect(dialog.getByLabel('API 密钥')).toHaveCount(0);
+    await dialog.getByRole('button', { name: '使用自定义服务地址' }).click();
+    await expect(dialog.getByLabel('服务地址')).toHaveValue('http://127.0.0.1:11434');
+  });
+
+  test('11 custom service exposes enum protocol, address, and key controls', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'custom');
+    await expect(dialog.getByLabel('协议')).toHaveAttribute('role', 'combobox');
+    await expect(dialog.getByLabel('服务地址')).toBeVisible();
+    await expect(dialog.getByLabel('API 密钥')).toBeVisible();
+  });
+
+  test('12 localhost custom service follows backend empty-key contract', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'custom');
+    await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
+    await addManualModel(page, 'fake-report-model');
+    await expect(dialog.getByLabel('API 密钥')).toHaveAttribute('placeholder', '本地服务可留空');
+    await expect(dialog.getByRole('button', { name: '添加到配置' })).toBeEnabled();
+  });
+
+  test('13 discovery returns candidates without auto-selecting them', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'custom');
+    await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
+    await dialog.getByRole('button', { name: '获取模型' }).click();
+    await expect(dialog.getByText('已选 0 / 3')).toBeVisible({ timeout: 20_000 });
+    await expect(dialog.getByRole('button', { name: '添加到配置' })).toBeDisabled();
+  });
+
+  test('14 discovered models support search and explicit multi-selection', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'custom');
+    await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
+    await dialog.getByRole('button', { name: '获取模型' }).click();
+    await expect(dialog.getByText('已选 0 / 3')).toBeVisible({ timeout: 20_000 });
+    await dialog.getByLabel('搜索模型').fill('vision');
+    await expect(dialog.getByRole('checkbox', { name: 'fake-vision-model' })).toBeVisible();
+    await expect(dialog.getByRole('checkbox', { name: 'fake-report-model' })).toHaveCount(0);
+    await dialog.getByRole('checkbox', { name: 'fake-vision-model' }).check();
+    await expect(dialog.getByRole('button', { name: '移除模型 fake-vision-model' })).toBeVisible();
+  });
+
+  test('15 manual model input splits and deduplicates pasted-style lists', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'custom');
+    await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
+    await addManualModel(page, 'model-a, model-b\nmodel-a');
+    await expect(dialog.getByRole('button', { name: '移除模型 model-a' })).toHaveCount(1);
+    await expect(dialog.getByRole('button', { name: '移除模型 model-b' })).toHaveCount(1);
+  });
+
+  test('16 Back returns to provider selection inside the same modal', async ({ page }) => {
+    await openConnections(page);
+    const dialog = await openAddDialog(page);
+    await chooseProvider(page, 'openai');
+    await dialog.getByRole('button', { name: '上一步' }).click();
+    await expect(dialog.getByLabel('选择模型服务商')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '添加模型服务' })).toHaveCount(1);
+  });
+
+  test('17 Add to configuration changes only the unified page draft', async ({ page }) => {
+    await openConnections(page);
+    let saves = 0;
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') saves += 1;
+    });
+    await configureCustomDraft(page);
+    expect(saves).toBe(0);
+    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+  });
+
+  test('18 the page Save performs one atomic transaction and persists the card', async ({ page }) => {
+    await openConnections(page);
+    await configureCustomDraft(page);
+    let saves = 0;
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') saves += 1;
+    });
+    await saveDraft(page);
+    expect(saves).toBe(1);
+    await page.reload();
+    await expect(page.getByTestId('connection-card-e2e')).toContainText('fake-report-model');
+  });
+
+  test('19 Edit reuses the connection modal and keeps the page compact', async ({ page }) => {
+    await createSavedConnection(page);
+    await page.getByTestId('connection-card-e2e').getByRole('button', { name: '编辑' }).click();
+    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    await expect(dialog.getByLabel('连接名称')).toHaveValue('e2e');
+    await expect(page.getByRole('dialog', { name: '编辑模型服务' })).toHaveCount(1);
+  });
+
+  test('20 clicking the model region reuses the modal and focuses model management', async ({ page }) => {
+    await createSavedConnection(page);
+    await page.getByRole('button', { name: '管理模型 e2e' }).click();
+    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    await expect(dialog.getByRole('button', { name: '获取模型' })).toBeFocused();
+  });
+
+  test('21 deleting an unreferenced connection requires confirmation', async ({ page }) => {
+    await createSavedConnection(page);
+    await page.getByRole('button', { name: '更多操作 e2e' }).click();
+    await page.getByRole('menuitem', { name: '删除连接' }).click();
+    const dialog = page.getByRole('dialog', { name: '删除连接？' });
+    await expect(page.getByTestId('connection-card-e2e')).toBeVisible();
+    await dialog.getByRole('button', { name: '删除连接' }).click();
+    await expect(page.getByTestId('connection-card-e2e')).toHaveCount(0);
+  });
+
+  test('22 task routing empty state links to model access', async ({ page }) => {
+    await openConnections(page);
+    await page.getByRole('tab', { name: '任务路由' }).click();
+    await expect(page.getByText('还没有可用模型')).toBeVisible();
+    await page.getByRole('button', { name: '前往模型接入' }).click();
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible();
+  });
+
+  test('23 available-model API errors are distinct from empty state and retryable', async ({ page }) => {
+    await login(page);
+    await resetModelConfig(page);
+    await page.route('**/api/v1/system/config/llm/available-models', (route) => route.fulfill({ status: 500, body: '{}' }));
+    await page.goto('/settings?section=ai_models&view=task_routing');
+    await expect(page.getByText(/可用模型加载失败/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /重试|重新加载/ })).toBeVisible();
+    await expect(page.getByText('还没有可用模型')).toHaveCount(0);
+  });
+
+  test('24 task models use strict SearchableSelect controls', async ({ page }) => {
+    await createSavedConnection(page);
+    await page.getByRole('tab', { name: '任务路由' }).click();
+    for (const label of ['主要模型', 'Agent 主要模型', 'Vision 模型']) {
+      const trigger = page.getByRole('button', { name: label, exact: true });
+      await expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+      await trigger.click();
+      await expect(page.locator('[role="option"][data-value="openai/fake-report-model"]')).toBeVisible();
+      await page.getByRole('combobox', { name: new RegExp(`${label}.*搜索`) }).press('Escape');
     }
-    await capture(page, testInfo, 'remediation-provider-catalog');
+    await expect(page.locator('input[aria-label="主要模型"]')).toHaveCount(0);
   });
 
-  test('scenario 5: Ollama connection marks the API key as optional', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
-
-    await addModelService(page, /Ollama/);
-
-    await expect(
-      page.getByPlaceholder('本地 Ollama 可留空').first(),
-    ).toBeVisible({ timeout: 5_000 });
-    await capture(page, testInfo, 'remediation-ollama-optional-key');
-  });
-
-  test('scenario 6: connection form uses value examples and new field labels', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
-
-    await addModelService(page, /DeepSeek/);
-
-    const content = await page.locator('main, body').first().innerText();
-    expect(content).toContain('服务地址');
-    expect(content).toContain('API 密钥');
-    // Value example surfaces as the base-URL placeholder (a plain URL).
-    await expect(page.getByPlaceholder(/^https?:\/\//).first()).toBeVisible({ timeout: 5_000 });
-    // Examples are plain values, not KEY=value env lines.
-    expect(content).not.toMatch(/LLM_[A-Z0-9_]+_BASE_URL=/);
-    expect(content).not.toMatch(/LLM_[A-Z0-9_]+_API_KEY=/);
-    await capture(page, testInfo, 'remediation-connection-form-labels');
-  });
-
-  test('scenario 7: a new connection starts with no prefilled sample models', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
-
-    await addModelService(page, /DeepSeek/);
-
-    await expect(
-      page.getByText(/尚未添加模型|尚未添加可用模型/).first(),
-    ).toBeVisible({ timeout: 5_000 });
-    await capture(page, testInfo, 'remediation-no-prefilled-models');
-  });
-
-  test('scenario 8: manual model entry adds tokens and splits pasted comma lists', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '连接' }).click();
-
-    await addModelService(page, /DeepSeek/);
-
-    const modelInput = page.getByPlaceholder(/输入模型|模型 ID/).first();
-    await expect(modelInput).toBeVisible({ timeout: 5_000 });
-
-    await modelInput.fill('model-alpha');
-    await modelInput.press('Enter');
-    await expect(page.getByText('model-alpha', { exact: true }).first()).toBeVisible();
-
-    await modelInput.fill('model-beta,model-gamma model-alpha');
-    await modelInput.press('Enter');
-    await expect(page.getByText('model-beta', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('model-gamma', { exact: true }).first()).toBeVisible();
-    // Dedupe: model-alpha appears exactly once as a removable token chip.
-    await expect(page.getByRole('button', { name: '移除模型 model-alpha' })).toHaveCount(1);
-    await capture(page, testInfo, 'remediation-token-model-entry');
-  });
-
-  test('scenario 9: task routing empty state links back to connections', async ({ page }, testInfo) => {
-    await openAiSection(page);
+  test('25 selected task routes survive Available Models becoming stale', async ({ page }) => {
+    await createSavedConnection(page);
     await page.getByRole('tab', { name: '任务路由' }).click();
-
-    await expect(page.getByText(/尚无可用模型|还没有可用模型/).first()).toBeVisible({ timeout: 10_000 });
-    const addButton = page.getByRole('button', { name: '添加模型服务' }).first();
-    await expect(addButton).toBeVisible();
-    await addButton.click();
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 10_000 });
-    await capture(page, testInfo, 'remediation-task-routing-empty');
+    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
+    await saveDraft(page);
+    await page.route('**/api/v1/system/config/llm/available-models', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ models: [] }),
+    }));
+    await page.reload();
+    await expect(page.getByText(/当前配置不可用.*openai\/fake-report-model/)).toBeVisible();
   });
 
-  test('scenario 10: task routing links to reliability for fallback order', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '任务路由' }).click();
-
-    await expect(page.getByText('备用顺序：').first()).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: /前往可靠性设置/ }).click();
-    await expect(page.getByText('执行后端故障切换').first()).toBeVisible({ timeout: 10_000 });
-    await capture(page, testInfo, 'remediation-routing-to-reliability');
-  });
-
-  test('scenario 11: reliability view renders failover card and model fallback editor', async ({ page }, testInfo) => {
-    await openAiSection(page);
+  test('26 fallback models are searchable, deduplicated, and reorderable', async ({ page }) => {
+    await createSavedConnection(page);
     await page.getByRole('tab', { name: '可靠性' }).click();
-
-    await expect(page.getByText('执行后端故障切换').first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('模型备用顺序').first()).toBeVisible();
-    await capture(page, testInfo, 'remediation-reliability-view');
+    await page.getByLabel('添加备用模型').click();
+    await page.locator('[role="option"][data-value="openai/fake-agent-model"]').click();
+    await page.getByLabel('添加备用模型').click();
+    await page.locator('[role="option"][data-value="openai/fake-vision-model"]').click();
+    await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeEnabled();
+    await page.getByRole('button', { name: '上移 fake-vision-model' }).click();
+    await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toBeDisabled();
+    await page.getByLabel('添加备用模型').click();
+    await expect(page.locator('[role="option"][data-value="openai/fake-vision-model"]')).toHaveCount(0);
   });
 
-  test('scenario 12: overview task matrix renders per-task status on the plain path', async ({ page }, testInfo) => {
-    await openAiSection(page);
-    await page.getByRole('tab', { name: '总览' }).click();
-
-    await expect(
-      page.getByText(/待配置|未配置/).first(),
-    ).toBeVisible({ timeout: 10_000 });
-    await capture(page, testInfo, 'remediation-overview-matrix');
+  test('27 provider catalog failure is compact and existing cards remain visible', async ({ page }) => {
+    await createSavedConnection(page);
+    await page.route('**/api/v1/system/config/llm/providers', (route) => route.fulfill({ status: 500, body: '{}' }));
+    await page.reload();
+    await expect(page.getByTestId('connection-card-e2e')).toBeVisible();
+    await expect(page.getByText('模型服务列表加载失败')).toBeVisible();
+    await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
   });
 
-  test('scenario 13: MARKET_REVIEW_REGION renders as a checkbox group with localized labels', async ({ page }, testInfo) => {
+  test('28 developer diagnostics is top-level and collapsed by default', async ({ page }, testInfo) => {
     await openSettings(page);
-    await page.getByRole('button', { name: '系统与安全' }).click();
-    await page.waitForTimeout(500);
-
-    const group = page.getByTestId('multi-enum-MARKET_REVIEW_REGION');
-    await group.scrollIntoViewIfNeeded();
-    await expect(group).toBeVisible({ timeout: 10_000 });
-    await expect(group.getByText('A 股（cn）')).toBeVisible();
-    await expect(group.getByText('港股（hk）')).toBeVisible();
-    await expect(group.getByText('全部市场（both）')).toBeVisible();
-    await capture(page, testInfo, 'remediation-market-region-checkboxes');
+    await page.goto('/settings?section=advanced&view=raw_config');
+    const details = page.locator('details').filter({ hasText: '开发者诊断' });
+    await expect(details).not.toHaveAttribute('open', '');
+    await details.locator('summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    await expect(details).toContainText(/模型配置生效来源|执行后端/);
+    await capture(page, testInfo, 'developer-diagnostics-expanded');
   });
 
-  test('scenario 14: notification routing fields render as checkbox groups', async ({ page }, testInfo) => {
-    await openSettings(page);
-    await page.getByRole('button', { name: '告警与自动化' }).click();
-    await page.waitForTimeout(500);
-
-    const group = page.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
-    await group.scrollIntoViewIfNeeded();
-    await expect(group).toBeVisible({ timeout: 10_000 });
-    await capture(page, testInfo, 'remediation-notification-checkboxes');
+  test('29 a real 409 keeps the local draft and surfaces conflict UI', async ({ page }) => {
+    await createSavedConnection(page, ['fake-report-model']);
+    await page.getByTestId('connection-card-e2e').getByRole('button', { name: '编辑' }).click();
+    await addManualModel(page, 'local-only-model');
+    await page.getByRole('button', { name: '保存修改' }).click();
+    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+    const mutation = await page.evaluate(async () => {
+      const config = await fetch('/api/v1/system/config').then((response) => response.json());
+      const response = await fetch('/api/v1/system/config', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          config_version: config.config_version,
+          mask_token: config.mask_token,
+          reload_now: true,
+          items: [{ key: 'LLM_E2E_MODELS', value: 'server-side-model' }],
+        }),
+      });
+      return response.status;
+    });
+    expect(mutation).toBe(200);
+    const conflictResponsePromise = page.waitForResponse(
+      (response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: /保存配置/ }).click();
+    expect((await conflictResponsePromise).status()).toBe(409);
+    await expect(page.getByText(/配置版本冲突/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
   });
 
-  test('scenario 15: editing a checkbox field marks the draft dirty and reset asks for confirmation', async ({ page }, testInfo) => {
-    await openSettings(page);
-    await page.getByRole('button', { name: '系统与安全' }).click();
-
-    const group = page.getByTestId('multi-enum-MARKET_REVIEW_REGION');
-    await group.scrollIntoViewIfNeeded();
-    await expect(group).toBeVisible({ timeout: 10_000 });
-    await group.getByText('美股（us）').click();
-
-    const saveButton = page.getByRole('button', { name: /保存配置/ });
-    await expect(saveButton).toBeEnabled();
-
-    await page.getByRole('button', { name: '重置' }).click();
-    await expect(page.getByText(/放弃未保存|确认|恢复/).first()).toBeVisible({ timeout: 5_000 });
-    await capture(page, testInfo, 'remediation-dirty-and-reset');
-  });
-
-  test('scenario 16: english UI uses connections terminology', async ({ page }, testInfo) => {
-    await login(page);
-    await page.getByRole('button', { name: '切换界面语言' }).click();
-    await page.getByRole('link', { name: 'Settings' }).click();
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByRole('heading', { name: 'System settings' })).toBeVisible({ timeout: 15_000 });
-
-    await page.getByRole('button', { name: 'AI & Models' }).click();
-    await expect(page.getByRole('tab', { name: 'Connections' })).toBeVisible({ timeout: 10_000 });
-
-    // Overview view describes the entry with "model connections" terminology.
-    await page.getByRole('tab', { name: 'Overview' }).click();
-    await expect(page.getByText(/model connections/i).first()).toBeVisible({ timeout: 10_000 });
-
-    await page.getByRole('tab', { name: 'Connections' }).click();
-    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 10_000 });
-
-    const content = await page.locator('main, body').first().innerText();
-    expect(content).not.toContain('model channels');
-    await capture(page, testInfo, 'remediation-english-terminology');
-  });
-
-  test('scenario 17: mobile viewport can reach AI connections view', async ({ page }, testInfo) => {
+  test('30 mobile modal is a bottom sheet and both themes remain usable', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await login(page);
+    await openConnections(page);
+    await selectTheme(page, '浅色');
+    let dialog = await openAddDialog(page);
+    let box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThanOrEqual(389);
+    expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
+    await capture(page, testInfo, 'connections-mobile-light-sheet');
+    await page.getByRole('button', { name: '关闭抽屉' }).click();
 
-    const menuButton = page.getByRole('button', { name: '打开导航菜单' });
-    await expect(menuButton).toBeVisible({ timeout: 10_000 });
-    await menuButton.click();
-    // The hidden desktop sidebar keeps its links in the DOM, so scope to the drawer.
-    await page.getByRole('dialog').getByRole('link', { name: '设置' }).click();
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15_000 });
-
-    // Mobile always renders the compact native section selector at 390px.
-    const sectionSelect = page.locator('#settings-section-select');
-    await expect(sectionSelect).toBeVisible({ timeout: 15_000 });
-    await sectionSelect.selectOption('ai_models');
-    await expect(page.getByRole('tab', { name: '连接' })).toBeVisible({ timeout: 10_000 });
-    await capture(page, testInfo, 'remediation-mobile-connections');
-  });
-
-  test('scenario 18: first-run wizard opens with catalog-driven provider list', async ({ page }, testInfo) => {
-    await openSettings(page);
-
-    // On the plain path setup is never complete, so the quick-setup banner
-    // (settings overview -> base category) must expose the wizard entry.
-    const wizardButton = page.getByRole('button', { name: /启动向导/ }).first();
-    await expect(wizardButton).toBeVisible({ timeout: 15_000 });
-    await expect(wizardButton).toBeEnabled({ timeout: 10_000 });
-    await wizardButton.click();
-    await page.waitForTimeout(500);
-
-    const content = await page.locator('main, body').first().innerText();
-    expect(content).toMatch(/DeepSeek|OpenAI|Ollama|云 API|本机 CLI/);
-    await capture(page, testInfo, 'remediation-first-run-wizard');
+    await selectTheme(page, '深色');
+    dialog = await openAddDialog(page);
+    box = await dialog.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThanOrEqual(389);
+    expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
+    await capture(page, testInfo, 'connections-mobile-dark-sheet');
   });
 });

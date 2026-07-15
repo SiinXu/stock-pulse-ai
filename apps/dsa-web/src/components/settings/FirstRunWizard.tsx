@@ -414,7 +414,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 {modelOptions.map((model) => (
                   <span
                     key={model}
-                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-[11px] text-secondary-text"
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
                     <button
@@ -429,7 +429,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 ))}
               </div>
             ) : (
-              <p className="text-[11px] text-muted-text">
+              <p className="text-xs text-muted-text">
                 {tx(language, '尚未添加模型，请自动发现或逐个手动添加。', 'No models yet — discover them or add each manually.')}
               </p>
             )}

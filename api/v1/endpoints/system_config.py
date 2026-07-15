@@ -291,9 +291,12 @@ def get_llm_available_models(
 def get_llm_provider_catalog() -> dict:
     """Return the authoritative provider catalog without reading user config."""
     try:
-        from src.llm.provider_catalog import get_provider_catalog
+        from src.llm.provider_catalog import get_empty_api_key_hosts, get_provider_catalog
 
-        return {"providers": get_provider_catalog()}
+        return {
+            "providers": get_provider_catalog(),
+            "empty_api_key_hosts": get_empty_api_key_hosts(),
+        }
     except Exception as exc:
         logger.error("Failed to load LLM provider catalog: %s", exc, exc_info=True)
         raise HTTPException(

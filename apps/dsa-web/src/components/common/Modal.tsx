@@ -30,7 +30,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm max-sm:items-end max-sm:p-0"
       onClick={onClose}
       role="presentation"
     >
@@ -41,7 +41,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
-          'flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl focus:outline-none',
+          // On phones the dialog docks to the bottom as a full-width sheet
+          // (same flow, same component); centered card from `sm` up.
+          'flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl focus:outline-none max-sm:max-h-[92vh] max-sm:rounded-b-none',
           className,
         )}
         onClick={(event) => event.stopPropagation()}
@@ -52,7 +54,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             type="button"
             onClick={onClose}
             aria-label={t('common.closeDrawer')}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

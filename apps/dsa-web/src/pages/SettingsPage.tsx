@@ -10,7 +10,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, CreatableCombobox, EmptyState, type ComboboxOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -28,7 +28,6 @@ import {
   getCategoryFieldGroupOrder,
   getCategoryFieldGroupId,
   getCategoryFieldOrder,
-  isLegacyModelProviderKey,
   getSubCategories,
   getSubCategoryOfKey,
   getSubCategoryFieldOrder,
@@ -512,7 +511,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{check.title}</p>
-                      <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-[11px] font-medium text-muted-text">
+                      <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
                         {getSetupCheckStatusLabel(check, t)}
                       </span>
                     </div>
@@ -725,7 +724,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 <label className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-border text-cyan focus:ring-cyan/20"
+                    className="mt-1 h-4 w-4 rounded border-border text-foreground focus:ring-foreground/20"
                     checked={displayedScheduleEnabled}
                     data-testid="scheduler-enabled-checkbox"
                     disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
@@ -757,7 +756,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                       type="time"
                       value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
                       aria-label={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="h-9 w-[8.75rem] rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-cyan/20"
+                      className="h-9 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
                       disabled={disabled}
                       onChange={(event) => {
                         const nextTimes = scheduleTimes.map((currentTime, currentIndex) => (
@@ -913,6 +912,8 @@ const SettingsPage: React.FC = () => {
   const [llmChannelDraftValid, setLlmChannelDraftValid] = useState(true);
   // Bumped to tell the mounted channel editor to discard its draft on Reset.
   const [llmChannelResetSignal, setLlmChannelResetSignal] = useState(0);
+  // Bumped by the page-level primary action to open the add-connection dialog.
+  const [llmChannelAddSignal, setLlmChannelAddSignal] = useState(0);
   const envBackupImportRef = useRef<HTMLInputElement | null>(null);
   const setupStatusRequestIdRef = useRef(0);
   const desktopRuntimeApi = getDesktopRuntimeApi();
@@ -973,6 +974,7 @@ const SettingsPage: React.FC = () => {
   // the model-access page.
   const {
     providers: providerCatalog,
+    emptyApiKeyHosts: providerEmptyApiKeyHosts,
     isLoading: isProviderCatalogLoading,
     error: providerCatalogError,
     reload: reloadProviderCatalog,
@@ -1303,28 +1305,12 @@ const SettingsPage: React.FC = () => {
     setSchedulerOverrideFromUi(overrideEnabled);
   }, []);
 
-  // UI rendering rule only: hide channel-managed and legacy provider-specific
-  // LLM keys from generic fields. This does not alter save/refresh payloads or
-  // config migration/rollback behavior. Legacy provider credentials
-  // (OPENAI_API_KEY, ANTHROPIC_*, …) stay backend-compatible but are edited
-  // exclusively through Model Access, so they never render as generic fields.
-  const LLM_CHANNEL_KEY_RE = /^LLM_[A-Z0-9_]+_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$/;
-  // Static registry fields that share the LLM_*_<SUFFIX> shape with dynamic
-  // channel keys but are standalone settings, so they must keep rendering.
-  const LLM_CHANNEL_KEY_EXCEPTIONS = new Set([
-    'LLM_PROMPT_CACHE_TELEMETRY_ENABLED',
-    'LLM_PROMPT_CACHE_HINTS_ENABLED',
-  ]);
-  // Keys owned by dedicated views (Model Access / Task Routing / Reliability),
-  // so they never render as raw generic fields on the normal path.
-  const AI_MODEL_HIDDEN_KEYS = new Set([
-    'LLM_CHANNELS',
-    'LLM_TEMPERATURE',
-    'LITELLM_MODEL',
-    'AGENT_LITELLM_MODEL',
-    'LITELLM_FALLBACK_MODELS',
-    'VISION_MODEL',
-  ]);
+  // UI rendering rule only: a field whose backend schema declares a
+  // uiPlacement is owned by a dedicated surface (Model Access / Task Routing /
+  // Reliability / developer diagnostics) or is a hidden legacy provider key,
+  // so the generic category views never render it. The backend registry is the
+  // single source of this ownership — the Web keeps no provider/field lists.
+  // This does not alter save/refresh payloads or migration/rollback behavior.
   const SYSTEM_HIDDEN_KEYS = new Set([
     'ADMIN_AUTH_ENABLED',
     ...SCHEDULER_SETTING_KEYS,
@@ -1332,28 +1318,13 @@ const SettingsPage: React.FC = () => {
   const DATA_SOURCE_HIDDEN_KEYS = new Set([
     'ALPHASIFT_ENABLED',
   ]);
-  const AGENT_HIDDEN_KEYS = new Set<string>();
+  const placementFilteredItems = rawActiveItems.filter((item) => !item.schema?.uiPlacement);
   const activeItems =
-    activeCategory === 'ai_model'
-      ? rawActiveItems.filter((item) => {
-        if (isLegacyModelProviderKey(item.key)) {
-          return false;
-        }
-        if (LLM_CHANNEL_KEY_RE.test(item.key) && !LLM_CHANNEL_KEY_EXCEPTIONS.has(item.key)) {
-          return false;
-        }
-        if (AI_MODEL_HIDDEN_KEYS.has(item.key)) {
-          return false;
-        }
-        return true;
-      })
-      : activeCategory === 'system'
-        ? rawActiveItems.filter((item) => !SYSTEM_HIDDEN_KEYS.has(item.key))
+    activeCategory === 'system'
+      ? placementFilteredItems.filter((item) => !SYSTEM_HIDDEN_KEYS.has(item.key))
       : activeCategory === 'data_source'
-        ? rawActiveItems.filter((item) => !DATA_SOURCE_HIDDEN_KEYS.has(item.key))
-      : activeCategory === 'agent'
-        ? rawActiveItems.filter((item) => !AGENT_HIDDEN_KEYS.has(item.key))
-      : rawActiveItems;
+        ? placementFilteredItems.filter((item) => !DATA_SOURCE_HIDDEN_KEYS.has(item.key))
+      : placementFilteredItems;
   // Current (draft-applied) value of every field, for evaluating cross-field
   // schema contract conditions (visibleWhen / enabledWhen).
   const allValuesByKey = useMemo(() => {
@@ -1431,7 +1402,10 @@ const SettingsPage: React.FC = () => {
   // Task Routing view: the single place to edit which model each task uses.
   const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
   const aiModelItemByKey = useMemo(
-    () => new Map((itemsByCategory.ai_model || []).map((item) => [item.key, item])),
+    // Placement, not the legacy category, owns these dedicated model views.
+    // This includes inferred keys such as VISION_MODEL that may arrive in a
+    // different backend category while still declaring task_routing ownership.
+    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key, item])),
     [itemsByCategory],
   );
   const pickAiModelItems = useCallback(
@@ -1447,15 +1421,26 @@ const SettingsPage: React.FC = () => {
     () => pickAiModelItems(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL', 'LLM_TEMPERATURE']),
     [pickAiModelItems],
   );
+  // Config keys whose value is a single model route (rendered via the selector).
+  const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
+  const configuredTaskRoutes = useMemo(
+    () => taskRoutingItems
+      .filter((item) => TASK_MODEL_KEYS.has(item.key) && item.value.trim())
+      .map((item) => ({ key: item.key, value: item.value.trim() })),
+    [TASK_MODEL_KEYS, taskRoutingItems],
+  );
   // Per-task model fields render a model selector fed by the authoritative
   // available-model catalog (grouped by connection), so users pick a display
   // name and never hand-type a provider/model route.
-  const modelSelectorOptions = useMemo<ComboboxOption[]>(
+  const modelSelectorOptions = useMemo<SearchableSelectOption[]>(
     () => availableModels.map((entry) => ({
       value: entry.route,
       label: entry.display,
-      group: entry.connection ?? entry.provider ?? undefined,
-      hint: entry.provider ?? undefined,
+      sublabel: [entry.providerLabel ?? entry.provider, entry.connection]
+        .filter((part): part is string => Boolean(part))
+        .join(' · ') || undefined,
+      group: entry.connection ?? entry.providerLabel ?? entry.provider ?? undefined,
+      keywords: [entry.route],
     })),
     [availableModels],
   );
@@ -1464,8 +1449,6 @@ const SettingsPage: React.FC = () => {
     () => new Set(availableModels.map((entry) => entry.route)),
     [availableModels],
   );
-  // Config keys whose value is a single model route (rendered via the selector).
-  const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
   // Task -> route references, used by the model-access manager to show which
   // tasks use each connection and to protect referenced connections on delete.
   const taskModelRefs = useMemo(() => {
@@ -1484,13 +1467,9 @@ const SettingsPage: React.FC = () => {
     }
     return refs;
   }, [allValuesByKey, uiLanguage]);
-  // Reliability view: two distinct mechanisms — execution-backend failover and
-  // in-LiteLLM model fallback order (MC-05, must not both read "Fallback").
+  // Reliability is the user-facing model fallback order. Execution-backend
+  // failover is an implementation diagnostic and lives under Advanced only.
   const isAiReliability = activeSection === 'ai_models' && activeView === 'reliability';
-  const executionFailoverItems = useMemo(
-    () => pickAiModelItems(['GENERATION_BACKEND', 'GENERATION_FALLBACK_BACKEND']),
-    [pickAiModelItems],
-  );
   // Event Monitor lives under the agent backend category but belongs to the
   // Alerts section (see the placement map). Render it there via a dedicated
   // card so it doesn't leak into Agent Behavior.
@@ -1987,7 +1966,7 @@ const SettingsPage: React.FC = () => {
         </details>
       ) : null}
     </SettingsSectionCard>
-  ) : hasSubNav || hasActiveConfigItems ? null : (
+  ) : hasSubNav || hasActiveConfigItems || activeSection === 'ai_models' || isTopLevelAdvanced ? null : (
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
@@ -2093,7 +2072,7 @@ const SettingsPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium text-foreground">{field.title || field.key}</p>
-                      <p className="text-[11px] text-muted-text">{field.key}</p>
+                      <p className="text-xs text-muted-text">{field.key}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -2116,13 +2095,13 @@ const SettingsPage: React.FC = () => {
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
-                      <p className="text-[11px] font-medium text-muted-text">服务器当前值</p>
+                      <p className="text-xs font-medium text-muted-text">服务器当前值</p>
                       <p className="mt-1 break-all text-xs text-secondary-text">
                         {field.isSensitive ? '敏感值已更新（内容隐藏）' : field.server || '（空）'}
                       </p>
                     </div>
                     <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
-                      <p className="text-[11px] font-medium text-muted-text">你的本地草稿</p>
+                      <p className="text-xs font-medium text-muted-text">你的本地草稿</p>
                       <p className="mt-1 break-all text-xs text-secondary-text">
                         {field.isSensitive ? '本地敏感值已修改（内容隐藏）' : field.local || '（空）'}
                       </p>
@@ -2295,7 +2274,7 @@ const SettingsPage: React.FC = () => {
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
                 >
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionWebui')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2303,7 +2282,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildId')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2311,7 +2290,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildTime')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2320,7 +2299,7 @@ const SettingsPage: React.FC = () => {
                   </div>
                   {shouldShowDesktopVersionCard ? (
                     <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-text">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                         {t('settings.versionDesktop')}
                       </p>
                       <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2496,26 +2475,43 @@ const SettingsPage: React.FC = () => {
                   <p className="mb-3 text-xs text-secondary-text">{uiLanguage === 'en' ? 'Loading available models…' : '正在加载可用模型…'}</p>
                 ) : availableModels.length === 0 ? (
                   <div className="mb-3 rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
-                    <p className="text-sm text-secondary-text">
+                    <p className="text-sm font-medium text-foreground">
+                      {uiLanguage === 'en' ? 'No available models yet' : '还没有可用模型'}
+                    </p>
+                    <p className="mt-1 text-sm text-secondary-text">
                       {(allValuesByKey.LLM_CHANNELS || '').trim()
                         ? (uiLanguage === 'en'
                           ? 'You have connected a model service, but it has no usable models yet. Add at least one model to it.'
                           : '已接入模型服务，但还没有可用模型。请为其添加至少一个模型。')
                         : (uiLanguage === 'en'
-                          ? 'No available models yet. Connect a model service and add at least one model.'
-                          : '尚无可用模型，请先接入模型服务并添加至少一个模型。')}
+                          ? 'Connect a model service and add at least one model first.'
+                          : '请先接入模型服务并添加至少一个模型。')}
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                      <Button type="button" variant="settings-primary" size="sm" onClick={() => selectSectionView('ai_models', 'connections')}>
-                        {uiLanguage === 'en' ? 'Add model service' : '添加模型服务'}
-                      </Button>
-                      <Button type="button" variant="settings-secondary" size="sm" onClick={() => selectSectionView('ai_models', 'connections')}>
-                        {uiLanguage === 'en' ? 'Manage models' : '管理模型'}
-                      </Button>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="settings-primary"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => selectSectionView('ai_models', 'connections')}
+                    >
+                      {uiLanguage === 'en' ? 'Go to model access' : '前往模型接入'}
+                    </Button>
+                    {configuredTaskRoutes.length > 0 ? (
+                      <div className="mt-4 space-y-1 text-left text-xs text-warning">
+                        {configuredTaskRoutes.map((route) => (
+                          <p key={route.key}>
+                            {uiLanguage === 'en'
+                              ? `Current value unavailable: ${route.value}`
+                              : `当前配置不可用：${route.value}`}
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
-                {taskRoutingItems.length > 0 ? (
+                {!availableModelsError && !availableModelsLoading && availableModels.length > 0 ? (
+                  <>
+                    {taskRoutingItems.length > 0 ? (
                   <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
                     {taskRoutingItems.map((item) => (
                       TASK_MODEL_KEYS.has(item.key) ? (
@@ -2524,22 +2520,23 @@ const SettingsPage: React.FC = () => {
                             {getFieldTitleZh(item.key, item.key)}
                           </label>
                           <div className="min-w-0">
-                            <CreatableCombobox
+                            <SearchableSelect
                               id={`setting-${item.key}`}
                               value={item.value}
                               onChange={(next) => setDraftValue(item.key, next)}
                               options={modelSelectorOptions}
-                              allowCustom={false}
+                              disabled={isSaving}
                               ariaLabel={getFieldTitleZh(item.key, item.key)}
                               placeholder={item.key === 'LITELLM_MODEL'
                                 ? (uiLanguage === 'en' ? 'Select a model' : '选择模型')
                                 : (uiLanguage === 'en' ? 'Inherit report model' : '跟随报告主要模型（默认）')}
                               error={(issueByKey[item.key] || []).some((issue) => issue.severity === 'error')}
                               emptyText={uiLanguage === 'en' ? 'No available models — add a model service first' : '暂无可用模型，请先添加模型服务'}
-                              customLabel={(val) => (uiLanguage === 'en' ? `Custom: ${val}` : `自定义：${val}`)}
-                              unavailableLabel={uiLanguage === 'en'
+                              searchPlaceholder={uiLanguage === 'en' ? 'Search models' : '搜索模型'}
+                              staleValueLabel={uiLanguage === 'en'
                                 ? `Current value unavailable: ${item.value}`
                                 : `当前配置不可用：${item.value}`}
+                              clearable={item.key !== 'LITELLM_MODEL'}
                             />
                             {(issueByKey[item.key] || []).map((issue) => (
                               <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
@@ -2560,12 +2557,12 @@ const SettingsPage: React.FC = () => {
                       )
                     ))}
                   </div>
-                ) : (
+                    ) : (
                   <p className="text-xs text-muted-text">
                     {uiLanguage === 'en' ? 'No routing fields available.' : '暂无可配置的任务路由字段。'}
                   </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-text">
+                    )}
+                    <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-secondary-text">
                   <span>{uiLanguage === 'en' ? 'Fallback order: ' : '备用顺序：'}</span>
                   <span className="font-medium text-foreground">
                     {allValuesByKey.LITELLM_FALLBACK_MODELS
@@ -2578,69 +2575,30 @@ const SettingsPage: React.FC = () => {
                   >
                     {uiLanguage === 'en' ? 'Edit in Reliability →' : '前往可靠性设置 →'}
                   </button>
-                </div>
+                    </div>
+                  </>
+                ) : null}
               </SettingsSectionCard>
             ) : null}
             {isAiReliability ? (
-              <div className="space-y-4">
-                <SettingsSectionCard
-                  title={uiLanguage === 'en' ? 'Execution failover' : '执行后端故障切换'}
-                  description={uiLanguage === 'en'
-                    ? 'When the primary execution backend fails, requests switch to the failover backend. This is separate from model fallback.'
-                    : '主执行后端失败时切换到备用执行后端。这与模型备用顺序是两个独立机制。'}
-                >
-                  <p className="mb-3 text-xs text-secondary-text">
-                    {uiLanguage === 'en' ? 'Current path: ' : '当前路径：'}
-                    <span className="font-medium text-foreground">{allValuesByKey.GENERATION_BACKEND || 'litellm'}</span>
-                    {' → '}
-                    <span className="font-medium text-foreground">
-                      {allValuesByKey.GENERATION_FALLBACK_BACKEND
-                        || (uiLanguage === 'en' ? 'none (no failover)' : '无（未配置切换）')}
-                    </span>
-                  </p>
-                  {executionFailoverItems.length > 0 ? (
-                    <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                      {executionFailoverItems.map((item) => (
-                        <SettingsField
-                          key={item.key}
-                          item={item}
-                          value={item.value}
-                          disabled={isSaving}
-                          onChange={setDraftValue}
-                          issues={issueByKey[item.key] || []}
-                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </SettingsSectionCard>
-                <SettingsSectionCard
-                  title={uiLanguage === 'en' ? 'Model fallback order' : '模型备用顺序'}
-                  description={uiLanguage === 'en'
-                    ? 'Within LiteLLM, when the primary model call fails these models are tried in order. This is separate from execution failover.'
-                    : '在 LiteLLM 内，主要模型调用失败时按顺序尝试这些备用模型。这与执行后端切换是两个独立机制。'}
-                >
-                  <p className="mb-3 text-xs text-secondary-text">
-                    {uiLanguage === 'en' ? 'Current order: ' : '当前顺序：'}
-                    <span className="font-medium text-foreground">
-                      {allValuesByKey.LITELLM_FALLBACK_MODELS
-                        || (uiLanguage === 'en' ? 'none set' : '未设置')}
-                    </span>
-                  </p>
-                  <ModelFallbackEditor
-                    value={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
-                    onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
-                    options={modelSelectorOptions}
-                    primaryRoute={allValuesByKey.LITELLM_MODEL || ''}
-                    language={uiLanguage}
-                    disabled={isSaving}
-                  />
-                  {(issueByKey.LITELLM_FALLBACK_MODELS || []).map((issue) => (
-                    <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
-                  ))}
-                </SettingsSectionCard>
-              </div>
+              <SettingsSectionCard
+                title={uiLanguage === 'en' ? 'Model fallback order' : '模型备用顺序'}
+                description={uiLanguage === 'en'
+                  ? 'When the primary model call fails, these models are tried in order.'
+                  : '主要模型调用失败时，按顺序尝试这些备用模型。'}
+              >
+                <ModelFallbackEditor
+                  value={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                  onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
+                  options={modelSelectorOptions}
+                  primaryRoute={allValuesByKey.LITELLM_MODEL || ''}
+                  language={uiLanguage}
+                  disabled={isSaving}
+                />
+                {(issueByKey.LITELLM_FALLBACK_MODELS || []).map((issue) => (
+                  <p key={`${issue.key}-${issue.code}`} className="mt-1 text-xs text-danger">{issue.message}</p>
+                ))}
+              </SettingsSectionCard>
             ) : null}
             {isTopLevelAdvanced ? (
               <SettingsSectionCard
@@ -2649,61 +2607,47 @@ const SettingsPage: React.FC = () => {
                   ? 'Internal, low-level settings such as usage-signing secrets. Most users never need to change these.'
                   : '内部与底层配置，例如用量签名密钥。大多数用户无需改动。'}
               >
-                {advancedSectionItems.length > 0 ? (
-                  <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
-                    {advancedSectionItems.map((item) => (
-                      <SettingsField
-                        key={item.key}
-                        item={item}
-                        value={item.value}
-                        disabled={isSaving}
-                        onChange={setDraftValue}
-                        issues={issueByKey[item.key] || []}
-                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-text">
-                    {uiLanguage === 'en' ? 'No advanced settings to configure.' : '暂无需要配置的高级项。'}
-                  </p>
-                )}
-              </SettingsSectionCard>
-            ) : null}
-            {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
-              <SettingsSectionCard
-                title={uiLanguage === 'en' ? 'Model access' : '模型接入'}
-                description={uiLanguage === 'en'
-                  ? 'Connect model services, manage their models, and see which tasks use them — one place for providers, connections and models.'
-                  : '接入模型服务、管理各自的可用模型，并查看被哪些任务使用——模型服务商、连接与模型的唯一入口。'}
-                contentBordered
-              >
-                <LLMConfigModeBanner
-                  status={llmModeStatus}
-                  configVersion={configVersion}
-                  onMigrated={() => {
-                    void (async () => {
-                      await load();
-                      applyPostSaveEffects();
-                    })();
-                  }}
-                />
                 <details className="group/backend-diagnostics overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
                   <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
                     <div className="min-w-0 space-y-1">
                       <p className="text-sm font-semibold text-foreground">
-                        {uiLanguage === 'en' ? 'Developer diagnostics' : '开发者诊断信息'}
+                        {uiLanguage === 'en' ? 'Developer diagnostics' : '开发者诊断'}
                       </p>
                       <p className="text-xs leading-5 text-muted-text">
                         {uiLanguage === 'en'
-                          ? 'Execution backend health and smoke tests. Normal configuration does not require this.'
-                          : '执行后端健康状态与冒烟测试。日常配置无需展开。'}
+                          ? 'Effective model-config source, execution backend health and smoke tests. Normal configuration does not require this.'
+                          : '模型配置生效来源、执行后端健康状态与冒烟测试。日常配置无需展开。'}
                       </p>
                     </div>
                     <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/backend-diagnostics:rotate-180" aria-hidden="true" />
                   </summary>
-                  <div className="border-t border-[var(--settings-border-soft)] p-3">
+                  <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
+                    {advancedSectionItems.length > 0 ? (
+                      <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                        {advancedSectionItems.map((item) => (
+                          <SettingsField
+                            key={item.key}
+                            item={item}
+                            value={item.value}
+                            disabled={isSaving}
+                            onChange={setDraftValue}
+                            issues={issueByKey[item.key] || []}
+                            requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                    <LLMConfigModeBanner
+                      status={llmModeStatus}
+                      configVersion={configVersion}
+                      onMigrated={() => {
+                        void (async () => {
+                          await load();
+                          applyPostSaveEffects();
+                        })();
+                      }}
+                    />
                     <GenerationBackendStatusPanel
                       items={generationBackendDraftItems}
                       maskToken={maskToken}
@@ -2711,29 +2655,42 @@ const SettingsPage: React.FC = () => {
                     />
                   </div>
                 </details>
-                {providerCatalogError ? (
-                  <SettingsAlert
-                    variant="error"
-                    title={uiLanguage === 'en' ? 'Failed to load the model-service catalog' : '模型服务商目录加载失败'}
-                    message={uiLanguage === 'en'
-                      ? 'Could not load the provider catalog, so new model services cannot be added right now. This is a load failure, not "no model services". Existing connections below stay read-only until it reloads.'
-                      : '无法加载模型服务商目录，暂时无法新增模型服务。这是加载失败，并非“暂无模型服务”；下方已有连接在恢复前保持只读。'}
-                    actionLabel={uiLanguage === 'en' ? 'Reload' : '重新加载'}
-                    onAction={() => reloadProviderCatalog()}
-                  />
-                ) : null}
+              </SettingsSectionCard>
+            ) : null}
+            {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
+              <SettingsSectionCard
+                title={uiLanguage === 'en' ? 'Model access' : '模型接入'}
+                description={uiLanguage === 'en'
+                  ? 'Connect model services and manage the models available to reports, agents and vision tasks.'
+                  : '连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。'}
+                actions={(
+                  <Button
+                    type="button"
+                    variant="settings-primary"
+                    disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || Boolean(channelsOverriddenByMode)}
+                    onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
+                  >
+                    {uiLanguage === 'en' ? '+ Add model service' : '＋ 添加模型服务'}
+                  </Button>
+                )}
+                contentBordered
+              >
                 <LLMChannelEditor
+                  key={`llm-connections-${configVersion}`}
                   items={rawActiveItems}
                   providers={providerCatalog}
+                  emptyApiKeyHosts={providerEmptyApiKeyHosts}
                   maskToken={maskToken}
                   persistedDraftItems={llmChannelDraftItems}
                   onDraftItemsChange={handleLlmChannelDraftItemsChange}
                   onValidityChange={handleLlmChannelValidityChange}
                   resetSignal={llmChannelResetSignal}
+                  addSignal={llmChannelAddSignal}
                   disabled={isSaving || isLoading}
                   catalogUnavailable={Boolean(providerCatalogError)}
+                  onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}
-                  showRuntimeConfig={false}
+                  onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
                   taskModelRefs={taskModelRefs}
                   onManageModels={() => selectSectionView('ai_models', 'task_routing')}
                 />

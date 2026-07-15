@@ -290,17 +290,6 @@ export function getCategoryFieldGroupId(category: string, key: string): string {
   return KEY_INDEX[category]?.group.get(key) ?? OTHER_GROUP.id;
 }
 
-// Legacy per-provider credential groups. These keys stay backend-compatible
-// (env/YAML), but Model Access is the only editing entry — the generic
-// settings views never render them.
-const LEGACY_MODEL_PROVIDER_GROUP_IDS = new Set<string>([
-  'openai', 'anthropic', 'gemini', 'deepseek', 'anspire', 'aihubmix',
-]);
-
-export function isLegacyModelProviderKey(key: string): boolean {
-  return LEGACY_MODEL_PROVIDER_GROUP_IDS.has(getCategoryFieldGroupId('ai_model', key));
-}
-
 export function getCategoryFieldOrder(category: string, key: string): number {
   return KEY_INDEX[category]?.order.get(key) ?? Number.MAX_SAFE_INTEGER;
 }

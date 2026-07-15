@@ -53,6 +53,23 @@ export interface ConfigFieldContract {
   restartRequired?: boolean;
 }
 
+/**
+ * Backend-declared UI ownership for AI-model related fields. The Web renders a
+ * field only in the surface its placement declares — it must not keep a second
+ * hardcoded provider/key list:
+ * - model_access: owned by the model-access connection manager
+ * - task_routing: task model selectors and routing fields
+ * - developer_diagnostics: advanced diagnostics, collapsed by default
+ * - hidden_legacy: legacy provider keys; readable but never rendered as a
+ *   generic editable settings field
+ * - null/undefined: regular field, rendered by its category page
+ */
+export type SystemConfigUIPlacement =
+  | 'model_access'
+  | 'task_routing'
+  | 'developer_diagnostics'
+  | 'hidden_legacy';
+
 export interface SystemConfigFieldSchema {
   key: string;
   title?: string;
@@ -72,6 +89,7 @@ export interface SystemConfigFieldSchema {
   docs?: SystemConfigDocLink[];
   warningCodes?: string[];
   contract?: ConfigFieldContract;
+  uiPlacement?: SystemConfigUIPlacement | null;
 }
 
 export interface SystemConfigCategorySchema {
@@ -182,6 +200,12 @@ export interface LlmProviderCatalogEntry {
 
 export interface LlmProviderCatalogResponse {
   providers: LlmProviderCatalogEntry[];
+  /**
+   * Hostnames whose endpoints may run without an API key, mirroring the
+   * backend `channel_allows_empty_api_key` contract. The Web applies this
+   * list instead of hardcoding its own localhost heuristic.
+   */
+  emptyApiKeyHosts?: string[];
 }
 
 export interface AvailableModelEntry {

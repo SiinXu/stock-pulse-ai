@@ -93,7 +93,10 @@ export function useDialogA11y({
         // trigger with aria-expanded="true"; let it consume Escape to close
         // the popup instead of dismissing the whole dialog.
         const target = event.target instanceof HTMLElement ? event.target : null;
-        if (target?.closest('[aria-haspopup][aria-expanded="true"]')) {
+        if (
+          target?.closest('[aria-haspopup][aria-expanded="true"]')
+          || target?.closest('[data-dialog-popup="true"]')
+        ) {
           return;
         }
         if (closeOnEscape && onEscape) {

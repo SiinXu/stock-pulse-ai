@@ -51,6 +51,7 @@ from src.llm.hermes import (
 )
 from src.core.config_manager import ConfigManager
 from src.core.config_registry import (
+    LLM_CHANNEL_FIELD_KEY_RE,
     build_schema_response,
     evaluate_config_conditions,
     get_category_definitions,
@@ -174,15 +175,11 @@ class SystemConfigService:
         "ANSPIRE_LLM_MODEL",
         "ANSPIRE_API_KEYS",
     }
-    _GENERATION_BACKEND_STATUS_LLM_CHANNEL_RE = re.compile(
-        r"^LLM_[A-Z0-9_]+_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
-    )
+    _GENERATION_BACKEND_STATUS_LLM_CHANNEL_RE = LLM_CHANNEL_FIELD_KEY_RE
 
     _LLM_CAPABILITY_ORDER: Tuple[str, ...] = ("json", "tools", "stream", "vision")
     _LLM_STREAM_CHUNK_LIMIT = 8
-    _WEB_SETTINGS_LLM_CHANNEL_SUPPORT_KEY_RE = re.compile(
-        r"^LLM_([A-Z0-9_]+)_(PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
-    )
+    _WEB_SETTINGS_LLM_CHANNEL_SUPPORT_KEY_RE = LLM_CHANNEL_FIELD_KEY_RE
     _LLM_CAPABILITY_PROBE_IMAGE = (
         "data:image/png;base64,"
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="

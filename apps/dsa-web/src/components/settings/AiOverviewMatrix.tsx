@@ -60,7 +60,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
       <div className="overflow-x-auto rounded-xl border border-[var(--settings-border)]">
         <table className="w-full min-w-[560px] border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-[var(--settings-border)] text-[11px] uppercase tracking-wide text-muted-text">
+            <tr className="border-b border-[var(--settings-border)] text-xs uppercase tracking-wide text-muted-text">
               <th scope="col" className="px-3 py-2 font-medium">{tx(T.colTask)}</th>
               <th scope="col" className="px-3 py-2 font-medium">{tx(T.colBackend)}</th>
               <th scope="col" className="px-3 py-2 font-medium">{tx(T.colPrimary)}</th>
@@ -75,7 +75,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                 <td className="px-3 py-2.5 text-secondary-text">
                   {tx(row.backendLabel)}
                   {row.fallbackBackendId ? (
-                    <span className="ml-1 text-[11px] text-muted-text">
+                    <span className="ml-1 text-xs text-muted-text">
                       · {tx(T.failover)}: {row.fallbackBackendId}
                     </span>
                   ) : null}
@@ -87,7 +87,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({ getValue, la
                     <span className="text-muted-text">{tx(T.none)}</span>
                   )}
                   {row.primaryInherited && row.primaryModel ? (
-                    <span className="ml-1 text-[11px] text-muted-text">（{tx(T.inherited)}）</span>
+                    <span className="ml-1 text-xs text-muted-text">（{tx(T.inherited)}）</span>
                   ) : null}
                 </td>
                 <td className="px-3 py-2.5 text-secondary-text">
