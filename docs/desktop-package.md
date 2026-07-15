@@ -81,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-all.ps1
 
 请按以下顺序排查：
 
-1. 只从项目的 [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) 下载附件，并确认安装包架构与 Mac 一致：Apple 芯片（M1/M2/M3/M4 等）使用 `daily-stock-analysis-macos-arm64-<tag>.dmg`，Intel 芯片使用 `daily-stock-analysis-macos-x64-<tag>.dmg`。不要对第三方转载或来源不明的安装包绕过 Gatekeeper。
+1. 只从项目的 [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) 下载附件，并确认安装包架构与 Mac 一致：Apple 芯片（M1/M2/M3/M4 等）使用 `daily-stock-analysis-macos-arm64-<tag>.dmg`，Intel 芯片使用 `daily-stock-analysis-macos-x64-<tag>.dmg`。不要对第三方转载或来源不明的安装包绕过 Gatekeeper。
 2. 打开 DMG，将 `Daily Stock Analysis` 拖入“应用程序”后尝试启动一次。若被拦截，进入“系统设置 -> 隐私与安全性”，在安全性提示处确认应用名称，然后点击“仍要打开”，按系统提示再次确认。较旧 macOS 的对应入口为“系统偏好设置 -> 安全性与隐私 -> 通用”。
 3. 仅当安装包确认来自上述官方 Release、且“仍要打开”仍无法放行时，打开“终端”清除该应用的下载隔离属性，然后重新启动：
 
@@ -142,7 +142,7 @@ ls -1 dist/*.yml dist/*.blockmap 2>/dev/null || true
 
 ```bash
 RELEASE_TAG="v$(node -p \"require('./package.json').version\")"
-REPO="ZhuLinsen/daily_stock_analysis"
+REPO="SiinXu/stock-pulse-ai"
 
 for f in dist/*latest.yml dist/*.blockmap dist/daily-stock-analysis-windows-installer-*.exe; do
   [ -f \"$f\" ] && echo \"[FOUND] $f\"

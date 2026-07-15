@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 配置管理模块
+StockPulse configuration management.
 ===================================
 
-职责：
-1. 使用单例模式管理全局配置
-2. 从 .env 文件加载敏感配置
-3. 提供类型安全的配置访问接口
+Responsibilities:
+1. Manage global configuration through a singleton.
+2. Load sensitive settings from the configured environment file.
+3. Provide typed access to resolved configuration values.
 """
 
 import json
@@ -927,7 +927,7 @@ class Config:
     
     # 邮件配置（只需邮箱和授权码，SMTP 自动识别）
     email_sender: Optional[str] = None  # 发件人邮箱
-    email_sender_name: str = "daily_stock_analysis股票分析助手"  # 发件人显示名称
+    email_sender_name: str = "StockPulse"  # Display name used in the email From header.
     email_password: Optional[str] = None  # 邮箱密码/授权码
     email_receivers: List[str] = field(default_factory=list)  # 收件人列表（留空则发给自己）
 
@@ -1913,7 +1913,7 @@ class Config:
             telegram_chat_id=os.getenv('TELEGRAM_CHAT_ID'),
             telegram_message_thread_id=os.getenv('TELEGRAM_MESSAGE_THREAD_ID'),
             email_sender=os.getenv('EMAIL_SENDER'),
-            email_sender_name=os.getenv('EMAIL_SENDER_NAME', 'daily_stock_analysis股票分析助手'),
+            email_sender_name=os.getenv('EMAIL_SENDER_NAME', 'StockPulse'),
             email_password=os.getenv('EMAIL_PASSWORD'),
             email_receivers=[r.strip() for r in os.getenv('EMAIL_RECEIVERS', '').split(',') if r.strip()],
             stock_email_groups=cls._parse_stock_email_groups(),
@@ -2385,7 +2385,7 @@ class Config:
 
         Mapping follows:
         - LiteLLM providers: https://docs.litellm.ai/docs/providers
-        - LiteLLM model_list 语义: https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
+        - LiteLLM model_list semantics: https://docs.litellm.ai/docs/proxy/configs#the-model_list-key
         """
         from src.llm.model_ref import canonicalize_connection_id, encode_model_ref
 
@@ -2416,10 +2416,8 @@ class Config:
                         litellm_params['api_key'] = api_key
                     if ch['base_url']:
                         litellm_params['api_base'] = ch['base_url']
-                    # Auto-inject aihubmix sponsored header
+                    # Preserve only headers explicitly configured for this connection.
                     headers = dict(ch.get('extra_headers') or {})
-                    if ch['base_url'] and 'aihubmix.com' in ch['base_url']:
-                        headers.setdefault('APP-Code', 'GPIJ3886')
                     if headers:
                         litellm_params['extra_headers'] = headers
 
@@ -2498,8 +2496,6 @@ class Config:
                 params: Dict[str, Any] = {'model': '__legacy_openai__', 'api_key': k}
                 if openai_base_url:
                     params['api_base'] = openai_base_url
-                if openai_base_url and 'aihubmix.com' in openai_base_url:
-                    params['extra_headers'] = {'APP-Code': 'GPIJ3886'}
                 model_list.append({
                     'model_name': '__legacy_openai__',
                     'litellm_params': params,
@@ -3537,23 +3533,21 @@ def extra_litellm_params(model: str, config: Config) -> Dict[str, Any]:
     if model.startswith("openai/") or "/" not in model:
         if config.openai_base_url:
             params["api_base"] = config.openai_base_url
-        if config.openai_base_url and "aihubmix.com" in config.openai_base_url:
-            params["extra_headers"] = {"APP-Code": "GPIJ3886"}
     return params
 
 
 if __name__ == "__main__":
-    # 测试配置加载
+    # Print a minimal configuration-loading diagnostic.
     config = get_config()
-    print("=== 配置加载测试 ===")
-    print(f"自选股列表: {config.stock_list}")
-    print(f"数据库路径: {config.database_path}")
-    print(f"最大并发数: {config.max_workers}")
-    print(f"调试模式: {config.debug}")
+    print("=== Configuration loading check ===")
+    print(f"Watchlist: {config.stock_list}")
+    print(f"Database path: {config.database_path}")
+    print(f"Maximum workers: {config.max_workers}")
+    print(f"Debug mode: {config.debug}")
     
-    # 验证配置
+    # Validate the resolved configuration.
     warnings = config.validate()
     if warnings:
-        print("\n配置验证结果:")
+        print("\nConfiguration warnings:")
         for w in warnings:
             print(f"  - {w}")

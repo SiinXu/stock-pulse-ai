@@ -291,17 +291,14 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
         "api_key": key,
         "timeout": VISION_API_TIMEOUT,
     }
-    # Add api_base and custom headers for OpenAI-compatible providers
+    # Prefer the exact Connection endpoint and headers selected by ModelRef.
     api_base = str(deployment_params.get("api_base") or "").strip()
     if api_base:
         call_kwargs["api_base"] = api_base
+    elif not wire_model.startswith(("gemini/", "anthropic/", "vertex_ai/")) and cfg.openai_base_url:
+        call_kwargs["api_base"] = cfg.openai_base_url
     if deployment_params.get("extra_headers"):
         call_kwargs["extra_headers"] = dict(deployment_params["extra_headers"])
-    elif not wire_model.startswith(("gemini/", "anthropic/", "vertex_ai/")):
-        if cfg.openai_base_url:
-            call_kwargs["api_base"] = cfg.openai_base_url
-        if cfg.openai_base_url and "aihubmix.com" in cfg.openai_base_url:
-            call_kwargs["extra_headers"] = {"APP-Code": "GPIJ3886"}
 
     if getattr(litellm, "completion", None) is None:
         import litellm as litellm_module

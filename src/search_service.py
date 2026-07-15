@@ -434,15 +434,12 @@ class TavilySearchProvider(BaseSearchProvider):
 
 
 class SerpAPISearchProvider(BaseSearchProvider):
-    """
-    SerpAPI 搜索引擎
-    
-    特点：
-    - 支持 Google、Bing、百度等多种搜索引擎
-    - 免费版每月 100 次请求
-    - 返回真实的搜索结果
-    
-    文档：https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis
+    """SerpAPI search provider.
+
+    Supports Google, Bing, Baidu, and other engines while returning the
+    provider's real search results. Quotas depend on the active SerpAPI plan.
+
+    Documentation: https://serpapi.com/baidu-search-api
     """
 
     _ORGANIC_CONTENT_FETCH_LIMIT = 1

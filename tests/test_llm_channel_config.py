@@ -17,6 +17,7 @@ from src.config import (
     get_effective_agent_models_to_try,
     get_effective_agent_primary_model,
     get_fixed_litellm_temperature,
+    extra_litellm_params,
     normalize_litellm_temperature,
 )
 from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
@@ -184,6 +185,59 @@ class LLMChannelConfigTestCase(unittest.TestCase):
         self.assertEqual(channel["provider_id"], "anthropic")
         self.assertEqual(channel["protocol"], "anthropic")
         self.assertEqual(channel["models"], ["anthropic/claude-test"])
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_aihubmix_channel_preserves_only_explicit_custom_headers(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        base_env = {
+            "LLM_CHANNELS": "aihubmix",
+            "LLM_AIHUBMIX_PROVIDER": "aihubmix",
+            "LLM_AIHUBMIX_PROTOCOL": "openai",
+            "LLM_AIHUBMIX_BASE_URL": "https://aihubmix.com/v1",
+            "LLM_AIHUBMIX_API_KEY": "sk-aihubmix-test-value",
+            "LLM_AIHUBMIX_MODELS": "gpt-test",
+        }
+
+        with patch.dict(os.environ, base_env, clear=True):
+            config = Config._load_from_env()
+        self.assertNotIn("extra_headers", config.llm_model_list[0]["litellm_params"])
+
+        with patch.dict(
+            os.environ,
+            {**base_env, "LLM_AIHUBMIX_EXTRA_HEADERS": '{"x-tenant":"custom"}'},
+            clear=True,
+        ):
+            config = Config._load_from_env()
+        self.assertEqual(
+            config.llm_model_list[0]["litellm_params"]["extra_headers"],
+            {"x-tenant": "custom"},
+        )
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_aihubmix_legacy_path_does_not_add_sponsored_headers(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        env = {
+            "OPENAI_API_KEY": "sk-openai-test-value",
+            "OPENAI_BASE_URL": "https://aihubmix.com/v1",
+            "LITELLM_MODEL": "openai/gpt-test",
+        }
+
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+
+        self.assertNotIn("extra_headers", config.llm_model_list[0]["litellm_params"])
+        self.assertEqual(
+            extra_litellm_params("openai/gpt-test", config),
+            {"api_base": "https://aihubmix.com/v1"},
+        )
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])

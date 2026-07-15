@@ -4,7 +4,7 @@ Thank you for your interest in contributing! All kinds of contributions are welc
 
 ## 🐛 Reporting Bugs
 
-1. Search [Issues](https://github.com/ZhuLinsen/daily_stock_analysis/issues) first to check if it has already been reported.
+1. Search [Issues](https://github.com/SiinXu/stock-pulse-ai/issues) first to check if it has already been reported.
 2. Create a new Issue using the **Bug Report** template.
 3. Provide detailed reproduction steps and environment information.
 
@@ -20,8 +20,8 @@ Thank you for your interest in contributing! All kinds of contributions are welc
 
 ```bash
 # Clone the repository
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/SiinXu/stock-pulse-ai.git
+cd stock-pulse-ai
 
 # Create a virtual environment
 python -m venv venv
@@ -48,6 +48,8 @@ cp .env.example .env
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
 
+Commit messages, Issue and PR titles/bodies, comments, reviews, GitHub Actions output, and bot comments must be written in English.
+
 ```
 feat:     New feature
 fix:      Bug fix
@@ -70,8 +72,8 @@ docs: update README deployment section
 ### Code Style
 
 - Python code follows PEP 8 (line length: 120).
-- Add docstrings to functions and classes.
-- Add comments for non-obvious logic.
+- Add English docstrings to functions and classes.
+- Add English comments for non-obvious logic.
 - Update relevant documentation when adding new features.
 
 ### CI Checks
@@ -132,6 +134,6 @@ When modifying either language of a bilingual core document (for example, `docs/
 
 Feel free to:
 - Open an Issue for discussion.
-- Browse existing Issues and Discussions.
+- Browse existing Issues.
 
 Thank you for contributing! 🎉

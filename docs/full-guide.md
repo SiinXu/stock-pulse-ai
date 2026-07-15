@@ -1,13 +1,13 @@
 # 📖 完整配置与部署指南
 
-本文档包含 A股智能分析系统的完整配置说明，适合需要高级功能或特殊部署方式的用户。
+本文档包含 StockPulse 的完整配置说明，适合需要高级功能或特殊部署方式的用户。
 
 > 💡 快速上手请参考 [README.md](../README.md)，本文档为进阶配置。
 
 ## 📁 项目结构
 
 ```
-daily_stock_analysis/
+stock-pulse-ai/
 ├── main.py              # 主程序入口
 ├── src/                 # 核心业务逻辑
 │   ├── analyzer.py      # AI 分析器
@@ -57,8 +57,8 @@ daily_stock_analysis/
 
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API Key，一 Key 同时启用大模型和中文优化联网搜索，含本项目免费额度 | 推荐 |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API Key，一 Key 切换使用全系模型，本项目可享 10% 优惠 | 推荐 |
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API Key，一 Key 同时启用大模型和中文优化联网搜索 | 推荐 |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/) API Key，一 Key切换使用多个模型系列 | 推荐 |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/) 获取免费 Key | 可选 |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | 可选 |
 | `OPENAI_API_KEY` | OpenAI 兼容 API Key（支持 DeepSeek、通义千问等） | 可选 |
@@ -92,7 +92,7 @@ daily_stock_analysis/
 | `EMAIL_SENDER` | 发件人邮箱（如 `xxx@qq.com`） | 可选 |
 | `EMAIL_PASSWORD` | 邮箱授权码（非登录密码） | 可选 |
 | `EMAIL_RECEIVERS` | 收件人邮箱（多个用逗号分隔，留空则发给自己） | 可选 |
-| `EMAIL_SENDER_NAME` | 发件人显示名称（默认：daily_stock_analysis股票分析助手） | 可选 |
+| `EMAIL_SENDER_NAME` | 发件人显示名称（默认：StockPulse） | 可选 |
 | `PUSHPLUS_TOKEN` | PushPlus Token（[获取地址](https://www.pushplus.plus)，国内推送服务） | 可选 |
 | `SERVERCHAN3_SENDKEY` | Server酱³ Sendkey（[获取地址](https://sc3.ft07.com/)，手机APP推送服务） | 可选 |
 | `ASTRBOT_URL` | AstrBot Webhook URL | 可选 |
@@ -155,14 +155,14 @@ daily_stock_analysis/
 |------------|------|:----:|
 | `STOCK_LIST` | 自选股代码，如 `600519,300750,002594,7203.T,005930.KS`；推荐使用英文逗号，中文逗号、顿号、分号、空格和换行会被识别并规范为英文逗号 | ✅ |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 可选 |
 | `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索优化，支持AI摘要，多个key用逗号分隔） | 可选 |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API（隐私优先，美股优化，多个key用逗号分隔） | 可选 |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | 可选 |
+| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API Key；可选，用于 A 股日 K、实时行情、股票列表/名称与大盘复盘增强；失败或权限不足时自动回退。 | 可选 |
 | `LONGBRIDGE_OAUTH_CLIENT_ID` | [Longbridge OpenAPI](https://open.longbridge.com/) OAuth client_id；留空且无 Legacy Access Token 时会兼容使用 `LONGBRIDGE_APP_KEY` | 可选 |
 | `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` | OAuth token 缓存文件的 base64 内容，供 GitHub Actions / Docker 等 headless 环境恢复 SDK token 缓存 | 可选 |
@@ -191,7 +191,7 @@ daily_stock_analysis/
 
 如果你想快速开始，最少需要配置以下项：
 
-1. **AI 模型**：`ANSPIRE_API_KEYS`（一 Key 同时启用大模型和搜索）、`AIHUBMIX_KEY`（[AIHubmix](https://aihubmix.com/?aff=CfMq)，一 Key 多模型）、`GEMINI_API_KEY` 或 `OPENAI_API_KEY`
+1. **AI 模型**：`ANSPIRE_API_KEYS`（一 Key 同时启用大模型和搜索）、`AIHUBMIX_KEY`（[AIHubmix](https://aihubmix.com/)，一 Key 多模型）、`GEMINI_API_KEY` 或 `OPENAI_API_KEY`
 2. **通知渠道**：至少配置一个，如 `WECHAT_WEBHOOK_URL` 或 `EMAIL_SENDER` + `EMAIL_PASSWORD`
 3. **股票列表**：`STOCK_LIST`（必填）
 4. **搜索 API**：`ANSPIRE_API_KEYS` 或 `SERPAPI_API_KEYS`（推荐，用于新闻与舆情搜索）
@@ -207,7 +207,7 @@ daily_stock_analysis/
 ### 4. 手动测试
 
 1. 进入 `Actions` 标签
-2. 左侧选择 `每日股票分析` workflow
+2. 左侧选择 `StockPulse Daily Analysis` workflow
 3. 点击右侧的 `Run workflow` 按钮
 4. 选择运行模式
 5. 点击绿色的 `Run workflow` 确认
@@ -255,8 +255,8 @@ daily_stock_analysis/
 | `LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL` | Prompt cache 诊断级别：`off` / `basic` / `debug`；basic/debug 仅在 debug 日志和测试可观察对象中提供脱敏诊断，不作为公开 Usage API 或普通设置页输出 | `off` | 否 |
 | `LLM_USAGE_HMAC_SECRET` | LLM 用量遥测 message HMAC 密钥；留空时自动使用数据目录中的本地密钥文件 | - | 否 |
 | `LLM_USAGE_HMAC_KEY_VERSION` | LLM 用量遥测 HMAC 密钥版本标签，轮换密钥时同步更新 | `local-v1` | 否 |
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API Key，一 Key 同时启用大模型网关和搜索 | - | 可选 |
-| `AIHUBMIX_KEY` | [AIHubmix](https://aihubmix.com/?aff=CfMq) API Key，一 Key 切换使用全系模型，无需额外配置 Base URL | - | 可选 |
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API Key，一 Key 同时启用大模型网关和搜索 | - | 可选 |
+| `AIHUBMIX_KEY` | [AIHubmix](https://aihubmix.com/) API Key，一 Key 切换使用多个模型系列，无需额外配置 Base URL | - | 可选 |
 | `GEMINI_API_KEY` | Google Gemini API Key | - | 可选 |
 | `GEMINI_MODEL` | 主模型名称（legacy，`LITELLM_MODEL` 优先） | `gemini-3.1-pro-preview` | 否 |
 | `GEMINI_MODEL_FALLBACK` | 备选模型（legacy） | `gemini-3-flash-preview` | 否 |
@@ -474,17 +474,19 @@ Dockerfile 使用多阶段构建，前端会在构建镜像时自动打包并内
 如需覆盖静态资源，可挂载本地 `static/` 到容器内 `/app/static`。
 运行中的 `server` 容器默认直接复用 `/app/static` 里的预构建产物，不要求容器内保留 `apps/dsa-web` 源码目录或运行时安装 `npm`；若 WebUI 无法打开，请优先确认 `/app/static/index.html` 是否存在。
 
-当前官方镜像发布地址：
+发布 workflow 配置的镜像目标如下（仅表示发布目标，不代表对应 tag 已存在）：
 
-- GHCR：`ghcr.io/zhulinsen/daily_stock_analysis:<tag>`
-- Docker Hub：`<DOCKERHUB_USERNAME>/daily_stock_analysis:<tag>`（由发布者的 `DOCKERHUB_USERNAME` secret 决定，官方发布为 `zhulinsen/daily_stock_analysis`）
+- GHCR：`ghcr.io/siinxu/stock-pulse-ai:<tag>`
+- Docker Hub：`<DOCKERHUB_USERNAME>/stock-pulse-ai:<tag>`（仅在维护者配置 Docker Hub secrets 后发布）
+
+使用预构建镜像前，请先在当前仓库的 Packages 或对应 registry 确认 tag 已发布。若没有可用镜像，请使用下面的 Compose 流程从当前源码构建；不要把上游镜像当作 StockPulse 产物。
 
 ### 快速启动
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/SiinXu/stock-pulse-ai.git
+cd stock-pulse-ai
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -504,13 +506,15 @@ docker-compose -f ./docker/docker-compose.yml logs -f server
 
 默认 Compose 为每个服务设置 `limits.memory: 1G`、`reservations.memory: 512M`。`512M` 仅建议用于轻量 Web/API、单股、低并发场景，并将 `MAX_WORKERS=1`；常规完整分析建议 `1G`，同时启动 `server + analyzer`、多股票、大盘复盘、新闻扩展、图片报告或 AlphaSift 建议 `2G+`。如果只能使用 `512M`，请避免同时启动两个服务并减少重型功能。
 
-### 直接拉官方镜像运行
+### 使用已发布的 StockPulse 镜像
 
-如果你不打算在目标机器上保留源码，可以直接拉取官方镜像：
+仅当目标 tag 已出现在当前仓库 Packages 中时使用以下命令。将 `<published-tag>` 替换为实际存在的 tag；若尚未发布，请使用上面的源码构建方式。
 
 ```bash
+IMAGE="ghcr.io/siinxu/stock-pulse-ai:<published-tag>"
+
 # Web/API 模式
-docker pull zhulinsen/daily_stock_analysis:latest
+docker pull "$IMAGE"
 docker run -d \
   --name dsa-server \
   --env-file .env \
@@ -518,7 +522,7 @@ docker run -d \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
-  zhulinsen/daily_stock_analysis:latest \
+  "$IMAGE" \
   python main.py --serve-only --host 0.0.0.0 --port 8000
 
 # 定时任务模式
@@ -528,10 +532,10 @@ docker run -d \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
-  zhulinsen/daily_stock_analysis:latest
+  "$IMAGE"
 ```
 
-如需固定版本或便于回滚，请将 `latest` 替换为具体版本 tag，例如 `v3.13.0`。
+生产部署应固定具体 tag，避免依赖可变的 `latest`。
 
 ### 运行模式说明
 
@@ -727,7 +731,7 @@ schedule:
 
 手动触发步骤：
 
-1. 打开 `Actions → 每日股票分析 → Run workflow`
+1. 打开 `Actions → StockPulse Daily Analysis → Run workflow`
 2. 选择 `mode`（`full` / `market-only` / `stocks-only`）
 3. 若当天是非交易日且希望仍执行，将 `force_run` 设为 `true`
 4. 点击 `Run workflow`
@@ -1709,7 +1713,7 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 ---
 
-更多问题请 [提交 Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+更多问题请 [提交 Issue](https://github.com/SiinXu/stock-pulse-ai/issues)
 
 ## Agent 工具数据缓存与持久化
 

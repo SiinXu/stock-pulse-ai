@@ -1,13 +1,13 @@
 # Complete Configuration & Deployment Guide
 
-This document contains the complete configuration guide for the AI Stock Analysis System, intended for users who need advanced features or special deployment methods.
+This document contains the complete StockPulse configuration guide for users who need advanced features or specialized deployment options.
 
 > Quick start guide available in [README_EN.md](README_EN.md). This document covers advanced configuration.
 
 ## Project Structure
 
 ```
-daily_stock_analysis/
+stock-pulse-ai/
 ├── main.py              # Main entry point
 ├── src/                 # Core business logic
 │   ├── analyzer.py      # AI analyzer
@@ -57,8 +57,8 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 | Secret Name | Description | Required |
 |------------|------|:----:|
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API key, one key for popular LLMs and Chinese-optimized web search with free quota for this project | Recommended |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API key, one key for multiple model families and a 10% top-up discount for this project | Recommended |
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API key for model access and Chinese-optimized web search | Recommended |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/) API key for multiple model families | Recommended |
 | `GEMINI_API_KEY` | Get free key from [Google AI Studio](https://aistudio.google.com/) | Optional |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API Key | Optional |
 | `OPENAI_API_KEY` | OpenAI-compatible API Key (supports DeepSeek, Qwen, etc.) | Optional |
@@ -145,14 +145,14 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 |------------|------|:----:|
 | `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594,7203.T,005930.KS`; English commas are recommended, while pasted Chinese commas, enumeration commas, semicolons, spaces, and newlines are recognized and normalized to English commas | ✅ |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) search-engine results for realtime financial news | Recommended |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
 | `BOCHA_API_KEYS` | [Bocha Search](https://open.bocha.cn/) Web Search API (Chinese search optimized, supports AI summaries, multiple keys comma-separated) | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API (privacy-first, US-stock news enrichment, comma-separated for multiple keys) | Optional |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search (structured search results) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638) Token | Optional |
+| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) token | Optional |
 | `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for optional A-share daily K-lines, realtime quotes, stock list/name lookup, and CN market review enhancement; permission or entitlement failures fall back to existing providers | Optional |
 
 > **GitHub Actions:** The bundled `00-daily-analysis.yml` maps `TUSHARE_TOKEN`, `TICKFLOW_API_KEY` / `TICKFLOW_*`, and the documented `LONGBRIDGE_*` variables into the job environment. Store `TICKFLOW_API_KEY` in **Secrets**; non-sensitive TickFlow priority, adjustment, and batch switches can live in **Variables** or **Secrets**. Longbridge OAuth still requires a client id plus `LONGBRIDGE_OAUTH_TOKEN_CACHE_B64` for headless Actions runs, while the legacy `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` triplet remains supported.
@@ -177,7 +177,7 @@ To get started quickly, you need at minimum:
 ### 4. Manual Test
 
 1. Go to `Actions` tab
-2. Select `Daily Stock Analysis` workflow on the left
+2. Select `StockPulse Daily Analysis` workflow on the left
 3. Click `Run workflow` button on the right
 4. Select run mode
 5. Click green `Run workflow` to confirm
@@ -216,8 +216,8 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `LITELLM_CONFIG` | Advanced model routing YAML path (expert use) | - | No |
 | `LLM_USAGE_HMAC_SECRET` | Secret for LLM usage telemetry message HMACs; leave empty to use a generated local data-dir secret file | - | No |
 | `LLM_USAGE_HMAC_KEY_VERSION` | Version label for the LLM usage HMAC key; update it when rotating the secret | `local-v1` | No |
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API key, one key for the LLM gateway and search | - | Optional |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API key, one key for multiple model families | - | Optional |
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API key, one key for the LLM gateway and search | - | Optional |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/) API key, one key for multiple model families | - | Optional |
 | `GEMINI_API_KEY` | Google Gemini API Key | - | Optional |
 | `GEMINI_MODEL` | Primary model name (legacy, `LITELLM_MODEL` preferred) | `gemini-3.1-pro-preview` | No |
 | `GEMINI_MODEL_FALLBACK` | Fallback model (legacy) | `gemini-3-flash-preview` | No |
@@ -410,17 +410,19 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 
 The image uses prebuilt frontend assets under `/app/static` at runtime, so the running `server` container does not require the `apps/dsa-web` source tree or runtime `npm`. If WebUI cannot be opened after Docker deployment, first verify that `/app/static/index.html` exists inside the container.
 
-Official image registries:
+The release workflows are configured for these image targets. A configured target does not guarantee that a tag has been published:
 
-- GHCR: `ghcr.io/zhulinsen/daily_stock_analysis:<tag>`
-- Docker Hub: `<DOCKERHUB_USERNAME>/daily_stock_analysis:<tag>` (driven by the publisher's `DOCKERHUB_USERNAME` secret; the official release uses `zhulinsen/daily_stock_analysis`)
+- GHCR: `ghcr.io/siinxu/stock-pulse-ai:<tag>`
+- Docker Hub: `<DOCKERHUB_USERNAME>/stock-pulse-ai:<tag>` (published only when maintainers configure the Docker Hub secrets)
+
+Before using a prebuilt image, verify that the tag exists in this repository's Packages page or the relevant registry. If no image is available, build from the current source with Compose as shown below. Do not treat an upstream image as a StockPulse artifact.
 
 ### Quick Start
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/SiinXu/stock-pulse-ai.git
+cd stock-pulse-ai
 
 # 2. Configure environment variables
 cp .env.example .env
@@ -440,13 +442,15 @@ docker-compose -f ./docker/docker-compose.yml logs -f server
 
 The default Compose file sets `limits.memory: 1G` and `reservations.memory: 512M` for each service. Use `512M` only for lightweight Web/API usage, single-stock runs, and low concurrency with `MAX_WORKERS=1`; use `1G` for normal full analysis, and `2G+` when running `server + analyzer` together, multi-stock analysis, market review, news expansion, image reports, or AlphaSift. If constrained to `512M`, avoid starting both services and reduce heavy features.
 
-### Run Official Images Directly
+### Run a Published StockPulse Image
 
-If you do not want to keep the source tree on the target machine, you can run the published image directly:
+Use these commands only after the target tag appears in this repository's Packages page. Replace `<published-tag>` with a tag that actually exists; otherwise use the source-build workflow above.
 
 ```bash
+IMAGE="ghcr.io/siinxu/stock-pulse-ai:<published-tag>"
+
 # Web/API mode
-docker pull zhulinsen/daily_stock_analysis:latest
+docker pull "$IMAGE"
 docker run -d \
   --name dsa-server \
   --env-file .env \
@@ -454,7 +458,7 @@ docker run -d \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
-  zhulinsen/daily_stock_analysis:latest \
+  "$IMAGE" \
   python main.py --serve-only --host 0.0.0.0 --port 8000
 
 # Scheduled-task mode
@@ -464,10 +468,10 @@ docker run -d \
   -v "$(pwd)/data:/app/data" \
   -v "$(pwd)/logs:/app/logs" \
   -v "$(pwd)/reports:/app/reports" \
-  zhulinsen/daily_stock_analysis:latest
+  "$IMAGE"
 ```
 
-For pinned deployments or easier rollback, replace `latest` with a concrete version tag such as `v3.13.0`.
+Pin a concrete tag in production instead of relying on the mutable `latest` tag.
 
 ### Run Mode Description
 
@@ -1596,4 +1600,4 @@ Technical indicator rules use daily-close edge triggers only. Partial-bar handli
 
 ---
 
-For more questions, please [submit an Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+For more questions, please [submit an Issue](https://github.com/SiinXu/stock-pulse-ai/issues)

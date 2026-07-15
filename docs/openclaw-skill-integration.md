@@ -1,15 +1,15 @@
 # openclaw Skill 集成指南
 
-本文档说明如何通过 [openclaw](https://github.com/openclaw/openclaw) Skill 调用 daily_stock_analysis 的 REST API，实现在 openclaw 对话中触发股票分析的能力。
+本文档说明如何通过 [openclaw](https://github.com/openclaw/openclaw) Skill 调用 StockPulse REST API，实现在 openclaw 对话中触发股票分析的能力。
 
 ## 概述
 
-- **集成方式**：openclaw Skill 通过 HTTP 调用 daily_stock_analysis（DSA）REST API
+- **集成方式**：openclaw Skill 通过 HTTP 调用 StockPulse REST API
 - **适用场景**：已部署 DSA API 服务，希望在 openclaw 对话中触发分析（如「帮我分析茅台」「analyze AAPL」）
 
 ## 前置条件
 
-1. **daily_stock_analysis 必须已运行**：执行 `python main.py --serve-only` 或通过 Docker 部署，使 API 长期可用
+1. **StockPulse 必须已运行**：执行 `python main.py --serve-only` 或通过 Docker 部署，使 API 长期可用
 2. **openclaw 需具备 HTTP 调用能力**：如 `system.run` 执行 curl，或内置 HTTP 工具（如 api-tester 等）
 3. **说明**：GitHub Actions 仅做定时任务，不长期暴露 API，需本地或 Docker 运行 DSA
 
@@ -120,7 +120,7 @@
 ```markdown
 ---
 name: daily-stock-analysis
-description: 调用 daily_stock_analysis API 进行股票智能分析。当用户询问「分析茅台」「analyze AAPL」「帮我看看 600519」等时使用。仅支持股票代码，不支持中文名称。
+description: 调用 StockPulse API 进行股票智能分析。当用户询问「分析茅台」「analyze AAPL」「帮我看看 600519」等时使用。仅支持股票代码，不支持中文名称。
 metadata:
   {"openclaw": {"requires": {"env": ["DSA_BASE_URL"]}, "primaryEnv": "DSA_BASE_URL"}}
 ---
@@ -156,7 +156,7 @@ metadata:
 
 ## Agent 策略问股（可选）
 
-若 daily_stock_analysis 已启用 `AGENT_MODE=true`，可调用 Agent 策略问股接口，支持多轮对话与多种策略（缠论、均线金叉等）：
+若 StockPulse 已启用 `AGENT_MODE=true`，可调用 Agent 策略问股接口，支持多轮对话与多种策略（缠论、均线金叉等）：
 
 ```bash
 # 将 {DSA_BASE_URL} 替换为实际配置的 API 地址（如 http://localhost:8000）

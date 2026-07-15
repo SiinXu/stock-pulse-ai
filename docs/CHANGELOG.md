@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-> For user-friendly release highlights, see the [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases) page.
+> For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据并使用安全外链，删除按 Provider ID 维护的前端业务外链表。
 - [修复] 配置 Schema API 完整透传字段条件契约；Web 对 AI 字段缺失/未知 `uiPlacement` 统一隔离到“高级”只读诊断，对未知条件保持可见但锁定，避免旧 Schema 或滚动部署重新暴露第二套普通编辑入口。
 - [改进] Web-facing API 错误统一为稳定 `error/message/params/details/trace_id` envelope，前端按 UI language 映射主错误并将 legacy 原文保留在诊断详情；任务 POST、SSE 与轮询载荷补齐 `message_code/message_params`，切换语言时已有任务即时重渲染，断线恢复按 task ID 去重合并。
+- [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
+- [修复] 移除上游 AIHubMix referral `APP-Code` 自动注入及 Anspire/AIHubMix/SerpAPI 推荐参数和优惠宣称；用户显式配置的自定义 headers 保持不变。
+- [改进] Workflow、邮件默认发件人、HTTP User-Agent、Web fallback 标题与 OpenAPI 标题统一使用 StockPulse；部署、桌面发布校验和远程股票索引切换到当前仓库。
+- [文档] Docker 指南不再把上游或尚未发布的镜像描述为 StockPulse 官方产物，并移除未启用的 Discussions 入口。
+- [测试] 新增 GitHub 协作资产英文守卫，并要求 PR 自动标签与审查报告通过分页 API 统计全部变更文件，避免大型 PR 只报告前 30 个文件。
+- [测试] SettingsPage 调度器运行态回填测试在两个状态方向都等待异步 API 响应，避免 CI 高负载下在运行态同步完成前提前断言。
+- [文档] 三语 README 将 StockPulse 明确为 ZhuLinsen/daily_stock_analysis 的 MIT License 独立维护 fork，并将当前仓库、CI、文档与反馈入口切换到 SiinXu/stock-pulse-ai。
 - [改进] StockPulse Web 补齐 Chat、Screening、Alerts、Portfolio、Settings、公共选择器、股票搜索和报告外围诊断的中英文界面，并将 UI language、report language 与动态原文边界分离。
 - [改进] Web 翻译按 alerts、portfolio、screening、settings、stock search、report chrome 等领域拆分为 typed locale 文件，便于后续扩展更多语言，避免单一字典持续膨胀。
 - [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 硬编码文案守卫及 30 项 Playwright i18n 验收；CI `web-gate` 显式执行 i18n 门禁。
@@ -104,12 +111,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### 发布亮点
 
-- feat: 项目身份统一为 StockPulse，并将桌面更新、Release、文档与自动化链接收口到 `SiinXu/stock-pulse-ai`。
-- feat: 模型目录和任务路由升级为 Connection-aware `ModelRef`，同服务商同名模型可独立选择、保存与执行。
-- feat: Settings 使用后端 Provider Catalog 与 Schema 驱动模型接入，并以分组自动保存、冲突恢复和离开保护替代全局 Save。
-- fix: API 错误、任务消息、异步请求与 Portfolio 写入统一稳定契约，补齐断线恢复、latest-request-wins 与持久化幂等。
-- fix: 配置、Agent、AlphaSift、Backtest 和图片提取收紧敏感信息边界，所有敏感配置默认遮罩，诊断与浏览器 trace 不再携带凭据。
-- test: CI 新增阻断型 i18n、Web 单元、构建与 40 场景语义 Playwright 门禁，覆盖 320px、390px、桌面及明暗主题。
+- feat: Standardized the project identity as StockPulse and moved desktop updates, Releases, documentation, and automation links to `SiinXu/stock-pulse-ai`.
+- feat: Upgraded the model catalog and task routing to Connection-aware `ModelRef` values so same-name models remain independently selectable and executable.
+- feat: Made Settings consume the backend Provider Catalog and Schema, with grouped autosave, conflict recovery, and leave protection replacing the global Save flow.
+- fix: Standardized API errors, task messages, asynchronous reads, and Portfolio mutations with reconnect recovery, latest-request-wins guards, and persistent idempotency.
+- fix: Hardened secret boundaries across configuration, Agent, AlphaSift, Backtest, and image extraction; sensitive values are masked and excluded from diagnostics and browser traces.
+- test: Added blocking i18n, Web unit, build, and 40-scenario Playwright gates covering 320px, 390px, desktop, light, and dark modes.
 
 ## [3.26.0] - 2026-07-12
 
@@ -2100,7 +2107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
-[Unreleased]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.25.0...HEAD
+[Unreleased]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.3...HEAD
+[3.26.3]: https://github.com/SiinXu/stock-pulse-ai/compare/v3.26.2...v3.26.3
 [3.25.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.1...v3.25.0
 [3.24.1]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.24.0...v3.24.1
 [3.24.0]: https://github.com/ZhuLinsen/daily_stock_analysis/compare/v3.23.0...v3.24.0

@@ -620,7 +620,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
         </Card>
       ) : null}
 
-      {/* 市场结构上下文（题材主线 + 个股位置）：仅当持久化报告返回该字段时渲染，旧报告无此字段时静默跳过 */}
+      {/* Render market structure context only when the persisted report includes it; legacy reports omit the section. */}
       {report?.details?.marketStructure ? (
         <MarketStructureCard
           context={report.details.marketStructure}

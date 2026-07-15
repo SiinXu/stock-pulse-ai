@@ -2,7 +2,7 @@
 
 基于 issue 分析结果实现修复，并按仓库规则补齐验证、风险与回滚说明。
 
-**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis
+**Repository**: https://github.com/SiinXu/stock-pulse-ai
 
 ## Usage
 
@@ -90,10 +90,11 @@ git pull --ff-only
 
 如用户要求创建 PR、生成 PR 标题或整理 PR 描述，PR title 建议遵循 `AGENTS.md`：
 
-- 使用 `<类型>: <修改内容>` 格式，例如 `fix: 修复大盘分析历史记录丢失`
+- 使用英文 `<type>: <change summary>` 格式，例如 `fix: preserve market analysis history`
 - 类型优先使用 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`
 - 标题只描述实际改动，建议不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀
 - 该约定仅用于协作一致性，不应被单独当作 process blocker
+- 所有发布到 GitHub 的 Issue / PR 正文、评论、review 和建议回复必须使用英文。
 
 只有在用户明确确认后，才执行：
 

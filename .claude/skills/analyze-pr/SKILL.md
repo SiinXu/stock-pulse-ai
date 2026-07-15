@@ -2,7 +2,7 @@
 
 分析 GitHub Pull Request，评估必要性、描述完整性、验证证据、主要风险与是否可直接合入。
 
-**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis/pulls
+**Repository**: https://github.com/SiinXu/stock-pulse-ai/pulls
 
 ## Usage
 
@@ -13,6 +13,7 @@
 ## Instructions
 
 分析时使用简洁中文，优先遵循仓库根目录 `AGENTS.md` 和 `.github/PULL_REQUEST_TEMPLATE.md`。
+所有发布到 GitHub 的标题、正文、评论、review 和建议回复必须使用英文；本地分析文档可继续使用中文。
 
 ### Step 1: 同步最新代码基线
 
@@ -32,10 +33,10 @@ git pull --ff-only
 ### Step 2: 拉取 PR 基本信息
 
 ```bash
-gh pr view <pr_number> --repo ZhuLinsen/daily_stock_analysis
-gh pr view <pr_number> --repo ZhuLinsen/daily_stock_analysis --comments
-gh pr checks <pr_number> --repo ZhuLinsen/daily_stock_analysis
-gh pr diff <pr_number> --repo ZhuLinsen/daily_stock_analysis
+gh pr view <pr_number> --repo SiinXu/stock-pulse-ai
+gh pr view <pr_number> --repo SiinXu/stock-pulse-ai --comments
+gh pr checks <pr_number> --repo SiinXu/stock-pulse-ai
+gh pr diff <pr_number> --repo SiinXu/stock-pulse-ai
 ```
 
 如有失败的 CI，优先查看失败日志，而不是立刻在本地重跑全部检查：
@@ -48,7 +49,7 @@ gh run view <run_id> --log-failed
 
 先检查 PR title 是否符合 `AGENTS.md` 的非阻断建议：
 
-- 格式应为 `<类型>: <修改内容>`，例如 `fix: 修复大盘分析历史记录丢失`
+- 格式应为英文 `<type>: <change summary>`，例如 `fix: preserve market analysis history`
 - 类型优先为 `fix`/`feat`/`refactor`/`docs`/`chore`/`test`/`ci`
 - 不应包含 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀
 - 标题应描述实际变更；若标题与 diff 不符，在描述完整性中指出，但不应单独作为 review process blocker。
@@ -139,7 +140,7 @@ gh run view <run_id> --log-failed
 
 ## Draft Review Comment
 
-<建议评论内容>
+<English draft review comment>
 ```
 
 ## Allowed Auto-Actions (No Confirmation Needed)

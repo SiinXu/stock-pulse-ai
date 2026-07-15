@@ -495,6 +495,12 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         self.assertEqual(fields["STOCK_LIST"]["help_key"], "settings.base.STOCK_LIST")
         self.assertIn("docs/full-guide.md", fields["STOCK_LIST"]["docs"][0]["href"])
 
+    def test_help_links_target_the_stockpulse_repository(self):
+        upstream_repository = "github.com/ZhuLinsen/daily_stock_analysis"
+        for key in get_registered_field_keys():
+            for doc in get_field_definition(key).get("docs", []):
+                self.assertNotIn(upstream_repository, doc.get("href", ""), key)
+
     def test_admin_auth_help_is_read_only_in_generic_settings(self):
         field = get_field_definition("ADMIN_AUTH_ENABLED")
         self.assertFalse(field["is_editable"])

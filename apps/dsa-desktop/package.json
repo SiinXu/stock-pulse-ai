@@ -42,8 +42,8 @@
       "publish": [
         {
           "provider": "github",
-          "owner": "ZhuLinsen",
-          "repo": "daily_stock_analysis"
+          "owner": "SiinXu",
+          "repo": "stock-pulse-ai"
         }
       ]
     },

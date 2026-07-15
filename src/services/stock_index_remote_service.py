@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_STOCK_INDEX_REMOTE_URL = (
-    "https://raw.githubusercontent.com/ZhuLinsen/daily_stock_analysis/"
+    "https://raw.githubusercontent.com/SiinXu/stock-pulse-ai/"
     "main/apps/dsa-web/public/stocks.index.json"
 )
 DEFAULT_STOCK_INDEX_CACHE_PATH = REPO_ROOT / "data" / "cache" / "stocks.index.json"

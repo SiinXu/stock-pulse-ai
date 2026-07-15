@@ -1,38 +1,37 @@
-# -*- coding: utf-8 -*-
-"""
-===================================
-通用响应模型
-===================================
+"""Shared API response models."""
 
-职责：
-1. 定义通用的响应模型（HealthResponse, ErrorResponse 等）
-2. 提供统一的响应格式
-"""
-
-from typing import Optional, Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class RootResponse(BaseModel):
-    """API 根路由响应"""
+    """Root API route response."""
     
-    message: str = Field(..., description="API 运行状态消息", json_schema_extra={"example": "Daily Stock Analysis API is running"})
-    version: Optional[str] = Field(None, description="API 版本", json_schema_extra={"example": "1.0.0"})
+    message: str = Field(
+        ...,
+        description="API runtime status message",
+        json_schema_extra={"example": "StockPulse API is running"},
+    )
+    version: Optional[str] = Field(
+        None,
+        description="API version",
+        json_schema_extra={"example": "1.0.0"},
+    )
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
-            "message": "Daily Stock Analysis API is running",
+            "message": "StockPulse API is running",
             "version": "1.0.0"
         }
     })
 
 
 class HealthResponse(BaseModel):
-    """健康检查响应"""
+    """Health check response."""
     
-    status: str = Field(..., description="服务状态", json_schema_extra={"example": "ok"})
-    timestamp: Optional[str] = Field(None, description="时间戳")
+    status: str = Field(..., description="Service status", json_schema_extra={"example": "ok"})
+    timestamp: Optional[str] = Field(None, description="Timestamp")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -44,17 +43,21 @@ class HealthResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Stable API error envelope."""
-    
-    error: str = Field(..., description="错误类型", json_schema_extra={"example": "validation_error"})
-    message: str = Field(..., description="错误详情", json_schema_extra={"example": "请求参数错误"})
-    params: Dict[str, Any] = Field(default_factory=dict, description="本地化插值参数")
-    details: Optional[Any] = Field(None, description="仅用于诊断的附加信息")
-    trace_id: Optional[str] = Field(None, description="诊断 trace ID")
+
+    error: str = Field(..., description="Error type", json_schema_extra={"example": "validation_error"})
+    message: str = Field(
+        ...,
+        description="Error details",
+        json_schema_extra={"example": "Invalid request parameters"},
+    )
+    params: Dict[str, Any] = Field(default_factory=dict, description="Localization interpolation parameters")
+    details: Optional[Any] = Field(None, description="Diagnostic details")
+    trace_id: Optional[str] = Field(None, description="Diagnostic trace ID")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "error": "not_found",
-            "message": "资源不存在",
+            "message": "Resource not found",
             "params": {},
             "details": None,
             "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
@@ -63,16 +66,16 @@ class ErrorResponse(BaseModel):
 
 
 class SuccessResponse(BaseModel):
-    """通用成功响应"""
+    """Generic success response."""
     
-    success: bool = Field(True, description="是否成功")
-    message: Optional[str] = Field(None, description="成功消息")
-    data: Optional[Any] = Field(None, description="响应数据")
+    success: bool = Field(True, description="Whether the operation succeeded")
+    message: Optional[str] = Field(None, description="Success message")
+    data: Optional[Any] = Field(None, description="Response data")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "success": True,
-            "message": "操作成功",
+            "message": "Operation completed successfully",
             "data": None
         }
     })

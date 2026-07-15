@@ -2,16 +2,11 @@
 
 # 📈 StockPulse · AI Stock Analysis System
 
-[![GitHub stars](https://img.shields.io/github/stars/ZhuLinsen/daily_stock_analysis?style=social)](https://github.com/ZhuLinsen/daily_stock_analysis/stargazers)
-[![CI](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhuLinsen/daily_stock_analysis/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=social)](https://github.com/SiinXu/stock-pulse-ai/stargazers)
+[![CI](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/zhulinsen/daily_stock_analysis)
-
-<p align="center">
-  <img src="https://trendshift.io/api/badge/trendshift/repositories/18527/daily?language=Python" alt="#1 Python Repository Of The Day | Trendshift" width="250" height="55"/>&nbsp;<a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" width="230" /></a>
-</p>
 
 **AI-powered stock analysis system for A-shares / Hong Kong / US / Japanese / Korean / Taiwan stocks**
 
@@ -24,21 +19,12 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 </div>
 
 > [!NOTE]
-> **StockPulse** is a customized derivative of the open-source project [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) (MIT License). Many thanks to the original author. See [LICENSE](../LICENSE) for the original copyright and terms.
-
-## 💖 Sponsors
-
-<div align="center">
-  <p align="center">
-    <a href="https://open.anspire.cn/?share_code=QFBC0FYC" target="_blank"><img src="assets/anspire.png" alt="Anspire Open all-in-one model and search service" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-    <a href="https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis" target="_blank"><img src="assets/serpapi_banner_en.png" alt="Easily scrape real-time financial news data from search engines - SerpApi" width="300" height="141" style="width: 300px; height: 141px; object-fit: contain;"></a>
-  </p>
-</div>
+> **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis), developed under the MIT License. StockPulse is not an official upstream release. Thanks to the original author and contributors; see [LICENSE](../LICENSE) for the original copyright and license terms.
 
 ## 🖥️ Product Preview
 
 <p align="center">
-  <img src="assets/readme_workspace_tour_20260510.gif" alt="DSA Web workspace demo" width="720">
+  <img src="assets/readme_workspace_tour_20260510.gif" alt="StockPulse Web workspace demo" width="720">
 </p>
 
 ## ✨ Key Features
@@ -58,9 +44,9 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
 | Type | Supported |
 |------|-----------|
-| AI Models | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC), [AIHubMix](https://aihubmix.com/?aff=CfMq), Gemini, OpenAI-compatible providers, DeepSeek, Qwen, Claude, Ollama |
-| Market Data | [TickFlow](https://tickflow.org/auth/register?ref=WDSGSPS5XC), AkShare, Tushare, Pytdx, Baostock, YFinance, Longbridge |
-| News Search | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC), [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis), [Tavily](https://tavily.com/), [Bocha](https://open.bocha.cn/), [Brave](https://brave.com/search/api/), [MiniMax](https://platform.minimaxi.com/), SearXNG |
+| AI Models | [Anspire](https://open.anspire.cn/), [AIHubMix](https://aihubmix.com/), Gemini, OpenAI-compatible providers, DeepSeek, Qwen, Claude, Ollama |
+| Market Data | [TickFlow](https://tickflow.org/), AkShare, Tushare, Pytdx, Baostock, YFinance, Longbridge |
+| News Search | [Anspire](https://open.anspire.cn/), [SerpAPI](https://serpapi.com/baidu-search-api), [Tavily](https://tavily.com/), [Bocha](https://open.bocha.cn/), [Brave](https://brave.com/search/api/), [MiniMax](https://platform.minimaxi.com/), SearXNG |
 | Social Sentiment | [Stock Sentiment API](https://api.adanos.org/docs) for Reddit / X / Polymarket, US stocks only |
 
 > The project includes free market-data sources such as AkShare, Baostock, and YFinance and can run without extra data-source credentials. These free sources can be rate-limited, change upstream contracts, or fluctuate by network condition, so stability is not guaranteed. For scheduled runs, batch analysis, or steadier quotes, configure token-based sources such as TickFlow, Tushare, or Longbridge; market coverage, Actions mappings, and fallback rules are documented in [Data Source Configuration](./full-guide_EN.md#data-source-configuration).
@@ -85,8 +71,8 @@ Start with one provider and one API key. For multi-model routing, image recognit
 
 | Secret Name | Description | Required |
 |-------------|-------------|:--------:|
-| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/?share_code=QFBC0FYC) API key, one key for popular LLMs and web search with free quota for this project | **Recommended** |
-| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/?aff=CfMq) API key, one key for multiple model families and a 10% top-up discount for this project | **Recommended** |
+| `ANSPIRE_API_KEYS` | [Anspire](https://open.anspire.cn/) API key for model access and online search | **Recommended** |
+| `AIHUBMIX_KEY` | [AIHubMix](https://aihubmix.com/) API key for access to multiple models | **Recommended** |
 | `GEMINI_API_KEY` | Google Gemini API key | Optional |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key | Optional |
 | `OPENAI_API_KEY` | OpenAI-compatible API key, including DeepSeek and Qwen-compatible services | Optional |
@@ -120,7 +106,7 @@ News search strongly improves sentiment, announcements, events, and catalyst qua
 | Secret Name | Description | Required |
 |-------------|-------------|:--------:|
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/), optimized for Chinese content and A-share analysis; the same key can also be used for Anspire LLM fallback examples | **Recommended** |
-| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis), search-engine results for realtime financial news | **Recommended** |
+| `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api), search-engine results for realtime financial news | **Recommended** |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/), general news search API | Optional |
 | `BOCHA_API_KEYS` | [Bocha](https://open.bocha.cn/), Chinese search with AI summaries | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/), privacy-first search and US-stock news enrichment | Optional |
@@ -147,7 +133,7 @@ Open the `Actions` tab and click `I understand my workflows, go ahead and enable
 
 #### 4. Manual Test
 
-`Actions` -> `Daily Stock Analysis` -> `Run workflow` -> `Run workflow`.
+`Actions` -> `StockPulse Daily Analysis` -> `Run workflow` -> `Run workflow`.
 
 #### Done
 
@@ -157,7 +143,7 @@ By default, the workflow runs every weekday at 18:00 Beijing time and skips non-
 
 ```bash
 # Clone the project
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git && cd daily_stock_analysis
+git clone https://github.com/SiinXu/stock-pulse-ai.git && cd stock-pulse-ai
 
 # Install dependencies
 pip install -r requirements.txt
@@ -244,44 +230,15 @@ After configuring any available AI API key, the Web `/chat` page can use strateg
 
 > Agent parameters, `skill` naming compatibility, multi-agent mode, and budget guards are covered in the [Full Guide](./full-guide_EN.md#local-webui-management-interface) and [LLM Config Guide](./LLM_CONFIG_GUIDE_EN.md).
 
-## 🧩 Related Projects
+## 📞 Project Links
 
-> DSA focuses on daily analysis reports. These sibling projects cover stock screening, strategy validation, and strategy evolution for users who want to extend the workflow. They are maintained independently today, with candidate import, backtest validation, and report handoff planned as future integration directions.
-
-| Project | Focus |
-|---------|-------|
-| [AlphaSift](https://github.com/ZhuLinsen/alphasift) | Multi-factor stock screening and full-market scanning for building candidate watchlists |
-| [AlphaEvo](https://github.com/ZhuLinsen/alphaevo) | Strategy backtesting and self-evolution experiments for validating rules and iteratively exploring strategy parameters and combinations |
-
-## 📞 Contact
-
-<table>
-  <tr>
-    <td width="92" valign="top"><strong>Email</strong></td>
-    <td valign="top">
-      <a href="mailto:zhuls345@gmail.com">zhuls345@gmail.com</a><br>
-      Project consulting, deployment support, and feature extensions
-    </td>
-    <td align="center" rowspan="3" valign="middle" width="148">
-      <a href="http://xhslink.com/m/tU520DWCKT" target="_blank"><img src="assets/xiaohongshu_tick.jpg" width="112" alt="Xiaohongshu QR code"></a><br>
-      <sub>Follow on Xiaohongshu</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>Xiaohongshu</strong></td>
-    <td valign="top"><a href="http://xhslink.com/m/tU520DWCKT">Follow on Xiaohongshu</a></td>
-  </tr>
-  <tr>
-    <td width="92" valign="top"><strong>Feedback</strong></td>
-    <td valign="top"><a href="https://github.com/ZhuLinsen/daily_stock_analysis/issues">GitHub Issues</a> · <a href="https://github.com/ZhuLinsen/daily_stock_analysis/discussions">Discussions</a></td>
-  </tr>
-</table>
+[GitHub Repository](https://github.com/SiinXu/stock-pulse-ai) · [GitHub Issues](https://github.com/SiinXu/stock-pulse-ai/issues) · [Documentation](https://github.com/SiinXu/stock-pulse-ai/tree/main/docs)
 
 ## 📄 License
 
-[MIT License](../LICENSE) © 2026 ZhuLinsen
+[MIT License](../LICENSE). StockPulse retains the upstream copyright and license notices and is maintained as an independent project.
 
-If you use or build on this project, attribution with a link back to this repository is appreciated.
+If you use or build on this project, attribution to both StockPulse and its upstream code lineage is appreciated.
 
 ## ⚠️ Disclaimer
 

@@ -115,3 +115,40 @@ def test_github_login_from_pr_network_error_warns_with_pr_and_exception_type(
     assert "PR #127" in caplog.text
     assert "exception_type=URLError" in caplog.text
     assert "secret-token" not in caplog.text
+
+
+def test_release_body_does_not_publish_localized_changelog_text(monkeypatch) -> None:
+    module = _load_release_notes_module()
+    monkeypatch.setattr(
+        module,
+        "_section_for",
+        lambda version: """### 发布亮点
+
+- feat: 新增市场分析
+- fix: レビューを改善
+- docs: Обновить документацию
+- fix: &#x4E2D;&#x6587;
+- docs: &#20013;&#25991;
+- fix: Improve release reliability
+""",
+    )
+    monkeypatch.setattr(module, "_previous_tag", lambda tag: "v1.2.2")
+    monkeypatch.setattr(module, "_contributors", lambda previous_tag, tag: ["@octocat"])
+
+    body = module.build("v1.2.3")
+
+    assert "Improve release reliability" in body
+    assert "新增市场分析" not in body
+    assert "レビューを改善" not in body
+    assert "Обновить документацию" not in body
+    assert "&#x4E2D;" not in body
+    assert "&#20013;" not in body
+    assert module.HAN_PATTERN.search(body) is None
+    assert not any(character.isalpha() and not character.isascii() for character in body)
+
+
+def test_fallback_login_rejects_non_github_author_names() -> None:
+    module = _load_release_notes_module()
+
+    assert module._fallback_login("octocat <octocat@example.com>") == "octocat"
+    assert module._fallback_login("中文作者 <author@example.com>") is None
