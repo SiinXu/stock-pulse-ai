@@ -2,7 +2,7 @@
 
 分析 GitHub Issue，判断其真实性、优先级、仓库责任边界与建议动作。
 
-**Repository**: https://github.com/ZhuLinsen/daily_stock_analysis/issues
+**Repository**: https://github.com/SiinXu/stock-pulse-ai/issues
 
 ## Usage
 
@@ -13,6 +13,7 @@
 ## Instructions
 
 分析时使用简洁中文，优先遵循仓库根目录 `AGENTS.md`。
+所有发布到 GitHub 的标题、正文、评论、review 和建议回复必须使用英文；本地分析文档可继续使用中文。
 
 ### Step 1: 同步最新代码基线
 
@@ -32,8 +33,8 @@ git pull --ff-only
 ### Step 2: 拉取 Issue 信息
 
 ```bash
-gh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis
-gh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis --comments
+gh issue view <issue_number> --repo SiinXu/stock-pulse-ai
+gh issue view <issue_number> --repo SiinXu/stock-pulse-ai --comments
 ```
 
 如为 bug，优先核对 issue 模板中是否提供了以下信息：
@@ -114,7 +115,7 @@ gh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis --comments
 
 <建议修复、澄清或关闭方式>
 
-若建议后续创建 PR，给出的 PR title 建议符合 `AGENTS.md`：使用 `<类型>: <修改内容>`，不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀；该约定仅用于协作一致性提醒，不应单独作为 review process blocker。
+若建议后续创建 PR，给出的英文 PR title 应符合 `AGENTS.md`：使用 `<type>: <change summary>`，例如 `fix: preserve market analysis history`，不添加 `[codex]`、`codex`、`autocode`、`copilot` 或其他工具/agent 来源前缀；该约定仅用于协作一致性提醒，不应单独作为 review process blocker。
 
 ## Risks And Rollback
 
@@ -123,7 +124,7 @@ gh issue view <issue_number> --repo ZhuLinsen/daily_stock_analysis --comments
 
 ## Draft Reply
 
-<建议回复内容>
+<English draft reply>
 ```
 
 ## Allowed Auto-Actions (No Confirmation Needed)

@@ -62,7 +62,7 @@ export const PROVIDER_PRESENTATION_BY_ID: Record<string, ProviderPresentation> =
   aihubmix: { officialSources: [{ label: 'AIHubmix', url: 'https://aihubmix.com/' }] },
   anspire: {
     officialSources: [
-      { label: 'Anspire Open', url: 'https://open.anspire.cn/?share_code=QFBC0FYC' },
+      { label: 'Anspire Open', url: 'https://open.anspire.cn/' },
       { label: 'LiteLLM OpenAI-compatible', url: 'https://docs.litellm.ai/docs/providers/openai_compatible' },
     ],
     configHint:

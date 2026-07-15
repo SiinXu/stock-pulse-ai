@@ -17,6 +17,7 @@ env:
   DOCKERHUB_REGISTRY: docker.io
   GHCR_IMAGE_NAME: ${{ github.repository }}
   DOCKERHUB_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+  IMAGE_TAG: ${{ inputs.image_tag }}
 
 jobs:
   build-and-push:
@@ -34,8 +35,8 @@ jobs:
 
       - name: Validate release inputs
         run: |
-          if [[ "${{ inputs.image_tag }}" =~ [[:space:]] ]]; then
-            echo "image_tag must not contain spaces"
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "image_tag must follow the ASCII Docker tag format and be at most 128 characters"
             exit 1
           fi
 
@@ -49,7 +50,7 @@ jobs:
       - name: Set up QEMU for multi-platform build
         uses: docker/setup-qemu-action@v3
 
-      # 登录到 GHCR
+      # Log in to GHCR.
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -57,7 +58,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 登录到 Docker Hub（需要预先设置 secrets.DOCKERHUB_USERNAME 和 secrets.DOCKERHUB_TOKEN）
+      # Docker Hub requires the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets.
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -71,7 +72,7 @@ jobs:
         with:
           images: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ inputs.image_tag }}
+            type=raw,value=${{ env.IMAGE_TAG }}
             type=raw,value=latest
           flavor: |
             latest=false
@@ -82,7 +83,7 @@ jobs:
         with:
           images: ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ inputs.image_tag }}
+            type=raw,value=${{ env.IMAGE_TAG }}
             type=raw,value=latest
           flavor: |
             latest=false
@@ -117,13 +118,13 @@ jobs:
         run: |
           echo "### Docker images built and pushed successfully" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- GHCR: \`${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Docker Hub: \`${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Tags: ${{ inputs.image_tag }}, latest" >> "$GITHUB_STEP_SUMMARY"
+          echo "- GHCR: \`${GHCR_REGISTRY}/${GHCR_IMAGE_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Docker Hub: \`${DOCKERHUB_REGISTRY}/${DOCKERHUB_IMAGE_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tags: $IMAGE_TAG, latest" >> "$GITHUB_STEP_SUMMARY"
           echo "- Platforms: linux/amd64, linux/arm64" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Pull commands" >> "$GITHUB_STEP_SUMMARY"
           echo '```bash' >> "$GITHUB_STEP_SUMMARY"
-          echo "docker pull ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}:${{ inputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "docker pull ${{ env.DOCKERHUB_REGISTRY }}/${{ env.DOCKERHUB_IMAGE_NAME }}:${{ inputs.image_tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ${GHCR_REGISTRY}/${GHCR_IMAGE_NAME}:$IMAGE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "docker pull ${DOCKERHUB_REGISTRY}/${DOCKERHUB_IMAGE_NAME}:$IMAGE_TAG" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

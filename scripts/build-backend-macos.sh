@@ -133,7 +133,7 @@ if [[ ! -x "${packaged_entry}" ]]; then
   exit 1
 fi
 
-# 先校验可执行文件可启动（不进入业务流程的参数），再检查冻结产物中是否携带 alphasift.
+# Verify that the executable starts with a non-business command before probing bundled modules.
 if ! "${packaged_entry}" --help >/tmp/alphasift-packaged-help.log 2>&1; then
   echo "ERROR: packaged backend help startup check failed."
   cat /tmp/alphasift-packaged-help.log

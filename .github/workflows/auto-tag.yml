@@ -1,6 +1,6 @@
 name: Auto Tag
 
-# 触发条件：当代码 push 到 main 分支时
+# Trigger when code is pushed to the main branch.
 on:
   push:
     branches: [main]

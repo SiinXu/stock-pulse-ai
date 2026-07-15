@@ -444,7 +444,7 @@ class IntelligenceService:
             return self._fetch_newsnow_entries(fields, limit=limit)
 
         timeout = max(1, min(float(self.config.news_intel_fetch_timeout_sec), 30.0))
-        headers = {"User-Agent": "daily-stock-analysis-intel/1.0"}
+        headers = {"User-Agent": "StockPulse-Intel/1.0"}
         self._validate_url(fields["url"])
         request_url = fields["url"]
         response = None
@@ -502,7 +502,7 @@ class IntelligenceService:
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 daily-stock-analysis-intel/1.0"
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 StockPulse-Intel/1.0"
             ),
             "Accept": "application/json",
         }

@@ -20,7 +20,7 @@ This document compiles common issues encountered by users and their solutions.
    ```
    This prioritizes Yahoo Finance data source for US stock data
 
-> Related Issue: [#153](https://github.com/ZhuLinsen/daily_stock_analysis/issues/153)
+> Related upstream issue: [#153](https://github.com/ZhuLinsen/daily_stock_analysis/issues/153)
 
 ---
 
@@ -38,7 +38,7 @@ This document compiles common issues encountered by users and their solutions.
    ```
 3. System has built-in 5-day average volume calculation as fallback
 
-> Related Issue: [#155](https://github.com/ZhuLinsen/daily_stock_analysis/issues/155)
+> Related upstream issue: [#155](https://github.com/ZhuLinsen/daily_stock_analysis/issues/155)
 
 ---
 
@@ -48,7 +48,7 @@ This document compiles common issues encountered by users and their solutions.
 
 **Solution**:
 1. **No Tushare account**: No need to configure `TUSHARE_TOKEN`, system will automatically use free data sources (AkShare, Efinance)
-2. **Have Tushare account**: Verify Token is correct, check in [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638) personal center
+2. **Have Tushare account**: Verify the token in your [Tushare Pro](https://tushare.pro/) account
 3. All core features of this project work normally without Tushare
 
 ---
@@ -312,11 +312,12 @@ Work through the following 5 checkpoints in order:
 4. The desktop app has its own version in `apps/dsa-desktop/package.json`, and that only applies to the Electron desktop build, not the Docker image.
 
 **How to check your current Docker version**:
-1. **Check the image tag in your deploy command or Compose file**. For example, in `ghcr.io/zhulinsen/daily_stock_analysis:v3.12.0`, the deployed version is `v3.12.0`.
-2. **If you used `latest`**, check your original `docker pull`, `docker-compose.yml`, or deployment script, then compare with [GitHub Releases](https://github.com/ZhuLinsen/daily_stock_analysis/releases).
-3. **If you only want to confirm the frontend was refreshed**, open WebUI → Settings and inspect `Build ID` / `Build Time`; that confirms static asset freshness, not the Docker release version.
+1. **First confirm that the image exists**. Find a published tag on this repository's Packages page or in the relevant registry. If no tag is available, build from the current source instead of running an image pull command.
+2. **Then check the image tag in your deploy command or Compose file**. For example, in `ghcr.io/siinxu/stock-pulse-ai:<published-tag>`, replace `<published-tag>` with a fixed tag that you confirmed exists in the previous step.
+3. **If the registry publishes `latest` and you used it**, check your original `docker pull`, `docker-compose.yml`, or deployment script, then compare with [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases).
+4. **If you only want to confirm the frontend was refreshed**, open WebUI → Settings and inspect `Build ID` / `Build Time`; that confirms static asset freshness, not the Docker release version.
 
-**Recommendation**: To avoid repeated updates, prefer a pinned version tag such as `v3.12.0` instead of relying on `latest`.
+**Recommendation**: To avoid repeated updates, use a pinned tag only after confirming that it has been published instead of relying on `latest`.
 
 ---
 
@@ -355,7 +356,7 @@ python main.py --market-only
 
 If the above content doesn't solve your issue, welcome to:
 1. Check [Complete Configuration Guide](full-guide_EN.md)
-2. Search or submit [GitHub Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+2. Search or submit [GitHub Issue](https://github.com/SiinXu/stock-pulse-ai/issues)
 3. Check [Changelog](CHANGELOG.md) for latest fixes
 
 ---
