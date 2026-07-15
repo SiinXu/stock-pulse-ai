@@ -50,6 +50,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const dialog = (
     <div
+      data-overlay-root="confirm"
       // Confirmations sit above drawers/modals so a confirm opened from inside a
       // drawer is never hidden (see OVERLAY_Z).
       style={{ zIndex: OVERLAY_Z.confirm }}
@@ -80,7 +81,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelText ?? t('common.cancel')}
           </button>
@@ -88,7 +89,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
+            className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
               isDanger
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-foreground text-background'

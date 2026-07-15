@@ -43,6 +43,8 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
 import { formatUiDateTime, formatUiNumber } from '../utils/uiLocale';
+import { formatTaskMessage } from '../utils/taskMessage';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 const SCREEN_TASK_STORAGE_KEY = 'dsa.alphasift.activeScreenTask.v1';
 const SCREEN_TASK_POLL_INTERVAL_MS = 2000;
@@ -52,6 +54,52 @@ type PersistedScreenTask = {
   market: string;
   strategy: string;
   maxResults: number;
+};
+
+type ScreeningRunParameters = Omit<PersistedScreenTask, 'taskId'>;
+
+const DEFAULT_SCREENING_RUN_PARAMETERS: ScreeningRunParameters = {
+  market: 'cn',
+  strategy: 'dual_low',
+  maxResults: 3,
+};
+
+const readScreeningRunParameters = (
+  restoredTask: PersistedScreenTask | null,
+  search = typeof window === 'undefined' ? '' : window.location.search,
+): ScreeningRunParameters => {
+  if (restoredTask) {
+    return {
+      market: restoredTask.market,
+      strategy: restoredTask.strategy,
+      maxResults: restoredTask.maxResults,
+    };
+  }
+  const params = new URLSearchParams(search);
+  const count = Number(params.get('count'));
+  const strategy = params.get('strategy')?.trim();
+  return {
+    market: params.get('market') === 'cn' ? 'cn' : DEFAULT_SCREENING_RUN_PARAMETERS.market,
+    strategy: strategy || DEFAULT_SCREENING_RUN_PARAMETERS.strategy,
+    maxResults: Number.isInteger(count) && count >= 1 && count <= 100
+      ? count
+      : DEFAULT_SCREENING_RUN_PARAMETERS.maxResults,
+  };
+};
+
+const syncScreeningRunParameters = ({ market, strategy, maxResults }: ScreeningRunParameters) => {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  const values: Record<string, string | undefined> = {
+    market: market === DEFAULT_SCREENING_RUN_PARAMETERS.market ? undefined : market,
+    strategy: strategy === DEFAULT_SCREENING_RUN_PARAMETERS.strategy ? undefined : strategy,
+    count: maxResults === DEFAULT_SCREENING_RUN_PARAMETERS.maxResults ? undefined : String(maxResults),
+  };
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  });
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 };
 
 const readPersistedScreenTask = (): PersistedScreenTask | null => {
@@ -182,7 +230,39 @@ const truncateMessageDetail = (value: string, maxLength = MAX_MESSAGE_DETAIL_LEN
   return `${text.slice(0, maxLength - 1)}…`;
 };
 
+const formatStableAlphaSiftDiagnostic = (value: string, text: ScreeningText) => {
+  const messages: Record<string, string> = {
+    alphasift_warning: text.diagnosticWarning,
+    alphasift_error: text.diagnosticInternal,
+    alphasift_source_error: text.diagnosticSourceUnavailable,
+    alphasift_llm_parse_error: text.diagnosticLlmParse,
+    alphasift_internal_error: text.diagnosticInternal,
+    alphasift_hotspot_refresh_failed: text.hotspotLoadFailed,
+    alphasift_hotspot_source_error: text.diagnosticSourceUnavailable,
+    alphasift_hotspot_direct_fallback_failed: text.hotspotLoadFailed,
+    alphasift_hotspot_direct_fallback_used: text.cacheFallback,
+    alphasift_hotspot_detail_prefetch_failed: text.hotspotDetailLoadFailed,
+    alphasift_hotspot_detail_stale_cache: text.cacheFallback,
+    alphasift_hotspot_detail_fallback: text.cacheFallback,
+    alphasift_hotspot_detail_source_error: text.diagnosticSourceUnavailable,
+    eastmoney_hotspot_unavailable: text.diagnosticNetwork,
+    dsa_candidate_enrichment_failed: text.diagnosticWarning,
+    dsa_stock_name_failed: text.diagnosticSourceUnavailable,
+    dsa_realtime_quote_missing: text.diagnosticEmpty,
+    dsa_realtime_quote_failed: text.diagnosticSourceUnavailable,
+    dsa_fundamental_context_failed: text.diagnosticSourceUnavailable,
+    dsa_search_unavailable: text.diagnosticSourceUnavailable,
+    stock_news_unavailable: text.diagnosticSourceUnavailable,
+    stock_news_failed: text.diagnosticSourceUnavailable,
+  };
+  return messages[value] || '';
+};
+
 const summarizeAlphaSiftDiagnostic = (detail: string, text: ScreeningText) => {
+  const stableMessage = formatStableAlphaSiftDiagnostic(detail, text);
+  if (stableMessage) {
+    return stableMessage;
+  }
   if (/trade_cal returned no open trading days/i.test(detail)) {
     return text.diagnosticCalendar;
   }
@@ -229,6 +309,10 @@ const normalizeScreenMessageKey = (value: string, text: ScreeningText) => {
 };
 
 const formatScreenMessage = (value: string, text: ScreeningText) => {
+  const stableMessage = formatStableAlphaSiftDiagnostic(value, text);
+  if (stableMessage) {
+    return stableMessage;
+  }
   if (/^DSA provider context applied \d+ of \d+ candidates/i.test(value)) {
     return '';
   }
@@ -276,14 +360,6 @@ const getScreenMessages = (meta: AlphaSiftScreenResponse | null, text: Screening
 };
 
 const isRunningScreenTask = (status: string | undefined | null) => status === 'pending' || status === 'processing';
-
-const formatScreenTaskFailure = (value: string | null | undefined, textMap: ScreeningText) => {
-  const text = String(value || '').trim();
-  if (!text) {
-    return textMap.taskFailed;
-  }
-  return formatUiText(textMap.taskFailedDetail, { detail: summarizeAlphaSiftDiagnostic(text, textMap) });
-};
 
 const ALPHASIFT_HOTSPOT_NO_CACHE_HINT = 'No cached AlphaSift hotspot snapshot. Click refresh to fetch live hotspots.';
 const ALPHASIFT_HOTSPOT_UNAVAILABLE_CODE = 'eastmoney_hotspot_unavailable';
@@ -454,19 +530,24 @@ const StockScreeningPage: React.FC = () => {
   const text = SCREENING_TEXT[language];
   const markets = useMemo(() => [{ id: 'cn', label: text.marketCn }], [text.marketCn]);
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
+  const [initialRunParameters] = useState<ScreeningRunParameters>(() => readScreeningRunParameters(restoredTask));
+  const [statusLoading, setStatusLoading] = useState(true);
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(false);
-  const [market, setMarket] = useState(restoredTask?.market || 'cn');
-  const [strategy, setStrategy] = useState(restoredTask?.strategy || 'dual_low');
+  const [market, setMarket] = useState(initialRunParameters.market);
+  const [strategy, setStrategy] = useState(initialRunParameters.strategy);
   const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
-  const [maxResults, setMaxResults] = useState(restoredTask?.maxResults || 3);
+  const [maxResults, setMaxResults] = useState(initialRunParameters.maxResults);
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
   const [hotspotsExpanded, setHotspotsExpanded] = useState(false);
   const [selectedHotspotTopic, setSelectedHotspotTopic] = useState<string | null>(null);
   const selectedHotspotTopicRef = useRef<string | null>(null);
+  const strategiesRequestIdRef = useRef(0);
+  const hotspotsRequestIdRef = useRef(0);
   const hotspotDetailRequestIdRef = useRef(0);
+  const mountedRef = useRef(true);
   const hotspotDetailsByTopicRef = useRef<Record<string, AlphaSiftHotspotDetail>>({});
   const [hotspotDetail, setHotspotDetail] = useState<AlphaSiftHotspotDetail | null>(null);
   const [loadingHotspotDetail, setLoadingHotspotDetail] = useState(false);
@@ -485,9 +566,12 @@ const StockScreeningPage: React.FC = () => {
   const [taskMessage, setTaskMessage] = useState(restoredTask?.taskId ? text.restoringTask : '');
 
   const selectedStrategy = useMemo(() => strategies.find((item) => item.id === strategy), [strategies, strategy]);
-  const selectedStrategyTitle = selectedStrategy?.name || selectedStrategy?.title || text.customStrategy;
-  const selectedStrategyTag = selectedStrategy?.category || selectedStrategy?.tag || selectedStrategy?.tags?.[0] || text.custom;
-  const displayedStrategy = selectedStrategy ? selectedStrategyTitle : `${text.customStrategy} (${strategy})`;
+  const selectedStrategyDisplay = useMemo(
+    () => selectedStrategy ? getStrategyDisplay(selectedStrategy, language) : null,
+    [language, selectedStrategy],
+  );
+  const selectedStrategyTag = selectedStrategyDisplay?.category || text.custom;
+  const displayedStrategy = selectedStrategyDisplay?.name ?? `${text.customStrategy} (${strategy})`;
   const screenMessages = useMemo(() => getScreenMessages(screenMeta, text), [screenMeta, text]);
   const llmDegraded = screenMeta?.llmRanked === false;
   const alertMessages = llmDegraded
@@ -496,11 +580,15 @@ const StockScreeningPage: React.FC = () => {
       : [text.localRankingNotice]
     : screenMessages;
   const isScreeningEnabled = enabled && available;
-  const statusText = isScreeningEnabled ? text.enabled : text.disabled;
+  const statusText = statusLoading ? text.statusLoading : isScreeningEnabled ? text.enabled : text.disabled;
 
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
+
+  useEffect(() => {
+    syncScreeningRunParameters({ market, strategy, maxResults });
+  }, [market, maxResults, strategy]);
 
   const applyScreenResult = useCallback((result: AlphaSiftScreenResponse) => {
     const nextCandidates = result.candidates || [];
@@ -557,10 +645,14 @@ const StockScreeningPage: React.FC = () => {
   }, [language, text.hotspotDetailLoadFailed]);
 
   const loadStrategies = useCallback(async () => {
+    const requestId = strategiesRequestIdRef.current + 1;
+    strategiesRequestIdRef.current = requestId;
+    const isLatestRequest = () => strategiesRequestIdRef.current === requestId;
     setLoadingStrategies(true);
+    setStrategyLoadError('');
     try {
-      setStrategyLoadError('');
       const result = await alphasiftApi.getStrategies();
+      if (!isLatestRequest()) return;
       const loadedStrategies = result.strategies || [];
       setStrategies(loadedStrategies);
       if (loadedStrategies.length > 0) {
@@ -569,18 +661,22 @@ const StockScreeningPage: React.FC = () => {
         );
       }
     } catch (err) {
-      setStrategies([]);
+      if (!isLatestRequest()) return;
       setStrategyLoadError(getParsedApiError(err, language).message || text.strategyLoadFailed);
     } finally {
-      setLoadingStrategies(false);
+      if (isLatestRequest()) setLoadingStrategies(false);
     }
   }, [language, text.strategyLoadFailed]);
 
   const loadHotspots = useCallback(async (refresh = false) => {
+    const requestId = hotspotsRequestIdRef.current + 1;
+    hotspotsRequestIdRef.current = requestId;
+    const isLatestRequest = () => hotspotsRequestIdRef.current === requestId;
     setLoadingHotspots(true);
     setHotspotError('');
     try {
       const result = await alphasiftApi.getHotspots({ provider: 'akshare', top: 12, refresh });
+      if (!isLatestRequest()) return;
       const nextHotspots = result.hotspots || [];
       const nextDetails = result.details || {};
       hotspotDetailsByTopicRef.current = {
@@ -607,9 +703,10 @@ const StockScreeningPage: React.FC = () => {
         setHotspotError(formatHotspotEmptyMessage(result, text));
       }
     } catch (err) {
+      if (!isLatestRequest()) return;
       setHotspotError(toApiErrorMessage(err, text.hotspotLoadFailed, language));
     } finally {
-      setLoadingHotspots(false);
+      if (isLatestRequest()) setLoadingHotspots(false);
     }
   }, [language, loadHotspotDetail, text]);
 
@@ -676,6 +773,7 @@ const StockScreeningPage: React.FC = () => {
         }
         setEnabled(status.enabled);
         setAvailable(status.available);
+        setStatusLoading(false);
         if (status.enabled && status.available) {
           void loadStrategies();
           void loadHotspots(false);
@@ -685,12 +783,23 @@ const StockScreeningPage: React.FC = () => {
         if (active) {
           setEnabled(false);
           setAvailable(false);
+          setStatusLoading(false);
         }
       });
     return () => {
       active = false;
     };
   }, [loadHotspots, loadStrategies]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      strategiesRequestIdRef.current += 1;
+      hotspotsRequestIdRef.current += 1;
+      hotspotDetailRequestIdRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeTaskId) {
@@ -710,7 +819,7 @@ const StockScreeningPage: React.FC = () => {
     function applyTaskStatus(task: AlphaSiftScreenTaskStatus) {
       const nextProgress = Number(task.progress ?? 0);
       setTaskProgress(Number.isFinite(nextProgress) ? nextProgress : 0);
-      setTaskMessage(task.message || '');
+      setTaskMessage(formatTaskMessage(task, language));
 
       if (task.status === 'completed') {
         if (task.result) {
@@ -729,7 +838,11 @@ const StockScreeningPage: React.FC = () => {
         setCandidates([]);
         setScreenMeta(null);
         setExpandedCode(null);
-        setError(formatScreenTaskFailure(task.error || task.message, text));
+        setError(getParsedApiError({
+          error: 'alphasift_screen_failed',
+          message: task.error || task.message || 'Screening failed',
+          trace_id: task.traceId,
+        }, language).message);
         finishTask();
         return;
       }
@@ -784,21 +897,27 @@ const StockScreeningPage: React.FC = () => {
     setError('');
     try {
       await alphasiftApi.enable();
+      if (!mountedRef.current) return;
       setEnabled(true);
       setAvailable(true);
+      setStatusLoading(false);
       await loadStrategies();
     } catch (err) {
       try {
         const status = await alphasiftApi.getStatus();
+        if (!mountedRef.current) return;
         setEnabled(status.enabled);
         setAvailable(status.available);
+        setStatusLoading(false);
       } catch {
+        if (!mountedRef.current) return;
         setEnabled(false);
         setAvailable(false);
+        setStatusLoading(false);
       }
-      setError(getParsedApiError(err, language).message || text.enableFailed);
+      if (mountedRef.current) setError(getParsedApiError(err, language).message || text.enableFailed);
     } finally {
-      setEnabling(false);
+      if (mountedRef.current) setEnabling(false);
     }
   };
 
@@ -831,6 +950,7 @@ const StockScreeningPage: React.FC = () => {
     setTaskMessage(text.submittingTask);
     try {
       const task = await alphasiftApi.startScreen({ market, strategy, maxResults });
+      if (!mountedRef.current) return;
       persistScreenTask({
         taskId: task.taskId,
         market,
@@ -839,11 +959,13 @@ const StockScreeningPage: React.FC = () => {
       });
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
-      setTaskMessage(task.message || text.taskSubmitted);
+      setTaskMessage(formatTaskMessage(task, language));
     } catch (err) {
-      setCandidates([]);
-      setLoading(false);
-      setError(toApiErrorMessage(err, text.taskSubmitFailed, language));
+      if (mountedRef.current) {
+        setCandidates([]);
+        setLoading(false);
+        setError(toApiErrorMessage(err, text.taskSubmitFailed, language));
+      }
     }
   };
 
@@ -866,7 +988,7 @@ const StockScreeningPage: React.FC = () => {
         </div>
       </div>
 
-      {!enabled ? (
+      {!statusLoading && !enabled ? (
         <InlineAlert
           variant="info"
           title={text.notEnabledTitle}
@@ -879,7 +1001,7 @@ const StockScreeningPage: React.FC = () => {
         />
       ) : null}
 
-      {enabled && !available ? (
+      {!statusLoading && enabled && !available ? (
         <InlineAlert
           variant="warning"
           title={text.unavailableTitle}
@@ -997,7 +1119,7 @@ const StockScreeningPage: React.FC = () => {
                     </span>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-foreground">{item.name || item.topic}</p>
-                      <span className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${strength.className}`}>
+                      <span className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-xs font-semibold ${strength.className}`}>
                         {strength.label}
                       </span>
                     </div>
@@ -1006,7 +1128,7 @@ const StockScreeningPage: React.FC = () => {
                     {formatNumber(item.heatScore, 0)}
                   </span>
                 </div>
-                <div className="mt-4 grid max-w-[72%] gap-1 text-[11px] text-secondary-text">
+                <div className="mt-4 grid max-w-[72%] gap-1 text-xs text-secondary-text">
                   <span>{text.change} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.changePct, text)}%</strong></span>
                   <span>{text.trend} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.trendScore, text)}</strong> · {text.persistence} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.persistenceScore, text)}</strong></span>
                   <span>{getHotspotSampleText(item, text)} · {text.leader} {getHotspotLeadersText(item, language, text)}</span>
@@ -1031,7 +1153,7 @@ const StockScreeningPage: React.FC = () => {
                   {loadingHotspotDetail ? text.loadingHotspotDetail : hotspotDetail?.summary || text.selectHotspot}
                 </p>
                 {hotspotDetail?.canonicalTopic && hotspotDetail.canonicalTopic !== selectedHotspotTopic ? (
-                  <p className="mt-1 text-[11px] text-secondary-text">{formatUiText(text.canonicalTopic, { topic: hotspotDetail.canonicalTopic })}</p>
+                  <p className="mt-1 text-xs text-secondary-text">{formatUiText(text.canonicalTopic, { topic: hotspotDetail.canonicalTopic })}</p>
                 ) : null}
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1067,7 +1189,7 @@ const StockScreeningPage: React.FC = () => {
                     <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(language === 'en' ? ', ' : '、') })}</p>
                   ) : null}
                   {(hotspotDetail.sourceErrors || []).slice(0, 4).map((message, index) => (
-                    <p key={`${message}-${index}`}>{message}</p>
+                    <p key={`${message}-${index}`}>{summarizeAlphaSiftDiagnostic(message, text)}</p>
                   ))}
                 </div>
               </details>
@@ -1085,10 +1207,10 @@ const StockScreeningPage: React.FC = () => {
                       <div key={`${item.title}-${index}`} className="relative pb-4 last:pb-0">
                         <span className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border border-orange-400 bg-card" />
                         <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                          <p className="text-[11px] font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
+                          <p className="text-xs font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
                           <p className="mt-1 text-xs font-semibold text-foreground">{item.title}</p>
                           <p className="mt-1 text-xs leading-5 text-secondary-text">{item.description}</p>
-                          {item.source ? <p className="mt-2 text-[11px] text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
+                          {item.source ? <p className="mt-2 text-xs text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
                         </div>
                       </div>
                     ))}
@@ -1102,17 +1224,17 @@ const StockScreeningPage: React.FC = () => {
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-foreground">{stock.name || stock.code || '-'}</p>
-                            <p className="mt-1 text-[11px] text-secondary-text">{stock.code || '-'}</p>
+                            <p className="mt-1 text-xs text-secondary-text">{stock.code || '-'}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            <span className="rounded-full bg-cyan/10 px-2 py-1 text-[11px] font-semibold text-cyan">
+                            <span className="rounded-full bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan">
                               {stock.role || text.conceptStock}
                             </span>
                             {stock.code ? (
                               <button
                                 type="button"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 text-[11px] font-semibold text-cyan transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground"
+                                className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 text-xs font-semibold text-cyan transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
                                 <Play className="h-3 w-3" />
@@ -1121,11 +1243,11 @@ const StockScreeningPage: React.FC = () => {
                             ) : null}
                           </div>
                         </div>
-                        <p className="mt-2 text-[11px] text-secondary-text">
+                        <p className="mt-2 text-xs text-secondary-text">
                           {text.change} {formatStockChangeText(stock.changePct, text)} · {text.heat} {formatNumber(stock.hotStockScore, 0)}
                         </p>
                         {stock.source || stock.sourceConfidence != null || stock.fallbackUsed ? (
-                          <p className="mt-1 text-[11px] text-secondary-text">
+                          <p className="mt-1 text-xs text-secondary-text">
                             {formatUiText(text.source, { source: stock.source || '-' })}
                             {stock.sourceConfidence != null ? ` · ${formatUiText(text.confidence, { value: formatPercent(stock.sourceConfidence) })}` : ''}
                             {stock.fallbackUsed ? ` · ${text.fallback}` : ''}
@@ -1153,7 +1275,7 @@ const StockScreeningPage: React.FC = () => {
         </div>
 
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {loadingStrategies ? (
+          {loadingStrategies && strategies.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
               {text.loadingStrategies}
             </div>
@@ -1162,8 +1284,16 @@ const StockScreeningPage: React.FC = () => {
               {strategyLoadError || text.strategiesUnavailable}
             </div>
           ) : (
-            strategies.map((item) => {
+            <>
+              {loadingStrategies ? (
+                <p className="col-span-full text-sm text-secondary-text">{text.loadingStrategies}</p>
+              ) : null}
+              {strategyLoadError ? (
+                <p role="alert" className="col-span-full text-sm text-danger">{strategyLoadError}</p>
+              ) : null}
+              {strategies.map((item) => {
               const selected = item.id === strategy;
+              const display = getStrategyDisplay(item, language);
               return (
                 <button
                   key={item.id}
@@ -1176,14 +1306,15 @@ const StockScreeningPage: React.FC = () => {
                   disabled={loading}
                   onClick={() => handleStrategyChange(item.id)}
                 >
-                  <span className="text-base font-semibold text-foreground">{item.name || item.title || item.id}</span>
-                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{item.description || item.id}</span>
+                  <span className="text-base font-semibold text-foreground">{display.name}</span>
+                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{display.description}</span>
                   <span className="mt-3 inline-flex text-xs font-semibold text-cyan">
-                    {item.category || item.tag || item.tags?.[0] || item.id}
+                    {display.category}
                   </span>
                 </button>
               );
-            })
+              })}
+            </>
           )}
         </div>
       </section>
@@ -1448,7 +1579,9 @@ const StockScreeningPage: React.FC = () => {
                                 {dsaWarnings.length > 0 ? (
                                   <div>
                                     <p className="text-xs font-semibold text-secondary-text">{text.dsaHints}</p>
-                                    <p className="mt-1 text-sm text-secondary-text">{dsaWarnings.join('，')}</p>
+                                    <p className="mt-1 text-sm text-secondary-text">
+                                      {dsaWarnings.map((warning) => summarizeAlphaSiftDiagnostic(warning, text)).join('，')}
+                                    </p>
                                   </div>
                                 ) : null}
                               </div>

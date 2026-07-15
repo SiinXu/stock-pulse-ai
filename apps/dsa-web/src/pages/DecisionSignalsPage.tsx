@@ -175,10 +175,24 @@ function parseSourceReportId(value: string): number | undefined {
 function getInitialFilters(search = typeof window === 'undefined' ? '' : window.location.search): ListFilters {
   const params = new URLSearchParams(search);
   const sourceReportId = parseSourceReportId(params.get('sourceReportId') ?? params.get('source_report_id') ?? '');
-  if (sourceReportId === undefined) return DEFAULT_LIST_FILTERS;
+  if (sourceReportId !== undefined) {
+    return { ...DEFAULT_LIST_FILTERS, sourceReportId: String(sourceReportId) };
+  }
+  const market = params.get('market');
+  const action = params.get('action');
+  const marketPhase = params.get('phase');
+  const sourceType = params.get('source');
+  const status = params.get('status');
   return {
-    ...DEFAULT_LIST_FILTERS,
-    sourceReportId: String(sourceReportId),
+    market: MARKET_OPTIONS.includes(market as DecisionSignalMarket) ? market as DecisionSignalMarket : '',
+    stockCode: params.get('listStock')?.trim() ?? '',
+    action: ACTION_OPTIONS.includes(action as DecisionAction) ? action as DecisionAction : '',
+    marketPhase: PHASE_OPTIONS.includes(marketPhase as MarketPhaseValue) ? marketPhase as MarketPhaseValue : '',
+    sourceType: SOURCE_OPTIONS.includes(sourceType as DecisionSignalSourceType) ? sourceType as DecisionSignalSourceType : '',
+    sourceReportId: '',
+    status: status === 'all'
+      ? ''
+      : STATUS_OPTIONS.includes(status as DecisionSignalStatus) ? status as DecisionSignalStatus : DEFAULT_LIST_FILTERS.status,
   };
 }
 
@@ -186,17 +200,70 @@ function getInitialStockCode(search = typeof window === 'undefined' ? '' : windo
   return new URLSearchParams(search).get('stock')?.trim() ?? '';
 }
 
+function getInitialPage(search = typeof window === 'undefined' ? '' : window.location.search): number {
+  const page = Number(new URLSearchParams(search).get('page'));
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function getInitialSelectedSignalId(search = typeof window === 'undefined' ? '' : window.location.search): number | null {
+  const signalId = Number(new URLSearchParams(search).get('signal'));
+  return Number.isInteger(signalId) && signalId > 0 ? signalId : null;
+}
+
+function getInitialTimelineFilters(search = typeof window === 'undefined' ? '' : window.location.search): TimelineFilters {
+  const params = new URLSearchParams(search);
+  const market = params.get('timelineMarket');
+  const range = params.get('timelineRange');
+  const status = params.get('timelineStatus');
+  const decisionProfile = params.get('timelineProfile');
+  return {
+    market: MARKET_OPTIONS.includes(market as DecisionSignalMarket) ? market as DecisionSignalMarket : '',
+    range: ['30d', '90d', '180d'].includes(range ?? '') ? range as TimelineRange : DEFAULT_TIMELINE_FILTERS.range,
+    status: ['all', 'active'].includes(status ?? '') ? status as TimelineStatusFilter : DEFAULT_TIMELINE_FILTERS.status,
+    decisionProfile: [...REASSESS_PROFILES, 'unknown'].includes(decisionProfile as DecisionProfileDisplay)
+      ? decisionProfile as DecisionProfileDisplay
+      : '',
+  };
+}
+
+function updateDecisionSignalSearchParams(values: Record<string, string | number | null | undefined>): void {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  Object.entries(values).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') url.searchParams.delete(key);
+    else url.searchParams.set(key, String(value));
+  });
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function syncListSearchParams(filters: ListFilters, page: number): void {
+  const sourceReportId = parseSourceReportId(filters.sourceReportId);
+  updateDecisionSignalSearchParams({
+    sourceReportId,
+    source_report_id: null,
+    market: sourceReportId ? null : filters.market,
+    listStock: sourceReportId ? null : filters.stockCode.trim(),
+    action: sourceReportId ? null : filters.action,
+    phase: sourceReportId ? null : filters.marketPhase,
+    source: sourceReportId ? null : filters.sourceType,
+    status: sourceReportId || filters.status === DEFAULT_LIST_FILTERS.status ? null : filters.status || 'all',
+    page: page > 1 ? page : null,
+  });
+}
+
+function syncTimelineSearchParams(filters: TimelineFilters): void {
+  updateDecisionSignalSearchParams({
+    timelineMarket: filters.market,
+    timelineRange: filters.range === DEFAULT_TIMELINE_FILTERS.range ? null : filters.range,
+    timelineStatus: filters.status === DEFAULT_TIMELINE_FILTERS.status ? null : filters.status,
+    timelineProfile: filters.decisionProfile,
+  });
+}
+
 // Reflect the current-stock scope in the URL (without a new history entry) so
 // the page can be shared/refreshed and restore the same stock.
 function syncStockSearchParam(code: string | null): void {
-  if (typeof window === 'undefined') return;
-  const url = new URL(window.location.href);
-  if (code) {
-    url.searchParams.set('stock', code);
-  } else {
-    url.searchParams.delete('stock');
-  }
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  updateDecisionSignalSearchParams({ stock: code });
 }
 
 function toListParams(filters: ListFilters, page: number): DecisionSignalListParams {
@@ -370,7 +437,7 @@ const DecisionSignalsPage: React.FC = () => {
   const { index: stockIndex } = useStockIndex();
   const [filters, setFilters] = useState<ListFilters>(() => getInitialFilters());
   const [appliedFilters, setAppliedFilters] = useState<ListFilters>(() => getInitialFilters());
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => getInitialPage());
   const [items, setItems] = useState<DecisionSignalItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -390,7 +457,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [latestSearched, setLatestSearched] = useState(false);
   const [latestLoading, setLatestLoading] = useState(false);
   const [latestError, setLatestError] = useState<ParsedApiError | null>(null);
-  const [timelineFilters, setTimelineFilters] = useState<TimelineFilters>(DEFAULT_TIMELINE_FILTERS);
+  const [timelineFilters, setTimelineFilters] = useState<TimelineFilters>(() => getInitialTimelineFilters());
   const [appliedTimelineContext, setAppliedTimelineContext] = useState<AppliedTimelineContext | null>(null);
   const [timelineItems, setTimelineItems] = useState<DecisionSignalItem[]>([]);
   const [timelineSearched, setTimelineSearched] = useState(false);
@@ -415,8 +482,34 @@ const DecisionSignalsPage: React.FC = () => {
   const detailRequestIdRef = useRef(0);
   const reassessRequestIdRef = useRef(0);
   const selectedSignalIdRef = useRef<number | null>(null);
+  const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId());
   const statusUpdateInFlightRef = useRef(false);
   const timelineMarketSourceRef = useRef<TimelineMarketSource>(null);
+  const mountedRef = useRef(true);
+
+  const takePendingSelection = useCallback((
+    source: SelectedSignal['source'],
+    nextItems: DecisionSignalItem[],
+  ): SelectedSignal | null => {
+    const pendingId = pendingSelectedSignalIdRef.current;
+    if (pendingId === null) return null;
+    const item = nextItems.find((candidate) => candidate.id === pendingId);
+    if (!item) return null;
+    pendingSelectedSignalIdRef.current = null;
+    return { source, item };
+  }, []);
+
+  const handleSelectSignal = useCallback((source: SelectedSignal['source'], item: DecisionSignalItem) => {
+    pendingSelectedSignalIdRef.current = null;
+    setSelected({ source, item });
+    updateDecisionSignalSearchParams({ signal: item.id });
+  }, []);
+
+  const handleCloseSignal = useCallback(() => {
+    pendingSelectedSignalIdRef.current = null;
+    setSelected(null);
+    updateDecisionSignalSearchParams({ signal: null });
+  }, []);
 
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
@@ -472,17 +565,24 @@ const DecisionSignalsPage: React.FC = () => {
       const lastPage = Math.max(1, Math.ceil(response.total / PAGE_SIZE));
       if (response.total > 0 && nextPage > lastPage) {
         setPage(lastPage);
+        syncListSearchParams(appliedFilters, lastPage);
         return;
       }
       setItems(response.items);
       setTotal(response.total);
       setError(null);
-      setSelected((current) => {
-        if (!current) return current;
-        if (current.source !== 'list') return current;
-        const refreshed = response.items.find((item) => item.id === current.item.id);
-        return refreshed ? { source: 'list', item: refreshed } : null;
-      });
+      syncListSearchParams(appliedFilters, nextPage);
+      const restoredSelection = takePendingSelection('list', response.items);
+      if (restoredSelection) {
+        setSelected(restoredSelection);
+      } else {
+        setSelected((current) => {
+          if (!current) return current;
+          if (current.source !== 'list') return current;
+          const refreshed = response.items.find((item) => item.id === current.item.id);
+          return refreshed ? { source: 'list', item: refreshed } : null;
+        });
+      }
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
       setError(getParsedApiError(err));
@@ -494,7 +594,7 @@ const DecisionSignalsPage: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [appliedFilters]);
+  }, [appliedFilters, takePendingSelection]);
 
   const loadSignals = useCallback(async () => {
     await loadSignalsForPage(page);
@@ -541,6 +641,22 @@ const DecisionSignalsPage: React.FC = () => {
   useEffect(() => () => {
     timelineRequestIdRef.current += 1;
   }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      detailRequestIdRef.current += 1;
+      reassessRequestIdRef.current += 1;
+      selectedSignalIdRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pendingSelectedSignalIdRef.current === null) {
+      updateDecisionSignalSearchParams({ signal: selected?.item.id ?? null });
+    }
+  }, [selected?.item.id]);
 
   useEffect(() => {
     selectedSignalIdRef.current = selected?.item.id ?? null;
@@ -640,6 +756,7 @@ const DecisionSignalsPage: React.FC = () => {
     event.preventDefault();
     setAppliedFilters(filters);
     setPage(1);
+    syncListSearchParams(filters, 1);
   };
 
   const resetLatestView = useCallback(() => {
@@ -668,7 +785,9 @@ const DecisionSignalsPage: React.FC = () => {
       });
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems(response.items);
-      setSelected((current) => refreshLatestSelection(current, response.items));
+      const restoredSelection = takePendingSelection('latest', response.items);
+      if (restoredSelection) setSelected(restoredSelection);
+      else setSelected((current) => refreshLatestSelection(current, response.items));
     } catch (err) {
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems([]);
@@ -679,7 +798,7 @@ const DecisionSignalsPage: React.FC = () => {
         setLatestLoading(false);
       }
     }
-  }, []);
+  }, [takePendingSelection]);
 
   const resetTimelineView = useCallback(() => {
     timelineRequestIdRef.current += 1;
@@ -707,6 +826,7 @@ const DecisionSignalsPage: React.FC = () => {
     setTimelineTruncated(false);
     setAppliedTimelineContext(null);
     setSelected((current) => (current?.source === 'timeline' ? null : current));
+    syncTimelineSearchParams(filtersSnapshot);
     const nextAppliedContext: AppliedTimelineContext = {
       ...filtersSnapshot,
       stockCode,
@@ -717,7 +837,9 @@ const DecisionSignalsPage: React.FC = () => {
       setAppliedTimelineContext(nextAppliedContext);
       setTimelineItems(response.items);
       setTimelineTruncated(response.total > response.items.length);
-      setSelected((current) => refreshTimelineSelection(current, response.items));
+      const restoredSelection = takePendingSelection('timeline', response.items);
+      if (restoredSelection) setSelected(restoredSelection);
+      else setSelected((current) => refreshTimelineSelection(current, response.items));
     } catch (err) {
       if (timelineRequestIdRef.current !== requestId) return;
       setTimelineItems([]);
@@ -729,7 +851,7 @@ const DecisionSignalsPage: React.FC = () => {
         setTimelineLoading(false);
       }
     }
-  }, []);
+  }, [takePendingSelection]);
 
   const applyStockContext = useCallback((nextContext: StockContext) => {
     const nextTimeline = buildNextTimelineFilters(
@@ -811,6 +933,7 @@ const DecisionSignalsPage: React.FC = () => {
       const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
         status: pendingStatus.status,
       });
+      if (!mountedRef.current) return;
       setPendingStatus(null);
       setLatestItems((current) => current.flatMap((item) => {
         if (item.id !== updated.id) return [item];
@@ -837,10 +960,12 @@ const DecisionSignalsPage: React.FC = () => {
       await loadSignalsForPage(page);
       await loadOutcomeStats();
     } catch (err) {
-      setError(getParsedApiError(err));
-      setPendingStatus(null);
+      if (mountedRef.current) {
+        setError(getParsedApiError(err));
+        setPendingStatus(null);
+      }
     } finally {
-      setStatusUpdating(false);
+      if (mountedRef.current) setStatusUpdating(false);
       statusUpdateInFlightRef.current = false;
     }
   };
@@ -854,14 +979,14 @@ const DecisionSignalsPage: React.FC = () => {
         feedbackValue,
         source: 'web',
       });
-      if (selectedSignalIdRef.current !== signalId) return;
+      if (!mountedRef.current || selectedSignalIdRef.current !== signalId) return;
       setSelectedFeedback(updated);
       setSelectedFeedbackError(null);
     } catch (err) {
-      if (selectedSignalIdRef.current !== signalId) return;
+      if (!mountedRef.current || selectedSignalIdRef.current !== signalId) return;
       setSelectedFeedbackError(getParsedApiError(err));
     } finally {
-      setFeedbackSaving(false);
+      if (mountedRef.current) setFeedbackSaving(false);
     }
   }, [feedbackSaving, selected]);
 
@@ -1280,7 +1405,7 @@ const DecisionSignalsPage: React.FC = () => {
                 <DecisionSignalCard
                   key={item.id}
                   item={item}
-                  onSelect={(selectedItem) => setSelected({ source: 'latest', item: selectedItem })}
+                  onSelect={(selectedItem) => handleSelectSignal('latest', selectedItem)}
                   selected={selected?.item.id === item.id}
                 />
               ))}
@@ -1369,7 +1494,7 @@ const DecisionSignalsPage: React.FC = () => {
                 loading={timelineLoading}
                 error={timelineError?.message ?? null}
                 truncated={timelineTruncated}
-                onSelect={(selectedItem) => setSelected({ source: 'timeline', item: selectedItem })}
+                onSelect={(selectedItem) => handleSelectSignal('timeline', selectedItem)}
               />
             )}
           </div>
@@ -1407,19 +1532,26 @@ const DecisionSignalsPage: React.FC = () => {
               <DecisionSignalCard
                 key={item.id}
                 item={item}
-                onSelect={(selectedItem) => setSelected({ source: 'list', item: selectedItem })}
+                onSelect={(selectedItem) => handleSelectSignal('list', selectedItem)}
                 selected={selected?.item.id === item.id}
               />
             ))}
           </div>
         )}
 
-        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={(nextPage) => {
+            setPage(nextPage);
+            syncListSearchParams(appliedFilters, nextPage);
+          }}
+        />
       </div>
 
       <Drawer
         isOpen={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={handleCloseSignal}
         title={t('decisionSignals.detailTitle')}
         width="max-w-3xl"
       >

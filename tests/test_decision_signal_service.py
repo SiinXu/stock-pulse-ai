@@ -7,7 +7,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from math import inf, nan
 from pathlib import Path
 from types import SimpleNamespace
@@ -105,6 +105,10 @@ def _history_result(**overrides):
     for key, value in overrides.items():
         setattr(result, key, value)
     return result
+
+
+def _local_naive_from_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
 
 
 def test_service_normalizes_fields_and_partial_plan_quality(isolated_db) -> None:
@@ -342,7 +346,7 @@ def test_list_signals_lazily_backfills_analysis_history_signal(isolated_db) -> N
         row.created_at = report_created_at
         session.commit()
     service = DecisionSignalService(db_manager=isolated_db)
-    expected_created_at = service._coerce_history_created_at_to_utc_naive(report_created_at)
+    expected_created_at = report_created_at.astimezone(timezone.utc).replace(tzinfo=None)
 
     listed = service.list_signals(source_type="analysis", source_report_id=record_id)
 
@@ -466,7 +470,8 @@ def test_list_signals_backfill_uses_saved_intraday_ttl_metadata(
     created_offset,
     expected_ttl,
 ) -> None:
-    report_created_at = utc_naive_now().replace(microsecond=0) - created_offset
+    expected_report_created_at = utc_naive_now().replace(microsecond=0) - created_offset
+    stored_report_created_at = _local_naive_from_utc(expected_report_created_at)
     record_id = isolated_db.save_analysis_history(
         result=_history_result(),
         query_id=f"query-lazy-signal-ttl-{market_phase_summary['phase']}",
@@ -477,10 +482,9 @@ def test_list_signals_backfill_uses_saved_intraday_ttl_metadata(
     )
     with isolated_db.get_session() as session:
         row = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).one()
-        row.created_at = report_created_at
+        row.created_at = stored_report_created_at
         session.commit()
     service = DecisionSignalService(db_manager=isolated_db)
-    expected_report_created_at = service._coerce_history_created_at_to_utc_naive(report_created_at)
 
     listed = service.list_signals(source_type="analysis", source_report_id=record_id)
 
@@ -488,6 +492,7 @@ def test_list_signals_backfill_uses_saved_intraday_ttl_metadata(
     item = listed["items"][0]
     assert item["horizon"] == "intraday"
     assert item["status"] == "expired"
+    assert datetime.fromisoformat(item["created_at"]) == expected_report_created_at
     assert datetime.fromisoformat(item["expires_at"]) == expected_report_created_at + expected_ttl
 
 
@@ -559,10 +564,11 @@ def test_list_signals_invalidates_stale_backfill_when_newer_opposing_signal_exis
         context_snapshot={"market_phase_summary": {"phase": "postmarket"}},
         save_snapshot=True,
     )
-    report_created_at = utc_naive_now() - timedelta(hours=1)
+    expected_report_created_at = utc_naive_now() - timedelta(hours=1)
+    stored_report_created_at = _local_naive_from_utc(expected_report_created_at)
     with isolated_db.get_session() as session:
         row = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).one()
-        row.created_at = report_created_at
+        row.created_at = stored_report_created_at
         session.commit()
 
     service = DecisionSignalService(db_manager=isolated_db)
@@ -581,6 +587,7 @@ def test_list_signals_invalidates_stale_backfill_when_newer_opposing_signal_exis
     assert backfilled["source_report_id"] == record_id
     assert backfilled["action"] == "buy"
     assert backfilled["status"] == "invalidated"
+    assert datetime.fromisoformat(backfilled["created_at"]) == expected_report_created_at
     assert backfilled["metadata"]["decision_profile"] == "balanced"
     assert backfilled["metadata"]["invalidated_by_signal_id"] == newer_sell["id"]
     assert backfilled["metadata"]["invalidated_reason"] == "opposite_active_signal:buy->sell"
@@ -605,7 +612,7 @@ def test_list_signals_stale_backfill_invalidation_does_not_cross_profile(isolate
         context_snapshot={"market_phase_summary": {"phase": "postmarket"}},
         save_snapshot=True,
     )
-    report_created_at = utc_naive_now() - timedelta(days=1)
+    report_created_at = _local_naive_from_utc(utc_naive_now() - timedelta(days=1))
     with isolated_db.get_session() as session:
         row = session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).one()
         row.created_at = report_created_at
@@ -999,6 +1006,23 @@ def test_shared_diagnostic_sanitizer_uses_same_auth_credential_boundary() -> Non
         "abc123",
     ):
         assert leaked not in sanitized
+
+
+@pytest.mark.parametrize(
+    ("raw_text", "expected_text"),
+    [
+        ("api_key=plain-secret next", "api_key=[REDACTED] next"),
+        ("x-api-key: plain-secret next", "x-api-key: [REDACTED] next"),
+    ],
+)
+def test_shared_diagnostic_sanitizer_redacts_api_key_assignments(
+    raw_text,
+    expected_text,
+) -> None:
+    sanitized = sanitize_diagnostic_text(raw_text)
+
+    assert sanitized == expected_text
+    assert "plain-secret" not in sanitized
 
 
 def test_trace_id_identity_is_not_silently_truncated(isolated_db) -> None:

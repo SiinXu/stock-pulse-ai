@@ -52,8 +52,54 @@ beforeEach(() => {
     completionBadge: false,
     hasInitialLoad: true,
     abortController: null,
+    lastFailedRequest: null,
   });
   vi.clearAllMocks();
+});
+
+describe('agentChatStore session lifecycle', () => {
+  it('hydrates the URL session instead of the locally saved session', async () => {
+    localStorage.setItem('dsa_chat_session_id', 'session-local');
+    useAgentChatStore.setState({
+      sessionId: 'session-generated',
+      hasInitialLoad: false,
+    });
+    vi.mocked(agentApi.getChatSessions).mockResolvedValue([
+      {
+        session_id: 'session-local',
+        title: 'Local session',
+        message_count: 0,
+        created_at: '2026-07-15T00:00:00Z',
+        last_active: '2026-07-15T00:00:00Z',
+      },
+      {
+        session_id: 'session-url',
+        title: 'Shared session',
+        message_count: 1,
+        created_at: '2026-07-15T00:00:00Z',
+        last_active: '2026-07-15T00:00:00Z',
+      },
+    ]);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([
+      { id: 'url-message', role: 'assistant', content: 'URL session reply', created_at: null },
+    ]);
+
+    await useAgentChatStore.getState().loadInitialSession('session-url');
+
+    const state = useAgentChatStore.getState();
+    expect(state.sessionId).toBe('session-url');
+    expect(state.messages).toEqual([
+      { id: 'url-message', role: 'assistant', content: 'URL session reply' },
+    ]);
+    expect(localStorage.getItem('dsa_chat_session_id')).toBe('session-url');
+  });
+
+  it('returns the new session ID so the router can persist it', () => {
+    const sessionId = useAgentChatStore.getState().startNewChat();
+
+    expect(sessionId).toBe(useAgentChatStore.getState().sessionId);
+    expect(sessionId).toBe(localStorage.getItem('dsa_chat_session_id'));
+  });
 });
 
 describe('agentChatStore.startStream', () => {
@@ -213,10 +259,37 @@ describe('agentChatStore.startStream', () => {
     expect(state.messages).toHaveLength(1);
     expect(state.chatError).toMatchObject({
       title: '请求失败',
-      message: '分析出错',
+      message: '请求未能完成，请稍后重试。',
       category: 'unknown',
       rawMessage: '分析出错',
     });
+  });
+
+  it('retries a failed stream without appending the user message twice', async () => {
+    vi.mocked(agentApi.chatStream)
+      .mockResolvedValueOnce(createStreamResponse([
+        'data: {"type":"error","error":"agent_stream_failed","message":"upstream disconnected"}',
+      ]))
+      .mockResolvedValueOnce(createStreamResponse([
+        'data: {"type":"done","success":true,"content":"重试后的分析结果"}',
+      ]));
+
+    await useAgentChatStore
+      .getState()
+      .startStream({ message: '分析茅台', session_id: 'session-test' }, { skillName: '趋势技能' });
+
+    expect(useAgentChatStore.getState().messages).toHaveLength(1);
+    expect(useAgentChatStore.getState().lastFailedRequest).not.toBeNull();
+
+    await useAgentChatStore.getState().retryLastStream();
+
+    const state = useAgentChatStore.getState();
+    expect(state.chatError).toBeNull();
+    expect(state.lastFailedRequest).toBeNull();
+    expect(state.messages).toHaveLength(2);
+    expect(state.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(state.messages[1].content).toBe('重试后的分析结果');
+    expect(agentApi.chatStream).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -308,5 +381,21 @@ describe('agentChatStore.switchSession', () => {
     expect(state.messages).toEqual([
       { id: 'msg-b', role: 'assistant', content: 'B 回复' },
     ]);
+  });
+});
+
+describe('agentChatStore.loadInitialSession', () => {
+  it('does not let late initial hydration overwrite a session selected afterward', async () => {
+    const sessions = createDeferred<Awaited<ReturnType<typeof agentApi.getChatSessions>>>();
+    useAgentChatStore.setState({ hasInitialLoad: false });
+    vi.mocked(agentApi.getChatSessions).mockImplementationOnce(() => sessions.promise);
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([]);
+
+    const initialLoad = useAgentChatStore.getState().loadInitialSession('url-session');
+    const switchLoad = useAgentChatStore.getState().switchSession('newer-session');
+    sessions.resolve([]);
+    await Promise.all([initialLoad, switchLoad]);
+
+    expect(useAgentChatStore.getState().sessionId).toBe('newer-session');
   });
 });

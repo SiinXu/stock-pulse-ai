@@ -596,14 +596,25 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         message = SimpleNamespace(content=content, tool_calls=tool_calls or [])
         return SimpleNamespace(choices=[SimpleNamespace(message=message)])
 
-    def test_get_config_keeps_regular_sensitive_values_unmasked(self) -> None:
+    def test_get_config_masks_registered_sensitive_values(self) -> None:
         payload = self.service.get_config(include_schema=True)
+        payload_without_schema = self.service.get_config(include_schema=False)
         items = {item["key"]: item for item in payload["items"]}
+        items_without_schema = {
+            item["key"]: item for item in payload_without_schema["items"]
+        }
 
         self.assertIn("GEMINI_API_KEY", items)
-        self.assertEqual(items["GEMINI_API_KEY"]["value"], "secret-key-value")
-        self.assertFalse(items["GEMINI_API_KEY"]["is_masked"])
+        self.assertEqual(items["GEMINI_API_KEY"]["value"], payload["mask_token"])
+        self.assertTrue(items["GEMINI_API_KEY"]["is_masked"])
         self.assertTrue(items["GEMINI_API_KEY"]["raw_value_exists"])
+        self.assertTrue(items["GEMINI_API_KEY"]["schema"]["is_sensitive"])
+        self.assertNotIn("secret-key-value", str(payload))
+        self.assertEqual(
+            items_without_schema["GEMINI_API_KEY"]["value"],
+            payload_without_schema["mask_token"],
+        )
+        self.assertNotIn("secret-key-value", str(payload_without_schema))
 
     def test_get_config_masks_alphasift_install_spec(self) -> None:
         self._rewrite_env(
@@ -621,10 +632,11 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_get_config_masks_hermes_secret_fields(self) -> None:
         self._rewrite_env(
             "STOCK_LIST=600519,000001",
-            "LLM_CHANNELS=hermes",
+            "LLM_CHANNELS=hermes,alpha",
             "LLM_HERMES_API_KEY=sk-hermes-secret-value",
             "LLM_HERMES_API_KEYS=sk-old-secret-value",
             "LLM_HERMES_EXTRA_HEADERS={\"Authorization\":\"Bearer secret\"}",
+            "LLM_ALPHA_EXTRA_HEADERS={\"Authorization\":\"Bearer alpha-secret\"}",
         )
 
         payload = self.service.get_config(include_schema=True)
@@ -636,6 +648,29 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertTrue(items["LLM_HERMES_API_KEYS"]["is_masked"])
         self.assertEqual(items["LLM_HERMES_EXTRA_HEADERS"]["value"], payload["mask_token"])
         self.assertTrue(items["LLM_HERMES_EXTRA_HEADERS"]["is_masked"])
+        self.assertEqual(items["LLM_ALPHA_EXTRA_HEADERS"]["value"], payload["mask_token"])
+        self.assertTrue(items["LLM_ALPHA_EXTRA_HEADERS"]["is_masked"])
+        self.assertTrue(items["LLM_ALPHA_EXTRA_HEADERS"]["schema"]["is_sensitive"])
+        self.assertNotIn("alpha-secret", str(payload))
+
+    def test_dynamic_extra_headers_require_valid_json_object_without_echoing_value(self) -> None:
+        for value, expected_code in (
+            ('{"Authorization":"Bearer private"', "invalid_json"),
+            ('["Authorization", "Bearer private"]', "invalid_json_object"),
+        ):
+            with self.subTest(expected_code=expected_code):
+                result = self.service.validate(
+                    items=[{"key": "LLM_ALPHA_EXTRA_HEADERS", "value": value}],
+                    mask_token="******",
+                )
+
+                issue = next(
+                    item for item in result["issues"]
+                    if item["key"] == "LLM_ALPHA_EXTRA_HEADERS"
+                )
+                self.assertEqual(issue["code"], expected_code)
+                self.assertEqual(issue["actual"], "[REDACTED]")
+                self.assertNotIn("private", str(result))
 
     def test_hermes_saved_secret_changed_port_does_not_send_request(self) -> None:
         self._rewrite_env(
@@ -1326,8 +1361,10 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
             self.assertEqual(pre_save_items["OPENAI_BASE_URL"]["value"], "https://runtime-openai.v1")
             self.assertFalse(pre_save_items["OPENAI_BASE_URL"]["raw_value_exists"])
-            self.assertEqual(pre_save_items["OPENAI_API_KEY"]["value"], "runtime-openai-key")
+            self.assertEqual(pre_save_items["OPENAI_API_KEY"]["value"], pre_save["mask_token"])
+            self.assertTrue(pre_save_items["OPENAI_API_KEY"]["is_masked"])
             self.assertFalse(pre_save_items["OPENAI_API_KEY"]["raw_value_exists"])
+            self.assertNotIn("runtime-openai-key", str(pre_save))
             self.assertEqual(pre_save_items["LITELLM_MODEL"]["value"], "openai/gpt-4o-mini")
             self.assertTrue(pre_save_items["LITELLM_MODEL"]["raw_value_exists"])
             self.assertEqual(pre_save_items["OPENAI_MODEL"]["value"], "gpt-4.1")
@@ -1411,7 +1448,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertIn("LOG_DIR", items)
         self.assertEqual(items["LOG_DIR"]["schema"]["help_key"], "settings.system.LOG_DIR")
 
-    def test_get_config_with_schema_keeps_declared_llm_channel_support_keys(self) -> None:
+    def test_get_config_keeps_declared_llm_channel_support_keys_and_masks_secrets(self) -> None:
         self._rewrite_env(
             "STOCK_LIST=600519,000001",
             "LLM_CHANNELS=deepseek,my_proxy",
@@ -1427,14 +1464,33 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         )
 
         payload = self.service.get_config(include_schema=True)
+        payload_without_schema = self.service.get_config(include_schema=False)
         items = {item["key"]: item for item in payload["items"]}
+        items_without_schema = {
+            item["key"]: item for item in payload_without_schema["items"]
+        }
 
         self.assertIn("LLM_CHANNELS", items)
-        self.assertEqual(items["LLM_DEEPSEEK_API_KEY"]["value"], "sk-test-value")
+        self.assertEqual(items["LLM_DEEPSEEK_API_KEY"]["value"], payload["mask_token"])
         self.assertEqual(items["LLM_DEEPSEEK_MODELS"]["value"], "deepseek-v4-flash,deepseek-v4-pro")
-        self.assertEqual(items["LLM_MY_PROXY_API_KEYS"]["value"], "sk-key-1,sk-key-2")
+        self.assertEqual(items["LLM_MY_PROXY_API_KEYS"]["value"], payload["mask_token"])
         self.assertEqual(items["LLM_MY_PROXY_MODELS"]["value"], "gpt-5.5")
+        self.assertTrue(items["LLM_DEEPSEEK_API_KEY"]["is_masked"])
+        self.assertTrue(items["LLM_MY_PROXY_API_KEYS"]["is_masked"])
         self.assertEqual(items["LLM_MY_PROXY_API_KEYS"]["schema"]["category"], "ai_model")
+        self.assertEqual(
+            items_without_schema["LLM_DEEPSEEK_API_KEY"]["value"],
+            payload_without_schema["mask_token"],
+        )
+        self.assertEqual(
+            items_without_schema["LLM_MY_PROXY_API_KEYS"]["value"],
+            payload_without_schema["mask_token"],
+        )
+        self.assertNotIn("schema", items_without_schema["LLM_MY_PROXY_API_KEYS"])
+        rendered = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("sk-test-value", rendered)
+        self.assertNotIn("sk-key-1", rendered)
+        self.assertNotIn("sk-key-2", rendered)
         self.assertNotIn("LLM_UNUSED_API_KEY", items)
         self.assertNotIn("DATABASE_PATH", items)
 
@@ -1517,6 +1573,493 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertEqual(payload["primary_backend_id"], "litellm")
         self.assertTrue(payload["primary"]["available"])
+
+    def test_generation_backend_smoke_reuses_saved_api_key_for_unchanged_connection_identity(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            "LLM_ALPHA_API_KEY=saved-alpha-secret",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-alpha",
+        )
+        observed: Dict[str, str] = {}
+
+        def dispatch(_analyzer, _model, _call_kwargs, *, config, **_kwargs):
+            deployment = config.llm_model_list[0]["litellm_params"]
+            observed["api_key"] = deployment["api_key"]
+            observed["base_url"] = deployment["api_base"]
+            return {
+                "choices": [{"message": {"content": '{"ok": true, "backend_smoke": "passed"}'}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            }
+
+        with patch("src.analyzer.GeminiAnalyzer._dispatch_litellm_completion", new=dispatch):
+            payload = self.service.test_generation_backend(
+                items=[
+                    {"key": "LLM_ALPHA_PROVIDER", "value": "custom"},
+                    {"key": "LLM_ALPHA_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_ALPHA_BASE_URL", "value": "https://saved.example/v1"},
+                    {"key": "LLM_ALPHA_API_KEY", "value": "******"},
+                ],
+                mask_token="******",
+            )
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(observed["api_key"], "saved-alpha-secret")
+        self.assertEqual(observed["base_url"], "https://saved.example/v1")
+
+    def test_generation_backend_smoke_rejects_masked_saved_api_key_when_endpoint_changes(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            "LLM_ALPHA_API_KEY=saved-alpha-secret",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-alpha",
+        )
+
+        completion = {
+            "choices": [{"message": {"content": '{"ok": true, "backend_smoke": "passed"}'}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+        with patch(
+            "src.analyzer.GeminiAnalyzer._dispatch_litellm_completion",
+            return_value=completion,
+        ) as dispatch:
+            with self.assertRaises(ConfigValidationError) as context:
+                self.service.test_generation_backend(
+                    items=[
+                        {"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                        {"key": "LLM_ALPHA_API_KEY", "value": "******"},
+                    ],
+                    mask_token="******",
+                )
+
+        issue = next(
+            item for item in context.exception.issues
+            if item["key"] == "LLM_ALPHA_API_KEY"
+        )
+        self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+        self.assertEqual(issue["details"]["reason"], "connection_identity_changed")
+        self.assertNotIn("saved-alpha-secret", json.dumps(context.exception.issues))
+        dispatch.assert_not_called()
+
+    def test_generation_backend_preview_rejects_omitted_saved_api_keys_when_provider_changes(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            "LLM_ALPHA_API_KEYS=saved-alpha-one,saved-alpha-two",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-alpha",
+        )
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.preview_generation_backend_status(
+                items=[{"key": "LLM_ALPHA_PROVIDER", "value": "openai"}],
+                mask_token="******",
+            )
+
+        issue = next(
+            item for item in context.exception.issues
+            if item["key"] == "LLM_ALPHA_API_KEYS"
+        )
+        self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+        self.assertEqual(issue["actual"], "omitted")
+        self.assertEqual(issue["details"]["changed_fields"], ["provider"])
+        rendered = json.dumps(context.exception.issues)
+        self.assertNotIn("saved-alpha-one", rendered)
+        self.assertNotIn("saved-alpha-two", rendered)
+
+    def test_update_rejects_saved_connection_secret_reuse_for_each_identity_change(self) -> None:
+        cases = (
+            (
+                "provider_masked_api_key",
+                "API_KEY",
+                [{"key": "LLM_ALPHA_PROVIDER", "value": "openai"},
+                 {"key": "LLM_ALPHA_API_KEY", "value": "******"}],
+                "provider",
+            ),
+            (
+                "protocol_omitted_api_key",
+                "API_KEY",
+                [{"key": "LLM_ALPHA_PROTOCOL", "value": "anthropic"}],
+                "protocol",
+            ),
+            (
+                "base_url_masked_api_keys",
+                "API_KEYS",
+                [{"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                 {"key": "LLM_ALPHA_API_KEYS", "value": "******"}],
+                "base_url",
+            ),
+            (
+                "provider_omitted_api_keys",
+                "API_KEYS",
+                [{"key": "LLM_ALPHA_PROVIDER", "value": "openai"}],
+                "provider",
+            ),
+        )
+        for name, secret_suffix, updates, changed_field in cases:
+            with self.subTest(name=name):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                    "LLM_CHANNELS=alpha",
+                    "LLM_ALPHA_PROVIDER=custom",
+                    "LLM_ALPHA_PROTOCOL=openai",
+                    "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+                    f"LLM_ALPHA_{secret_suffix}=saved-alpha-secret",
+                    "LLM_ALPHA_MODELS=gpt-alpha",
+                    "LLM_ALPHA_ENABLED=true",
+                    "LITELLM_MODEL=openai/gpt-alpha",
+                )
+                before = self.manager.read_config_map()
+
+                with self.assertRaises(ConfigValidationError) as context:
+                    self.service.update(
+                        config_version=self.manager.get_config_version(),
+                        items=updates,
+                        mask_token="******",
+                        reload_now=False,
+                    )
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == f"LLM_ALPHA_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+                self.assertIn(changed_field, issue["details"]["changed_fields"])
+                self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_update_rejects_masked_extra_headers_when_endpoint_changes(self) -> None:
+        saved_headers = '{"Authorization":"Bearer saved-header-secret"}'
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            f"LLM_ALPHA_EXTRA_HEADERS={saved_headers}",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=false",
+        )
+        before = self.manager.read_config_map()
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                    {"key": "LLM_ALPHA_EXTRA_HEADERS", "value": "******"},
+                ],
+                mask_token="******",
+                reload_now=False,
+            )
+
+        issue = next(
+            item for item in context.exception.issues
+            if item["key"] == "LLM_ALPHA_EXTRA_HEADERS"
+        )
+        self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+        self.assertEqual(issue["details"]["changed_fields"], ["base_url"])
+        self.assertNotIn("saved-header-secret", json.dumps(context.exception.issues))
+        self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_preview_rejects_masked_runtime_only_extra_headers(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+        )
+        runtime_env = {
+            "LLM_CHANNELS": "runtime",
+            "LLM_RUNTIME_PROVIDER": "custom",
+            "LLM_RUNTIME_PROTOCOL": "openai",
+            "LLM_RUNTIME_BASE_URL": "https://runtime.example/v1",
+            "LLM_RUNTIME_API_KEY": "fresh-test-key",
+            "LLM_RUNTIME_EXTRA_HEADERS": '{"Authorization":"Bearer runtime-header-secret"}',
+            "LLM_RUNTIME_MODELS": "gpt-runtime",
+            "LLM_RUNTIME_ENABLED": "true",
+            "LITELLM_MODEL": "openai/gpt-runtime",
+        }
+
+        with patch.dict(os.environ, runtime_env, clear=False):
+            with self.assertRaises(ConfigValidationError) as context:
+                self.service.preview_generation_backend_status(
+                    items=[
+                        {"key": "LLM_RUNTIME_API_KEY", "value": "fresh-test-key"},
+                        {"key": "LLM_RUNTIME_EXTRA_HEADERS", "value": "******"},
+                    ],
+                    mask_token="******",
+                )
+
+        issue = next(
+            item for item in context.exception.issues
+            if item["key"] == "LLM_RUNTIME_EXTRA_HEADERS"
+        )
+        self.assertEqual(issue["code"], "runtime_secret_not_reusable")
+        self.assertNotIn("runtime-header-secret", json.dumps(context.exception.issues))
+
+    def test_generation_backend_preview_rejects_masked_runtime_only_connection_secrets(self) -> None:
+        for secret_suffix in ("API_KEY", "API_KEYS"):
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                )
+                runtime_env = {
+                    "LLM_CHANNELS": "runtime",
+                    "LLM_RUNTIME_PROVIDER": "custom",
+                    "LLM_RUNTIME_PROTOCOL": "openai",
+                    "LLM_RUNTIME_BASE_URL": "https://runtime.example/v1",
+                    f"LLM_RUNTIME_{secret_suffix}": "runtime-only-secret",
+                    "LLM_RUNTIME_MODELS": "gpt-runtime",
+                    "LLM_RUNTIME_ENABLED": "true",
+                    "LITELLM_MODEL": "openai/gpt-runtime",
+                }
+
+                with patch.dict(os.environ, runtime_env, clear=False):
+                    with self.assertRaises(ConfigValidationError) as context:
+                        self.service.preview_generation_backend_status(
+                            items=[
+                                {"key": f"LLM_RUNTIME_{secret_suffix}", "value": "******"},
+                            ],
+                            mask_token="******",
+                        )
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == f"LLM_RUNTIME_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "runtime_secret_not_reusable")
+                self.assertEqual(issue["actual"], "masked")
+                self.assertNotIn("runtime-only-secret", json.dumps(context.exception.issues))
+
+    def test_generation_backend_smoke_rejects_omitted_runtime_only_connection_secrets(self) -> None:
+        completion = {
+            "choices": [{"message": {"content": '{"ok": true, "backend_smoke": "passed"}'}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+        for secret_suffix in ("API_KEY", "API_KEYS"):
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                )
+                runtime_env = {
+                    "LLM_CHANNELS": "runtime",
+                    "LLM_RUNTIME_PROVIDER": "custom",
+                    "LLM_RUNTIME_PROTOCOL": "openai",
+                    "LLM_RUNTIME_BASE_URL": "https://runtime.example/v1",
+                    f"LLM_RUNTIME_{secret_suffix}": "runtime-only-secret",
+                    "LLM_RUNTIME_MODELS": "gpt-runtime",
+                    "LLM_RUNTIME_ENABLED": "true",
+                    "LITELLM_MODEL": "openai/gpt-runtime",
+                }
+
+                with patch.dict(os.environ, runtime_env, clear=False), patch(
+                    "src.analyzer.GeminiAnalyzer._dispatch_litellm_completion",
+                    return_value=completion,
+                ) as dispatch:
+                    with self.assertRaises(ConfigValidationError) as context:
+                        self.service.test_generation_backend(mask_token="******")
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == f"LLM_RUNTIME_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "runtime_secret_not_reusable")
+                self.assertEqual(issue["actual"], "omitted")
+                self.assertNotIn("runtime-only-secret", json.dumps(context.exception.issues))
+                dispatch.assert_not_called()
+
+    def test_generation_backend_smoke_rejects_saved_literal_mask_placeholder(self) -> None:
+        completion = {
+            "choices": [{"message": {"content": '{"ok": true, "backend_smoke": "passed"}'}}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        }
+        for secret_suffix in ("API_KEY", "API_KEYS"):
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                    "LLM_CHANNELS=alpha",
+                    "LLM_ALPHA_PROVIDER=custom",
+                    "LLM_ALPHA_PROTOCOL=openai",
+                    "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+                    f"LLM_ALPHA_{secret_suffix}=******",
+                    "LLM_ALPHA_MODELS=gpt-alpha",
+                    "LLM_ALPHA_ENABLED=true",
+                    "LITELLM_MODEL=openai/gpt-alpha",
+                )
+
+                with patch(
+                    "src.analyzer.GeminiAnalyzer._dispatch_litellm_completion",
+                    return_value=completion,
+                ) as dispatch:
+                    with self.assertRaises(ConfigValidationError) as context:
+                        self.service.test_generation_backend(mask_token="******")
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == f"LLM_ALPHA_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+                self.assertEqual(issue["details"]["reason"], "invalid_saved_secret_placeholder")
+                dispatch.assert_not_called()
+
+    def test_update_rejects_masked_secret_for_renamed_connection_key(self) -> None:
+        for secret_suffix in ("API_KEY", "API_KEYS"):
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                    "LLM_CHANNELS=old",
+                    "LLM_OLD_PROVIDER=custom",
+                    "LLM_OLD_PROTOCOL=openai",
+                    "LLM_OLD_BASE_URL=https://saved.example/v1",
+                    f"LLM_OLD_{secret_suffix}=saved-old-secret",
+                    "LLM_OLD_MODELS=gpt-alpha",
+                    "LLM_OLD_ENABLED=true",
+                )
+                before = self.manager.read_config_map()
+
+                with self.assertRaises(ConfigValidationError) as context:
+                    self.service.update(
+                        config_version=self.manager.get_config_version(),
+                        items=[
+                            {"key": "LLM_CHANNELS", "value": "new"},
+                            {"key": "LLM_NEW_PROVIDER", "value": "custom"},
+                            {"key": "LLM_NEW_PROTOCOL", "value": "openai"},
+                            {"key": "LLM_NEW_BASE_URL", "value": "https://saved.example/v1"},
+                            {"key": f"LLM_NEW_{secret_suffix}", "value": "******"},
+                            {"key": "LLM_NEW_MODELS", "value": "gpt-alpha"},
+                            {"key": "LLM_NEW_ENABLED", "value": "true"},
+                        ],
+                        mask_token="******",
+                        reload_now=False,
+                    )
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == f"LLM_NEW_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+                self.assertEqual(issue["details"]["reason"], "missing_scoped_saved_secret")
+                self.assertNotIn("saved-old-secret", json.dumps(context.exception.issues))
+                self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_update_accepts_fresh_connection_secret_when_endpoint_changes(self) -> None:
+        for secret_suffix in ("API_KEY", "API_KEYS"):
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "GENERATION_BACKEND=litellm",
+                    "GENERATION_FALLBACK_BACKEND=",
+                    "LLM_CHANNELS=alpha",
+                    "LLM_ALPHA_PROVIDER=custom",
+                    "LLM_ALPHA_PROTOCOL=openai",
+                    "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+                    f"LLM_ALPHA_{secret_suffix}=saved-alpha-secret",
+                    "LLM_ALPHA_MODELS=gpt-alpha",
+                    "LLM_ALPHA_ENABLED=true",
+                )
+
+                result = self.service.update(
+                    config_version=self.manager.get_config_version(),
+                    items=[
+                        {"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                        {"key": f"LLM_ALPHA_{secret_suffix}", "value": "fresh-alpha-secret"},
+                    ],
+                    mask_token="******",
+                    reload_now=False,
+                )
+
+                saved = self.manager.read_config_map()
+                self.assertTrue(result["success"])
+                self.assertEqual(saved["LLM_ALPHA_BASE_URL"], "https://changed.example/v1")
+                self.assertEqual(saved[f"LLM_ALPHA_{secret_suffix}"], "fresh-alpha-secret")
+
+    def test_update_rejects_identity_change_while_removing_connection_with_saved_secret(self) -> None:
+        for submitted_secret in (None, "******"):
+            with self.subTest(submitted_secret=submitted_secret):
+                self._rewrite_env(
+                    "LLM_CHANNELS=alpha",
+                    "LLM_ALPHA_PROVIDER=custom",
+                    "LLM_ALPHA_PROTOCOL=openai",
+                    "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+                    "LLM_ALPHA_API_KEY=saved-alpha-secret",
+                    "LLM_ALPHA_MODELS=gpt-alpha",
+                    "LLM_ALPHA_ENABLED=true",
+                )
+                updates = [
+                    {"key": "LLM_CHANNELS", "value": ""},
+                    {"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                ]
+                if submitted_secret is not None:
+                    updates.append({"key": "LLM_ALPHA_API_KEY", "value": submitted_secret})
+                before = self.manager.read_config_map()
+
+                with self.assertRaises(ConfigValidationError) as context:
+                    self.service.update(
+                        config_version=self.manager.get_config_version(),
+                        items=updates,
+                        mask_token="******",
+                        reload_now=False,
+                    )
+
+                issue = next(
+                    item for item in context.exception.issues
+                    if item["key"] == "LLM_ALPHA_API_KEY"
+                )
+                self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+                self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_update_rejects_identity_change_for_orphaned_saved_connection_secret(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            "LLM_ALPHA_API_KEYS=saved-alpha-secret",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+        )
+        self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=[{"key": "LLM_CHANNELS", "value": ""}],
+            reload_now=False,
+        )
+        before = self.manager.read_config_map()
+
+        with self.assertRaises(ConfigValidationError) as context:
+            self.service.update(
+                config_version=self.manager.get_config_version(),
+                items=[
+                    {"key": "LLM_ALPHA_PROVIDER", "value": "openai"},
+                    {"key": "LLM_ALPHA_API_KEYS", "value": "******"},
+                ],
+                mask_token="******",
+                reload_now=False,
+            )
+
+        issue = next(
+            item for item in context.exception.issues
+            if item["key"] == "LLM_ALPHA_API_KEYS"
+        )
+        self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+        self.assertEqual(self.manager.read_config_map(), before)
 
     def test_generation_backend_status_saved_invalid_numeric_returns_failed_status(self) -> None:
         self._rewrite_env(
@@ -4401,6 +4944,8 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     @patch("litellm.completion")
     def test_test_llm_channel_ignores_stream_close_failures(self, mock_completion) -> None:
+        api_key = "submitted-stream-secret"
+
         class _Stream:
             def __init__(self):
                 self.close_attempted = False
@@ -4410,7 +4955,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
             def close(self):
                 self.close_attempted = True
-                raise RuntimeError("transport already closed")
+                raise RuntimeError(f"transport already closed for {api_key}")
 
         stream = _Stream()
         mock_completion.side_effect = [
@@ -4418,18 +4963,22 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             stream,
         ]
 
-        payload = self.service.test_llm_channel(
-            name="primary",
-            protocol="openai",
-            base_url="https://api.example.com/v1",
-            api_key="sk-test-value",
-            models=["gpt-4o-mini"],
-            capability_checks=["stream"],
-        )
+        with self.assertLogs("src.services.system_config_service", level="DEBUG") as logs:
+            payload = self.service.test_llm_channel(
+                name="primary",
+                protocol="openai",
+                base_url="https://api.example.com/v1",
+                api_key=api_key,
+                models=["gpt-4o-mini"],
+                capability_checks=["stream"],
+            )
 
         self.assertTrue(payload["success"])
         self.assertEqual(payload["capability_results"]["stream"]["status"], "passed")
         self.assertTrue(stream.close_attempted)
+        rendered_logs = "\n".join(logs.output)
+        self.assertNotIn(api_key, rendered_logs)
+        self.assertIn("[REDACTED]", rendered_logs)
 
     @patch("litellm.completion")
     def test_test_llm_channel_runs_vision_capability_check(self, mock_completion) -> None:
@@ -4525,6 +5074,44 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                     self.assertFalse(payload["retryable"])
                     self.assertEqual(payload["details"]["model"], "openai/gpt-4o-mini")
                     self.assertEqual(payload["resolved_model"], "openai/gpt-4o-mini")
+
+    @patch("litellm.completion")
+    def test_test_llm_channel_redacts_unsubmitted_secrets_and_urls(self, mock_completion) -> None:
+        mock_completion.side_effect = RuntimeError(
+            "provider failed token=super-secret at https://private.example/internal"
+        )
+
+        payload = self.service.test_llm_channel(
+            name="primary",
+            protocol="openai",
+            base_url="https://api.example.com/v1",
+            api_key="submitted-key",
+            models=["gpt-4o-mini"],
+            capability_checks=["json"],
+        )
+
+        serialized = json.dumps(payload, ensure_ascii=False)
+        self.assertFalse(payload["success"])
+        self.assertNotIn("super-secret", serialized)
+        self.assertNotIn("private.example", serialized)
+
+    @patch("src.services.system_config_service.requests.get")
+    def test_discover_llm_channel_models_redacts_unsubmitted_secrets_and_urls(self, mock_get) -> None:
+        mock_get.side_effect = requests.ConnectionError(
+            "provider failed token=super-secret at https://private.example/internal"
+        )
+
+        payload = self.service.discover_llm_channel_models(
+            name="primary",
+            protocol="openai",
+            base_url="https://api.example.com/v1",
+            api_key="submitted-key",
+        )
+
+        serialized = json.dumps(payload, ensure_ascii=False)
+        self.assertFalse(payload["success"])
+        self.assertNotIn("super-secret", serialized)
+        self.assertNotIn("private.example", serialized)
 
     def test_test_llm_channel_reports_comma_only_api_key_as_missing(self) -> None:
         payload = self.service.test_llm_channel(

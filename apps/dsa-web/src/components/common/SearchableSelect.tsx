@@ -239,7 +239,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground',
+            'flex h-8 min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground sm:min-h-0',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : '',
@@ -303,7 +303,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                className="h-7 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
+                className="h-7 min-h-11 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none sm:min-h-0"
               />
             </div>
             <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="max-h-60 overflow-auto p-1">
@@ -328,7 +328,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                     onMouseEnter={() => setActiveIndex(index)}
                     onClick={() => !item.disabled && commit(item.value)}
                     className={cn(
-                      'flex cursor-pointer flex-col gap-0.5 rounded-md px-3 py-1.5 text-xs text-foreground',
+                      'flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 rounded-md px-3 py-1.5 text-xs text-foreground sm:min-h-0',
                       index === activeIndex && 'bg-hover',
                       item.value === value && 'font-medium',
                       item.disabled && 'cursor-not-allowed opacity-50',

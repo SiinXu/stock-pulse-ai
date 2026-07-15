@@ -1,6 +1,6 @@
 """Shared API response models."""
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -42,21 +42,25 @@ class HealthResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Error response."""
-    
+    """Stable API error envelope."""
+
     error: str = Field(..., description="Error type", json_schema_extra={"example": "validation_error"})
     message: str = Field(
         ...,
         description="Error details",
         json_schema_extra={"example": "Invalid request parameters"},
     )
-    detail: Optional[Any] = Field(None, description="Additional error information")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Localization interpolation parameters")
+    details: Optional[Any] = Field(None, description="Diagnostic details")
+    trace_id: Optional[str] = Field(None, description="Diagnostic trace ID")
     
     model_config = ConfigDict(json_schema_extra={
         "example": {
             "error": "not_found",
             "message": "Resource not found",
-            "detail": None
+            "params": {},
+            "details": None,
+            "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         }
     })
 

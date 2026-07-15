@@ -438,14 +438,6 @@ def test_generation_backend(
                 "issues": exc.issues,
             },
         )
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "validation_error",
-                "message": str(exc),
-            },
-        )
     except Exception as exc:
         logger.error("Failed to smoke test generation backend: %s", exc, exc_info=True)
         raise HTTPException(
@@ -688,14 +680,6 @@ def test_llm_channel(
             use_saved_secret=request.use_saved_secret,
         )
         return TestLLMChannelResponse.model_validate(payload)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "validation_error",
-                "message": str(exc),
-            },
-        )
     except Exception as exc:
         logger.error("Failed to test LLM channel: %s", exc, exc_info=True)
         raise HTTPException(
@@ -732,14 +716,6 @@ def test_notification_channel(
             timeout_seconds=request.timeout_seconds,
         )
         return TestNotificationChannelResponse.model_validate(payload)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "validation_error",
-                "message": str(exc),
-            },
-        )
     except Exception as exc:
         logger.error("Failed to test notification channel: %s", exc, exc_info=True)
         raise HTTPException(
@@ -778,14 +754,6 @@ def discover_llm_channel_models(
             use_saved_secret=request.use_saved_secret,
         )
         return DiscoverLLMChannelModelsResponse.model_validate(payload)
-    except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "error": "validation_error",
-                "message": str(exc),
-            },
-        )
     except Exception as exc:
         logger.error("Failed to discover LLM channel models: %s", exc, exc_info=True)
         raise HTTPException(

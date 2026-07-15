@@ -31,6 +31,7 @@ const {
   selectTab,
   save,
   resetDraft,
+  resetDraftKeys,
   setDraftValue,
   applyPartialUpdate,
   getChangedItems,
@@ -64,6 +65,7 @@ const {
   selectTab: vi.fn(),
   save: vi.fn(),
   resetDraft: vi.fn(),
+  resetDraftKeys: vi.fn(),
   setDraftValue: vi.fn(),
   applyPartialUpdate: vi.fn(),
   getChangedItems: vi.fn(),
@@ -191,6 +193,7 @@ vi.mock('../../components/settings', async () => ({
     taskModelRefs,
     onReplaceModelReferences,
     focusFieldRequest,
+    disabled,
   }: {
     items: Array<{ key: string; value: string }>;
     onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
@@ -202,9 +205,12 @@ vi.mock('../../components/settings', async () => ({
       references: Array<{ key?: string; label: string; route: string }>;
     }>) => void;
     focusFieldRequest?: { requestId: number; key: string } | null;
+    disabled?: boolean;
   }) => (
     <div>
-      <div data-testid="llm-channel-editor-items">{items.map((item) => item.key).join(',')}</div>
+      <div data-testid="llm-channel-editor-items" data-disabled={disabled ? 'true' : 'false'}>
+        {items.map((item) => item.key).join(',')}
+      </div>
       <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
       <button
         type="button"
@@ -277,6 +283,9 @@ vi.mock('../../components/settings', async () => ({
   ),
   SettingsField: ({
     item,
+    disabled,
+    dependencyLocked,
+    readOnlyDiagnostic,
   }: {
     item: {
       key: string;
@@ -285,9 +294,16 @@ vi.mock('../../components/settings', async () => ({
         options?: Array<string | { label: string; value: string }>;
       };
     };
+    disabled?: boolean;
+    dependencyLocked?: boolean;
+    readOnlyDiagnostic?: string;
   }) => (
-    <div data-testid={`settings-field-${item.key}`}>
+    <div
+      data-testid={`settings-field-${item.key}`}
+      data-readonly={disabled || dependencyLocked || Boolean(readOnlyDiagnostic) ? 'true' : 'false'}
+    >
       <div>{item.key}</div>
+      {readOnlyDiagnostic ? <p>{readOnlyDiagnostic}</p> : null}
       {item.schema?.description ? <p>{item.schema.description}</p> : null}
       {item.schema?.options?.map((option) => {
         const label = typeof option === 'string' ? option : option.label;
@@ -561,6 +577,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
     retry: vi.fn(),
     save,
     resetDraft,
+    resetDraftKeys,
     setDraftValue,
     applyPartialUpdate,
     getChangedItems: () => [],
@@ -569,6 +586,13 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
     maskToken: '******',
     ...overrides,
   };
+}
+
+function useAdvancedConfigState(overrides: ConfigOverride = {}) {
+  const state = buildSystemConfigState({ ...overrides, activeCategory: 'ai_model' });
+  useSystemConfigMock.mockReturnValue(state);
+  routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+  return state;
 }
 
 function createDeferred<T>() {
@@ -1056,8 +1080,12 @@ describe('SettingsPage', () => {
     expect(screen.getAllByText('build-20260329-021530Z')).toHaveLength(2);
   });
 
-  it('resets local drafts from the page header button', () => {
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+  it('resets only the current autosave group from the page header', () => {
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    }));
 
     render(<SettingsPage />);
 
@@ -1065,16 +1093,20 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
 
     // Reset now asks for confirmation before discarding dirty drafts.
-    fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '重置当前分组' }));
     fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
-    // Reset should call resetDraft and NOT call load
-    expect(resetDraft).toHaveBeenCalledTimes(1);
+    expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
+    expect(resetDraft).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
   });
 
   it('blocks in-app navigation only when there are unsaved changes', () => {
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    }));
 
     render(<SettingsPage />);
 
@@ -1283,11 +1315,12 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
-  it('reset button semantic: discards local changes without network request', () => {
+  it('group reset discards local changes without a network request', () => {
     // Simulate user has unsaved drafts
     const dirtyState = buildSystemConfigState({
       hasDirty: true,
-      dirtyCount: 2,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
     });
 
     useSystemConfigMock.mockReturnValue(dirtyState);
@@ -1298,12 +1331,13 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
 
     // Click reset button, then confirm discarding drafts.
-    fireEvent.click(screen.getByRole('button', { name: '重置' }));
+    fireEvent.click(screen.getByRole('button', { name: '重置当前分组' }));
     fireEvent.click(screen.getByRole('button', { name: '放弃修改' }));
 
     // Verify semantic: reset should only discard local changes
     // It should NOT trigger a network load
-    expect(resetDraft).toHaveBeenCalledTimes(1);
+    expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
+    expect(resetDraft).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });
@@ -1319,21 +1353,21 @@ describe('SettingsPage', () => {
     expect(load).toHaveBeenCalledTimes(1);
   });
 
-  it('commits the llm channel draft through the unified save', async () => {
+  it('autosaves the llm channel and task-routing draft as one group', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
     render(<SettingsPage />);
 
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
 
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+    expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     const payload = save.mock.calls[0][0];
     expect(payload).toEqual(expect.arrayContaining([
       expect.objectContaining({ key: 'LLM_CHANNELS', value: 'draft,backup' }),
       expect.objectContaining({ key: 'LITELLM_MODEL', value: 'openai/draft-model' }),
-      expect.objectContaining({ key: 'GENERATION_BACKEND', value: 'codex_cli' }),
     ]));
   });
 
@@ -1371,7 +1405,7 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('clears llm channel draft items after the unified save succeeds', async () => {
+  it('clears llm channel draft items after autosave succeeds', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
@@ -1384,12 +1418,72 @@ describe('SettingsPage', () => {
     rerender(<SettingsPage />);
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
     await waitFor(() => {
       expect(screen.getByTestId('generation-backend-status-items')).not.toHaveTextContent('LLM_CHANNELS=draft,backup');
+    }, { timeout: 2000 });
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  });
+
+  it('debounces a group autosave and reports saving then saved', async () => {
+    const pendingSave = createDeferred<{ success: boolean }>();
+    save.mockReturnValueOnce(pendingSave.promise);
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    }));
+
+    render(<SettingsPage />);
+
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+    expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    expect(screen.getByText(/自动保存中/)).toBeInTheDocument();
+
+    await act(async () => {
+      pendingSave.resolve({ success: true });
+      await pendingSave.promise;
     });
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/已自动保存/)).toBeInTheDocument();
+  });
+
+  it('keeps a failed autosave draft and retries the same group', async () => {
+    save
+      .mockResolvedValueOnce({ success: false, message: '保存失败' })
+      .mockResolvedValueOnce({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    }));
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText(/自动保存失败/, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(resetDraftKeys).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/已自动保存/)).toBeInTheDocument();
+  });
+
+  it('marks a 409 autosave as conflicted and can restore that group', async () => {
+    save.mockResolvedValueOnce({ success: false, message: 'config_conflict' });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      hasDirty: true,
+      dirtyCount: 1,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    }));
+
+    render(<SettingsPage />);
+
+    expect(await screen.findByText(/保存冲突/, {}, { timeout: 2000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '恢复服务器值' }));
+    expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
   });
 
   it('runs the unified post-save effects after a legacy migration applies', async () => {
@@ -1623,13 +1717,85 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('settings-field-LLM_TEMPERATURE')).toBeInTheDocument();
     // Fallback order is NOT an editable field here; it is a read-only summary.
     expect(screen.queryByTestId('settings-field-LITELLM_FALLBACK_MODELS')).not.toBeInTheDocument();
-    expect(screen.getByText('deepseek/deepseek-v4-pro')).toBeInTheDocument();
+    expect(screen.getByText(/deepseek-v4-pro · deepseek/)).toBeInTheDocument();
 
     // The jump link routes to the Reliability view (the canonical fallback editor).
     fireEvent.click(screen.getByRole('button', { name: /前往可靠性设置/ }));
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('ai_models');
     expect(nextParams?.get('view')).toBe('reliability');
+  });
+
+  it('keeps duplicate runtime routes separate and saves the selected Connection ModelRef', async () => {
+    const modelField = {
+      key: 'LITELLM_MODEL',
+      value: 'openai/gpt-4o',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'LITELLM_MODEL',
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: true,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        uiPlacement: 'task_routing' as const,
+      },
+    };
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: { ...configState.itemsByCategory, ai_model: [modelField] },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+    getLlmAvailableModels.mockResolvedValue({
+      models: [
+        {
+          modelRef: 'modelref:v1:personal:openai%2Fgpt-4o',
+          route: 'openai/gpt-4o',
+          display: 'gpt-4o',
+          connection: 'personal',
+          connectionId: 'personal',
+          connectionName: 'Personal',
+          provider: 'openai',
+          providerId: 'openai',
+          providerLabel: 'OpenAI',
+          available: true,
+        },
+        {
+          modelRef: 'modelref:v1:work:openai%2Fgpt-4o',
+          route: 'openai/gpt-4o',
+          display: 'gpt-4o',
+          connection: 'work',
+          connectionId: 'work',
+          connectionName: 'Work',
+          provider: 'openai',
+          providerId: 'openai',
+          providerLabel: 'OpenAI',
+          available: true,
+        },
+      ],
+    });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    expect(setDraftValue).not.toHaveBeenCalledWith('LITELLM_MODEL', expect.stringContaining('modelref:v1:'));
+    fireEvent.click(trigger);
+    const workOption = screen.getAllByRole('option', { name: /gpt-4o/ })
+      .find((option) => option.textContent?.includes('Work'));
+    expect(workOption).toBeDefined();
+    fireEvent.click(workOption!);
+
+    expect(setDraftValue).toHaveBeenCalledWith(
+      'LITELLM_MODEL',
+      'modelref:v1:work:openai%2Fgpt-4o',
+    );
   });
 
   it('splits notification fields so Reports and Alerts render independent field sets', () => {
@@ -1888,7 +2054,7 @@ describe('SettingsPage', () => {
       expect(screen.queryByRole('button', { name: '启动向导' })).not.toBeInTheDocument());
   });
 
-  it('keeps prompt cache settings collapsed and expandable at the bottom of AI model settings', () => {
+  it('routes prompt cache settings to their explicit developer diagnostics placement', () => {
     const aiField = (key: string, displayOrder: number, value = '') => ({
       key,
       value,
@@ -1905,6 +2071,7 @@ describe('SettingsPage', () => {
         options: key === 'LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL' ? ['off', 'basic', 'debug'] : [],
         validation: {},
         displayOrder,
+        uiPlacement: 'developer_diagnostics' as const,
       },
     });
     const configState = buildSystemConfigState();
@@ -1922,40 +2089,18 @@ describe('SettingsPage', () => {
       },
     }));
 
-    const { container } = render(<SettingsPage />);
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).not.toBeInTheDocument();
 
-    const promptCacheSummary = screen.getByText('Provider Prompt Cache 高级设置').closest('summary');
-    const promptCacheDetails = promptCacheSummary?.closest('details');
-    const telemetryField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED');
-    const hintsField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED');
-    const diagnosticsField = screen.getByTestId('settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL');
-
-    expect(promptCacheSummary).toBeInTheDocument();
-    expect(promptCacheDetails).toBeInTheDocument();
-    expect(promptCacheDetails).not.toHaveAttribute('open');
-    expect(promptCacheDetails).toContainElement(telemetryField);
-    expect(promptCacheDetails).toContainElement(hintsField);
-    expect(promptCacheDetails).toContainElement(diagnosticsField);
-    expect(telemetryField).not.toBeVisible();
-    expect(hintsField).not.toBeVisible();
-    expect(diagnosticsField).not.toBeVisible();
-
-    fireEvent.click(promptCacheSummary as HTMLElement);
-
-    expect(promptCacheDetails).toHaveAttribute('open');
-    expect(telemetryField).toBeVisible();
-    expect(hintsField).toBeVisible();
-    expect(diagnosticsField).toBeVisible();
-
-    expect(Array.from(container.querySelectorAll('[data-testid^="settings-field-"]')).map((node) => node.getAttribute('data-testid'))).toEqual([
-      'settings-field-LITELLM_CONFIG',
-      'settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED',
-      'settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED',
-      'settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL',
-    ]);
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_HINTS_ENABLED')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL')).toBeInTheDocument();
   });
 
-  it('notifies alphasift status update and skips install after generic save when ALPHASIFT_ENABLED is set false', async () => {
+  it('notifies alphasift status update after its autosave group is persisted as false', async () => {
     save.mockResolvedValue({ success: true });
     getChangedItems.mockReturnValue([{ key: 'ALPHASIFT_ENABLED', value: 'false' }]);
 
@@ -1967,16 +2112,14 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(notifyAlphaSiftConfigChanged).toHaveBeenCalledTimes(1);
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
     expect(alphasiftEnable).not.toHaveBeenCalled();
     expect(alphasiftInstall).not.toHaveBeenCalled();
   });
 
-  it('runs the AlphaSift enable flow after generic save when ALPHASIFT_ENABLED is set true', async () => {
+  it('runs the AlphaSift enable flow after autosave persists ALPHASIFT_ENABLED', async () => {
     save.mockResolvedValue({ success: true });
     getChangedItems.mockReturnValue([{ key: 'ALPHASIFT_ENABLED', value: 'true' }]);
 
@@ -1988,16 +2131,14 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
     expect(alphasiftEnable).toHaveBeenCalledTimes(1);
     expect(alphasiftInstall).not.toHaveBeenCalled();
     expect(refreshAfterExternalSave).toHaveBeenCalledWith(['ALPHASIFT_ENABLED']);
   });
 
-  it('does not notify alphasift status when generic save updates other fields', async () => {
+  it('does not notify alphasift status when another autosave group updates', async () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       hasDirty: true,
@@ -2007,9 +2148,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }));
-
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
     expect(notifySystemConfigChanged).toHaveBeenCalledTimes(1);
     expect(notifyAlphaSiftConfigChanged).not.toHaveBeenCalled();
   });
@@ -2712,19 +2851,17 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const saveButton = screen.getByRole('button', { name: /保存配置/ });
-    expect(saveButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
     const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
     await waitFor(() => expect(enabledCheckbox).toBeChecked());
     fireEvent.click(enabledCheckbox);
 
     await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await waitFor(() => expect(saveButton).toHaveTextContent('保存配置 (1)'));
-
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(save).toHaveBeenCalledWith([{ key: 'SCHEDULE_ENABLED', value: 'false' }]));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      [{ key: 'SCHEDULE_ENABLED', value: 'false' }],
+      { silent: true },
+    ), { timeout: 2000 });
   });
 
   it('can reconcile runtime scheduler state when runtime is disabled but saved value is enabled', async () => {
@@ -2790,22 +2927,20 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const saveButton = screen.getByRole('button', { name: /保存配置/ });
-    expect(saveButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
     const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
     await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
     fireEvent.click(enabledCheckbox);
 
     await waitFor(() => expect(enabledCheckbox).toBeChecked());
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await waitFor(() => expect(saveButton).toHaveTextContent('保存配置 (1)'));
-
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(save).toHaveBeenCalledWith([{ key: 'SCHEDULE_ENABLED', value: 'true' }]));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(
+      [{ key: 'SCHEDULE_ENABLED', value: 'true' }],
+      { silent: true },
+    ), { timeout: 2000 });
   });
 
-  it('refreshes scheduler status after saving scheduler settings', async () => {
+  it('refreshes scheduler status after autosaving scheduler settings', async () => {
     const configState = buildSystemConfigState();
     getSchedulerStatus
       .mockResolvedValueOnce({
@@ -2880,9 +3015,7 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText('未启用')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '保存配置 (1)' }));
-
-    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(2), { timeout: 2000 });
     expect(await screen.findByText('已启用')).toBeInTheDocument();
   });
 
@@ -3067,6 +3200,94 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-LLM_MY_PROXY_MODELS')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['missing', undefined],
+    ['unknown', 'future_surface'],
+  ])('quarantines AI fields with %s uiPlacement in Advanced as read-only diagnostics', async (_case, uiPlacement) => {
+    const configState = buildSystemConfigState();
+    const unsafeItem = {
+      key: 'OPENAI_API_KEY',
+      value: 'saved-secret',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'OPENAI_API_KEY',
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'password' as const,
+        isSensitive: true,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        ...(uiPlacement ? { uiPlacement: uiPlacement as never } : {}),
+      },
+    };
+    const unsafeModelAccessItem = {
+      ...unsafeItem,
+      key: 'LLM_CHANNELS',
+      value: 'openai',
+      isMasked: false,
+      schema: {
+        ...unsafeItem.schema,
+        key: 'LLM_CHANNELS',
+        uiControl: 'textarea' as const,
+        isSensitive: false,
+      },
+    };
+    const state = buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: { ...configState.itemsByCategory, ai_model: [unsafeModelAccessItem, unsafeItem] },
+    });
+    useSystemConfigMock.mockReturnValue(state);
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'connections' });
+    const { rerender } = render(<SettingsPage />);
+    expect(screen.queryByTestId('settings-field-OPENAI_API_KEY')).not.toBeInTheDocument();
+    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    const field = screen.getByTestId('settings-field-OPENAI_API_KEY');
+    expect(field).toHaveAttribute('data-readonly', 'true');
+    expect(field).toHaveTextContent(`schema_ui_placement_${_case}`);
+  });
+
+  it('keeps an unknown schema condition visible but read-only with a diagnostic', () => {
+    const configState = buildSystemConfigState();
+    const conditionalItem = {
+      key: 'LOG_LEVEL',
+      value: 'INFO',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'LOG_LEVEL',
+        category: 'system' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        contract: {
+          requirement: 'optional' as const,
+          visibleWhen: [{ key: 'MODE', operator: 'regex' as never, value: '^safe$' }],
+        },
+      },
+    };
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: { ...configState.itemsByCategory, system: [conditionalItem] },
+    }));
+
+    render(<SettingsPage />);
+    const field = screen.getByTestId('settings-field-LOG_LEVEL');
+    expect(field).toHaveAttribute('data-readonly', 'true');
+    expect(field).toHaveTextContent('schema_condition_unknown');
+  });
+
   it('never renders legacy provider credential fields even without configured channels', async () => {
     // Model Access is the only entry for provider credentials: legacy keys
     // like OPENAI_API_KEY stay backend-compatible but must not surface as
@@ -3139,8 +3360,13 @@ describe('SettingsPage', () => {
     expect(screen.queryByText(/浏览器开发者工具控制台与后端日志/)).not.toBeInTheDocument();
   });
 
-  it('renders env backup actions outside desktop runtime', () => {
-    render(<SettingsPage />);
+  it('keeps env backup actions in Advanced outside desktop runtime', () => {
+    const { rerender } = render(<SettingsPage />);
+
+    expect(screen.queryByRole('heading', { name: '配置备份' })).not.toBeInTheDocument();
+
+    useAdvancedConfigState();
+    rerender(<SettingsPage />);
 
     expect(screen.getByRole('heading', { name: '配置备份' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '导出 .env' })).toBeInTheDocument();
@@ -3154,6 +3380,7 @@ describe('SettingsPage', () => {
       passwordChangeable: false,
       refreshStatus,
     });
+    useAdvancedConfigState();
 
     render(<SettingsPage />);
 
@@ -3164,14 +3391,14 @@ describe('SettingsPage', () => {
 
   it('uses live auth state for env backup availability instead of loaded config items', () => {
     const configState = buildSystemConfigState();
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+    useAdvancedConfigState({
       itemsByCategory: {
         ...configState.itemsByCategory,
         system: configState.itemsByCategory.system.map((item) => (
           item.key === 'ADMIN_AUTH_ENABLED' ? { ...item, value: 'false' } : item
         )),
       },
-    }));
+    });
     useAuthMock.mockReturnValue({
       authEnabled: true,
       passwordChangeable: true,
@@ -3187,6 +3414,7 @@ describe('SettingsPage', () => {
 
   it('exports saved env from config backup actions', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
+    useAdvancedConfigState();
 
     render(<SettingsPage />);
 
@@ -3201,7 +3429,11 @@ describe('SettingsPage', () => {
 
   it('asks for confirmation before importing when local drafts exist', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ hasDirty: true, dirtyCount: 2 }));
+    useAdvancedConfigState({
+      hasDirty: true,
+      dirtyCount: 2,
+      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+    });
 
     render(<SettingsPage />);
 
@@ -3215,6 +3447,7 @@ describe('SettingsPage', () => {
 
   it('reloads config after successful env import', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
+    useAdvancedConfigState();
 
     const { container } = render(<SettingsPage />);
 
@@ -3233,28 +3466,9 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
   });
 
-  it('refreshes scheduler status after successful env import updates scheduler settings', async () => {
+  it('imports scheduler settings from Advanced without mounting runtime controls', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
     const configState = buildSystemConfigState();
-    getSchedulerStatus
-      .mockResolvedValueOnce({
-        enabled: false,
-        running: false,
-        scheduleTimes: ['18:00'],
-        nextRunAt: null,
-        lastRunAt: null,
-        lastSuccessAt: null,
-        lastError: null,
-      })
-      .mockResolvedValueOnce({
-        enabled: true,
-        running: false,
-        scheduleTimes: ['09:20', '15:10'],
-        nextRunAt: '2026-06-21T09:20:00+08:00',
-        lastRunAt: null,
-        lastSuccessAt: null,
-        lastError: null,
-      });
     importEnv.mockResolvedValueOnce({
       success: true,
       configVersion: 'v2',
@@ -3264,8 +3478,7 @@ describe('SettingsPage', () => {
       updatedKeys: ['SCHEDULE_ENABLED', 'SCHEDULE_TIMES'],
       warnings: [],
     });
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
-      activeCategory: 'system',
+    useAdvancedConfigState({
       itemsByCategory: {
         ...configState.itemsByCategory,
         system: [
@@ -3308,12 +3521,9 @@ describe('SettingsPage', () => {
           },
         ],
       },
-    }));
+    });
 
     const { container } = render(<SettingsPage />);
-
-    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText('未启用')).toBeInTheDocument();
 
     vi.clearAllMocks();
 
@@ -3328,13 +3538,13 @@ describe('SettingsPage', () => {
 
     await waitFor(() => expect(importEnv).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(getSchedulerStatus).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText('已启用')).toBeInTheDocument();
+    expect(getSchedulerStatus).not.toHaveBeenCalled();
   });
 
   it('shows an error when env import succeeds but reload fails', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
     load.mockResolvedValue(false);
+    useAdvancedConfigState();
 
     const { container } = render(<SettingsPage />);
 

@@ -2,8 +2,11 @@
 """Integration tests for system configuration API endpoints."""
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -33,7 +36,7 @@ from api.v1.schemas.system_config import (
 import src.auth as auth
 from src.config import Config
 from src.core.config_manager import ConfigManager
-from src.services.system_config_service import SystemConfigService
+from src.services.system_config_service import ConfigConflictError, SystemConfigService
 
 
 class SystemConfigApiTestCase(unittest.TestCase):
@@ -122,11 +125,270 @@ class SystemConfigApiTestCase(unittest.TestCase):
         add_auth_middleware(app)
         return app
 
-    def test_get_config_keeps_regular_secret_value_unmasked(self) -> None:
+    def _build_system_config_router_app(self) -> FastAPI:
+        app = FastAPI()
+        app.include_router(system_config.router, prefix="/api/v1/system")
+        app.dependency_overrides[system_config.get_system_config_service] = lambda: self.service
+        add_error_handlers(app)
+        return app
+
+    def test_request_validation_does_not_echo_secret_shaped_input(self) -> None:
+        async def request_invalid_payload() -> httpx.Response:
+            transport = httpx.ASGITransport(
+                app=self._build_system_config_router_app(),
+                raise_app_exceptions=False,
+            )
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                return await client.put(
+                    "/api/v1/system/config",
+                    json={
+                        "config_version": {
+                            "api_key": "plain-secret-value",
+                            "credential": "plain-secret-value",
+                        },
+                        "items": [{"key": "STOCK_LIST", "value": "600519"}],
+                    },
+                )
+
+        response = asyncio.run(request_invalid_payload())
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(response.json()["error"], "validation_error")
+        self.assertNotIn("plain-secret-value", response.text)
+        self.assertNotIn('"input"', response.text)
+
+    def test_get_config_masks_regular_secret_value(self) -> None:
         payload = system_config.get_system_config(include_schema=True, service=self.service).model_dump(by_alias=True)
         item_map = {item["key"]: item for item in payload["items"]}
-        self.assertEqual(item_map["GEMINI_API_KEY"]["value"], "secret-key-value")
-        self.assertFalse(item_map["GEMINI_API_KEY"]["is_masked"])
+        self.assertEqual(item_map["GEMINI_API_KEY"]["value"], payload["mask_token"])
+        self.assertTrue(item_map["GEMINI_API_KEY"]["is_masked"])
+        self.assertNotIn("secret-key-value", str(payload))
+
+    def test_get_config_masks_dynamic_llm_connection_api_keys(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha,beta",
+            "LLM_ALPHA_PROVIDER=openai",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_API_KEY=alpha-secret-value",
+            'LLM_ALPHA_EXTRA_HEADERS={"Authorization":"Bearer alpha-header-secret"}',
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "LLM_BETA_PROVIDER=openai",
+            "LLM_BETA_PROTOCOL=openai",
+            "LLM_BETA_API_KEYS=beta-secret-one,beta-secret-two",
+            "LLM_BETA_MODELS=gpt-beta",
+            "LLM_BETA_ENABLED=true",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+
+        for include_schema in (True, False):
+            with self.subTest(include_schema=include_schema):
+                payload = system_config.get_system_config(
+                    include_schema=include_schema,
+                    service=self.service,
+                ).model_dump(by_alias=True)
+                item_map = {item["key"]: item for item in payload["items"]}
+
+                for key in ("LLM_ALPHA_API_KEY", "LLM_BETA_API_KEYS"):
+                    self.assertEqual(item_map[key]["value"], payload["mask_token"])
+                    self.assertTrue(item_map[key]["is_masked"])
+                    self.assertTrue(item_map[key]["raw_value_exists"])
+                    if include_schema:
+                        self.assertTrue(item_map[key]["schema"]["is_sensitive"])
+                    else:
+                        self.assertIsNone(item_map[key]["schema"])
+                self.assertNotIn("alpha-secret-value", str(payload))
+                self.assertNotIn("beta-secret-one", str(payload))
+
+    def test_get_config_without_schema_masks_runtime_only_connection_api_keys(self) -> None:
+        self._rewrite_env("ADMIN_AUTH_ENABLED=true")
+        runtime_env = {
+            "LLM_CHANNELS": "runtime",
+            "LLM_RUNTIME_PROVIDER": "custom",
+            "LLM_RUNTIME_PROTOCOL": "openai",
+            "LLM_RUNTIME_BASE_URL": "https://runtime.example/v1",
+            "LLM_RUNTIME_API_KEY": "runtime-secret-one",
+            "LLM_RUNTIME_API_KEYS": "runtime-secret-two,runtime-secret-three",
+            "LLM_RUNTIME_MODELS": "gpt-runtime",
+            "LLM_RUNTIME_ENABLED": "true",
+        }
+
+        with patch.dict(os.environ, runtime_env, clear=False):
+            payload = system_config.get_system_config(
+                include_schema=False,
+                service=self.service,
+            ).model_dump(by_alias=True)
+
+        item_map = {item["key"]: item for item in payload["items"]}
+        for key in ("LLM_RUNTIME_API_KEY", "LLM_RUNTIME_API_KEYS"):
+            self.assertEqual(item_map[key]["value"], payload["mask_token"])
+            self.assertTrue(item_map[key]["is_masked"])
+            self.assertFalse(item_map[key]["raw_value_exists"])
+            self.assertIsNone(item_map[key]["schema"])
+        rendered = str(payload)
+        self.assertNotIn("runtime-secret-one", rendered)
+        self.assertNotIn("runtime-secret-two", rendered)
+
+    def test_dynamic_llm_connection_mask_token_preserves_saved_secret(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=openai",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_API_KEY=alpha-secret-value",
+            'LLM_ALPHA_EXTRA_HEADERS={"Authorization":"Bearer alpha-header-secret"}',
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+        config = system_config.get_system_config(
+            include_schema=True,
+            service=self.service,
+        ).model_dump(by_alias=True)
+
+        response = system_config.update_system_config(
+            request=UpdateSystemConfigRequest(
+                config_version=config["config_version"],
+                mask_token=config["mask_token"],
+                reload_now=False,
+                items=[
+                    {
+                        "key": "LLM_ALPHA_API_KEY",
+                        "value": config["mask_token"],
+                    },
+                    {
+                        "key": "LLM_ALPHA_EXTRA_HEADERS",
+                        "value": config["mask_token"],
+                    },
+                ],
+            ),
+            service=self.service,
+        ).model_dump()
+
+        self.assertEqual(response["applied_count"], 0)
+        self.assertEqual(response["skipped_masked_count"], 2)
+        self.assertEqual(
+            self.manager.read_config_map()["LLM_ALPHA_API_KEY"],
+            "alpha-secret-value",
+        )
+        self.assertEqual(
+            self.manager.read_config_map()["LLM_ALPHA_EXTRA_HEADERS"],
+            '{"Authorization":"Bearer alpha-header-secret"}',
+        )
+
+    def test_put_config_rejects_saved_secret_reuse_when_connection_identity_changes(self) -> None:
+        cases = (
+            (
+                "API_KEY",
+                [{"key": "LLM_ALPHA_PROVIDER", "value": "openai"},
+                 {"key": "LLM_ALPHA_API_KEY", "value": "******"}],
+            ),
+            (
+                "API_KEYS",
+                [{"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"}],
+            ),
+        )
+        for secret_suffix, updates in cases:
+            with self.subTest(secret_suffix=secret_suffix):
+                self._rewrite_env(
+                    "LLM_CHANNELS=alpha",
+                    "LLM_ALPHA_PROVIDER=custom",
+                    "LLM_ALPHA_PROTOCOL=openai",
+                    "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+                    f"LLM_ALPHA_{secret_suffix}=saved-alpha-secret",
+                    "LLM_ALPHA_MODELS=gpt-alpha",
+                    "LLM_ALPHA_ENABLED=true",
+                    "ADMIN_AUTH_ENABLED=true",
+                )
+                before = self.manager.read_config_map()
+
+                with self.assertRaises(HTTPException) as context:
+                    system_config.update_system_config(
+                        request=UpdateSystemConfigRequest(
+                            config_version=self.manager.get_config_version(),
+                            mask_token="******",
+                            reload_now=False,
+                            items=updates,
+                        ),
+                        service=self.service,
+                    )
+
+                self.assertEqual(context.exception.status_code, 400)
+                self.assertEqual(context.exception.detail["error"], "validation_failed")
+                issue = next(
+                    item for item in context.exception.detail["issues"]
+                    if item["key"] == f"LLM_ALPHA_{secret_suffix}"
+                )
+                self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+                self.assertNotIn("saved-alpha-secret", str(context.exception.detail))
+                self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_put_config_rejects_masked_extra_headers_when_endpoint_changes(self) -> None:
+        self._rewrite_env(
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=custom",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_BASE_URL=https://saved.example/v1",
+            'LLM_ALPHA_EXTRA_HEADERS={"Authorization":"Bearer saved-header-secret"}',
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=false",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+        before = self.manager.read_config_map()
+
+        with self.assertRaises(HTTPException) as context:
+            system_config.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=self.manager.get_config_version(),
+                    mask_token="******",
+                    reload_now=False,
+                    items=[
+                        {"key": "LLM_ALPHA_BASE_URL", "value": "https://changed.example/v1"},
+                        {"key": "LLM_ALPHA_EXTRA_HEADERS", "value": "******"},
+                    ],
+                ),
+                service=self.service,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        issue = next(
+            item for item in context.exception.detail["issues"]
+            if item["key"] == "LLM_ALPHA_EXTRA_HEADERS"
+        )
+        self.assertEqual(issue["code"], "saved_secret_scope_mismatch")
+        self.assertNotIn("saved-header-secret", str(context.exception.detail))
+        self.assertEqual(self.manager.read_config_map(), before)
+
+    def test_generation_backend_smoke_draft_resolves_masked_connection_secret(self) -> None:
+        self._rewrite_env(
+            "GENERATION_BACKEND=litellm",
+            "GENERATION_FALLBACK_BACKEND=",
+            "LLM_CHANNELS=alpha",
+            "LLM_ALPHA_PROVIDER=openai",
+            "LLM_ALPHA_PROTOCOL=openai",
+            "LLM_ALPHA_API_KEY=alpha-secret-value",
+            "LLM_ALPHA_MODELS=gpt-alpha",
+            "LLM_ALPHA_ENABLED=true",
+            "LITELLM_MODEL=openai/gpt-alpha",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+        config = system_config.get_system_config(
+            include_schema=True,
+            service=self.service,
+        ).model_dump(by_alias=True)
+        draft = [
+            {"key": item["key"], "value": item["value"]}
+            for item in config["items"]
+        ]
+
+        effective_map = self.service._build_generation_backend_effective_map(
+            items=draft,
+            mask_token=config["mask_token"],
+        )
+
+        self.assertEqual(effective_map["LLM_ALPHA_API_KEY"], "alpha-secret-value")
+        self.assertNotEqual(effective_map["LLM_ALPHA_API_KEY"], config["mask_token"])
 
     def test_get_config_masks_llm_usage_hmac_secret(self) -> None:
         self._rewrite_env(
@@ -229,6 +491,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 "id", "label", "protocol", "default_base_url",
                 "capabilities", "requires_api_key", "requires_base_url",
                 "supports_discovery", "is_local", "is_custom",
+                "credential_url", "console_url", "models_url", "docs_url",
             ):
                 self.assertIn(field, provider)
             # The catalog must NOT ship concrete model IDs: model names age fast
@@ -237,6 +500,9 @@ class SystemConfigApiTestCase(unittest.TestCase):
         # Credential/base-URL requirements are derived from the backend contract.
         self.assertTrue(providers["deepseek"]["requires_api_key"])
         self.assertEqual(providers["deepseek"]["default_base_url"], "https://api.deepseek.com")
+        self.assertEqual(providers["openai"]["credential_url"], "https://platform.openai.com/api-keys")
+        self.assertEqual(providers["ollama"]["models_url"], "https://ollama.com/library")
+        self.assertIsNone(providers["custom"]["docs_url"])
         # Ollama is a local runtime: no key required.
         self.assertFalse(providers["ollama"]["requires_api_key"])
         self.assertTrue(providers["ollama"]["is_local"])
@@ -268,6 +534,51 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(fields["GENERATION_BACKEND"]["ui_placement"], "developer_diagnostics")
         self.assertEqual(fields["OPENAI_API_KEY"]["ui_placement"], "hidden_legacy")
         self.assertIsNone(fields["STOCK_LIST"]["ui_placement"])
+        self.assertEqual(
+            fields["OPENCODE_CLI_MODEL"]["contract"],
+            {
+                "requirement": "optional",
+                "required_when": None,
+                "visible_when": [
+                    {"key": "GENERATION_BACKEND", "operator": "equals", "value": "opencode_cli"}
+                ],
+                "enabled_when": None,
+                "requires_connection_test": None,
+            },
+        )
+
+    def test_config_contract_survives_real_http_schema_serialization(self) -> None:
+        schema_payload = deepcopy(self.service.get_schema())
+        opencode_field = next(
+            field
+            for category in schema_payload["categories"]
+            for field in category["fields"]
+            if field["key"] == "OPENCODE_CLI_MODEL"
+        )
+        opencode_field["contract"] = {
+            "requirement": "inherited",
+            "required_when": [{"key": "A", "operator": "notEmpty", "value": None}],
+            "visible_when": [{"key": "B", "operator": "notEquals", "value": "off"}],
+            "enabled_when": [{"key": "C", "operator": "in", "value": ["one", "two"]}],
+            "requires_connection_test": True,
+        }
+
+        async def request_schema() -> httpx.Response:
+            transport = httpx.ASGITransport(app=self._build_system_config_router_app())
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+                with patch.object(self.service, "get_schema", return_value=schema_payload):
+                    return await client.get("/api/v1/system/config/schema")
+
+        response = asyncio.run(request_schema())
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        field = next(
+            item
+            for category in payload["categories"]
+            for item in category["fields"]
+            if item["key"] == "OPENCODE_CLI_MODEL"
+        )
+        self.assertEqual(field["contract"], opencode_field["contract"])
 
     def test_get_generation_backend_status_uses_saved_config_only(self) -> None:
         self._rewrite_env(
@@ -324,6 +635,51 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["mode"], "json")
         self.assertEqual(payload["status"]["backend_id"], "codex_cli")
         self.assertEqual(payload["status"]["last_error_code"], "command_not_found")
+
+    def test_system_config_action_endpoints_hide_unexpected_value_errors(self) -> None:
+        secret_error = ValueError(
+            "provider failed token=super-secret at https://private.example/internal"
+        )
+        cases = [
+            (
+                "/api/v1/system/config/generation-backends/smoke-test",
+                "test_generation_backend",
+                {},
+            ),
+            (
+                "/api/v1/system/config/llm/test-channel",
+                "test_llm_channel",
+                {},
+            ),
+            (
+                "/api/v1/system/config/notification/test-channel",
+                "test_notification_channel",
+                {"channel": "wechat"},
+            ),
+            (
+                "/api/v1/system/config/llm/discover-models",
+                "discover_llm_channel_models",
+                {},
+            ),
+        ]
+
+        async def request_endpoint(path: str, method_name: str, body: dict) -> httpx.Response:
+            transport = httpx.ASGITransport(
+                app=self._build_system_config_router_app(),
+                raise_app_exceptions=False,
+            )
+            async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+                with patch.object(self.service, method_name, side_effect=secret_error):
+                    return await client.post(path, json=body)
+
+        for path, method_name, body in cases:
+            with self.subTest(path=path):
+                response = asyncio.run(request_endpoint(path, method_name, body))
+                serialized = response.text
+                self.assertEqual(response.status_code, 500, serialized)
+                self.assertEqual(response.json()["error"], "internal_error")
+                self.assertNotIn("super-secret", serialized)
+                self.assertNotIn("private.example", serialized)
 
     def test_preview_generation_backend_status_returns_validation_error_for_bad_draft(self) -> None:
         self._rewrite_env(
@@ -414,6 +770,37 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 409)
         self.assertEqual(context.exception.detail["error"], "config_version_conflict")
+
+    def test_concurrent_updates_with_the_same_version_allow_exactly_one_commit(self) -> None:
+        config_version = self.manager.get_config_version()
+        barrier = threading.Barrier(2)
+        collect_issues = self.service._collect_issues
+
+        def synchronized_collect(*args, **kwargs):
+            issues = collect_issues(*args, **kwargs)
+            barrier.wait(timeout=5)
+            return issues
+
+        def update_stock_list(value: str) -> str:
+            try:
+                self.service.update(
+                    config_version=config_version,
+                    items=[{"key": "STOCK_LIST", "value": value}],
+                    reload_now=False,
+                )
+            except ConfigConflictError:
+                return "conflict"
+            return "success"
+
+        with patch.object(self.service, "_collect_issues", side_effect=synchronized_collect):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                outcomes = list(executor.map(update_stock_list, ["600519,300750", "600519,AAPL"]))
+
+        self.assertCountEqual(outcomes, ["success", "conflict"])
+        self.assertIn(
+            self.manager.read_config_map()["STOCK_LIST"],
+            {"600519,300750", "600519,AAPL"},
+        )
 
     def test_put_config_preserves_comments_and_blank_lines(self) -> None:
         self.env_path.write_text(

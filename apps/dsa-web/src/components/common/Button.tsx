@@ -12,10 +12,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BUTTON_SIZE_STYLES = {
-  xsm: 'h-6 rounded-full px-2.5 text-xs',
-  sm: 'h-8 rounded-full px-3.5 text-xs',
-  md: 'h-9 rounded-full px-4 text-sm',
-  lg: 'h-10 rounded-full px-5 text-sm',
+  xsm: 'h-6 min-h-11 rounded-full px-2.5 text-xs sm:min-h-0',
+  sm: 'h-8 min-h-11 rounded-full px-3.5 text-xs sm:min-h-0',
+  md: 'h-9 min-h-11 rounded-full px-4 text-sm sm:min-h-0',
+  lg: 'h-10 min-h-11 rounded-full px-5 text-sm sm:min-h-0',
   xl: 'h-11 rounded-full px-6 text-sm',
 } as const;
 

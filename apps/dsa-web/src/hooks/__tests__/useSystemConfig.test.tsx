@@ -139,6 +139,16 @@ const sampleLlmConfig = {
   ],
 };
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('useSystemConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -187,6 +197,37 @@ describe('useSystemConfig', () => {
 
     expect(getConfig).toHaveBeenCalledTimes(1);
     expect(result.current.load).toBe(firstLoad);
+  });
+
+  it('keeps the latest config load when responses resolve out of order', async () => {
+    const first = createDeferred<typeof sampleConfig>();
+    const second = createDeferred<typeof sampleConfig>();
+    const latest = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600519' })),
+    };
+    getConfig.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useSystemConfig());
+
+    let firstLoad!: Promise<boolean>;
+    let secondLoad!: Promise<boolean>;
+    act(() => {
+      firstLoad = result.current.load();
+      secondLoad = result.current.load();
+    });
+    await act(async () => {
+      second.resolve(latest);
+      await secondLoad;
+    });
+    await act(async () => {
+      first.resolve(sampleConfig);
+      await firstLoad;
+    });
+
+    expect(result.current.configVersion).toBe('v2');
+    expect(result.current.serverItems[0]?.value).toBe('SH600519');
+    expect(result.current.isLoading).toBe(false);
   });
 
   it('normalizes STOCK_LIST separators before saving', async () => {
@@ -329,6 +370,27 @@ describe('useSystemConfig', () => {
 
     expect(validate).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it('resets only the requested atomic group keys', async () => {
+    getConfig.mockResolvedValueOnce(sampleLlmConfig);
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+    act(() => {
+      result.current.setDraftValue('STOCK_LIST', 'SH600519');
+      result.current.setDraftValue('LITELLM_MODEL', 'qwen/qwen2.5');
+    });
+    expect(result.current.dirtyKeys).toEqual(['STOCK_LIST', 'LITELLM_MODEL']);
+
+    act(() => {
+      result.current.resetDraftKeys(['LITELLM_MODEL']);
+    });
+
+    expect(result.current.dirtyKeys).toEqual(['STOCK_LIST']);
+    expect(result.current.itemsByCategory.ai_model?.find((item) => item.key === 'LITELLM_MODEL')?.value).toBe('gpt-5.0');
   });
 
   it('preserves unrelated runtime model fields when saving non-runtime config keys', async () => {
@@ -615,6 +677,40 @@ describe('useSystemConfig', () => {
       key: 'OPENAI_API_KEY',
       isSensitive: true,
     }));
+  });
+
+  it('does not auto-replay a secret when both conflict snapshots are masked', async () => {
+    const maskedSensitiveConfig = {
+      ...sensitiveConfig,
+      items: sensitiveConfig.items.map((item) => (
+        item.key === 'OPENAI_API_KEY'
+          ? { ...item, value: '******', rawValueExists: true, isMasked: true }
+          : item
+      )),
+    };
+    const latestConfig = {
+      ...maskedSensitiveConfig,
+      configVersion: 'v2',
+      items: maskedSensitiveConfig.items.map((item) => ({ ...item })),
+    };
+    getConfig.mockResolvedValueOnce(maskedSensitiveConfig).mockResolvedValueOnce(latestConfig);
+    update.mockRejectedValueOnce(new ConflictError('conflict'));
+
+    const { result } = renderHook(() => useSystemConfig());
+    await act(async () => { await result.current.load(); });
+    act(() => result.current.setDraftValue('OPENAI_API_KEY', 'sk-local-secret'));
+    await act(async () => { await result.current.save(); });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(result.current.conflictState?.fields).toEqual([
+      expect.objectContaining({
+        key: 'OPENAI_API_KEY',
+        base: '******',
+        server: '******',
+        local: 'sk-local-secret',
+        isSensitive: true,
+      }),
+    ]);
   });
 
   it('includes channel dynamic keys in the three-way conflict', async () => {

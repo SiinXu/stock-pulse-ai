@@ -84,6 +84,7 @@ describe('systemConfigApi', () => {
     get.mockResolvedValueOnce({
       data: {
         models: [{
+          model_ref: 'modelref:v1:production:openai%2Fgpt-4o-mini',
           route: 'openai/gpt-4o-mini',
           display: 'gpt-4o-mini',
           connection: 'production',
@@ -100,11 +101,106 @@ describe('systemConfigApi', () => {
     const result = await systemConfigApi.getLlmAvailableModels();
 
     expect(result.models[0]).toMatchObject({
+      modelRef: 'modelref:v1:production:openai%2Fgpt-4o-mini',
       connectionId: 'production',
       connectionName: 'Production gateway',
       providerId: 'openai',
       providerLabel: 'OpenAI',
     });
+  });
+
+  it('maps Provider Catalog quick-link metadata to camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        providers: [{
+          id: 'openai',
+          label: 'OpenAI',
+          protocol: 'openai',
+          default_base_url: 'https://api.openai.com/v1',
+          credential_url: 'https://platform.openai.com/api-keys',
+          console_url: 'https://platform.openai.com/',
+          models_url: 'https://platform.openai.com/docs/models',
+          docs_url: 'https://platform.openai.com/docs/overview',
+          capabilities: [],
+          requires_api_key: true,
+          requires_base_url: false,
+          supports_discovery: true,
+          is_local: false,
+          is_custom: false,
+        }],
+        empty_api_key_hosts: [],
+      },
+    });
+
+    const result = await systemConfigApi.getLlmProviderCatalog();
+
+    expect(result.providers[0]).toMatchObject({
+      credentialUrl: 'https://platform.openai.com/api-keys',
+      consoleUrl: 'https://platform.openai.com/',
+      modelsUrl: 'https://platform.openai.com/docs/models',
+      docsUrl: 'https://platform.openai.com/docs/overview',
+    });
+  });
+
+  it('maps nested ConfigContract condition fields to camelCase', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        schema_version: 'test',
+        categories: [{
+          category: 'ai_model',
+          title: 'AI',
+          display_order: 1,
+          fields: [{
+            key: 'EXAMPLE',
+            category: 'ai_model',
+            data_type: 'string',
+            ui_control: 'text',
+            is_sensitive: false,
+            is_required: false,
+            is_editable: true,
+            options: [],
+            validation: {},
+            display_order: 1,
+            contract: {
+              requirement: 'optional',
+              required_when: [{ key: 'A', operator: 'notEmpty' }],
+              visible_when: [{ key: 'B', operator: 'equals', value: 'on' }],
+              enabled_when: [{ key: 'C', operator: 'in', value: ['one'] }],
+              requires_connection_test: true,
+            },
+            ui_placement: 'developer_diagnostics',
+          }],
+        }],
+      },
+    });
+
+    const result = await systemConfigApi.getSchema();
+    const field = result.categories[0].fields[0];
+
+    expect(field.contract).toMatchObject({
+      requiredWhen: [{ key: 'A', operator: 'notEmpty' }],
+      visibleWhen: [{ key: 'B', operator: 'equals', value: 'on' }],
+      enabledWhen: [{ key: 'C', operator: 'in', value: ['one'] }],
+      requiresConnectionTest: true,
+    });
+    expect(field.uiPlacement).toBe('developer_diagnostics');
+  });
+
+  it('keeps a legacy route usable when an older backend omits model_ref', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        models: [{
+          route: 'openai/gpt-4o-mini',
+          display: 'gpt-4o-mini',
+          connection: null,
+          available: true,
+        }],
+      },
+    });
+
+    const result = await systemConfigApi.getLlmAvailableModels();
+
+    expect(result.models[0]?.modelRef).toBe('openai/gpt-4o-mini');
   });
 
   it('sends capability_checks only for explicit runtime capability checks', async () => {

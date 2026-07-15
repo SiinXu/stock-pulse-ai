@@ -62,7 +62,8 @@ export interface ConfigFieldContract {
  * - developer_diagnostics: advanced diagnostics, collapsed by default
  * - hidden_legacy: legacy provider keys; readable but never rendered as a
  *   generic editable settings field
- * - null/undefined: regular field, rendered by its category page
+ * - null/undefined: regular only for non-AI fields; AI fields fail safe to a
+ *   read-only Advanced diagnostic during rolling upgrades
  */
 export type SystemConfigUIPlacement =
   | 'model_access'
@@ -190,6 +191,10 @@ export interface LlmProviderCatalogEntry {
   label: string;
   protocol: string;
   defaultBaseUrl: string;
+  credentialUrl?: string | null;
+  consoleUrl?: string | null;
+  modelsUrl?: string | null;
+  docsUrl?: string | null;
   capabilities: string[];
   requiresApiKey: boolean;
   requiresBaseUrl: boolean;
@@ -209,7 +214,9 @@ export interface LlmProviderCatalogResponse {
 }
 
 export interface AvailableModelEntry {
-  /** Canonical backend route stored on selection (e.g. deepseek/deepseek-v4-flash). */
+  /** Stable Connection-aware identity stored by task routing. */
+  modelRef: string;
+  /** Canonical runtime route resolved only when the model is executed. */
   route: string;
   /** User-facing display name. */
   display: string;
@@ -465,11 +472,13 @@ export interface DiscoverLLMChannelModelsResponse {
 export interface SystemConfigValidationErrorResponse {
   error: string;
   message: string;
-  issues: ConfigValidationIssue[];
+  issues?: ConfigValidationIssue[];
+  params?: { issues?: ConfigValidationIssue[] };
 }
 
 export interface SystemConfigConflictResponse {
   error: string;
   message: string;
-  currentConfigVersion: string;
+  currentConfigVersion?: string;
+  params?: { currentConfigVersion?: string };
 }

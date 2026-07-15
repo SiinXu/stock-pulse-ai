@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
+import type { AvailableModelEntry, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
-import { getProviderPresentation } from './llmProviderTemplates';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -31,6 +30,8 @@ import {
   type ChannelFieldSuffix,
   type ModelAccessFieldFocusRequest,
 } from './modelAccessFieldKey';
+import { encodeModelRef, isModelRef } from '../../utils/modelRef';
+import { ProviderQuickLinks } from './ProviderQuickLinks';
 
 // Provider *business* metadata comes from the backend catalog (passed as a
 // prop). These helpers resolve an entry by channel/provider id; "known" excludes
@@ -95,7 +96,10 @@ const hasRuntimeOnlyMaskedHermesSecret = (
 
 interface ChannelConfig {
   id: string;
+  /** Stable runtime identity used in env keys and ModelRef values. */
   name: string;
+  /** User-facing label; changing it never changes the Connection identity. */
+  displayName: string;
   providerId: string;
   protocol: ChannelProtocol;
   baseUrl: string;
@@ -146,6 +150,8 @@ interface LLMChannelEditorProps {
   emptyApiKeyHosts?: string[];
   /** Authoritative routes, used for backend-equivalent historical Agent normalization. */
   availableModelRoutes?: string[];
+  /** Connection-aware identities returned by Available Models. */
+  availableModels?: AvailableModelEntry[];
   maskToken: string;
   /** Parent-held channel draft, used to rehydrate after a tab-switch remount. */
   persistedDraftItems?: Array<{ key: string; value: string }>;
@@ -182,6 +188,7 @@ interface LLMChannelEditorProps {
 function parseChannelFieldKeys(channel: ChannelConfig): string[] {
   const upperName = channel.name.trim().toUpperCase();
   return [
+    `LLM_${upperName}_DISPLAY_NAME`,
     `LLM_${upperName}_PROVIDER`,
     `LLM_${upperName}_PROTOCOL`,
     `LLM_${upperName}_BASE_URL`,
@@ -329,6 +336,9 @@ function buildChangedItemKeys(
     }
 
     const prefix = `LLM_${currentName}`;
+    if (current.displayName !== previous.displayName) {
+      changedKeys.add(`${prefix}_DISPLAY_NAME`);
+    }
     if (current.protocol !== previous.protocol) {
       changedKeys.add(`${prefix}_PROTOCOL`);
     }
@@ -469,6 +479,7 @@ async function runChannelModelDiscovery(
 interface ConnectionCardProps {
   channel: ChannelConfig;
   providers: LlmProviderCatalogEntry[];
+  availableModels: AvailableModelEntry[];
   taskModelRefs: TaskModelReference[];
   unsaved: boolean;
   busy: boolean;
@@ -487,6 +498,7 @@ interface ConnectionCardProps {
 const ConnectionCard: React.FC<ConnectionCardProps> = ({
   channel,
   providers,
+  availableModels,
   taskModelRefs,
   unsaved,
   busy,
@@ -505,10 +517,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     ?? (channel.providerId && channel.providerId !== 'custom' ? channel.providerId : text.customProvider);
   const selectedModels = splitModels(channel.models);
   const channelRouteModels = resolveChannelRouteModels(channel);
+  const channelModelRefs = new Set(channelRouteModels.map((route) => (
+    modelIdentityForConnection(availableModels, channel.name, route)
+  )));
   const usedByTasks = Array.from(
     new Set(
       taskModelRefs
-        .filter((ref) => channelRouteModels.includes(ref.route))
+        .filter((ref) => channelModelRefs.has(ref.route) || channelRouteModels.includes(ref.route))
         .map((ref) => ref.label),
     ),
   );
@@ -545,7 +560,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-sm font-semibold text-foreground">{displayLabel}</span>
-            <span className="truncate text-xs text-muted-text">{channel.name}</span>
+            <span className="truncate text-xs text-muted-text">{channel.displayName}</span>
             {unsaved ? <Badge variant="warning">{text.unsaved}</Badge> : null}
             {!isComplete ? (
               <Tooltip content={issues.map((issue) => localizeModelAccessIssue(issue, language)).join(language === 'en' ? ', ' : '、')}>
@@ -570,7 +585,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           {selectedModels.length > 0 ? (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.name })}
+              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 flex max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -591,7 +606,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           ) : (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.name })}
+              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -632,7 +647,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               size="sm"
               className="h-8 px-2 text-xs text-muted-text"
               disabled={busy}
-              aria-label={formatUiText(text.moreActions, { name: channel.name })}
+              aria-label={formatUiText(text.moreActions, { name: channel.displayName })}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((previous) => !previous)}
@@ -700,6 +715,7 @@ interface ConnectionModalProps {
   focusField?: ChannelFieldSuffix;
   channels: ChannelConfig[];
   availableModelRoutes: string[];
+  availableModels: AvailableModelEntry[];
   providers: LlmProviderCatalogEntry[];
   emptyApiKeyHosts: string[];
   maskToken: string;
@@ -723,6 +739,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   focusField,
   channels,
   availableModelRoutes,
+  availableModels,
   providers,
   emptyApiKeyHosts,
   maskToken,
@@ -778,6 +795,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const [pendingModelRemoval, setPendingModelRemoval] = useState<null | {
     model: string;
     route: string;
+    modelRef: string;
     references: TaskModelReference[];
   }>(null);
   const [replacementRoute, setReplacementRoute] = useState('');
@@ -863,6 +881,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setDraft({
       id: `modal:${providerId}`,
       name: suggestConnectionName(existingNames, providerId),
+      displayName: chosen.label,
       providerId,
       protocol: normalizeProtocol(chosen.protocol),
       baseUrl: chosen.defaultBaseUrl ?? '',
@@ -934,20 +953,21 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
         const route = isHermesChannel(channel)
           ? canonicalizeHermesRouteModel(model)
           : normalizeModelForRuntime(model, channel.protocol);
-        if (route === pendingModelRemoval.route || seen.has(route)) {
+        const modelRef = modelIdentityForConnection(availableModels, channel.name, route);
+        if (modelRef === pendingModelRemoval.modelRef || seen.has(modelRef)) {
           continue;
         }
-        seen.add(route);
+        seen.add(modelRef);
         options.push({
-          value: route,
+          value: modelRef,
           label: model,
-          sublabel: channel.name,
-          keywords: [route, channel.providerId],
+          sublabel: channel.displayName,
+          keywords: [route, channel.name, channel.providerId],
         });
       }
     }
     return options;
-  }, [candidateChannels, draft, pendingModelRemoval]);
+  }, [availableModels, candidateChannels, draft, pendingModelRemoval]);
   const removeModel = (model: string) => {
     if (!draft) {
       return;
@@ -963,20 +983,16 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const route = isHermesChannel(draft)
       ? canonicalizeHermesRouteModel(model)
       : normalizeModelForRuntime(model, draft.protocol);
-    const references = effectiveTaskModelRefs.filter((reference) => reference.route === route);
-    const nextDraft = {
-      ...draft,
-      models: selectedModels.filter((existing) => existing !== model).join(','),
-    };
-    const nextChannels = candidateChannels.map((channel) => (
-      channel.id === draft.id ? nextDraft : channel
+    const modelRef = modelIdentityForConnection(availableModels, draft.name, route);
+    const references = effectiveTaskModelRefs.filter((reference) => (
+      reference.route === modelRef
+      || (!isModelRef(reference.route) && reference.route === route)
     ));
-    const routeStillAvailable = collectChannelRouteSet(nextChannels, true).has(route);
-    if (references.length === 0 || routeStillAvailable) {
+    if (references.length === 0) {
       removeModel(model);
       return;
     }
-    setPendingModelRemoval({ model, route, references });
+    setPendingModelRemoval({ model, route, modelRef, references });
     setReplacementRoute('');
   };
   const addModelToken = (raw: string) => {
@@ -1044,14 +1060,15 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const nameIssues = draft ? getChannelNameIssues(draft) : [];
+  const displayNameIssues = draft && !draft.displayName.trim() ? ['连接名称必填'] : [];
   const nameConflict = draft && existingNames.includes(draft.name.trim().toLowerCase())
     ? ['连接名称已存在，请更换']
     : [];
   const completenessIssues = draft
     ? getChannelCompletenessIssues(draft, providers, emptyApiKeyHosts, catalogUnavailable)
     : [];
-  const blockingIssues = [...nameIssues, ...nameConflict, ...(draft?.enabled ? completenessIssues : [])];
-  const nameError = [...nameIssues, ...nameConflict][0];
+  const blockingIssues = [...nameIssues, ...displayNameIssues, ...nameConflict, ...(draft?.enabled ? completenessIssues : [])];
+  const nameError = [...displayNameIssues, ...nameIssues, ...nameConflict][0];
   const apiKeyError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少 API 密钥') : undefined;
   const baseUrlError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少服务地址') : undefined;
   const modelsError = draft?.enabled ? completenessIssues.find((issue) => issue === '至少配置一个模型') : undefined;
@@ -1065,7 +1082,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const allowsEmptyKey = draft ? channelAllowsEmptyApiKey(draft, emptyApiKeyHosts) : false;
   const showApiKeyField = Boolean(draft) && (providerRequirements?.showApiKey ?? true);
   const supportsDiscovery = provider?.supportsDiscovery === true;
-  const presentation = providerId ? getProviderPresentation(providerId) : undefined;
   const showBaseUrlSummary = !isCustomService && !customBaseUrl;
   const discoveredModels = discovery?.models || [];
   const providerSelectId = 'connection-modal-provider';
@@ -1148,7 +1164,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4" data-connection-id={draft.name}>
           {mode === 'edit' ? (
             <div>
               <label htmlFor={providerSelectId} className="mb-2 block text-sm font-medium text-foreground">
@@ -1173,8 +1189,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             </label>
             <Input
               id={nameInputId}
-              value={draft.name}
-              onChange={(e) => updateDraft('name', e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+              value={draft.displayName}
+              onChange={(e) => updateDraft('displayName', e.target.value)}
               placeholder={text.connectionName}
               error={nameError}
             />
@@ -1271,22 +1287,15 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 placeholder={allowsEmptyKey ? text.localKeyOptional : text.multipleKeys}
                 error={apiKeyError}
               />
-              {presentation && presentation.officialSources.length > 0 ? (
-                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-text">
-                  <span>{text.getKey}</span>
-                  {presentation.officialSources.map((source) => (
-                    <a
-                      key={source.url}
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="settings-accent-text underline-offset-2 hover:underline"
-                    >
-                      {source.label}
-                    </a>
-                  ))}
-                </p>
-              ) : null}
+              <div className="mt-1">
+                <ProviderQuickLinks
+                  provider={provider}
+                  context="credentials"
+                  language={language}
+                  primaryLabel={text.getKey.replace(/[:：]\s*$/, '')}
+                  secondaryLabel={provider?.label ?? text.provider}
+                />
+              </div>
             </div>
           ) : null}
 
@@ -1308,6 +1317,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <label htmlFor={modelsInputId} className="block text-sm font-medium text-foreground">
               {text.availableModels}
             </label>
+            <ProviderQuickLinks
+              provider={provider}
+              context="models"
+              language={language}
+              primaryLabel={text.availableModels}
+              secondaryLabel={provider?.label ?? text.viewDetails}
+            />
             {selectedModels.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
                 {selectedModels.map((model) => (
@@ -1356,14 +1372,16 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                           size="sm"
                           disabled={!replacementRoute}
                           onClick={() => {
-                            const replacement = {
-                              fromRoute: pendingModelRemoval.route,
+                            const replacements = Array.from(new Set(
+                              pendingModelRemoval.references.map((reference) => reference.route),
+                            )).map((fromRoute) => ({
+                              fromRoute,
                               toRoute: replacementRoute,
-                              references: pendingModelRemoval.references,
-                            };
+                              references: pendingModelRemoval.references.filter((reference) => reference.route === fromRoute),
+                            }));
                             setStagedReplacements((previous) => [
-                              ...previous.filter((item) => item.fromRoute !== replacement.fromRoute),
-                              replacement,
+                              ...previous.filter((item) => !replacements.some((replacement) => replacement.fromRoute === item.fromRoute)),
+                              ...replacements,
                             ]);
                             removeModel(pendingModelRemoval.model);
                           }}
@@ -1761,6 +1779,17 @@ function collectChannelRouteSet(channels: ChannelConfig[], enabledOnly: boolean)
   return routes;
 }
 
+function modelIdentityForConnection(
+  availableModels: AvailableModelEntry[],
+  connectionId: string,
+  runtimeRoute: string,
+): string {
+  return availableModels.find((entry) => (
+    entry.connectionId?.toLowerCase() === connectionId.trim().toLowerCase()
+    && entry.route === runtimeRoute
+  ))?.modelRef ?? encodeModelRef(connectionId, runtimeRoute);
+}
+
 // Mirrors normalize_agent_litellm_model() in the backend. Other task fields
 // use exact route identity; only the historical Agent field accepts a bare
 // model name and resolves it against the currently configured routes first.
@@ -1769,7 +1798,7 @@ function normalizeTaskReferenceRoute(
   knownRoutes: Set<string>,
 ): string {
   const route = reference.route.trim();
-  if (!route || reference.key !== 'AGENT_LITELLM_MODEL' || route.includes('/')) {
+  if (!route || isModelRef(route) || reference.key !== 'AGENT_LITELLM_MODEL' || route.includes('/')) {
     return route;
   }
   return knownRoutes.has(route) ? route : `openai/${route}`;
@@ -1934,6 +1963,7 @@ function parseChannelsFromItems(
     return {
       id: `parsed:${index}:${upperName}`,
       name: name.toLowerCase(),
+      displayName: itemMap.get(`LLM_${upperName}_DISPLAY_NAME`) || name,
       providerId: explicitProviderId || inferLegacyProviderId(providers, name),
       protocol: inferProtocol(itemMap.get(`LLM_${upperName}_PROTOCOL`) || '', baseUrl, models),
       baseUrl,
@@ -1966,6 +1996,7 @@ function channelsToUpdateItems(
   for (const channel of channels) {
     const prefix = `LLM_${channel.name.toUpperCase()}`;
     const isMultiKey = channel.apiKey.includes(',');
+    updates.push({ key: `${prefix}_DISPLAY_NAME`, value: channel.displayName.trim() || channel.name });
     updates.push({ key: `${prefix}_PROVIDER`, value: channel.providerId });
     updates.push({ key: `${prefix}_PROTOCOL`, value: channel.protocol });
     updates.push({ key: `${prefix}_BASE_URL`, value: channel.baseUrl });
@@ -1988,6 +2019,7 @@ function channelsToUpdateItems(
     }
 
     const prefix = `LLM_${upperName}`;
+    updates.push({ key: `${prefix}_DISPLAY_NAME`, value: '' });
     updates.push({ key: `${prefix}_PROVIDER`, value: '' });
     updates.push({ key: `${prefix}_PROTOCOL`, value: '' });
     updates.push({ key: `${prefix}_BASE_URL`, value: '' });
@@ -2017,6 +2049,10 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
     return ['连接名称仅限小写字母、数字或下划线'];
   }
   return [];
+}
+
+function getChannelDisplayNameIssues(channel: ChannelConfig): string[] {
+  return channel.displayName.trim() ? [] : ['连接名称必填'];
 }
 
 // Mirrors the backend `channel_allows_empty_api_key` contract: ollama never
@@ -2066,8 +2102,9 @@ function getChannelSaveIssues(
   catalogUnavailable = false,
 ): string[] {
   const nameIssues = getChannelNameIssues(channel);
-  if (nameIssues.length > 0) {
-    return nameIssues;
+  const displayNameIssues = getChannelDisplayNameIssues(channel);
+  if (nameIssues.length > 0 || displayNameIssues.length > 0) {
+    return [...nameIssues, ...displayNameIssues];
   }
   return channel.enabled
     ? getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable)
@@ -2100,10 +2137,10 @@ function buildFilteredChannelUpdateItems({
   return channelsToUpdateItems(channels, initialNames, runtimeConfig, managesRuntimeConfig).filter((item) => {
     const itemKey = item.key.toUpperCase();
     const initialItemSource = initialItemSourceByKey.get(itemKey);
-    if (initialItemSource === false) {
+    if (isChannelSecretFieldKey(itemKey)) {
       return changedKeys.has(itemKey);
     }
-    if (isChannelSecretFieldKey(itemKey) && initialItemSource === undefined) {
+    if (initialItemSource === false) {
       return changedKeys.has(itemKey);
     }
     return true;
@@ -2149,6 +2186,7 @@ function buildChannelDraftItems({
 function channelsAreEqual(left: ChannelConfig, right: ChannelConfig): boolean {
   return (
     left.name === right.name
+    && left.displayName === right.displayName
     && left.providerId === right.providerId
     && left.protocol === right.protocol
     && left.baseUrl === right.baseUrl
@@ -2215,6 +2253,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   providers,
   emptyApiKeyHosts = [],
   availableModelRoutes = [],
+  availableModels = [],
   maskToken,
   persistedDraftItems,
   onDraftItemsChange,
@@ -2458,16 +2497,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const routes = channel.enabled
       ? new Set(resolveChannelRouteModels(channel))
       : new Set<string>();
-    const remainingRoutes = collectChannelRouteSet(
-      channels.filter((_, channelIndex) => channelIndex !== index),
-      true,
-    );
+    const modelRefs = new Set(Array.from(routes).map((route) => (
+      modelIdentityForConnection(availableModels, channel.name, route)
+    )));
     const referencedBy = Array.from(new Set(
       resolvedTaskModelRefs
-        .filter((ref) => routes.has(ref.route) && !remainingRoutes.has(ref.route))
+        .filter((ref) => modelRefs.has(ref.route) || (!isModelRef(ref.route) && routes.has(ref.route)))
         .map((ref) => ref.label),
     ));
-    setPendingRemove({ index, name: channel.name.trim() || `#${index + 1}`, referencedBy });
+    setPendingRemove({ index, name: channel.displayName.trim() || channel.name || `#${index + 1}`, referencedBy });
   };
 
   // Enabling an incomplete connection opens the edit dialog instead of letting
@@ -2566,12 +2604,14 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               key={channel.id}
               channel={channel}
               providers={providers}
+              availableModels={availableModels}
               taskModelRefs={resolvedTaskModelRefs}
               unsaved={isChannelUnsaved(channel)}
               busy={busy}
               testState={testStates[channel.id]}
               issues={[
                 ...getChannelNameIssues(channel),
+                ...getChannelDisplayNameIssues(channel),
                 ...getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable),
               ]}
               onTest={() => void handleTest(channel)}
@@ -2595,7 +2635,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                 {blockingChannels.map(({ channel, index, issues }) => (
                   <li key={channel.id || index}>
                     {formatUiText(editorText.invalidConnection, {
-                      name: channel.name.trim() || formatUiText(editorText.connectionNumber, { number: index + 1 }),
+                      name: channel.displayName.trim() || channel.name || formatUiText(editorText.connectionNumber, { number: index + 1 }),
                       issues: issues.map((issue) => localizeModelAccessIssue(issue, language)).join(language === 'en' ? ', ' : '、'),
                     })}
                   </li>
@@ -2650,6 +2690,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           focusField={modal.mode === 'edit' ? modal.focusField : undefined}
           channels={channels}
           availableModelRoutes={availableModelRoutes}
+          availableModels={availableModels}
           providers={providers}
           emptyApiKeyHosts={emptyApiKeyHosts}
           maskToken={maskToken}

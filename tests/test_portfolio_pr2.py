@@ -311,7 +311,7 @@ class PortfolioPr2TestCase(unittest.TestCase):
 
         with patch.object(
             self.import_service.portfolio_service,
-            "record_trade",
+            "record_trade_in_session",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             result = self.import_service.commit_trade_records(

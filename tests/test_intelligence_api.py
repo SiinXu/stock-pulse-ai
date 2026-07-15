@@ -131,7 +131,11 @@ class IntelligenceApiTestCase(unittest.TestCase):
         self.assertEqual(fetch_resp.status_code, 500)
         body = fetch_resp.json()
         self.assertEqual(body["error"], "internal_error")
-        self.assertEqual(body["message"], "Fetch intelligence source failed: internal intelligence service error")
+        self.assertEqual(body["message"], "Internal server error")
+        self.assertEqual(body["params"], {})
+        self.assertIsNone(body["details"])
+        self.assertTrue(body["trace_id"])
+        self.assertNotIn("secret", fetch_resp.text)
 
     def test_fetch_source_internal_error_without_sensitive_pattern_is_generic(self) -> None:
         create_resp = self.client.post("/api/v1/intelligence/sources", json={"name": "api-feed", "url": "https://feeds.example.com/rss.xml", "source_type": "rss", "scope_type": "market", "market": "cn"})
@@ -143,8 +147,11 @@ class IntelligenceApiTestCase(unittest.TestCase):
         self.assertEqual(fetch_resp.status_code, 500)
         body = fetch_resp.json()
         self.assertEqual(body["error"], "internal_error")
-        self.assertEqual(body["message"], "Fetch intelligence source failed: internal intelligence service error")
-        self.assertNotIn("pipeline context exhausted", body["message"])
+        self.assertEqual(body["message"], "Internal server error")
+        self.assertEqual(body["params"], {})
+        self.assertIsNone(body["details"])
+        self.assertTrue(body["trace_id"])
+        self.assertNotIn("pipeline context exhausted", fetch_resp.text)
 
     def test_create_builtin_default_sources_are_disabled_by_default(self) -> None:
         default_resp = self.client.post("/api/v1/intelligence/sources/defaults")

@@ -286,7 +286,7 @@ describe('RunFlowPanel', () => {
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(screen.getByText('贵州茅台运行流')).toBeInTheDocument();
     expect(screen.getByTestId('run-flow-layout')).toHaveClass('xl:grid-cols-[minmax(0,1fr)_19.25rem]');
-    expect(screen.getByTestId('run-flow-events-column')).toHaveClass('xl:max-h-[calc(100vh-18rem)]');
+    expect(screen.getByTestId('run-flow-events-column')).toHaveClass('xl:max-h-[calc(100dvh-18rem)]');
     expect(screen.getByTestId('run-flow-graph')).toBeInTheDocument();
     expect(screen.getByTestId('run-flow-events')).toBeInTheDocument();
     expect(await screen.findByTestId('run-flow-node-details')).toHaveTextContent('新闻舆情');

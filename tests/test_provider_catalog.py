@@ -63,10 +63,20 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
         allowed = {
             "id", "label", "protocol", "default_base_url", "capabilities",
             "requires_api_key", "requires_base_url", "supports_discovery",
-            "is_local", "is_custom",
+            "is_local", "is_custom", "credential_url", "console_url",
+            "models_url", "docs_url",
         }
         for entry in get_provider_catalog():
             self.assertEqual(set(entry.keys()), allowed)
+
+    def test_catalog_exposes_optional_provider_owned_quick_links(self) -> None:
+        providers = {entry["id"]: entry for entry in get_provider_catalog()}
+        for field in ("credential_url", "console_url", "models_url", "docs_url"):
+            self.assertTrue(providers["openai"][field].startswith("https://"))
+        self.assertIsNone(providers["ollama"]["credential_url"])
+        self.assertTrue(providers["ollama"]["models_url"].startswith("https://"))
+        self.assertIsNone(providers["custom"]["credential_url"])
+        self.assertIsNone(providers["custom"]["docs_url"])
 
     def test_catalog_return_is_caller_immune(self) -> None:
         first = get_provider_catalog()

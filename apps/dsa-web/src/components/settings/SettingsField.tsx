@@ -75,6 +75,8 @@ interface SettingsFieldProps {
   requirement?: 'required' | 'optional' | 'inherited' | null;
   /** True when the field's enabledWhen conditions are not met (read-only). */
   dependencyLocked?: boolean;
+  /** Fail-safe schema diagnostic that forces a field into read-only mode. */
+  readOnlyDiagnostic?: string;
 }
 
 function renderFieldControl(
@@ -336,6 +338,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   issues = [],
   requirement = null,
   dependencyLocked = false,
+  readOnlyDiagnostic,
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
@@ -383,7 +386,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             description={description}
             rawValueExists={item.rawValueExists}
           />
-          {!schema?.isEditable ? (
+          {!schema?.isEditable || readOnlyDiagnostic ? (
             <Badge variant="default" size="sm">
               {t('common.readOnly')}
             </Badge>
@@ -395,7 +398,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           ) : requirement === 'optional' ? (
             <Badge variant="default" size="sm">{t('settings.fieldOptional')}</Badge>
           ) : null}
-          {dependencyLocked ? (
+          {dependencyLocked && requirement !== 'inherited' && !readOnlyDiagnostic ? (
             <Badge variant="default" size="sm">{t('settings.fieldDependencyLocked')}</Badge>
           ) : null}
           {schema?.warningCodes?.includes('restart_required') ? (
@@ -405,13 +408,18 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
         {/* External docs links and raw KEY=value examples are intentionally not
             shown inline on everyday fields — they live in the field's help
             dialog instead, so the everyday path stays free of config jargon. */}
+        {readOnlyDiagnostic ? (
+          <p className="text-xs text-warning" data-testid={`settings-schema-diagnostic-${item.key}`}>
+            {readOnlyDiagnostic}
+          </p>
+        ) : null}
       </div>
 
       <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>
         {renderFieldControl(
           item,
           displayValue,
-          disabled || dependencyLocked,
+          disabled || dependencyLocked || Boolean(readOnlyDiagnostic),
           (nextValue) => onChange(item.key, nextValue),
           isPasswordEditable,
           () => setIsPasswordEditable(true),

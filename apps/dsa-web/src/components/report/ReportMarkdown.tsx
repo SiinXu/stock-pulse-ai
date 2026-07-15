@@ -1,5 +1,7 @@
 import type React from 'react';
 import { useCallback, useState } from 'react';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { Drawer } from '../common/Drawer';
 import { OVERLAY_Z } from '../common/overlayZ';
@@ -24,6 +26,8 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
   onClose,
   reportLanguage = 'zh',
 }) => {
+  const { language: uiLanguage } = useUiLanguage();
+  const text = REPORT_CHROME_TEXT[uiLanguage];
   const [isOpen, setIsOpen] = useState(true);
 
   const handleClose = useCallback(() => {
@@ -35,6 +39,7 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
     <Drawer
       isOpen={isOpen}
       onClose={handleClose}
+      title={text.fullReport}
       width="max-w-3xl"
       zIndex={OVERLAY_Z.reportDrawer}
       backdropClassName="bg-background/56 backdrop-blur-[2px]"

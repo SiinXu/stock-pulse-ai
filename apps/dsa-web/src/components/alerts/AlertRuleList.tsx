@@ -21,11 +21,7 @@ import { formatUiDateTime } from '../../utils/uiLocale';
 export type AlertRuleEnabledFilter = 'all' | 'enabled' | 'disabled';
 export type AlertTypeFilter = 'all' | AlertType;
 export type AlertRuleBusyAction = 'test' | 'toggle' | 'delete';
-
-export interface AlertRuleBusyState {
-  id: number;
-  action: AlertRuleBusyAction;
-}
+export type AlertRuleBusyMap = Readonly<Record<number, AlertRuleBusyAction | undefined>>;
 
 function formatParameters(rule: AlertRuleItem, language: UiLanguage): string {
   const directionLabels = ALERT_DIRECTION_LABELS[language];
@@ -104,7 +100,7 @@ interface AlertRuleListProps {
   onToggleEnabled: (rule: AlertRuleItem) => void;
   onDelete: (rule: AlertRuleItem) => void;
   onTest: (rule: AlertRuleItem) => void;
-  busyRule?: AlertRuleBusyState | null;
+  busyRules?: AlertRuleBusyMap;
 }
 
 export const AlertRuleList: React.FC<AlertRuleListProps> = ({
@@ -122,15 +118,15 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   onToggleEnabled,
   onDelete,
   onTest,
-  busyRule = null,
+  busyRules = {},
 }) => {
   const { language } = useUiLanguage();
   const text = ALERT_LIST_TEXT[language];
   const [pendingDelete, setPendingDelete] = useState<AlertRuleItem | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const isRuleBusy = (rule: AlertRuleItem) => busyRule?.id === rule.id;
+  const isRuleBusy = (rule: AlertRuleItem) => Boolean(busyRules[rule.id]);
   const isRuleActionBusy = (rule: AlertRuleItem, action: AlertRuleBusyAction) => (
-    busyRule?.id === rule.id && busyRule.action === action
+    busyRules[rule.id] === action
   );
 
   return (

@@ -1,15 +1,23 @@
 # -*- coding: utf-8 -*-
 """Agent chat history API regressions."""
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
 from api.app import create_app
 from src.config import Config
 from src.storage import DatabaseManager
+
+
+SENSITIVE_PROVIDER_ERROR = (
+    "provider rejected token=super-secret api_key=super-secret "
+    "x-api-key: super-secret credential=super-secret at "
+    "https://private.example/v1/chat?token=super-secret"
+)
 
 
 def teardown_function() -> None:
@@ -24,6 +32,11 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     session_id = "api-trace-hidden"
     user_id = db.save_conversation_message(session_id, "user", "visible question")
     assistant_id = db.save_conversation_message(session_id, "assistant", "visible answer")
+    db.save_conversation_message(
+        session_id,
+        "assistant",
+        f"[分析失败] {SENSITIVE_PROVIDER_ERROR}",
+    )
     db.save_agent_provider_turn(
         session_id=session_id,
         run_id="run-hidden",
@@ -47,6 +60,14 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         estimated_tokens=10,
     )
 
+    assert db.get_conversation_history(session_id)[-1] == {
+        "role": "assistant",
+        "content": "[分析失败] Agent chat failed",
+    }
+    assert db.get_visible_conversation_messages(session_id)[-1]["content"] == (
+        "[分析失败] Agent chat failed"
+    )
+
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
         response = client.get(f"/api/v1/agent/chat/sessions/{session_id}")
@@ -57,6 +78,7 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     assert [(msg["role"], msg["content"]) for msg in payload["messages"]] == [
         ("user", "visible question"),
         ("assistant", "visible answer"),
+        ("assistant", "[分析失败] Agent chat failed"),
     ]
     assert "SECRET_REASONING" not in response.text
     assert "SECRET_TOOL_RESULT" not in response.text
@@ -96,6 +118,116 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     assert kwargs["context"]["stock_name"] == "匿名标的"
 
 
+def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, caplog) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=False,
+        content=SENSITIVE_PROVIDER_ERROR,
+        error=SENSITIVE_PROVIDER_ERROR,
+    )
+    config = SimpleNamespace(is_agent_available=lambda: True)
+    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={"message": "分析失败场景", "session_id": "private-rest"},
+                )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "content": "",
+        "session_id": "private-rest",
+        "error": "agent_chat_failed",
+    }
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+    assert "super-secret" not in caplog.text
+    assert "private.example" not in caplog.text
+
+
+def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) -> None:
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        agent_deep_research_budget=30000,
+        agent_deep_research_timeout=180,
+    )
+    research_result = SimpleNamespace(
+        success=False,
+        report=SENSITIVE_PROVIDER_ERROR,
+        sub_questions=[SENSITIVE_PROVIDER_ERROR],
+        total_tokens=42,
+        error=SENSITIVE_PROVIDER_ERROR,
+        timed_out=False,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=AsyncMock(return_value=research_result),
+            ):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/research",
+                    json={"question": "研究失败场景"},
+                )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "content": "",
+        "sources": [],
+        "token_usage": 0,
+        "error": "agent_research_failed",
+    }
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+
+
+def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) -> None:
+    config = SimpleNamespace(
+        is_agent_available=lambda: True,
+        agent_deep_research_budget=30000,
+        agent_deep_research_timeout=180,
+    )
+    research_result = SimpleNamespace(
+        success=False,
+        report=SENSITIVE_PROVIDER_ERROR,
+        sub_questions=[SENSITIVE_PROVIDER_ERROR],
+        total_tokens=42,
+        error=SENSITIVE_PROVIDER_ERROR,
+        timed_out=True,
+    )
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch(
+                "api.v1.endpoints.agent._run_research_in_background",
+                new=AsyncMock(return_value=research_result),
+            ):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/research",
+                    json={"question": "研究超时场景"},
+                )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "content": "",
+        "sources": [],
+        "token_usage": 0,
+        "error": "agent_research_failed",
+    }
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+
+
 def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) -> None:
     executor = MagicMock()
     executor.chat.return_value = SimpleNamespace(
@@ -129,3 +261,95 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
     assert kwargs["session_id"] == "s1"
     assert kwargs["context"]["stock_code"] == "600519"
     assert kwargs["context"]["stock_name"] == "匿名标的"
+
+
+def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Path, caplog) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = SimpleNamespace(
+        success=False,
+        content=SENSITIVE_PROVIDER_ERROR,
+        error=SENSITIVE_PROVIDER_ERROR,
+        total_steps=1,
+    )
+    config = SimpleNamespace(is_agent_available=lambda: True)
+    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={"message": "流式失败场景", "session_id": "private-stream"},
+                )
+
+    assert response.status_code == 200
+    assert '"type": "done"' in response.text
+    assert '"success": false' in response.text
+    assert '"content": ""' in response.text
+    assert '"error": "agent_chat_failed"' in response.text
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+    assert "super-secret" not in caplog.text
+    assert "private.example" not in caplog.text
+
+
+def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: Path) -> None:
+    executor = MagicMock()
+
+    def fail_with_callback(**kwargs):
+        kwargs["progress_callback"]({
+            "type": "error",
+            "error": SENSITIVE_PROVIDER_ERROR,
+            "message": SENSITIVE_PROVIDER_ERROR,
+            "content": SENSITIVE_PROVIDER_ERROR,
+            "details": {"url": SENSITIVE_PROVIDER_ERROR},
+        })
+        return SimpleNamespace(
+            success=False,
+            content=SENSITIVE_PROVIDER_ERROR,
+            error=SENSITIVE_PROVIDER_ERROR,
+            total_steps=1,
+        )
+
+    executor.chat.side_effect = fail_with_callback
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={"message": "回调失败场景", "session_id": "private-callback"},
+                )
+
+    assert response.status_code == 200
+    assert '"type": "error"' in response.text
+    assert '"error": "agent_stream_failed"' in response.text
+    assert '"message": "Agent stream failed"' in response.text
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+
+
+def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: Path, caplog) -> None:
+    executor = MagicMock()
+    executor.chat.side_effect = RuntimeError(SENSITIVE_PROVIDER_ERROR)
+    config = SimpleNamespace(is_agent_available=lambda: True)
+    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={"message": "流式异常场景", "session_id": "private-exception"},
+                )
+
+    assert response.status_code == 200
+    assert '"error": "agent_stream_failed"' in response.text
+    assert "super-secret" not in response.text
+    assert "private.example" not in response.text
+    assert "super-secret" not in caplog.text
+    assert "private.example" not in caplog.text

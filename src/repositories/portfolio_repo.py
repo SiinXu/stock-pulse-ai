@@ -21,6 +21,7 @@ from src.storage import (
     PortfolioCorporateAction,
     PortfolioDailySnapshot,
     PortfolioFxRate,
+    PortfolioIdempotencyRecord,
     PortfolioPosition,
     PortfolioPositionLot,
     PortfolioTrade,
@@ -133,6 +134,38 @@ class PortfolioRepository:
     # ------------------------------------------------------------------
     # Event writes
     # ------------------------------------------------------------------
+    def get_idempotency_record_in_session(
+        self,
+        *,
+        session: Any,
+        operation_id: str,
+    ) -> Optional[PortfolioIdempotencyRecord]:
+        return session.execute(
+            select(PortfolioIdempotencyRecord).where(
+                PortfolioIdempotencyRecord.operation_id == operation_id
+            ).limit(1)
+        ).scalar_one_or_none()
+
+    def add_idempotency_record_in_session(
+        self,
+        *,
+        session: Any,
+        operation_id: str,
+        operation_type: str,
+        request_hash: str,
+        response_json: str,
+    ) -> PortfolioIdempotencyRecord:
+        row = PortfolioIdempotencyRecord(
+            operation_id=operation_id,
+            operation_type=operation_type,
+            request_hash=request_hash,
+            response_json=response_json,
+        )
+        session.add(row)
+        session.flush()
+        session.refresh(row)
+        return row
+
     @contextmanager
     def portfolio_write_session(self):
         session = self.db.get_session()

@@ -5,6 +5,7 @@ import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { formatTaskMessage } from '../../utils/taskMessage';
 
 /**
  * 任务项组件属性
@@ -50,6 +51,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
   const requestedPhaseVariant = task.analysisPhase === 'auto' ? 'default' : 'info';
+  const taskMessage = formatTaskMessage(task, language);
 
   return (
     <div className="home-subpanel grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
@@ -125,9 +127,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
         </div>
       </div>
 
-      {task.message ? (
+      {taskMessage ? (
         <p className="min-w-0 truncate text-xs text-secondary-text">
-          {task.message}
+          {taskMessage}
         </p>
       ) : null}
 
@@ -147,7 +149,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               style={{ width: `${progress}%` }}
             />
           </div>
-          <span className="shrink-0 text-[11px] text-muted-text tabular-nums">
+          <span className="shrink-0 text-xs text-muted-text tabular-nums">
             {progress}%
           </span>
         </div>
@@ -160,14 +162,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             data-testid="task-panel-diagnostics-summary"
           >
             <span className="whitespace-nowrap">{t('taskPanel.diagnostics')}</span>
-            <span className="min-w-0 truncate font-mono text-[11px] text-secondary-text">
+            <span className="min-w-0 truncate font-mono text-xs text-secondary-text">
               {traceId.length > 18 ? `${traceId.slice(0, 10)}...` : traceId}
             </span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open/task:rotate-180" aria-hidden="true" />
           </summary>
           <div className="mt-1 rounded-lg border border-subtle bg-base/50 px-2 py-1.5 text-muted-text">
             <span className="mr-1">Trace:</span>
-            <code className="break-all font-mono text-[11px] text-secondary-text">
+            <code className="break-all font-mono text-xs text-secondary-text">
               {traceId}
             </code>
           </div>
@@ -245,13 +247,13 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
             <div className="flex items-center gap-2 text-xs text-muted-text">
               {processingCount > 0 && (
                 <span className="flex items-center gap-1">
-                  <StatusDot tone="info" pulse className="h-1.5 w-1.5" aria-label="进行中任务" />
+                  <StatusDot tone="info" pulse className="h-1.5 w-1.5" aria-label={t('taskPanel.processingAria')} />
                   {t('taskPanel.processingTasks', { count: processingCount })}
                 </span>
               )}
               {pendingCount > 0 ? (
                 <span className="flex items-center gap-1">
-                  <StatusDot tone="neutral" className="h-1.5 w-1.5" aria-label="等待中任务" />
+                  <StatusDot tone="neutral" className="h-1.5 w-1.5" aria-label={t('taskPanel.pendingAria')} />
                   {t('taskPanel.pendingTasks', { count: pendingCount })}
                 </span>
               ) : null}

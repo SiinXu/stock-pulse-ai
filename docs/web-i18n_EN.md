@@ -19,6 +19,7 @@ locales/screening.ts
 locales/settingsPage.ts
 locales/settingsModelAccess.ts
 locales/reportChrome.ts
+locales/reportContent.ts
 ```
 
 Each domain registry must use `Record<UiLanguage, ...>` or an equivalent typed constraint so every language has the same structure. To add a language, extend `UiLanguage` and then implement the same keys in every domain. Do not add broad `language === 'en' ? ... : ...` branches in JSX.
@@ -27,9 +28,15 @@ Use named interpolation parameters such as `{count}` and `{name}`. Every languag
 
 ## Errors and Formatting
 
-Backend errors exposed to the Web should include a stable `error` code, diagnostic `message`, and structured `details`. The UI maps the code to localized primary copy. Raw messages belong in expandable diagnostics and must not become a Chinese primary error in an English UI.
+Backend errors exposed to the Web use one envelope: `error` is the stable business code, `params` contains localization interpolation values, and `message`, `details`, plus optional `trace_id` are diagnostic-only. The UI maps `error + params` to primary copy in the current UI language. Unknown codes show a localized generic error; the legacy raw-string adapter preserves the original value in Details instead of promoting it to primary copy.
+
+Task POST, SSE, and polling payloads use stable `message_code` and `message_params`. Components format them at render time in the current UI language so existing tasks update immediately after a language switch. A legacy server `message` is diagnostic compatibility data and must not bypass localization as the primary task status.
 
 Use `src/utils/uiLocale.ts` for dates, numbers, currency, and lists. Keep display locale separate from market business time zones. ISO form values, stock symbols, and model IDs are not localized.
+
+## Overlays and Accessibility Copy
+
+`Modal`, `Drawer`, `ConfirmDialog`, and mobile history panels share one overlay stack. Only the top layer handles Escape and Tab; opening a layer isolates the background and locks scrolling, and closing restores focus. Titles, descriptions, close controls, aria labels, and pending-state copy follow UI language. Report content inside an overlay still follows report language, while the overlay chrome does not.
 
 ## Verification
 
@@ -39,7 +46,7 @@ npm run test:i18n
 npm run test
 npx tsc -b
 npm run build
-npx playwright test e2e/i18n.spec.ts
+npm run test:smoke
 ```
 
-`test:i18n` checks zh/en keys, empty translations, interpolation parameters, duplicate keys, and hardcoded Chinese UI copy in production TSX. Allowances must identify a specific file and purpose; directory-wide exclusions are prohibited.
+`test:i18n` checks zh/en keys, empty translations, interpolation parameters, duplicate keys, and production TSX JSXText, strings, template literals, aria, placeholders, titles, toasts, and document titles. Allowances must identify the exact file, string, and purpose; file-wide and directory-wide exclusions are prohibited. Playwright scenarios need independent readable test names and key assertions; loops or numbered comments do not count as semantic coverage.

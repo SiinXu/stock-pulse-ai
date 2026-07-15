@@ -45,11 +45,45 @@ let marketReviewHistoryRequestSeq = 0;
 let stockHistoryRequestSeq = 0;
 let stockBarRequestSeq = 0;
 let activeTaskRequestSeq = 0;
+let knownTaskPollSeq = 0;
 let activeTaskLocalRevision = 0;
 let manualSelectionRequestSeq = 0;
 let manualSelectionRequestId = 0;
-const dismissedTaskIds = new Set<string>();
+export const TERMINAL_TASK_RETENTION_MS = 2 * 60 * 1000;
+
+type DismissedTask = {
+  expiresAt: number;
+  fingerprint: string;
+};
+
+const dismissedTasks = new Map<string, DismissedTask>();
 const pendingCompletedTaskSelectionKeys = new Map<string, CompletedTaskSelectionIntent>();
+
+const isTerminalTask = (task: Pick<TaskInfo, 'status'>): boolean =>
+  task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
+
+const taskFingerprint = (task: TaskInfo): string =>
+  [task.status, task.progress, task.completedAt ?? '', task.messageCode ?? ''].join('|');
+
+const isRecentlyTerminalTask = (task: TaskInfo, now = Date.now()): boolean => {
+  if (!isTerminalTask(task)) {
+    return true;
+  }
+  const timestamp = Date.parse(task.completedAt || task.createdAt);
+  return !Number.isFinite(timestamp) || now - timestamp <= TERMINAL_TASK_RETENTION_MS;
+};
+
+const isTaskDismissed = (task: TaskInfo, now = Date.now()): boolean => {
+  const dismissed = dismissedTasks.get(task.taskId);
+  if (!dismissed) {
+    return false;
+  }
+  if (dismissed.expiresAt <= now) {
+    dismissedTasks.delete(task.taskId);
+    return false;
+  }
+  return true;
+};
 
 export interface StockPoolState {
   query: string;
@@ -57,6 +91,7 @@ export interface StockPoolState {
   notify: boolean;
   inputError?: string;
   duplicateError: string | null;
+  duplicateTask: { stockCode: string; existingTaskId: string } | null;
   error: ParsedApiError | null;
   isAnalyzing: boolean;
   historyItems: HistoryItem[];
@@ -126,6 +161,7 @@ export interface StockPoolState {
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
   refreshActiveTasks: () => Promise<void>;
+  pollKnownTasks: () => Promise<void>;
   removeTask: (taskId: string) => void;
   resetDashboardState: () => void;
   loadStockBar: () => Promise<void>;
@@ -138,6 +174,7 @@ const initialState = {
   notify: true,
   inputError: undefined,
   duplicateError: null,
+  duplicateTask: null,
   error: null,
   isAnalyzing: false,
   historyItems: [] as HistoryItem[],
@@ -616,12 +653,13 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
       selectionSource: 'manual',
       inputError: undefined,
       duplicateError: null,
+      duplicateTask: null,
     });
   },
 
   clearError: () => set({ error: null }),
 
-  clearInlineMessages: () => set({ inputError: undefined, duplicateError: null }),
+  clearInlineMessages: () => set({ inputError: undefined, duplicateError: null, duplicateTask: null }),
 
   setNotify: (notify) => set({ notify }),
 
@@ -924,12 +962,12 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const skills = options?.skills;
 
     if (!stockCodeInput) {
-      set({ inputError: '请输入股票代码', duplicateError: null });
+      set({ inputError: '请输入股票代码', duplicateError: null, duplicateTask: null });
       return;
     }
 
     if (selectionSource !== 'autocomplete' && isObviouslyInvalidStockQuery(stockCodeInput)) {
-      set({ inputError: '请输入有效的股票代码或股票名称', duplicateError: null });
+      set({ inputError: '请输入有效的股票代码或股票名称', duplicateError: null, duplicateTask: null });
       return;
     }
 
@@ -937,7 +975,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     if (selectionSource === 'autocomplete' || looksLikeStockCode(stockCodeInput)) {
       const { valid, message, normalized } = validateStockCode(stockCodeInput);
       if (!valid) {
-        set({ inputError: message, duplicateError: null });
+        set({ inputError: message, duplicateError: null, duplicateTask: null });
         return;
       }
       normalizedStockCode = normalized;
@@ -946,6 +984,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     set({
       inputError: undefined,
       duplicateError: null,
+      duplicateTask: null,
       error: null,
       isAnalyzing: true,
     });
@@ -978,6 +1017,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         taskStockCode: string,
         status: TaskInfo['status'],
         analysisPhase?: TaskInfo['analysisPhase'],
+        messageCode?: string,
+        messageParams?: Record<string, unknown>,
       ) => {
         get().syncTaskCreated({
           taskId,
@@ -987,6 +1028,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
           progress: 0,
           reportType: 'detailed',
           createdAt,
+          messageCode: messageCode || 'task.queued',
+          messageParams: messageParams || { stockCode: taskStockCode },
           originalQuery: originalQuery || stockCodeInput,
           selectionSource,
           ...(analysisPhase !== undefined ? { analysisPhase } : {}),
@@ -996,10 +1039,24 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
       const accepted: AnalyzeAsyncResponse | undefined = response;
       if (accepted && 'taskId' in accepted) {
-        registerTask(accepted.taskId, normalizedStockCode, accepted.status, accepted.analysisPhase);
+        registerTask(
+          accepted.taskId,
+          normalizedStockCode,
+          accepted.status,
+          accepted.analysisPhase,
+          accepted.messageCode,
+          accepted.messageParams,
+        );
       } else if (accepted && 'accepted' in accepted) {
         for (const item of accepted.accepted) {
-          registerTask(item.taskId, item.stockCode, item.status, item.analysisPhase);
+          registerTask(
+            item.taskId,
+            item.stockCode,
+            item.status,
+            item.analysisPhase,
+            item.messageCode,
+            item.messageParams,
+          );
         }
       }
 
@@ -1014,7 +1071,11 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
       if (error instanceof DuplicateTaskError) {
         set({
-          duplicateError: `股票 ${error.stockCode} 正在分析中，请等待完成`,
+          duplicateError: error.message,
+          duplicateTask: {
+            stockCode: error.stockCode,
+            existingTaskId: error.existingTaskId,
+          },
         });
         return;
       }
@@ -1028,32 +1089,45 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   },
 
   syncTaskCreated: (task) => {
-    if (dismissedTaskIds.has(task.taskId)) {
+    if (isTaskDismissed(task)) {
       return;
     }
-    if (get().activeTasks.some((item) => item.taskId === task.taskId)) {
-      return;
+    const currentTasks = get().activeTasks;
+    const index = currentTasks.findIndex((item) => item.taskId === task.taskId);
+    if (index >= 0) {
+      const nextTasks = [...currentTasks];
+      nextTasks[index] = { ...nextTasks[index], ...task };
+      activeTaskLocalRevision += 1;
+      set({ activeTasks: nextTasks });
+    } else {
+      activeTaskLocalRevision += 1;
+      set({ activeTasks: [...currentTasks, task] });
     }
-    activeTaskLocalRevision += 1;
-    set({ activeTasks: [...get().activeTasks, task] });
   },
 
   syncTaskUpdated: (task) => {
-    if (dismissedTaskIds.has(task.taskId)) {
+    if (isTaskDismissed(task)) {
       return;
     }
     const nextTasks = [...get().activeTasks];
     const index = nextTasks.findIndex((item) => item.taskId === task.taskId);
-    if (index >= 0) {
-      nextTasks[index] = task;
-      activeTaskLocalRevision += 1;
-      set({ activeTasks: nextTasks });
+    if (index < 0) {
+      return;
     }
+    nextTasks[index] = { ...nextTasks[index], ...task };
+    activeTaskLocalRevision += 1;
+    set({ activeTasks: nextTasks });
   },
 
   syncTaskFailed: (task) => {
     get().syncTaskUpdated(task);
-    set({ error: getParsedApiError(task.error || '分析失败') });
+    set({
+      error: getParsedApiError({
+        error: 'analysis_failed',
+        message: task.error || task.message || 'Analysis failed',
+        trace_id: task.traceId,
+      }),
+    });
   },
 
   refreshActiveTasks: async () => {
@@ -1061,27 +1135,26 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const localRevisionAtRequest = activeTaskLocalRevision;
     try {
       const response = await analysisApi.getTasks({
-        status: 'pending,processing,cancel_requested',
+        status: 'pending,processing,cancel_requested,completed,failed,cancelled',
         limit: 100,
       });
       if (requestId !== activeTaskRequestSeq) {
         return;
       }
 
-      const remoteTasks = response.tasks.filter(
-        (task) => !dismissedTaskIds.has(task.taskId),
-      );
+      const now = Date.now();
+      const remoteTasks = response.tasks
+        .filter((task) => isRecentlyTerminalTask(task, now))
+        .filter((task) => !isTaskDismissed(task, now));
       const remoteTaskIds = new Set(remoteTasks.map((task) => task.taskId));
       const remoteTaskById = new Map(remoteTasks.map((task) => [task.taskId, task]));
-      const activeTaskCount = response.pending
-        + response.processing
-        + response.tasks.filter((task) => task.status === 'cancel_requested').length;
-      const isCompleteSnapshot = response.tasks.length === activeTaskCount;
+      const isCompleteSnapshot = response.tasks.length >= Math.min(response.total, 100);
       const canPruneLocalTasks = isCompleteSnapshot && activeTaskLocalRevision === localRevisionAtRequest;
 
       const currentTasks = get().activeTasks;
       const nextTasks = currentTasks
-        .filter((task) => !dismissedTaskIds.has(task.taskId))
+        .filter((task) => isRecentlyTerminalTask(task, now))
+        .filter((task) => !isTaskDismissed(task, now))
         .filter((task) => !canPruneLocalTasks || remoteTaskIds.has(task.taskId))
         .map((task) => remoteTaskById.get(task.taskId) ?? task);
 
@@ -1103,9 +1176,60 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     }
   },
 
+  pollKnownTasks: async () => {
+    const knownTasks = get().activeTasks.filter((task) => !isTerminalTask(task));
+    if (knownTasks.length === 0) {
+      return;
+    }
+
+    const requestId = ++knownTaskPollSeq;
+    const results = await Promise.allSettled(
+      knownTasks.map(async (task) => ({ task, status: await analysisApi.getStatus(task.taskId) })),
+    );
+    if (requestId !== knownTaskPollSeq) {
+      return;
+    }
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled') {
+        continue;
+      }
+      const { task, status } = result.value;
+      if (!status || typeof status.status !== 'string') {
+        continue;
+      }
+      const updated: TaskInfo = {
+        ...task,
+        status: status.status,
+        progress: status.progress ?? task.progress,
+        message: status.message ?? task.message,
+        messageCode: status.messageCode ?? task.messageCode,
+        messageParams: status.messageParams ?? task.messageParams,
+        error: status.error ?? task.error,
+        traceId: status.traceId ?? task.traceId,
+        stockName: status.stockName ?? task.stockName,
+        originalQuery: status.originalQuery ?? task.originalQuery,
+        selectionSource: status.selectionSource ?? task.selectionSource,
+        analysisPhase: status.analysisPhase ?? task.analysisPhase,
+        skills: status.skills ?? task.skills,
+        completedAt: isTerminalTask(status) ? task.completedAt ?? new Date().toISOString() : task.completedAt,
+      };
+      get().syncTaskUpdated(updated);
+      if (updated.status === 'failed') {
+        get().syncTaskFailed(updated);
+      }
+    }
+  },
+
   removeTask: (taskId) => {
-    dismissedTaskIds.add(taskId);
     const currentTasks = get().activeTasks;
+    const removed = currentTasks.find((task) => task.taskId === taskId);
+    if (removed) {
+      dismissedTasks.set(taskId, {
+        expiresAt: Date.now() + TERMINAL_TASK_RETENTION_MS,
+        fingerprint: taskFingerprint(removed),
+      });
+    }
     const nextTasks = currentTasks.filter((task) => task.taskId !== taskId);
     if (nextTasks.length !== currentTasks.length) {
       activeTaskLocalRevision += 1;
@@ -1124,7 +1248,8 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     stockBarRequestSeq += 1;
     activeTaskRequestSeq += 1;
     activeTaskLocalRevision += 1;
-    dismissedTaskIds.clear();
+    knownTaskPollSeq += 1;
+    dismissedTasks.clear();
     pendingCompletedTaskSelectionKeys.clear();
     set({ ...initialState });
   },

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProviderCatalog } from '../useProviderCatalog';
 
@@ -31,5 +31,29 @@ describe('useProviderCatalog', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe('boom');
     expect(result.current.providers).toEqual([]);
+  });
+
+  it('ignores an older response after reload starts a newer request', async () => {
+    let resolveFirst!: (value: { providers: Array<{ id: string; label: string; protocol: string }> }) => void;
+    let resolveSecond!: (value: { providers: Array<{ id: string; label: string; protocol: string }> }) => void;
+    getLlmProviderCatalog
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    const { result } = renderHook(() => useProviderCatalog());
+    await waitFor(() => expect(getLlmProviderCatalog).toHaveBeenCalledTimes(1));
+    act(() => result.current.reload());
+    await waitFor(() => expect(getLlmProviderCatalog).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      resolveSecond({ providers: [{ id: 'new', label: 'New', protocol: 'openai' }] });
+    });
+    await waitFor(() => expect(result.current.providers[0]?.id).toBe('new'));
+
+    await act(async () => {
+      resolveFirst({ providers: [{ id: 'old', label: 'Old', protocol: 'openai' }] });
+    });
+    expect(result.current.providers[0]?.id).toBe('new');
+    expect(result.current.isLoading).toBe(false);
   });
 });

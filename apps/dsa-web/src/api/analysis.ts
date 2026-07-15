@@ -87,10 +87,15 @@ export const analysisApi = {
       const errorData = toCamelCase<{
         error: string;
         message: string;
-        stockCode: string;
-        existingTaskId: string;
+        params?: { stockCode?: string; existingTaskId?: string };
+        stockCode?: string;
+        existingTaskId?: string;
       }>(response.data);
-      throw new DuplicateTaskError(errorData.stockCode, errorData.existingTaskId, errorData.message);
+      throw new DuplicateTaskError(
+        errorData.params?.stockCode || errorData.stockCode || data.stockCode || '',
+        errorData.params?.existingTaskId || errorData.existingTaskId || '',
+        errorData.message,
+      );
     }
 
     return toCamelCase<AnalyzeAsyncResponse>(response.data);

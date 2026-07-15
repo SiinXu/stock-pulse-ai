@@ -42,6 +42,7 @@ from src.agent.protocols import (
     StageStatus,
     normalize_decision_signal,
 )
+from src.agent.public_contract import AGENT_CHAT_FAILURE_HISTORY_MESSAGE
 from src.agent.risk_override import build_risk_override_plan
 from src.agent.runner import parse_dashboard_json
 from src.agent.stock_scope import resolve_stock_scope
@@ -375,9 +376,15 @@ class AgentOrchestrator:
         if orch_result.success:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
         else:
+            logger.error(
+                "Agent orchestrator chat failed: session_id=%s error=%s",
+                session_id,
+                orch_result.error,
+            )
             conversation_manager.add_message(
-                session_id, "assistant",
-                f"[分析失败] {orch_result.error or '未知错误'}",
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
             )
 
         return AgentResult(

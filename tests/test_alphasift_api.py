@@ -30,6 +30,10 @@ from src.services import alphasift_service
 from src.services.task_queue import TaskInfo, TaskStatus as QueueTaskStatus
 
 DEFAULT_ALPHASIFT_TEST_SPEC = DEFAULT_ALPHASIFT_INSTALL_SPEC
+PUBLIC_DIAGNOSTIC_SECRET = (
+    "Authorization: Bearer sk-alphasift-secret-marker "
+    "https://user:password@example.invalid/private"
+)
 
 
 def _alphasift_unavailable() -> HTTPException:
@@ -121,6 +125,11 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             with patch.dict(os.environ, {"ALPHASIFT_DATA_DIR": str(Path(tmpdir) / "alphasift")}, clear=False):
                 return alphasift_endpoint.alphasift_hotspot_detail(config=config, **kwargs)
 
+    def assert_public_payload_is_private(self, payload: Any) -> None:
+        serialized = json.dumps(payload, ensure_ascii=False, default=str)
+        self.assertNotIn("sk-alphasift-secret-marker", serialized)
+        self.assertNotIn("user:password@example.invalid", serialized)
+
     def test_default_install_spec_is_commit_pinned(self) -> None:
         self.assertRegex(
             DEFAULT_ALPHASIFT_TEST_SPEC,
@@ -178,6 +187,32 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             payload = alphasift_endpoint.alphasift_status(config=config)
 
         self.assertEqual(payload["source_health"]["snapshot"]["sina"]["failures"], 2)
+
+    def test_status_hides_raw_source_health_diagnostics(self) -> None:
+        config = self._config(enabled=True)
+
+        with (
+            patch(
+                "src.services.alphasift_service._call_alphasift_status",
+                return_value={"available": True, "contract_version": "1", "version": "0.2.0"},
+            ),
+            patch(
+                "src.services.alphasift_service._get_alphasift_source_health_snapshot",
+                return_value={
+                    "snapshot": {
+                        "source_errors": [PUBLIC_DIAGNOSTIC_SECRET],
+                        "warnings": [PUBLIC_DIAGNOSTIC_SECRET],
+                        "exception": PUBLIC_DIAGNOSTIC_SECRET,
+                    },
+                },
+            ),
+        ):
+            payload = alphasift_endpoint.alphasift_status(config=config)
+
+        self.assertEqual(payload["source_health"]["snapshot"]["source_errors"], ["alphasift_source_error"])
+        self.assertEqual(payload["source_health"]["snapshot"]["warnings"], ["alphasift_warning"])
+        self.assertEqual(payload["source_health"]["snapshot"]["exception"], "alphasift_internal_error")
+        self.assert_public_payload_is_private(payload)
 
     def test_status_preserves_adapter_available_false_without_diagnostics(self) -> None:
         config = self._config(enabled=False)
@@ -563,7 +598,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["fallback_used"], True)
         self.assertEqual(payload["hotspot_count"], 1)
         self.assertEqual(payload["hotspots"][0]["topic"], "MLCC")
-        self.assertIn("akshare returned no usable board rows", payload["source_errors"])
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_source_error"])
         discover.assert_called_once()
 
     def test_hotspots_refresh_failure_without_cache_returns_friendly_empty_payload(self) -> None:
@@ -587,6 +622,41 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["message"], "热点源连接中断，暂无可用缓存。")
         self.assertNotIn("RemoteDisconnected", payload["message"])
         discover.assert_called_once()
+
+    def test_hotspots_refresh_failure_with_cache_uses_stable_public_error_code(self) -> None:
+        config = self._config(enabled=True)
+        discover = MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "hotspots.json"
+            cache_path.write_text(
+                json.dumps({
+                    "cached_at": "2026-06-07T12:00:00Z",
+                    "payload": {
+                        "enabled": True,
+                        "provider": "akshare",
+                        "provider_used": "DsaEastMoneyHotspotProvider",
+                        "source_errors": [],
+                        "hotspots": [{"topic": "MLCC", "heat_score": 91.0}],
+                    },
+                }),
+                encoding="utf-8",
+            )
+            provider = alphasift_service.DsaEastMoneyHotspotProvider()
+            with (
+                patch("src.services.alphasift_service.DSA_ALPHASIFT_HOTSPOT_CACHE_PATH", cache_path),
+                patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+                patch("src.services.alphasift_service._resolve_hotspot_provider", return_value=("akshare", provider)),
+                patch(
+                    "src.services.alphasift_service._import_alphasift_hotspot",
+                    return_value=SimpleNamespace(discover_hotspots=discover),
+                ),
+            ):
+                payload = self._hotspots(config=config, provider="akshare", top=1, refresh=True)
+
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_refresh_failed"])
+        self.assertTrue(payload["cache_used"])
+        self.assert_public_payload_is_private(payload)
 
     def test_hotspots_default_refresh_degraded_eastmoney_failure_without_cache_returns_friendly_empty_payload(self) -> None:
         config = self._config(enabled=True)
@@ -644,8 +714,30 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(caught.exception.status_code, 424)
         self.assertEqual(caught.exception.detail["error"], "alphasift_hotspot_refresh_failed")
-        self.assertIn("adapter contract returned invalid payload", caught.exception.detail["message"])
+        self.assertEqual(caught.exception.detail["message"], "AlphaSift 热点刷新失败，请稍后重试。")
         discover.assert_called_once()
+
+    def test_hotspots_refresh_runtime_failure_without_cache_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+        discover = MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "missing-hotspots.json"
+            with (
+                patch("src.services.alphasift_service.DSA_ALPHASIFT_HOTSPOT_CACHE_PATH", cache_path),
+                patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+                patch("src.services.alphasift_service._resolve_hotspot_provider", return_value=("custom", "custom")),
+                patch(
+                    "src.services.alphasift_service._import_alphasift_hotspot",
+                    return_value=SimpleNamespace(discover_hotspots=discover),
+                ),
+            ):
+                with self.assertRaises(HTTPException) as caught:
+                    self._hotspots(config=config, provider="custom", top=1, refresh=True)
+
+        self.assertEqual(caught.exception.detail["error"], "alphasift_hotspot_refresh_failed")
+        self.assertEqual(caught.exception.detail["message"], "AlphaSift 热点刷新失败，请稍后重试。")
+        self.assert_public_payload_is_private(caught.exception.detail)
 
     def test_hotspots_refresh_non_akshare_failure_without_cache_raises_integration_error(self) -> None:
         config = self._config(enabled=True)
@@ -664,7 +756,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(caught.exception.status_code, 424)
         self.assertEqual(caught.exception.detail["error"], "alphasift_hotspot_refresh_failed")
-        self.assertIn("RemoteDisconnected", caught.exception.detail["message"])
+        self.assertEqual(caught.exception.detail["message"], "AlphaSift 热点刷新失败，请稍后重试。")
         discover.assert_called_once()
 
     def test_hotspot_provider_retries_transient_eastmoney_failure(self) -> None:
@@ -795,7 +887,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(cached["cache_used"], True)
         self.assertEqual(cached["cached_at"], "2026-06-13T02:55:00Z")
         self.assertEqual(cached["schema_version"], 2)
-        self.assertEqual(cached["source_errors"], ["provider timeout"])
+        self.assertEqual(cached["source_errors"], ["alphasift_hotspot_source_error"])
         self.assertEqual(cached["hotspots"][0]["canonical_topic"], "算力")
         discover.assert_not_called()
 
@@ -919,7 +1011,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["quality_status"], "stale")
         self.assertEqual(payload["aliases"], ["AI算力"])
         self.assertEqual(payload["missing_fields"], ["live_stocks"])
-        self.assertEqual(payload["source_errors"], ["none: no live detail rows"])
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_detail_source_error"])
         self.assertEqual(payload["stocks"][0]["source"], "last_good_cache.leader_stocks")
         self.assertEqual(payload["leader_stocks"][0]["source"], "last_good_cache.leader_stocks")
         self.assertEqual(payload["route"][0]["title"], "AI算力催化")
@@ -1186,11 +1278,99 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["route"][0]["title"], "盘中发酵")
         self.assertEqual(payload["route"][0]["source"], "eastmoney_board_change")
         provider.hotspot_detail.assert_called_once_with("机器人执行器")
-        self.assertEqual(
-            payload["source_errors"][0],
-            "alphasift_hotspot_detail_fallback: contract parser broken",
-        )
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_detail_fallback"])
         self.assertTrue(payload["fallback_used"])
+
+    def test_hotspot_detail_helper_fallback_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+        provider = alphasift_service.DsaEastMoneyHotspotProvider()
+        provider.hotspot_detail = MagicMock(return_value={
+            "topic": "机器人执行器",
+            "summary": "机器人执行器盘中发酵。",
+            "route": [{"title": "盘中发酵", "source": "eastmoney_board_change"}],
+            "stocks": [],
+            "source_errors": [],
+        })
+
+        with (
+            patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+            patch("src.services.alphasift_service._resolve_hotspot_provider", return_value=("akshare", provider)),
+            patch(
+                "src.services.alphasift_service._import_alphasift_hotspot",
+                return_value=SimpleNamespace(
+                    get_hotspot_detail=MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET))
+                ),
+            ),
+        ):
+            payload = self._hotspot_detail(config=config, provider="akshare", topic="机器人执行器")
+
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_detail_fallback"])
+        self.assert_public_payload_is_private(payload)
+
+    def test_hotspot_detail_failure_with_stale_cache_uses_stable_public_error_code(self) -> None:
+        config = self._config(enabled=True)
+        provider = alphasift_service.DsaEastMoneyHotspotProvider()
+        provider.hotspot_detail = MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = Path(tmpdir) / "alphasift"
+            with patch.dict(os.environ, {"ALPHASIFT_DATA_DIR": str(data_dir)}, clear=False):
+                cache_path = alphasift_service._alphasift_hotspot_detail_cache_path(
+                    provider="akshare",
+                    topic="机器人执行器",
+                )
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_text(
+                    json.dumps({
+                        "cached_at": "2020-01-01T00:00:00Z",
+                        "payload": {
+                            "topic": "机器人执行器",
+                            "summary": "stale",
+                            "stocks": [],
+                            "source_errors": [],
+                        },
+                    }),
+                    encoding="utf-8",
+                )
+                with (
+                    patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+                    patch("src.services.alphasift_service._resolve_hotspot_provider", return_value=("akshare", provider)),
+                    patch("src.services.alphasift_service._import_alphasift_hotspot", return_value=SimpleNamespace()),
+                ):
+                    payload = self._hotspot_detail(
+                        config=config,
+                        provider="akshare",
+                        topic="机器人执行器",
+                        refresh=True,
+                    )
+
+        self.assertEqual(payload["source_errors"], ["alphasift_hotspot_detail_stale_cache"])
+        self.assertTrue(payload["stale"])
+        self.assert_public_payload_is_private(payload)
+
+    def test_hotspot_detail_failure_without_cache_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+        provider = alphasift_service.DsaEastMoneyHotspotProvider()
+        provider.hotspot_detail = MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET))
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with (
+                patch.dict(os.environ, {"ALPHASIFT_DATA_DIR": str(Path(tmpdir) / "alphasift")}, clear=False),
+                patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+                patch("src.services.alphasift_service._resolve_hotspot_provider", return_value=("akshare", provider)),
+                patch("src.services.alphasift_service._import_alphasift_hotspot", return_value=SimpleNamespace()),
+            ):
+                with self.assertRaises(HTTPException) as caught:
+                    self._hotspot_detail(
+                        config=config,
+                        provider="akshare",
+                        topic="机器人执行器",
+                        refresh=True,
+                    )
+
+        self.assertEqual(caught.exception.detail["error"], "alphasift_hotspot_detail_failed")
+        self.assertEqual(caught.exception.detail["message"], "AlphaSift 热点详情获取失败，请稍后重试。")
+        self.assert_public_payload_is_private(caught.exception.detail)
 
     def test_hotspot_detail_preserves_provider_route_when_contract_detail_has_no_timeline(self) -> None:
         config = self._config(enabled=True)
@@ -1659,6 +1839,10 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload.max_results, 3)
         fake_queue.submit_background_task.assert_called_once()
         self.assertEqual(fake_queue.submit_background_task.call_args.kwargs["report_type"], "alphasift_screen")
+        self.assertEqual(
+            fake_queue.submit_background_task.call_args.kwargs["failure_error_code"],
+            "alphasift_screen_failed",
+        )
         screen_mock.assert_called_once_with(strategy="dual_low", market="cn", max_results=3)
         self.assertEqual(result["candidate_count"], 0)
         fake_queue.update_task_progress.assert_any_call(
@@ -1686,6 +1870,31 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(payload.status, "completed")
         self.assertEqual(payload.result["candidate_count"], 0)
+
+    def test_screen_task_status_does_not_expose_legacy_diagnostic_text(self) -> None:
+        secret_marker = "Authorization: Bearer sk-alphasift-secret-marker"
+        task = TaskInfo(
+            task_id="screen-task-failed",
+            trace_id="trace-screen-task-failed",
+            stock_code="alphasift_screen",
+            status=QueueTaskStatus.FAILED,
+            progress=40,
+            message=f"任务失败: {secret_marker}",
+            message_code="task.failed",
+            error=secret_marker,
+            diagnostic_error=secret_marker,
+            failure_error_code="alphasift_screen_failed",
+            report_type="alphasift_screen",
+        )
+        fake_queue = MagicMock()
+        fake_queue.get_task.return_value = task
+
+        with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
+            payload = alphasift_endpoint.alphasift_screen_task_status(task.task_id)
+
+        self.assertEqual(payload.error, "alphasift_screen_failed")
+        self.assertEqual(payload.message, "任务执行失败")
+        self.assertNotIn(secret_marker, payload.model_dump_json())
 
     def test_screen_task_status_rejects_non_alphasift_task(self) -> None:
         task = TaskInfo(
@@ -1815,6 +2024,37 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertIn("--force-reinstall", install_command)
         self.assertIn(DEFAULT_ALPHASIFT_TEST_SPEC, install_command)
 
+    def test_install_start_failure_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+
+        with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
+            patch("src.services.alphasift_service._is_alphasift_available", return_value=False),
+            patch("src.services.alphasift_service.subprocess.run", side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET)),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                alphasift_endpoint.alphasift_install(request=self._request(), config=config)
+
+        self.assertEqual(caught.exception.detail["error"], "alphasift_install_failed")
+        self.assertEqual(caught.exception.detail["message"], "修复安装 AlphaSift 失败，请检查后端日志。")
+        self.assert_public_payload_is_private(caught.exception.detail)
+
+    def test_install_command_failure_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+        completed = SimpleNamespace(returncode=1, stdout="", stderr=PUBLIC_DIAGNOSTIC_SECRET)
+
+        with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
+            patch("src.services.alphasift_service._is_alphasift_available", return_value=False),
+            patch("src.services.alphasift_service.subprocess.run", return_value=completed),
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                alphasift_endpoint.alphasift_install(request=self._request(), config=config)
+
+        self.assertEqual(caught.exception.detail["error"], "alphasift_install_failed")
+        self.assertEqual(caught.exception.detail["message"], "修复安装 AlphaSift 失败，请检查后端日志。")
+        self.assert_public_payload_is_private(caught.exception.detail)
+
     def test_install_rejects_when_alphasift_adapter_reports_unavailable(self) -> None:
         config = self._config(enabled=True)
         completed = SimpleNamespace(returncode=0, stdout="installed", stderr="")
@@ -1912,9 +2152,9 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["after_filter_count"], 5)
         self.assertEqual(payload["llm_ranked"], True)
         self.assertEqual(payload["llm_coverage"], 1.0)
-        self.assertEqual(payload["warnings"], ["fallback"])
-        self.assertEqual(payload["source_errors"], ["sina timeout"])
-        self.assertEqual(payload["llm_parse_errors"], ["retry parsed partial JSON"])
+        self.assertEqual(payload["warnings"], ["alphasift_warning"])
+        self.assertEqual(payload["source_errors"], ["alphasift_source_error"])
+        self.assertEqual(payload["llm_parse_errors"], ["alphasift_llm_parse_error"])
         self.assertEqual(payload["candidate_count"], 1)
         self.assertEqual(payload["post_analyzers"], ["scorecard"])
         self.assertEqual(payload["daily_enriched"], True)
@@ -1926,6 +2166,136 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["candidates"][0]["risk_level"], "medium")
         self.assertEqual(payload["candidates"][0]["price"], 1688.0)
         self.assertEqual(payload["candidates"][0]["industry"], "Baijiu")
+
+    def test_screen_success_hides_raw_adapter_diagnostics_recursively(self) -> None:
+        config = self._config(enabled=True)
+        fake_module = _make_adapter_module(
+            screen=MagicMock(return_value={
+                "warnings": [PUBLIC_DIAGNOSTIC_SECRET],
+                "source_errors": [PUBLIC_DIAGNOSTIC_SECRET],
+                "llm_parse_errors": [PUBLIC_DIAGNOSTIC_SECRET],
+                "candidates": [{
+                    "code": "600519",
+                    "warnings": [PUBLIC_DIAGNOSTIC_SECRET],
+                    "source_errors": [PUBLIC_DIAGNOSTIC_SECRET],
+                    "exception": PUBLIC_DIAGNOSTIC_SECRET,
+                    "error": PUBLIC_DIAGNOSTIC_SECRET,
+                    "error_message": PUBLIC_DIAGNOSTIC_SECRET,
+                    "errorMessage": PUBLIC_DIAGNOSTIC_SECRET,
+                    "error_msg": PUBLIC_DIAGNOSTIC_SECRET,
+                    "errorMsg": PUBLIC_DIAGNOSTIC_SECRET,
+                    "error_code": PUBLIC_DIAGNOSTIC_SECRET,
+                    "errorReason": PUBLIC_DIAGNOSTIC_SECRET,
+                    "last_error": PUBLIC_DIAGNOSTIC_SECRET,
+                    "lastError": PUBLIC_DIAGNOSTIC_SECRET,
+                    "last_error_message": PUBLIC_DIAGNOSTIC_SECRET,
+                    "last_error_code": "stock_news_failed",
+                    "diagnostic_error": PUBLIC_DIAGNOSTIC_SECRET,
+                    "response_error": PUBLIC_DIAGNOSTIC_SECRET,
+                    "raw_error": PUBLIC_DIAGNOSTIC_SECRET,
+                    "errors": [PUBLIC_DIAGNOSTIC_SECRET],
+                    "error_messages": [PUBLIC_DIAGNOSTIC_SECRET],
+                    "responseErrors": [PUBLIC_DIAGNOSTIC_SECRET],
+                    "nested": {
+                        "error": "stock_news_unavailable",
+                        "errors": ["stock_news_failed", PUBLIC_DIAGNOSTIC_SECRET],
+                    },
+                    "diagnostics": {
+                        "endpoint": PUBLIC_DIAGNOSTIC_SECRET,
+                        "note": "provider returned a partial business payload",
+                        "public_url": "https://docs.example.invalid/alphasift",
+                        PUBLIC_DIAGNOSTIC_SECRET: "failed",
+                    },
+                    "debug_message": PUBLIC_DIAGNOSTIC_SECRET,
+                }],
+            }),
+        )
+
+        with patch("src.services.alphasift_service._import_alphasift", return_value=fake_module):
+            payload = self._screen(config, market="cn", strategy="dual_low", max_results=1)
+
+        self.assertEqual(payload["warnings"], ["alphasift_warning"])
+        self.assertEqual(payload["source_errors"], ["alphasift_source_error"])
+        self.assertEqual(payload["llm_parse_errors"], ["alphasift_llm_parse_error"])
+        raw = payload["candidates"][0]["raw"]
+        self.assertEqual(raw["exception"], "alphasift_internal_error")
+        for key in (
+            "error",
+            "error_message",
+            "errorMessage",
+            "error_msg",
+            "errorMsg",
+            "error_code",
+            "errorReason",
+            "last_error",
+            "lastError",
+            "last_error_message",
+            "diagnostic_error",
+            "response_error",
+            "raw_error",
+        ):
+            self.assertEqual(raw[key], "alphasift_error")
+            self.assertIsInstance(raw[key], str)
+        self.assertEqual(raw["errors"], ["alphasift_error"])
+        self.assertEqual(raw["error_messages"], ["alphasift_error"])
+        self.assertEqual(raw["responseErrors"], ["alphasift_error"])
+        self.assertEqual(raw["last_error_code"], "stock_news_failed")
+        self.assertEqual(raw["nested"]["error"], "stock_news_unavailable")
+        self.assertEqual(raw["nested"]["errors"], ["stock_news_failed", "alphasift_error"])
+        self.assertNotIn(PUBLIC_DIAGNOSTIC_SECRET, raw["diagnostics"]["endpoint"])
+        self.assertIn("[REDACTED]", raw["diagnostics"]["endpoint"])
+        self.assertIn("[REDACTED_URL]", raw["diagnostics"]["endpoint"])
+        self.assertEqual(
+            raw["diagnostics"]["note"],
+            "provider returned a partial business payload",
+        )
+        self.assertEqual(
+            raw["diagnostics"]["public_url"],
+            "https://docs.example.invalid/alphasift",
+        )
+        diagnostic_keys = list(raw["diagnostics"])
+        self.assertIn("Authorization: [REDACTED] [REDACTED_URL]", diagnostic_keys)
+        self.assertNotIn(PUBLIC_DIAGNOSTIC_SECRET, diagnostic_keys)
+        self.assertNotIn(PUBLIC_DIAGNOSTIC_SECRET, raw["debug_message"])
+        self.assertIn("[REDACTED]", raw["debug_message"])
+        self.assertIn("[REDACTED_URL]", raw["debug_message"])
+        self.assert_public_payload_is_private(payload)
+
+    def test_screen_news_enrichment_exception_hides_raw_error_field(self) -> None:
+        config = self._config(enabled=True)
+        fake_manager = SimpleNamespace(get_stock_name=MagicMock(return_value="贵州茅台"))
+        fake_module = _make_adapter_module(
+            screen=MagicMock(return_value={
+                "candidates": [{"code": "600519", "score": 88.5}],
+            }),
+        )
+
+        with (
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            patch("src.services.alphasift_service._get_dsa_fetcher_manager", return_value=fake_manager),
+            patch("src.services.alphasift_service.get_dsa_realtime_quote", return_value={}),
+            patch("src.services.alphasift_service.get_dsa_fundamental_context", return_value={}),
+            patch(
+                "src.services.alphasift_service.search_dsa_stock_news",
+                side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET),
+            ),
+        ):
+            payload = self._screen(
+                config,
+                market="cn",
+                strategy="dual_low",
+                max_results=1,
+                mock_enrichment=False,
+            )
+
+        news = payload["candidates"][0]["dsa_context"]["news"]
+        self.assertEqual(news["error"], "stock_news_failed")
+        self.assertIsInstance(news["error"], str)
+        self.assertEqual(
+            payload["dsa_enrichment"]["warnings"],
+            ["dsa_realtime_quote_missing", "stock_news_failed"],
+        )
+        self.assert_public_payload_is_private(payload)
 
     def test_screen_prefers_dsa_daily_history_for_alphasift_enrichment(self) -> None:
         config = self._config(enabled=True)
@@ -2078,7 +2448,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(candidate["dsa_news"][0]["title"], "贵州茅台最新公告")
         self.assertEqual(candidate["dsa_analysis_summary"], "DSA新闻: 贵州茅台最新公告")
         self.assertEqual(payload["dsa_enrichment"]["enriched_count"], 1)
-        self.assertEqual(payload["dsa_enrichment"]["warnings"], ["from_alphasift_provider"])
+        self.assertEqual(payload["dsa_enrichment"]["warnings"], ["alphasift_warning"])
         quote_mock.assert_not_called()
         fundamentals_mock.assert_not_called()
         news_mock.assert_not_called()
@@ -2128,7 +2498,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(candidate["dsa_news"][0]["title"], "贵州茅台最新公告")
         self.assertEqual(candidate["dsa_analysis_summary"], "DSA新闻：贵州茅台最新公告")
         self.assertEqual(payload["dsa_enrichment"]["enriched_count"], 1)
-        self.assertEqual(payload["dsa_enrichment"]["warnings"], ["from_alphasift_provider"])
+        self.assertEqual(payload["dsa_enrichment"]["warnings"], ["alphasift_warning"])
         quote_mock.assert_not_called()
         fundamentals_mock.assert_not_called()
         news_mock.assert_not_called()
@@ -3039,6 +3409,21 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
         self.assertEqual(caught.exception.status_code, 400)
         self.assertEqual(caught.exception.detail["error"], "alphasift_screen_rejected")
+
+    def test_screen_runtime_exception_hides_raw_diagnostic(self) -> None:
+        config = self._config(enabled=True)
+        fake_module = _make_adapter_module(
+            screen=MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET)),
+        )
+
+        with patch("src.services.alphasift_service._import_alphasift", return_value=fake_module):
+            with self.assertRaises(HTTPException) as caught:
+                self._screen(config, market="cn", strategy="dual_low", max_results=5)
+
+        self.assertEqual(caught.exception.status_code, 424)
+        self.assertEqual(caught.exception.detail["error"], "alphasift_screen_failed")
+        self.assertEqual(caught.exception.detail["message"], "AlphaSift 选股运行失败，请稍后重试。")
+        self.assert_public_payload_is_private(caught.exception.detail)
 
 
 if __name__ == "__main__":

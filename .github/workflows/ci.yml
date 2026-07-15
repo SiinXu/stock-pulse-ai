@@ -24,6 +24,19 @@ jobs:
           filters: |
             frontend:
               - 'apps/dsa-web/**'
+              - 'api/**'
+              - 'src/config.py'
+              - 'src/core/config_registry.py'
+              - 'src/llm/**'
+              - 'src/repositories/**'
+              - 'src/services/**'
+              - 'src/storage.py'
+              - 'src/auth.py'
+              - 'src/analyzer.py'
+              - 'main.py'
+              - 'requirements.txt'
+              - '.github/requirements-ci.txt'
+              - '.github/workflows/ci.yml'
 
   ai-governance:
     name: ai-governance
@@ -188,8 +201,8 @@ jobs:
           DSA_WEB_SMOKE_PASSWORD: dsa-ci-smoke
         run: npm run test:smoke
       - name: 📤 Upload Playwright artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-artifacts
           path: apps/dsa-web/test-results/

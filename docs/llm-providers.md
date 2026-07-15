@@ -20,7 +20,9 @@
 
 优先级保持不变：`LITELLM_CONFIG` / `LITELLM_CONFIG_YAML` > `LLM_CHANNELS` > legacy provider keys。P4 只补文档，不迁移、不清空、不静默改写旧配置。
 
-Channels 中连接名与 Provider 身份是两个字段。新配置使用 `LLM_<CONNECTION>_PROVIDER=<provider_id>` 保存后端 Provider Catalog ID，因此 `openai_work` 和 `openai_personal` 可以同时属于 OpenAI，重命名连接也不会改变服务商身份。旧配置没有该字段时，仅当连接名精确等于 Catalog ID 才兼容识别；系统不会按 `openai2` 等名称前缀猜测，也不会静默回写旧配置。无法可靠识别的旧连接按 Custom 处理。
+Channels 中连接名与 Provider 身份是两个字段。新配置使用 `LLM_<CONNECTION>_PROVIDER=<provider_id>` 保存后端 Provider Catalog ID，因此 `openai_work` 和 `openai_personal` 可以同时属于 OpenAI，重命名连接也不会改变服务商身份。旧配置没有该字段时，仅当连接名精确等于 Catalog ID 才兼容识别；系统不会按 `openai2` 等名称前缀猜测，也不会静默回写旧配置。只有持久化身份确实无法识别的 legacy 连接才按 Custom 迁移处理；Catalog 请求暂时失败不会改变已保存卡片的 Provider 身份。
+
+任务路由不再用 runtime route 单独承担身份。可用模型目录为每个 `connection_id + runtime_route` 生成稳定 `ModelRef`；同一 Provider 的两条 Connection 即使提供同名模型，也会保持为两个可区分选项并解析到各自凭据。旧裸 route 唯一匹配时继续兼容，多连接歧义时以 `ambiguous_model_route` 要求确认。删除或停用 Connection、删除同名模型时，引用检查按 `ModelRef` 精确定位，不会影响另一条 Connection 的同名模型。
 
 Generation backend 配置是更外层的运行时选择契约。Phase 4 支持 `GENERATION_BACKEND=litellm|codex_cli|claude_code_cli|opencode_cli`，但本地 CLI backend 不是 LiteLLM provider；不要配置成 `LITELLM_MODEL=codex_cli/...`、`LITELLM_MODEL=claude_code_cli/...` 或 `LITELLM_MODEL=opencode_cli/...`。`codex_cli` preset 使用 `codex exec --output-last-message <temp-file> -` 读取最终响应；`claude_code_cli` preset 使用 `claude --safe-mode --tools "" --disallowedTools "mcp__*" --strict-mcp-config --no-session-persistence --output-format json -p <static instruction>`，完整 DSA prompt 走 stdin，并只从 JSON envelope 的 `result/success` 字段提取最终文本，参数依据见 [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference)；`opencode_cli` preset 使用 `opencode --pure run --format json [--model <OPENCODE_CLI_MODEL>] <static instruction> --file <temp prompt file>`，仅在显式配置 `OPENCODE_CLI_MODEL` 时追加 `--model`，完整 DSA prompt 走权限受控的临时文件，并只从无工具事件的 JSON event text 输出提取最终文本，参数依据见 [OpenCode CLI reference](https://opencode.ai/docs/cli)，配置合并语义见 [OpenCode config reference](https://opencode.ai/docs/config)。诊断 stdout/stderr 与最终响应一起受 `GENERATION_BACKEND_MAX_OUTPUT_BYTES` 总上限约束，超限时返回结构化 `output_too_large`。`GENERATION_FALLBACK_BACKEND=` 空值会在本地 `.env` 禁用 backend-level fallback，未配置时默认回退到 `litellm`；默认 GitHub Actions workflow 未配置该变量时会显式使用 `litellm`，如需禁用 fallback 可设为 primary backend 走 self no-op。Agent 工具调用仍使用 LiteLLM；Web 设置页只暴露 `AGENT_GENERATION_BACKEND=auto|litellm`，手写 `codex_cli|claude_code_cli|opencode_cli` 不会启用 text-only Agent mode，只会返回明确 unsupported tool-calling 诊断。
 
@@ -46,9 +48,13 @@ Phase 6a Tool Surface 只补充 AgentBackend 前置的内部工具面：统一 D
 6. 在「任务路由」为报告 / Agent / Vision 等任务从已接入模型中选择模型（底层 route 由系统生成，无需手写 `provider/model`）。
 7. 如需确认 JSON / tools / stream / vision 能力，手动勾选「运行时能力检测」后再触发；该检测会产生真实 LLM 请求，结果只代表当前账号、模型和 endpoint 的一次 best-effort 检测，不会写回 `.env`，也不会阻止保存。
 
+日常设置修改按字段组在停止编辑 700ms 后自动保存，不显示全局 Save。AI 模型相关键共享一个原子组；失败或 409 冲突会保留草稿，并提供重试、恢复服务器值或逐字段解决冲突，当前组 Reset 不影响其它设置。连接测试与模型发现不会因自动保存而运行。
+
 > 底层仍以 `LLM_CHANNELS` + `LLM_<CONNECTION>_*` 存储，其中 `LLM_<CONNECTION>_PROVIDER` 保存服务商身份（“渠道/channel”是底层兼容字段与开发者术语）；普通界面统一使用「模型服务商 / 模型连接 / 可用模型 / 任务模型」。
 
 任务路由中的历史值如果不在当前可用模型目录中会保留并标记“当前配置不可用”，保存不会静默删除。删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 会列出全部引用并允许在同一草稿中选择替代模型；直接 API 请求会返回 `model_in_use` 和 `details.referenced_by`。替换引用与删除模型在同一次更新中可原子成功，未替换的历史失效值仍按 `unknown_model` 处理。
+
+Provider 的 protocol、默认 Base URL、Key/端点要求、发现能力以及获取凭据、控制台、模型列表和文档地址都来自后端 Catalog；缺少链接时 Web 不渲染空操作。配置 Schema 同时是字段 ownership 与条件契约的唯一真源：AI 字段缺失或携带未知 `ui_placement` 时只进入「高级」只读诊断，未知条件保持可见但锁定，滚动部署不会重新暴露第二套普通模型表单。
 
 ## Channels 示例
 

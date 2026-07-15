@@ -7,6 +7,7 @@ Covers:
 - _call_litellm_vision(): request payload / timeout / error handling
 - extract_stock_codes_from_image(): magic bytes check, parsing
 """
+import io
 import sys
 from unittest.mock import MagicMock
 
@@ -20,8 +21,11 @@ for _stub in ("google.generativeai", "google.genai", "anthropic"):
         sys.modules[_stub] = MagicMock()
 
 import pytest
+from fastapi import HTTPException, UploadFile
+from starlette.datastructures import Headers
 from unittest.mock import patch
 
+from api.v1.endpoints.stocks import extract_from_image
 from src.services.image_stock_extractor import (
     _resolve_vision_model,
     _get_api_keys_for_model,
@@ -32,6 +36,7 @@ from src.services.image_stock_extractor import (
     VISION_API_TIMEOUT,
 )
 from src.config import Config
+from src.llm.model_ref import encode_model_ref
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +154,22 @@ class TestGetApiKeysForModel:
         assert "short" not in keys
         assert _GEMINI_KEY in keys
 
+    def test_model_ref_uses_only_exact_connection_keys(self):
+        model_ref = encode_model_ref("work", "openai/gpt-4o")
+        cfg = _cfg(
+            openai_api_keys=[_OPENAI_KEY],
+            llm_model_list=[
+                {
+                    "model_name": model_ref,
+                    "litellm_params": {
+                        "model": "openai/gpt-4o",
+                        "api_key": "sk-work-exact-key",
+                    },
+                }
+            ],
+        )
+        assert _get_api_keys_for_model(model_ref, cfg) == ["sk-work-exact-key"]
+
 
 # ---------------------------------------------------------------------------
 # _call_litellm_vision
@@ -189,6 +210,34 @@ class TestCallLitellmVision:
             kwargs = mock_comp.call_args[1]
             assert kwargs["api_base"] == "https://aihubmix.com/v1"
             assert "extra_headers" not in kwargs
+
+    def test_model_ref_uses_exact_connection_deployment(self):
+        model_ref = encode_model_ref("work", "openai/gpt-4o")
+        cfg = _cfg(
+            vision_model=model_ref,
+            openai_api_keys=[_OPENAI_KEY],
+            llm_model_list=[
+                {
+                    "model_name": model_ref,
+                    "litellm_params": {
+                        "model": "openai/gpt-4o",
+                        "api_key": "sk-work-exact-key",
+                        "api_base": "https://work.example/v1",
+                        "extra_headers": {"X-Workspace": "work"},
+                    },
+                }
+            ],
+        )
+        with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
+             patch("src.services.image_stock_extractor.litellm.completion",
+                   return_value=self._good_response()) as mock_comp:
+            _call_litellm_vision("b64", "image/jpeg")
+
+        kwargs = mock_comp.call_args.kwargs
+        assert kwargs["model"] == "openai/gpt-4o"
+        assert kwargs["api_key"] == "sk-work-exact-key"
+        assert kwargs["api_base"] == "https://work.example/v1"
+        assert kwargs["extra_headers"] == {"X-Workspace": "work"}
 
     def test_raises_when_model_not_configured(self):
         cfg = _cfg(openai_vision_model=None, litellm_model="", gemini_api_keys=[], anthropic_api_keys=[], openai_api_keys=[])
@@ -404,6 +453,36 @@ class TestExtractStockCodesFromImage:
         jpeg = _make_jpeg_bytes()
         with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
              patch("src.services.image_stock_extractor.litellm.completion",
-                   side_effect=RuntimeError("network down")):
-            with pytest.raises(ValueError, match="Vision API 调用失败"):
+                   side_effect=RuntimeError(
+                       "network down token=super-secret at https://private.example/internal"
+                   )):
+            with pytest.raises(ValueError, match="^Vision API 调用失败$") as exc_info:
                 extract_stock_codes_from_image(jpeg, "image/jpeg")
+        assert "super-secret" not in str(exc_info.value)
+        assert "private.example" not in str(exc_info.value)
+
+    def test_image_api_hides_litellm_provider_error(self):
+        cfg = _cfg(gemini_api_keys=[_GEMINI_KEY])
+        upload = UploadFile(
+            io.BytesIO(_make_jpeg_bytes()),
+            filename="stocks.jpg",
+            headers=Headers({"content-type": "image/jpeg"}),
+        )
+        with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
+             patch(
+                 "src.services.image_stock_extractor.litellm.completion",
+                 side_effect=RuntimeError(
+                     "provider failed token=super-secret at https://private.example/internal"
+                 ),
+             ), \
+             pytest.raises(HTTPException) as exc_info:
+            extract_from_image(file=upload, include_raw=False)
+
+        serialized = str(exc_info.value.detail)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == {
+            "error": "extract_failed",
+            "message": "Vision API 调用失败",
+        }
+        assert "super-secret" not in serialized
+        assert "private.example" not in serialized

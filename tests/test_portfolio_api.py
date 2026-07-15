@@ -451,6 +451,8 @@ class PortfolioApiTestCase(unittest.TestCase):
         payload = resp.json()
         self.assertEqual(payload["task_id"], "task-portfolio-1")
         self.assertEqual(payload["analysis_phase"], "intraday")
+        self.assertEqual(payload["message_code"], "task.queued")
+        self.assertEqual(payload["message_params"], {"stock_code": "600519"})
         self.assertNotIn("portfolio_context", str(payload))
 
         args, kwargs = queue.submit_tasks_batch.call_args
@@ -553,7 +555,8 @@ class PortfolioApiTestCase(unittest.TestCase):
         self.assertEqual(resp.status_code, 409, resp.text)
         payload = resp.json()
         self.assertEqual(payload["error"], "duplicate_task")
-        self.assertEqual(payload["existing_task_id"], "existing-task-1")
+        self.assertEqual(payload["params"]["stock_code"], "600519.SH")
+        self.assertEqual(payload["params"]["existing_task_id"], "existing-task-1")
         self.assertTrue(queue.submit_tasks_batch.call_args.kwargs["force_refresh"])
 
     def test_snapshot_invalid_cost_method_returns_400(self) -> None:

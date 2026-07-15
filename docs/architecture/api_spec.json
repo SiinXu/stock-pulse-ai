@@ -4606,15 +4606,33 @@
             "description": "Error details",
             "example": "Invalid request parameters"
           },
-          "detail": {
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params",
+            "description": "Localization interpolation parameters"
+          },
+          "details": {
             "anyOf": [
               {},
               {
                 "type": "null"
               }
             ],
-            "title": "Detail",
-            "description": "Additional error information"
+            "title": "Details",
+            "description": "Diagnostic details"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id",
+            "description": "Diagnostic trace ID"
           }
         },
         "type": "object",
@@ -4623,10 +4641,12 @@
           "message"
         ],
         "title": "ErrorResponse",
-        "description": "Error response.",
+        "description": "Stable API error envelope.",
         "example": {
           "error": "not_found",
-          "message": "Resource not found"
+          "message": "Resource not found",
+          "params": {},
+          "trace_id": "7f48e8f72ab04b7db8c4c1df6fc9bb35"
         }
       },
       "RunFlowLane": {

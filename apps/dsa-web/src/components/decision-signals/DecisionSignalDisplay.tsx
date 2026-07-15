@@ -167,7 +167,7 @@ type SignalMetricProps = {
 
 const SignalMetric: React.FC<SignalMetricProps> = ({ label, value, tone = 'default' }) => (
   <div className="min-w-0 rounded-xl border border-border/60 bg-elevated/45 px-3 py-2">
-    <p className="truncate text-[11px] text-muted-text">{label}</p>
+    <p className="truncate text-xs text-muted-text">{label}</p>
     <p className={cn('mt-1 truncate text-sm font-semibold tabular-nums', metricToneClass[tone])}>{value}</p>
   </div>
 );
@@ -193,7 +193,7 @@ const SignalTextBlock: React.FC<SignalTextBlockProps> = ({ label, value, tone = 
   if (!normalized) return null;
   return (
     <div className={cn('rounded-xl border px-3 py-2.5', textToneClass[tone])}>
-      <p className="text-[11px] font-medium text-current/80">{label}</p>
+      <p className="text-xs font-medium text-current/80">{label}</p>
       <p className={cn('mt-1 text-sm leading-5 text-current', clamp ? 'line-clamp-2' : 'whitespace-pre-wrap')}>
         {normalized}
       </p>
@@ -254,7 +254,7 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
           <div className="grid gap-2 sm:grid-cols-3">
             {pricePlanItems.map((entry) => (
               <div key={entry.label} className="min-w-0">
-                <p className="truncate text-[11px] text-muted-text">{entry.label}</p>
+                <p className="truncate text-xs text-muted-text">{entry.label}</p>
                 <p className={cn('mt-1 truncate text-sm font-semibold tabular-nums', metricToneClass[entry.tone])}>
                   {entry.value}
                 </p>
@@ -499,10 +499,10 @@ export const PortfolioSignalSummary: React.FC<PortfolioSignalSummaryProps> = ({ 
     <div className="min-w-[11rem] max-w-[18rem] text-left">
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         <Badge variant={getActionVariant(item)}>{actionLabel}</Badge>
-        {item.horizon ? <span className="text-[11px] text-secondary-text">{getDecisionSignalHorizonLabel(item.horizon, t)}</span> : null}
+        {item.horizon ? <span className="text-xs text-secondary-text">{getDecisionSignalHorizonLabel(item.horizon, t)}</span> : null}
       </div>
-      {item.riskSummary ? <p className="mt-1 line-clamp-2 text-[11px] text-warning">{item.riskSummary}</p> : null}
-      {item.watchConditions ? <p className="mt-1 line-clamp-2 text-[11px] text-secondary-text">{item.watchConditions}</p> : null}
+      {item.riskSummary ? <p className="mt-1 line-clamp-2 text-xs text-warning">{item.riskSummary}</p> : null}
+      {item.watchConditions ? <p className="mt-1 line-clamp-2 text-xs text-secondary-text">{item.watchConditions}</p> : null}
     </div>
   );
 };

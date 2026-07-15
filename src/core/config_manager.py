@@ -32,6 +32,27 @@ _ESCAPED_APPLICATION_TEMPLATE_PLACEHOLDER_PATTERN = re.compile(
 )
 
 logger = logging.getLogger(__name__)
+_PATH_LOCKS_GUARD = threading.Lock()
+_PATH_LOCKS: Dict[str, threading.RLock] = {}
+
+
+def _lock_for_path(env_path: Path) -> threading.RLock:
+    """Share one in-process write lock across managers for the same file."""
+    key = str(env_path.expanduser().resolve())
+    with _PATH_LOCKS_GUARD:
+        lock = _PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _PATH_LOCKS[key] = lock
+        return lock
+
+
+class ConfigVersionMismatchError(RuntimeError):
+    """Raised when an atomic update no longer matches its base version."""
+
+    def __init__(self, current_version: str):
+        super().__init__("Configuration version changed before write")
+        self.current_version = current_version
 
 
 def escape_compose_sensitive_env_value(key: str, value: str) -> str:
@@ -114,7 +135,7 @@ class ConfigManager:
 
     def __init__(self, env_path: Optional[Path] = None):
         self._env_path = env_path or self._resolve_env_path()
-        self._lock = threading.RLock()
+        self._lock = _lock_for_path(self._env_path)
 
     @property
     def env_path(self) -> Path:
@@ -179,9 +200,14 @@ class ConfigManager:
         updates: Iterable[Tuple[str, str]],
         sensitive_keys: Set[str],
         mask_token: str,
+        expected_version: Optional[str] = None,
     ) -> Tuple[List[str], List[str], str]:
         """Apply updates into `.env` file using atomic replace when possible."""
         with self._lock:
+            current_version = self.get_config_version()
+            if expected_version is not None and current_version != expected_version:
+                raise ConfigVersionMismatchError(current_version=current_version)
+
             current_values = self.read_config_map()
             stored_values = self._read_config_map(normalize_values=False)
             mutable_updates: Dict[str, str] = {}

@@ -177,10 +177,10 @@ def test_litellm_smoke_timeout_reaches_final_completion_dispatch() -> None:
     service = GenerationBackendStatusService(effective_map=_litellm_effective_map())
 
     with patch("src.analyzer.GeminiAnalyzer._dispatch_litellm_completion", new=_dispatch):
-        payload = service.smoke_test(mode="json", timeout_seconds=1)
+        payload = service.smoke_test(mode="json", timeout_seconds=20.0)
 
     assert payload["success"] is True
-    assert captured["timeout"] == 1
+    assert captured["timeout"] == 20
 
 
 def test_litellm_smoke_redacts_provider_error_from_response_and_logs(caplog) -> None:

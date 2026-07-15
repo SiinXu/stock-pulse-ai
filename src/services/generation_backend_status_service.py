@@ -162,10 +162,15 @@ def _parse_smoke_timeout(value: Optional[float], *, backend_id: str) -> int:
         return spec.default
     if isinstance(value, float) and not value.is_integer():
         raise _numeric_config_error(backend_id=backend_id, spec=spec, value=value, reason="invalid_integer")
-    error = _validate_int_config_value(backend_id=backend_id, value=value, spec=spec)
+    normalized_value = int(value) if isinstance(value, float) else value
+    error = _validate_int_config_value(
+        backend_id=backend_id,
+        value=normalized_value,
+        spec=spec,
+    )
     if error is not None:
         raise error
-    return int(value)
+    return int(normalized_value)
 
 
 class GenerationBackendStatusService:

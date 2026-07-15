@@ -6,10 +6,13 @@ from fastapi import HTTPException
 from api.v1.errors import api_error, error_body, error_json_response
 
 
-def test_error_body_omits_empty_detail() -> None:
+def test_error_body_uses_stable_envelope() -> None:
     assert error_body("validation_error", "bad input") == {
         "error": "validation_error",
         "message": "bad input",
+        "params": {},
+        "details": None,
+        "trace_id": None,
     }
 
 
@@ -21,7 +24,9 @@ def test_api_error_uses_standard_detail_shape() -> None:
     assert exc.detail == {
         "error": "not_found",
         "message": "missing",
-        "detail": {"id": 1},
+        "params": {},
+        "details": {"id": 1},
+        "trace_id": None,
     }
 
 
@@ -29,4 +34,7 @@ def test_error_json_response_uses_standard_content() -> None:
     response = error_json_response(409, "conflict", "already exists")
 
     assert response.status_code == 409
-    assert response.body == b'{"error":"conflict","message":"already exists"}'
+    assert response.body == (
+        b'{"error":"conflict","message":"already exists","params":{},'
+        b'"details":null,"trace_id":null}'
+    )

@@ -7,6 +7,7 @@ type UseDashboardLifecycleOptions = {
   refreshHistory: (silent?: boolean) => Promise<void>;
   refreshHistoryForCompletedTask?: (task: TaskInfo) => Promise<void>;
   refreshActiveTasks: () => Promise<void>;
+  pollKnownTasks?: () => Promise<void>;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
   loadMarketReviewHistory?: () => Promise<void>;
@@ -18,13 +19,18 @@ type UseDashboardLifecycleOptions = {
   onDashboardDataRefresh?: () => void;
   onCompletedTaskDataRefreshed?: (task: TaskInfo) => void;
   enabled?: boolean;
+  taskPollIntervalMs?: number;
+  terminalRetentionMs?: number;
 };
+
+const noopAsync = async (): Promise<void> => undefined;
 
 export function useDashboardLifecycle({
   loadInitialHistory,
   refreshHistory,
   refreshHistoryForCompletedTask,
   refreshActiveTasks,
+  pollKnownTasks = noopAsync,
   loadStockBar,
   refreshStockBar,
   loadMarketReviewHistory,
@@ -36,8 +42,10 @@ export function useDashboardLifecycle({
   onDashboardDataRefresh,
   onCompletedTaskDataRefreshed,
   enabled = true,
+  taskPollIntervalMs = 2_000,
+  terminalRetentionMs = 2 * 60 * 1000,
 }: UseDashboardLifecycleOptions): void {
-  const removalTimeoutsRef = useRef<number[]>([]);
+  const removalTimeoutsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!enabled) {
@@ -86,22 +94,27 @@ export function useDashboardLifecycle({
   }, [enabled, onDashboardDataRefresh, refreshHistory, refreshMarketReviewHistory, refreshStockBar, refreshActiveTasks]);
 
   useEffect(() => {
+    const removalTimeouts = removalTimeoutsRef.current;
     return () => {
-      removalTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-      removalTimeoutsRef.current = [];
+      removalTimeouts.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      removalTimeouts.clear();
     };
   }, []);
 
   const scheduleTaskRemoval = (taskId: string, delayMs: number) => {
+    const existingTimeout = removalTimeoutsRef.current.get(taskId);
+    if (existingTimeout !== undefined) {
+      window.clearTimeout(existingTimeout);
+    }
     const timeoutId = window.setTimeout(() => {
       removeTask(taskId);
-      removalTimeoutsRef.current = removalTimeoutsRef.current.filter((item) => item !== timeoutId);
+      removalTimeoutsRef.current.delete(taskId);
     }, delayMs);
 
-    removalTimeoutsRef.current.push(timeoutId);
+    removalTimeoutsRef.current.set(taskId, timeoutId);
   };
 
-  useTaskStream({
+  const taskStream = useTaskStream({
     onTaskCreated: syncTaskCreated,
     onTaskStarted: syncTaskUpdated,
     onTaskProgress: syncTaskUpdated,
@@ -120,17 +133,31 @@ export function useDashboardLifecycle({
       void refreshMarketReviewHistory?.(true);
       // Keep the terminal task visible long enough for the user to see the
       // completion and dismiss it; the panel now renders terminal tasks.
-      scheduleTaskRemoval(task.taskId, 6_000);
+      scheduleTaskRemoval(task.taskId, terminalRetentionMs);
     },
     onTaskFailed: (task) => {
       syncTaskFailed(task);
-      scheduleTaskRemoval(task.taskId, 8_000);
+      scheduleTaskRemoval(task.taskId, terminalRetentionMs);
     },
     onError: () => {
       console.warn('SSE connection disconnected, reconnecting...');
+      void pollKnownTasks();
     },
     enabled,
   });
+  const isConnected = taskStream?.isConnected ?? false;
+
+  useEffect(() => {
+    if (!enabled || isConnected) {
+      return;
+    }
+
+    void pollKnownTasks();
+    const intervalId = window.setInterval(() => {
+      void pollKnownTasks();
+    }, taskPollIntervalMs);
+    return () => window.clearInterval(intervalId);
+  }, [enabled, isConnected, pollKnownTasks, taskPollIntervalMs]);
 }
 
 export default useDashboardLifecycle;

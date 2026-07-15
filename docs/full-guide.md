@@ -1789,7 +1789,8 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 ### 使用行为说明
 
 - CSV 导入内建 `huatai`、`citic`、`cmb` 解析器；若券商列表接口失败，Web 端会自动回退到这些内建选项。
-- 导入流程会先把 CSV 解析成标准化记录，再逐条提交到持仓账本；遇到忙碌行会计入 `failed_count`，不会因为单行冲突让整批请求整体失败。
+- 交易、现金流水、公司行动和 CSV 提交均支持客户端 `operation_id`（也可使用同值的 `Idempotency-Key` 请求头）。同一 operation ID 和相同请求会回放首次响应；即使首次响应在提交后超时，重试也不会重复入账。同一 ID 对应不同请求时返回 `409 idempotency_conflict`。
+- CSV 导入会先把文件解析成标准化记录，再在单个持仓账本事务内提交整批记录；每行使用独立 savepoint 保留 `inserted_count` / `duplicate_count` / `failed_count` 汇总，整批结果与 operation ID 记录一起提交。账本锁竞争会返回 `409 portfolio_busy`，客户端应使用原 operation ID 重试。
 - 删除账户使用软删除语义：默认账户列表、快照、风险、录入入口和事件列表不再显示该账户，但交易、现金流水和公司行动不会被物理清理；如需纠正单条流水，需在账户归档前使用事件列表里的删除修正入口。
 - 交易去重优先使用账户内唯一的 `trade_uid`，缺失时回退到基于日期、代码、方向、数量、价格、费用、税费、币种的确定性哈希。
 - 卖出会先校验可用数量，超卖返回 `409 portfolio_oversell`；并发写入冲突时可能返回 `409 portfolio_busy`。

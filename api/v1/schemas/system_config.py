@@ -41,6 +41,24 @@ class SystemConfigDocLink(BaseModel):
     href: str
 
 
+class SystemConfigCondition(BaseModel):
+    """One condition in an AND-composed configuration field contract."""
+
+    key: str
+    operator: Literal["equals", "notEquals", "in", "notEmpty"]
+    value: Optional[str | List[str]] = None
+
+
+class SystemConfigFieldContract(BaseModel):
+    """Authoritative conditional behavior for a configuration field."""
+
+    requirement: Literal["required", "optional", "inherited"]
+    required_when: Optional[List[SystemConfigCondition]] = None
+    visible_when: Optional[List[SystemConfigCondition]] = None
+    enabled_when: Optional[List[SystemConfigCondition]] = None
+    requires_connection_test: Optional[bool] = None
+
+
 class SystemConfigFieldSchema(BaseModel):
     """Metadata schema for a single config field."""
 
@@ -51,7 +69,11 @@ class SystemConfigFieldSchema(BaseModel):
     data_type: Literal["string", "integer", "number", "boolean", "array", "json", "time"]
     ui_control: Literal["text", "password", "number", "select", "textarea", "switch", "time"]
     is_sensitive: bool
-    is_required: bool
+    is_required: bool = Field(
+        ...,
+        deprecated=True,
+        description="Deprecated compatibility flag; contract.requirement is authoritative when present",
+    )
     is_editable: bool
     default_value: Optional[str] = None
     options: List[str | SystemConfigOption] = Field(default_factory=list)
@@ -61,6 +83,10 @@ class SystemConfigFieldSchema(BaseModel):
     examples: List[str] = Field(default_factory=list, description="Safe example values for help panels")
     docs: List[SystemConfigDocLink] = Field(default_factory=list, description="Related documentation links")
     warning_codes: List[str] = Field(default_factory=list, description="Stable warning identifiers for help panels")
+    contract: Optional[SystemConfigFieldContract] = Field(
+        None,
+        description="Authoritative requirement, condition, and connection-test metadata",
+    )
     ui_placement: Optional[
         Literal[
             "model_access",
@@ -372,16 +398,20 @@ class DiscoverLLMChannelModelsResponse(BaseModel):
 
 
 class SystemConfigValidationErrorResponse(BaseModel):
-    """Error payload for failed update validation."""
+    """Stable envelope for failed update validation."""
 
     error: str
     message: str
-    issues: List[ConfigValidationIssue]
+    params: Dict[str, List[ConfigValidationIssue]] = Field(default_factory=dict)
+    details: Optional[Any] = None
+    trace_id: Optional[str] = None
 
 
 class SystemConfigConflictResponse(BaseModel):
-    """Error payload for optimistic lock conflict."""
+    """Stable envelope for optimistic-lock conflicts."""
 
     error: str
     message: str
-    current_config_version: str
+    params: Dict[str, str] = Field(default_factory=dict)
+    details: Optional[Any] = None
+    trace_id: Optional[str] = None

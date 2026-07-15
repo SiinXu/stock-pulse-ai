@@ -13,8 +13,12 @@ from api.deps import get_config_dep
 from api.v1.errors import api_error
 from src.config import Config
 from src.services.alphasift_service import AlphaSiftService
-from src.services.task_queue import TaskStatus as QueueTaskStatus
-from src.services.task_queue import get_task_queue
+from src.services.task_queue import (
+    TaskStatus as QueueTaskStatus,
+    get_task_queue,
+    public_task_error,
+    public_task_message,
+)
 
 router = APIRouter()
 
@@ -42,6 +46,8 @@ class AlphaSiftScreenAccepted(BaseModel):
     trace_id: str
     status: str = "pending"
     message: str
+    message_code: str = "task.screening.queued"
+    message_params: Dict[str, Any] = Field(default_factory=dict)
     strategy: str
     market: str
     max_results: int
@@ -53,6 +59,8 @@ class AlphaSiftScreenTaskStatus(BaseModel):
     status: str
     progress: int = 0
     message: Optional[str] = None
+    message_code: str = "task.status"
+    message_params: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
 
@@ -158,12 +166,15 @@ def alphasift_start_screen_task(
         message="AlphaSift 选股任务已提交",
         task_id=task_id,
         trace_id=task_id,
+        failure_error_code="alphasift_screen_failed",
     )
     return AlphaSiftScreenAccepted(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,
         status=task.status.value if isinstance(task.status, QueueTaskStatus) else str(task.status),
         message=task.message or "AlphaSift 选股任务已提交",
+        message_code=getattr(task, "message_code", "task.screening.queued"),
+        message_params=getattr(task, "message_params", {}),
         strategy=request.strategy,
         market=request.market,
         max_results=request.max_results,
@@ -182,8 +193,10 @@ def alphasift_screen_task_status(task_id: str) -> AlphaSiftScreenTaskStatus:
         trace_id=task.trace_id or task.task_id,
         status=task.status.value if isinstance(task.status, QueueTaskStatus) else str(task.status),
         progress=task.progress,
-        message=task.message,
-        error=task.error,
+        message=public_task_message(task),
+        message_code=getattr(task, "message_code", "task.status"),
+        message_params=getattr(task, "message_params", {}),
+        error=public_task_error(task, default_error_code="alphasift_screen_failed"),
         result=result,
     )
 

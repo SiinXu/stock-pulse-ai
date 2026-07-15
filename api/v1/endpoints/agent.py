@@ -9,10 +9,23 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
+from api.v1.errors import api_error
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILED,
+    AGENT_CHAT_FAILURE_MESSAGE,
+    AGENT_RESEARCH_FAILED,
+    AGENT_RESEARCH_FAILURE_MESSAGE,
+    AGENT_STREAM_FAILED,
+    AGENT_STREAM_FAILURE_MESSAGE,
+    AGENT_STREAM_TIMEOUT,
+    AGENT_STREAM_TIMEOUT_MESSAGE,
+    sanitize_agent_diagnostic,
+    sanitize_stream_event,
+)
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
 
@@ -153,7 +166,7 @@ async def agent_chat(request: ChatRequest):
     config = get_config()
     
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
         
     session_id = request.session_id or str(uuid.uuid4())
     
@@ -176,17 +189,34 @@ async def agent_chat(request: ChatRequest):
                                   context=ctx),
         )
 
+        if not result.success:
+            logger.error(
+                "Agent chat failed: session_id=%s diagnostic=%s",
+                session_id,
+                sanitize_agent_diagnostic(result.error),
+            )
+            return ChatResponse(
+                success=False,
+                content="",
+                session_id=session_id,
+                error=AGENT_CHAT_FAILED,
+            )
+
         return ChatResponse(
-            success=result.success,
+            success=True,
             content=result.content,
             session_id=session_id,
-            error=result.error
+            error=None,
         )
             
-    except Exception as e:
-        logger.error(f"Agent chat API failed: {e}")
-        logger.exception("Agent chat error details:")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        logger.error(
+            "Agent chat API failed: session_id=%s exception_type=%s diagnostic=%s",
+            session_id,
+            type(exc).__name__,
+            sanitize_agent_diagnostic(exc),
+        )
+        raise api_error(500, AGENT_CHAT_FAILED, AGENT_CHAT_FAILURE_MESSAGE)
 
 
 class SessionItem(BaseModel):
@@ -316,7 +346,7 @@ async def agent_research(request: ResearchRequest):
     """
     config = get_config()
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
 
     question = request.question
     context: Optional[Dict[str, Any]] = None
@@ -348,26 +378,46 @@ async def agent_research(request: ResearchRequest):
             timeout=research_timeout,
         )
         if getattr(result, "timed_out", False):
-            logger.warning("Agent research API timed out after %ss", research_timeout)
+            logger.warning(
+                "Agent research API timed out after %ss: diagnostic=%s",
+                research_timeout,
+                sanitize_agent_diagnostic(result.error),
+            )
             return ResearchResponse(
                 success=False,
                 content="",
                 sources=[],
                 token_usage=0,
-                error=f"Deep research timed out after {research_timeout}s",
+                error=AGENT_RESEARCH_FAILED,
+            )
+
+        if not result.success:
+            logger.error(
+                "Agent research API failed: diagnostic=%s",
+                sanitize_agent_diagnostic(result.error),
+            )
+            return ResearchResponse(
+                success=False,
+                content="",
+                sources=[],
+                token_usage=0,
+                error=AGENT_RESEARCH_FAILED,
             )
 
         return ResearchResponse(
-            success=result.success,
+            success=True,
             content=result.report,
             sources=[f"Sub-question {i+1}: {q}" for i, q in enumerate(result.sub_questions)],
             token_usage=result.total_tokens,
-            error=result.error if not result.success else None,
+            error=None,
         )
-    except Exception as e:
-        logger.error("Agent research API failed: %s", e)
-        logger.exception("Agent research error details:")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        logger.error(
+            "Agent research API failed: exception_type=%s diagnostic=%s",
+            type(exc).__name__,
+            sanitize_agent_diagnostic(exc),
+        )
+        raise api_error(500, AGENT_RESEARCH_FAILED, AGENT_RESEARCH_FAILURE_MESSAGE)
 
 
 @router.post("/chat/stream")
@@ -389,7 +439,7 @@ async def agent_chat_stream(request: ChatRequest):
     """
     config = get_config()
     if not config.is_agent_available():
-        raise HTTPException(status_code=400, detail="Agent mode is not enabled")
+        raise api_error(400, "agent_disabled", "Agent mode is not enabled")
 
     session_id = request.session_id or str(uuid.uuid4())
     loop = asyncio.get_running_loop()
@@ -407,7 +457,8 @@ async def agent_chat_stream(request: ChatRequest):
         if event.get("type") in ("tool_start", "tool_done"):
             tool = event.get("tool", "")
             event["display_name"] = TOOL_DISPLAY_NAMES.get(tool, tool)
-        asyncio.run_coroutine_threadsafe(queue.put(event), loop)
+        public_event = sanitize_stream_event(event, trace_id=session_id)
+        asyncio.run_coroutine_threadsafe(queue.put(public_event), loop)
 
     def run_sync():
         try:
@@ -418,21 +469,43 @@ async def agent_chat_stream(request: ChatRequest):
                 progress_callback=progress_callback,
                 context=stream_ctx,
             )
+            if not result.success:
+                logger.error(
+                    "Agent stream chat failed: session_id=%s diagnostic=%s",
+                    session_id,
+                    sanitize_agent_diagnostic(result.error),
+                )
             asyncio.run_coroutine_threadsafe(
                 queue.put({
                     "type": "done",
                     "success": result.success,
-                    "content": result.content,
-                    "error": result.error,
+                    "content": result.content if result.success else "",
+                    "error": None if result.success else AGENT_CHAT_FAILED,
+                    "message": None if result.success else AGENT_CHAT_FAILURE_MESSAGE,
+                    "params": {},
+                    "details": None,
+                    "trace_id": session_id,
                     "total_steps": result.total_steps,
                     "session_id": session_id,
                 }),
                 loop,
             )
         except Exception as exc:
-            logger.error(f"Agent stream error: {exc}")
+            logger.error(
+                "Agent stream error: session_id=%s exception_type=%s diagnostic=%s",
+                session_id,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             asyncio.run_coroutine_threadsafe(
-                queue.put({"type": "error", "message": str(exc)}),
+                queue.put({
+                    "type": "error",
+                    "error": AGENT_STREAM_FAILED,
+                    "message": AGENT_STREAM_FAILURE_MESSAGE,
+                    "params": {},
+                    "details": None,
+                    "trace_id": session_id,
+                }),
                 loop,
             )
 
@@ -444,7 +517,14 @@ async def agent_chat_stream(request: ChatRequest):
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=300.0)
                 except asyncio.TimeoutError:
-                    yield "data: " + json.dumps({"type": "error", "message": "分析超时"}, ensure_ascii=False) + "\n\n"
+                    yield "data: " + json.dumps({
+                        "type": "error",
+                        "error": AGENT_STREAM_TIMEOUT,
+                        "message": AGENT_STREAM_TIMEOUT_MESSAGE,
+                        "params": {"timeout_seconds": 300},
+                        "details": None,
+                        "trace_id": session_id,
+                    }, ensure_ascii=False) + "\n\n"
                     break
                 yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
                 if event.get("type") in ("done", "error"):
@@ -458,7 +538,13 @@ async def agent_chat_stream(request: ChatRequest):
                 # Cleanup taking longer than 5s is treated as an expected timeout; no warning.
                 logger.debug("agent executor cleanup timed out after 5s for session %s", session_id)
             except Exception as exc:
-                logger.warning("agent executor cleanup error (ignored): %s", exc, exc_info=True)
+                logger.warning(
+                    "agent executor cleanup error (ignored): session_id=%s "
+                    "exception_type=%s diagnostic=%s",
+                    session_id,
+                    type(exc).__name__,
+                    sanitize_agent_diagnostic(exc),
+                )
 
     return StreamingResponse(
         event_generator(),

@@ -44,9 +44,12 @@ describe('Input', () => {
     render(<Input label="密码" type="password" allowTogglePassword />);
 
     const input = screen.getByLabelText('密码');
+    const toggle = screen.getByRole('button', { name: '显示内容' });
     expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveClass('h-11');
+    expect(toggle).toHaveClass('h-11', 'w-11');
 
-    fireEvent.click(screen.getByRole('button', { name: '显示内容' }));
+    fireEvent.click(toggle);
     expect(input).toHaveAttribute('type', 'text');
   });
 

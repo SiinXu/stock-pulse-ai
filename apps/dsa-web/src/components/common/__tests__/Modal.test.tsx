@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -27,6 +28,63 @@ function renderModalWithSelect() {
 }
 
 describe('Modal escape behavior', () => {
+  it('blocks backdrop, Escape, and close-button dismissal while closing is disabled', () => {
+    const onClose = vi.fn();
+    render(
+      <UiLanguageProvider>
+        <Modal
+          isOpen
+          closeDisabled
+          onClose={onClose}
+          title="保存中"
+          description="保存完成前不能关闭"
+        >
+          <p>正在保存</p>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '保存中' });
+    expect(dialog).toHaveAccessibleDescription('保存完成前不能关闭');
+    const root = dialog.closest<HTMLElement>('[data-overlay-root]');
+    fireEvent.click(root as HTMLElement);
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(within(dialog).getByRole('button'));
+
+    expect(within(dialog).getByRole('button')).toBeDisabled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('isolates the application while open and restores focus after closing', () => {
+    const Harness = () => {
+      const [isOpen, setIsOpen] = useState(false);
+      return (
+        <UiLanguageProvider>
+          <button type="button" onClick={() => setIsOpen(true)}>打开弹窗</button>
+          <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title="测试弹窗">
+            <p>弹窗内容</p>
+          </Modal>
+        </UiLanguageProvider>
+      );
+    };
+
+    const { container } = render(<Harness />);
+    const trigger = screen.getByRole('button', { name: '打开弹窗' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const dialog = screen.getByRole('dialog', { name: '测试弹窗' });
+    expect(container).toHaveAttribute('inert');
+    expect(container).toHaveAttribute('aria-hidden', 'true');
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    fireEvent.click(within(dialog).getByRole('button'));
+
+    expect(container).not.toHaveAttribute('inert');
+    expect(container).not.toHaveAttribute('aria-hidden');
+    expect(trigger).toHaveFocus();
+  });
+
   it('closes on Escape when no popup is open inside', () => {
     const { onClose } = renderModalWithSelect();
 
@@ -73,9 +131,53 @@ describe('Modal escape behavior', () => {
     const { rerender } = render(renderTree(false));
     rerender(renderTree(true));
 
+    const outerDialog = screen.getByRole('dialog', { name: '外层弹窗', hidden: true });
+    const confirmDialog = screen.getByRole('dialog', { name: '确认操作' });
+    expect(outerDialog.closest('[data-overlay-root]')).toHaveAttribute('inert');
+    expect(outerDialog.closest('[data-overlay-root]')).toHaveAttribute('aria-hidden', 'true');
+    expect(confirmDialog.closest('[data-overlay-root]')).not.toHaveAttribute('inert');
+
+    outerDialog.focus();
+    fireEvent.keyDown(document.body, { key: 'Tab' });
+    expect(confirmDialog).toHaveFocus();
+
     // Escape must close the topmost dialog (the confirm) only, not the modal.
     fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('restores focus inside the underlying modal after closing a confirmation', () => {
+    const Harness = () => {
+      const [confirmOpen, setConfirmOpen] = useState(false);
+      return (
+        <UiLanguageProvider>
+          <Modal isOpen onClose={() => undefined} title="外层弹窗">
+            <button type="button" onClick={() => setConfirmOpen(true)}>打开确认</button>
+            <ConfirmDialog
+              isOpen={confirmOpen}
+              title="确认操作"
+              message="确定吗？"
+              onConfirm={() => undefined}
+              onCancel={() => setConfirmOpen(false)}
+            />
+          </Modal>
+        </UiLanguageProvider>
+      );
+    };
+
+    render(<Harness />);
+    const trigger = screen.getByRole('button', { name: '打开确认' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    const confirmation = screen.getByRole('dialog', { name: '确认操作' });
+    expect(confirmation).toHaveAccessibleDescription('确定吗？');
+    fireEvent.keyDown(confirmation, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: '确认操作' })).not.toBeInTheDocument();
+    const outer = screen.getByRole('dialog', { name: '外层弹窗' });
+    expect(outer.closest('[data-overlay-root]')).not.toHaveAttribute('inert');
+    expect(trigger).toHaveFocus();
   });
 });

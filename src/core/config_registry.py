@@ -19,7 +19,7 @@ from src.config import (
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
-SCHEMA_VERSION = "2026-07-15-connection-provider"
+SCHEMA_VERSION = "2026-07-16-config-contract"
 
 _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
     {
@@ -4957,7 +4957,7 @@ _UI_PLACEMENT_HIDDEN_LEGACY_PREFIXES = ("OPENAI_", "ANTHROPIC_", "GEMINI_", "ANS
 # group(1) captures the channel name. Shared with the service layer so "what is
 # a channel field key" has a single definition.
 LLM_CHANNEL_FIELD_KEY_RE = re.compile(
-    r"^LLM_([A-Z0-9_]+)_(PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
+    r"^LLM_([A-Z0-9_]+)_(DISPLAY_NAME|PROVIDER|PROTOCOL|BASE_URL|API_KEY|API_KEYS|MODELS|EXTRA_HEADERS|ENABLED)$"
 )
 
 
@@ -5083,7 +5083,7 @@ def build_schema_response() -> Dict[str, Any]:
 
 def _is_sensitive_key(key: str) -> bool:
     markers = ("KEY", "TOKEN", "SECRET", "PASSWORD")
-    return any(marker in key for marker in markers)
+    return key.endswith("_EXTRA_HEADERS") or any(marker in key for marker in markers)
 
 
 def _infer_category(key: str) -> str:
@@ -5139,6 +5139,8 @@ def _infer_category(key: str) -> str:
 def _infer_data_type(key: str, value_hint: Optional[str]) -> str:
     if key.endswith("_TIME"):
         return "time"
+    if key.endswith("_EXTRA_HEADERS"):
+        return "json"
     if value_hint is None:
         return "string"
 
@@ -5164,6 +5166,8 @@ def _infer_data_type(key: str, value_hint: Optional[str]) -> str:
 
 
 def _infer_ui_control(data_type: str, key: str) -> str:
+    if data_type == "json":
+        return "textarea"
     if _is_sensitive_key(key):
         return "password"
     if data_type == "boolean":

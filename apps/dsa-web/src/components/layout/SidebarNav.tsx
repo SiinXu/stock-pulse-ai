@@ -157,7 +157,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
               <Search className="h-4 w-4" />
               {t('layout.search')}
             </span>
-            <kbd className="flex h-5 w-5 items-center justify-center rounded bg-muted text-[11px] font-medium text-secondary-text">/</kbd>
+            <kbd className="flex h-5 w-5 items-center justify-center rounded bg-muted text-xs font-medium text-secondary-text">/</kbd>
           </button>
           <div className="mb-3 border-t border-dashed border-border" />
         </>

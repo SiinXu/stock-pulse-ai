@@ -9,7 +9,6 @@ import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
-import { useDialogA11y } from '../components/common/useDialogA11y';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -39,6 +38,7 @@ import type {
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -209,9 +209,7 @@ const HomePage: React.FC = () => {
   const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
   const marketReviewPollGeneration = useRef(0);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  useDialogA11y({ isOpen: sidebarOpen, containerRef: sidebarRef, onEscape: closeSidebar });
   const stockBarLoadStartedRef = useRef(false);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
   const strategyMenuRef = useRef<HTMLDivElement | null>(null);
@@ -250,6 +248,7 @@ const HomePage: React.FC = () => {
     query,
     inputError,
     duplicateError,
+    duplicateTask,
     error,
     isAnalyzing,
     selectedReport,
@@ -283,6 +282,7 @@ const HomePage: React.FC = () => {
     syncTaskUpdated,
     syncTaskFailed,
     refreshActiveTasks,
+    pollKnownTasks,
     removeTask,
     openMarkdownDrawer,
     closeMarkdownDrawer,
@@ -410,6 +410,10 @@ const HomePage: React.FC = () => {
     () => analysisSkills.find((skill) => skill.id === selectedStrategyId),
     [analysisSkills, selectedStrategyId],
   );
+  const selectedStrategyDisplay = useMemo(
+    () => selectedStrategy ? getStrategyDisplay(selectedStrategy, uiLanguage) : null,
+    [selectedStrategy, uiLanguage],
+  );
   const selectedAnalysisSkills = useMemo(
     () => (selectedStrategyId ? [selectedStrategyId] : undefined),
     [selectedStrategyId],
@@ -417,13 +421,9 @@ const HomePage: React.FC = () => {
   const strategyOptions = useMemo(
     () => [
       { id: '', name: t('home.defaultStrategyName'), description: t('home.defaultStrategyDescription') },
-      ...analysisSkills.map((skill) => ({
-        id: skill.id,
-        name: skill.name,
-        description: skill.description,
-      })),
+      ...analysisSkills.map((skill) => ({ id: skill.id, ...getStrategyDisplay(skill, uiLanguage) })),
     ],
-    [analysisSkills, t],
+    [analysisSkills, t, uiLanguage],
   );
   const closeStrategyMenu = useCallback((restoreFocus = false) => {
     setStrategyMenuOpen(false);
@@ -542,6 +542,7 @@ const HomePage: React.FC = () => {
     syncTaskUpdated,
     syncTaskFailed,
     refreshActiveTasks,
+    pollKnownTasks,
     removeTask,
     onDashboardDataRefresh: handleDashboardDataRefresh,
     onCompletedTaskDataRefreshed: handleCompletedTaskDataRefreshed,
@@ -930,7 +931,7 @@ const HomePage: React.FC = () => {
       scrollMarketReviewFeedbackIntoView();
 
       if (result.taskId) {
-        await pollMarketReviewStatus(result.taskId);
+        void pollMarketReviewStatus(result.taskId);
       }
     } catch (err: unknown) {
       setMarketReviewError(getParsedApiError(err));
@@ -1231,6 +1232,16 @@ const HomePage: React.FC = () => {
   const sidebarContent = useMemo(
     () => (
       <div className="flex min-h-0 h-full flex-col gap-3 overflow-hidden">
+        <div className="flex justify-end md:hidden">
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+            aria-label={t('common.closeDrawer')}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
         {/* StockPulse keeps its task-dismiss interaction (onDismiss); the home
             watchlist workspace is the upstream feature, adapted to StockPulse
             design and wired to StockPulse's pending/selected record logic. */}
@@ -1266,6 +1277,7 @@ const HomePage: React.FC = () => {
     [
       activeTasks,
       batchAnalyzeStatus,
+      closeSidebar,
       handleAnalyzeWatchlist,
       handleDeleteStock,
       handleHistoryItemClick,
@@ -1282,6 +1294,7 @@ const HomePage: React.FC = () => {
       selectedReport?.meta.stockCode,
       sidebarWorkspaceTab,
       todayAnalysisItems,
+      t,
       watchlistAnalyzedTodayCount,
       watchlistRows,
       watchlistState.actionMessage,
@@ -1296,15 +1309,16 @@ const HomePage: React.FC = () => {
   return (
     <div
       data-testid="home-dashboard"
-      className="flex h-[calc(100vh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="flex h-[calc(100dvh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full w-full">
         <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden -ml-1 flex-shrink-0 rounded-lg p-1.5 text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('home.historyButton')}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1338,7 +1352,7 @@ const HomePage: React.FC = () => {
                     className="home-surface-button flex h-10 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                   >
                     <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate">{selectedStrategy?.name || t('home.strategy')}</span>
+                    <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
                   </button>
                   {strategyMenuOpen ? (
                     <div
@@ -1434,7 +1448,9 @@ const HomePage: React.FC = () => {
               <InlineAlert
                 variant="warning"
                 title={t('home.duplicateTask')}
-                message={duplicateError}
+                message={duplicateTask
+                  ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
+                  : duplicateError}
                 action={(
                   <button
                     type="button"
@@ -1481,22 +1497,20 @@ const HomePage: React.FC = () => {
             {sidebarContent}
           </div>
 
-          {sidebarOpen ? (
-            <div className="fixed inset-0 z-40 md:hidden" onClick={closeSidebar} role="presentation">
-              <div className="page-drawer-overlay absolute inset-0" />
-              <div
-                ref={sidebarRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label={t('home.historyButton')}
-                tabIndex={-1}
-                className="dashboard-card absolute bottom-0 left-0 top-0 flex w-72 flex-col overflow-hidden !rounded-none !rounded-r-xl p-3 shadow-2xl focus:outline-none"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {sidebarContent}
-              </div>
-            </div>
-          ) : null}
+          <Drawer
+            isOpen={sidebarOpen}
+            onClose={closeSidebar}
+            title={t('home.historyButton')}
+            width="w-72"
+            zIndex={OVERLAY_Z.pageDrawer}
+            side="left"
+            backdropClassName="page-drawer-overlay"
+            panelClassName="dashboard-card !rounded-none !rounded-r-xl p-3 shadow-2xl"
+            contentClassName="min-h-0 overflow-hidden !p-0"
+            showHeader={false}
+          >
+            {sidebarContent}
+          </Drawer>
 
           <section
             ref={dashboardScrollRef}

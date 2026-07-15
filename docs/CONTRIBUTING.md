@@ -80,10 +80,11 @@ docs: update the README deployment guide
 
 | 检查项 | 说明 | 必须通过 |
 |--------|------|:--------:|
-| backend-gate | `scripts/ci_gate.sh`（py_compile + flake8 严重错误 + 本地核心脚本 + offline pytest） | ✅ |
+| ai-governance | 校验 `AGENTS.md`、兼容指令和仓库协作资产 | ✅ |
+| backend-gate | `scripts/ci_gate.sh` 的 syntax、flake8、deterministic 与 offline-tests | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
-| web-gate | 前端变更时执行 `npm run lint` + `npm run test` + `npm run build` | ✅（触发时） |
-| web-e2e | 前端变更时以隔离的临时 `ENV_FILE` 启动真实后端、Vite 与本地 fake 模型端点，并执行 `npm run test:smoke`（Playwright） | ✅（触发时） |
+| web-gate | Web 或关联 API/配置/服务契约变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` | ✅（触发时） |
+| web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
 
 **本地运行检查：**
@@ -108,7 +109,9 @@ npm run test:smoke
 
 Web 界面文案、语言边界、领域字典和错误码约定见 [Web 国际化开发约定](web-i18n.md)。新增页面或语言时必须按领域扩展 `src/locales/`，不得在 JSX 中硬编码可见文案。
 
-Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/runtime/`；测试启动时播种确定性报告数据，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端、Vite 与 fake provider 日志保存在 `test-results/service-logs/`，失败时由 CI 连同截图、trace 和 video 上传。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/runtime/`；场景需要的报告、任务、账户和配置必须由 fixture 或场景本身确定性播种，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端 Python 按祖先目录 `.venv`、`python3`、`python` 的顺序查找并在启动前打印选择；确定性场景固定 `retries: 0`。后端、Vite 与 fake provider 日志保存在 `test-results/service-logs/`，失败时由 CI 连同截图、trace 和 video 上传。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+
+契约回归不能用 mock 数量、循环条目或注释编号代替语义覆盖。模型路由测试必须覆盖两条 Connection 的同名模型并断言具体 `ModelRef`；Portfolio 交易、资金流水、公司行为和 CSV commit 测试必须复用同一 operation ID 验证 timeout-after-commit 不重复入账，并验证同 ID 异 payload 冲突；Overlay 测试必须覆盖叠层仅顶层响应 Escape、焦点限制与恢复、背景 inert 和滚动锁定。每个 Playwright 验收场景使用独立可读 test 名称与关键断言。
 
 前端本地联调：`npm run dev` 启动的 vite dev server 会把 `/api` 请求代理到 `DSA_WEB_DEV_API_PROXY`（默认 `http://127.0.0.1:8000`）；后端不在本机默认端口时，通过该环境变量指向实际后端地址。
 

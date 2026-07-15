@@ -26,7 +26,7 @@ const PageButton: React.FC<PageButtonProps> = ({ page, isActive, disabled, onCli
       aria-label={ariaLabel}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'inline-flex h-10 min-w-[2.5rem] items-center justify-center rounded-full border px-3 text-sm font-medium transition-all duration-200',
+        'inline-flex h-11 min-w-11 items-center justify-center rounded-full border px-3 text-sm font-medium transition-all duration-200',
         isActive
           ? 'border-transparent bg-foreground text-background shadow-soft-card'
           : 'border-border bg-elevated text-secondary-text hover:bg-hover hover:text-foreground',

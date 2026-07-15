@@ -8,6 +8,41 @@ type AuthStatus = {
 };
 
 const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
+const smokeBackendPort = Number(process.env.DSA_WEB_SMOKE_BACKEND_PORT || 18100);
+const smokeBackendOrigin = `http://127.0.0.1:${smokeBackendPort}`;
+
+type ConfigUpdateItem = { key: string; value: string };
+
+export async function updateE2eConfigOutsidePlaywrightTrace(items: ConfigUpdateItem[]): Promise<void> {
+  // Playwright traces retain API request bodies. Keep generated credentials in
+  // this native-fetch setup boundary, then exercise all masked UI/API flows normally.
+  const login = await fetch(`${smokeBackendOrigin}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ password: smokePassword, passwordConfirm: smokePassword }),
+  });
+  if (!login.ok) throw new Error(`E2E native login failed (${login.status})`);
+  const cookie = login.headers.get('set-cookie')?.split(';', 1)[0];
+  if (!cookie) throw new Error('E2E native login did not return a session cookie');
+
+  const configResponse = await fetch(`${smokeBackendOrigin}/api/v1/system/config`, {
+    headers: { cookie },
+  });
+  if (!configResponse.ok) throw new Error(`E2E native config read failed (${configResponse.status})`);
+  const config = await configResponse.json() as { config_version: string; mask_token: string };
+
+  const update = await fetch(`${smokeBackendOrigin}/api/v1/system/config`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({
+      config_version: config.config_version,
+      mask_token: config.mask_token,
+      reload_now: true,
+      items,
+    }),
+  });
+  if (!update.ok) throw new Error(`E2E native config update failed (${update.status})`);
+}
 
 export async function getE2eAuthStatus(page: Page): Promise<AuthStatus> {
   const response = await page.request.get('/api/v1/auth/status');

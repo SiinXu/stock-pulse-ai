@@ -18,7 +18,7 @@ from api.v1.schemas.backtest import (
     PerformanceMetrics,
 )
 from api.v1.schemas.common import ErrorResponse
-from src.services.backtest_service import BacktestService
+from src.services.backtest_service import BacktestService, BacktestValidationError
 from src.storage import DatabaseManager
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ def run_backtest(
             limit=request.limit,
         )
         return BacktestRunResponse(**stats)
-    except ValueError as exc:
+    except BacktestValidationError as exc:
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_params", "message": str(exc)},
@@ -78,10 +78,10 @@ def run_backtest(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(f"回测执行失败: {exc}", exc_info=True)
+        logger.error("回测执行失败: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={"error": "internal_error", "message": f"回测执行失败: {str(exc)}"},
+            detail={"error": "internal_error", "message": "回测执行失败"},
         )
 
 
@@ -125,7 +125,7 @@ def get_backtest_results(
             limit=limit,
             items=items,
         )
-    except ValueError as exc:
+    except BacktestValidationError as exc:
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_params", "message": str(exc)},
@@ -133,10 +133,10 @@ def get_backtest_results(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(f"查询回测结果失败: {exc}", exc_info=True)
+        logger.error("查询回测结果失败: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={"error": "internal_error", "message": f"查询回测结果失败: {str(exc)}"},
+            detail={"error": "internal_error", "message": "查询回测结果失败"},
         )
 
 
@@ -175,7 +175,7 @@ def get_overall_performance(
                 detail={"error": "not_found", "message": "未找到整体回测汇总"},
             )
         return PerformanceMetrics(**summary)
-    except ValueError as exc:
+    except BacktestValidationError as exc:
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_params", "message": str(exc)},
@@ -183,10 +183,10 @@ def get_overall_performance(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(f"查询整体表现失败: {exc}", exc_info=True)
+        logger.error("查询整体表现失败: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={"error": "internal_error", "message": f"查询整体表现失败: {str(exc)}"},
+            detail={"error": "internal_error", "message": "查询整体表现失败"},
         )
 
 
@@ -226,7 +226,7 @@ def get_stock_performance(
                 detail={"error": "not_found", "message": f"未找到 {code} 的回测汇总"},
             )
         return PerformanceMetrics(**summary)
-    except ValueError as exc:
+    except BacktestValidationError as exc:
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_params", "message": str(exc)},
@@ -234,8 +234,8 @@ def get_stock_performance(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(f"查询单股表现失败: {exc}", exc_info=True)
+        logger.error("查询单股表现失败: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail={"error": "internal_error", "message": f"查询单股表现失败: {str(exc)}"},
+            detail={"error": "internal_error", "message": "查询单股表现失败"},
         )

@@ -179,6 +179,7 @@ export interface PortfolioRiskResponse {
 }
 
 export interface PortfolioTradeCreateRequest {
+  operationId: string;
   accountId: number;
   symbol: string;
   tradeDate: string;
@@ -194,6 +195,7 @@ export interface PortfolioTradeCreateRequest {
 }
 
 export interface PortfolioCashLedgerCreateRequest {
+  operationId: string;
   accountId: number;
   eventDate: string;
   direction: PortfolioCashDirection;
@@ -203,6 +205,7 @@ export interface PortfolioCashLedgerCreateRequest {
 }
 
 export interface PortfolioCorporateActionCreateRequest {
+  operationId: string;
   accountId: number;
   symbol: string;
   effectiveDate: string;

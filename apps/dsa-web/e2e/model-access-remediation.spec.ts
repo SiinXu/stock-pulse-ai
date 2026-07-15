@@ -1,9 +1,13 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { encodeModelRef } from '../src/utils/modelRef';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
 const fakeProviderBaseUrl = `http://127.0.0.1:${fakeProviderPort}/v1`;
 const fakeProviderRootUrl = `http://127.0.0.1:${fakeProviderPort}`;
+const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
+const modelRef = (connection: string, model: string) => encodeModelRef(connection, `openai/${model}`);
+const autosaveClockPages = new WeakSet<Page>();
 
 const MODEL_KEYS_TO_RESET = [
   'LLM_CONFIG_MODE',
@@ -15,6 +19,13 @@ const MODEL_KEYS_TO_RESET = [
   'LLM_E2E_API_KEYS',
   'LLM_E2E_MODELS',
   'LLM_E2E_ENABLED',
+  'LLM_CUSTOM_PROTOCOL',
+  'LLM_CUSTOM_PROVIDER',
+  'LLM_CUSTOM_BASE_URL',
+  'LLM_CUSTOM_API_KEY',
+  'LLM_CUSTOM_API_KEYS',
+  'LLM_CUSTOM_MODELS',
+  'LLM_CUSTOM_ENABLED',
   'LLM_OPENAI_PROTOCOL',
   'LLM_OPENAI_PROVIDER',
   'LLM_OPENAI_BASE_URL',
@@ -145,7 +156,65 @@ async function addManualModel(page: Page, model: string) {
   await input.press('Enter');
 }
 
-async function configureCustomDraft(page: Page, selectedModels = ['fake-report-model']) {
+interface AutosaveExpectation {
+  channels?: string;
+  providers?: Record<string, string>;
+  status?: number;
+}
+
+interface AutosaveResult {
+  payload: { items: Array<{ key: string; value: string }> };
+  refreshed?: { items: Array<{ key: string; value: string }> };
+}
+
+async function waitForAiAutosave(
+  page: Page,
+  trigger: () => Promise<void>,
+  expectation: AutosaveExpectation = { channels: 'custom', providers: { custom: 'custom' } },
+): Promise<AutosaveResult> {
+  if (!autosaveClockPages.has(page)) {
+    await page.clock.install();
+    autosaveClockPages.add(page);
+  }
+  const expectedStatus = expectation.status ?? 200;
+  const responsePromise = page.waitForResponse(
+    (response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT',
+  );
+  const refreshPromise = expectedStatus === 200
+    ? page.waitForResponse(
+      (response) => response.url().includes('/api/v1/system/config?include_schema=true')
+        && response.request().method() === 'GET',
+    )
+    : null;
+
+  await trigger();
+  await expect(page.getByText(/AI 模型: (等待自动保存|自动保存中…)/)).toBeVisible();
+  await page.clock.fastForward(SETTINGS_AUTOSAVE_DEBOUNCE_MS + 1);
+
+  const response = await responsePromise;
+  expect(response.status()).toBe(expectedStatus);
+  const payload = response.request().postDataJSON() as AutosaveResult['payload'];
+  if (!refreshPromise) {
+    await expect(page.getByText(/AI 模型: 保存冲突/)).toBeVisible();
+    return { payload };
+  }
+
+  const refreshResponse = await refreshPromise;
+  expect(refreshResponse.status()).toBe(200);
+  const refreshed = await refreshResponse.json() as AutosaveResult['refreshed'];
+  await expect(page.getByText(/AI 模型: 已自动保存/)).toBeVisible();
+
+  if (expectation.channels !== undefined) {
+    expect(refreshed?.items.find((item) => item.key === 'LLM_CHANNELS')?.value).toBe(expectation.channels);
+  }
+  for (const [connection, provider] of Object.entries(expectation.providers ?? {})) {
+    const providerKey = `LLM_${connection.toUpperCase()}_PROVIDER`;
+    expect(refreshed?.items.find((item) => item.key === providerKey)?.value).toBe(provider);
+  }
+  return { payload, refreshed };
+}
+
+async function configureCustomConnection(page: Page, selectedModels = ['fake-report-model']) {
   const dialog = await openAddDialog(page);
   await chooseProviderBySearch(page, '自定义', 'custom');
   await page.getByLabel('连接名称').fill('e2e');
@@ -157,12 +226,13 @@ async function configureCustomDraft(page: Page, selectedModels = ['fake-report-m
     await page.getByRole('checkbox', { name: model }).check();
   }
   await dialog.getByLabel('搜索模型').press('Escape');
-  await page.getByRole('button', { name: '添加到配置' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+  return waitForAiAutosave(page, async () => {
+    await page.getByRole('button', { name: '添加到配置' }).click();
+    await expect(dialog).toBeHidden();
+  });
 }
 
-async function configureOpenAiDraft(page: Page, name: string, model: string) {
+async function configureOpenAiConnection(page: Page, name: string, model: string) {
   const dialog = await openAddDialog(page);
   await chooseProvider(page, 'openai');
   await dialog.getByLabel('连接名称').fill(name);
@@ -170,56 +240,15 @@ async function configureOpenAiDraft(page: Page, name: string, model: string) {
   await dialog.getByRole('button', { name: '使用自定义服务地址' }).click();
   await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
   await addManualModel(page, model);
-  await dialog.getByRole('button', { name: '添加到配置' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByTestId(`connection-card-${name}`)).toContainText('未保存');
-}
-
-interface SaveExpectation {
-  channels?: string;
-  providers?: Record<string, string>;
-}
-
-async function saveDraft(
-  page: Page,
-  expectation: SaveExpectation = { channels: 'e2e', providers: { e2e: 'custom' } },
-) {
-  const responsePromise = page.waitForResponse(
-    (response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT',
-    { timeout: 20_000 },
-  );
-  const refreshPromise = page.waitForResponse(
-    (response) => response.url().includes('/api/v1/system/config?include_schema=true') && response.request().method() === 'GET',
-    { timeout: 20_000 },
-  );
-  await page.getByRole('button', { name: /保存配置/ }).click();
-  const response = await responsePromise;
-  expect(response.status()).toBe(200);
-  const refreshResponse = await refreshPromise;
-  expect(refreshResponse.status()).toBe(200);
-  const refreshed = await refreshResponse.json();
-  if (expectation.channels !== undefined) {
-    expect(refreshed.items.find((item: { key: string }) => item.key === 'LLM_CHANNELS')?.value).toBe(expectation.channels);
-  }
-  for (const [connection, provider] of Object.entries(expectation.providers ?? {})) {
-    const providerKey = `LLM_${connection.toUpperCase()}_PROVIDER`;
-    expect(refreshed.items.find((item: { key: string }) => item.key === providerKey)?.value).toBe(provider);
-  }
-  for (const connection of (expectation.channels ?? '').split(',').filter(Boolean)) {
-    if (await page.getByTestId(`connection-card-${connection}`).count()) {
-      await expect(page.getByTestId(`connection-card-${connection}`)).not.toContainText('未保存', { timeout: 15_000 });
-    }
-  }
-  return {
-    payload: response.request().postDataJSON() as { items: Array<{ key: string; value: string }> },
-    refreshed,
-  };
+  return waitForAiAutosave(page, async () => {
+    await dialog.getByRole('button', { name: '添加到配置' }).click();
+    await expect(dialog).toBeHidden();
+  }, { channels: 'openai', providers: { openai: 'openai' } });
 }
 
 async function createSavedConnection(page: Page, selectedModels = ['fake-report-model', 'fake-agent-model', 'fake-vision-model']) {
   await openConnections(page, true);
-  await configureCustomDraft(page, selectedModels);
-  await saveDraft(page);
+  await configureCustomConnection(page, selectedModels);
 }
 
 async function selectStrictModel(page: Page, label: string, route: string) {
@@ -267,7 +296,7 @@ test.describe('model access product convergence', () => {
     await createSavedConnection(page);
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
     await expect(page.getByLabel('服务地址')).toHaveCount(0);
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('fake-report-model');
+    await expect(page.getByTestId('connection-card-custom')).toContainText('fake-report-model');
   });
 
   test('06 normal AI views contain no raw config keys or legacy terminology', async ({ page }) => {
@@ -325,7 +354,7 @@ test.describe('model access product convergence', () => {
 
   test('09b a second OpenAI Connection persists the same explicit Provider identity', async ({ page }) => {
     await openConnections(page);
-    await configureOpenAiDraft(page, 'openai', 'fake-report-model');
+    await configureOpenAiConnection(page, 'openai', 'fake-report-model');
 
     const dialog = await openAddDialog(page);
     await dialog.getByLabel('选择模型服务商').click();
@@ -338,9 +367,10 @@ test.describe('model access product convergence', () => {
     await dialog.getByRole('button', { name: '使用自定义服务地址' }).click();
     await dialog.getByLabel('服务地址').fill(fakeProviderBaseUrl);
     await addManualModel(page, 'fake-agent-model');
-    await dialog.getByRole('button', { name: '添加到配置' }).click();
-
-    await saveDraft(page, {
+    await waitForAiAutosave(page, async () => {
+      await dialog.getByRole('button', { name: '添加到配置' }).click();
+      await expect(dialog).toBeHidden();
+    }, {
       channels: 'openai,openai2',
       providers: { openai: 'openai', openai2: 'openai' },
     });
@@ -350,6 +380,7 @@ test.describe('model access product convergence', () => {
     expect(available.models).toEqual(expect.arrayContaining([
       expect.objectContaining({
         route: 'openai/fake-report-model',
+        model_ref: modelRef('openai', 'fake-report-model'),
         connection_id: 'openai',
         connection_name: 'openai',
         provider_id: 'openai',
@@ -357,6 +388,7 @@ test.describe('model access product convergence', () => {
       }),
       expect.objectContaining({
         route: 'openai/fake-agent-model',
+        model_ref: modelRef('openai2', 'fake-agent-model'),
         connection_id: 'openai2',
         connection_name: 'openai2',
         provider_id: 'openai',
@@ -367,25 +399,27 @@ test.describe('model access product convergence', () => {
 
   test('09c renaming an OpenAI Connection preserves Provider identity and model metadata', async ({ page }) => {
     await openConnections(page);
-    await configureOpenAiDraft(page, 'openai', 'fake-report-model');
-    await saveDraft(page, { channels: 'openai', providers: { openai: 'openai' } });
+    await configureOpenAiConnection(page, 'openai', 'fake-report-model');
 
     await page.getByTestId('connection-card-openai').getByRole('button', { name: '编辑' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await dialog.getByLabel('连接名称').fill('primary_gateway');
-    await dialog.getByRole('button', { name: '保存修改' }).click();
-    await expect(page.getByTestId('connection-card-primary_gateway')).toContainText('OpenAI 官方');
-    await saveDraft(page, {
-      channels: 'primary_gateway',
-      providers: { primary_gateway: 'openai' },
+    await waitForAiAutosave(page, async () => {
+      await dialog.getByRole('button', { name: '保存修改' }).click();
+      await expect(dialog).toBeHidden();
+    }, {
+      channels: 'openai',
+      providers: { openai: 'openai' },
     });
+    await expect(page.getByTestId('connection-card-openai')).toContainText('primary_gateway');
 
     const available = await page.evaluate(async () => (
       fetch('/api/v1/system/config/llm/available-models').then((response) => response.json())
     ));
     expect(available.models).toContainEqual(expect.objectContaining({
       route: 'openai/fake-report-model',
-      connection_id: 'primary_gateway',
+      model_ref: modelRef('openai', 'fake-report-model'),
+      connection_id: 'openai',
       connection_name: 'primary_gateway',
       provider_id: 'openai',
       provider_label: 'OpenAI 官方',
@@ -533,33 +567,33 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('dialog', { name: '添加模型服务' })).toHaveCount(1);
   });
 
-  test('17 Add to configuration changes only the unified page draft', async ({ page }) => {
+  test('17 Add to configuration schedules the AI group autosave without a global Save', async ({ page }) => {
     await openConnections(page);
     let saves = 0;
     page.on('request', (request) => {
       if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') saves += 1;
     });
-    await configureCustomDraft(page);
-    expect(saves).toBe(0);
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+    await configureCustomConnection(page);
+    expect(saves).toBe(1);
+    await expect(page.getByRole('button', { name: /保存配置/ })).toHaveCount(0);
+    await expect(page.getByTestId('connection-card-custom')).toContainText('fake-report-model');
   });
 
-  test('18 the page Save performs one atomic transaction and persists the card', async ({ page }) => {
+  test('18 autosave performs one atomic transaction and persists the card', async ({ page }) => {
     await openConnections(page);
-    await configureCustomDraft(page);
     let saves = 0;
     page.on('request', (request) => {
       if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') saves += 1;
     });
-    await saveDraft(page);
+    await configureCustomConnection(page);
     expect(saves).toBe(1);
     await page.reload();
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('fake-report-model');
+    await expect(page.getByTestId('connection-card-custom')).toContainText('fake-report-model');
   });
 
   test('18b a Connection card shows Provider identity, enablement, and independent test status', async ({ page }) => {
     await createSavedConnection(page, ['fake-report-model']);
-    const card = page.getByTestId('connection-card-e2e');
+    const card = page.getByTestId('connection-card-custom');
     await expect(card.getByTestId('provider-avatar-custom')).toBeVisible();
     await expect(card).toContainText('自定义兼容服务');
     await expect(card.getByText('已启用', { exact: true })).toBeVisible();
@@ -571,7 +605,7 @@ test.describe('model access product convergence', () => {
 
   test('19 Edit reuses the connection modal and keeps the page compact', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByTestId('connection-card-e2e').getByRole('button', { name: '编辑' }).click();
+    await page.getByTestId('connection-card-custom').getByRole('button', { name: '编辑' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await expect(dialog.getByLabel('连接名称')).toHaveValue('e2e');
     await expect(page.getByRole('dialog', { name: '编辑模型服务' })).toHaveCount(1);
@@ -589,16 +623,18 @@ test.describe('model access product convergence', () => {
     await page.getByRole('button', { name: '更多操作 e2e' }).click();
     await page.getByRole('menuitem', { name: '删除连接' }).click();
     const dialog = page.getByRole('dialog', { name: '删除连接？' });
-    await expect(page.getByTestId('connection-card-e2e')).toBeVisible();
-    await dialog.getByRole('button', { name: '删除连接' }).click();
-    await expect(page.getByTestId('connection-card-e2e')).toHaveCount(0);
+    await expect(page.getByTestId('connection-card-custom')).toBeVisible();
+    await waitForAiAutosave(page, async () => {
+      await dialog.getByRole('button', { name: '删除连接' }).click();
+    }, { channels: '', providers: {} });
+    await expect(page.getByTestId('connection-card-custom')).toHaveCount(0);
   });
 
   test('21b deleting a referenced Connection is blocked by both the API and the page workflow', async ({ page }) => {
     await createSavedConnection(page, ['fake-report-model', 'fake-agent-model']);
     await page.getByRole('tab', { name: '任务路由' }).click();
-    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
-    await saveDraft(page);
+    const reportModelRef = modelRef('custom', 'fake-report-model');
+    await waitForAiAutosave(page, () => selectStrictModel(page, '主要模型', reportModelRef));
 
     const rejected = await page.evaluate(async () => {
       const before = await fetch('/api/v1/system/config').then((response) => response.json());
@@ -617,12 +653,12 @@ test.describe('model access product convergence', () => {
       return { status: response.status, body, channels: after.items.find((item: { key: string }) => item.key === 'LLM_CHANNELS')?.value };
     });
     expect(rejected.status).toBe(400);
-    expect(rejected.channels).toBe('e2e');
-    expect(rejected.body.issues).toEqual(expect.arrayContaining([
+    expect(rejected.channels).toBe('custom');
+    expect(rejected.body.params.issues).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'model_in_use',
         details: expect.objectContaining({
-          route: 'openai/fake-report-model',
+          model_ref: reportModelRef,
           referenced_by: expect.arrayContaining([
             expect.objectContaining({ task: 'report', key: 'LITELLM_MODEL' }),
           ]),
@@ -635,12 +671,12 @@ test.describe('model access product convergence', () => {
     await page.getByRole('menuitem', { name: '删除连接' }).click();
     const dialog = page.getByRole('dialog', { name: '无法直接删除连接' });
     await expect(dialog).toContainText('报告');
-    await expect(page.getByTestId('connection-card-e2e')).toBeVisible();
+    await expect(page.getByTestId('connection-card-custom')).toBeVisible();
     await dialog.getByRole('button', { name: '前往任务路由替换' }).click();
     await expect(page.getByRole('heading', { name: '任务路由' })).toBeVisible();
     await expect(page.getByRole('button', { name: '主要模型', exact: true })).toHaveAttribute(
       'data-value',
-      'openai/fake-report-model',
+      reportModelRef,
     );
   });
 
@@ -667,13 +703,12 @@ test.describe('model access product convergence', () => {
     await expect(page).toHaveURL(/section=ai_models&view=connections&from=task_routing/);
     await expect(page.getByRole('button', { name: '返回任务路由' })).toBeVisible();
 
-    await configureCustomDraft(page, ['fake-report-model']);
-    await saveDraft(page);
+    await configureCustomConnection(page, ['fake-report-model']);
     await page.getByRole('button', { name: '返回任务路由' }).click();
     await expect(page).toHaveURL(/section=ai_models&view=task_routing/);
     await expect(page).not.toHaveURL(/from=task_routing/);
     await page.getByRole('button', { name: '主要模型', exact: true }).click();
-    await expect(page.locator('[role="option"][data-value="openai/fake-report-model"]')).toBeVisible();
+    await expect(page.locator(`[role="option"][data-value="${modelRef('custom', 'fake-report-model')}"]`)).toBeVisible();
   });
 
   test('23 available-model API errors are distinct from empty state and retryable', async ({ page }) => {
@@ -689,51 +724,56 @@ test.describe('model access product convergence', () => {
   test('24 task models use strict SearchableSelect controls', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('tab', { name: '任务路由' }).click();
+    const reportModelRef = modelRef('custom', 'fake-report-model');
     for (const label of ['主要模型', 'Agent 主要模型', 'Vision 模型']) {
       const trigger = page.getByRole('button', { name: label, exact: true });
       await expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
       await trigger.click();
-      await expect(page.locator('[role="option"][data-value="openai/fake-report-model"]')).toBeVisible();
+      await expect(page.locator(`[role="option"][data-value="${reportModelRef}"]`)).toBeVisible();
       await page.getByRole('combobox', { name: new RegExp(label) }).press('Escape');
     }
     await expect(page.locator('input[aria-label="主要模型"]')).toHaveCount(0);
   });
 
-  test('24b Report, Agent, and Vision selections persist exact catalog routes in one payload', async ({ page }) => {
+  test('24b Report, Agent, and Vision selections persist exact Connection model refs in one autosave', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('tab', { name: '任务路由' }).click();
-    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
-    await selectStrictModel(page, 'Agent 主要模型', 'openai/fake-agent-model');
-    await selectStrictModel(page, 'Vision 模型', 'openai/fake-vision-model');
-    const { payload, refreshed } = await saveDraft(page);
+    const reportModelRef = modelRef('custom', 'fake-report-model');
+    const agentModelRef = modelRef('custom', 'fake-agent-model');
+    const visionModelRef = modelRef('custom', 'fake-vision-model');
+    const { payload, refreshed } = await waitForAiAutosave(page, async () => {
+      await selectStrictModel(page, '主要模型', reportModelRef);
+      await selectStrictModel(page, 'Agent 主要模型', agentModelRef);
+      await selectStrictModel(page, 'Vision 模型', visionModelRef);
+    });
     const submitted = Object.fromEntries(payload.items.map((item) => [item.key, item.value]));
     expect(submitted).toMatchObject({
-      LITELLM_MODEL: 'openai/fake-report-model',
-      AGENT_LITELLM_MODEL: 'openai/fake-agent-model',
-      VISION_MODEL: 'openai/fake-vision-model',
+      LITELLM_MODEL: reportModelRef,
+      AGENT_LITELLM_MODEL: agentModelRef,
+      VISION_MODEL: visionModelRef,
     });
     const persisted = Object.fromEntries(
       refreshed.items.map((item: { key: string; value: string }) => [item.key, item.value]),
     );
     expect(persisted).toMatchObject({
-      LITELLM_MODEL: 'openai/fake-report-model',
-      AGENT_LITELLM_MODEL: 'openai/fake-agent-model',
-      VISION_MODEL: 'openai/fake-vision-model',
+      LITELLM_MODEL: reportModelRef,
+      AGENT_LITELLM_MODEL: agentModelRef,
+      VISION_MODEL: visionModelRef,
     });
   });
 
   test('25 selected task routes survive Available Models becoming stale', async ({ page }) => {
     await createSavedConnection(page);
     await page.getByRole('tab', { name: '任务路由' }).click();
-    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
-    await saveDraft(page);
+    const reportModelRef = modelRef('custom', 'fake-report-model');
+    await waitForAiAutosave(page, () => selectStrictModel(page, '主要模型', reportModelRef));
     await page.route('**/api/v1/system/config/llm/available-models', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ models: [] }),
     }));
     await page.reload();
-    await expect(page.getByText(/当前配置不可用.*openai\/fake-report-model/)).toBeVisible();
+    await expect(page.getByText(/当前配置不可用.*fake-report-model/)).toBeVisible();
   });
 
   test('26 fallback models are searchable, deduplicated, and reorderable', async ({ page }) => {
@@ -756,16 +796,20 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('button', { name: '上移 fake-vision-model' })).toHaveCount(1);
   });
 
-  test('26b referenced model deletion lists every task and replaces all references in the same Save', async ({ page }) => {
+  test('26b referenced model deletion lists every task and replaces all references in one autosave', async ({ page }) => {
     await createSavedConnection(page);
-    await page.getByRole('tab', { name: '可靠性' }).click();
-    await page.getByRole('button', { name: '选择备用模型' }).click();
-    await page.getByRole('checkbox', { name: 'fake-report-model' }).check();
-    await page.getByLabel('搜索模型').press('Escape');
-    await page.getByRole('tab', { name: '任务路由' }).click();
-    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
-    await selectStrictModel(page, 'Agent 主要模型', 'openai/fake-report-model');
-    await selectStrictModel(page, 'Vision 模型', 'openai/fake-report-model');
+    const reportModelRef = modelRef('custom', 'fake-report-model');
+    const agentModelRef = modelRef('custom', 'fake-agent-model');
+    await waitForAiAutosave(page, async () => {
+      await page.getByRole('tab', { name: '可靠性' }).click();
+      await page.getByRole('button', { name: '选择备用模型' }).click();
+      await page.getByRole('checkbox', { name: 'fake-report-model' }).check();
+      await page.getByLabel('搜索模型').press('Escape');
+      await page.getByRole('tab', { name: '任务路由' }).click();
+      await selectStrictModel(page, '主要模型', reportModelRef);
+      await selectStrictModel(page, 'Agent 主要模型', reportModelRef);
+      await selectStrictModel(page, 'Vision 模型', reportModelRef);
+    });
 
     await page.getByRole('tab', { name: '模型接入' }).click();
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
@@ -778,59 +822,48 @@ test.describe('model access product convergence', () => {
     }
     await expect(dialog.getByRole('button', { name: '移除模型 fake-report-model' })).toBeVisible();
     await dialog.getByRole('button', { name: '替代模型' }).click();
-    await page.locator('[role="option"][data-value="openai/fake-agent-model"]').click();
+    await page.locator(`[role="option"][data-value="${agentModelRef}"]`).click();
     await dialog.getByRole('button', { name: '替换引用并删除' }).click();
     await expect(dialog.getByText('无法直接删除模型')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: '移除模型 fake-report-model' })).toHaveCount(0);
-    await dialog.getByRole('button', { name: '保存修改' }).click();
-
-    const { payload } = await saveDraft(page);
+    const { payload } = await waitForAiAutosave(page, async () => {
+      await dialog.getByRole('button', { name: '保存修改' }).click();
+      await expect(dialog).toBeHidden();
+    });
     const submitted = Object.fromEntries(payload.items.map((item) => [item.key, item.value]));
-    expect(submitted.LLM_E2E_MODELS).toBe('fake-agent-model,fake-vision-model');
+    expect(submitted.LLM_CUSTOM_MODELS).toBe('fake-agent-model,fake-vision-model');
     expect(submitted).toMatchObject({
-      LITELLM_MODEL: 'openai/fake-agent-model',
-      AGENT_LITELLM_MODEL: 'openai/fake-agent-model',
-      VISION_MODEL: 'openai/fake-agent-model',
-      LITELLM_FALLBACK_MODELS: 'openai/fake-agent-model',
+      LITELLM_MODEL: agentModelRef,
+      AGENT_LITELLM_MODEL: agentModelRef,
+      VISION_MODEL: agentModelRef,
+      LITELLM_FALLBACK_MODELS: agentModelRef,
     });
   });
 
-  test('26c Reset restores both Connection and task-routing drafts without saving', async ({ page }) => {
+  test('26c Reset current group cancels its scheduled autosave', async ({ page }) => {
     await createSavedConnection(page);
     let putCount = 0;
     page.on('request', (request) => {
       if (request.url().endsWith('/api/v1/system/config') && request.method() === 'PUT') putCount += 1;
     });
     await page.getByRole('tab', { name: '任务路由' }).click();
-    await selectStrictModel(page, '主要模型', 'openai/fake-report-model');
-    await selectStrictModel(page, 'Agent 主要模型', 'openai/fake-agent-model');
-    await page.getByRole('tab', { name: '模型接入' }).click();
-    await page.getByRole('button', { name: '管理模型 e2e' }).click();
-    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
-    await addManualModel(page, 'unsaved-model');
-    await dialog.getByRole('button', { name: '保存修改' }).click();
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('unsaved-model');
-
-    await page.getByRole('button', { name: '重置', exact: true }).click();
+    await selectStrictModel(page, '主要模型', modelRef('custom', 'fake-report-model'));
+    await expect(page.getByText(/AI 模型: 等待自动保存/)).toBeVisible();
+    await page.getByRole('button', { name: '重置当前分组' }).click();
     const resetDialog = page.getByRole('dialog', { name: '放弃未保存的修改？' });
     await resetDialog.getByRole('button', { name: '放弃修改' }).click();
-    await expect(page.getByTestId('connection-card-e2e')).not.toContainText('unsaved-model');
-    await page.getByRole('tab', { name: '任务路由' }).click();
     await expect(page.getByRole('button', { name: '主要模型', exact: true })).toHaveAttribute('data-value', '');
-    await expect(page.getByRole('button', { name: 'Agent 主要模型', exact: true })).toHaveAttribute('data-value', '');
+    await expect(page.getByText(/AI 模型: 等待自动保存/)).toHaveCount(0);
+    await page.clock.fastForward(SETTINGS_AUTOSAVE_DEBOUNCE_MS + 1);
     expect(putCount).toBe(0);
   });
 
   test('27 provider catalog failure is compact and keeps a renamed official Provider identity', async ({ page }) => {
     await openConnections(page);
-    await configureOpenAiDraft(page, 'primary_gateway', 'fake-report-model');
-    await saveDraft(page, {
-      channels: 'primary_gateway',
-      providers: { primary_gateway: 'openai' },
-    });
+    await configureOpenAiConnection(page, 'primary_gateway', 'fake-report-model');
     await page.route('**/api/v1/system/config/llm/providers', (route) => route.fulfill({ status: 500, body: '{}' }));
     await page.reload();
-    const card = page.getByTestId('connection-card-primary_gateway');
+    const card = page.getByTestId('connection-card-openai');
     await expect(card).toBeVisible();
     await expect(card).toContainText('openai');
     await expect(card).not.toContainText('自定义服务');
@@ -853,10 +886,6 @@ test.describe('model access product convergence', () => {
 
   test('29 a real 409 keeps the local draft and surfaces conflict UI', async ({ page }) => {
     await createSavedConnection(page, ['fake-report-model']);
-    await page.getByTestId('connection-card-e2e').getByRole('button', { name: '编辑' }).click();
-    await addManualModel(page, 'local-only-model');
-    await page.getByRole('button', { name: '保存修改' }).click();
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
     const mutation = await page.evaluate(async () => {
       const config = await fetch('/api/v1/system/config').then((response) => response.json());
       const response = await fetch('/api/v1/system/config', {
@@ -866,19 +895,21 @@ test.describe('model access product convergence', () => {
           config_version: config.config_version,
           mask_token: config.mask_token,
           reload_now: true,
-          items: [{ key: 'LLM_E2E_MODELS', value: 'server-side-model' }],
+          items: [{ key: 'LLM_CUSTOM_MODELS', value: 'server-side-model' }],
         }),
       });
       return response.status;
     });
     expect(mutation).toBe(200);
-    const conflictResponsePromise = page.waitForResponse(
-      (response) => response.url().endsWith('/api/v1/system/config') && response.request().method() === 'PUT',
-    );
-    await page.getByRole('button', { name: /保存配置/ }).click();
-    expect((await conflictResponsePromise).status()).toBe(409);
-    await expect(page.getByText(/配置版本冲突/)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('connection-card-e2e')).toContainText('未保存');
+    await page.getByTestId('connection-card-custom').getByRole('button', { name: '编辑' }).click();
+    const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
+    await addManualModel(page, 'local-only-model');
+    await waitForAiAutosave(page, async () => {
+      await dialog.getByRole('button', { name: '保存修改' }).click();
+      await expect(dialog).toBeHidden();
+    }, { status: 409 });
+    await expect(page.getByText(/配置版本冲突|保存冲突/).first()).toBeVisible();
+    await expect(page.getByTestId('connection-card-custom')).toContainText('local-only-model');
   });
 
   test('30 mobile modal is a bottom sheet and both themes remain usable', async ({ page }, testInfo) => {

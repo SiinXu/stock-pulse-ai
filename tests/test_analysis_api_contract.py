@@ -48,7 +48,7 @@ except Exception:  # pragma: no cover - optional dependency environments
 from src.enums import ReportType
 from src.services.analysis_service import AnalysisService
 from src.services.image_stock_extractor import _call_litellm_vision
-from src.services.task_queue import AnalysisTaskQueue, TaskStatus
+from src.services.task_queue import AnalysisTaskQueue, TaskInfo as QueueTaskInfo, TaskStatus
 
 
 def tearDownModule() -> None:
@@ -190,6 +190,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(kwargs["stock_code"], "market_review")
         self.assertEqual(kwargs["stock_name"], "大盘复盘")
         self.assertEqual(kwargs["message"], "大盘复盘任务已提交")
+        self.assertEqual(kwargs["failure_error_code"], "analysis_failed")
 
     def test_trigger_market_review_accepts_request_level_report_language(self) -> None:
         if trigger_market_review is None or analysis_endpoint_module is None:
@@ -1039,9 +1040,36 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         task_info = queue.get_task(task.task_id)
         self.assertIsNotNone(task_info)
         self.assertEqual(task_info.status, TaskStatus.FAILED)
-        self.assertEqual(task_info.error, "runtime init failed")
-        self.assertEqual(task_info.message, "任务失败: runtime init failed")
+        self.assertEqual(task_info.error, "task_failed")
+        self.assertEqual(task_info.message, "任务执行失败")
+        self.assertEqual(task_info.diagnostic_error, "runtime init failed")
         release_market_review_lock.assert_called_once()
+
+    def test_failed_task_polling_does_not_expose_legacy_diagnostic_text(self) -> None:
+        if get_analysis_status is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        secret_marker = "api_key=sk-polling-secret-marker"
+        failed_task = QueueTaskInfo(
+            task_id="failed-poll-task",
+            trace_id="trace-failed-poll-task",
+            stock_code="600519",
+            status=TaskStatus.FAILED,
+            progress=80,
+            message=f"分析失败: {secret_marker}",
+            message_code="task.analysis.failed",
+            error=secret_marker,
+            failure_error_code="analysis_failed",
+        )
+        mock_queue = MagicMock()
+        mock_queue.get_task.return_value = failed_task
+
+        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue):
+            response = get_analysis_status(failed_task.task_id)
+
+        self.assertEqual(response.error, "analysis_failed")
+        self.assertEqual(response.message, "分析失败")
+        self.assertNotIn(secret_marker, response.model_dump_json())
 
     def test_get_analysis_status_completed_db_snapshot_preserves_zero_change_pct(self) -> None:
         if get_analysis_status is None:
@@ -1306,6 +1334,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             {
                 "error": "analysis_failed",
                 "message": "LLM stream interrupted",
+                "params": {},
+                "details": None,
+                "trace_id": None,
             },
         )
 
@@ -3266,9 +3297,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             self.assertEqual(first.status_code, 202)
             self.assertEqual(second.status_code, 409)
             self.assertEqual(json.loads(second.body)["error"], "duplicate_task")
-            self.assertEqual(json.loads(second.body)["stock_code"], "600519.SH")
+            self.assertEqual(json.loads(second.body)["params"]["stock_code"], "600519.SH")
             self.assertEqual(
-                json.loads(second.body)["existing_task_id"],
+                json.loads(second.body)["params"]["existing_task_id"],
                 json.loads(first.body)["task_id"],
             )
         finally:

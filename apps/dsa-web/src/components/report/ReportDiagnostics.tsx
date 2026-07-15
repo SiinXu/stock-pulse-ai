@@ -10,7 +10,6 @@ import type {
   RunDiagnosticStatus,
   RunDiagnosticSummary,
 } from '../../types/analysis';
-import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, Button, Card, StatusDot } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
@@ -74,13 +73,11 @@ const getOrderedComponents = (
 export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   recordId,
   summary,
-  language: reportLanguageValue,
   onOpenRunFlow,
 }) => {
   const { language: uiLanguage } = useUiLanguage();
-  const reportLanguage = normalizeReportLanguage(reportLanguageValue ?? uiLanguage);
-  const text = REPORT_CHROME_TEXT[reportLanguage];
-  const runFlowText = UI_TEXT[reportLanguage === 'ko' ? 'en' : reportLanguage];
+  const text = REPORT_CHROME_TEXT[uiLanguage];
+  const runFlowText = UI_TEXT[uiLanguage];
   const [fetchState, setFetchState] = useState<{
     recordId?: number;
     summary: RunDiagnosticSummary | null;
@@ -286,11 +283,11 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
                 size="xsm"
                 disabled={!hasCopyText}
                 onClick={() => void copyDiagnostics()}
-                aria-label={copied ? text.copied : text.copy}
+                aria-label={copied ? text.copied : text.copyDiagnostics}
                 className="shrink-0"
               >
                 {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? text.copied : text.copy}
+                {copied ? text.copied : text.copyDiagnostics}
               </Button>
             </div>
           </div>

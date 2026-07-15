@@ -13,7 +13,7 @@ const NotFoundPage: React.FC = () => {
   }, [t]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
+    <div className="min-h-dvh flex flex-col items-center justify-center text-center px-4">
       {/* 404 */}
       <div className="relative mb-8">
         <span

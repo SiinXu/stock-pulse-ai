@@ -12,6 +12,7 @@ import {
 } from './llmConnectionContract';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
+import { ProviderQuickLinks } from './ProviderQuickLinks';
 
 export interface WizardDraftItem {
   key: string;
@@ -377,6 +378,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     ? text.apiKeyPlaceholder
                     : text.localKeyPlaceholder}
                 />
+                <div className="mt-1">
+                  <ProviderQuickLinks
+                    provider={provider}
+                    context="credentials"
+                    language={language}
+                    primaryLabel={requirements.apiKeyRequired ? text.apiKey : text.apiKeyOptional}
+                    secondaryLabel={provider?.label ?? text.provider}
+                  />
+                </div>
               </div>
             ) : null}
             {requirements?.showBaseUrl ? (
@@ -428,6 +438,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 </Button>
               ) : null}
             </div>
+            <ProviderQuickLinks
+              provider={provider}
+              context="models"
+              language={language}
+              primaryLabel={text.availableModels}
+              secondaryLabel={provider?.label ?? text.provider}
+            />
             {requirements?.supportsDiscovery === false ? (
               <p className="text-xs text-muted-text">
                 {text.discoveryUnsupported}

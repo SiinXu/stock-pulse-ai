@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from collections import defaultdict
@@ -65,6 +66,10 @@ def _merge_portfolio_limitations(*groups: Iterable[str]) -> List[str]:
 
 class PortfolioConflictError(Exception):
     """Raised when request conflicts with existing portfolio state."""
+
+
+class PortfolioIdempotencyConflictError(PortfolioConflictError):
+    """Raised when an operation ID is reused for a different mutation."""
 
 
 class PortfolioOversellError(ValueError):
@@ -199,6 +204,7 @@ class PortfolioService:
         trade_uid: Optional[str] = None,
         dedup_hash: Optional[str] = None,
         note: Optional[str] = None,
+        operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         side_norm = (side or "").strip().lower()
         if side_norm not in VALID_SIDES:
@@ -212,46 +218,124 @@ class PortfolioService:
             raise ValueError("symbol is required")
         trade_uid_norm = (trade_uid or "").strip() or None
         dedup_hash_norm = (dedup_hash or "").strip() or None
+        operation_payload = {
+            "account_id": int(account_id),
+            "symbol": symbol_norm,
+            "trade_date": trade_date.isoformat(),
+            "side": side_norm,
+            "quantity": float(quantity),
+            "price": float(price),
+            "fee": float(fee),
+            "tax": float(tax),
+            "market": self._normalize_market(market) if market else None,
+            "currency": self._normalize_currency(currency) if currency else None,
+            "trade_uid": trade_uid_norm,
+            "dedup_hash": dedup_hash_norm,
+            "note": (note or "").strip() or None,
+        }
+        with self.repo.portfolio_write_session() as session:
+            replay = self.replay_operation_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="trade.create",
+                payload=operation_payload,
+            )
+            if replay is not None:
+                return replay
+            result = self.record_trade_in_session(
+                session=session,
+                account_id=account_id,
+                symbol=symbol_norm,
+                trade_date=trade_date,
+                side=side_norm,
+                quantity=float(quantity),
+                price=float(price),
+                fee=float(fee),
+                tax=float(tax),
+                market=market,
+                currency=currency,
+                trade_uid=trade_uid_norm,
+                dedup_hash=dedup_hash_norm,
+                note=note,
+            )
+            self.store_operation_result_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="trade.create",
+                payload=operation_payload,
+                response=result,
+            )
+            return result
+
+    def record_trade_in_session(
+        self,
+        *,
+        session: Any,
+        account_id: int,
+        symbol: str,
+        trade_date: date,
+        side: str,
+        quantity: float,
+        price: float,
+        fee: float = 0.0,
+        tax: float = 0.0,
+        market: Optional[str] = None,
+        currency: Optional[str] = None,
+        trade_uid: Optional[str] = None,
+        dedup_hash: Optional[str] = None,
+        note: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        side_norm = (side or "").strip().lower()
+        if side_norm not in VALID_SIDES:
+            raise ValueError("side must be buy or sell")
+        if quantity <= 0 or price <= 0:
+            raise ValueError("quantity and price must be > 0")
+        if fee < 0 or tax < 0:
+            raise ValueError("fee and tax must be >= 0")
+        symbol_norm = self._normalize_symbol_for_storage(symbol)
+        if not symbol_norm:
+            raise ValueError("symbol is required")
+        trade_uid_norm = (trade_uid or "").strip() or None
+        dedup_hash_norm = (dedup_hash or "").strip() or None
+        account = self._require_active_account_in_session(session=session, account_id=account_id)
+        market_norm = self._normalize_market(market or account.market)
+        currency_norm = self._normalize_currency(currency or self._default_currency_for_market(market_norm))
+        self._validate_trade_identity(
+            account_id=account_id,
+            trade_uid=trade_uid_norm,
+            dedup_hash=dedup_hash_norm,
+            session=session,
+        )
+        if side_norm == "sell":
+            self._validate_sell_quantity(
+                account_id=account_id,
+                symbol=symbol_norm,
+                market=market_norm,
+                currency=currency_norm,
+                trade_date=trade_date,
+                quantity=float(quantity),
+                session=session,
+            )
         try:
-            with self.repo.portfolio_write_session() as session:
-                account = self._require_active_account_in_session(session=session, account_id=account_id)
-                market_norm = self._normalize_market(market or account.market)
-                currency_norm = self._normalize_currency(currency or self._default_currency_for_market(market_norm))
-                self._validate_trade_identity(
-                    account_id=account_id,
-                    trade_uid=trade_uid_norm,
-                    dedup_hash=dedup_hash_norm,
-                    session=session,
-                    )
-                if side_norm == "sell":
-                    self._validate_sell_quantity(
-                        account_id=account_id,
-                        symbol=symbol,
-                        market=market_norm,
-                        currency=currency_norm,
-                        trade_date=trade_date,
-                        quantity=float(quantity),
-                        session=session,
-                    )
-                row = self.repo.add_trade_in_session(
-                    session=session,
-                    account_id=account_id,
-                    trade_uid=trade_uid_norm,
-                    symbol=symbol_norm,
-                    market=market_norm,
-                    currency=currency_norm,
-                    trade_date=trade_date,
-                    side=side_norm,
-                    quantity=float(quantity),
-                    price=float(price),
-                    fee=float(fee),
-                    tax=float(tax),
-                    note=(note or "").strip() or None,
-                    dedup_hash=dedup_hash_norm,
-                )
-                return {"id": int(row.id)}
+            row = self.repo.add_trade_in_session(
+                session=session,
+                account_id=account_id,
+                trade_uid=trade_uid_norm,
+                symbol=symbol_norm,
+                market=market_norm,
+                currency=currency_norm,
+                trade_date=trade_date,
+                side=side_norm,
+                quantity=float(quantity),
+                price=float(price),
+                fee=float(fee),
+                tax=float(tax),
+                note=(note or "").strip() or None,
+                dedup_hash=dedup_hash_norm,
+            )
         except (DuplicateTradeUidError, DuplicateTradeDedupHashError) as exc:
             raise PortfolioConflictError(str(exc)) from exc
+        return {"id": int(row.id)}
 
     def record_cash_ledger(
         self,
@@ -262,13 +346,30 @@ class PortfolioService:
         amount: float,
         currency: Optional[str] = None,
         note: Optional[str] = None,
+        operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         direction_norm = (direction or "").strip().lower()
         if direction_norm not in VALID_CASH_DIRECTIONS:
             raise ValueError("direction must be in or out")
         if amount <= 0:
             raise ValueError("amount must be > 0")
+        operation_payload = {
+            "account_id": int(account_id),
+            "event_date": event_date.isoformat(),
+            "direction": direction_norm,
+            "amount": float(amount),
+            "currency": self._normalize_currency(currency) if currency else None,
+            "note": (note or "").strip() or None,
+        }
         with self.repo.portfolio_write_session() as session:
+            replay = self.replay_operation_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="cash_ledger.create",
+                payload=operation_payload,
+            )
+            if replay is not None:
+                return replay
             account = self._require_active_account_in_session(session=session, account_id=account_id)
             currency_norm = self._normalize_currency(currency or account.base_currency)
             row = self.repo.add_cash_ledger_in_session(
@@ -280,7 +381,15 @@ class PortfolioService:
                 currency=currency_norm,
                 note=(note or "").strip() or None,
             )
-            return {"id": int(row.id)}
+            result = {"id": int(row.id)}
+            self.store_operation_result_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="cash_ledger.create",
+                payload=operation_payload,
+                response=result,
+            )
+            return result
 
     def record_corporate_action(
         self,
@@ -294,6 +403,7 @@ class PortfolioService:
         cash_dividend_per_share: Optional[float] = None,
         split_ratio: Optional[float] = None,
         note: Optional[str] = None,
+        operation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         action_type_norm = (action_type or "").strip().lower()
         if action_type_norm not in VALID_CORPORATE_ACTIONS:
@@ -305,13 +415,32 @@ class PortfolioService:
         if action_type_norm == "split_adjustment":
             if split_ratio is None or split_ratio <= 0:
                 raise ValueError("split_ratio must be > 0 for split_adjustment")
+        symbol_norm = self._normalize_symbol_for_storage(symbol)
+        if not symbol_norm:
+            raise ValueError("symbol is required")
+        operation_payload = {
+            "account_id": int(account_id),
+            "symbol": symbol_norm,
+            "effective_date": effective_date.isoformat(),
+            "action_type": action_type_norm,
+            "market": self._normalize_market(market) if market else None,
+            "currency": self._normalize_currency(currency) if currency else None,
+            "cash_dividend_per_share": float(cash_dividend_per_share) if cash_dividend_per_share is not None else None,
+            "split_ratio": float(split_ratio) if split_ratio is not None else None,
+            "note": (note or "").strip() or None,
+        }
         with self.repo.portfolio_write_session() as session:
+            replay = self.replay_operation_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="corporate_action.create",
+                payload=operation_payload,
+            )
+            if replay is not None:
+                return replay
             account = self._require_active_account_in_session(session=session, account_id=account_id)
             market_norm = self._normalize_market(market or account.market)
             currency_norm = self._normalize_currency(currency or self._default_currency_for_market(market_norm))
-            symbol_norm = self._normalize_symbol_for_storage(symbol)
-            if not symbol_norm:
-                raise ValueError("symbol is required")
             row = self.repo.add_corporate_action_in_session(
                 session=session,
                 account_id=account_id,
@@ -324,7 +453,15 @@ class PortfolioService:
                 split_ratio=split_ratio,
                 note=(note or "").strip() or None,
             )
-            return {"id": int(row.id)}
+            result = {"id": int(row.id)}
+            self.store_operation_result_in_session(
+                session=session,
+                operation_id=operation_id,
+                operation_type="corporate_action.create",
+                payload=operation_payload,
+                response=result,
+            )
+            return result
 
     def delete_trade_event(self, trade_id: int) -> bool:
         with self.repo.portfolio_write_session() as session:
@@ -652,6 +789,91 @@ class PortfolioService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    @staticmethod
+    def normalize_operation_id(operation_id: Optional[str]) -> Optional[str]:
+        if operation_id is None:
+            return None
+        value = str(operation_id).strip()
+        if not value:
+            raise ValueError("operation_id must not be blank")
+        if len(value) > 128:
+            raise ValueError("operation_id must be at most 128 characters")
+        if any(char.isspace() or ord(char) < 32 for char in value):
+            raise ValueError("operation_id must not contain whitespace or control characters")
+        return value
+
+    @staticmethod
+    def _operation_request_hash(payload: Any) -> str:
+        serialized = json.dumps(
+            payload,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=PortfolioService._serialize_operation_value,
+        )
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _serialize_operation_value(value: Any) -> Any:
+        if isinstance(value, date):
+            return value.isoformat()
+        item = getattr(value, "item", None)
+        if callable(item):
+            return item()
+        raise TypeError(f"Unsupported operation payload value: {type(value).__name__}")
+
+    def replay_operation_in_session(
+        self,
+        *,
+        session: Any,
+        operation_id: Optional[str],
+        operation_type: str,
+        payload: Any,
+    ) -> Optional[Dict[str, Any]]:
+        operation_id_norm = self.normalize_operation_id(operation_id)
+        if operation_id_norm is None:
+            return None
+        request_hash = self._operation_request_hash(payload)
+        existing = self.repo.get_idempotency_record_in_session(
+            session=session,
+            operation_id=operation_id_norm,
+        )
+        if existing is None:
+            return None
+        if existing.operation_type != operation_type or existing.request_hash != request_hash:
+            raise PortfolioIdempotencyConflictError(
+                f"operation_id already used for a different request: {operation_id_norm}"
+            )
+        response = json.loads(existing.response_json)
+        if not isinstance(response, dict):
+            raise RuntimeError(f"Invalid stored response for operation_id={operation_id_norm}")
+        return response
+
+    def store_operation_result_in_session(
+        self,
+        *,
+        session: Any,
+        operation_id: Optional[str],
+        operation_type: str,
+        payload: Any,
+        response: Dict[str, Any],
+    ) -> None:
+        operation_id_norm = self.normalize_operation_id(operation_id)
+        if operation_id_norm is None:
+            return
+        self.repo.add_idempotency_record_in_session(
+            session=session,
+            operation_id=operation_id_norm,
+            operation_type=operation_type,
+            request_hash=self._operation_request_hash(payload),
+            response_json=json.dumps(
+                response,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+
     def _validate_trade_identity(
         self,
         *,

@@ -2,12 +2,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, ConfirmDialog, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
-import { useDialogA11y } from '../components/common/useDialogA11y';
+import { ApiErrorAlert, Badge, Button, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
+import { OVERLAY_Z } from '../components/common/overlayZ';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -32,6 +32,7 @@ import { findMatchingStockCode, includesStockCode, normalizeStockCode } from '..
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiTextKey } from '../i18n/uiText';
 import { formatUiDateTime } from '../utils/uiLocale';
+import { getStrategyDisplay } from '../utils/strategyDisplay';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -45,6 +46,7 @@ const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> 
 
 const MAX_SELECTED_SKILLS = 3;
 const CONTEXT_COMPRESSION_CONFIG_KEY = 'AGENT_CONTEXT_COMPRESSION_ENABLED';
+const CHAT_SESSION_QUERY_KEY = 'session';
 const STRONG_COMPARE_STOCK_MESSAGE_RE = /比较|对比|\bvs\b|和[^，。,.!?！？]{0,40}比/i;
 const WEAK_COMPARE_STOCK_MESSAGE_RE = /差异(?!化)|区别|不同|相比|对照|比一比/;
 const CHOICE_COMPARE_STOCK_MESSAGE_RE = /哪个|哪只|哪一个|谁更|更值得|更适合|怎么选|选哪|二选一/;
@@ -174,6 +176,9 @@ const restoreActiveStockContextFromMessages = (messages: Message[]): ActiveStock
 const ChatPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialUrlSessionIdRef = useRef(
+    searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim() || undefined,
+  );
   const [input, setInput] = useState('');
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
@@ -182,9 +187,7 @@ const ChatPage: React.FC = () => {
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  useDialogA11y({ isOpen: sidebarOpen, containerRef: sidebarRef, onEscape: closeSidebar });
   const [sending, setSending] = useState(false);
   const [isFollowUpContextLoading, setIsFollowUpContextLoading] = useState(false);
   const [sendToast, setSendToast] = useState<{
@@ -323,11 +326,14 @@ const ChatPage: React.FC = () => {
     sessionId,
     sessions,
     sessionsLoading,
+    hasInitialLoad,
     chatError,
+    lastFailedRequest,
     loadSessions,
     loadInitialSession,
     switchSession,
     startStream,
+    retryLastStream,
     stopStream,
     clearCompletionBadge,
   } = useAgentChatStore();
@@ -403,8 +409,30 @@ const ChatPage: React.FC = () => {
   }, [clearCompletionBadge]);
 
   useEffect(() => {
-    loadInitialSession();
+    void loadInitialSession(initialUrlSessionIdRef.current);
   }, [loadInitialSession]);
+
+  const setSessionInUrl = useCallback((targetSessionId: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set(CHAT_SESSION_QUERY_KEY, targetSessionId);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    if (!hasInitialLoad) {
+      return;
+    }
+    const urlSessionId = searchParams.get(CHAT_SESSION_QUERY_KEY)?.trim();
+    if (!urlSessionId) {
+      setSessionInUrl(sessionId);
+      return;
+    }
+    if (urlSessionId !== sessionId) {
+      void switchSession(urlSessionId);
+    }
+  }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
 
   useEffect(() => {
     agentApi.getSkills()
@@ -501,8 +529,11 @@ const ChatPage: React.FC = () => {
   const skillLimitReached = selectedSkillIds.length >= MAX_SELECTED_SKILLS;
 
   const getSkillNames = useCallback(
-    (skillIds: string[]) => skillIds.map((id) => skills.find((s) => s.id === id)?.name || id),
-    [skills],
+    (skillIds: string[]) => skillIds.map((id) => {
+      const skill = skills.find((item) => item.id === id);
+      return skill ? getStrategyDisplay(skill, language).name : id;
+    }),
+    [language, skills],
   );
 
   const normalizeSelectedSkillIds = useCallback((skillIds: string[]) => {
@@ -533,9 +564,10 @@ const ChatPage: React.FC = () => {
     setActiveStockContext(null);
     setActiveStockCode(null);
     requestScrollToBottom('auto');
-    useAgentChatStore.getState().startNewChat();
+    const newSessionId = useAgentChatStore.getState().startNewChat();
+    setSessionInUrl(newSessionId);
     setSidebarOpen(false);
-  }, [requestScrollToBottom]);
+  }, [requestScrollToBottom, setSessionInUrl]);
 
   const handleSwitchSession = useCallback((targetSessionId: string) => {
     if (targetSessionId === sessionId) {
@@ -546,9 +578,10 @@ const ChatPage: React.FC = () => {
     setActiveStockContext(null);
     setActiveStockCode(null);
     requestScrollToBottom('auto');
-    switchSession(targetSessionId);
+    setSessionInUrl(targetSessionId);
+    void switchSession(targetSessionId);
     setSidebarOpen(false);
-  }, [requestScrollToBottom, sessionId, switchSession]);
+  }, [requestScrollToBottom, sessionId, setSessionInUrl, switchSession]);
 
   const confirmDelete = useCallback(() => {
     if (!deleteConfirmId) return;
@@ -572,7 +605,6 @@ const ChatPage: React.FC = () => {
     const recordId = parseFollowUpRecordId(searchParams.get('recordId'));
 
     if (!stock) {
-      setSearchParams({}, { replace: true });
       return;
     }
 
@@ -604,13 +636,22 @@ const ChatPage: React.FC = () => {
         setIsFollowUpContextLoading(false);
       }
     });
-    setSearchParams({}, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('stock');
+      next.delete('name');
+      next.delete('recordId');
+      if (!next.get(CHAT_SESSION_QUERY_KEY)) {
+        next.set(CHAT_SESSION_QUERY_KEY, sessionId);
+      }
+      return next;
+    }, { replace: true });
+  }, [searchParams, sessionId, setSearchParams]);
 
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
-      if (!msgText || loading) return;
+      if (!msgText || loading || isFollowUpContextLoading) return;
       const usedSkillIds = normalizeSelectedSkillIds(overrideSkillIds ?? selectedSkillIds);
       const usedSkillNames = usedSkillIds.length > 0 ? getSkillNames(usedSkillIds) : [t('chat.general')];
 
@@ -645,7 +686,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(language === 'en' ? ', ' : '、'),
       });
     },
-    [activeStockContext, getSkillNames, input, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
+    [activeStockContext, getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -845,25 +886,36 @@ const ChatPage: React.FC = () => {
           </svg>
           {t('chat.history')}
         </h2>
-        <button
-          onClick={handleStartNewChat}
-          className="rounded-lg p-1.5 text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
-          aria-label={t('chat.newConversation')}
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            aria-label={t('chat.newConversation')}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={closeSidebar}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
+            aria-label={t('common.closeDrawer')}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
         {sessionsLoading ? (
@@ -940,13 +992,13 @@ const ChatPage: React.FC = () => {
   );
 
   const selectedSkillSummary = selectedSkillIds.length > 0
-    ? getSkillNames(selectedSkillIds).join('、')
+    ? getSkillNames(selectedSkillIds).join(language === 'en' ? ', ' : '、')
     : t('chat.generalAnalysis');
 
   return (
     <div
       data-testid="chat-workspace"
-      className="flex h-[calc(100vh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100vh-5.5rem)] lg:h-[calc(100vh-2rem)]"
+      className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
       <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-card/82 shadow-soft-card md:flex">
@@ -954,26 +1006,20 @@ const ChatPage: React.FC = () => {
       </div>
 
       {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 md:hidden"
-          onClick={closeSidebar}
-          role="presentation"
-        >
-          <div className="page-drawer-overlay absolute inset-0" />
-          <div
-            ref={sidebarRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('chat.history')}
-            tabIndex={-1}
-            className="absolute left-0 top-0 bottom-0 w-72 flex flex-col glass-card overflow-hidden border-r border-white/10 bg-card/90 shadow-2xl focus:outline-none"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {sidebarContent}
-          </div>
-        </div>
-      )}
+      <Drawer
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        title={t('chat.history')}
+        width="w-72"
+        zIndex={OVERLAY_Z.pageDrawer}
+        side="left"
+        backdropClassName="page-drawer-overlay"
+        panelClassName="glass-card !rounded-none overflow-hidden border-white/10 bg-card/90 shadow-2xl"
+        contentClassName="overflow-hidden !p-0"
+        showHeader={false}
+      >
+        {sidebarContent}
+      </Drawer>
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog
@@ -993,8 +1039,9 @@ const ChatPage: React.FC = () => {
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-1.5 -ml-1 rounded-lg hover:bg-hover transition-colors text-secondary-text hover:text-foreground"
+                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('chat.history')}
               >
                 <svg
@@ -1189,7 +1236,7 @@ const ChatPage: React.FC = () => {
                 >
                   <div
                     className={cn(
-                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold shadow-sm transition-all',
+                      'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm transition-all',
                       msg.role === 'user' ? 'chat-avatar-user' : 'chat-avatar-ai'
                     )}
                   >
@@ -1324,7 +1371,13 @@ const ChatPage: React.FC = () => {
           {/* Input area */}
           <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
             <div className="space-y-3">
-              {chatError ? <ApiErrorAlert error={chatError} /> : null}
+              {chatError ? (
+                <ApiErrorAlert
+                  error={chatError}
+                  actionLabel={lastFailedRequest ? t('common.retry') : undefined}
+                  onAction={lastFailedRequest ? () => void retryLastStream() : undefined}
+                />
+              ) : null}
               {isFollowUpContextLoading ? (
                 <InlineAlert
                   variant="info"
@@ -1423,6 +1476,7 @@ const ChatPage: React.FC = () => {
                     {skills.map((s) => {
                       const checked = selectedSkillIdSet.has(s.id);
                       const disabled = !checked && skillLimitReached;
+                      const display = getStrategyDisplay(s, language);
                       return (
                         <label
                           key={s.id}
@@ -1442,12 +1496,12 @@ const ChatPage: React.FC = () => {
                           <span
                             className={`transition-colors text-sm ${checked ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
                           >
-                            {s.name}
+                            {display.name}
                           </span>
                           {showSkillDesc === s.id && s.description && (
                             <div className="skill-desc-tooltip">
-                              <p className="skill-title">{s.name}</p>
-                              <p>{s.description}</p>
+                              <p className="skill-title">{display.name}</p>
+                              <p>{display.description}</p>
                             </div>
                           )}
                         </label>
@@ -1465,12 +1519,12 @@ const ChatPage: React.FC = () => {
                   size="xsm"
                   isLoading={isWatchlistActioning}
                   onClick={() => void handleToggleWatchlist(activeStockCode)}
-                  className="text-[11px]"
+                  className="text-xs"
                 >
                   {stockInWatchlist(activeStockCode) ? t('chat.removeWatchlist') : t('chat.addWatchlist')}
                 </Button>
                 {watchlistMessage && (
-                  <span className="text-[11px] text-secondary-text animate-in fade-in">{watchlistMessage}</span>
+                  <span className="text-xs text-secondary-text animate-in fade-in">{watchlistMessage}</span>
                 )}
               </div>
             )}
@@ -1505,7 +1559,7 @@ const ChatPage: React.FC = () => {
                   <Button
                     variant="primary"
                     onClick={() => handleSend()}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || isFollowUpContextLoading}
                     className="btn-primary flex-shrink-0"
                   >
                     {t('chat.send')}

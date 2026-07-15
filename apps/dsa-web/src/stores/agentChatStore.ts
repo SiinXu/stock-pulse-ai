@@ -47,12 +47,24 @@ export interface StreamMeta {
   skillName?: string;
 }
 
+type FailedStreamRequest = {
+  payload: ChatStreamRequest;
+  meta?: StreamMeta;
+};
+
+type StartStreamOptions = {
+  appendUserMessage?: boolean;
+};
+
 type StreamFailureEvent = {
   type: string;
   success?: boolean;
   content?: string;
   error?: unknown;
   message?: unknown;
+  params?: unknown;
+  details?: unknown;
+  trace_id?: unknown;
 };
 
 function getFirstMeaningfulStreamError(...candidates: Array<unknown>): unknown {
@@ -76,6 +88,18 @@ function getStreamFailureError(
   event: StreamFailureEvent,
   fallbackMessage: string,
 ): ParsedApiError {
+  if (
+    typeof event.error === 'string'
+    && /^[a-z][a-z0-9_]*$/.test(event.error.trim())
+  ) {
+    return getParsedApiError({
+      error: event.error,
+      message: typeof event.message === 'string' ? event.message : fallbackMessage,
+      params: event.params,
+      details: event.details,
+      trace_id: event.trace_id,
+    });
+  }
   return getParsedApiError(
     getFirstMeaningfulStreamError(
       event.error,
@@ -98,16 +122,18 @@ interface AgentChatState {
   completionBadge: boolean;
   hasInitialLoad: boolean;
   abortController: AbortController | null;
+  lastFailedRequest: FailedStreamRequest | null;
 }
 
 interface AgentChatActions {
   setCurrentRoute: (path: string) => void;
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
-  loadInitialSession: () => Promise<void>;
+  loadInitialSession: (preferredSessionId?: string) => Promise<void>;
   switchSession: (targetSessionId: string) => Promise<void>;
-  startNewChat: () => void;
-  startStream: (payload: ChatStreamRequest, meta?: StreamMeta) => Promise<void>;
+  startNewChat: () => string;
+  startStream: (payload: ChatStreamRequest, meta?: StreamMeta, options?: StartStreamOptions) => Promise<void>;
+  retryLastStream: () => Promise<void>;
   stopStream: () => void;
 }
 
@@ -115,6 +141,8 @@ const getInitialSessionId = (): string =>
   typeof localStorage !== 'undefined'
     ? localStorage.getItem(STORAGE_KEY_SESSION) || generateUUID()
     : generateUUID();
+
+let sessionHistoryGeneration = 0;
 
 export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set, get) => ({
   messages: [],
@@ -128,6 +156,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   completionBadge: false,
   hasInitialLoad: false,
   abortController: null,
+  lastFailedRequest: null,
 
   setCurrentRoute: (path) => set({ currentRoute: path }),
 
@@ -145,41 +174,65 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     }
   },
 
-  loadInitialSession: async () => {
+  loadInitialSession: async (preferredSessionId) => {
     const { hasInitialLoad } = get();
     if (hasInitialLoad) return;
-    set({ hasInitialLoad: true, sessionsLoading: true });
+    const preferred = preferredSessionId?.trim() || null;
+    const generation = ++sessionHistoryGeneration;
+    if (preferred) {
+      localStorage.setItem(STORAGE_KEY_SESSION, preferred);
+    }
+    set({
+      hasInitialLoad: true,
+      sessionsLoading: true,
+      ...(preferred ? { sessionId: preferred } : {}),
+    });
 
     try {
       const sessionList = await agentApi.getChatSessions();
+      if (generation !== sessionHistoryGeneration) {
+        return;
+      }
       set({ sessions: sessionList });
 
-      const savedId = localStorage.getItem(STORAGE_KEY_SESSION);
-      if (savedId) {
-        const sessionExists = sessionList.some((s) => s.session_id === savedId);
-        if (sessionExists) {
-          const msgs = await agentApi.getChatSessionMessages(savedId);
-          if (msgs.length > 0) {
-            set({
-              messages: msgs.map((m) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-              })),
-            });
-          }
-        } else {
+      const savedId = preferred || localStorage.getItem(STORAGE_KEY_SESSION);
+      if (!savedId) {
+        localStorage.setItem(STORAGE_KEY_SESSION, get().sessionId);
+        return;
+      }
+
+      const sessionExists = sessionList.some((session) => session.session_id === savedId);
+      if (!sessionExists && !preferred) {
+        if (generation === sessionHistoryGeneration) {
           const newId = generateUUID();
           set({ sessionId: newId });
           localStorage.setItem(STORAGE_KEY_SESSION, newId);
         }
-      } else {
-        localStorage.setItem(STORAGE_KEY_SESSION, get().sessionId);
+        return;
       }
+
+      set({ sessionId: savedId });
+      localStorage.setItem(STORAGE_KEY_SESSION, savedId);
+      const msgs = await agentApi.getChatSessionMessages(savedId);
+      if (
+        generation !== sessionHistoryGeneration
+        || get().sessionId !== savedId
+      ) {
+        return;
+      }
+      set({
+        messages: msgs.map((message) => ({
+          id: message.id,
+          role: message.role,
+          content: message.content,
+        })),
+      });
     } catch {
       // Ignore
     } finally {
-      set({ sessionsLoading: false });
+      if (generation === sessionHistoryGeneration) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
@@ -187,20 +240,26 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     const { sessionId, messages, abortController } = get();
     if (targetSessionId === sessionId && messages.length > 0) return;
 
+    const generation = ++sessionHistoryGeneration;
     abortController?.abort();
     set({
       messages: [],
       sessionId: targetSessionId,
       loading: false,
+      sessionsLoading: false,
       progressSteps: [],
       chatError: null,
       abortController: null,
+      lastFailedRequest: null,
     });
     localStorage.setItem(STORAGE_KEY_SESSION, targetSessionId);
 
     try {
       const msgs = await agentApi.getChatSessionMessages(targetSessionId);
-      if (get().sessionId !== targetSessionId) {
+      if (
+        generation !== sessionHistoryGeneration
+        || get().sessionId !== targetSessionId
+      ) {
         return;
       }
       set({
@@ -228,19 +287,23 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   startNewChat: () => {
     // Abort any in-flight stream so the old request does not keep running
     get().abortController?.abort();
+    sessionHistoryGeneration += 1;
     const newId = generateUUID();
     set({
       sessionId: newId,
       messages: [],
       loading: false,
+      sessionsLoading: false,
       progressSteps: [],
       chatError: null,
       abortController: null,
+      lastFailedRequest: null,
     });
     localStorage.setItem(STORAGE_KEY_SESSION, newId);
+    return newId;
   },
 
-  startStream: async (payload, meta) => {
+  startStream: async (payload, meta, options) => {
     if (get().loading) return;
     const { abortController: prevAc, sessionId: storeSessionId } = get();
     prevAc?.abort();
@@ -263,12 +326,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       skillNames,
       skillName,
     };
+    const appendUserMessage = options?.appendUserMessage !== false;
 
     set((s) => ({
-      messages: [...s.messages, userMessage],
+      messages: appendUserMessage ? [...s.messages, userMessage] : s.messages,
       loading: true,
       progressSteps: [],
       chatError: null,
+      lastFailedRequest: null,
       sessions: s.sessions.some((x) => x.session_id === streamSessionId)
         ? s.sessions
         : [
@@ -310,7 +375,13 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         }
 
         currentProgressSteps.push(event);
-        set((s) => ({ progressSteps: [...s.progressSteps, event] }));
+        if (
+          get().sessionId === streamSessionId
+          && get().abortController === ac
+          && !ac.signal.aborted
+        ) {
+          set((s) => ({ progressSteps: [...s.progressSteps, event] }));
+        }
       };
 
       while (true) {
@@ -378,8 +449,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         // User-initiated abort: silent, no badge
-      } else {
-        set({ chatError: getParsedApiError(error) });
+      } else if (
+        get().sessionId === streamSessionId
+        && get().abortController === ac
+      ) {
+        set({
+          chatError: getParsedApiError(error),
+          lastFailedRequest: { payload, meta },
+        });
         const { currentRoute } = get();
         if (currentRoute !== '/chat') {
           set({ completionBadge: true });
@@ -396,5 +473,17 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       }
       await get().loadSessions();
     }
+  },
+
+  retryLastStream: async () => {
+    const { lastFailedRequest, loading } = get();
+    if (!lastFailedRequest || loading) {
+      return;
+    }
+    await get().startStream(
+      lastFailedRequest.payload,
+      lastFailedRequest.meta,
+      { appendUserMessage: false },
+    );
   },
 }));

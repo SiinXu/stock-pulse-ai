@@ -17,6 +17,41 @@ function openListbox(trigger: HTMLElement) {
 }
 
 describe('SettingsField', () => {
+  it('forces a schema safety diagnostic into visible read-only mode', () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsField
+        item={{
+          key: 'UNSAFE_AI_FIELD',
+          value: 'saved-value',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'UNSAFE_AI_FIELD',
+            category: 'ai_model',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+          },
+        }}
+        value="saved-value"
+        onChange={onChange}
+        readOnlyDiagnostic="Diagnostics: schema_condition_unknown"
+      />,
+    );
+
+    expect(screen.getByDisplayValue('saved-value')).toBeDisabled();
+    expect(screen.getByText('只读')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-schema-diagnostic-UNSAFE_AI_FIELD')).toHaveTextContent(
+      'schema_condition_unknown',
+    );
+  });
+
   it('prefers localized Chinese field titles over backend schema titles', () => {
     render(
       <SettingsField

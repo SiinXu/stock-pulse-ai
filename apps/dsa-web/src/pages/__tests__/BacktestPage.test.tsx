@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
@@ -87,6 +87,7 @@ const baseResultItem = {
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  window.history.replaceState({}, '', '/backtest');
   mockGetOverallPerformance.mockResolvedValue(basePerformance);
   mockGetStockPerformance.mockResolvedValue(null);
   mockGetResults.mockResolvedValue({
@@ -449,5 +450,94 @@ describe('BacktestPage', () => {
     expect(screen.getByText('实际表现')).toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
+  });
+
+  it('restores applied filters and pagination from the URL', async () => {
+    window.history.replaceState({}, '', '/backtest?code=aapl&window=20&from=2026-03-01&to=2026-03-31&phase=intraday&page=3');
+    mockGetResults.mockResolvedValueOnce({
+      total: 45,
+      page: 3,
+      limit: 20,
+      items: [{ ...baseResultItem, code: 'AAPL', stockName: 'Apple' }],
+    });
+
+    render(<BacktestPage />);
+
+    expect(await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）')).toHaveValue('AAPL');
+    expect(screen.getByPlaceholderText('10')).toHaveValue(20);
+    expect(screen.getByLabelText('分析开始日期')).toHaveValue('2026-03-01');
+    expect(screen.getByLabelText('分析结束日期')).toHaveValue('2026-03-31');
+    expect(screen.getByLabelText('结果筛选 · 阶段')).toHaveTextContent('盘中');
+    await waitFor(() => expect(mockGetResults).toHaveBeenCalledWith({
+      code: 'AAPL',
+      evalWindowDays: 20,
+      analysisDateFrom: '2026-03-01',
+      analysisDateTo: '2026-03-31',
+      analysisPhase: 'intraday',
+      page: 3,
+      limit: 20,
+    }));
+  });
+
+  it('keeps only the latest results and performance when phase requests resolve out of order', async () => {
+    type ResultsResponse = { total: number; page: number; limit: number; items: typeof baseResultItem[] };
+    let resolveOldResults!: (value: ResultsResponse) => void;
+    let resolveNewResults!: (value: ResultsResponse) => void;
+    let resolveOldPerformance!: (value: typeof basePerformance) => void;
+    let resolveNewPerformance!: (value: typeof basePerformance) => void;
+
+    render(<BacktestPage />);
+    await screen.findByText('600519');
+    mockGetResults
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOldResults = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNewResults = resolve; }));
+    mockGetOverallPerformance
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOldPerformance = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNewPerformance = resolve; }));
+
+    const phaseSelect = screen.getByLabelText('结果筛选 · 阶段');
+    chooseOption(phaseSelect, 'intraday');
+    chooseOption(phaseSelect, 'postmarket');
+    await waitFor(() => expect(mockGetResults).toHaveBeenCalledTimes(3));
+
+    await act(async () => {
+      resolveNewResults({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [{ ...baseResultItem, code: 'NEW', stockName: 'Latest result' }],
+      });
+      resolveNewPerformance({ ...basePerformance, winRatePct: 88 });
+    });
+    expect(await screen.findByText('NEW')).toBeInTheDocument();
+    expect(await screen.findByText('88.0%')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveOldResults({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [{ ...baseResultItem, code: 'OLD', stockName: 'Stale result' }],
+      });
+      resolveOldPerformance({ ...basePerformance, winRatePct: 11 });
+    });
+    expect(screen.queryByText('OLD')).not.toBeInTheDocument();
+    expect(screen.queryByText('11.0%')).not.toBeInTheDocument();
+    expect(screen.getByText('NEW')).toBeInTheDocument();
+  });
+
+  it('does not continue the initial results request after unmount', async () => {
+    let resolvePerformance!: (value: typeof basePerformance) => void;
+    mockGetOverallPerformance.mockImplementationOnce(() => new Promise((resolve) => {
+      resolvePerformance = resolve;
+    }));
+    const { unmount } = render(<BacktestPage />);
+    await waitFor(() => expect(mockGetOverallPerformance).toHaveBeenCalledTimes(1));
+    unmount();
+
+    await act(async () => {
+      resolvePerformance(basePerformance);
+    });
+    expect(mockGetResults).not.toHaveBeenCalled();
   });
 });

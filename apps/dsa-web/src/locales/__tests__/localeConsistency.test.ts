@@ -10,6 +10,12 @@ import { UI_TEXT } from '../../i18n/uiText';
 import { ALERT_FORM_TEXT, ALERT_LIST_TEXT, ALERT_PAGE_TEXT, ALERT_TRIGGER_TEXT } from '../alerts';
 import { BACKTEST_TEXT } from '../backtest';
 import { PORTFOLIO_TEXT } from '../portfolio';
+import {
+  ANALYSIS_CONTEXT_CONTENT_TEXT,
+  MARKET_REVIEW_CONTENT_TEXT,
+  MARKET_STRUCTURE_CONTENT_TEXT,
+  REPORT_NEWS_CONTENT_TEXT,
+} from '../reportContent';
 import { REPORT_CHROME_TEXT } from '../reportChrome';
 import { SCREENING_TEXT } from '../screening';
 import { SETTINGS_CONTROLS_TEXT } from '../settingsControls';
@@ -38,6 +44,10 @@ const registries: Record<string, LocaleMap> = {
   alertsTrigger: ALERT_TRIGGER_TEXT,
   backtest: BACKTEST_TEXT,
   portfolio: PORTFOLIO_TEXT,
+  reportAnalysisContext: ANALYSIS_CONTEXT_CONTENT_TEXT,
+  reportMarketReview: MARKET_REVIEW_CONTENT_TEXT,
+  reportMarketStructure: MARKET_STRUCTURE_CONTENT_TEXT,
+  reportNewsContent: REPORT_NEWS_CONTENT_TEXT,
   reportChrome: REPORT_CHROME_TEXT,
   screening: SCREENING_TEXT,
   settingsControls: SETTINGS_CONTROLS_TEXT,

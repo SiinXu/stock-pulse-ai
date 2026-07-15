@@ -3,6 +3,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from './
 import { toCamelCase } from './utils';
 import type {
   AvailableModelsResponse,
+  ConfigValidationIssue,
   DiscoverLLMChannelModelsRequest,
   DiscoverLLMChannelModelsResponse,
   ExportSystemConfigResponse,
@@ -32,10 +33,10 @@ import type {
 } from '../types/systemConfig';
 
 export class SystemConfigValidationError extends Error {
-  issues: SystemConfigValidationErrorResponse['issues'];
+  issues: ConfigValidationIssue[];
   parsedError: ParsedApiError;
 
-  constructor(message: string, issues: SystemConfigValidationErrorResponse['issues'], parsedError?: ParsedApiError) {
+  constructor(message: string, issues: ConfigValidationIssue[], parsedError?: ParsedApiError) {
     super(message);
     this.name = 'SystemConfigValidationError';
     this.issues = issues;
@@ -234,7 +235,15 @@ export const systemConfigApi = {
 
   async getLlmAvailableModels(): Promise<AvailableModelsResponse> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/system/config/llm/available-models');
-    return toCamelCase<AvailableModelsResponse>(response.data);
+    const parsed = toCamelCase<AvailableModelsResponse>(response.data);
+    return {
+      ...parsed,
+      models: (parsed.models ?? []).map((entry) => ({
+        ...entry,
+        // Rolling-upgrade compatibility for servers predating ModelRef.
+        modelRef: entry.modelRef || entry.route,
+      })),
+    };
   },
 
   async previewGenerationBackendStatus(
@@ -328,7 +337,7 @@ export const systemConfigApi = {
           const validationError = toCamelCase<SystemConfigValidationErrorResponse>(payloadData ?? {});
           throw new SystemConfigValidationError(
             parsed.message || validationError.message || '配置校验失败',
-            validationError.issues || [],
+            validationError.params?.issues || validationError.issues || [],
             parsed,
           );
         }
@@ -337,7 +346,7 @@ export const systemConfigApi = {
           const conflict = toCamelCase<SystemConfigConflictResponse>(payloadData ?? {});
           throw new SystemConfigConflictError(
             parsed.message || conflict.message || '配置版本冲突',
-            conflict.currentConfigVersion,
+            conflict.params?.currentConfigVersion || conflict.currentConfigVersion,
             parsed,
           );
         }

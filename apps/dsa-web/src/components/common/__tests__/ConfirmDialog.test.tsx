@@ -3,6 +3,7 @@ import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { OVERLAY_Z } from '../overlayZ';
 
 function renderDialog(overrides: Partial<React.ComponentProps<typeof ConfirmDialog>> = {}) {
   const onConfirm = vi.fn();
@@ -25,6 +26,16 @@ function renderDialog(overrides: Partial<React.ComponentProps<typeof ConfirmDial
 }
 
 describe('ConfirmDialog', () => {
+  it('renders above every drawer, navigation, and settings overlay layer', () => {
+    renderDialog();
+
+    const root = screen.getByRole('dialog', { name: '确认操作' }).closest<HTMLElement>('[data-overlay-root]');
+    expect(root?.style.zIndex).toBe(String(OVERLAY_Z.confirm));
+    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.settingsModal);
+    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.reportDrawer);
+    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.runFlowDrawer);
+  });
+
   it('disables confirm and cancel actions independently', () => {
     const { onConfirm, onCancel } = renderDialog({
       confirmDisabled: true,
@@ -49,5 +60,12 @@ describe('ConfirmDialog', () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps both actions at least 44px tall for touch input', () => {
+    renderDialog();
+
+    expect(screen.getByRole('button', { name: '确定' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '取消' })).toHaveClass('min-h-11');
   });
 });

@@ -336,7 +336,11 @@ class LLMChannelConfigTestCase(unittest.TestCase):
         with patch.dict(os.environ, env, clear=True):
             config = Config._load_from_env()
 
-        route_models = [entry["model_name"] for entry in config.llm_model_list]
+        route_models = [
+            entry["model_name"]
+            for entry in config.llm_model_list
+            if not entry["model_name"].startswith("modelref:")
+        ]
         self.assertEqual(
             route_models,
             [
@@ -347,7 +351,11 @@ class LLMChannelConfigTestCase(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            [entry["litellm_params"]["model"] for entry in config.llm_model_list],
+            [
+                entry["litellm_params"]["model"]
+                for entry in config.llm_model_list
+                if not entry["model_name"].startswith("modelref:")
+            ],
             route_models,
         )
         self.assertEqual(config.llm_model_list[1]["model_info"]["dsa_display_model"], "deepseek-ai/DeepSeek-V3")

@@ -45,7 +45,7 @@ const AppLayout: React.FC = () => {
 
   if (loadError) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base px-4">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-base px-4">
         <div className="w-full max-w-lg">
           <ApiErrorAlert error={loadError} />
         </div>

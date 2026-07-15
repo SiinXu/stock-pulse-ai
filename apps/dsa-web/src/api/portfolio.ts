@@ -164,6 +164,7 @@ export const portfolioApi = {
 
   async createTrade(payload: PortfolioTradeCreateRequest): Promise<PortfolioEventCreatedResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/trades', {
+      operation_id: payload.operationId,
       account_id: payload.accountId,
       symbol: payload.symbol,
       trade_date: payload.tradeDate,
@@ -176,7 +177,7 @@ export const portfolioApi = {
       currency: payload.currency,
       trade_uid: payload.tradeUid,
       note: payload.note,
-    });
+    }, { headers: { 'Idempotency-Key': payload.operationId } });
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -187,13 +188,14 @@ export const portfolioApi = {
 
   async createCashLedger(payload: PortfolioCashLedgerCreateRequest): Promise<PortfolioEventCreatedResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/cash-ledger', {
+      operation_id: payload.operationId,
       account_id: payload.accountId,
       event_date: payload.eventDate,
       direction: payload.direction,
       amount: payload.amount,
       currency: payload.currency,
       note: payload.note,
-    });
+    }, { headers: { 'Idempotency-Key': payload.operationId } });
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -204,6 +206,7 @@ export const portfolioApi = {
 
   async createCorporateAction(payload: PortfolioCorporateActionCreateRequest): Promise<PortfolioEventCreatedResponse> {
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/corporate-actions', {
+      operation_id: payload.operationId,
       account_id: payload.accountId,
       symbol: payload.symbol,
       effective_date: payload.effectiveDate,
@@ -213,7 +216,7 @@ export const portfolioApi = {
       cash_dividend_per_share: payload.cashDividendPerShare,
       split_ratio: payload.splitRatio,
       note: payload.note,
-    });
+    }, { headers: { 'Idempotency-Key': payload.operationId } });
     return toCamelCase<PortfolioEventCreatedResponse>(response.data);
   },
 
@@ -274,15 +277,20 @@ export const portfolioApi = {
     accountId: number,
     broker: string,
     file: File,
+    operationId: string,
     dryRun = false,
   ): Promise<PortfolioImportCommitResponse> {
     const formData = new FormData();
     formData.append('account_id', String(accountId));
     formData.append('broker', broker);
     formData.append('dry_run', dryRun ? 'true' : 'false');
+    formData.append('operation_id', operationId);
     formData.append('file', file);
     const response = await apiClient.post<Record<string, unknown>>('/api/v1/portfolio/imports/csv/commit', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Idempotency-Key': operationId,
+      },
     });
     return toCamelCase<PortfolioImportCommitResponse>(response.data);
   },

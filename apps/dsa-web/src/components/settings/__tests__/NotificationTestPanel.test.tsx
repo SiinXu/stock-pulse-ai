@@ -91,12 +91,10 @@ describe('NotificationTestPanel', () => {
     const SwitchHarness = ({ children }: { children: ReactNode }) => {
       const { setLanguage } = useUiLanguage();
       return (
-        <div>
-          <button type="button" onClick={() => setLanguage('en')}>
-            switch-en
-          </button>
+        <>
           {children}
-        </div>
+          <button type="button" onClick={() => setLanguage('en')}>switch-language</button>
+        </>
       );
     };
 
@@ -118,7 +116,7 @@ describe('NotificationTestPanel', () => {
     expect(titleInput).toHaveValue('DSA 通知测试');
     expect(contentInput).toHaveValue('这是一条来自 DSA Web 设置页的通知测试消息。');
 
-    fireEvent.click(screen.getByRole('button', { name: 'switch-en' }));
+    fireEvent.click(screen.getByText('switch-language'));
 
     await waitFor(() => {
       expect(titleInput).toHaveValue('DSA notification test');
@@ -139,12 +137,10 @@ describe('NotificationTestPanel', () => {
     const SwitchHarness = ({ children }: { children: ReactNode }) => {
       const { setLanguage } = useUiLanguage();
       return (
-        <div>
-          <button type="button" onClick={() => setLanguage('en')}>
-            switch-en
-          </button>
+        <>
           {children}
-        </div>
+          <button type="button" onClick={() => setLanguage('en')}>switch-language</button>
+        </>
       );
     };
 
@@ -166,7 +162,7 @@ describe('NotificationTestPanel', () => {
     fireEvent.change(titleInput, { target: { value: '自定义标题' } });
     fireEvent.change(contentInput, { target: { value: '自定义正文' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'switch-en' }));
+    fireEvent.click(screen.getByText('switch-language'));
     expect(titleInput).toHaveValue('自定义标题');
     expect(contentInput).toHaveValue('自定义正文');
   });
