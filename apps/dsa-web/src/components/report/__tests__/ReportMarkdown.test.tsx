@@ -33,41 +33,65 @@ describe('ReportMarkdown', () => {
     );
   };
 
+  const createDeferredMarkdown = () => {
+    let resolve!: (content: string) => void;
+    const promise = new Promise<string>((done) => {
+      resolve = done;
+    });
+    return { promise, resolve };
+  };
+
   it('keeps Chinese chrome around a Chinese report', async () => {
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 中文报告');
+    const markdown = createDeferredMarkdown();
+    vi.mocked(historyApi.getMarkdown).mockReturnValue(markdown.promise);
 
     renderReport('zh', 'zh');
 
-    expect(await screen.findByRole('button', { name: '复制 Markdown 源码' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '中文报告' })).toBeInTheDocument();
+    const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
+    expect(copyButton).toBeDisabled();
+    markdown.resolve('# 中文报告');
+    expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
+    expect(copyButton).toBeEnabled();
   });
 
   it('keeps Chinese chrome around an English report', async () => {
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Full report');
+    const markdown = createDeferredMarkdown();
+    vi.mocked(historyApi.getMarkdown).mockReturnValue(markdown.promise);
 
     renderReport('zh', 'en');
 
-    expect(await screen.findByRole('button', { name: '复制 Markdown 源码' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Full report' })).toBeInTheDocument();
+    const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
+    expect(copyButton).toBeDisabled();
+    markdown.resolve('# Full report');
+    expect(await screen.findByRole('heading', { name: 'Full report' })).toBeInTheDocument();
+    expect(copyButton).toBeEnabled();
   });
 
   it('keeps English chrome around a Chinese report', async () => {
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 中文报告');
+    const markdown = createDeferredMarkdown();
+    vi.mocked(historyApi.getMarkdown).mockReturnValue(markdown.promise);
 
     renderReport('en', 'zh');
 
-    expect(await screen.findByRole('button', { name: 'Copy Markdown Source' })).toBeInTheDocument();
+    const copyButton = await screen.findByRole('button', { name: 'Copy Markdown Source' });
+    expect(copyButton).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '中文报告' })).toBeInTheDocument();
+    markdown.resolve('# 中文报告');
+    expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
+    expect(copyButton).toBeEnabled();
   });
 
   it('keeps English chrome around an English report', async () => {
-    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# Full report');
+    const markdown = createDeferredMarkdown();
+    vi.mocked(historyApi.getMarkdown).mockReturnValue(markdown.promise);
 
     renderReport('en', 'en');
 
-    expect(await screen.findByRole('button', { name: 'Copy Markdown Source' })).toBeInTheDocument();
+    const copyButton = await screen.findByRole('button', { name: 'Copy Markdown Source' });
+    expect(copyButton).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Full report' })).toBeInTheDocument();
+    markdown.resolve('# Full report');
+    expect(await screen.findByRole('heading', { name: 'Full report' })).toBeInTheDocument();
+    expect(copyButton).toBeEnabled();
   });
 });

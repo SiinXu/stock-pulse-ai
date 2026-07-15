@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
 - [修复] System Config、Backtest、图片提取、Agent 与 AlphaSift 的错误边界统一收口：未知下游异常返回安全的结构化 500，诊断递归移除凭据、URL query token 与私有端点，SSE/history/日志不再回显敏感原文，预期校验错误仍保留明确的 4xx 语义。
 - [修复] 全局 422 请求校验 envelope 删除 Pydantic `input` 与异常上下文，只保留安全的字段位置、类型和通用文案，避免登录或配置请求中的 password/API key 被响应与浏览器 trace 复制。
