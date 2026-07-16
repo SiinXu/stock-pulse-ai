@@ -363,7 +363,9 @@ class TickFlowFetcher(BaseFetcher):
         return 0.10
 
     @staticmethod
-    def _coerce_frame(value: Any) -> pd.DataFrame:
+    def _coerce_frame(
+        value: pd.DataFrame | list | dict | None,
+    ) -> pd.DataFrame:
         if value is None:
             return pd.DataFrame()
         if isinstance(value, pd.DataFrame):
@@ -455,7 +457,7 @@ class TickFlowFetcher(BaseFetcher):
     @classmethod
     def _prepare_daily_frame(
         cls,
-        value: Any,
+        value: pd.DataFrame | list | dict | None,
         *,
         symbol: str,
         start_date: str,

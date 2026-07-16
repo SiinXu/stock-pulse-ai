@@ -13,12 +13,21 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
+
+if TYPE_CHECKING:
+    from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+
+class RunnerToolCall(Protocol):
+    name: str
+    arguments: Dict[str, Any]
+
 
 _SUMMARY_LIMIT = 500
 _TOKEN_PATTERN = re.compile(
@@ -172,7 +181,7 @@ def _guard_tool_stock_scope(
     tool_registry: ToolRegistry,
     tool_name: str,
     arguments: Dict[str, Any],
-    stock_scope: Any,
+    stock_scope: Optional[StockScope],
 ) -> Optional[Dict[str, Any]]:
     if stock_scope is None or not isinstance(arguments, dict):
         return None
@@ -248,9 +257,9 @@ def _redact_json_string_if_possible(text: str) -> str:
 
 def execute_runner_tool_call(
     *,
-    tool_call: Any,
+    tool_call: RunnerToolCall,
     tool_registry: ToolRegistry,
-    stock_scope: Any = None,
+    stock_scope: Optional[StockScope] = None,
     non_retriable_tool_results: Optional[Dict[str, str]] = None,
 ) -> tuple[Any, str, bool, float, bool, Optional[Dict[str, Any]]]:
     """Execute a single tool call using the legacy runner semantics."""
@@ -276,7 +285,7 @@ def execute_runner_tool_call(
         logger.info(
             "Tool '%s' skipped via non-retriable cache for arguments=%s",
             tool_call.name,
-            tool_call.arguments,
+            _redact_structured_secrets(tool_call.arguments),
         )
         return tool_call, non_retriable_tool_results[cache_key], False, dur, True, None
 

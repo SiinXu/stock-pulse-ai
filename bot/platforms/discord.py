@@ -20,7 +20,7 @@ from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
 from bot.platforms.base import BotPlatform
-from bot.models import BotMessage, WebhookResponse, ChatType
+from bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
 from src.utils.sanitize import log_safe_exception
 
 
@@ -251,7 +251,7 @@ class DiscordPlatform(BotPlatform):
     # Discord message content hard limit
     DISCORD_MAX_CONTENT_LENGTH = 2000
 
-    def send_followup(self, response: Any, message: BotMessage) -> bool:
+    def send_followup(self, response: BotResponse, message: BotMessage) -> bool:
         """Edit the deferred interaction placeholder with the real result.
 
         Uses ``PATCH /webhooks/{application_id}/{token}/messages/@original``

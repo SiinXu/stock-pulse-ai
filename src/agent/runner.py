@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from src.agent.llm_adapter import LLMToolAdapter
+from src.agent.llm_adapter import LLMToolAdapter, ToolCall
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -594,7 +594,7 @@ def run_agent_loop(
 # ============================================================
 
 def _execute_tools(
-    tool_calls,
+    tool_calls: List[ToolCall],
     tool_registry: ToolRegistry,
     step: int,
     progress_callback: Optional[Callable],

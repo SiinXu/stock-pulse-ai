@@ -204,19 +204,21 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const showModelsField = fieldIsVisible('models');
   const modelsAreReadOnly = fieldIsReadOnly('models');
   const supportsDiscovery = provider?.supportsDiscovery === true;
-  const discoveryEnabledByContract = hasConnectionSchema
-    ? Boolean(connectionContractValues && isConnectionModelDiscoveryEnabled(
-      connectionContractValues,
-      connectionSchemaFields,
-    ))
-    : !apiKeyRequired || Boolean(apiKey.trim());
   const canPersistConnectionIdentity = !hasConnectionSchema || Boolean(
     connectionSchemaFields.length > 0
-    && (
-      connectionFieldStates.connection_name === undefined
-      || fieldCanWrite('connection_name')
-    ),
+    && fieldCanWrite('connection_name')
+    && fieldCanWrite('provider_id'),
   );
+  const discoveryEnabledByContract = hasConnectionSchema
+    ? Boolean(
+      canPersistConnectionIdentity
+      && connectionContractValues
+      && isConnectionModelDiscoveryEnabled(
+        connectionContractValues,
+        connectionSchemaFields,
+      )
+    )
+    : !apiKeyRequired || Boolean(apiKey.trim());
   const cloudContractReady = Boolean(
     provider
     && canPersistConnectionIdentity
@@ -326,7 +328,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleDiscover = async () => {
-    if (!provider || !supportsDiscovery || !discoveryEnabledByContract) {
+    if (
+      !provider
+      || !canPersistConnectionIdentity
+      || !supportsDiscovery
+      || !discoveryEnabledByContract
+    ) {
       return;
     }
     setIsDiscovering(true);
@@ -355,7 +362,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleTestConnection = async () => {
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return;
     }
     setIsTesting(true);
@@ -419,16 +426,21 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       }
       case 'models':
         return hasConnectionSchema
-          ? !missingConnectionFields.includes('models') && !hasUnknownConnectionContract
+          ? canPersistConnectionIdentity
+            && !missingConnectionFields.includes('models')
+            && !hasUnknownConnectionContract
           : modelOptions.length > 0;
       case 'model':
-        return true; // defaults to the first model
+        return !hasConnectionSchema || cloudContractReady;
       default:
         return true;
     }
   })();
 
   const goNext = () => {
+    if (!canAdvance) {
+      return;
+    }
     if (step === 'model' && !reportModel && modelOptions.length > 0) {
       setReportModel(modelOptions[0]);
     }
@@ -460,7 +472,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (mode === 'cli') {
       return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
     }
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return [];
     }
     const name = suggestedConnectionName;
@@ -471,9 +483,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     const primaryModelRef = primaryRoute ? encodeModelRef(name, primaryRoute) : '';
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
-    if (hasConnectionSchema && !canPersistConnectionIdentity) {
-      return [];
-    }
     const items: WizardDraftItem[] = [
       // Make the configured channels the active source so a co-existing YAML /
       // Legacy config doesn't silently shadow the wizard result.
@@ -668,6 +677,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   onClick={() => void handleDiscover()}
                   disabled={
                     isDiscovering
+                    || !canPersistConnectionIdentity
                     || !discoveryEnabledByContract
                   }
                   isLoading={isDiscovering}
@@ -828,7 +838,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   variant="settings-secondary"
                   size="xsm"
                   onClick={() => void handleTestConnection()}
-                  disabled={isTesting}
+                  disabled={isTesting || (hasConnectionSchema && !cloudContractReady)}
                   isLoading={isTesting}
                 >
                   {text.testOptional}

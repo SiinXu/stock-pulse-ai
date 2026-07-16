@@ -67,7 +67,7 @@ class GracefulShutdown:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-    def _signal_handler(self, signum, frame):
+    def _signal_handler(self, signum: int, frame):
         """信号处理函数"""
         with self._lock:
             if not self.shutdown_requested:
