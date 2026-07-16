@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi } from '../../api/analysis';
@@ -140,10 +140,12 @@ const runFlowSnapshot: RunFlowSnapshot = {
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function renderHome(initialEntry: string) {
@@ -338,7 +340,8 @@ describe('HomePage URL state', () => {
   });
 
   it('keeps a localized Run Flow error after removing a permanently unavailable source', async () => {
-    vi.mocked(historyApi.getRecordFlow).mockRejectedValue({
+    const runFlowRequest = createDeferred<RunFlowSnapshot>();
+    const runFlowError = {
       response: {
         status: 404,
         data: {
@@ -348,11 +351,18 @@ describe('HomePage URL state', () => {
           details: null,
         },
       },
-    });
+    };
+    vi.mocked(historyApi.getRecordFlow).mockReturnValue(runFlowRequest.promise);
     const router = renderHome('/?recordId=1&keep=yes&runFlow=history&runFlowRecordId=404');
 
-    await waitFor(() => expect(router.state.location.search).toBe('?recordId=1&keep=yes'));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument());
+    await waitFor(() => expect(historyApi.getRecordFlow).toHaveBeenCalledWith(404));
+    await act(async () => {
+      runFlowRequest.reject(runFlowError);
+      await runFlowRequest.promise.catch(() => undefined);
+    });
+
+    expect(router.state.location.search).toBe('?recordId=1&keep=yes');
+    expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument();
     expect(screen.getByText('未找到请求的内容')).toBeInTheDocument();
   });
 });
