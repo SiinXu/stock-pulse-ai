@@ -22,7 +22,10 @@ from api.v1.schemas.intelligence import (
     IntelligenceSourceTestResponse,
 )
 from src.services.intelligence_service import IntelligenceService, IntelligenceServiceError
-from src.services.run_diagnostics import sanitize_diagnostic_text
+from src.services.run_diagnostics import (
+    sanitize_diagnostic_text as sanitize_run_diagnostic_text,
+)
+from src.utils.sanitize import sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -37,7 +40,11 @@ def _not_found(message: str) -> HTTPException:
 
 
 def _internal_error(message: str, exc: Exception) -> HTTPException:
-    sanitized_error = sanitize_diagnostic_text(str(exc), max_length=300) or "internal intelligence error"
+    safe_exception = sanitize_diagnostic_text(exc, max_length=300)
+    sanitized_error = (
+        sanitize_run_diagnostic_text(safe_exception, max_length=300)
+        or "internal intelligence error"
+    )
     logger.error("%s: %s", message, sanitized_error)
     return HTTPException(
         status_code=500,

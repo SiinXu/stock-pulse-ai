@@ -13,6 +13,7 @@ from src.core.market_review import MARKET_REVIEW_HISTORY_CODE, MARKET_REVIEW_REP
 from src.market_analyzer import MarketAnalyzer
 from src.schemas.market_light import MarketLightSnapshot
 from src.storage import AnalysisHistory, DatabaseManager
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -95,12 +96,17 @@ def load_previous_snapshot(
             try:
                 candidate = MarketLightSnapshot.model_validate(snapshot).model_dump()
             except Exception as exc:
-                logger.warning(
-                    "invalid persisted market light snapshot: row_id=%s region=%s trade_date=%s error=%s",
-                    getattr(row, "id", "?"),
-                    normalized_region,
-                    trade_date,
+                log_safe_exception(
+                    logger,
+                    "Persisted Market Light snapshot is invalid",
                     exc,
+                    error_code="persisted_market_light_snapshot_invalid",
+                    level=logging.WARNING,
+                    context={
+                        "row_id": getattr(row, "id", "unknown"),
+                        "region": normalized_region,
+                        "trade_date": trade_date,
+                    },
                 )
                 if best_snapshot is None:
                     invalid_target_error = exc

@@ -40,6 +40,7 @@ from src.services.decision_signal_reassess_service import (
     DecisionSignalUnsupportedReportSnapshotError,
     DecisionSignalUnsupportedReportTypeError,
 )
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,12 @@ def _error(status_code: int, exc: Exception, *, error: str) -> HTTPException:
 
 
 def _internal_error(message: str, exc: Exception) -> HTTPException:
-    logger.error("%s: %s", message, exc, exc_info=True)
+    log_safe_exception(
+        logger,
+        message,
+        exc,
+        error_code="internal_error",
+    )
     return HTTPException(
         status_code=500,
         detail={"error": "internal_error", "message": message},

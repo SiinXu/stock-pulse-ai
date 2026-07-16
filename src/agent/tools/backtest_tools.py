@@ -11,6 +11,7 @@ Tools:
 import logging
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +69,14 @@ def _handle_get_overall_backtest_summary(eval_window_days: int = 30) -> dict:
         if summary is None:
             return {"info": "No backtest summary available. Backtest may not have been run yet."}
         return _serialize_overall_backtest_summary(summary, eval_window_days)
-    except Exception:
-        logger.warning("[backtest_tools] get_overall_backtest_summary error", exc_info=True)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Agent overall backtest summary lookup failed",
+            exc,
+            error_code="agent_overall_backtest_summary_failed",
+            level=logging.WARNING,
+        )
         return {"error": "Failed to retrieve backtest summary."}
 
 
@@ -106,8 +113,15 @@ def _handle_get_skill_backtest_summary(skill_id: str = "", eval_window_days: int
             "avg_simulated_return_pct": summary.get("avg_simulated_return_pct"),
             "computed_at": summary.get("computed_at"),
         }
-    except Exception:
-        logger.warning("[backtest_tools] get_skill_backtest_summary error", exc_info=True)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Agent skill backtest summary lookup failed",
+            exc,
+            error_code="agent_skill_backtest_summary_failed",
+            level=logging.WARNING,
+            context={"skill_id": skill_id},
+        )
         return {"error": "Failed to retrieve backtest summary."}
 
 
@@ -211,8 +225,15 @@ def _handle_get_stock_backtest_summary(stock_code: str, eval_window_days: int = 
             return {"info": f"No backtest data available for {stock_code}. Backtest may not have been run yet."}
 
         return result
-    except Exception:
-        logger.warning("[backtest_tools] get_stock_backtest_summary error", exc_info=True)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Agent stock backtest summary lookup failed",
+            exc,
+            error_code="agent_stock_backtest_summary_failed",
+            level=logging.WARNING,
+            context={"stock_code": stock_code},
+        )
         return {"error": "Failed to retrieve backtest data."}
 
 

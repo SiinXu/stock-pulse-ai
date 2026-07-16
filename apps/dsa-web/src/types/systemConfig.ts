@@ -188,7 +188,10 @@ export interface LLMConfigModeStatus {
 
 export interface LlmProviderCatalogEntry {
   id: string;
+  /** @deprecated Chinese compatibility label; select labelZh/labelEn for UI. */
   label: string;
+  labelZh?: string;
+  labelEn?: string;
   protocol: string;
   defaultBaseUrl: string;
   credentialUrl?: string | null;
@@ -203,8 +206,20 @@ export interface LlmProviderCatalogEntry {
   isCustom: boolean;
 }
 
+export interface LlmConnectionFieldSchema {
+  key: string;
+  envSuffix?: string | null;
+  dataType: 'string' | 'boolean' | 'array' | 'json';
+  isSensitive: boolean;
+  /** @deprecated Unconditional compatibility projection; contract is authoritative. */
+  isRequired: boolean;
+  contract: ConfigFieldContract;
+}
+
 export interface LlmProviderCatalogResponse {
   providers: LlmProviderCatalogEntry[];
+  /** Undefined only for rolling upgrades from a backend predating this schema. */
+  connectionFields?: LlmConnectionFieldSchema[];
   /**
    * Hostnames whose endpoints may run without an API key, mirroring the
    * backend `channel_allows_empty_api_key` contract. The Web applies this
@@ -474,6 +489,10 @@ export interface SystemConfigValidationErrorResponse {
   message: string;
   issues?: ConfigValidationIssue[];
   params?: { issues?: ConfigValidationIssue[] };
+  details?: unknown;
+  /** @deprecated Read-only server alias of details during the compatibility window. */
+  detail?: unknown;
+  traceId?: string | null;
 }
 
 export interface SystemConfigConflictResponse {
@@ -481,4 +500,8 @@ export interface SystemConfigConflictResponse {
   message: string;
   currentConfigVersion?: string;
   params?: { currentConfigVersion?: string };
+  details?: unknown;
+  /** @deprecated Read-only server alias of details during the compatibility window. */
+  detail?: unknown;
+  traceId?: string | null;
 }

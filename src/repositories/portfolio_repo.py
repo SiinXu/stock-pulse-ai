@@ -138,28 +138,59 @@ class PortfolioRepository:
         self,
         *,
         session: Any,
-        operation_id: str,
+        operation_type: str,
+        scope_key: str,
+        client_operation_id: str,
+        created_at_from: datetime,
     ) -> Optional[PortfolioIdempotencyRecord]:
         return session.execute(
             select(PortfolioIdempotencyRecord).where(
-                PortfolioIdempotencyRecord.operation_id == operation_id
+                PortfolioIdempotencyRecord.operation_type == operation_type,
+                PortfolioIdempotencyRecord.scope_key == scope_key,
+                PortfolioIdempotencyRecord.client_operation_id == client_operation_id,
+                PortfolioIdempotencyRecord.created_at >= created_at_from,
             ).limit(1)
         ).scalar_one_or_none()
+
+    def delete_expired_idempotency_records_in_session(
+        self,
+        *,
+        session: Any,
+        created_at_before: datetime,
+    ) -> int:
+        """Delete idempotency records older than the replay cutoff."""
+
+        result = session.execute(
+            delete(PortfolioIdempotencyRecord).where(
+                PortfolioIdempotencyRecord.created_at < created_at_before
+            )
+        )
+        return max(0, int(result.rowcount or 0))
 
     def add_idempotency_record_in_session(
         self,
         *,
         session: Any,
         operation_id: str,
+        client_operation_id: str,
         operation_type: str,
+        scope_key: str,
+        scope_account_id: int,
+        scope_owner_id: Optional[str],
         request_hash: str,
         response_json: str,
+        created_at: datetime,
     ) -> PortfolioIdempotencyRecord:
         row = PortfolioIdempotencyRecord(
             operation_id=operation_id,
+            client_operation_id=client_operation_id,
             operation_type=operation_type,
+            scope_key=scope_key,
+            scope_account_id=scope_account_id,
+            scope_owner_id=scope_owner_id,
             request_hash=request_hash,
             response_json=response_json,
+            created_at=created_at,
         )
         session.add(row)
         session.flush()

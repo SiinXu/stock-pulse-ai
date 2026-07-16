@@ -246,7 +246,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground',
+            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-full border bg-transparent px-3 text-left text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : '',

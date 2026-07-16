@@ -10,6 +10,7 @@ from typing import List
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,11 @@ class StrategiesCommand(BotCommand):
 
             return BotResponse.markdown_response("\n".join(lines))
 
-        except Exception as e:
-            logger.error(f"Strategies command failed: {e}")
-            logger.exception("Strategies error details:")
-            return BotResponse.text_response(f"⚠️ 获取策略列表失败: {str(e)}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[StrategiesCommand] Strategy listing failed",
+                exc,
+                error_code="bot_strategies_list_failed",
+            )
+            return BotResponse.text_response("⚠️ 获取策略列表失败，请稍后重试。")

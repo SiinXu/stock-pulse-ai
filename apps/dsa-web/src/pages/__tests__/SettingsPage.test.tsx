@@ -12,6 +12,7 @@ const {
   exportEnv,
   getSchedulerStatus,
   getSetupStatus,
+  getLlmProviderCatalog,
   getLlmAvailableModels,
   importEnv,
   runSchedulerNow,
@@ -46,6 +47,7 @@ const {
   exportEnv: vi.fn(),
   getSchedulerStatus: vi.fn(),
   getSetupStatus: vi.fn(),
+  getLlmProviderCatalog: vi.fn(),
   getLlmAvailableModels: vi.fn(),
   importEnv: vi.fn(),
   runSchedulerNow: vi.fn(),
@@ -125,11 +127,7 @@ vi.mock('../../api/systemConfig', () => ({
       overriddenSources: [],
       issues: [],
     }),
-    getLlmProviderCatalog: () => Promise.resolve({
-      providers: [
-        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
-      ],
-    }),
+    getLlmProviderCatalog: (...args: unknown[]) => getLlmProviderCatalog(...args),
     getLlmAvailableModels: (...args: unknown[]) => getLlmAvailableModels(...args),
     importEnv: (...args: unknown[]) => importEnv(...args),
     runSchedulerNow: (...args: unknown[]) => runSchedulerNow(...args),
@@ -194,6 +192,7 @@ vi.mock('../../components/settings', async () => ({
     onReplaceModelReferences,
     focusFieldRequest,
     disabled,
+    catalogUnavailable,
   }: {
     items: Array<{ key: string; value: string }>;
     onDraftItemsChange?: (items: Array<{ key: string; value: string }>) => void;
@@ -206,9 +205,14 @@ vi.mock('../../components/settings', async () => ({
     }>) => void;
     focusFieldRequest?: { requestId: number; key: string } | null;
     disabled?: boolean;
+    catalogUnavailable?: boolean;
   }) => (
     <div>
-      <div data-testid="llm-channel-editor-items" data-disabled={disabled ? 'true' : 'false'}>
+      <div
+        data-testid="llm-channel-editor-items"
+        data-disabled={disabled ? 'true' : 'false'}
+        data-catalog-unavailable={catalogUnavailable ? 'true' : 'false'}
+      >
         {items.map((item) => item.key).join(',')}
       </div>
       <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
@@ -221,6 +225,15 @@ vi.mock('../../components/settings', async () => ({
         ])}
       >
         emit llm draft
+      </button>
+      <button
+        type="button"
+        onClick={() => onDraftItemsChange?.([
+          { key: 'LLM_CHANNELS', value: 'draft,backup' },
+          { key: 'LITELLM_MODEL', value: 'openai/draft-model' },
+        ])}
+      >
+        emit connection draft
       </button>
       <button type="button" onClick={() => onValidityChange?.(false)}>
         mark llm draft invalid
@@ -670,6 +683,11 @@ describe('SettingsPage', () => {
           message: '通知可选。',
           nextStep: null,
         },
+      ],
+    });
+    getLlmProviderCatalog.mockResolvedValue({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
       ],
     });
     getLlmAvailableModels.mockResolvedValue({
@@ -1360,7 +1378,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
     expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
@@ -1370,6 +1388,49 @@ describe('SettingsPage', () => {
       expect.objectContaining({ key: 'LLM_CHANNELS', value: 'draft,backup' }),
       expect.objectContaining({ key: 'LITELLM_MODEL', value: 'openai/draft-model' }),
     ]));
+  });
+
+  it('does not autosave an AI draft before the Catalog establishes schema presence', async () => {
+    const catalog = createDeferred<{ providers: Array<Record<string, unknown>> }>();
+    getLlmProviderCatalog.mockReturnValueOnce(catalog.promise);
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+
+    await act(async () => {
+      catalog.resolve({
+        providers: [
+          { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' },
+        ],
+      });
+      await catalog.promise;
+    });
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2500 });
+  });
+
+  it('keeps AI autosave and the editor blocked after a Catalog failure', async () => {
+    getLlmProviderCatalog.mockRejectedValueOnce(new Error('catalog failed'));
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
+      .toHaveAttribute('data-catalog-unavailable', 'true'));
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
   });
 
   it('passes merged generation backend draft items to the backend status panel', async () => {
@@ -1440,8 +1501,11 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
     expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
     expect(save).not.toHaveBeenCalled();
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
-    expect(screen.getByText(/自动保存中/)).toBeInTheDocument();
+    await waitFor(
+      () => expect(screen.getByText(/自动保存中/)).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
+    expect(save).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       pendingSave.resolve({ success: true });

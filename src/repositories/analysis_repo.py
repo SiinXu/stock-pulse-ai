@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 from src.storage import DatabaseManager, AnalysisHistory
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,14 @@ class AnalysisRepository:
         try:
             records = self.db.get_analysis_history(query_id=query_id, limit=1)
             return records[0] if records else None
-        except Exception as e:
-            logger.error(f"查询分析记录失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis record lookup failed",
+                exc,
+                error_code="analysis_record_lookup_failed",
+                context={"query_id": query_id},
+            )
             return None
     
     def get_list(
@@ -74,8 +81,14 @@ class AnalysisRepository:
                 days=days,
                 limit=limit
             )
-        except Exception as e:
-            logger.error(f"获取分析列表失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis record list failed",
+                exc,
+                error_code="analysis_record_list_failed",
+                context={"stock_code": code or "all"},
+            )
             return []
     
     def save(
@@ -107,8 +120,14 @@ class AnalysisRepository:
                 news_content=news_content,
                 context_snapshot=context_snapshot
             )
-        except Exception as e:
-            logger.error(f"保存分析结果失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis result persistence failed",
+                exc,
+                error_code="analysis_result_save_failed",
+                context={"query_id": query_id, "report_type": report_type},
+            )
             return 0
     
     def count_by_code(self, code: str, days: int = 30) -> int:
@@ -125,6 +144,12 @@ class AnalysisRepository:
         try:
             records = self.db.get_analysis_history(code=code, days=days, limit=1000)
             return len(records)
-        except Exception as e:
-            logger.error(f"统计分析记录失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis record count failed",
+                exc,
+                error_code="analysis_record_count_failed",
+                context={"stock_code": code},
+            )
             return 0

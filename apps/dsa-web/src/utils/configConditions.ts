@@ -11,7 +11,7 @@ export function evaluateConfigConditions(
   conditions: ConfigCondition[] | undefined,
   values: Record<string, string>,
 ): ConditionResult {
-  if (!conditions) {
+  if (conditions === undefined || conditions === null) {
     return 'met';
   }
   if (!Array.isArray(conditions)) {
@@ -20,6 +20,7 @@ export function evaluateConfigConditions(
   if (conditions.length === 0) {
     return 'met';
   }
+  let allMet = true;
   for (const condition of conditions) {
     if (!condition || typeof condition.key !== 'string' || !condition.key.trim()) {
       return 'unknown';
@@ -45,11 +46,9 @@ export function evaluateConfigConditions(
       default:
         return 'unknown';
     }
-    if (!met) {
-      return 'notMet';
-    }
+    allMet = allMet && met;
   }
-  return 'met';
+  return allMet ? 'met' : 'notMet';
 }
 
 /** A field is visible unless its visibleWhen conditions are definitively not met. */

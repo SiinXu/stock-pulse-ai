@@ -15,6 +15,7 @@ from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -336,10 +337,13 @@ def _handle_get_daily_history(stock_code: str, days: int = 60) -> dict:
                 saved_count,
             )
         except Exception as exc:
-            logger.warning(
-                "Agent daily history persistence failed for %s: %s",
-                normalized_code,
+            log_safe_exception(
+                logger,
+                "Agent daily history persistence failed",
                 exc,
+                error_code="agent_daily_history_persistence_failed",
+                level=logging.WARNING,
+                context={"stock_code": normalized_code},
             )
 
     # Convert DataFrame to list of dicts (last N records)
@@ -486,9 +490,16 @@ def _handle_get_stock_info(stock_code: str) -> dict:
     manager = _get_fetcher_manager()
     try:
         fundamental_context = manager.get_fundamental_context(stock_code)
-    except Exception as e:
-        logger.warning(f"get_stock_info via fundamental pipeline failed for {stock_code}: {e}")
-        fundamental_context = manager.build_failed_fundamental_context(stock_code, str(e))
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Agent stock information lookup failed",
+            exc,
+            error_code="agent_stock_info_lookup_failed",
+            level=logging.WARNING,
+            context={"stock_code": stock_code},
+        )
+        fundamental_context = manager.build_failed_fundamental_context(stock_code, str(exc))
 
     compact_context = _compact_fundamental_context(fundamental_context)
     valuation = compact_context.get("valuation", {}).get("data", {})
@@ -562,7 +573,14 @@ def _handle_get_portfolio_snapshot(
         from src.services.portfolio_service import PortfolioService
         from src.services.portfolio_risk_service import PortfolioRiskService
     except Exception as exc:
-        logger.warning("get_portfolio_snapshot unavailable: %s", exc)
+        log_safe_exception(
+            logger,
+            "Agent portfolio snapshot dependencies unavailable",
+            exc,
+            error_code="agent_portfolio_snapshot_unavailable",
+            level=logging.WARNING,
+            context={"account_id": account_id},
+        )
         return {"status": "not_supported", "error": f"portfolio module unavailable: {exc}"}
 
     try:
@@ -586,11 +604,25 @@ def _handle_get_portfolio_snapshot(
                 )
                 result["risk"] = {"status": "ok", **_compact_portfolio_risk(risk)}
             except Exception as risk_exc:
-                logger.warning("get_portfolio_snapshot risk block failed: %s", risk_exc)
+                log_safe_exception(
+                    logger,
+                    "Agent portfolio risk snapshot lookup failed",
+                    risk_exc,
+                    error_code="agent_portfolio_risk_snapshot_failed",
+                    level=logging.WARNING,
+                    context={"account_id": account_id},
+                )
                 result["risk"] = {"status": "failed", "error": str(risk_exc)}
         return result
     except Exception as exc:
-        logger.warning("get_portfolio_snapshot failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Agent portfolio snapshot lookup failed",
+            exc,
+            error_code="agent_portfolio_snapshot_failed",
+            level=logging.WARNING,
+            context={"account_id": account_id},
+        )
         return {"status": "failed", "error": f"failed to fetch portfolio snapshot: {exc}"}
 
 
@@ -667,7 +699,14 @@ def _handle_get_capital_flow(stock_code: str) -> dict:
     try:
         ctx = manager.get_capital_flow_context(stock_code)
     except Exception as exc:
-        logger.warning("get_capital_flow failed for %s: %s", stock_code, exc)
+        log_safe_exception(
+            logger,
+            "Agent capital flow lookup failed",
+            exc,
+            error_code="agent_capital_flow_lookup_failed",
+            level=logging.WARNING,
+            context={"stock_code": stock_code},
+        )
         return {
             "stock_code": stock_code,
             "status": "error",

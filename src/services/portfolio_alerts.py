@@ -11,6 +11,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from src.services.portfolio_risk_service import PortfolioRiskService
 from src.services.portfolio_service import PortfolioService
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -340,7 +341,13 @@ def _watchlist_symbols(config: Any) -> List[str]:
         try:
             refresh()
         except Exception as exc:
-            logger.warning("[portfolio_alerts] Failed to refresh watchlist symbols: %s", exc)
+            log_safe_exception(
+                logger,
+                "Portfolio alert watchlist refresh failed",
+                exc,
+                error_code="portfolio_alert_watchlist_refresh_failed",
+                level=logging.WARNING,
+            )
     return list(getattr(config, "stock_list", []) or [])
 
 

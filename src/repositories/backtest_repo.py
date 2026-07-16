@@ -18,6 +18,7 @@ from src.core.backtest_engine import OVERALL_SENTINEL_CODE
 from src.services.stock_code_utils import normalize_code as normalize_backtest_code
 
 from src.storage import BacktestResult, BacktestSummary, DatabaseManager, AnalysisHistory
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +171,12 @@ class BacktestRepository:
                 return len(results)
             except Exception as exc:
                 session.rollback()
-                logger.error(f"批量保存回测结果失败: {exc}")
+                log_safe_exception(
+                    logger,
+                    "Backtest result batch persistence failed",
+                    exc,
+                    error_code="backtest_result_batch_save_failed",
+                )
                 raise
 
     def get_results_paginated(

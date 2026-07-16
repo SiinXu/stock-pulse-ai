@@ -15,6 +15,7 @@ interface ModalProps {
   children: React.ReactNode;
   className?: string;
   closeDisabled?: boolean;
+  closeLabel?: string;
 }
 
 /**
@@ -29,6 +30,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   className = '',
   closeDisabled = false,
+  closeLabel,
 }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -75,7 +77,7 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <div>
+          <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
             {description ? (
               <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
@@ -85,8 +87,8 @@ export const Modal: React.FC<ModalProps> = ({
             type="button"
             onClick={handleClose}
             disabled={closeDisabled}
-            aria-label={t('common.closeDrawer')}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
+            aria-label={closeLabel ?? t('common.close')}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

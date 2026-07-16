@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse, ChatType
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,13 @@ class HistoryCommand(BotCommand):
         try:
             from src.storage import get_db
             db = get_db()
-        except Exception as e:
-            logger.error(f"History: storage unavailable: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[HistoryCommand] Conversation storage unavailable",
+                exc,
+                error_code="bot_history_storage_unavailable",
+            )
             return BotResponse.text_response("⚠️ 存储模块不可用，无法查询对话历史。")
 
         prefix = _user_prefix(message)
@@ -86,9 +92,14 @@ class HistoryCommand(BotCommand):
                 return BotResponse.text_response(
                     f"✅ 已清除当前会话 ({deleted} 条消息)"
                 )
-            except Exception as e:
-                logger.error(f"History clear failed: {e}")
-                return BotResponse.text_response(f"⚠️ 清除失败: {str(e)}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "[HistoryCommand] Conversation history clear failed",
+                    exc,
+                    error_code="bot_history_clear_failed",
+                )
+                return BotResponse.text_response("⚠️ 清除失败，请稍后重试。")
 
         # /history <session_id> — show messages for a specific session
         # Only allow access if the session belongs to the requesting user.
@@ -113,9 +124,14 @@ class HistoryCommand(BotCommand):
                     lines.append("")
 
                 return BotResponse.markdown_response("\n".join(lines))
-            except Exception as e:
-                logger.error(f"History detail failed: {e}")
-                return BotResponse.text_response(f"⚠️ 获取会话详情失败: {str(e)}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "[HistoryCommand] Conversation detail lookup failed",
+                    exc,
+                    error_code="bot_history_detail_failed",
+                )
+                return BotResponse.text_response("⚠️ 获取会话详情失败，请稍后重试。")
 
         # /history [count] — list recent sessions for this user only
         limit = 10
@@ -145,6 +161,11 @@ class HistoryCommand(BotCommand):
             lines.append(f"💡 使用 `/history <session_id>` 查看具体会话内容")
             return BotResponse.markdown_response("\n".join(lines))
 
-        except Exception as e:
-            logger.error(f"History list failed: {e}")
-            return BotResponse.text_response(f"⚠️ 获取会话列表失败: {str(e)}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[HistoryCommand] Conversation history listing failed",
+                exc,
+                error_code="bot_history_list_failed",
+            )
+            return BotResponse.text_response("⚠️ 获取会话列表失败，请稍后重试。")

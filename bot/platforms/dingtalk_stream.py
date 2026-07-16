@@ -25,7 +25,10 @@ import threading
 from datetime import datetime
 from typing import Optional, Callable, Any
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
+DINGTALK_STREAM_PUBLIC_ERROR = "message_processing_failed"
 
 # 尝试导入钉钉 Stream SDK
 try:
@@ -35,8 +38,10 @@ try:
     DINGTALK_STREAM_AVAILABLE = True
 except ImportError:
     DINGTALK_STREAM_AVAILABLE = False
-    logger.warning("[DingTalk Stream] dingtalk-stream SDK 未安装，Stream 模式不可用")
-    logger.warning("[DingTalk Stream] 请运行: pip install dingtalk-stream")
+    logger.warning(
+        "[DingTalk Stream] dingtalk-stream SDK is not installed; stream mode is unavailable"
+    )
+    logger.warning("[DingTalk Stream] Install it with: pip install dingtalk-stream")
 
 from bot.models import BotMessage, BotResponse, ChatType
 
@@ -57,23 +62,12 @@ class DingtalkStreamHandler:
         self._on_message = on_message
         self._logger = logger
 
-    @staticmethod
-    def _truncate_log_content(text: str, max_len: int = 200) -> str:
-        cleaned = text.replace("\n", " ").strip()
-        if len(cleaned) > max_len:
-            return f"{cleaned[:max_len]}..."
-        return cleaned
-
     def _log_incoming_message(self, message: BotMessage) -> None:
         content = message.raw_content or message.content or ""
-        summary = self._truncate_log_content(content)
         self._logger.info(
-            "[DingTalk Stream] Incoming message: msg_id=%s user_id=%s chat_id=%s chat_type=%s content=%s",
-            message.message_id,
-            message.user_id,
-            message.chat_id,
+            "[DingTalk Stream] Incoming message: chat_type=%s content_length=%d",
             getattr(message.chat_type, "value", message.chat_type),
-            summary,
+            len(content),
         )
 
     if DINGTALK_STREAM_AVAILABLE:
@@ -116,10 +110,14 @@ class DingtalkStreamHandler:
 
                     return AckMessage.STATUS_OK, 'OK'
 
-                except Exception as e:
-                    self.logger.error(f"[DingTalk Stream] 处理消息失败: {e}")
-                    self.logger.exception(e)
-                    return AckMessage.STATUS_SYSTEM_EXCEPTION, str(e)
+                except Exception as exc:
+                    log_safe_exception(
+                        self.logger,
+                        "[DingTalk Stream] Message processing failed",
+                        exc,
+                        error_code="bot_dingtalk_stream_message_failed",
+                    )
+                    return AckMessage.STATUS_SYSTEM_EXCEPTION, DINGTALK_STREAM_PUBLIC_ERROR
 
         def create_handler(self) -> '_ChatbotHandler':
             """创建 SDK 需要的处理器实例"""
@@ -178,8 +176,13 @@ class DingtalkStreamHandler:
                 raw_data=raw_data,
             )
 
-        except Exception as e:
-            logger.error(f"[DingTalk Stream] 解析消息失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[DingTalk Stream] Message parsing failed",
+                exc,
+                error_code="bot_dingtalk_stream_parse_failed",
+            )
             return None
 
     def _extract_command(self, text: str) -> str:
@@ -250,7 +253,7 @@ class DingtalkStreamClient:
 
         此方法会阻塞当前线程，直到客户端停止。
         """
-        logger.info("[DingTalk Stream] 正在启动...")
+        logger.info("[DingTalk Stream] Starting client")
 
         # 创建凭证
         credential = dingtalk_stream.Credential(
@@ -269,7 +272,7 @@ class DingtalkStreamClient:
         )
 
         self._running = True
-        logger.info("[DingTalk Stream] 客户端已启动，等待消息...")
+        logger.info("[DingTalk Stream] Client started and waiting for messages")
 
         # 启动（阻塞）
         self._client.start_forever()
@@ -281,7 +284,7 @@ class DingtalkStreamClient:
         适用于与其他服务（如 WebUI）同时运行的场景。
         """
         if self._background_thread and self._background_thread.is_alive():
-            logger.warning("[DingTalk Stream] 客户端已在运行")
+            logger.warning("[DingTalk Stream] Client is already running")
             return
 
         self._running = True
@@ -291,7 +294,7 @@ class DingtalkStreamClient:
             name="DingtalkStreamClient"
         )
         self._background_thread.start()
-        logger.info("[DingTalk Stream] 后台客户端已启动")
+        logger.info("[DingTalk Stream] Background client started")
 
     def _run_in_background(self) -> None:
         """后台运行（处理异常和重连）"""
@@ -300,16 +303,21 @@ class DingtalkStreamClient:
         while self._running:
             try:
                 self.start()
-            except Exception as e:
-                logger.error(f"[DingTalk Stream] 运行异常: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "[DingTalk Stream] Client run failed",
+                    exc,
+                    error_code="bot_dingtalk_stream_run_failed",
+                )
                 if self._running:
-                    logger.info("[DingTalk Stream] 5 秒后重连...")
+                    logger.info("[DingTalk Stream] Reconnecting in 5 seconds")
                     time.sleep(5)
 
     def stop(self) -> None:
         """停止客户端"""
         self._running = False
-        logger.info("[DingTalk Stream] 客户端已停止")
+        logger.info("[DingTalk Stream] Client stopped")
 
     @property
     def is_running(self) -> bool:
@@ -328,8 +336,14 @@ def get_dingtalk_stream_client() -> Optional[DingtalkStreamClient]:
     if _stream_client is None and DINGTALK_STREAM_AVAILABLE:
         try:
             _stream_client = DingtalkStreamClient()
-        except (ImportError, ValueError) as e:
-            logger.warning(f"[DingTalk Stream] 无法创建客户端: {e}")
+        except (ImportError, ValueError) as exc:
+            log_safe_exception(
+                logger,
+                "[DingTalk Stream] Client creation failed",
+                exc,
+                error_code="bot_dingtalk_stream_client_create_failed",
+                level=logging.WARNING,
+            )
             return None
 
     return _stream_client

@@ -26,6 +26,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 # Default minimum samples before calibration kicks in
@@ -135,7 +137,14 @@ class AgentMemory:
                 ))
             return entries
         except Exception as exc:
-            logger.debug("[AgentMemory] get_stock_history failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Agent memory stock history lookup failed",
+                exc,
+                error_code="agent_memory_stock_history_failed",
+                level=logging.DEBUG,
+                context={"stock_code": stock_code},
+            )
             return []
 
     # -----------------------------------------------------------------
@@ -184,7 +193,18 @@ class AgentMemory:
                 result.calibration_factor = 1.0
 
         except Exception as exc:
-            logger.debug("[AgentMemory] calibration failed for %s: %s", agent_name, exc)
+            log_safe_exception(
+                logger,
+                "Agent memory confidence calibration failed",
+                exc,
+                error_code="agent_memory_calibration_failed",
+                level=logging.DEBUG,
+                context={
+                    "agent_name": agent_name,
+                    "stock_code": stock_code,
+                    "skill_id": skill_id or strategy_id,
+                },
+            )
 
         return result
 

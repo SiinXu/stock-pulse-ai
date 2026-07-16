@@ -148,6 +148,7 @@ export interface StockPoolState {
   loadMoreMarketReviewHistory: () => Promise<void>;
   selectHistoryItem: (recordId: number, isUserInitiated?: boolean) => Promise<void>;
   retrySelectedRecord: () => Promise<void>;
+  clearSelectedRecord: (preserveError?: boolean) => void;
   clearSelectedReportForStock: (stockCode: string) => void;
   toggleHistorySelection: (recordId: number) => void;
   toggleSelectAllVisible: () => void;
@@ -555,7 +556,12 @@ async function fetchHistory(
       const selectedReport = get().selectedReport;
       if (latestCompletedTaskItem && latestCompletedTaskItem.id !== selectedReport?.meta.id) {
         await get().selectHistoryItem(latestCompletedTaskItem.id, false);
-      } else if (autoSelectFirst && response.items.length > 0 && !selectedReport) {
+      } else if (
+        autoSelectFirst
+        && response.items.length > 0
+        && !selectedReport
+        && get().selectedRecordId === null
+      ) {
         await get().selectHistoryItem(response.items[0].id, false);
       }
     }
@@ -704,7 +710,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   },
 
   loadInitialHistory: async () => {
-    await fetchHistory(get, set, { autoSelectFirst: true, reset: true });
+    await fetchHistory(get, set, { reset: true });
   },
 
   refreshHistory: async (silent = false) => {
@@ -754,6 +760,24 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     if (matchesDeletedStock) {
       set({ selectedReport: null, selectedRecordId: null, pendingRecordId: null });
     }
+  },
+
+  clearSelectedRecord: (preserveError = false) => {
+    reportRequestSeq += 1;
+    manualSelectionRequestSeq += 1;
+    manualSelectionRequestId = 0;
+    pendingCompletedTaskSelectionKeys.clear();
+    stockHistoryRequestSeq += 1;
+    resetStockHistoryState(set);
+    set({
+      selectedReport: null,
+      selectedRecordId: null,
+      pendingRecordId: null,
+      isLoadingReport: false,
+      isHistoryTrendOpen: false,
+      markdownDrawerOpen: false,
+      ...(preserveError ? {} : { error: null }),
+    });
   },
 
   selectHistoryItem: async (recordId, isUserInitiated = true) => {

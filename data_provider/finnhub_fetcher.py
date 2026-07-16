@@ -15,6 +15,8 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from src.utils.sanitize import log_safe_exception
+
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from .us_index_mapping import is_us_stock_code
@@ -111,7 +113,14 @@ class FinnhubFetcher(BaseFetcher):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            logger.warning(f"[Finnhub] Realtime quote failed for {symbol}: {e}")
+            log_safe_exception(
+                logger,
+                "Finnhub realtime quote failed",
+                e,
+                error_code="finnhub_realtime_quote_failed",
+                level=logging.WARNING,
+                context={"symbol": symbol},
+            )
             return None
 
         price = data.get('c')
@@ -160,7 +169,14 @@ class FinnhubFetcher(BaseFetcher):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            logger.debug(f"[Finnhub] Symbol search failed for {symbol}: {e}")
+            log_safe_exception(
+                logger,
+                "Finnhub symbol search failed",
+                e,
+                error_code="finnhub_symbol_search_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
             return None
 
         for item in data.get('result', []):

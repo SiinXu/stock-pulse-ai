@@ -15,6 +15,7 @@ import requests
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes, slice_at_max_bytes
+from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 
 logger = logging.getLogger(__name__)
@@ -94,8 +95,14 @@ class CustomWebhookSender:
                 else:
                     logger.error(f"自定义 Webhook {i+1} 推送失败")
                     
-            except Exception as e:
-                logger.error(f"自定义 Webhook {i+1} 推送异常: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Custom webhook delivery failed",
+                    exc,
+                    error_code="custom_webhook_delivery_failed",
+                    context={"webhook_index": i + 1},
+                )
         
         logger.info(f"自定义 Webhook 推送完成：成功 {success_count}/{len(self._custom_webhook_urls)}")
         return success_count > 0
@@ -142,8 +149,14 @@ class CustomWebhookSender:
                         logger.warning(
                             "自定义 Webhook %d 不支持图片，且无回退内容，跳过", i + 1
                         )
-            except Exception as e:
-                logger.error("自定义 Webhook %d 图片推送异常: %s", i + 1, e)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Custom webhook image delivery failed",
+                    exc,
+                    error_code="custom_webhook_image_delivery_failed",
+                    context={"webhook_index": i + 1},
+                )
         return success_count > 0
 
     def _post_custom_webhook(self, url: str, payload: dict, timeout: int = 30) -> bool:
@@ -180,7 +193,7 @@ class CustomWebhookSender:
                 attempts.append({
                     "channel": "custom",
                     "success": False,
-                    "message": f"自定义 Webhook {index + 1} 测试异常: {exc}",
+                    "message": sanitize_exception_chain(exc),
                     "target": url,
                     "error_code": self._classify_custom_webhook_exception(exc)[0],
                     "stage": "notification_send",
@@ -336,9 +349,11 @@ class CustomWebhookSender:
         try:
             payload: Any = json.loads(rendered)
         except json.JSONDecodeError as exc:
-            logger.error(
-                "CUSTOM_WEBHOOK_BODY_TEMPLATE 不是有效 JSON，已回退为默认 Webhook payload: %s",
+            log_safe_exception(
+                logger,
+                "Custom webhook body template is invalid JSON; using default payload",
                 exc,
+                error_code="custom_webhook_template_json_invalid",
             )
             return None
         if not isinstance(payload, dict):

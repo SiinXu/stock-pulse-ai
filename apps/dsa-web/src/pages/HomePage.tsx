@@ -23,7 +23,7 @@ import {
   type HomeWorkspaceTab,
   type WatchlistAnalyzeMode,
 } from '../components/watchlist/HomeStockWorkspace';
-import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
+import { useDashboardLifecycle, useHomeDashboardState, useHomeUrlState } from '../hooks';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { SetupStatusResponse } from '../types/systemConfig';
@@ -190,7 +190,7 @@ const HomePage: React.FC = () => {
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
-  const [runFlowDrawer, setRunFlowDrawer] = useState<RunFlowDrawerState>({ open: false });
+  const [runFlowRestoreError, setRunFlowRestoreError] = useState<ParsedApiError | null>(null);
   const [duplicateBannerVisible, setDuplicateBannerVisible] = useState(false);
   const [sidebarWorkspaceTab, setSidebarWorkspaceTab] = useState<HomeWorkspaceTab>('history');
   const [isBatchAnalyzingWatchlist, setIsBatchAnalyzingWatchlist] = useState(false);
@@ -251,6 +251,8 @@ const HomePage: React.FC = () => {
     duplicateTask,
     error,
     isAnalyzing,
+    historyItems,
+    isLoadingHistory,
     selectedReport,
     selectedRecordId,
     isLoadingReport,
@@ -274,6 +276,7 @@ const HomePage: React.FC = () => {
     refreshMarketReviewHistory,
     selectHistoryItem,
     retrySelectedRecord,
+    clearSelectedRecord,
     clearSelectedReportForStock,
     submitAnalysis,
     notify,
@@ -296,6 +299,16 @@ const HomePage: React.FC = () => {
     loadStockBar,
     refreshStockBar,
   } = useHomeDashboardState();
+
+  const homeUrlState = useHomeUrlState({
+    defaultRecordId: historyItems[0]?.id ?? null,
+    isHistoryLoading: isLoadingHistory,
+    selectedRecordId,
+    isReportLoading: isLoadingReport,
+    reportError: error,
+    selectHistoryItem,
+    clearSelectedRecord,
+  });
 
   const clearDuplicateBannerTimer = useCallback(() => {
     if (duplicateBannerTimer.current !== null) {
@@ -395,6 +408,12 @@ const HomePage: React.FC = () => {
   const liveMarketReviewLanguage = normalizeReportLanguage(marketReviewPayload?.language);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
+  const homeUrlIssueTitle = homeUrlState.urlIssue === 'invalid_record'
+    ? t('home.invalidRecordLinkTitle')
+    : t('home.invalidRunFlowLinkTitle');
+  const homeUrlIssueMessage = homeUrlState.urlIssue === 'invalid_record'
+    ? t('home.invalidRecordLinkMessage')
+    : t('home.invalidRunFlowLinkMessage');
   // A selected record failed to load: keep the failure (with retry) in view
   // instead of the stale previous report or the generic empty state.
   const isReportLoadFailure = Boolean(error) && selectedRecordId !== null && !selectedReport;
@@ -685,9 +704,9 @@ const HomePage: React.FC = () => {
 
   const handleHistoryItemClick = useCallback((recordId: number) => {
     clearMarketReviewState();
-    void selectHistoryItem(recordId);
+    homeUrlState.navigateToRecord(recordId);
     setSidebarOpen(false);
-  }, [clearMarketReviewState, selectHistoryItem]);
+  }, [clearMarketReviewState, homeUrlState]);
 
   const [isDeletingStock, setIsDeletingStock] = useState(false);
   const handleDeleteStock = useCallback(async (stockCode: string) => {
@@ -766,27 +785,53 @@ const HomePage: React.FC = () => {
   }, [selectedAnalysisSkills, selectedReport, submitAnalysis]);
 
   const openTaskRunFlow = useCallback((task: TaskInfo) => {
-    const stock = task.stockName || task.stockCode || task.taskId;
-    setRunFlowDrawer({
-      open: true,
-      source: { type: 'task', taskId: task.taskId },
-      title: t('runFlow.taskDrawerTitle', { stock }),
-    });
-  }, [t]);
+    setRunFlowRestoreError(null);
+    homeUrlState.openTaskRunFlow(task.taskId);
+  }, [homeUrlState]);
 
   const openHistoryRunFlow = useCallback((recordId: number) => {
-    const meta = selectedReport?.meta.id === recordId ? selectedReport.meta : null;
-    const stock = meta?.stockName || meta?.stockCode || String(recordId);
-    setRunFlowDrawer({
-      open: true,
-      source: { type: 'history', recordId },
-      title: t('runFlow.historyDrawerTitle', { stock }),
-    });
-  }, [selectedReport, t]);
+    setRunFlowRestoreError(null);
+    homeUrlState.openHistoryRunFlow(recordId);
+  }, [homeUrlState]);
 
   const closeRunFlowDrawer = useCallback(() => {
-    setRunFlowDrawer({ open: false });
-  }, []);
+    homeUrlState.closeRunFlow();
+  }, [homeUrlState]);
+
+  const handleUnavailableRunFlow = useCallback((runFlowError: ParsedApiError) => {
+    setRunFlowRestoreError(runFlowError);
+    homeUrlState.removeUnavailableRunFlow();
+  }, [homeUrlState]);
+
+  const runFlowDrawer = useMemo<RunFlowDrawerState>(() => {
+    const source = homeUrlState.runFlowSource;
+    if (!source) {
+      return { open: false };
+    }
+
+    if (source.type === 'task') {
+      const task = activeTasks.find((item) => item.taskId === source.taskId);
+      const stock = task?.stockName || task?.stockCode || source.taskId;
+      return {
+        open: true,
+        source,
+        title: t('runFlow.taskDrawerTitle', { stock }),
+      };
+    }
+
+    const reportMeta = selectedReport?.meta.id === source.recordId ? selectedReport.meta : null;
+    const historyItem = historyItems.find((item) => item.id === source.recordId);
+    const stock = reportMeta?.stockName
+      || reportMeta?.stockCode
+      || historyItem?.stockName
+      || historyItem?.stockCode
+      || String(source.recordId);
+    return {
+      open: true,
+      source,
+      title: t('runFlow.historyDrawerTitle', { stock }),
+    };
+  }, [activeTasks, historyItems, homeUrlState.runFlowSource, selectedReport, t]);
 
   const pollMarketReviewStatus = useCallback(
     async (taskId: string) => {
@@ -1236,7 +1281,7 @@ const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
             aria-label={t('common.closeDrawer')}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -1318,7 +1363,7 @@ const HomePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('home.historyButton')}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1349,7 +1394,7 @@ const HomePage: React.FC = () => {
                     onClick={() => setStrategyMenuOpen((open) => !open)}
                     onKeyDown={handleStrategyButtonKeyDown}
                     disabled={isAnalyzing}
-                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
+                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-full px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                   >
                     <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
@@ -1375,7 +1420,7 @@ const HomePage: React.FC = () => {
                             aria-checked={selected}
                             tabIndex={-1}
                             onClick={() => selectStrategy(option.id)}
-                            className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                            className="flex min-h-11 w-full items-start gap-2 rounded-full px-2.5 py-2 text-left transition-colors hover:bg-hover"
                           >
                             <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
                             <span className="min-w-0">
@@ -1456,7 +1501,7 @@ const HomePage: React.FC = () => {
                     type="button"
                     onClick={dismissDuplicateBanner}
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
@@ -1538,6 +1583,35 @@ const HomePage: React.FC = () => {
               </div>
             ) : null}
 
+            {homeUrlState.urlIssue ? (
+              <div className="mb-3">
+                <InlineAlert
+                  variant="warning"
+                  title={homeUrlIssueTitle}
+                  message={homeUrlIssueMessage}
+                  action={(
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('common.close')}
+                      onClick={homeUrlState.dismissUrlIssue}
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                />
+              </div>
+            ) : null}
+
+            {runFlowRestoreError ? (
+              <ApiErrorAlert
+                error={runFlowRestoreError}
+                className="mb-3"
+                onDismiss={() => setRunFlowRestoreError(null)}
+              />
+            ) : null}
+
             {marketReviewReport ? (
               <MarketReviewReportView
                 content={marketReviewReport}
@@ -1605,7 +1679,7 @@ const HomePage: React.FC = () => {
                     variant="home-action-ai"
                     size="sm"
                     disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
-                    className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-glow-cyan' : undefined}
+                    className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
                     onClick={() => {
                       if (isHistoryTrendOpen) {
                         closeHistoryTrend();
@@ -1643,7 +1717,7 @@ const HomePage: React.FC = () => {
                     onClose={closeHistoryTrend}
                     onRangeChange={(range) => void setStockHistoryRange(range)}
                     onLoadMore={() => void loadMoreStockHistory()}
-                    onSelectRecord={(recordId) => void selectHistoryItem(recordId)}
+                    onSelectRecord={handleHistoryItemClick}
                     onRetry={() => void openHistoryTrend()}
                   />
                 ) : (
@@ -1701,6 +1775,7 @@ const HomePage: React.FC = () => {
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
             source={runFlowDrawer.source}
             title={runFlowDrawer.title}
+            onUnavailable={handleUnavailableRunFlow}
           />
         </Drawer>
       ) : null}

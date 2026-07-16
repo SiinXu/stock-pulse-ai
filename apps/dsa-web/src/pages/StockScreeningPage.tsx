@@ -485,7 +485,7 @@ const getHotspotStrength = (item: AlphaSiftHotspot, index: number, text: Screeni
   if (heat >= 80 || changePct >= 5) {
     return { label: text.strengthStrong, className: 'bg-blue-500/10 text-blue-500' };
   }
-  return { label: text.strengthFirm, className: 'bg-cyan/10 text-cyan' };
+  return { label: text.strengthFirm, className: 'bg-primary/10 text-primary' };
 };
 
 const HOTSPOT_ICON_RULES: Array<{
@@ -509,7 +509,7 @@ const HOTSPOT_ICON_RULES: Array<{
 
 const getHotspotIcon = (topic: string) => {
   const match = HOTSPOT_ICON_RULES.find((rule) => rule.pattern.test(topic));
-  return match || { icon: Activity, className: 'bg-cyan/10 text-cyan' };
+  return match || { icon: Activity, className: 'bg-primary/10 text-primary' };
 };
 
 const MiniSparkline: React.FC<{ score?: number | null; selected?: boolean }> = ({ score, selected }) => {
@@ -518,8 +518,8 @@ const MiniSparkline: React.FC<{ score?: number | null; selected?: boolean }> = (
   const path = `M2 35 C12 ${32 - lift / 4}, 16 ${34 - lift / 2}, 24 ${28 - lift / 3} S38 ${29 - lift}, 46 ${23 - lift / 2} S62 ${24 - lift}, 72 ${16 - lift / 3} S86 ${15 - lift}, 94 ${7}`;
   return (
     <svg className="h-8 w-20" viewBox="0 0 96 40" aria-hidden="true">
-      <path d={`${path} L94 40 L2 40 Z`} fill={selected ? 'rgba(249,115,22,0.14)' : 'rgba(59,130,246,0.12)'} />
-      <path d={path} fill="none" stroke={selected ? '#f97316' : '#3b82f6'} strokeLinecap="round" strokeWidth="2" />
+      <path d={`${path} L94 40 L2 40 Z`} fill={selected ? 'hsl(var(--warning) / 0.14)' : 'hsl(var(--primary) / 0.12)'} />
+      <path d={path} fill="none" stroke={selected ? 'hsl(var(--warning))' : 'hsl(var(--primary))'} strokeLinecap="round" strokeWidth="2" />
     </svg>
   );
 };
@@ -973,7 +973,7 @@ const StockScreeningPage: React.FC = () => {
     <AppPage className="max-w-6xl space-y-6 pb-12 pt-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-cyan text-cyan shadow-[0_0_24px_hsl(var(--primary)/0.18)]">
+          <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-primary text-primary shadow-soft-card">
             <PlusCircle className="h-4 w-4" />
           </span>
           <div>
@@ -1028,7 +1028,7 @@ const StockScreeningPage: React.FC = () => {
       <section className="rounded-2xl border border-border/80 bg-card/95 p-4 shadow-soft-card">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-orange-500/10 text-orange-500 shadow-[0_10px_30px_rgba(249,115,22,0.16)]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning/10 text-warning shadow-soft-card">
               <Flame className="h-5 w-5" />
             </span>
             <div>
@@ -1097,10 +1097,10 @@ const StockScreeningPage: React.FC = () => {
               return (
               <button
                 key={`${item.topic}-${item.rank ?? ''}`}
-                className={`group relative min-h-[116px] overflow-hidden rounded-xl border px-3 py-3 text-left transition-all ${
+                className={`group relative min-h-28 overflow-hidden rounded-full border px-3 py-3 text-left transition-all ${
                   selected
-                    ? 'border-orange-400 bg-gradient-to-br from-orange-500/10 via-card to-card shadow-[0_0_0_1px_rgba(249,115,22,0.16),0_18px_44px_rgba(249,115,22,0.14)]'
-                    : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-orange-300/70 hover:shadow-soft-card'
+                    ? 'border-warning/50 bg-gradient-to-br from-warning/10 via-card to-card shadow-soft-card ring-1 ring-warning/20'
+                    : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-soft-card'
                 }`}
                 type="button"
                 onClick={() => handleHotspotSelect(item.topic)}
@@ -1109,7 +1109,7 @@ const StockScreeningPage: React.FC = () => {
                   <div className="flex min-w-0 items-start gap-3">
                     <span
                       className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
-                        index < 3 ? 'bg-orange-500 text-white shadow-[0_8px_24px_rgba(249,115,22,0.24)]' : 'bg-surface text-secondary-text'
+                        index < 3 ? 'bg-warning/15 text-warning shadow-soft-card' : 'bg-surface text-secondary-text'
                       }`}
                     >
                       {index + 1}
@@ -1229,17 +1229,17 @@ const StockScreeningPage: React.FC = () => {
                             <p className="mt-1 text-xs text-secondary-text">{stock.code || '-'}</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            <span className="rounded-full bg-cyan/10 px-2 py-1 text-xs font-semibold text-cyan">
+                            <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                               {stock.role || text.conceptStock}
                             </span>
                             {stock.code ? (
                               <button
                                 type="button"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs font-semibold text-cyan"
+                                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs font-semibold text-primary"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
-                                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground">
+                                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 transition-colors hover:border-primary hover:bg-primary/15 hover:text-foreground">
                                   <Play className="h-3 w-3" />
                                   {text.analyze}
                                 </span>
@@ -1267,13 +1267,13 @@ const StockScreeningPage: React.FC = () => {
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-cyan/35 bg-card/95 p-4 shadow-soft-card">
+      <section className="rounded-2xl border border-primary/35 bg-card/95 p-4 shadow-soft-card">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-foreground">{text.selectStrategy}</h2>
             <p className="mt-1 text-xs text-secondary-text">{text.strategyDescription}</p>
           </div>
-          <span className="rounded-full border border-cyan/30 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
+          <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
             {selectedStrategyTag}
           </span>
         </div>
@@ -1301,10 +1301,10 @@ const StockScreeningPage: React.FC = () => {
               return (
                 <button
                   key={item.id}
-                  className={`min-h-28 rounded-xl border p-4 text-left transition-all ${
+                  className={`min-h-28 rounded-full border p-4 text-left transition-all ${
                     selected
-                      ? 'border-cyan bg-cyan/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
-                      : 'border-border/80 bg-surface/70 hover:border-cyan/45 hover:bg-hover/70'
+                      ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
+                      : 'border-border/80 bg-surface/70 hover:border-primary/45 hover:bg-hover/70'
                   }`}
                   type="button"
                   disabled={loading}
@@ -1312,7 +1312,7 @@ const StockScreeningPage: React.FC = () => {
                 >
                   <span className="text-base font-semibold text-foreground">{display.name}</span>
                   <span className="mt-2 block text-sm leading-6 text-secondary-text">{display.description}</span>
-                  <span className="mt-3 inline-flex text-xs font-semibold text-cyan">
+                  <span className="mt-3 inline-flex text-xs font-semibold text-primary">
                     {display.category}
                   </span>
                 </button>
@@ -1325,7 +1325,7 @@ const StockScreeningPage: React.FC = () => {
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <SlidersHorizontal className="h-4 w-4 text-cyan" />
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
           {text.parameters}
         </div>
 
@@ -1341,7 +1341,7 @@ const StockScreeningPage: React.FC = () => {
           <label className="space-y-2 text-xs font-medium text-secondary-text">
             {text.strategyParameter}
             <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-cyan"
+              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
               value={strategy}
               disabled={loading}
               onChange={(event) => handleStrategyChange(event.target.value)}
@@ -1351,7 +1351,7 @@ const StockScreeningPage: React.FC = () => {
           <label className="space-y-2 text-xs font-medium text-secondary-text">
             {text.resultCount}
             <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-cyan"
+              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
               type="number"
               min={1}
               max={100}
@@ -1379,7 +1379,7 @@ const StockScreeningPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <span
               className={`grid h-7 w-7 place-items-center rounded-full ${
-                candidates.length > 0 ? 'text-success' : isScreeningEnabled ? 'text-cyan' : 'text-warning'
+                candidates.length > 0 ? 'text-success' : isScreeningEnabled ? 'text-primary' : 'text-warning'
               }`}
             >
               {candidates.length > 0 ? <CheckCircle2 className="h-5 w-5" /> : <CircleAlert className="h-5 w-5" />}
@@ -1429,7 +1429,7 @@ const StockScreeningPage: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-xs text-secondary-text">
-            <Search className="h-4 w-4 text-cyan" />
+            <Search className="h-4 w-4 text-primary" />
             {formatUiText(text.candidateCount, { count: candidates.length })}
           </div>
         </div>
@@ -1441,7 +1441,7 @@ const StockScreeningPage: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
+            <table className="w-full min-w-216 border-collapse text-sm">
               <thead className="bg-surface text-left text-xs text-secondary-text">
                 <tr>
                   <th className="w-14 px-4 py-3 font-semibold">#</th>
@@ -1476,7 +1476,7 @@ const StockScreeningPage: React.FC = () => {
                         <td className="px-4 py-3 text-secondary-text">{item.industry || '-'}</td>
                         <td className="px-4 py-3 text-secondary-text">{formatNumber(item.price)}</td>
                         <td className="px-4 py-3 text-secondary-text">{formatNumber(item.changePct)}%</td>
-                        <td className="px-4 py-3 font-bold text-cyan">{formatScore(item.score)}</td>
+                        <td className="px-4 py-3 font-bold text-primary">{formatScore(item.score)}</td>
                         <td className="px-4 py-3 text-secondary-text">{llmDegraded ? text.notReranked : formatScore(item.llmScore)}</td>
                         <td className="px-4 py-3">
                           <span className="rounded-lg bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
@@ -1485,7 +1485,7 @@ const StockScreeningPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3">
                           <button
-                            className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-semibold text-cyan transition-colors hover:text-foreground"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-semibold text-primary transition-colors hover:text-foreground"
                             type="button"
                             onClick={() => setExpandedCode(expanded ? null : item.code)}
                           >

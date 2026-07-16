@@ -14,6 +14,7 @@ from src.services.stock_index_remote_service import (
     is_valid_remote_stock_index_file,
     validate_stock_index_payload,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,14 @@ def _get_stock_index_signature(index_path: Path) -> tuple[float, int] | None:
     try:
         stat_result = index_path.stat()
     except OSError as exc:
-        logger.debug("[股票名称] 读取股票索引元数据失败 %s: %s", index_path, exc)
+        log_safe_exception(
+            logger,
+            "Stock index metadata lookup failed",
+            exc,
+            error_code="stock_index_metadata_lookup_failed",
+            level=logging.DEBUG,
+            context={"file_name": index_path.name},
+        )
         return None
     if not index_path.is_file():
         return None
@@ -260,7 +268,14 @@ def get_stock_name_index_map() -> Dict[str, str]:
                 )
                 return _STOCK_INDEX_CACHE
             except (OSError, TypeError, ValueError) as exc:
-                logger.debug("[股票名称] 读取股票索引失败 %s: %s", index_path, exc)
+                log_safe_exception(
+                    logger,
+                    "Stock name index load failed",
+                    exc,
+                    error_code="stock_name_index_load_failed",
+                    level=logging.DEBUG,
+                    context={"file_name": index_path.name},
+                )
 
         _STOCK_INDEX_CACHE = {}
         return _STOCK_INDEX_CACHE
@@ -316,7 +331,14 @@ def get_stock_code_index_map() -> Dict[str, str]:
                 for key, value in _build_stock_code_lookup(raw_items).items():
                     merged_lookup.setdefault(key, value)
             except (OSError, TypeError, ValueError) as exc:
-                logger.debug("[鑲＄エ绱㈠紩] 瑙ｆ瀽浠ｇ爜绱㈠紩澶辫触 %s: %s", index_path, exc)
+                log_safe_exception(
+                    logger,
+                    "Stock code index parsing failed",
+                    exc,
+                    error_code="stock_code_index_parse_failed",
+                    level=logging.DEBUG,
+                    context={"file_name": index_path.name},
+                )
 
         _STOCK_CODE_LOOKUP_CACHE = merged_lookup
         return _STOCK_CODE_LOOKUP_CACHE
@@ -337,7 +359,14 @@ def _resolve_index_stock_code_uncached(query: str) -> str | None:
             if resolved:
                 return resolved
         except (OSError, TypeError, ValueError) as exc:
-            logger.debug("[股票索引] 解析代码索引失败 %s: %s", index_path, exc)
+            log_safe_exception(
+                logger,
+                "Stock code index lookup failed",
+                exc,
+                error_code="stock_code_index_lookup_failed",
+                level=logging.DEBUG,
+                context={"file_name": index_path.name},
+            )
 
     return None
 

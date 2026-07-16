@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from src.services.market_symbol_utils import get_suffix_market
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +171,15 @@ def is_market_open(market: str, check_date: date) -> bool:
         cal = xcals.get_calendar(ex)
         session = datetime(check_date.year, check_date.month, check_date.day)
         return cal.is_session(session)
-    except Exception as e:
-        logger.warning("trading_calendar.is_market_open fail-open: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Trading calendar market-open lookup failed open",
+            exc,
+            error_code="trading_calendar_market_open_failed_open",
+            level=logging.WARNING,
+            context={"market": market},
+        )
         return True
 
 
@@ -243,8 +251,15 @@ def get_effective_trading_date(
             return session.date()
 
         return cal.previous_session(session).date()
-    except Exception as e:
-        logger.warning("trading_calendar.get_effective_trading_date fail-open: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Effective trading date lookup failed open",
+            exc,
+            error_code="effective_trading_date_failed_open",
+            level=logging.WARNING,
+            context={"market": market or "unknown"},
+        )
         return fallback_date
 
 
@@ -350,8 +365,15 @@ def infer_market_phase(
         if market_now < closing_window_start:
             return MarketPhase.INTRADAY
         return MarketPhase.CLOSING_AUCTION
-    except Exception as e:
-        logger.warning("trading_calendar.infer_market_phase fail-closed: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Market phase inference failed closed",
+            exc,
+            error_code="market_phase_inference_failed_closed",
+            level=logging.WARNING,
+            context={"market": market or "unknown"},
+        )
         return MarketPhase.UNKNOWN
 
 
@@ -415,8 +437,15 @@ def _phase_minutes(
 
     try:
         session_open, session_close = _session_open_close_for_today(market, market_now)
-    except Exception as e:
-        logger.warning("trading_calendar.market_phase_context calendar_error: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Market phase context calendar lookup failed",
+            exc,
+            error_code="market_phase_context_calendar_failed",
+            level=logging.WARNING,
+            context={"market": market},
+        )
         return None, None, True
 
     if session_open is None or session_close is None:
@@ -541,8 +570,15 @@ def get_open_markets_today() -> Set[str]:
             today = datetime.now(tz).date()
             if is_market_open(mkt, today):
                 result.add(mkt)
-        except Exception as e:
-            logger.warning("get_open_markets_today fail-open for %s: %s", mkt, e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Open markets lookup failed open",
+                exc,
+                error_code="open_markets_lookup_failed_open",
+                level=logging.WARNING,
+                context={"market": mkt},
+            )
             result.add(mkt)
     return result
 

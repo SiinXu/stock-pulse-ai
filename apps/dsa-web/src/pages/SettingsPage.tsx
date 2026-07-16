@@ -48,6 +48,7 @@ import {
   parseModelAccessFieldKey,
   type ModelAccessFieldFocusRequest,
 } from '../components/settings/modelAccessFieldKey';
+import { getProviderDisplayLabel } from '../components/settings/llmConnectionContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
@@ -996,6 +997,7 @@ const SettingsPage: React.FC = () => {
   // the model-access page.
   const {
     providers: providerCatalog,
+    connectionFields: providerConnectionFields,
     emptyApiKeyHosts: providerEmptyApiKeyHosts,
     isLoading: isProviderCatalogLoading,
     error: providerCatalogError,
@@ -1547,18 +1549,22 @@ const SettingsPage: React.FC = () => {
   const modelSelectorOptions = useMemo<SearchableSelectOption[]>(
     () => availableModels.map((entry) => {
       const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
+      const catalogProvider = providerCatalog.find((provider) => provider.id === entry.providerId);
+      const providerLabel = catalogProvider
+        ? getProviderDisplayLabel(catalogProvider, uiLanguage)
+        : entry.providerLabel ?? entry.provider;
       return {
         value: entry.modelRef || entry.route,
         label: entry.display,
-        sublabel: [entry.providerLabel ?? entry.provider, connectionLabel]
+        sublabel: [providerLabel, connectionLabel]
           .filter((part): part is string => Boolean(part))
           .join(' · ') || undefined,
-        group: connectionLabel ?? entry.providerLabel ?? entry.provider ?? undefined,
+        group: connectionLabel ?? providerLabel ?? undefined,
         keywords: [entry.route, entry.modelRef, entry.providerId, connectionLabel]
           .filter((part): part is string => Boolean(part)),
       };
     }),
-    [availableModels],
+    [availableModels, providerCatalog, uiLanguage],
   );
   // Authoritative routable route set for AI Overview Active/Unavailable status.
   const availableModelRefSet = useMemo(
@@ -1904,6 +1910,10 @@ const SettingsPage: React.FC = () => {
       return;
     }
     const fingerprint = JSON.stringify(items);
+    if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
+      setGroupSaveState(group, { status: 'scheduled', fingerprint });
+      return;
+    }
     if (group === 'ai_model' && !llmChannelDraftValid) {
       setGroupSaveState(group, { status: 'failed', fingerprint });
       return;
@@ -1925,7 +1935,7 @@ const SettingsPage: React.FC = () => {
     } finally {
       autosaveInFlightRef.current = null;
     }
-  }, [llmChannelDraftValid, persistConfigGroup, setGroupSaveState]);
+  }, [isProviderCatalogLoading, llmChannelDraftValid, persistConfigGroup, providerCatalogError, setGroupSaveState]);
 
   useEffect(() => {
     if (autosaveTimerRef.current !== null) {
@@ -1940,6 +1950,10 @@ const SettingsPage: React.FC = () => {
     let nextGroup: string | null = null;
     for (const [group, items] of currentPendingGroups) {
       const fingerprint = JSON.stringify(items);
+      if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
+        setGroupSaveState(group, { status: 'scheduled', fingerprint });
+        continue;
+      }
       const previous = groupSaveStatesRef.current[group];
       if (group === 'ai_model' && !llmChannelDraftValid) {
         setGroupSaveState(group, { status: 'failed', fingerprint });
@@ -1971,9 +1985,11 @@ const SettingsPage: React.FC = () => {
   }, [
     conflictState,
     isLoading,
+    isProviderCatalogLoading,
     llmChannelDraftValid,
     pendingGroupsFingerprint,
     runGroupAutosave,
+    providerCatalogError,
     setGroupSaveState,
   ]);
 
@@ -3011,6 +3027,8 @@ const SettingsPage: React.FC = () => {
                   key={`llm-connections-${configVersion}`}
                   items={rawActiveItems}
                   providers={providerCatalog}
+                  connectionFields={providerConnectionFields}
+                  catalogLoading={isProviderCatalogLoading}
                   emptyApiKeyHosts={providerEmptyApiKeyHosts}
                   availableModels={availableModels}
                   availableModelRoutes={availableModels.map((model) => model.route)}
@@ -3021,7 +3039,7 @@ const SettingsPage: React.FC = () => {
                   resetSignal={llmChannelResetSignal}
                   addSignal={llmChannelAddSignal}
                   focusFieldRequest={llmFocusFieldRequest}
-                  disabled={isSaving || isLoading || hasUnsafeModelAccessSchema}
+                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || hasUnsafeModelAccessSchema}
                   catalogUnavailable={Boolean(providerCatalogError)}
                   onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}
@@ -3084,7 +3102,7 @@ const SettingsPage: React.FC = () => {
       )}
 
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 w-[320px] max-w-[calc(100vw-24px)]">
+        <div className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]">
           {toast.type === 'success'
             ? (
                 <SettingsAlert
@@ -3146,6 +3164,7 @@ const SettingsPage: React.FC = () => {
           language={uiLanguage}
           existingChannelNames={existingChannelNames}
           providers={providerCatalog}
+          connectionFields={providerConnectionFields}
           emptyApiKeyHosts={providerEmptyApiKeyHosts}
         />
       ) : null}

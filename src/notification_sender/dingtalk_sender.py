@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import chunk_content_by_max_bytes  # <-- 引入项目内置的切片器
 
 logger = logging.getLogger(__name__)
@@ -75,8 +76,14 @@ class DingtalkSender:
                 else:
                     logger.error(f"钉钉消息分段 {index + 1} 发送失败 (DingTalk API error): {result}")
                     all_success = False
-            except Exception as e:
-                logger.error(f"发送钉钉消息异常 (Failed to send DingTalk notification chunk {index + 1}): {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "DingTalk notification chunk delivery failed",
+                    exc,
+                    error_code="dingtalk_chunk_delivery_failed",
+                    context={"chunk_index": index + 1},
+                )
                 all_success = False
             
             if len(chunks) > 1 and index < len(chunks) - 1:

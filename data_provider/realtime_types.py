@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Union
 from enum import Enum
 
+from src.utils.sanitize import sanitize_diagnostic_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -421,7 +423,11 @@ class CircuitBreaker:
                 logger.warning(f"[熔断器] {source} 连续失败 {state['failures']} 次，进入熔断状态 "
                               f"(冷却 {self.cooldown_seconds}s)")
                 if error:
-                    logger.warning(f"[熔断器] 最后错误: {error}")
+                    logger.warning(
+                        "Circuit breaker last failure source=%s error_code=%s",
+                        source,
+                        sanitize_diagnostic_text(error, max_length=120),
+                    )
     
     def get_status(self) -> Dict[str, str]:
         """获取所有数据源状态"""

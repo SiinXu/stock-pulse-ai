@@ -23,7 +23,10 @@ from sqlalchemy.exc import IntegrityError
 from src.config import Config, get_config
 from src.repositories.intelligence_repo import IntelligenceRepository
 from src.storage import IntelligenceSource, INTELLIGENCE_ITEM_NULL_SCOPE_VALUE
-from src.services.run_diagnostics import sanitize_diagnostic_text
+from src.services.run_diagnostics import (
+    sanitize_diagnostic_text as sanitize_run_diagnostic_text,
+)
+from src.utils.sanitize import sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 _ALLOWED_SOURCE_TYPES = {"rss", "atom", "newsnow"}
@@ -753,7 +756,11 @@ class IntelligenceService:
 
     @staticmethod
     def _sanitize_error(exc: Exception) -> str:
-        return sanitize_diagnostic_text(str(exc), max_length=500) or "internal intelligence service error"
+        safe_exception = sanitize_diagnostic_text(exc, max_length=500)
+        return (
+            sanitize_run_diagnostic_text(safe_exception, max_length=500)
+            or "internal intelligence service error"
+        )
 
     @staticmethod
     def _strip_ns(tag: str) -> str:
@@ -821,7 +828,6 @@ class IntelligenceService:
         query = dict(parse_qsl(parsed.query, keep_blank_values=True))
         query["id"] = source_id
         return urlunparse(parsed._replace(query=urlencode(query)))
-
 
     @staticmethod
     def _iso(value: Optional[datetime]) -> Optional[str]:

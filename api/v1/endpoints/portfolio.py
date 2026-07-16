@@ -14,6 +14,7 @@ from api.v1.errors import api_error, error_body
 from api.v1.schemas.analysis import TaskAccepted
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.portfolio import (
+    PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
     PortfolioAccountCreateRequest,
     PortfolioAccountItem,
     PortfolioAccountListResponse,
@@ -45,6 +46,7 @@ from src.services.portfolio_service import (
     PortfolioOversellError,
     PortfolioService,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,12 @@ def _bad_request(exc: Exception) -> HTTPException:
 
 
 def _internal_error(message: str, exc: Exception) -> HTTPException:
-    logger.error(f"{message}: {exc}", exc_info=True)
+    log_safe_exception(
+        logger,
+        message,
+        exc,
+        error_code="internal_error",
+    )
     return api_error(500, "internal_error", message)
 
 
@@ -188,7 +195,11 @@ def delete_account(account_id: int):
 )
 def create_trade(
     request: PortfolioTradeCreateRequest,
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
 ) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
@@ -286,7 +297,11 @@ def delete_trade(trade_id: int) -> PortfolioDeleteResponse:
 )
 def create_cash_ledger(
     request: PortfolioCashLedgerCreateRequest,
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
 ) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
@@ -372,7 +387,11 @@ def delete_cash_ledger(entry_id: int) -> PortfolioDeleteResponse:
 )
 def create_corporate_action(
     request: PortfolioCorporateActionCreateRequest,
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
 ) -> PortfolioEventCreatedResponse:
     service = PortfolioService()
     try:
@@ -662,9 +681,16 @@ def commit_csv_import(
     account_id: int = Form(...),
     broker: str = Form(..., description="Broker id: huatai/citic/cmb"),
     dry_run: bool = Form(False),
-    operation_id: Optional[str] = Form(None),
+    operation_id: Optional[str] = Form(
+        None,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
     file: UploadFile = File(...),
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: Optional[str] = Header(
+        None,
+        alias="Idempotency-Key",
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    ),
 ) -> PortfolioImportCommitResponse:
     importer = PortfolioImportService()
     try:

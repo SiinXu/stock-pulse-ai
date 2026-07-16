@@ -126,7 +126,7 @@ describe('stockPoolStore', () => {
     vi.mocked(analysisApi.getTasks).mockResolvedValue(createTaskListResponse([]));
   });
 
-  it('loads initial history and auto-selects the first report', async () => {
+  it('loads initial history without bypassing the URL-owned selection path', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -139,7 +139,9 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
-    expect(state.selectedReport?.meta.stockCode).toBe('600519');
+    expect(state.selectedReport).toBeNull();
+    expect(state.selectedRecordId).toBeNull();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
   });
@@ -1307,6 +1309,27 @@ describe('stockPoolStore', () => {
     expect(state.pendingRecordId).toBeNull();
     expect(state.isLoadingReport).toBe(false);
     expect(state.selectedReport?.meta.id).toBe(2);
+  });
+
+  it('clears the URL-owned report selection and ignores an older in-flight response', async () => {
+    const deferred = createDeferred<AnalysisReport>();
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(deferred.promise as never);
+
+    const loadPromise = useStockPoolStore.getState().selectHistoryItem(2);
+    expect(useStockPoolStore.getState().pendingRecordId).toBe(2);
+
+    useStockPoolStore.getState().clearSelectedRecord();
+    deferred.resolve({
+      ...historyReport,
+      meta: { ...historyReport.meta, id: 2, stockCode: 'AAPL' },
+    } as AnalysisReport);
+    await loadPromise;
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedRecordId).toBeNull();
+    expect(state.pendingRecordId).toBeNull();
+    expect(state.selectedReport).toBeNull();
+    expect(state.isLoadingReport).toBe(false);
   });
 
   it('drops the stale report and keeps a retryable failure when a user switch fails', async () => {

@@ -324,7 +324,7 @@ function getStockContextInput() {
 }
 
 function closeStockContextModal() {
-  fireEvent.click(within(getStockContextModal()).getByRole('button', { name: '关闭抽屉' }));
+  fireEvent.click(within(getStockContextModal()).getByRole('button', { name: '关闭' }));
 }
 
 function closeSignalDetailsDrawer() {

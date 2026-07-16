@@ -39,6 +39,7 @@ from src.services.decision_signal_summary import (
 )
 from src.services.history_service import HistoryService
 from src.services.market_light_service import normalize_market_alert_region
+from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,13 @@ class AlertWorker:
         try:
             config = self.config_provider()
         except Exception as exc:
-            logger.warning("[AlertWorker] Failed to load runtime config: %s", exc)
+            log_safe_exception(
+                logger,
+                "Alert worker runtime configuration lookup failed",
+                exc,
+                error_code="alert_worker_config_lookup_failed",
+                level=logging.WARNING,
+            )
             return stats
 
         if not getattr(config, "agent_event_monitor_enabled", False):
@@ -229,7 +236,14 @@ class AlertWorker:
                 if len(runtime_rules) >= ALERT_WORKER_RULE_LIMIT:
                     break
             except Exception as exc:
-                logger.warning("[AlertWorker] Skip invalid persisted alert rule %s: %s", getattr(row, "id", "?"), exc)
+                log_safe_exception(
+                    logger,
+                    "Invalid persisted alert rule skipped",
+                    exc,
+                    error_code="persisted_alert_rule_invalid",
+                    level=logging.WARNING,
+                    context={"rule_id": getattr(row, "id", "unknown")},
+                )
 
         for key, rule in self._load_legacy_rules(config):
             if key in seen_keys:
@@ -245,7 +259,13 @@ class AlertWorker:
         try:
             parsed_rules = parse_event_alert_rules(raw_rules)
         except Exception as exc:
-            logger.warning("[AlertWorker] Failed to parse legacy alert rules: %s", exc)
+            log_safe_exception(
+                logger,
+                "Legacy alert rule parsing failed",
+                exc,
+                error_code="legacy_alert_rule_parse_failed",
+                level=logging.WARNING,
+            )
             return []
 
         legacy_rules: List[Tuple[str, Any]] = []
@@ -281,7 +301,14 @@ class AlertWorker:
                     raise ValueError(f"unsupported alert_type: {alert_type}")
                 legacy_rules.append((key, rule))
             except Exception as exc:
-                logger.warning("[AlertWorker] Skip invalid legacy alert rule #%d: %s", index, exc)
+                log_safe_exception(
+                    logger,
+                    "Invalid legacy alert rule skipped",
+                    exc,
+                    error_code="legacy_alert_rule_invalid",
+                    level=logging.WARNING,
+                    context={"rule_index": index},
+                )
         return legacy_rules
 
     @staticmethod
@@ -323,10 +350,13 @@ class AlertWorker:
         try:
             return self._record_trigger(runtime_rule, result, status)
         except Exception as exc:
-            logger.warning(
-                "[AlertWorker] Failed to record alert trigger for %s: %s",
-                self._display_target(runtime_rule),
-                self.service._sanitize_text(str(exc) or "trigger write failed"),
+            log_safe_exception(
+                logger,
+                "Alert trigger persistence failed",
+                exc,
+                error_code="alert_trigger_persistence_failed",
+                level=logging.WARNING,
+                context={"target": self._display_target(runtime_rule)},
             )
             return TriggerWriteResult()
 
@@ -385,10 +415,13 @@ class AlertWorker:
             payload["decision_signal_summary"] = summary
             result["diagnostics"] = payload
         except Exception as exc:
-            logger.debug(
-                "[AlertWorker] decision signal summary unavailable for %s: %s",
-                self._display_target(runtime_rule),
-                self.service._sanitize_text(str(exc) or "decision signal summary failed"),
+            log_safe_exception(
+                logger,
+                "Alert decision signal summary unavailable",
+                exc,
+                error_code="alert_decision_signal_summary_unavailable",
+                level=logging.DEBUG,
+                context={"target": self._display_target(runtime_rule)},
             )
 
     def _resolve_decision_signal_summary(
@@ -556,7 +589,13 @@ class AlertWorker:
             payload = context.to_dict() if hasattr(context, "to_dict") else context
             return render_market_phase_summary(payload)
         except Exception as exc:
-            logger.debug("[AlertWorker] phase summary unavailable: %s", exc)
+            log_safe_exception(
+                logger,
+                "Alert market phase summary unavailable",
+                exc,
+                error_code="alert_market_phase_summary_unavailable",
+                level=logging.DEBUG,
+            )
             return None
 
     @staticmethod
@@ -594,7 +633,14 @@ class AlertWorker:
             if records:
                 overview = extract_analysis_context_pack_overview(getattr(records[0], "context_snapshot", None))
         except Exception as exc:
-            logger.debug("[AlertWorker] recent history overview unavailable for %s: %s", target, exc)
+            log_safe_exception(
+                logger,
+                "Alert recent history overview unavailable",
+                exc,
+                error_code="alert_recent_history_overview_unavailable",
+                level=logging.DEBUG,
+                context={"target": target},
+            )
             overview = None
         self._analysis_visibility_cache[cache_key] = overview
         return overview
@@ -664,11 +710,14 @@ class AlertWorker:
         except Exception as exc:
             from src.notification import ChannelAttemptResult, NotificationDispatchResult
 
-            sanitized = self.service._sanitize_text(str(exc) or "notification failed")
-            logger.warning(
-                "[AlertWorker] Failed to send alert notification for %s: %s",
-                self._display_target(runtime_rule),
-                sanitized,
+            sanitized = sanitize_exception_chain(exc) or "notification failed"
+            log_safe_exception(
+                logger,
+                "Alert notification dispatch failed",
+                exc,
+                error_code="alert_notification_dispatch_failed",
+                level=logging.WARNING,
+                context={"target": self._display_target(runtime_rule)},
             )
             return NotificationDispatchResult(
                 dispatched=False,
@@ -694,9 +743,13 @@ class AlertWorker:
         try:
             return self._record_notification_attempts(trigger_id, dispatch)
         except Exception as exc:
-            logger.warning(
-                "[AlertWorker] Failed to record alert notification attempt: %s",
-                self.service._sanitize_text(str(exc) or "notification attempt write failed"),
+            log_safe_exception(
+                logger,
+                "Alert notification attempt persistence failed",
+                exc,
+                error_code="alert_notification_attempt_persistence_failed",
+                level=logging.WARNING,
+                context={"trigger_id": trigger_id or "unknown"},
             )
             return 0
 
@@ -783,10 +836,13 @@ class AlertWorker:
                 now=now_dt,
             )
         except Exception as exc:
-            logger.warning(
-                "[AlertWorker] Failed to read alert cooldown for %s: %s",
-                self._display_target(runtime_rule),
-                self.service._sanitize_text(str(exc) or "cooldown read failed"),
+            log_safe_exception(
+                logger,
+                "Alert cooldown lookup failed",
+                exc,
+                error_code="alert_cooldown_lookup_failed",
+                level=logging.WARNING,
+                context={"target": self._display_target(runtime_rule)},
             )
             fallback_key = self._db_cooldown_fallback_key(runtime_rule.key)
             if self._should_notify(fallback_key, ttl_seconds=cooldown_seconds):
@@ -829,7 +885,7 @@ class AlertWorker:
     def _record_cooldown_read_failure_suppression(self, trigger_id: Optional[int], exc: Exception) -> None:
         from src.notification import ChannelAttemptResult, NotificationDispatchResult
 
-        sanitized = self.service._sanitize_text(str(exc) or "cooldown read failed")
+        sanitized = sanitize_exception_chain(exc) or "cooldown read failed"
         self._record_notification_attempts_safely(
             trigger_id,
             NotificationDispatchResult(
@@ -868,10 +924,13 @@ class AlertWorker:
                 reason=self.service._sanitize_text(result.get("reason") or result.get("message")),
             )
         except Exception as exc:
-            logger.warning(
-                "[AlertWorker] Failed to update alert cooldown for %s: %s",
-                self._display_target(runtime_rule),
-                self.service._sanitize_text(str(exc) or "cooldown write failed"),
+            log_safe_exception(
+                logger,
+                "Alert cooldown update failed",
+                exc,
+                error_code="alert_cooldown_update_failed",
+                level=logging.WARNING,
+                context={"target": self._display_target(runtime_rule)},
             )
 
     @staticmethod

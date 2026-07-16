@@ -69,7 +69,7 @@ from src.storage import (
     AlertTriggerRecord,
     DatabaseManager,
 )
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 
 LEGACY_RUNTIME_ALERT_TYPES = frozenset({"price_cross", "price_change_percent", "volume_spike"})
@@ -1187,10 +1187,13 @@ class AlertService:
                 severity=str(row.severity) if row.severity else None,
             )
         except Exception as exc:
-            logger.warning(
-                "[AlertService] Failed to load alert cooldown summary for rule %s: %s",
-                getattr(row, "id", "?"),
-                self._sanitize_text(str(exc) or "cooldown summary read failed"),
+            log_safe_exception(
+                logger,
+                "Alert cooldown summary lookup failed",
+                exc,
+                error_code="alert_cooldown_summary_lookup_failed",
+                level=logging.WARNING,
+                context={"rule_id": getattr(row, "id", "unknown")},
             )
             return {"last_triggered_at": None, "cooldown_until": None, "cooldown_active": False}
         return self._serialize_cooldown_summary(cooldown)

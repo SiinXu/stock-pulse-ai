@@ -15,6 +15,7 @@ from src.agent.skills.defaults import (
     extract_skill_id,
     is_skill_agent_name,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -141,8 +142,15 @@ class SkillAggregator:
             if summary and summary.get("total_evaluations", 0) >= min_samples:
                 win_rate = summary.get("win_rate", 0.5)
                 return 0.5 + win_rate
-        except Exception:
-            logger.debug("Failed to compute backtest factor for %s", agent_name, exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Skill backtest factor computation failed",
+                exc,
+                error_code="agent_skill_backtest_factor_failed",
+                level=logging.DEBUG,
+                context={"skill_id": skill_id},
+            )
         return 1.0
 
     @staticmethod
@@ -152,8 +160,14 @@ class SkillAggregator:
 
             config = get_config()
             return getattr(config, "agent_skill_autoweight", True)
-        except Exception:
-            logger.debug("Failed to get backtest autoweight config, defaulting to True", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Skill backtest autoweight configuration lookup failed",
+                exc,
+                error_code="agent_skill_autoweight_config_failed",
+                level=logging.DEBUG,
+            )
             return True
 
 

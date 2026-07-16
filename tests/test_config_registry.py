@@ -847,6 +847,16 @@ class TestConfigConditions(unittest.TestCase):
 
         self.assertEqual(evaluate_config_conditions([{"key": "X", "operator": "regex"}], {"X": "y"}), "unknown")
 
+    def test_evaluate_config_conditions_normalizes_missing_scalar_values(self) -> None:
+        from src.core.config_registry import evaluate_config_conditions
+
+        for value_payload in ({}, {"value": None}):
+            with self.subTest(value_payload=value_payload):
+                equals = {"key": "X", "operator": "equals", **value_payload}
+                not_equals = {"key": "X", "operator": "notEquals", **value_payload}
+                self.assertEqual(evaluate_config_conditions([equals], {"X": ""}), "met")
+                self.assertEqual(evaluate_config_conditions([not_equals], {"X": ""}), "not_met")
+
     def test_opencode_cli_model_has_visible_when_contract(self) -> None:
         from src.core.config_registry import get_field_definition
 

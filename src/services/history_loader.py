@@ -16,6 +16,8 @@ from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 _CACHE_MIN_RECORDS = 30
 
@@ -159,8 +161,15 @@ def load_history_df(
                 stock_code, len(df), days,
             )
             return df, "db_cache"
-    except Exception as e:
-        logger.debug("load_history_df(%s): DB read failed: %s", stock_code, e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Historical bars database lookup failed",
+            exc,
+            error_code="historical_bars_database_lookup_failed",
+            level=logging.DEBUG,
+            context={"stock_code": stock_code},
+        )
 
     # --- 2. Network fallback via singleton DataFetcherManager -------------
     try:
@@ -168,7 +177,14 @@ def load_history_df(
         df, source = manager.get_daily_data(stock_code, days=days)
         if df is not None and not df.empty:
             return df, source
-    except Exception as e:
-        logger.warning("load_history_df(%s): DataFetcherManager failed: %s", stock_code, e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Historical bars provider fallback failed",
+            exc,
+            error_code="historical_bars_provider_fallback_failed",
+            level=logging.WARNING,
+            context={"stock_code": stock_code},
+        )
 
     return None, "none"

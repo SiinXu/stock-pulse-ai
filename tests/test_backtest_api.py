@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """HTTP regressions for the Backtest API error contract."""
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,6 +51,7 @@ def _assert_safe_internal_error(response) -> None:
 )
 def test_unexpected_value_error_is_safe_internal_error(
     client: TestClient,
+    caplog,
     method: str,
     path: str,
     service_method: str,
@@ -57,10 +59,17 @@ def test_unexpected_value_error_is_safe_internal_error(
     service = MagicMock()
     getattr(service, service_method).side_effect = ValueError(SENSITIVE_ERROR)
 
+    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.backtest")
     with patch.object(backtest_endpoint, "BacktestService", return_value=service):
         response = client.request(method, path, json={} if method == "POST" else None)
 
     _assert_safe_internal_error(response)
+    rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+    assert "super-secret" not in rendered_logs
+    assert "private.example" not in rendered_logs
+    assert "error_code=internal_error" in rendered_logs
+    assert "exception_type=ValueError" in rendered_logs
+    assert all(record.exc_info is None for record in caplog.records)
 
 
 def test_response_validation_error_is_safe_internal_error(client: TestClient) -> None:

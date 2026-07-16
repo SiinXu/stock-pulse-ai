@@ -881,7 +881,7 @@ const ChatPage: React.FC = () => {
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
-        <h2 className="text-sm font-semibold text-cyan uppercase tracking-[0.2em] flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-primary uppercase tracking-[0.2em] flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -891,7 +891,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -911,7 +911,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
             aria-label={t('common.closeDrawer')}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -1002,7 +1002,7 @@ const ChatPage: React.FC = () => {
       className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
-      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/8 bg-card/82 shadow-soft-card md:flex">
+      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-white/8 bg-card/82 shadow-soft-card md:flex">
         {sidebarContent}
       </div>
 
@@ -1042,7 +1042,7 @@ const ChatPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('chat.history')}
               >
                 <svg
@@ -1060,7 +1060,7 @@ const ChatPage: React.FC = () => {
                 </svg>
               </button>
               <svg
-                className="w-6 h-6 text-cyan"
+                className="w-6 h-6 text-primary"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -1324,11 +1324,11 @@ const ChatPage: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
                   AI
                 </div>
-                <div className="min-w-[200px] max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-white/6 bg-card/72 px-5 py-4">
+                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-white/6 bg-card/72 px-5 py-4">
                   <div className="flex items-center gap-2.5 text-sm text-secondary-text">
                     <div className="relative w-4 h-4 flex-shrink-0">
-                      <div className="absolute inset-0 rounded-full border-2 border-cyan/20" />
-                      <div className="absolute inset-0 rounded-full border-2 border-cyan border-t-transparent animate-spin" />
+                      <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+                      <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                     </div>
                     <span className="text-secondary-text">
                       {getCurrentStage(progressSteps)}
@@ -1441,7 +1441,7 @@ const ChatPage: React.FC = () => {
                 <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm text-foreground"
+                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-full px-3 text-left text-sm text-foreground"
                     aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"
@@ -1548,7 +1548,7 @@ const ChatPage: React.FC = () => {
                   placeholder={t('chat.inputPlaceholder')}
                   disabled={loading}
                   rows={1}
-                  className="flex-1 min-h-11 max-h-[200px] rounded-[10px] border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ height: 'auto' }}
                   onInput={(e) => {
                     const t = e.target as HTMLTextAreaElement;

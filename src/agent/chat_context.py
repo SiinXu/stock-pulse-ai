@@ -24,6 +24,7 @@ from src.agent.provider_trace import (
 )
 from src.llm.usage import should_persist_usage_telemetry
 from src.storage import get_db, persist_llm_usage
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,13 @@ def estimate_text_tokens(text: str, config: Any) -> int:
         count = litellm.token_counter(model=model, text=normalized_text)
         return max(0, int(count or 0))
     except Exception as exc:
-        logger.debug("Token counter failed; using character heuristic: %s", exc)
+        log_safe_exception(
+            logger,
+            "Agent token counting failed; using character heuristic",
+            exc,
+            error_code="agent_token_count_failed",
+            level=logging.DEBUG,
+        )
         return int(math.ceil(len(normalized_text) / 3))
 
 
@@ -410,7 +417,13 @@ def _generate_summary(
             timeout=SUMMARY_LLM_TIMEOUT_SECONDS,
         )
     except Exception as exc:
-        logger.warning("Conversation summary LLM call raised: %s", exc)
+        log_safe_exception(
+            logger,
+            "Agent conversation summary generation failed",
+            exc,
+            error_code="agent_conversation_summary_failed",
+            level=logging.WARNING,
+        )
         return None, None
 
     content = (getattr(response, "content", None) or "").strip()

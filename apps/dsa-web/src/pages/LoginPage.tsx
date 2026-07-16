@@ -83,22 +83,6 @@ const LoginPage: React.FC = () => {
       {/* Cyber Grid */}
       <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,var(--login-grid-line)_1px,transparent_1px),linear-gradient(to_bottom,var(--login-grid-line)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:var(--login-grid-mask)]" />
 
-      {/* Parallax Glowing Orbs */}
-      <motion.div
-        style={{
-          x: useTransform(smoothX, [-0.5, 0.5], [-50, 50]),
-          y: useTransform(smoothY, [-0.5, 0.5], [-50, 50]),
-        }}
-        className="absolute left-[20%] top-[20%] -z-10 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--login-accent-glow)] blur-[100px]"
-      />
-      <motion.div
-        style={{
-          x: useTransform(smoothX, [-0.5, 0.5], [60, -60]),
-          y: useTransform(smoothY, [-0.5, 0.5], [60, -60]),
-        }}
-        className="absolute right-[20%] bottom-[10%] -z-10 h-[400px] w-[400px] translate-x-1/2 translate-y-1/2 rounded-full bg-emerald-600/10 blur-[120px]"
-      />
-
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -115,7 +99,7 @@ const LoginPage: React.FC = () => {
             }}
             className="pointer-events-none absolute -top-[20vh] -z-10 opacity-80"
           >
-            <div className="relative flex h-[120vh] w-[120vh] items-center justify-center rounded-full border border-[var(--login-accent-soft)] bg-gradient-to-br from-[var(--login-accent-soft)] to-[hsl(var(--foreground)/0.1)] shadow-[inset_0_0_200px_var(--login-accent-glow)] blur-[4px]">
+            <div className="relative flex h-[120vh] w-[120vh] items-center justify-center rounded-full border border-[var(--login-accent-soft)] bg-gradient-to-br from-[var(--login-accent-soft)] to-[hsl(var(--foreground)/0.1)] blur-sm">
               <Cpu className="h-[70vh] w-[70vh] text-[hsl(var(--foreground)/0.22)] brightness-50" />
               <TrendingUp className="absolute h-[25vh] w-[25vh] translate-x-[15vh] translate-y-[15vh] text-[hsl(var(--primary)/0.3)] brightness-50" />
             </div>
@@ -123,7 +107,7 @@ const LoginPage: React.FC = () => {
 
           <div className="mt-8 flex flex-col items-center">
             <h2 className="text-4xl font-extrabold tracking-tighter text-[var(--login-text-primary)] sm:text-6xl">
-              <span className="bg-gradient-to-r from-[var(--login-brand-start)] to-[var(--login-brand-end)] bg-clip-text text-transparent drop-shadow-[0_0_20px_var(--login-accent-glow)]">StockPulse</span>
+              <span className="bg-gradient-to-r from-[var(--login-brand-start)] to-[var(--login-brand-end)] bg-clip-text text-transparent">StockPulse</span>
             </h2>
             <h3 className="mt-1 text-xl font-bold uppercase tracking-[0.5em] text-[var(--login-text-muted)]">
               {t('login.brandTagline')}
@@ -147,14 +131,7 @@ const LoginPage: React.FC = () => {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="relative group z-20 pointer-events-auto"
         >
-          {/* Card Border Glow */}
-          <div className="pointer-events-none absolute -inset-0.5 rounded-3xl bg-gradient-to-b from-[var(--login-accent-glow)] to-[hsl(var(--primary)/0.18)] opacity-50 blur-sm transition duration-1000 group-hover:opacity-100 group-hover:duration-200" />
-
-          <div className="pointer-events-auto relative flex flex-col overflow-hidden rounded-3xl border border-[var(--login-border-card)] bg-[var(--login-bg-card)]/80 p-8 shadow-2xl backdrop-blur-xl">
-            {/* Inner corner glow */}
-            <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-[var(--login-accent-soft)] blur-[50px]" />
-            <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-[hsl(var(--primary)/0.08)] blur-[50px]" />
-
+          <div className="pointer-events-auto relative flex flex-col overflow-hidden rounded-3xl border border-[var(--login-border-card)] bg-[var(--login-bg-card)] p-8 shadow-soft-card">
             <div className="mb-8">
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-[var(--login-text-primary)]">
                 {isFirstTime ? (
@@ -229,7 +206,7 @@ const LoginPage: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="group/btn relative h-12 w-full overflow-hidden rounded-full border-0 bg-gradient-to-r from-[var(--login-brand-button-start)] to-[var(--login-brand-button-end)] font-medium text-[var(--login-button-text)] shadow-lg shadow-[0_18px_36px_hsl(0_0%_0%_/_0.2)] hover:from-[var(--login-brand-button-start-hover)] hover:to-[var(--login-brand-button-end-hover)]"
+                className="group/btn relative h-12 w-full overflow-hidden rounded-full border-0 bg-gradient-to-r from-[var(--login-brand-button-start)] to-[var(--login-brand-button-end)] font-medium text-[var(--login-button-text)] shadow-lg hover:from-[var(--login-brand-button-start-hover)] hover:to-[var(--login-brand-button-end-hover)]"
                 disabled={isSubmitting}
               >
                 <div className="relative z-10 flex items-center justify-center gap-2">

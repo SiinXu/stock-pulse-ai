@@ -15,6 +15,7 @@ from typing import Optional
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -88,8 +89,13 @@ class WechatSender:
         
         try:
             return self._send_wechat_message(content, timeout_seconds=timeout_seconds)
-        except Exception as e:
-            logger.error(f"发送企业微信消息失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "WeChat Work message delivery failed",
+                exc,
+                error_code="wechat_work_delivery_failed",
+            )
             return False
 
     def _send_wechat_image(self, image_bytes: bytes) -> bool:
@@ -121,8 +127,13 @@ class WechatSender:
             else:
                 logger.error("企业微信请求失败: HTTP %s", response.status_code)
             return False
-        except Exception as e:
-            logger.error("企业微信图片发送异常: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "WeChat Work image delivery failed",
+                exc,
+                error_code="wechat_work_image_delivery_failed",
+            )
             return False
     
     def _send_wechat_message(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:

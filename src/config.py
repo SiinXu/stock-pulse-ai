@@ -37,6 +37,7 @@ from src.notification_contracts import (
     is_feishu_static_configured,
 )
 from src.services.stock_list_parser import split_stock_list
+from src.utils.sanitize import log_safe_exception
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,
     GENERATION_ONLY_BACKEND_IDS,
@@ -161,6 +162,7 @@ def parse_prompt_cache_diagnostics_level(value: Optional[str]) -> str:
 
 AGENT_MAX_STEPS_DEFAULT = 10
 FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT = 8.0
+PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT = 7
 NEWS_STRATEGY_WINDOWS: Dict[str, int] = {
     "ultra_short": 1,
     "short": 3,
@@ -718,7 +720,13 @@ def setup_env(override: bool = False):
     try:
         raw_env_values = dotenv_values(env_path, interpolate=False)
     except Exception as exc:  # pragma: no cover - defensive branch
-        logger.warning("Failed to read raw .env values from %s: %s", env_path, exc)
+        log_safe_exception(
+            logger,
+            "Raw environment file read failed",
+            exc,
+            error_code="raw_environment_file_read_failed",
+            level=logging.WARNING,
+        )
         return
 
     key = "CUSTOM_WEBHOOK_BODY_TEMPLATE"
@@ -1106,7 +1114,8 @@ class Config:
     # 基本面缓存最大条目数（避免长时间运行内存增长）
     fundamental_cache_max_entries: int = 256
 
-    # === Portfolio PR2: import/risk/fx settings ===
+    # === Portfolio import, risk, FX, and idempotency settings ===
+    portfolio_idempotency_replay_window_days: int = PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT
     portfolio_risk_concentration_alert_pct: float = 35.0
     portfolio_risk_drawdown_alert_pct: float = 15.0
     portfolio_risk_stop_loss_alert_pct: float = 10.0
@@ -2132,6 +2141,13 @@ class Config:
                 field_name='FUNDAMENTAL_CACHE_MAX_ENTRIES',
                 minimum=1,
             ),
+            portfolio_idempotency_replay_window_days=parse_env_int(
+                os.getenv('PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS'),
+                PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+                field_name='PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS',
+                minimum=1,
+                maximum=3650,
+            ),
             portfolio_risk_concentration_alert_pct=parse_env_float(
                 os.getenv('PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT'),
                 35.0,
@@ -2196,8 +2212,14 @@ class Config:
         try:
             with open(path, encoding='utf-8') as f:
                 yaml_config = yaml.safe_load(f) or {}
-        except Exception as e:
-            _logger.warning(f"Failed to parse LITELLM_CONFIG: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                _logger,
+                "LiteLLM configuration parsing failed",
+                exc,
+                error_code="litellm_config_parse_failed",
+                level=logging.WARNING,
+            )
             return []
 
         model_list = yaml_config.get('model_list', [])
@@ -2573,11 +2595,13 @@ class Config:
         try:
             env_values = dotenv_values(env_path)
         except Exception as exc:  # pragma: no cover - defensive branch
-            logging.getLogger(__name__).warning(
-                "Failed to read %s while resolving %s: %s",
-                env_path,
-                key,
+            log_safe_exception(
+                logging.getLogger(__name__),
+                "Environment file read failed",
                 exc,
+                error_code="environment_file_read_failed",
+                level=logging.WARNING,
+                context={"config_key": key},
             )
             return None
 

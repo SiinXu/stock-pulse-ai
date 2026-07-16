@@ -34,11 +34,27 @@ function chooseOption(trigger: HTMLElement, value: string) {
 
 const CATALOG = [
   { id: 'aihubmix', label: 'AIHubmix', protocol: 'openai', defaultBaseUrl: 'https://aihubmix.com/v1', capabilities: ['openai-compatible'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+  { id: 'openai', label: 'OpenAI 官方', protocol: 'openai', defaultBaseUrl: 'https://api.openai.com/v1', capabilities: ['official-api'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
   { id: 'deepseek', label: 'DeepSeek 官方', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: ['official-api'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
   { id: 'gemini', label: 'Gemini 官方', protocol: 'gemini', defaultBaseUrl: '', capabilities: ['official-api', 'vision'], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: false, isLocal: false, isCustom: false },
   { id: 'ollama', label: 'Ollama（本地）', protocol: 'ollama', defaultBaseUrl: 'http://127.0.0.1:11434', capabilities: ['local-runtime'], requiresApiKey: false, requiresBaseUrl: false, supportsDiscovery: true, isLocal: true, isCustom: false },
   { id: 'custom', label: '自定义兼容服务', protocol: 'openai', defaultBaseUrl: '', capabilities: [], requiresApiKey: true, requiresBaseUrl: true, supportsDiscovery: true, isLocal: false, isCustom: true },
 ];
+
+const ENGLISH_PROVIDER_LABELS: Record<string, string> = {
+  aihubmix: 'AIHubmix (Aggregator)',
+  openai: 'OpenAI Official',
+  deepseek: 'DeepSeek Official',
+  gemini: 'Gemini Official',
+  ollama: 'Ollama (Local)',
+  custom: 'Custom compatible service',
+};
+
+const BILINGUAL_CATALOG = CATALOG.map((entry) => ({
+  ...entry,
+  labelZh: entry.label,
+  labelEn: ENGLISH_PROVIDER_LABELS[entry.id],
+}));
 
 const okComplete = () => vi.fn().mockResolvedValue({ success: true });
 
@@ -56,6 +72,404 @@ function addWizardModels(models: string[]): void {
 describe('FirstRunWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('renders built-in Provider labels in the requested English UI language', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Cloud API/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const options = within(openListbox(screen.getByLabelText('Provider'))).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual(expect.arrayContaining([
+      expect.stringContaining('DeepSeek Official'),
+      expect.stringContaining('OpenAI Official'),
+      expect.stringContaining('Gemini Official'),
+      expect.stringContaining('Ollama (Local)'),
+      expect.stringContaining('Custom compatible service'),
+    ]));
+    expect(options.map((option) => option.textContent).join(' ')).not.toMatch(/[\u3400-\u9fff]/u);
+  });
+
+  it('uses the schema API-key requirement when Catalog says the key is required', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        connectionFields={[{
+          key: 'api_key',
+          dataType: 'string',
+          isSensitive: true,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByLabelText('API 密钥（可选）')).toHaveValue('');
+    expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
+  });
+
+  it('does not read legacy Catalog requirement flags when the schema is present', () => {
+    const legacyRequirementRead = vi.fn(() => true);
+    const catalogProvider = { ...CATALOG.find((entry) => entry.id === 'openai')! };
+    Object.defineProperties(catalogProvider, {
+      requiresApiKey: { configurable: true, get: legacyRequirementRead },
+      requiresBaseUrl: { configurable: true, get: legacyRequirementRead },
+    });
+
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[catalogProvider]}
+        connectionFields={[{
+          key: 'api_key',
+          dataType: 'string',
+          isSensitive: true,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByLabelText('API 密钥（可选）')).toBeInTheDocument();
+    expect(legacyRequirementRead).not.toHaveBeenCalled();
+  });
+
+  it('treats an explicitly empty schema as present instead of using legacy Catalog requirements', () => {
+    const legacyRequirementRead = vi.fn(() => true);
+    const catalogProvider = { ...CATALOG.find((entry) => entry.id === 'openai')! };
+    Object.defineProperties(catalogProvider, {
+      requiresApiKey: { configurable: true, get: legacyRequirementRead },
+      requiresBaseUrl: { configurable: true, get: legacyRequirementRead },
+    });
+
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[catalogProvider]}
+        connectionFields={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.queryByLabelText(/API 密钥/)).not.toBeInTheDocument();
+    expect(legacyRequirementRead).not.toHaveBeenCalled();
+  });
+
+  it('uses the schema API-key requirement when Catalog says the key is optional', () => {
+    const catalogProvider = {
+      ...CATALOG.find((entry) => entry.id === 'openai')!,
+      requiresApiKey: false,
+    };
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[catalogProvider]}
+        connectionFields={[{
+          key: 'api_key',
+          dataType: 'string',
+          isSensitive: true,
+          isRequired: true,
+          contract: { requirement: 'required' },
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByLabelText('API 密钥')).toHaveValue('');
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'schema-key' } });
+    expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
+  });
+
+  it('keeps an unknown-condition field visible and read-only while blocking progress', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            visibleWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'openai' }],
+          },
+        }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByLabelText('服务地址')).toBeDisabled();
+    expect(screen.getByText('连接字段契约包含不支持的条件，无法继续。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
+  });
+
+  it('applies schema enabled state to every Provider and model writer', () => {
+    const disabledForThisProvider = [{
+      key: 'provider_id',
+      operator: 'equals' as const,
+      value: 'other',
+    }];
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        connectionFields={[
+          {
+            key: 'provider_id',
+            dataType: 'string',
+            isSensitive: false,
+            isRequired: false,
+            contract: { requirement: 'optional', enabledWhen: disabledForThisProvider },
+          },
+          {
+            key: 'api_key',
+            dataType: 'string',
+            isSensitive: true,
+            isRequired: false,
+            contract: { requirement: 'optional' },
+          },
+          {
+            key: 'models',
+            dataType: 'array',
+            isSensitive: false,
+            isRequired: false,
+            contract: { requirement: 'optional', enabledWhen: disabledForThisProvider },
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    expect(screen.getByLabelText('服务商')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByRole('button', { name: '自动发现模型' })).toBeDisabled();
+    expect(screen.getByLabelText('添加模型')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '添加' })).toBeDisabled();
+  });
+
+  it('does not render model writers when the schema hides the models field', () => {
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        connectionFields={[
+          {
+            key: 'api_key',
+            dataType: 'string',
+            isSensitive: true,
+            isRequired: false,
+            contract: { requirement: 'optional' },
+          },
+          {
+            key: 'models',
+            dataType: 'array',
+            isSensitive: false,
+            isRequired: false,
+            contract: {
+              requirement: 'optional',
+              visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'other' }],
+            },
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.queryByRole('button', { name: '自动发现模型' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('添加模型')).not.toBeInTheDocument();
+  });
+
+  it('does not create a Connection when an explicitly empty schema authorizes no field writes', () => {
+    const onComplete = okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        connectionFields={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+
+    expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('persists the exact suggested identity and only the schema-writable credential sibling', async () => {
+    const onComplete = okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        existingChannelNames={['openai']}
+        connectionFields={[
+          { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'api_keys', dataType: 'array', isSensitive: true, isRequired: true, contract: { requirement: 'required', requiresConnectionTest: true } },
+          { key: 'models', dataType: 'array', isSensitive: false, isRequired: true, contract: { requirement: 'required', requiresConnectionTest: true } },
+          { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'single-schema-key' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存并应用' }));
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    const items: Array<{ key: string; value: string }> = onComplete.mock.calls[0][0];
+    const byKey = new Map(items.map((item) => [item.key, item.value]));
+    expect(byKey.get('LLM_CHANNELS')).toBe('openai,openai2');
+    expect(byKey.get('LLM_OPENAI2_DISPLAY_NAME')).toBe('OpenAI 官方');
+    expect(byKey.get('LLM_OPENAI2_API_KEYS')).toBe('single-schema-key');
+    expect(byKey.has('LLM_OPENAI2_API_KEY')).toBe(false);
+    expect(byKey.get('LITELLM_MODEL')).toBe('modelref:v1:openai2:openai%2Fgpt-4o-mini');
+  });
+
+  it('does not let a Provider selection rewrite schema-read-only transport fields', () => {
+    const readOnly = [{ key: 'provider_id', operator: 'equals' as const, value: 'never' }];
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        connectionFields={[
+          { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
+          { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    const protocolBefore = (screen.getByLabelText('协议') as HTMLButtonElement).textContent;
+    const baseUrlBefore = (screen.getByLabelText('服务地址') as HTMLInputElement).value;
+    chooseOption(screen.getByLabelText('服务商'), 'deepseek');
+
+    expect(screen.getByLabelText('协议')).toHaveTextContent(protocolBefore ?? '');
+    expect(screen.getByLabelText('服务地址')).toHaveValue(baseUrlBefore);
+  });
+
+  it('evaluates transport writers against the proposed Provider state', () => {
+    const writableForDeepSeek = [{ key: 'provider_id', operator: 'equals' as const, value: 'deepseek' }];
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={CATALOG}
+        connectionFields={[
+          { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: writableForDeepSeek } },
+          { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: writableForDeepSeek } },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    chooseOption(screen.getByLabelText('服务商'), 'deepseek');
+
+    expect(screen.getByLabelText('协议')).toHaveTextContent('deepseek');
+    expect(screen.getByLabelText('服务地址')).toHaveValue('https://api.deepseek.com');
+  });
+
+  it('uses the suggested duplicate identity for discovery and connection tests', async () => {
+    discoverLLMChannelModels.mockResolvedValue({ success: true, models: ['gpt-4o-mini'] });
+    testLLMChannel.mockResolvedValue({ success: true });
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+        existingChannelNames={['openai']}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.change(screen.getByLabelText('API 密钥'), { target: { value: 'sk-test' } });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '自动发现模型' }));
+    await waitFor(() => expect(discoverLLMChannelModels).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'openai2' }),
+    ));
+    addWizardModels(['gpt-4o-mini']);
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
+    await waitFor(() => expect(testLLMChannel).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'openai2' }),
+    ));
   });
 
   it('emits a backend-valid channel config: canonical route, channels mode, merged channels', async () => {

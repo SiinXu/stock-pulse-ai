@@ -18,6 +18,7 @@ import pandas as pd
 
 from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.stock_code_utils import is_code_like, normalize_code
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -163,16 +164,22 @@ def parse_import_from_bytes(data: bytes, filename: Optional[str] = None) -> List
                 df.columns = df.iloc[0]
                 df = df.iloc[1:].reset_index(drop=True)
             return _parse_dataframe(df)
-        except Exception as e:
+        except Exception as exc:
             # If bytes strongly indicate xlsx container, treat as real Excel parse failure.
             if looks_like_zip:
                 hint = (
                     "请确认：(1) 文件为 .xlsx 格式；(2) 工作表不为空；(3) 文件未损坏。"
                     "若为 .xls 格式，请另存为 .xlsx 后重试。"
                 )
-                raise ValueError(f"Excel 解析失败: {e}。{hint}") from e
+                raise ValueError(f"Excel 解析失败。{hint}") from exc
             # For extension-only mismatch (e.g. csv named .xlsx), fallback to text parsing.
-            logger.warning(f"扩展名为 .xlsx 但未解析为 Excel，将回退文本解析: {e}")
+            log_safe_exception(
+                logger,
+                "XLSX extension parse failed; falling back to text",
+                exc,
+                error_code="xlsx_extension_parse_fallback",
+                level=logging.WARNING,
+            )
 
     # .xls not supported
     if ext == ".xls":

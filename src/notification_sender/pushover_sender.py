@@ -11,6 +11,7 @@ from datetime import datetime
 import requests
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import markdown_to_plain_text
 
 
@@ -150,8 +151,13 @@ class PushoverSender:
                 logger.debug(f"响应内容: {response.text}")
                 return False
                 
-        except Exception as e:
-            logger.error(f"发送 Pushover 消息失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Pushover message delivery failed",
+                exc,
+                error_code="pushover_delivery_failed",
+            )
             return False
     
     def _send_pushover_chunked(

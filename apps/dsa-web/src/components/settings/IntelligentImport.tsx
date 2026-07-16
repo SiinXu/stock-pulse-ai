@@ -305,7 +305,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
         onDrop={onDrop}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-        className={`flex min-h-[96px] flex-col gap-4 rounded-xl border border-dashed  p-4 transition-colors ${
+        className={`flex min-h-24 flex-col gap-4 rounded-xl border border-dashed  p-4 transition-colors ${
           isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
         } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
       >
@@ -346,7 +346,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
         <div className="flex flex-col gap-2 sm:flex-row">
           <textarea
             placeholder={t('settings.intelligentImportPastePlaceholder')}
-            className="settings-surface-strong settings-border-strong min-h-[72px] w-full rounded-lg border px-3 py-2 text-xs text-foreground shadow-none transition-colors placeholder:text-muted-text focus:outline-none focus:border-muted-text"
+            className="settings-surface-strong settings-border-strong min-h-18 w-full rounded-lg border px-3 py-2 text-xs text-foreground shadow-none transition-colors placeholder:text-muted-text focus:outline-none focus:border-muted-text"
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             disabled={disabled || isLoading}
@@ -395,7 +395,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
               </button>
             </div>
           </div>
-          <div className="max-h-[220px] space-y-1 overflow-y-auto rounded-xl border settings-border-strong settings-surface-overlay-soft p-2">
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border settings-border-strong settings-surface-overlay-soft p-2">
             {items.map((it) => {
               const confidence = normalizeConfidence(it.confidence);
               const confidenceMeta = getConfidenceMeta(confidence, language);

@@ -27,6 +27,7 @@ from src.formatters import (
     chunk_content_by_max_bytes,
     format_feishu_markdown,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -211,8 +212,14 @@ class FeishuSender:
                     .build()
                 )
                 logger.info("飞书 App Bot 客户端初始化成功 (domain=%s)", self._feishu_domain)
-            except Exception as e:
-                logger.error("飞书 App Bot 客户端初始化失败: %s", e)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Feishu App Bot client initialization failed",
+                    exc,
+                    error_code="feishu_app_bot_client_init_failed",
+                    context={"domain": self._feishu_domain},
+                )
                 self._app_client = None
             return self._app_client
 
@@ -247,8 +254,13 @@ class FeishuSender:
             chunks = chunk_content_by_max_bytes(
                 content, self._feishu_max_bytes, add_page_marker=True
             )
-        except (ValueError, TypeError, Exception) as e:
-            logger.error("App Bot 分片失败: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu App Bot message chunking failed",
+                exc,
+                error_code="feishu_app_bot_chunking_failed",
+            )
             return False
 
         success = True
@@ -302,8 +314,13 @@ class FeishuSender:
                 )
                 .build()
             )
-        except Exception as e:
-            logger.error("App Bot 请求构建失败: %s: %s", type(e).__name__, e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu App Bot request construction failed",
+                exc,
+                error_code="feishu_app_bot_request_build_failed",
+            )
             return False
 
         last_status: Optional[str] = None
@@ -311,10 +328,17 @@ class FeishuSender:
         for attempt in range(_APP_SEND_RETRIES):
             try:
                 resp = client.im.v1.message.create(req)
-            except Exception as e:
-                logger.warning(
-                    "App Bot 发送异常 (attempt=%d/%d): %s: %s",
-                    attempt + 1, _APP_SEND_RETRIES, type(e).__name__, e,
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Feishu App Bot delivery attempt failed",
+                    exc,
+                    error_code="feishu_app_bot_delivery_attempt_failed",
+                    level=logging.WARNING,
+                    context={
+                        "attempt": attempt + 1,
+                        "max_attempts": _APP_SEND_RETRIES,
+                    },
                 )
                 if attempt < _APP_SEND_RETRIES - 1:
                     time.sleep(
@@ -446,8 +470,14 @@ class FeishuSender:
                     .build()
                 )
                 resp = client.im.v1.file.create(req)
-        except Exception as e:
-            logger.error("App Bot 文件上传异常: %s: %s", type(e).__name__, e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu App Bot file upload failed",
+                exc,
+                error_code="feishu_app_bot_file_upload_failed",
+                context={"file_type": file_type},
+            )
             return False
 
         if not resp.success():
@@ -483,8 +513,14 @@ class FeishuSender:
         """Send file *content* as a Feishu message (webhook fallback)."""
         try:
             text = path.read_text("utf-8")
-        except (OSError, UnicodeDecodeError) as e:
-            logger.error("读取文件内容失败 (webhook fallback): %s: %s", type(e).__name__, e)
+        except (OSError, UnicodeDecodeError) as exc:
+            log_safe_exception(
+                logger,
+                "Feishu webhook fallback file read failed",
+                exc,
+                error_code="feishu_webhook_fallback_file_read_failed",
+                context={"file_suffix": path.suffix.lower() or "none"},
+            )
             return False
 
         file_label = self._guess_mime_for_webhook(path)
@@ -524,15 +560,25 @@ class FeishuSender:
 
         try:
             return self._send_feishu_message(formatted_content, timeout_seconds=timeout_seconds)
-        except Exception as e:
-            logger.error("发送飞书消息失败: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu webhook message delivery failed",
+                exc,
+                error_code="feishu_webhook_delivery_failed",
+            )
             return False
 
     def _send_feishu_chunked(self, content: str, max_bytes: int) -> bool:
         try:
             chunks = chunk_content_by_max_bytes(content, max_bytes, add_page_marker=True)
-        except ValueError as e:
-            logger.error("飞书消息分片失败，单片预算不足以安全分页（关键词过长或 max_bytes 过小）: %s", e)
+        except ValueError as exc:
+            log_safe_exception(
+                logger,
+                "Feishu webhook message chunking failed",
+                exc,
+                error_code="feishu_webhook_chunking_failed",
+            )
             return False
 
         total_chunks = len(chunks)
@@ -545,8 +591,14 @@ class FeishuSender:
                     logger.info("飞书第 %d/%d 批发送成功", i + 1, total_chunks)
                 else:
                     logger.error("飞书第 %d/%d 批发送失败", i + 1, total_chunks)
-            except Exception as e:
-                logger.error("飞书第 %d/%d 批发送异常: %s", i + 1, total_chunks, e)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Feishu webhook message chunk delivery failed",
+                    exc,
+                    error_code="feishu_webhook_chunk_delivery_failed",
+                    context={"chunk_index": i + 1, "chunk_count": total_chunks},
+                )
             if i < total_chunks - 1:
                 time.sleep(1)
         return success_count == total_chunks
@@ -567,9 +619,14 @@ class FeishuSender:
                     verify=self._webhook_verify_ssl,
                 )
             except (requests.exceptions.ConnectionError,
-                     requests.exceptions.Timeout,
-                     requests.exceptions.RequestException) as e:
-                logger.error("飞书 Webhook 网络请求异常: %s", e)
+                    requests.exceptions.Timeout,
+                    requests.exceptions.RequestException) as exc:
+                log_safe_exception(
+                    logger,
+                    "Feishu webhook network request failed",
+                    exc,
+                    error_code="feishu_webhook_network_request_failed",
+                )
                 return False
             if response.status_code == 200:
                 try:

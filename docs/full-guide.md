@@ -413,6 +413,7 @@ stock-pulse-ai/
 | `FUNDAMENTAL_RETRY_MAX` | 基本面能力重试次数（含首次） | `1` | 可选 |
 | `FUNDAMENTAL_CACHE_TTL_SECONDS` | 基本面聚合缓存 TTL（秒），短缓存减轻重复拉取 | `120` | 可选 |
 | `FUNDAMENTAL_CACHE_MAX_ENTRIES` | 基本面缓存最大条目数（TTL 内按时间淘汰） | `256` | 可选 |
+| `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` | Portfolio 写操作的幂等回放窗口（天），取值 `1-3650`；窗口外记录在后续带幂等 key 的成功写入中惰性清理 | `7` | 可选 |
 
 > 行为说明：
 > - A 股：按 `valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards` 聚合能力返回；
@@ -1513,6 +1514,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 
 - 📝 **配置管理** - 查看/修改自选股列表
 - 🗂️ **首页三视图** - 首页新增「历史 / 自选 / 今日」工作区，默认进入历史视图；自选页支持批量提交全部或仅提交“今日未分析”股票
+- 🔗 **首页可恢复链接** - 历史报告使用 `?recordId=<正整数>`；task 运行流使用 `?runFlow=task&runFlowTaskId=<task_id>`；history 运行流使用 `?runFlow=history&runFlowRecordId=<正整数>`。点击使用浏览器 history push，关闭运行流只移除运行流参数并保留报告和其它 query；刷新、分享、Back/Forward 会从 URL 恢复。非法、无权限或已删除对象会显示本地化错误并用 replace 清理失效参数。
 - 🧭 **界面语言切换** - 登录态与退出态均支持界面语言快速切换（`zh` / `en`），独立于 `REPORT_LANGUAGE`，用于静态 UI 文案与导航骨架
 - 🚀 **快速分析** - 通过 API 接口触发个股分析；首页也提供“大盘复盘”按钮，可在 Docker/server 模式下后台触发大盘复盘
 - 🎯 **策略选择** - 首页支持显式选择分析策略 skill；不传 `skills` 时按系统默认策略运行，便于保持与历史行为兼容
@@ -1789,7 +1791,11 @@ worker 会把 `triggered`、`skipped`、`degraded`、`failed` 写入 `alert_trig
 ### 使用行为说明
 
 - CSV 导入内建 `huatai`、`citic`、`cmb` 解析器；若券商列表接口失败，Web 端会自动回退到这些内建选项。
-- 交易、现金流水、公司行动和 CSV 提交均支持客户端 `operation_id`（也可使用同值的 `Idempotency-Key` 请求头）。同一 operation ID 和相同请求会回放首次响应；即使首次响应在提交后超时，重试也不会重复入账。同一 ID 对应不同请求时返回 `409 idempotency_conflict`。
+- 交易、现金流水、公司行动和 CSV 提交均支持客户端 `operation_id`（也可使用同值的 `Idempotency-Key` 请求头）。幂等身份由操作类型、账户、账户 owner 和客户端 key 共同确定；不同操作类型、账户或 owner 可以安全复用相同 key。
+- 默认 7 天回放窗口内，同一幂等身份和相同请求会回放首次响应；即使首次响应在提交后超时，重试也不会重复入账。同一身份对应不同请求时返回 `409 idempotency_conflict`。窗口可通过 `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` 调整。
+- 窗口外的幂等记录会在后续带 key 的 Portfolio 写事务中惰性清理，过期 key 按新操作处理。清理与查重、账本写入处于同一原子事务，只删除 `portfolio_idempotency_records`，不会删除交易、现金流水、公司行动、持仓快照或其它业务账本数据。
+- 旧 SQLite 表会以 additive migration 追加 nullable scope 列、唯一索引和 legacy 写入保护 trigger。raw-key 旧行无法证明写入时的历史 owner，因此会保留但保持 unscoped，当前版本不会回放这些旧行；相同客户端 key 将按新的 scoped 操作处理。
+- 回滚使用正常代码 revert，并保留新增 nullable 列、索引、保护 trigger 与全部账本数据。旧版本无法读取 v2 scoped 响应；若它尝试用已存在的 v2 client key 写入 raw-key 记录，trigger 会中止同一事务并回滚账本写入，避免重复入账，但该请求表现为失败而不是 replay。回滚期间产生的其它 raw-key 行在再次升级时仍保持 unscoped，不会与 v2 唯一索引冲突或阻断启动。
 - CSV 导入会先把文件解析成标准化记录，再在单个持仓账本事务内提交整批记录；每行使用独立 savepoint 保留 `inserted_count` / `duplicate_count` / `failed_count` 汇总，整批结果与 operation ID 记录一起提交。账本锁竞争会返回 `409 portfolio_busy`，客户端应使用原 operation ID 重试。
 - 删除账户使用软删除语义：默认账户列表、快照、风险、录入入口和事件列表不再显示该账户，但交易、现金流水和公司行动不会被物理清理；如需纠正单条流水，需在账户归档前使用事件列表里的删除修正入口。
 - 交易去重优先使用账户内唯一的 `trade_uid`，缺失时回退到基于日期、代码、方向、数量、价格、费用、税费、币种的确定性哈希。

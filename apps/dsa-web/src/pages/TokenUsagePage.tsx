@@ -74,7 +74,7 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
           <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>
           <p className="mt-1 text-xs text-secondary-text">{t('usage.calls', { count: formatNumber(model.calls, language) })}</p>
         </div>
-        <span className="rounded-full border border-cyan/20 bg-cyan/10 px-2 py-1 text-xs text-cyan">
+        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-xs text-primary">
           {formatNumber(model.totalTokens, language)} {t('usage.tokenUnit')}
         </span>
       </div>
@@ -157,9 +157,9 @@ const TokenUsagePage: React.FC = () => {
                     type="button"
                     onClick={() => setPeriod(option)}
                     className={cn(
-                      'min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                      'min-h-11 min-w-11 rounded-full px-3 py-1.5 text-sm transition-colors',
                       period === option
-                        ? 'bg-cyan text-background shadow-soft-card'
+                        ? 'bg-primary text-background shadow-soft-card'
                         : 'text-secondary-text hover:bg-hover hover:text-foreground'
                     )}
                   >
@@ -226,7 +226,7 @@ const TokenUsagePage: React.FC = () => {
                           </div>
                           <div className="mt-2 h-2 overflow-hidden rounded-full bg-border/70">
                             <div
-                              className="h-full rounded-full bg-cyan"
+                              className="h-full rounded-full bg-primary"
                               style={{ width: `${Math.max(4, (item.totalTokens / largestCallTypeTotal) * 100)}%` }}
                             />
                           </div>

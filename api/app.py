@@ -32,6 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,14 @@ def _check_frontend_assets_consistency(static_dir: Path) -> List[str]:
     try:
         html = index_html.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
-        logger.warning("Failed to read %s for asset check: %s", index_html, exc)
+        log_safe_exception(
+            logger,
+            "Frontend asset consistency check failed",
+            exc,
+            error_code="frontend_index_read_failed",
+            level=logging.WARNING,
+            context={"asset": "frontend_index"},
+        )
         return []
 
     missing: List[str] = []
@@ -195,7 +203,14 @@ async def _refresh_stock_index_cache_in_background(reason: str) -> None:
     except asyncio.CancelledError:
         raise
     except Exception as exc:  # noqa: BLE001 - index refresh must stay best-effort.
-        logger.warning("[stock-index] background refresh failed (%s): %s", reason, exc)
+        log_safe_exception(
+            logger,
+            "Stock index background refresh failed",
+            exc,
+            error_code="stock_index_background_refresh_failed",
+            level=logging.WARNING,
+            context={"reason": reason},
+        )
 
 
 def _schedule_stock_index_background_refresh(app: FastAPI, reason: str) -> None:

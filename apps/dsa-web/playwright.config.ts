@@ -65,13 +65,22 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: 'list',
+  reporter: [
+    ['list'],
+    ['json', { outputFile: path.join(resultDir, 'playwright-results.json') }],
+  ],
   use: {
     baseURL: `http://127.0.0.1:${frontendPort}`,
     locale: 'zh-CN',
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    trace: {
+      mode: 'retain-on-failure',
+      screenshots: false,
+      snapshots: true,
+      sources: true,
+      attachments: false,
+    },
+    screenshot: 'off',
+    video: 'off',
   },
   webServer: [
     {

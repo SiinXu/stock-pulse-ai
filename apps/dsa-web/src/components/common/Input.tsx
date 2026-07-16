@@ -88,10 +88,10 @@ export const Input = ({
     <button
       type="button"
       className={cn(
-        'inline-flex h-11 w-11 items-center justify-center rounded-lg border transition-all duration-200 focus:outline-none focus:ring-2',
+        'inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2',
         isLoginAppearance
           ? visible
-            ? 'border-[var(--login-input-toggle-active-border)] bg-[var(--login-input-toggle-active-bg)] text-[var(--login-input-toggle-active-text)] shadow-[0_0_14px_var(--login-accent-glow)] focus:ring-[var(--login-input-toggle-ring)]'
+            ? 'border-[var(--login-input-toggle-active-border)] bg-[var(--login-input-toggle-active-bg)] text-[var(--login-input-toggle-active-text)] shadow-soft-card focus:ring-[var(--login-input-toggle-ring)]'
             : 'border-[var(--login-input-toggle-border)] bg-[var(--login-input-toggle-bg)] text-[var(--login-input-toggle-text)] hover:border-[var(--login-input-toggle-border-hover)] hover:bg-[var(--login-input-toggle-bg-hover)] hover:text-[var(--login-input-toggle-text-hover)] focus:ring-[var(--login-input-toggle-ring)]'
           : visible
             ? 'border-transparent bg-transparent text-warning'
@@ -139,7 +139,7 @@ export const Input = ({
           data-appearance={appearance}
           className={cn(
             isLoginAppearance
-              ? 'input-surface input-focus-glow input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
+              ? 'input-surface input-focus-ring input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
               : 'h-11 w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text',
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',

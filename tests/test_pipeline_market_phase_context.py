@@ -430,10 +430,11 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         self.assertIsNotNone(result)
         analyze_kwargs = pipeline.analyzer.analyze.call_args.kwargs
         self.assertEqual(analyze_kwargs["analysis_context_pack_summary"], "")
-        self.assertIn(
-            "AnalysisContextPack output generation failed for 600519 query_id=q-runtime",
-            "\n".join(logs.output),
-        )
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("Analysis context pack output generation failed", rendered_logs)
+        self.assertIn("error_code=pipeline_analysis_context_pack_failed", rendered_logs)
+        self.assertIn("stock_code=600519", rendered_logs)
+        self.assertIn("query_id=q-runtime", rendered_logs)
         save_kwargs = pipeline.db.save_analysis_history.call_args.kwargs
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")
         self.assertNotIn("analysis_context_pack_overview", save_kwargs["context_snapshot"])
@@ -662,10 +663,11 @@ class PipelineMarketPhaseContextTestCase(unittest.TestCase):
         self.assertIsNotNone(result)
         run_context = executor.run.call_args.kwargs["context"]
         self.assertNotIn("analysis_context_pack_summary", run_context)
-        self.assertIn(
-            "AnalysisContextPack output generation failed for 600519 query_id=q-agent",
-            "\n".join(logs.output),
-        )
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("Analysis context pack output generation failed", rendered_logs)
+        self.assertIn("error_code=pipeline_analysis_context_pack_failed", rendered_logs)
+        self.assertIn("stock_code=600519", rendered_logs)
+        self.assertIn("query_id=q-agent", rendered_logs)
         save_kwargs = pipeline.db.save_analysis_history.call_args.kwargs
         self.assertEqual(save_kwargs["context_snapshot"]["market_phase_summary"]["phase"], "intraday")
         self.assertNotIn("analysis_context_pack_overview", save_kwargs["context_snapshot"])

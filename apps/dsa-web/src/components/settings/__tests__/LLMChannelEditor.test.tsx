@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LlmProviderCatalogEntry } from '../../../types/systemConfig';
+import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { LLMChannelEditor } from '../LLMChannelEditor';
 
 function provider(
@@ -69,6 +70,26 @@ const PROVIDERS: LlmProviderCatalogEntry[] = [
     isCustom: true,
   }),
 ];
+
+const ENGLISH_PROVIDER_LABELS: Record<string, string> = {
+  openai: 'OpenAI Official',
+  deepseek: 'DeepSeek Official',
+  dashscope: 'Qwen (DashScope)',
+  ollama: 'Ollama (Local)',
+  anthropic: 'Anthropic Official',
+  custom: 'Custom compatible service',
+};
+
+const BILINGUAL_PROVIDERS = PROVIDERS.map((entry) => ({
+  ...entry,
+  labelZh: entry.label,
+  labelEn: ENGLISH_PROVIDER_LABELS[entry.id],
+}));
+
+function RuntimeLanguageSwitch() {
+  const { language, setLanguage } = useUiLanguage();
+  return <button type="button" onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}>switch-language</button>;
+}
 
 const OPENAI_ITEMS = [
   { key: 'LLM_CHANNELS', value: 'openai' },
@@ -171,6 +192,28 @@ describe('LLMChannelEditor', () => {
   beforeEach(() => {
     testLLMChannel.mockReset();
     discoverLLMChannelModels.mockReset();
+    localStorage.clear();
+  });
+
+  it('updates cards and an open Connection modal immediately when UI language changes', () => {
+    localStorage.setItem('dsa.uiLanguage', 'en');
+    render(
+      <UiLanguageProvider>
+        <RuntimeLanguageSwitch />
+        <LLMChannelEditor items={OPENAI_ITEMS} providers={BILINGUAL_PROVIDERS} maskToken="******" />
+      </UiLanguageProvider>,
+    );
+    const languageSwitch = screen.getByRole('button', { name: 'switch-language' });
+    expect(connectionCard()).toHaveTextContent('OpenAI Official');
+    fireEvent.click(within(connectionCard()).getByRole('button', { name: 'Edit' }));
+    const dialog = screen.getByRole('dialog', { name: 'Edit model service' });
+    expect(within(dialog).getByRole('button', { name: 'Choose model provider' })).toHaveTextContent('OpenAI Official');
+
+    fireEvent.click(languageSwitch);
+
+    expect(connectionCard()).toHaveTextContent('OpenAI 官方');
+    expect(within(dialog).getByRole('button', { name: '选择模型服务商' })).toHaveTextContent('OpenAI 官方');
+    expect(OPENAI_ITEMS.find((item) => item.key === 'LLM_OPENAI_PROVIDER')?.value).toBe('openai');
   });
 
   it('renders saved connections as compact cards without flat credential fields', () => {
@@ -183,6 +226,603 @@ describe('LLMChannelEditor', () => {
     expect(screen.queryByLabelText('API 密钥')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('服务地址')).not.toBeInTheDocument();
     expect(container.textContent).not.toMatch(/生成后端状态|主后端|备用后端|运行时能力检测/);
+  });
+
+  it('uses the backend Connection field contract instead of a local models requirement', async () => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_MODELS')}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'models',
+          dataType: 'array',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+    expect(connectionCard()).not.toHaveTextContent('草稿 · 未完成');
+  });
+
+  it('uses the schema API-key label when Catalog says the key is required', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'api_key',
+          dataType: 'string',
+          isSensitive: true,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByLabelText('API 密钥（可选）')).toHaveValue('secret-key');
+  });
+
+  it('does not read legacy Catalog requirements for an explicitly empty schema', () => {
+    const legacyRequirementRead = vi.fn(() => true);
+    const openai = { ...PROVIDERS.find((entry) => entry.id === 'openai')! };
+    Object.defineProperties(openai, {
+      requiresApiKey: { configurable: true, get: legacyRequirementRead },
+      requiresBaseUrl: { configurable: true, get: legacyRequirementRead },
+    });
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={[openai]}
+        connectionFields={[]}
+        maskToken="******"
+      />,
+    );
+
+    editConnection();
+    expect(legacyRequirementRead).not.toHaveBeenCalled();
+  });
+
+  it('uses schema visibility and enabled state for protocol and Base URL fields', () => {
+    const readOnlyForThisProvider = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
+    const visibleForThisProvider = [{ key: 'provider_id', operator: 'equals' as const, value: 'openai' }];
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[
+          {
+            key: 'protocol',
+            dataType: 'string',
+            isSensitive: false,
+            isRequired: false,
+            contract: {
+              requirement: 'optional',
+              visibleWhen: visibleForThisProvider,
+              enabledWhen: readOnlyForThisProvider,
+            },
+          },
+          {
+            key: 'base_url',
+            dataType: 'string',
+            isSensitive: false,
+            isRequired: false,
+            contract: {
+              requirement: 'optional',
+              visibleWhen: visibleForThisProvider,
+              enabledWhen: readOnlyForThisProvider,
+            },
+          },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByLabelText('协议')).toBeDisabled();
+    expect(within(dialog).getByLabelText('服务地址')).toBeDisabled();
+  });
+
+  it('does not expose legacy Base URL actions when the schema hides the field', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'other' }],
+          },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).queryByLabelText('服务地址')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '使用自定义服务地址' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('使用服务商官方地址')).not.toBeInTheDocument();
+  });
+
+  it('exposes the Base URL reveal only when the schema authorizes that UI context', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            visibleWhen: [{ key: 'base_url_visible', operator: 'equals', value: 'true' }],
+          },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByText('使用服务商官方地址')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '使用自定义服务地址' }));
+    expect(within(dialog).getByLabelText('服务地址')).toHaveValue('https://api.openai.com/v1');
+  });
+
+  it('does not restore a Base URL when the schema makes that field read-only', () => {
+    const customUrlItems = OPENAI_ITEMS.map((item) => (
+      item.key === 'LLM_OPENAI_BASE_URL'
+        ? { ...item, value: 'https://proxy.example.com/v1' }
+        : item
+    ));
+    render(
+      <LLMChannelEditor
+        items={customUrlItems}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            enabledWhen: [{ key: 'provider_id', operator: 'equals', value: 'other' }],
+          },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    const baseUrlInput = within(dialog).getByLabelText('服务地址');
+    const restore = within(dialog).getByRole('button', { name: '恢复官方默认地址' });
+    expect(restore).toBeDisabled();
+    fireEvent.click(restore);
+    expect(baseUrlInput).toHaveValue('https://proxy.example.com/v1');
+  });
+
+  it('does not mutate models through secondary controls when the schema is read-only', async () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'models',
+          dataType: 'array',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            enabledWhen: [{ key: 'provider_id', operator: 'equals', value: 'other' }],
+          },
+        }]}
+        maskToken="******"
+        onDraftItemsChange={onDraftItemsChange}
+      />,
+    );
+
+    const dialog = editConnection();
+    const remove = within(dialog).getByRole('button', { name: '移除模型 gpt-4o-mini' });
+    const discover = within(dialog).getByRole('button', { name: '获取模型' });
+    const manual = within(dialog).getByRole('button', { name: /手动添加模型/ });
+    expect(remove).toBeDisabled();
+    expect(discover).toBeDisabled();
+    expect(manual).toBeDisabled();
+    fireEvent.click(remove);
+    fireEvent.click(manual);
+    expect(within(dialog).queryByLabelText('手动添加模型')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('gpt-4o-mini')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => {
+      const draft = lastDraft(onDraftItemsChange);
+      expect(draft).not.toContainEqual({ key: 'LLM_OPENAI_MODELS', value: '' });
+    });
+  });
+
+  it('disables model discovery when a schema-required connection-test field is missing', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_API_KEY')}
+        providers={PROVIDERS}
+        connectionFields={[
+          {
+            key: 'api_key',
+            dataType: 'string',
+            isSensitive: true,
+            isRequired: true,
+            contract: { requirement: 'required', requiresConnectionTest: true },
+          },
+          {
+            key: 'models',
+            dataType: 'array',
+            isSensitive: false,
+            isRequired: false,
+            contract: { requirement: 'optional', requiresConnectionTest: true },
+          },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByRole('button', { name: '获取模型' })).toBeDisabled();
+  });
+
+  it('uses schema visibility and enabled state for the remaining editable fields', () => {
+    const disabledHere = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
+    const hiddenHere = [{ key: 'provider_id', operator: 'equals' as const, value: 'other' }];
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[
+          { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: disabledHere } },
+          { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: disabledHere } },
+          { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: false, contract: { requirement: 'optional', visibleWhen: hiddenHere } },
+          { key: 'extra_headers', dataType: 'json', isSensitive: true, isRequired: false, contract: { requirement: 'optional', enabledWhen: disabledHere } },
+          { key: 'models', dataType: 'array', isSensitive: false, isRequired: false, contract: { requirement: 'optional', visibleWhen: hiddenHere } },
+          { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: disabledHere } },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByRole('button', { name: '选择模型服务商' })).toBeDisabled();
+    expect(within(dialog).getByLabelText('连接名称')).toBeDisabled();
+    expect(within(dialog).queryByLabelText(/API 密钥/)).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('附加请求头（JSON）')).toBeDisabled();
+    expect(within(dialog).queryByLabelText('可用模型')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('switch', { name: '启用此连接' })).toBeDisabled();
+  });
+
+  it('blocks saving a disabled draft when its schema contains an unknown operator', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS.map((item) => (
+          item.key === 'LLM_OPENAI_ENABLED' ? { ...item, value: 'false' } : item
+        ))}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            visibleWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'openai' }],
+          },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    expect(within(dialog).getByLabelText('服务地址')).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '恢复官方默认地址' })).toBeDisabled();
+    expect(within(dialog).getByText('连接字段契约包含不支持的条件')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '保存修改' })).toBeDisabled();
+  });
+
+  it('does not let the card shortcut toggle enabled when an empty schema authorizes no writes', async () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[]}
+        maskToken="******"
+        onDraftItemsChange={onDraftItemsChange}
+      />,
+    );
+
+    const toggle = within(openConnectionMenu()).getByRole('menuitem', { name: '停用连接' });
+    expect(toggle).toBeDisabled();
+    fireEvent.click(toggle);
+
+    expect(connectionCard()).toHaveTextContent('已启用');
+    await waitFor(() => expect(lastDraft(onDraftItemsChange)).toEqual([]));
+  });
+
+  it('does not expose the add-flow Provider writer under an empty schema', () => {
+    const { rerender } = render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[]}
+        maskToken="******"
+        addSignal={0}
+      />,
+    );
+    rerender(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[]}
+        maskToken="******"
+        addSignal={1}
+      />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '添加模型服务' });
+    expect(within(dialog).queryByLabelText('选择模型服务商')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '下一步' })).toBeDisabled();
+  });
+
+  it('does not authorize a new Connection when the schema omits connection_name', () => {
+    const dialog = openAddAfterRender({
+      connectionFields: [{
+        key: 'provider_id',
+        dataType: 'string',
+        isSensitive: false,
+        isRequired: true,
+        contract: { requirement: 'required' },
+      }],
+    });
+
+    expect(within(dialog).queryByLabelText('选择模型服务商')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '下一步' })).toBeDisabled();
+  });
+
+  it('does not let a Provider change rewrite schema-read-only transport fields', () => {
+    const readOnly = [{ key: 'provider_id', operator: 'equals' as const, value: 'never' }];
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[
+          { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+          { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
+          { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
+        ]}
+        maskToken="******"
+      />,
+    );
+
+    const dialog = editConnection();
+    const protocol = within(dialog).getByLabelText('协议');
+    const baseUrl = within(dialog).getByLabelText('服务地址');
+    const protocolBefore = protocol.textContent;
+    const baseUrlBefore = (baseUrl as HTMLInputElement).value;
+    selectProvider('deepseek');
+
+    expect(protocol).toHaveTextContent(protocolBefore ?? '');
+    expect(baseUrl).toHaveValue(baseUrlBefore);
+  });
+
+  it('writes a single credential only to the schema-visible API_KEYS sibling', async () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_API_KEY')}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'api_keys',
+          dataType: 'array',
+          isSensitive: true,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+        onDraftItemsChange={onDraftItemsChange}
+      />,
+    );
+
+    const dialog = editConnection();
+    fireEvent.change(within(dialog).getByLabelText('API 密钥（可选）'), {
+      target: { value: 'single-schema-key' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => {
+      const draft = lastDraft(onDraftItemsChange);
+      expect(draft).toContainEqual({ key: 'LLM_OPENAI_API_KEYS', value: 'single-schema-key' });
+      expect(draft.some((item) => item.key === 'LLM_OPENAI_API_KEY')).toBe(false);
+    });
+  });
+
+  it('serializes only fields authorized by the final schema state', async () => {
+    const onDraftItemsChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'models',
+          dataType: 'array',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+        onDraftItemsChange={onDraftItemsChange}
+      />,
+    );
+
+    const dialog = editConnection();
+    replaceModels(['gpt-5.5']);
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => expect(lastDraft(onDraftItemsChange)).toEqual([
+      { key: 'LLM_OPENAI_MODELS', value: 'gpt-5.5' },
+    ]));
+  });
+
+  it('blocks card Test/Delete and modal Test when the schema authorizes no operations', () => {
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        connectionFields={[]}
+        maskToken="******"
+      />,
+    );
+
+    const card = connectionCard();
+    const cardTest = within(card).getByRole('button', { name: '测试' });
+    expect(cardTest).toBeDisabled();
+    const deleteAction = within(openConnectionMenu()).getByRole('menuitem', { name: '删除连接' });
+    expect(deleteAction).toBeDisabled();
+
+    const dialog = editConnection();
+    const modalTest = within(dialog).getByRole('button', { name: '测试连接' });
+    expect(modalTest).toBeDisabled();
+    fireEvent.click(cardTest);
+    fireEvent.click(deleteAction);
+    fireEvent.click(modalTest);
+    expect(testLLMChannel).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Catalog loading', { catalogLoading: true }],
+    ['Catalog failure', { catalogUnavailable: true }],
+  ])('keeps the draft invalid and actions read-only during %s', async (_label, state) => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS}
+        providers={PROVIDERS}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+        {...state}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+    expect(within(connectionCard()).getByRole('button', { name: '测试' })).toBeDisabled();
+    expect(within(connectionCard()).getByRole('button', { name: '编辑' })).toBeDisabled();
+  });
+
+  it('does not read legacy Base URL requirements when a schema is present', () => {
+    const legacyRequirementRead = vi.fn(() => false);
+    const anthropic = { ...PROVIDERS.find((entry) => entry.id === 'anthropic')! };
+    Object.defineProperty(anthropic, 'requiresBaseUrl', {
+      configurable: true,
+      get: legacyRequirementRead,
+    });
+    render(
+      <LLMChannelEditor
+        items={officialItemsWithoutBaseUrl('anthropic')}
+        providers={[anthropic]}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+      />,
+    );
+
+    editConnection('anthropic');
+    expect(legacyRequirementRead).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without evaluating legacy completeness while the Catalog schema is still loading', async () => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={OPENAI_ITEMS.filter((item) => item.key !== 'LLM_OPENAI_MODELS')}
+        providers={PROVIDERS}
+        maskToken="******"
+        catalogLoading
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+    expect(within(connectionCard()).getByRole('button', { name: '编辑' })).toBeDisabled();
+  });
+
+  it('uses the backend Connection field contract instead of a local display-name requirement', async () => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={[
+          ...OPENAI_ITEMS,
+          { key: 'LLM_OPENAI_DISPLAY_NAME', value: '' },
+        ]}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'display_name',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'optional' },
+        }]}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
+    expect(connectionCard()).not.toHaveTextContent('草稿 · 未完成');
+  });
+
+  it('preserves legacy model-based local runtime inference with the backend contract', async () => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={[
+          { key: 'LLM_CHANNELS', value: 'lab' },
+          { key: 'LLM_LAB_MODELS', value: 'ollama/llama3' },
+          { key: 'LLM_LAB_ENABLED', value: 'true' },
+        ]}
+        providers={PROVIDERS}
+        connectionFields={[{
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: {
+            requirement: 'optional',
+            requiredWhen: [
+              { key: 'enabled', operator: 'equals', value: 'true' },
+              { key: 'base_url_required', operator: 'equals', value: 'true' },
+            ],
+            visibleWhen: [{ key: 'base_url_visible', operator: 'equals', value: 'true' }],
+          },
+        }]}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
   });
 
   it('shows provider identity plus independent enabled and untested states', () => {
@@ -240,6 +880,28 @@ describe('LLMChannelEditor', () => {
     });
     expect(connectionCard('production')).toHaveTextContent('OpenAI 官方');
     expect(connectionCard('production')).toHaveTextContent('research');
+  });
+
+  it('preserves an explicitly empty display name for contract validation', async () => {
+    const onValidityChange = vi.fn();
+    render(
+      <LLMChannelEditor
+        items={[
+          ...OPENAI_ITEMS,
+          { key: 'LLM_OPENAI_DISPLAY_NAME', value: '' },
+        ]}
+        providers={PROVIDERS}
+        maskToken="******"
+        onValidityChange={onValidityChange}
+      />,
+    );
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+    const dialog = editConnection();
+    const displayNameInput = within(dialog).getByLabelText('连接名称');
+    expect(displayNameInput).toHaveValue('');
+    expect(displayNameInput).toHaveAccessibleDescription('连接名称必填');
+    expect(within(dialog).getByRole('button', { name: '保存修改' })).toBeDisabled();
   });
 
   it('reports one stable empty draft while the saved connection is unchanged', async () => {
@@ -894,6 +1556,29 @@ describe('LLMChannelEditor', () => {
     expect(within(dialog).getByRole('button', { name: '添加到配置' })).toBeEnabled();
   });
 
+  it('keeps the schema-owned API Key control visible when a Custom endpoint becomes local', () => {
+    const dialog = openAddAfterRender({
+      emptyApiKeyHosts: ['localhost', '127.0.0.1'],
+      connectionFields: [
+        { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', visibleWhen: [{ key: 'protocol_visible', operator: 'equals', value: 'true' }] } },
+        { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', visibleWhen: [{ key: 'base_url_visible', operator: 'equals', value: 'true' }] } },
+        { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: false, contract: { requirement: 'optional', requiredWhen: [{ key: 'api_key_required', operator: 'equals', value: 'true' }], visibleWhen: [{ key: 'api_key_visible', operator: 'equals', value: 'true' }] } },
+        { key: 'models', dataType: 'array', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+      ],
+    });
+    selectProvider('custom');
+    fireEvent.change(within(dialog).getByLabelText('服务地址'), {
+      target: { value: 'http://localhost:9000/v1' },
+    });
+
+    expect(within(dialog).getByLabelText('API 密钥（可选）'))
+      .toHaveAttribute('placeholder', '本地服务可留空');
+  });
+
   it('requires a key and service address for a remote custom enabled connection', () => {
     const dialog = openAddAfterRender();
     selectProvider('custom');
@@ -964,14 +1649,9 @@ describe('LLMChannelEditor', () => {
       const card = connectionCard(providerId);
       expect(card).toHaveTextContent(providerId);
       expect(card).not.toHaveTextContent('草稿 · 未完成');
-      await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(true));
-
-      const dialog = editConnection(providerId);
-      expect(within(dialog).queryByLabelText('协议')).not.toBeInTheDocument();
-      expect(within(dialog).queryByLabelText('服务地址')).not.toBeInTheDocument();
-      expect(within(dialog).queryByRole('button', { name: '获取模型' })).not.toBeInTheDocument();
-      expect(within(dialog).getByLabelText('手动添加模型')).toBeInTheDocument();
-      expect(within(dialog).getByRole('button', { name: '保存修改' })).toBeEnabled();
+      await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+      expect(within(card).getByRole('button', { name: '测试' })).toBeDisabled();
+      expect(within(card).getByRole('button', { name: '编辑' })).toBeDisabled();
     },
   );
 

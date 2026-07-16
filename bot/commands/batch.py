@@ -14,6 +14,7 @@ from typing import List
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,10 @@ class BatchCommand(BotCommand):
         if limit:
             stock_list = stock_list[:limit]
         
-        logger.info(f"[BatchCommand] 开始批量分析 {len(stock_list)} 只股票")
+        logger.info(
+            "[BatchCommand] Starting batch analysis: stock_count=%d",
+            len(stock_list),
+        )
         
         # 在后台线程中执行分析
         thread = threading.Thread(
@@ -119,8 +123,16 @@ class BatchCommand(BotCommand):
                 send_notification=True
             )
             
-            logger.info(f"[BatchCommand] 批量分析完成，成功 {len(results)} 只")
+            logger.info(
+                "[BatchCommand] Batch analysis completed: success_count=%d",
+                len(results),
+            )
             
-        except Exception as e:
-            logger.error(f"[BatchCommand] 批量分析失败: {e}")
-            logger.exception(e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[BatchCommand] Batch analysis failed",
+                exc,
+                error_code="bot_batch_analysis_failed",
+                context={"stock_count": len(stock_list)},
+            )

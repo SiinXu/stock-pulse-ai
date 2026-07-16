@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 
 from src.repositories.stock_repo import StockRepository
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +82,14 @@ class StockService:
         except ImportError:
             logger.warning("DataFetcherManager 未找到，使用占位数据")
             return self._get_placeholder_quote(stock_code)
-        except Exception as e:
-            logger.error(f"获取实时行情失败: {e}", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Realtime quote lookup failed",
+                exc,
+                error_code="realtime_quote_lookup_failed",
+                context={"stock_code": stock_code},
+            )
             return None
     
     def get_history_data(
@@ -156,8 +163,14 @@ class StockService:
         except ImportError:
             logger.warning("DataFetcherManager 未找到，返回空数据")
             return {"stock_code": stock_code, "period": period, "data": []}
-        except Exception as e:
-            logger.error(f"获取历史数据失败: {e}", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Historical stock data lookup failed",
+                exc,
+                error_code="historical_stock_data_lookup_failed",
+                context={"stock_code": stock_code, "period": period},
+            )
             return {"stock_code": stock_code, "period": period, "data": []}
     
     def _get_placeholder_quote(self, stock_code: str) -> Dict[str, Any]:

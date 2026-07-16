@@ -263,6 +263,26 @@ describe('RunFlowPanel', () => {
     expect(screen.getByRole('button', { name: '重新加载' })).toBeInTheDocument();
   });
 
+  it('reports a permanently unavailable deep-link source to its URL owner', async () => {
+    const onUnavailable = vi.fn();
+    vi.mocked(historyApi.getRecordFlow).mockRejectedValue({
+      response: {
+        status: 404,
+        data: { error: 'not_found', message: 'The run flow does not exist.' },
+      },
+    });
+
+    render(
+      <RunFlowPanel
+        source={{ type: 'history', recordId: 404 }}
+        onUnavailable={onUnavailable}
+      />,
+    );
+
+    expect(await screen.findByTestId('run-flow-panel-error')).toBeInTheDocument();
+    expect(onUnavailable).toHaveBeenCalledWith(expect.objectContaining({ status: 404 }));
+  });
+
   it('renders an empty snapshot state when there are no nodes or events', async () => {
     vi.mocked(historyApi.getRecordFlow).mockResolvedValue({
       ...snapshot,

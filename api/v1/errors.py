@@ -20,8 +20,8 @@ def error_body(
 ) -> dict[str, Any]:
     """Build the version-one error envelope.
 
-    ``detail`` remains an input-only alias while callers migrate. It is never
-    emitted: consumers have one stable ``details`` location for diagnostics.
+    ``details`` is authoritative. ``detail`` is emitted from that same value
+    as a deprecated read-only compatibility alias for legacy clients.
     """
     if details is None and detail is not None:
         details = detail
@@ -30,6 +30,7 @@ def error_body(
         "message": str(message or "Request failed"),
         "params": dict(params or {}),
         "details": details,
+        "detail": details,
         "trace_id": trace_id,
     }
 

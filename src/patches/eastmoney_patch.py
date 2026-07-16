@@ -9,6 +9,8 @@ import uuid
 import logging
 from fake_useragent import UserAgent
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 original_request = requests.Session.request
@@ -133,14 +135,26 @@ def _get_nid(user_agent):
             _cache.data = nid
             _cache.expire_at = now + _cache.ttl
             return nid
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"请求东方财富授权接口失败: {e}")
+        except requests.exceptions.RequestException as exc:
+            log_safe_exception(
+                logger,
+                "Eastmoney authorization request failed",
+                exc,
+                error_code="eastmoney_authorization_request_failed",
+                level=logging.WARNING,
+            )
             _cache.data = None
             # 该接口请求失败时，方案可能已失效，后续大概率会继续失败，因无法成功获取，下次会继续请求，设置较长过期时间，可避免频繁请求
             _cache.expire_at = now + 5 * 60
             return None
-        except (KeyError, json.JSONDecodeError) as e:
-            logger.warning(f"解析东方财富授权接口响应失败: {e}")
+        except (KeyError, json.JSONDecodeError) as exc:
+            log_safe_exception(
+                logger,
+                "Eastmoney authorization response parsing failed",
+                exc,
+                error_code="eastmoney_authorization_response_parse_failed",
+                level=logging.WARNING,
+            )
             _cache.data = None
             # 该接口请求失败时，方案可能已失效，后续大概率会继续失败，因无法成功获取，下次会继续请求，设置较长过期时间，可避免频繁请求
             _cache.expire_at = now + 5 * 60

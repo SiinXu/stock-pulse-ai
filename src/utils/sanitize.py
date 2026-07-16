@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import inspect
+import logging
 import re
-from typing import Any
+from typing import Any, Callable, Iterable, Mapping, Optional
 from urllib.parse import parse_qsl, urlsplit
 
 
@@ -59,35 +61,517 @@ _AUTHORIZATION_HEADER_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _COOKIE_HEADER_PATTERN = re.compile(
+    r"\b(cookie|set[_-]?cookie)(\s*:\s*)[^\r\n]+",
+    re.IGNORECASE,
+)
+_COOKIE_ASSIGNMENT_PATTERN = re.compile(
+    r"\b(cookie|set[_-]?cookie)(\s*=\s*)[^\s,;&]+",
+    re.IGNORECASE,
+)
+_COOKIE_SEGMENT_PATTERN = re.compile(
     r"\b(cookie|set[_-]?cookie)(\s*[:=]\s*)[^\s,;&]+",
     re.IGNORECASE,
 )
-_SECRET_ASSIGNMENT_PATTERN = re.compile(
-    r"\b(token|secret|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
+_SENSITIVE_ASSIGNMENT_KEY_PATTERN = (
+    r"token|secret|password|credential|credentials|sendkey|x[_-]?api[_-]?key|"
     r"api[_-]?key|apikey|api[_-]?token|auth[_-]?token|"
     r"access[_-]?token|refresh[_-]?token|session[_-]?token|license[_-]?key|private[_-]?key|"
-    r"secret[_-]?key|webhook[_-]?url|authorization|proxy[_-]?authorization|cookie|set[_-]?cookie)"
-    r"([=:]\s*)[^\s,;&]+",
+    r"secret[_-]?key|webhook[_-]?url|authorization|proxy[_-]?authorization|cookie|set[_-]?cookie"
+)
+_QUOTED_SECRET_ASSIGNMENT_PATTERN = re.compile(
+    rf"(?P<key_quote>['\"])(?P<key>{_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(?P=key_quote)"
+    r"(?P<separator>\s*:\s*)"
+    r"(?P<value_quote>['\"])(?P<value>(?:\\.|(?!(?P=value_quote)).)*)(?P=value_quote)",
+    re.IGNORECASE,
+)
+_QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN = re.compile(
+    rf"(?P<key_quote>['\"])(?P<key>{_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(?P=key_quote)"
+    r"(?P<separator>\s*:\s*)"
+    r"(?P<value>[^,\}\]\s'\"]+)",
+    re.IGNORECASE,
+)
+_SECRET_ASSIGNMENT_PATTERN = re.compile(
+    rf"\b({_SENSITIVE_ASSIGNMENT_KEY_PATTERN})(\s*[=:]\s*)[^\s,;&]+",
     re.IGNORECASE,
 )
 _TOKEN_LIKE_PATTERN = re.compile(
     r"\b(?:sk-[a-z0-9_\-]{16,}|xox[baprs]-[a-z0-9\-]{16,}|gh[pousr]_[a-z0-9_]{20,})\b",
     re.IGNORECASE,
 )
+_SAFE_EXCEPTION_CHAIN_LIMIT = 4
+_SAFE_EXCEPTION_PART_MAX_LENGTH = 240
+_SAFE_EXCEPTION_SUMMARY_MAX_LENGTH = 900
+_EXACT_REDACTION_VALUE_LIMIT = 64
+_SAFE_RENDER_FAILURE = "[UNRENDERABLE]"
+_UNSAFE_EXCEPTION_ACCESS = object()
 
 
-def sanitize_diagnostic_text(text: Any, *, max_length: int = 300) -> str:
+def _bounded_render_failure(max_length: Any) -> str:
+    """Return the fixed render-failure marker without trusting a custom bound."""
+
+    if type(max_length) is not int:
+        return _SAFE_RENDER_FAILURE
+    return _SAFE_RENDER_FAILURE[: max(0, max_length)]
+
+
+def _safe_string(value: Any) -> str:
+    """Render one value without consulting repr or propagating conversion failures."""
+
+    if value is None:
+        return ""
+    try:
+        return str(value)
+    except BaseException:
+        return _SAFE_RENDER_FAILURE
+
+
+def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
+    """Render built-in containers without invoking repr on nested custom objects."""
+
+    if type(value) is str:
+        return repr(value) if nested else value
+    if value is None:
+        return "None" if nested else ""
+    if type(value) in {bool, int, float, complex, bytes}:
+        return str(value)
+    if type(value) is dict:
+        try:
+            items = (
+                f"{_safe_structured_string(key, nested=True)}: "
+                f"{_safe_structured_string(item, nested=True)}"
+                for key, item in value.items()
+            )
+            return "{" + ", ".join(items) + "}"
+        except BaseException:
+            return _SAFE_RENDER_FAILURE
+    if type(value) is list:
+        try:
+            return "[" + ", ".join(
+                _safe_structured_string(item, nested=True) for item in value
+            ) + "]"
+        except BaseException:
+            return _SAFE_RENDER_FAILURE
+    if type(value) is tuple:
+        try:
+            rendered = ", ".join(
+                _safe_structured_string(item, nested=True) for item in value
+            )
+            if len(value) == 1:
+                rendered += ","
+            return f"({rendered})"
+        except BaseException:
+            return _SAFE_RENDER_FAILURE
+    if type(value) in {set, frozenset}:
+        try:
+            rendered_items = sorted(
+                _safe_structured_string(item, nested=True) for item in value
+            )
+            if type(value) is set:
+                return "set()" if not rendered_items else "{" + ", ".join(rendered_items) + "}"
+            if not rendered_items:
+                return "frozenset()"
+            return "frozenset({" + ", ".join(rendered_items) + "})"
+        except BaseException:
+            return _SAFE_RENDER_FAILURE
+
+    rendered = _safe_string(value)
+    return repr(rendered) if nested else rendered
+
+
+def _normalize_redaction_values(
+    redaction_values: Optional[Iterable[Any]],
+) -> Optional[tuple[str, ...]]:
+    """Return bounded exact-match values, or None when normalization is unsafe."""
+    if redaction_values is None:
+        return ()
+    candidates: Iterable[Any]
+    if isinstance(redaction_values, (str, bytes)):
+        candidates = (redaction_values,)
+    else:
+        candidates = redaction_values
+
+    normalized: set[str] = set()
+    try:
+        iterator = iter(candidates)
+    except TypeError:
+        iterator = iter((candidates,))
+    except BaseException:
+        return None
+    try:
+        for value in iterator:
+            if value is None:
+                continue
+            rendered = (
+                value.decode("utf-8", errors="replace")
+                if isinstance(value, bytes)
+                else str(value)
+            )
+            if rendered == _SAFE_RENDER_FAILURE:
+                continue
+            if rendered.strip():
+                normalized.add(rendered)
+                if len(normalized) > _EXACT_REDACTION_VALUE_LIMIT:
+                    return None
+    except BaseException:
+        return None
+    return tuple(sorted(normalized, key=len, reverse=True))
+
+
+def _redact_exact_values(text: str, redaction_values: tuple[str, ...]) -> str:
+    """Replace caller-provided sensitive values before pattern sanitization."""
+    redacted = text
+    for value in redaction_values:
+        redacted = redacted.replace(value, _REDACTED)
+    return redacted
+
+
+def sanitize_diagnostic_text(
+    text: Any,
+    *,
+    max_length: int = 300,
+    redaction_values: Optional[Iterable[Any]] = None,
+) -> str:
     """Redact common secrets and URLs from diagnostic text."""
-    sanitized = str(text or "").strip()
+    exact_values = _normalize_redaction_values(redaction_values)
+    if exact_values is None:
+        return _bounded_render_failure(max_length)
+    try:
+        structured_text = (
+            redact_sensitive_mapping(text)
+            if isinstance(text, (Mapping, list, tuple, set, frozenset))
+            else text
+        )
+    except BaseException:
+        return _bounded_render_failure(max_length)
+    sanitized = _safe_structured_string(structured_text).strip()
     if not sanitized:
         return ""
+    sanitized = _redact_exact_values(sanitized, exact_values)
+    sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
+    sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"
+        r"\g<value_quote>[REDACTED]\g<value_quote>",
+        sanitized,
+    )
+    sanitized = _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>[REDACTED]",
+        sanitized,
+    )
     sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
-    sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
     return " ".join(sanitized.split())[:max_length]
+
+
+def safe_exception_type_name(error: Any, *, max_length: int = 120) -> str:
+    """Return a bounded exception type label without trusting its metaclass."""
+
+    try:
+        name = type(error).__name__
+    except BaseException:
+        return _bounded_render_failure(max_length)
+    return (
+        sanitize_diagnostic_text(name, max_length=max_length)
+        or "BaseException"
+    )
+
+
+def _safe_exception_diagnostic_source(error: BaseException) -> Any:
+    """Select a diagnostic source without triggering built-in nested repr paths."""
+
+    try:
+        args = error.args
+        if type(args) is not tuple:
+            return _UNSAFE_EXCEPTION_ACCESS
+        if not args:
+            return error
+
+        string_method = inspect.getattr_static(type(error), "__str__", None)
+        render_args = (
+            len(args) > 1
+            or isinstance(args[0], (Mapping, list, tuple, set, frozenset))
+            or inspect.ismethoddescriptor(string_method)
+        )
+        if render_args:
+            return args[0] if len(args) == 1 else args
+        return error
+    except BaseException:
+        return _UNSAFE_EXCEPTION_ACCESS
+
+
+def _safe_next_exception(error: BaseException) -> Any:
+    """Read the next explicit or implicit exception without propagating access errors."""
+
+    try:
+        cause = error.__cause__
+        if cause is not None:
+            return cause if isinstance(cause, BaseException) else _UNSAFE_EXCEPTION_ACCESS
+
+        suppress_context = error.__suppress_context__
+        if type(suppress_context) is not bool:
+            return _UNSAFE_EXCEPTION_ACCESS
+        if suppress_context:
+            return None
+
+        context = error.__context__
+        if context is None or isinstance(context, BaseException):
+            return context
+        return _UNSAFE_EXCEPTION_ACCESS
+    except BaseException:
+        return _UNSAFE_EXCEPTION_ACCESS
+
+
+def sanitize_exception_chain(
+    exc: BaseException,
+    *,
+    max_length: int = _SAFE_EXCEPTION_SUMMARY_MAX_LENGTH,
+    redaction_values: Optional[Iterable[Any]] = None,
+) -> str:
+    """Return a bounded, sanitized summary of an exception and its causes."""
+    exact_values = _normalize_redaction_values(redaction_values)
+    if exact_values is None:
+        return _bounded_render_failure(max_length)
+    try:
+        parts: list[str] = []
+        current: Optional[BaseException] = exc
+        seen: set[int] = set()
+        while current is not None and len(parts) < _SAFE_EXCEPTION_CHAIN_LIMIT:
+            identity = id(current)
+            if identity in seen:
+                break
+            seen.add(identity)
+
+            diagnostic_source = _safe_exception_diagnostic_source(current)
+            if diagnostic_source is _UNSAFE_EXCEPTION_ACCESS:
+                return _bounded_render_failure(max_length)
+            diagnostic = sanitize_diagnostic_text(
+                diagnostic_source,
+                max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
+                redaction_values=exact_values,
+            ) or "no diagnostic message"
+            exception_type = safe_exception_type_name(current, max_length=80)
+            parts.append(
+                sanitize_diagnostic_text(
+                    f"{exception_type}: {diagnostic}",
+                    max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
+                    redaction_values=exact_values,
+                )
+            )
+
+            next_exception = _safe_next_exception(current)
+            if next_exception is _UNSAFE_EXCEPTION_ACCESS:
+                return _bounded_render_failure(max_length)
+            current = next_exception
+        return sanitize_diagnostic_text(
+            " <- ".join(parts),
+            max_length=max_length,
+            redaction_values=exact_values,
+        )
+    except BaseException:
+        return _bounded_render_failure(max_length)
+
+
+def exception_chain_redaction_values(error: Any) -> set[str]:
+    """Return each raw exception-chain message for fail-closed exact redaction."""
+
+    values: set[str] = set()
+    current = error
+    seen: set[int] = set()
+    while current is not None and len(seen) < _SAFE_EXCEPTION_CHAIN_LIMIT:
+        identity = id(current)
+        if identity in seen:
+            break
+        seen.add(identity)
+        try:
+            rendered = str(current)
+        except BaseException:
+            rendered = ""
+        if rendered:
+            values.add(rendered)
+        if not isinstance(current, BaseException):
+            break
+        next_exception = _safe_next_exception(current)
+        if next_exception is _UNSAFE_EXCEPTION_ACCESS:
+            break
+        current = next_exception
+    return values
+
+
+def _safe_log_context_fields(
+    context: Optional[Mapping[str, Any]],
+    *,
+    redaction_values: Optional[Iterable[Any]] = None,
+) -> list[str]:
+    """Render structured log context as sanitized key-value fields."""
+    fields: list[str] = []
+    if context is None:
+        return fields
+    try:
+        for key, value in context.items():
+            rendered_key = _safe_string(key)
+            if rendered_key == _SAFE_RENDER_FAILURE:
+                return [f"context={_SAFE_RENDER_FAILURE}"]
+            safe_key = re.sub(r"[^A-Za-z0-9_.-]", "_", rendered_key)[:80]
+            if not safe_key:
+                continue
+            safe_value = (
+                _REDACTED
+                if _is_sensitive_mapping_key_text(rendered_key)
+                else sanitize_diagnostic_text(
+                    value,
+                    max_length=180,
+                    redaction_values=redaction_values,
+                )
+            )
+            if safe_key and safe_value:
+                fields.append(f"{safe_key}={safe_value}")
+    except BaseException:
+        return [f"context={_SAFE_RENDER_FAILURE}"]
+    return fields
+
+
+def log_safe_exception(
+    target_logger: logging.Logger,
+    event: str,
+    exc: BaseException,
+    *,
+    error_code: str,
+    level: int = logging.ERROR,
+    trace_id: Optional[str] = None,
+    method: Optional[str] = None,
+    path: Optional[str] = None,
+    context: Optional[Mapping[str, Any]] = None,
+    redaction_values: Optional[Iterable[Any]] = None,
+) -> None:
+    """Log a sanitized exception summary without attaching raw exception info."""
+    exact_values = _normalize_redaction_values(redaction_values)
+    if exact_values is None:
+        message = _SAFE_RENDER_FAILURE
+    else:
+        try:
+            fields = [
+                sanitize_diagnostic_text(
+                    event,
+                    max_length=160,
+                    redaction_values=exact_values,
+                ) or "Unhandled exception",
+                "error_code="
+                f"{sanitize_diagnostic_text(error_code, max_length=120, redaction_values=exact_values) or 'unknown_error'}",
+            ]
+            for field_name, value, field_limit in (
+                ("trace_id", trace_id, 128),
+                ("method", method, 16),
+                ("path", path, 240),
+            ):
+                if value is None:
+                    continue
+                safe_value = sanitize_diagnostic_text(
+                    value,
+                    max_length=field_limit,
+                    redaction_values=exact_values,
+                )
+                if safe_value:
+                    fields.append(f"{field_name}={safe_value}")
+            fields.extend(
+                _safe_log_context_fields(context, redaction_values=exact_values)
+            )
+            summary = sanitize_exception_chain(exc, redaction_values=exact_values)
+            fields.extend(
+                (
+                    f"exception_type={safe_exception_type_name(exc)}",
+                    f"summary={summary}",
+                    f"diagnostic={summary}",
+                )
+            )
+            message = " ".join(fields)
+        except BaseException:
+            message = _SAFE_RENDER_FAILURE
+    target_logger.log(level, message)
+
+
+def safe_before_sleep_log(
+    target_logger: logging.Logger,
+    level: int = logging.WARNING,
+    *,
+    event: str,
+    error_code: str,
+    context: Optional[Mapping[str, Any]] = None,
+    redaction_values: Optional[Iterable[Any]] = None,
+) -> Callable[[Any], None]:
+    """Build a Tenacity-compatible retry callback without logging raw outcomes."""
+    context_snapshot_failed = False
+    try:
+        static_context = dict(context.items()) if context is not None else {}
+    except BaseException:
+        static_context = {}
+        context_snapshot_failed = True
+    exact_values = _normalize_redaction_values(redaction_values)
+
+    def _log_retry(retry_state: Any) -> None:
+        """Log one retry state without exposing its raw outcome."""
+        if exact_values is None:
+            target_logger.log(level, _SAFE_RENDER_FAILURE)
+            return
+        retry_context = dict(static_context)
+        if context_snapshot_failed:
+            retry_context["context"] = _SAFE_RENDER_FAILURE
+        retry_exception: Optional[BaseException] = None
+        try:
+            attempt_number = getattr(retry_state, "attempt_number", None)
+            if isinstance(attempt_number, int) and not isinstance(attempt_number, bool):
+                retry_context["attempt"] = attempt_number
+
+            next_action = getattr(retry_state, "next_action", None)
+            wait_seconds = getattr(next_action, "sleep", None)
+            if isinstance(wait_seconds, (int, float)) and not isinstance(wait_seconds, bool):
+                retry_context["retry_in_seconds"] = wait_seconds
+
+            outcome = getattr(retry_state, "outcome", None)
+            exception_getter = getattr(outcome, "exception", None)
+            if callable(exception_getter):
+                candidate = exception_getter()
+                if isinstance(candidate, BaseException):
+                    retry_exception = candidate
+        except BaseException as state_error:
+            retry_exception = state_error
+
+        if retry_exception is not None:
+            log_safe_exception(
+                target_logger,
+                event,
+                retry_exception,
+                error_code=error_code,
+                level=level,
+                context=retry_context,
+                redaction_values=exact_values,
+            )
+            return
+
+        safe_error_code = sanitize_diagnostic_text(
+            error_code,
+            max_length=120,
+            redaction_values=exact_values,
+        )
+        fields = [
+            sanitize_diagnostic_text(
+                event,
+                max_length=160,
+                redaction_values=exact_values,
+            ) or "Retry scheduled",
+            f"error_code={safe_error_code or 'retry_scheduled'}",
+            *_safe_log_context_fields(
+                retry_context,
+                redaction_values=exact_values,
+            ),
+            "exception_type=none",
+            "summary=retry scheduled without an exception outcome",
+        ]
+        target_logger.log(level, " ".join(fields))
+
+    return _log_retry
 
 
 def redact_sensitive_mapping(obj: Any) -> Any:
@@ -96,7 +580,7 @@ def redact_sensitive_mapping(obj: Any) -> Any:
     This helper intentionally does not inspect arbitrary string values. P1 only
     needs a deterministic serializer for AnalysisContextPack dictionaries.
     """
-    if isinstance(obj, dict):
+    if isinstance(obj, Mapping):
         redacted = {}
         for key, value in obj.items():
             if _is_sensitive_mapping_key(key):
@@ -106,6 +590,12 @@ def redact_sensitive_mapping(obj: Any) -> Any:
         return redacted
     if isinstance(obj, list):
         return [redact_sensitive_mapping(item) for item in obj]
+    if isinstance(obj, tuple):
+        return tuple(redact_sensitive_mapping(item) for item in obj)
+    if isinstance(obj, set):
+        return {redact_sensitive_mapping(item) for item in obj}
+    if isinstance(obj, frozenset):
+        return frozenset(redact_sensitive_mapping(item) for item in obj)
     return obj
 
 
@@ -116,8 +606,17 @@ def sanitize_sensitive_text(text: Any) -> str:
         return ""
     sanitized = _URL_PATTERN.sub(_redact_sensitive_url_match, sanitized)
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
-    sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
+    sanitized = _COOKIE_SEGMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
+    sanitized = _QUOTED_SECRET_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>"
+        r"\g<value_quote>[REDACTED]\g<value_quote>",
+        sanitized,
+    )
+    sanitized = _QUOTED_SECRET_LITERAL_ASSIGNMENT_PATTERN.sub(
+        r"\g<key_quote>\g<key>\g<key_quote>\g<separator>[REDACTED]",
+        sanitized,
+    )
     sanitized = _SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _TOKEN_LIKE_PATTERN.sub("[REDACTED]", sanitized)
     return " ".join(sanitized.split())
@@ -212,7 +711,16 @@ def _has_sensitive_url_params(params_text: str) -> bool:
 
 
 def _is_sensitive_mapping_key(key: Any) -> bool:
-    key_text = str(key or "").strip()
+    if key is None:
+        return False
+    key_text = _safe_string(key)
+    if key_text == _SAFE_RENDER_FAILURE:
+        return True
+    return _is_sensitive_mapping_key_text(key_text)
+
+
+def _is_sensitive_mapping_key_text(key_text: str) -> bool:
+    key_text = key_text.strip()
     if not key_text:
         return False
     parts = _mapping_key_parts(key_text)

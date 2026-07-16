@@ -9,17 +9,25 @@ import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import date, timedelta
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from datetime import date, datetime, timedelta
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
-from src.config import get_config
+from src.config import (
+    PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+    get_config,
+)
+from src.portfolio_idempotency import (
+    build_portfolio_idempotency_scope_key,
+    build_portfolio_idempotency_storage_id,
+)
 from src.repositories.portfolio_repo import (
     DuplicateTradeDedupHashError,
     DuplicateTradeUidError,
     PortfolioBusyError as RepoPortfolioBusyError,
     PortfolioRepository,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +122,14 @@ class _ResolvedPositionPrice:
 class PortfolioService:
     """Business logic for account CRUD, event writes, and snapshot replay."""
 
-    def __init__(self, repo: Optional[PortfolioRepository] = None):
+    def __init__(
+        self,
+        repo: Optional[PortfolioRepository] = None,
+        *,
+        now_provider: Optional[Callable[[], datetime]] = None,
+    ):
         self.repo = repo or PortfolioRepository()
+        self._now_provider = now_provider or datetime.now
 
     # ------------------------------------------------------------------
     # Account CRUD
@@ -238,6 +252,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="trade.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
             )
             if replay is not None:
@@ -262,6 +277,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="trade.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
                 response=result,
             )
@@ -366,6 +382,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="cash_ledger.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
             )
             if replay is not None:
@@ -386,6 +403,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="cash_ledger.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
                 response=result,
             )
@@ -434,6 +452,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="corporate_action.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
             )
             if replay is not None:
@@ -458,6 +477,7 @@ class PortfolioService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="corporate_action.create",
+                scope_account_id=account_id,
                 payload=operation_payload,
                 response=result,
             )
@@ -828,19 +848,35 @@ class PortfolioService:
         session: Any,
         operation_id: Optional[str],
         operation_type: str,
+        scope_account_id: int,
         payload: Any,
     ) -> Optional[Dict[str, Any]]:
         operation_id_norm = self.normalize_operation_id(operation_id)
         if operation_id_norm is None:
             return None
+        cutoff = self._idempotency_replay_cutoff()
+        self.repo.delete_expired_idempotency_records_in_session(
+            session=session,
+            created_at_before=cutoff,
+        )
+        _scope_owner_id, scope_key = self._resolve_idempotency_scope_in_session(
+            session=session,
+            account_id=scope_account_id,
+        )
         request_hash = self._operation_request_hash(payload)
         existing = self.repo.get_idempotency_record_in_session(
             session=session,
-            operation_id=operation_id_norm,
+            operation_type=operation_type,
+            scope_key=scope_key,
+            client_operation_id=operation_id_norm,
+            created_at_from=cutoff,
         )
         if existing is None:
+            # Raw-key legacy rows cannot prove historical owner scope. Startup
+            # migration preserves them unscoped, and this scoped query therefore
+            # fails closed to a new operation without crossing owner boundaries.
             return None
-        if existing.operation_type != operation_type or existing.request_hash != request_hash:
+        if existing.request_hash != request_hash:
             raise PortfolioIdempotencyConflictError(
                 f"operation_id already used for a different request: {operation_id_norm}"
             )
@@ -855,22 +891,73 @@ class PortfolioService:
         session: Any,
         operation_id: Optional[str],
         operation_type: str,
+        scope_account_id: int,
         payload: Any,
         response: Dict[str, Any],
     ) -> None:
         operation_id_norm = self.normalize_operation_id(operation_id)
         if operation_id_norm is None:
             return
+        scope_owner_id, scope_key = self._resolve_idempotency_scope_in_session(
+            session=session,
+            account_id=scope_account_id,
+        )
         self.repo.add_idempotency_record_in_session(
             session=session,
-            operation_id=operation_id_norm,
+            operation_id=build_portfolio_idempotency_storage_id(
+                operation_type=operation_type,
+                scope_key=scope_key,
+                client_operation_id=operation_id_norm,
+            ),
+            client_operation_id=operation_id_norm,
             operation_type=operation_type,
+            scope_key=scope_key,
+            scope_account_id=int(scope_account_id),
+            scope_owner_id=scope_owner_id,
             request_hash=self._operation_request_hash(payload),
             response_json=json.dumps(
                 response,
                 ensure_ascii=True,
                 sort_keys=True,
                 separators=(",", ":"),
+            ),
+            created_at=self._now_provider(),
+        )
+
+    def _idempotency_replay_cutoff(self) -> datetime:
+        """Return the inclusive lower bound for replayable operations."""
+
+        config = get_config()
+        replay_window_days = int(
+            getattr(
+                config,
+                "portfolio_idempotency_replay_window_days",
+                PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS_DEFAULT,
+            )
+        )
+        return self._now_provider() - timedelta(days=max(1, replay_window_days))
+
+    def _resolve_idempotency_scope_in_session(
+        self,
+        *,
+        session: Any,
+        account_id: int,
+    ) -> Tuple[Optional[str], str]:
+        """Resolve the current owner and stable scope key for an account."""
+
+        account = self.repo.get_account_in_session(
+            session=session,
+            account_id=int(account_id),
+            include_inactive=True,
+        )
+        owner_id = None
+        if account is not None and account.owner_id is not None:
+            owner_id = str(account.owner_id).strip() or None
+        return (
+            owner_id,
+            build_portfolio_idempotency_scope_key(
+                account_id=int(account_id),
+                owner_id=owner_id,
             ),
         )
 
@@ -1423,7 +1510,14 @@ class PortfolioService:
 
                 DataFetcherManager().prefetch_realtime_quotes(unique_symbols)
             except Exception as exc:
-                logger.warning("Failed to prefetch realtime portfolio quotes: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "Portfolio realtime quote batch prefetch failed",
+                    exc,
+                    error_code="portfolio_realtime_quote_prefetch_failed",
+                    level=logging.WARNING,
+                    context={"symbol_count": len(unique_symbols)},
+                )
 
         if len(unique_symbols) == 1:
             symbol = unique_symbols[0]
@@ -1441,7 +1535,14 @@ class PortfolioService:
                 try:
                     results[symbol] = future.result()
                 except Exception as exc:  # pragma: no cover - defensive guard for patched fetchers
-                    logger.warning("Failed to prefetch realtime portfolio price for %s: %s", symbol, exc)
+                    log_safe_exception(
+                        logger,
+                        "Portfolio realtime price worker failed",
+                        exc,
+                        error_code="portfolio_realtime_price_worker_failed",
+                        level=logging.WARNING,
+                        context={"stock_code": symbol},
+                    )
                     results[symbol] = (None, None)
 
         return results
@@ -1454,7 +1555,14 @@ class PortfolioService:
             fetcher_manager = DataFetcherManager()
             quote = fetcher_manager.get_realtime_quote(symbol, log_final_failure=False)
         except Exception as exc:
-            logger.warning("Failed to fetch realtime portfolio price for %s: %s", symbol, exc)
+            log_safe_exception(
+                logger,
+                "Portfolio realtime price lookup failed",
+                exc,
+                error_code="portfolio_realtime_price_lookup_failed",
+                level=logging.WARNING,
+                context={"stock_code": symbol},
+            )
             return None, None
 
         if quote is None:
@@ -1778,12 +1886,17 @@ class PortfolioService:
                     summary["updated_count"] += 1
                     continue
             except Exception as exc:
-                logger.warning(
-                    "FX online fetch failed for %s/%s on %s: %s",
-                    from_currency,
-                    base_currency,
-                    as_of_date.isoformat(),
+                log_safe_exception(
+                    logger,
+                    "Portfolio FX online lookup failed",
                     exc,
+                    error_code="portfolio_fx_online_lookup_failed",
+                    level=logging.WARNING,
+                    context={
+                        "from_currency": from_currency,
+                        "to_currency": base_currency,
+                        "as_of": as_of_date.isoformat(),
+                    },
                 )
 
             fallback = self.repo.get_latest_fx_rate(

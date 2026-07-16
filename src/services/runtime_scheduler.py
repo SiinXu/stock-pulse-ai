@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from src.config import Config, get_config
 from src.scheduler import Scheduler, normalize_schedule_times
+from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 logger = logging.getLogger(__name__)
 CLI_SCHEDULER_OWNER_ENV = "DSA_CLI_SCHEDULER_OWNS_SCHEDULE"
@@ -79,7 +80,13 @@ def build_agent_event_monitor_background_tasks(
     try:
         alert_worker = AlertWorker(config_provider=config_provider)
     except Exception as exc:  # pragma: no cover - defensive branch
-        logger.warning("Failed to initialize AlertWorker for event monitor: %s", exc)
+        log_safe_exception(
+            logger,
+            "Event monitor alert worker initialization failed",
+            exc,
+            error_code="event_monitor_alert_worker_init_failed",
+            level=logging.WARNING,
+        )
         return []
 
     def event_monitor_task() -> None:
@@ -185,8 +192,13 @@ class RuntimeSchedulerService:
             self._last_success_at = datetime.now().isoformat()
             self._last_error = None
         except Exception as exc:  # noqa: BLE001 - scheduled runs must not kill API process.
-            self._last_error = str(exc)
-            logger.exception("Runtime scheduled analysis failed: %s", exc)
+            self._last_error = sanitize_exception_chain(exc)
+            log_safe_exception(
+                logger,
+                "Runtime scheduled analysis failed",
+                exc,
+                error_code="runtime_scheduled_analysis_failed",
+            )
 
     def _run_analysis_once(self, stock_codes: Optional[List[str]] = None) -> bool:
         if not self._run_lock.acquire(blocking=False):

@@ -122,9 +122,9 @@ describe('BacktestPage', () => {
     const windowInput = screen.getByPlaceholderText('10');
 
     expect(filterInput).toHaveClass('h-11');
-    expect(filterInput).toHaveClass('rounded-[10px]');
+    expect(filterInput).toHaveClass('rounded-sm');
     expect(windowInput).toHaveClass('h-11');
-    expect(windowInput).toHaveClass('rounded-[10px]');
+    expect(windowInput).toHaveClass('rounded-sm');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();

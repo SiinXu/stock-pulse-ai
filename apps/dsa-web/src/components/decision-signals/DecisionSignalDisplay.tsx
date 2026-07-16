@@ -178,7 +178,7 @@ const textToneClass: Record<SignalTextTone, string> = {
   default: 'border-border/55 bg-elevated/35 text-secondary-text',
   warning: 'border-warning/25 bg-warning/10 text-warning',
   danger: 'border-danger/25 bg-danger/10 text-danger',
-  info: 'border-cyan/25 bg-cyan/10 text-cyan',
+  info: 'border-primary/25 bg-primary/10 text-primary',
 };
 
 type SignalTextBlockProps = {
@@ -220,8 +220,8 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
   ].filter((entry) => hasDisplayValue(entry.value));
   const className = cn(
     'block w-full rounded-2xl border bg-card/75 p-4 text-left',
-    interactive ? 'transition-colors hover:border-cyan/40 hover:bg-hover/70' : '',
-    selected ? 'border-cyan/50 bg-cyan/10' : 'border-border/70',
+    interactive ? 'transition-colors hover:border-primary/40 hover:bg-hover/70' : '',
+    selected ? 'border-primary/50 bg-primary/10' : 'border-border/70',
   );
   const content = (
     <>

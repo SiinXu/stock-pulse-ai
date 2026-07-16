@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Type, Callable
 
 from bot.models import BotMessage, BotResponse
 from bot.commands.base import BotCommand
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -131,18 +132,28 @@ class CommandDispatcher:
         name = command.name.lower()
 
         if name in self._commands:
-            logger.warning(f"[Dispatcher] 命令 '{name}' 已存在，将被覆盖")
+            logger.warning(
+                "[Dispatcher] Command '%s' is already registered and will be replaced",
+                name,
+            )
 
         self._commands[name] = command
-        logger.debug(f"[Dispatcher] 注册命令: {name}")
+        logger.debug("[Dispatcher] Registered command: %s", name)
 
         # 注册别名
         for alias in command.aliases:
             alias_lower = alias.lower()
             if alias_lower in self._aliases:
-                logger.warning(f"[Dispatcher] 别名 '{alias_lower}' 已存在，将被覆盖")
+                logger.warning(
+                    "[Dispatcher] Alias '%s' is already registered and will be replaced",
+                    alias_lower,
+                )
             self._aliases[alias_lower] = name
-            logger.debug(f"[Dispatcher] 注册别名: {alias_lower} -> {name}")
+            logger.debug(
+                "[Dispatcher] Registered alias: %s -> %s",
+                alias_lower,
+                name,
+            )
 
     def register_class(self, command_class: Type[BotCommand]) -> None:
         """
@@ -174,7 +185,7 @@ class CommandDispatcher:
         for alias in command.aliases:
             self._aliases.pop(alias.lower(), None)
 
-        logger.debug(f"[Dispatcher] 注销命令: {name}")
+        logger.debug("[Dispatcher] Unregistered command: %s", name)
         return True
 
     def get_command(self, name: str) -> Optional[BotCommand]:
@@ -270,7 +281,7 @@ class CommandDispatcher:
         if cmd_name is None:
             return None, args, None, None
 
-        logger.info(f"[Dispatcher] 收到命令: {cmd_name}, 参数: {args}, 用户: {message.user_name}")
+        logger.info("[Dispatcher] Received command: argument_count=%d", len(args))
 
         command = self.get_command(cmd_name)
         if command is None:
@@ -312,12 +323,17 @@ class CommandDispatcher:
 
         try:
             response = command.execute(message, args)
-            logger.info(f"[Dispatcher] 命令 {cmd_name} 执行成功")
+            logger.info("[Dispatcher] Command completed: command=%s", cmd_name)
             return response
-        except Exception as e:
-            logger.error(f"[Dispatcher] 命令 {cmd_name} 执行失败: {e}")
-            logger.exception(e)
-            return BotResponse.error_response(f"命令执行失败: {str(e)[:100]}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[Dispatcher] Command execution failed",
+                exc,
+                error_code="bot_command_execution_failed",
+                context={"command": cmd_name},
+            )
+            return BotResponse.error_response("命令执行失败，请稍后重试")
 
     async def dispatch_async(self, message: BotMessage) -> BotResponse:
         """
@@ -353,12 +369,17 @@ class CommandDispatcher:
         # 6. 执行命令
         try:
             response = await command.execute_async(message, args)
-            logger.info(f"[Dispatcher] 命令 {cmd_name} 执行成功")
+            logger.info("[Dispatcher] Command completed: command=%s", cmd_name)
             return response
-        except Exception as e:
-            logger.error(f"[Dispatcher] 命令 {cmd_name} 执行失败: {e}")
-            logger.exception(e)
-            return BotResponse.error_response(f"命令执行失败: {str(e)[:100]}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[Dispatcher] Command execution failed",
+                exc,
+                error_code="bot_command_execution_failed",
+                context={"command": cmd_name},
+            )
+            return BotResponse.error_response("命令执行失败，请稍后重试")
 
     def set_help_command_getter(self, getter: Callable) -> None:
         """
@@ -514,7 +535,7 @@ User: "analyze TSLA and NVDA using trend strategy"
         if intent == "chat":
             chat_cmd = self.get_command("chat")
             if chat_cmd:
-                logger.info("[Dispatcher] NL routing → /chat: %s", text[:60])
+                logger.info("[Dispatcher] Natural-language request routed to chat")
                 return await chat_cmd.execute_async(message, [text])
             return None
 
@@ -531,8 +552,9 @@ User: "analyze TSLA and NVDA using trend strategy"
                 args.append(strategy)
 
             logger.info(
-                "[Dispatcher] NL routing → /ask %s (strategy=%s, text=%s)",
-                code_str, strategy, text[:60],
+                "[Dispatcher] Natural-language request routed to analysis: code_count=%d strategy_selected=%s",
+                len(codes[:5]),
+                bool(strategy),
             )
             return await ask_cmd.execute_async(message, args)
 
@@ -579,7 +601,7 @@ User: "analyze TSLA and NVDA using trend strategy"
         if intent == "chat":
             chat_cmd = self.get_command("chat")
             if chat_cmd:
-                logger.info("[Dispatcher] NL routing → /chat: %s", text[:60])
+                logger.info("[Dispatcher] Natural-language request routed to chat")
                 return chat_cmd.execute(message, [text])
             return None
 
@@ -594,8 +616,9 @@ User: "analyze TSLA and NVDA using trend strategy"
                 args.append(strategy)
 
             logger.info(
-                "[Dispatcher] NL routing → /ask %s (strategy=%s, text=%s)",
-                code_str, strategy, text[:60],
+                "[Dispatcher] Natural-language request routed to analysis: code_count=%d strategy_selected=%s",
+                len(codes[:5]),
+                bool(strategy),
             )
             return ask_cmd.execute(message, args)
 
@@ -621,7 +644,13 @@ User: "analyze TSLA and NVDA using trend strategy"
             )
             return CommandDispatcher._parse_intent_payload(resp.content or "")
         except Exception as exc:
-            logger.debug("[Dispatcher] NL parse LLM call failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "[Dispatcher] Natural-language intent parsing failed",
+                exc,
+                error_code="bot_nl_intent_parse_failed",
+                level=logging.DEBUG,
+            )
             return None
 
     @staticmethod
@@ -643,7 +672,13 @@ User: "analyze TSLA and NVDA using trend strategy"
             )
             return CommandDispatcher._parse_intent_payload(resp.content or "")
         except Exception as exc:
-            logger.debug("[Dispatcher] NL parse LLM call failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "[Dispatcher] Natural-language intent parsing failed",
+                exc,
+                error_code="bot_nl_intent_parse_failed",
+                level=logging.DEBUG,
+            )
             return None
 
     @staticmethod
@@ -662,13 +697,19 @@ User: "analyze TSLA and NVDA using trend strategy"
         try:
             result = _json.loads(cleaned)
         except _json.JSONDecodeError:
-            logger.debug("[Dispatcher] NL parse: invalid JSON from LLM: %s", cleaned[:200])
+            logger.debug(
+                "[Dispatcher] Natural-language parser returned invalid JSON: response_length=%d",
+                len(cleaned),
+            )
             return None
 
         if isinstance(result, dict) and "intent" in result:
             return result
 
-        logger.debug("[Dispatcher] NL parse: unexpected structure: %s", cleaned[:200])
+        logger.debug(
+            "[Dispatcher] Natural-language parser returned an unexpected structure: response_length=%d",
+            len(cleaned),
+        )
         return None
 
     @classmethod
@@ -758,7 +799,10 @@ def get_dispatcher() -> CommandDispatcher:
         for command_class in ALL_COMMANDS:
             _dispatcher.register_class(command_class)
 
-        logger.info(f"[Dispatcher] 初始化完成，已注册 {len(_dispatcher._commands)} 个命令")
+        logger.info(
+            "[Dispatcher] Initialization completed: command_count=%d",
+            len(_dispatcher._commands),
+        )
 
     return _dispatcher
 

@@ -51,6 +51,7 @@ from src.utils.data_processing import (
     extract_market_structure_detail_field,
     extract_realtime_detail_fields,
 )
+from src.utils.sanitize import log_safe_exception
 from src.analysis_context_pack_overview import (
     extract_analysis_context_pack_overview,
     sanitize_context_snapshot_for_api,
@@ -219,7 +220,13 @@ def get_history_list(
         )
         
     except Exception as e:
-        logger.error(f"查询历史列表失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "History list query failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": stock_code, "report_type": report_type, "page": page},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -275,7 +282,13 @@ def delete_history_by_code(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"按股票代码删除历史记录失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "History deletion by stock code failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": stock_code},
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"删除失败: {str(e)}"},
@@ -317,7 +330,13 @@ def delete_history_records(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"删除历史记录失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "History record deletion failed",
+            e,
+            error_code="internal_error",
+            context={"record_count": len(record_ids)},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -422,7 +441,13 @@ def get_stock_bar(
         return StockBarResponse(total=len(items), items=items)
 
     except Exception as e:
-        logger.error(f"查询个股栏失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Stock history bar query failed",
+            e,
+            error_code="internal_error",
+            context={"limit": limit},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -591,7 +616,13 @@ def get_history_detail(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"查询历史详情失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "History detail query failed",
+            e,
+            error_code="internal_error",
+            context={"record_id": record_id},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -634,7 +665,13 @@ def get_history_diagnostics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"查询运行诊断摘要失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Run diagnostic summary query failed",
+            e,
+            error_code="internal_error",
+            context={"record_id": record_id},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -677,7 +714,13 @@ def get_history_run_flow(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"查询运行流快照失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Run-flow snapshot query failed",
+            e,
+            error_code="internal_error",
+            context={"record_id": record_id},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -735,7 +778,13 @@ def get_history_news(
         )
 
     except Exception as e:
-        logger.error(f"查询新闻情报失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "History news intelligence query failed",
+            e,
+            error_code="internal_error",
+            context={"record_id": record_id, "limit": limit},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -781,7 +830,13 @@ def get_history_markdown(
     try:
         markdown_content = service.get_markdown_report(record_id)
     except MarkdownReportGenerationError as e:
-        logger.error(f"Markdown report generation failed for {record_id}: {e.message}")
+        log_safe_exception(
+            logger,
+            "Markdown report generation failed",
+            e,
+            error_code="generation_failed",
+            context={"record_id": record_id},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -790,7 +845,13 @@ def get_history_markdown(
             }
         )
     except Exception as e:
-        logger.error(f"获取 Markdown 报告失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Markdown report query failed",
+            e,
+            error_code="internal_error",
+            context={"record_id": record_id},
+        )
         raise HTTPException(
             status_code=500,
             detail={

@@ -35,8 +35,8 @@ describe('JsonViewer', () => {
       note: 'ok',
     });
 
-    expect(screen.getByText('"status"')).toHaveClass('text-cyan-400');
-    expect(screen.getByText('true')).toHaveClass('text-purple-400');
+    expect(screen.getByText('"status"')).toHaveClass('text-primary');
+    expect(screen.getByText('true')).toHaveClass('text-secondary-text');
     expect(screen.getByText('82')).toHaveClass('text-amber-400');
     expect(screen.getByText('"ok"')).toHaveClass('text-emerald-400');
     expect(screen.getByRole('button', { name: /^(?:复制|Copy)$/ })).toHaveClass('min-h-11', 'min-w-11');

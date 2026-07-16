@@ -300,7 +300,7 @@ class TestAnspireSearchProvider(unittest.TestCase):
         self.assertFalse(response.success)
         self.assertEqual(response.provider, "Anspire")
         self.assertEqual(len(response.results), 0)
-        self.assertTrue("网络" in response.error_message or "Connection" in response.error_message)
+        self.assertEqual(response.error_message, "Network connection failed")
     
     @patch('src.search_service.requests')
     def test_search_empty_results(self, mock_requests):

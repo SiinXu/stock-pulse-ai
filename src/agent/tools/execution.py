@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 
 from src.agent.tools.registry import ToolRegistry
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -285,10 +286,17 @@ def execute_runner_tool_call(
         ok = True
         if cache_key and non_retriable_tool_results is not None and _is_non_retriable_tool_result(res):
             non_retriable_tool_results[cache_key] = res_str
-    except Exception as e:
-        res_str = json.dumps({"error": str(e)})
+    except Exception as exc:
+        res_str = json.dumps({"error": str(exc)})
         ok = False
-        logger.warning("Tool '%s' failed: %s", tool_call.name, e)
+        log_safe_exception(
+            logger,
+            "Agent tool execution failed",
+            exc,
+            error_code="agent_tool_execution_failed",
+            level=logging.WARNING,
+            context={"tool_name": tool_call.name},
+        )
     dur = round(time.time() - t0, 2)
     return tool_call, res_str, ok, dur, False, None
 

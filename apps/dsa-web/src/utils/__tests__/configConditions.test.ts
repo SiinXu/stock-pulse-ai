@@ -27,11 +27,27 @@ describe('evaluateConfigConditions', () => {
     ], values)).toBe('notMet');
   });
 
+  it('normalizes omitted and null scalar values to an empty string', () => {
+    for (const valuePayload of [{}, { value: null }]) {
+      expect(evaluateConfigConditions([
+        { key: 'X', operator: 'equals', ...valuePayload } as never,
+      ], { X: '' })).toBe('met');
+      expect(evaluateConfigConditions([
+        { key: 'X', operator: 'notEquals', ...valuePayload } as never,
+      ], { X: '' })).toBe('notMet');
+    }
+  });
+
   it('fails safe to unknown for unknown operators', () => {
     expect(evaluateConfigConditions([{ key: 'X', operator: 'regex' as never }], {})).toBe('unknown');
     expect(evaluateConfigConditions([{ key: '', operator: 'notEmpty' }], {})).toBe('unknown');
     expect(evaluateConfigConditions([{ key: 'X', operator: 'in', value: 'not-an-array' }], {})).toBe('unknown');
     expect(evaluateConfigConditions({ key: 'X' } as never, {})).toBe('unknown');
+    expect(evaluateConfigConditions('' as never, {})).toBe('unknown');
+    expect(evaluateConfigConditions([
+      { key: 'X', operator: 'equals', value: 'not-the-current-value' },
+      { key: 'X', operator: 'futureOperator' as never },
+    ], { X: 'current-value' })).toBe('unknown');
   });
 
   it('keeps fields visible but read-only on unknown conditions (fail-safe)', () => {

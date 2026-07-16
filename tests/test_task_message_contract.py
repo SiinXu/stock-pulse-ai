@@ -79,7 +79,8 @@ def test_background_failure_keeps_diagnostic_exception_out_of_public_payload() -
     assert failed.error == "analysis_failed"
     assert failed.message == "任务执行失败"
     assert failed.message_code == "task.failed"
-    assert failed.diagnostic_error == secret_marker
+    assert failed.diagnostic_error == "RuntimeError: [REDACTED]"
+    assert secret_marker not in failed.diagnostic_error
 
     public_payload = failed.to_dict()
     assert public_payload["error"] == "analysis_failed"

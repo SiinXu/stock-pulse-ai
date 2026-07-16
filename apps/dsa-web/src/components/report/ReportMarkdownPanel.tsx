@@ -105,7 +105,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 type="button"
                 onClick={handleCopyMarkdown}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyMarkdownSource}
               >
                 {copiedType === 'markdown' ? (
@@ -127,7 +127,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 type="button"
                 onClick={handleCopyPlainText}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyPlainText}
               >
                 {copiedType === 'text' ? (
@@ -167,7 +167,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         <button
           type="button"
           onClick={onRequestClose}
-          className="home-surface-button min-h-11 min-w-11 rounded-lg px-4 py-2 text-sm text-secondary-text hover:text-foreground"
+          className="home-surface-button min-h-11 min-w-11 rounded-full px-4 py-2 text-sm text-secondary-text hover:text-foreground"
         >
           {text.dismiss}
         </button>

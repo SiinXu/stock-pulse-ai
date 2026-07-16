@@ -54,6 +54,7 @@ from src.llm.provider_cache import (
     normalize_prompt_cache_diagnostics_level,
     resolve_provider_cache_caps,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -371,8 +372,16 @@ class LLMToolAdapter:
                     }
                 )
                 logger.debug(f"Registered custom pricing for {model_name}")
-            except Exception as e:
-                logger.debug(f"Model {model_name} may already be registered or pricing error: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Custom model pricing registration skipped",
+                    exc,
+                    error_code="agent_model_pricing_registration_failed",
+                    level=logging.DEBUG,
+                    context={"model": model_name},
+                )
+
     def _has_channel_config(self) -> bool:
         """Check if multi-channel config (channels / YAML) is active."""
         return bool(self._config.llm_model_list) and not all(
@@ -387,7 +396,12 @@ class LLMToolAdapter:
             self._generation_backend_id = resolve_agent_generation_backend_id(config)
         except GenerationError as exc:
             self._backend_error = exc
-            logger.error("Agent LLM backend configuration error: %s", exc.message)
+            log_safe_exception(
+                logger,
+                "Agent LLM backend configuration error",
+                exc,
+                error_code="agent_backend_configuration_error",
+            )
             return
         if self._generation_backend_id != LITELLM_BACKEND_ID:
             self._backend_error = GenerationError(
@@ -638,15 +652,17 @@ class LLMToolAdapter:
                     max_tokens=max_tokens,
                     timeout=remaining_timeout,
                 )
-            except Exception as e:
-                diagnostic = sanitize_agent_diagnostic(e)
+            except Exception as exc:
+                diagnostic = sanitize_agent_diagnostic(exc)
                 last_diagnostic = diagnostic
-                if isinstance(e, _resolve_litellm_exception("RateLimitError")):
-                    logger.warning(
-                        "Agent LLM rate-limited on %s: exception_type=%s diagnostic=%s",
-                        model,
-                        type(e).__name__,
-                        diagnostic,
+                if isinstance(exc, _resolve_litellm_exception("RateLimitError")):
+                    log_safe_exception(
+                        logger,
+                        "Agent LLM rate-limited",
+                        exc,
+                        error_code="agent_llm_rate_limited",
+                        level=logging.WARNING,
+                        context={"model": model},
                     )
                     hit_rate_limit = True
 
@@ -665,19 +681,23 @@ class LLMToolAdapter:
                         else:
                             time.sleep(backoff_sleep)
                     continue
-                if isinstance(e, _resolve_litellm_exception("ContextWindowExceededError")):
-                    logger.warning(
-                        "Agent LLM context window exceeded on %s: exception_type=%s diagnostic=%s",
-                        model,
-                        type(e).__name__,
-                        diagnostic,
+                if isinstance(exc, _resolve_litellm_exception("ContextWindowExceededError")):
+                    log_safe_exception(
+                        logger,
+                        "Agent LLM context window exceeded",
+                        exc,
+                        error_code="agent_llm_context_window_exceeded",
+                        level=logging.WARNING,
+                        context={"model": model},
                     )
                     continue
-                logger.warning(
-                    "Agent LLM call failed with %s: exception_type=%s diagnostic=%s",
-                    model,
-                    type(e).__name__,
-                    diagnostic,
+                log_safe_exception(
+                    logger,
+                    "Agent LLM call failed",
+                    exc,
+                    error_code="agent_llm_call_failed",
+                    level=logging.WARNING,
+                    context={"model": model},
                 )
                 continue
 
@@ -998,10 +1018,13 @@ def register_fallback_model_pricing(models: Iterable[str]) -> None:
                 register({wire_model: dict(custom_pricing)})
                 logger.debug("Registered custom pricing for %s", wire_model)
             except Exception as exc:
-                logger.debug(
-                    "Custom pricing registration failed for %s, will try fallback pricing: %s",
-                    wire_model,
+                log_safe_exception(
+                    logger,
+                    "Custom pricing registration failed; trying fallback pricing",
                     exc,
+                    error_code="agent_model_pricing_registration_failed",
+                    level=logging.DEBUG,
+                    context={"model": wire_model},
                 )
             else:
                 continue
@@ -1012,4 +1035,11 @@ def register_fallback_model_pricing(models: Iterable[str]) -> None:
             _FALLBACK_MODEL_PRICING_REGISTERED.add(wire_model)
             logger.debug("Registered fallback pricing for %s", wire_model)
         except Exception as exc:
-            logger.debug("Fallback pricing registration skipped for %s: %s", wire_model, exc)
+            log_safe_exception(
+                logger,
+                "Fallback pricing registration skipped",
+                exc,
+                error_code="agent_model_pricing_registration_failed",
+                level=logging.DEBUG,
+                context={"model": wire_model},
+            )

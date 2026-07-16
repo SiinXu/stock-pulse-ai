@@ -31,6 +31,11 @@ from src.services.run_diagnostics import (
     get_current_diagnostic_context,
     reset_run_diagnostic_context,
 )
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_diagnostic_text,
+    sanitize_exception_chain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,16 +140,25 @@ class AnalysisService:
                 return None
 
             if not getattr(result, "success", True):
-                self.last_error = getattr(result, "error_message", None) or f"分析股票 {stock_code} 失败"
+                self.last_error = sanitize_diagnostic_text(
+                    getattr(result, "error_message", None),
+                    max_length=300,
+                ) or f"分析股票 {stock_code} 失败"
                 logger.warning(f"分析股票 {stock_code} 未成功完成: {self.last_error}")
                 return None
             
             # 构建响应
             return self._build_analysis_response(result, query_id, report_type=rt.value)
             
-        except Exception as e:
-            self.last_error = str(e)
-            logger.error(f"分析股票 {stock_code} 失败: {e}", exc_info=True)
+        except Exception as exc:
+            self.last_error = sanitize_exception_chain(exc)
+            log_safe_exception(
+                logger,
+                "Stock analysis failed",
+                exc,
+                error_code="stock_analysis_failed",
+                context={"stock_code": stock_code},
+            )
             return None
         finally:
             reset_run_diagnostic_context(locals().get("diag_token"))

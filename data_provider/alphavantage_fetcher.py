@@ -15,6 +15,8 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from src.utils.sanitize import log_safe_exception
+
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from .us_index_mapping import is_us_stock_code
@@ -128,7 +130,14 @@ class AlphaVantageFetcher(BaseFetcher):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            logger.warning(f"[AlphaVantage] Realtime quote failed for {symbol}: {e}")
+            log_safe_exception(
+                logger,
+                "AlphaVantage realtime quote failed",
+                e,
+                error_code="alphavantage_realtime_quote_failed",
+                level=logging.WARNING,
+                context={"symbol": symbol},
+            )
             return None
 
         gq = data.get('Global Quote', {})
@@ -172,7 +181,14 @@ class AlphaVantageFetcher(BaseFetcher):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            logger.debug(f"[AlphaVantage] Symbol search failed for {symbol}: {e}")
+            log_safe_exception(
+                logger,
+                "AlphaVantage symbol search failed",
+                e,
+                error_code="alphavantage_symbol_search_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
             return None
 
         for match in data.get('bestMatches', []):

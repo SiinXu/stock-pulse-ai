@@ -48,6 +48,14 @@ NEWSNOW_FIXTURE = {
 }
 
 
+class BrokenIntelligenceError(Exception):
+    def __str__(self) -> str:
+        raise RuntimeError("intelligence error rendering failed")
+
+    def __repr__(self) -> str:
+        return "BROKEN_INTELLIGENCE_SERVICE_REPR_CANARY"
+
+
 class IntelligenceServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
@@ -551,6 +559,15 @@ class IntelligenceServiceTestCase(unittest.TestCase):
         with patch("src.services.intelligence_service.requests.get", return_value=large_response):
             with self.assertRaises(IntelligenceServiceError):
                 self.service.fetch_source(source["id"])
+
+    def test_sanitize_error_does_not_pre_render_exception(self) -> None:
+        rendered = self.service._sanitize_error(
+            BrokenIntelligenceError("RAW_INTELLIGENCE_SERVICE_CANARY")
+        )
+
+        self.assertEqual(rendered, "[UNRENDERABLE]")
+        self.assertNotIn("RAW_INTELLIGENCE_SERVICE_CANARY", rendered)
+        self.assertNotIn("BROKEN_INTELLIGENCE_SERVICE_REPR_CANARY", rendered)
 
     def test_retention_removes_old_items(self) -> None:
         repo = IntelligenceRepository()

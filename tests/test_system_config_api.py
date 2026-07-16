@@ -488,7 +488,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         # Every provider carries the fields the Web model-access page needs.
         for provider in payload["providers"]:
             for field in (
-                "id", "label", "protocol", "default_base_url",
+                "id", "label", "label_zh", "label_en", "protocol", "default_base_url",
                 "capabilities", "requires_api_key", "requires_base_url",
                 "supports_discovery", "is_local", "is_custom",
                 "credential_url", "console_url", "models_url", "docs_url",
@@ -518,6 +518,13 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(
             payload["empty_api_key_hosts"], sorted(LLM_EMPTY_API_KEY_HOSTNAMES)
+        )
+        self.assertEqual(
+            {field["key"] for field in payload["connection_fields"]},
+            {
+                "connection_name", "display_name", "provider_id", "protocol",
+                "base_url", "api_key", "api_keys", "models", "extra_headers", "enabled",
+            },
         )
 
     def test_config_schema_preserves_ui_placement_metadata(self) -> None:
@@ -1399,6 +1406,182 @@ class SystemConfigApiTestCase(unittest.TestCase):
             issue["details"]["referenced_by"],
             [{"task": "report", "key": "LITELLM_MODEL"}],
         )
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_put_config_rejects_explicit_empty_connection_display_name(self) -> None:
+        before = self.env_path.read_bytes()
+        items = [
+            {"key": "LLM_CHANNELS", "value": "openai_team"},
+            {"key": "LLM_OPENAI_TEAM_DISPLAY_NAME", "value": ""},
+            {"key": "LLM_OPENAI_TEAM_PROVIDER", "value": "openai"},
+            {"key": "LLM_OPENAI_TEAM_PROTOCOL", "value": "openai"},
+            {"key": "LLM_OPENAI_TEAM_BASE_URL", "value": "https://api.openai.com/v1"},
+            {"key": "LLM_OPENAI_TEAM_API_KEY", "value": "sk-team"},
+            {"key": "LLM_OPENAI_TEAM_MODELS", "value": "gpt-test"},
+            {"key": "LLM_OPENAI_TEAM_ENABLED", "value": "true"},
+        ]
+
+        validation = self.service.validate(items=items)
+        self.assertFalse(validation["valid"])
+        issue = next(
+            issue
+            for issue in validation["issues"]
+            if issue["key"] == "LLM_OPENAI_TEAM_DISPLAY_NAME"
+        )
+        self.assertEqual(issue["code"], "field_required")
+
+        async def request_update() -> httpx.Response:
+            transport = httpx.ASGITransport(
+                app=self._build_system_config_router_app(),
+                raise_app_exceptions=False,
+            )
+            async with httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+            ) as client:
+                return await client.put(
+                    "/api/v1/system/config",
+                    json={
+                        "config_version": self.manager.get_config_version(),
+                        "reload_now": False,
+                        "items": items,
+                    },
+                )
+
+        response = asyncio.run(request_update())
+
+        self.assertEqual(response.status_code, 400, response.text)
+        payload = response.json()
+        self.assertEqual(payload["error"], "validation_failed")
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_put_config_rejects_empty_display_name_for_disabled_draft(self) -> None:
+        before = self.env_path.read_bytes()
+        items = [
+            {"key": "LLM_CHANNELS", "value": "custom_draft"},
+            {"key": "LLM_CUSTOM_DRAFT_DISPLAY_NAME", "value": ""},
+            {"key": "LLM_CUSTOM_DRAFT_PROVIDER", "value": "custom"},
+            {"key": "LLM_CUSTOM_DRAFT_PROTOCOL", "value": "openai"},
+            {"key": "LLM_CUSTOM_DRAFT_ENABLED", "value": "false"},
+        ]
+
+        validation = self.service.validate(items=items)
+        self.assertFalse(validation["valid"])
+        issue = next(
+            issue
+            for issue in validation["issues"]
+            if issue["key"] == "LLM_CUSTOM_DRAFT_DISPLAY_NAME"
+        )
+        self.assertEqual(issue["code"], "field_required")
+
+        with self.assertRaises(HTTPException) as context:
+            system_config.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=self.manager.get_config_version(),
+                    items=items,
+                    reload_now=False,
+                ),
+                service=self.service,
+            )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_put_config_rejects_unknown_connection_contract_operator(self) -> None:
+        from src.llm.provider_catalog import get_connection_field_schema
+
+        schema = get_connection_field_schema()
+        base_url = next(field for field in schema if field["key"] == "base_url")
+        base_url["contract"]["visible_when"] = [
+            {
+                "key": "provider_id",
+                "operator": "futureOperator",
+                "value": "custom",
+            }
+        ]
+        before = self.env_path.read_bytes()
+        items = [
+            {"key": "LLM_CHANNELS", "value": "custom_team"},
+            {"key": "LLM_CUSTOM_TEAM_DISPLAY_NAME", "value": "Custom team"},
+            {"key": "LLM_CUSTOM_TEAM_PROVIDER", "value": "custom"},
+            {"key": "LLM_CUSTOM_TEAM_PROTOCOL", "value": "openai"},
+            {"key": "LLM_CUSTOM_TEAM_BASE_URL", "value": "https://llm.example.com/v1"},
+            {"key": "LLM_CUSTOM_TEAM_API_KEY", "value": "sk-team"},
+            {"key": "LLM_CUSTOM_TEAM_MODELS", "value": "model-test"},
+            {"key": "LLM_CUSTOM_TEAM_ENABLED", "value": "true"},
+        ]
+
+        with patch(
+            "src.services.system_config_service.get_connection_field_schema",
+            return_value=schema,
+        ):
+            validation = self.service.validate(items=items)
+            self.assertFalse(validation["valid"])
+            issue = next(
+                issue
+                for issue in validation["issues"]
+                if issue["code"] == "unknown_contract_condition"
+            )
+            self.assertEqual(issue["key"], "LLM_CUSTOM_TEAM_BASE_URL")
+
+            with self.assertRaises(HTTPException) as context:
+                system_config.update_system_config(
+                    request=UpdateSystemConfigRequest(
+                        config_version=self.manager.get_config_version(),
+                        items=items,
+                        reload_now=False,
+                    ),
+                    service=self.service,
+                )
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(self.env_path.read_bytes(), before)
+
+    def test_put_config_rejects_unknown_contract_operator_for_disabled_draft(self) -> None:
+        from src.llm.provider_catalog import get_connection_field_schema
+
+        schema = get_connection_field_schema()
+        base_url = next(field for field in schema if field["key"] == "base_url")
+        base_url["contract"]["visible_when"] = [
+            {
+                "key": "provider_id",
+                "operator": "futureOperator",
+                "value": "custom",
+            }
+        ]
+        before = self.env_path.read_bytes()
+        items = [
+            {"key": "LLM_CHANNELS", "value": "custom_draft"},
+            {"key": "LLM_CUSTOM_DRAFT_DISPLAY_NAME", "value": "Custom draft"},
+            {"key": "LLM_CUSTOM_DRAFT_PROVIDER", "value": "custom"},
+            {"key": "LLM_CUSTOM_DRAFT_PROTOCOL", "value": "openai"},
+            {"key": "LLM_CUSTOM_DRAFT_ENABLED", "value": "false"},
+        ]
+
+        with patch(
+            "src.services.system_config_service.get_connection_field_schema",
+            return_value=schema,
+        ):
+            validation = self.service.validate(items=items)
+            self.assertFalse(validation["valid"])
+            issue = next(
+                issue
+                for issue in validation["issues"]
+                if issue["code"] == "unknown_contract_condition"
+            )
+            self.assertEqual(issue["key"], "LLM_CUSTOM_DRAFT_BASE_URL")
+
+            with self.assertRaises(HTTPException) as context:
+                system_config.update_system_config(
+                    request=UpdateSystemConfigRequest(
+                        config_version=self.manager.get_config_version(),
+                        items=items,
+                        reload_now=False,
+                    ),
+                    service=self.service,
+                )
+
+        self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(self.env_path.read_bytes(), before)
 
     def test_provider_identity_round_trips_through_config_and_available_models_api(self) -> None:

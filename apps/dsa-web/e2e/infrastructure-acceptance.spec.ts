@@ -6,7 +6,6 @@ import {
   type Locator,
   type Page,
   type Route,
-  type TestInfo,
 } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { ALERT_PAGE_TEXT } from '../src/locales/alerts';
@@ -280,6 +279,7 @@ async function resetModelConfig(page: Page) {
 function connectionItems(id: string, model: string, provider = 'openai', apiKey = 'e2e-key') {
   const prefix = `LLM_${id.toUpperCase()}`;
   return [
+    { key: `${prefix}_DISPLAY_NAME`, value: id },
     { key: `${prefix}_PROTOCOL`, value: 'openai' },
     { key: `${prefix}_PROVIDER`, value: provider },
     { key: `${prefix}_BASE_URL`, value: fakeProviderBaseUrl },
@@ -365,12 +365,6 @@ async function addOpenAiConnectionThroughUi(page: Page, id: string, model: strin
   expect(addedConnectionId).toBeTruthy();
   await expect(page.getByText(/AI 模型: 已自动保存/)).toBeVisible();
   return addedConnectionId!;
-}
-
-async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
-  const path = testInfo.outputPath(`${name}.png`);
-  await page.screenshot({ path, fullPage: true });
-  await testInfo.attach(name, { path, contentType: 'image/png' });
 }
 
 async function editConnectionAddModel(page: Page, id: string, model: string) {
@@ -1554,7 +1548,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(chatHistory).toBeFocused();
   });
 
-  test('38 320px Home keeps Analyze, Market Review, and History fully reachable', async ({ page }, testInfo) => {
+  test('38 320px Home keeps Analyze, Market Review, and History fully reachable', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await login(page);
     const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
@@ -1572,10 +1566,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       expect(box!.x + box!.width).toBeLessThanOrEqual(320);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
-    await attachScreenshot(page, testInfo, 'acceptance-home-320');
   });
 
-  test('39 every first-level page avoids critical document-level horizontal clipping at 390px', async ({ page }, testInfo) => {
+  test('39 every first-level page avoids critical document-level horizontal clipping at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     await assertNoDocumentOverflow(page, '/');
@@ -1586,7 +1579,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(reportBody).toBeVisible();
     await expect.poll(async () => (await getElementContrast(reportHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(reportBody)).ratio).toBeGreaterThanOrEqual(4.5);
-    await attachScreenshot(page, testInfo, 'acceptance-home-390');
     await assertNoDocumentOverflow(page, '/chat');
     await assertNoDocumentOverflow(page, '/screening');
     await assertNoDocumentOverflow(page, '/portfolio');
@@ -1607,7 +1599,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
     const homeLightContrast = await getElementContrast(homeText);
-    await attachScreenshot(page, testInfo, 'acceptance-home-desktop-light');
 
     await page.getByRole('button', { name: '切换主题' }).first().click();
     await page.getByRole('menuitemradio', { name: '深色', exact: true }).click();
@@ -1616,7 +1607,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
     const homeDarkContrast = await getElementContrast(homeText);
     expect(homeDarkContrast).not.toEqual(homeLightContrast);
-    await attachScreenshot(page, testInfo, 'acceptance-home-desktop-dark');
 
     await page.goto('/settings?section=ai_models&view=connections');
     const settingsHeading = page.getByRole('heading', { name: '系统设置' });
@@ -1628,7 +1618,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect.poll(async () => (await getElementContrast(settingsBody)).ratio).toBeGreaterThanOrEqual(4.5);
     const settingsDarkHeadingContrast = await getElementContrast(settingsHeading);
     const settingsDarkBodyContrast = await getElementContrast(settingsBody);
-    await attachScreenshot(page, testInfo, 'acceptance-settings-desktop-dark');
 
     await page.getByRole('button', { name: '切换主题' }).first().click();
     await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
@@ -1655,11 +1644,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       path: contrastPath,
       contentType: 'application/json',
     });
-    await attachScreenshot(page, testInfo, 'acceptance-settings-desktop-light');
     await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
   });
 
-  test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }, testInfo) => {
+  test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     const alphaRef = encodeModelRef('alpha_conn', 'openai/model-alpha');
@@ -1688,7 +1676,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
     const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
     await expectMinimumTouchTarget(fallbackCheckbox.locator('..'));
-    await attachScreenshot(page, testInfo, 'acceptance-settings-touch-targets-390');
 
     await page.goto('/settings?section=system_security&view=runtime');
     const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
@@ -1699,6 +1686,5 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
     await page.goto('/chat');
     await expectMinimumTouchTarget(page.getByRole('switch', { name: '上下文压缩' }));
-    await attachScreenshot(page, testInfo, 'acceptance-chat-touch-targets-390');
   });
 });

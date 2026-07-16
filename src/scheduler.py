@@ -21,6 +21,8 @@ import time
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 
@@ -201,7 +203,14 @@ class Scheduler:
         try:
             latest_schedule_time = (self._schedule_time_provider() or "").strip()
         except Exception as exc:  # pragma: no cover - defensive branch
-            logger.warning("读取最新 SCHEDULE_TIME 失败，继续沿用 %s: %s", self.schedule_time, exc)
+            log_safe_exception(
+                logger,
+                "Schedule time refresh failed; keeping current value",
+                exc,
+                error_code="schedule_time_refresh_failed",
+                level=logging.WARNING,
+                context={"schedule_time": self.schedule_time},
+            )
             return
 
         if not latest_schedule_time or latest_schedule_time == self.schedule_time:
@@ -260,10 +269,13 @@ class Scheduler:
             else:
                 return
         except Exception as exc:  # pragma: no cover - defensive branch
-            logger.warning(
-                "Failed to read latest schedule times; keeping %s: %s",
-                ",".join(self.schedule_times),
+            log_safe_exception(
+                logger,
+                "Schedule times refresh failed; keeping current values",
                 exc,
+                error_code="schedule_times_refresh_failed",
+                level=logging.WARNING,
+                context={"schedule_times": ",".join(self.schedule_times)},
             )
             return
 
@@ -292,8 +304,13 @@ class Scheduler:
 
             logger.info(f"定时任务执行完成 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        except Exception as e:
-            logger.exception(f"定时任务执行失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Scheduled task execution failed",
+                exc,
+                error_code="scheduled_task_execution_failed",
+            )
 
     def add_background_task(
         self,
@@ -345,7 +362,13 @@ class Scheduler:
                 logger.info("后台任务开始执行: %s", entry["name"])
                 entry["task"]()
             except Exception as exc:
-                logger.exception("后台任务执行失败 [%s]: %s", entry["name"], exc)
+                log_safe_exception(
+                    logger,
+                    "Scheduler background task execution failed",
+                    exc,
+                    error_code="scheduler_background_task_failed",
+                    context={"task_name": entry["name"]},
+                )
             finally:
                 entry["running"] = False
                 entry["thread"] = None

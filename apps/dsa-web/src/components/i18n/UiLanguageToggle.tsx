@@ -39,17 +39,17 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
           triggerClassName
             ? triggerClassName
             : isRailVariant
-              ? 'flex h-[var(--nav-item-height)] w-full items-center justify-center gap-2.5 rounded-2xl border border-transparent px-2 text-sm leading-none text-secondary-text transition-all hover:bg-[var(--nav-hover-bg)] hover:text-foreground'
+              ? 'flex h-[var(--nav-item-height)] w-full items-center justify-center gap-2.5 rounded-full border border-transparent px-2 text-sm leading-none text-secondary-text transition-all hover:bg-[var(--nav-hover-bg)] hover:text-foreground'
               : isNavVariant
-                ? 'group relative flex h-12 w-full select-none items-center gap-3 rounded-[1.35rem] border border-transparent px-4 text-sm text-secondary-text transition-all duration-300 hover:bg-hover hover:text-foreground'
-                : 'inline-flex h-11 min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
+                ? 'group relative flex h-12 w-full select-none items-center gap-3 rounded-full border border-transparent px-4 text-sm text-secondary-text transition-all duration-300 hover:bg-hover hover:text-foreground'
+                : 'inline-flex h-11 min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
           triggerActiveClassName,
           isNavVariant && collapsed ? 'justify-center px-2' : ''
         )}
         aria-label={t('language.toggle')}
         title={t('language.toggle')}
       >
-        <Languages className={iconClassName ?? cn('shrink-0', isRailVariant ? 'h-[18px] w-[18px]' : isNavVariant ? 'h-5 w-5' : 'h-4 w-4')} />
+        <Languages className={iconClassName ?? cn('shrink-0', isRailVariant ? 'size-4.5' : isNavVariant ? 'h-5 w-5' : 'h-4 w-4')} />
         {isRailVariant ? (
           <span className={labelClassName}>{language === 'zh' ? t('language.short.zh') : t('language.short.en')}</span>
         ) : isNavVariant ? (

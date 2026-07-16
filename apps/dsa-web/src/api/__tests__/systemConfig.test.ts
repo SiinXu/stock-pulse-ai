@@ -109,12 +109,14 @@ describe('systemConfigApi', () => {
     });
   });
 
-  it('maps Provider Catalog quick-link metadata to camelCase', async () => {
+  it('maps Provider Catalog labels, quick links, and Connection contracts to camelCase', async () => {
     get.mockResolvedValueOnce({
       data: {
         providers: [{
           id: 'openai',
-          label: 'OpenAI',
+          label: 'OpenAI 官方',
+          label_zh: 'OpenAI 官方',
+          label_en: 'OpenAI Official',
           protocol: 'openai',
           default_base_url: 'https://api.openai.com/v1',
           credential_url: 'https://platform.openai.com/api-keys',
@@ -128,6 +130,18 @@ describe('systemConfigApi', () => {
           is_local: false,
           is_custom: false,
         }],
+        connection_fields: [{
+          key: 'api_key',
+          env_suffix: 'API_KEY',
+          data_type: 'string',
+          is_sensitive: true,
+          is_required: false,
+          contract: {
+            requirement: 'optional',
+            required_when: [{ key: 'enabled', operator: 'equals', value: 'true' }],
+            requires_connection_test: true,
+          },
+        }],
         empty_api_key_hosts: [],
       },
     });
@@ -136,9 +150,22 @@ describe('systemConfigApi', () => {
 
     expect(result.providers[0]).toMatchObject({
       credentialUrl: 'https://platform.openai.com/api-keys',
+      labelZh: 'OpenAI 官方',
+      labelEn: 'OpenAI Official',
       consoleUrl: 'https://platform.openai.com/',
       modelsUrl: 'https://platform.openai.com/docs/models',
       docsUrl: 'https://platform.openai.com/docs/overview',
+    });
+    expect(result.connectionFields?.[0]).toMatchObject({
+      key: 'api_key',
+      envSuffix: 'API_KEY',
+      dataType: 'string',
+      isSensitive: true,
+      isRequired: false,
+      contract: {
+        requiredWhen: [{ key: 'enabled', operator: 'equals', value: 'true' }],
+        requiresConnectionTest: true,
+      },
     });
   });
 

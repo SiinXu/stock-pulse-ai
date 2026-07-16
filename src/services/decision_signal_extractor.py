@@ -20,6 +20,7 @@ from src.schemas.decision_scale import (
 )
 from src.services.decision_signal_service import DecisionSignalService
 from src.services.portfolio_service import VALID_MARKETS
+from src.utils.sanitize import log_safe_exception
 from src.utils.sniper_points import extract_sniper_points
 
 
@@ -206,12 +207,14 @@ def extract_and_persist_from_analysis_result(
         writer = service or DecisionSignalService()
         return writer.create_signal(payload)
     except Exception as exc:
-        logger.warning(
-            "Decision signal extraction failed: query_id=%s stock_code=%s error=%s",
-            trace_id,
-            getattr(result, "code", None),
+        log_safe_exception(
+            logger,
+            "Decision signal extraction failed",
             exc,
-            exc_info=True,
+            error_code="decision_signal_extraction_failed",
+            level=logging.WARNING,
+            trace_id=trace_id,
+            context={"stock_code": getattr(result, "code", None) or "unknown"},
         )
         return None
 

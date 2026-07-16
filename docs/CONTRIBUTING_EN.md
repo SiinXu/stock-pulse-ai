@@ -88,6 +88,8 @@ After opening a PR, CI will automatically run the following PR checks:
 | `web-gate` | `npm run lint` + `npm run test:i18n` + `npm run test` + `npm run build` for Web or related API/config/service contract changes | ✅ (when triggered) |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
 
+`web-e2e` uses dedicated canary credentials only and scopes each CI run to `test-results/ci-secret-bearing/`. That run disables screenshots, videos, trace screenshots, and media attachments while writing the machine-readable `playwright-results.json` into the same directory. Whether E2E passes or fails, CI first scans text, logs, JSON, HAR, raw binary canary bytes, and trace/ZIP entries, and rejects uninspectable PNG/JPEG/WebM by extension or file signature. The scanner does not use OCR or echo matched values. CI uploads the same run directory only after a successful scan, so a failed test can retain scan-approved text/JSON/media-free trace diagnostics while a scanner failure uploads nothing from that run.
+
 Separately, the repository also has a non-blocking `network-smoke` workflow in `.github/workflows/network-smoke.yml`, but it is only triggered by `schedule` and `workflow_dispatch`, not by pull requests.
 
 **Running checks locally:**
@@ -107,12 +109,20 @@ npm run test
 npm run build
 
 # Frontend E2E (starts the isolated backend, Vite, and fake provider)
-npm run test:smoke
+DSA_WEB_E2E_RUN_ID=local-secret-bearing \
+DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
+DSA_WEB_E2E_ALPHA_API_KEY=stockpulse-local-canary-change-me \
+  npm run test:smoke
+
+# Scan local Playwright artifacts (use a dedicated test canary, never a real credential)
+cd ../..
+DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
+  python scripts/scan_playwright_artifacts.py apps/dsa-web/test-results/local-secret-bearing
 ```
 
 See [Web Internationalization Conventions](web-i18n_EN.md) for UI/report-language boundaries, domain registries, and error-code handling. New pages and languages must extend the relevant `src/locales/` domain instead of hardcoding visible JSX copy.
 
-Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/runtime/`. Reports, tasks, accounts, and configuration required by a scenario must be seeded deterministically by the fixture or the scenario itself; runtime state is removed when the suite ends without reading or modifying the developer's `.env`, database, or auth files. Backend Python resolution checks ancestor `.venv` directories first, then `python3`, then `python`, and prints the selected interpreter before startup; deterministic scenarios use `retries: 0`. Backend, Vite, and fake-provider logs are retained under `test-results/service-logs/`; CI uploads them with screenshots, traces, and videos on failure. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
+Playwright uses a throwaway password and isolates its `.env`, SQLite database, password hash, and session secret under `test-results/<run-id>/runtime/`. Reports, tasks, accounts, and configuration required by a scenario must be seeded deterministically by the fixture or the scenario itself; runtime state is removed when the suite ends without reading or modifying the developer's `.env`, database, or auth files. Backend Python resolution checks ancestor `.venv` directories first, then `python3`, then `python`, and prints the selected interpreter before startup; deterministic scenarios use `retries: 0`. Backend, Vite, and fake-provider logs are retained under `test-results/<run-id>/service-logs/`, and the machine-readable result is written to `playwright-results.json` in that run directory. CI uploads only scan-approved text logs, JSON, and media-free trace/ZIP diagnostics, never screenshots or videos. PR screenshots must come from a separate credential-free manual acceptance session and be attached directly to the PR description or comment. Override port conflicts with `DSA_WEB_SMOKE_BACKEND_PORT`, `DSA_WEB_SMOKE_FRONTEND_PORT`, or `DSA_WEB_SMOKE_PROVIDER_PORT`.
 
 Contract regressions cannot be represented by mock counts, loop entries, or numbered comments. Model-routing tests must cover the same model name on two Connections and assert the exact `ModelRef`. Portfolio trade, cash-flow, corporate-action, and CSV-commit tests must reuse one operation ID to prove timeout-after-commit does not duplicate the ledger, and must reject a different payload under the same ID. Overlay tests must cover top-layer-only Escape handling, focus trapping/restoration, background inertness, and scroll locking. Every Playwright acceptance scenario needs its own readable test name and key assertion.
 

@@ -20,6 +20,7 @@ from api.v1.schemas.backtest import (
 from api.v1.schemas.common import ErrorResponse
 from src.services.backtest_service import BacktestService, BacktestValidationError
 from src.storage import DatabaseManager
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,12 @@ def run_backtest(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("回测执行失败: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Backtest execution failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "回测执行失败"},
@@ -133,7 +139,12 @@ def get_backtest_results(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("查询回测结果失败: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Backtest results query failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "查询回测结果失败"},
@@ -183,7 +194,12 @@ def get_overall_performance(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("查询整体表现失败: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Overall backtest performance query failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "查询整体表现失败"},
@@ -234,7 +250,12 @@ def get_stock_performance(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("查询单股表现失败: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Stock backtest performance query failed",
+            exc,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "查询单股表现失败"},

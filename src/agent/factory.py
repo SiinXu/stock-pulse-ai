@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from src.config import AGENT_MAX_STEPS_DEFAULT
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,13 @@ def get_skill_manager(config=None):
         try:
             skill_manager.load_custom_skills(current_custom_dir)
         except Exception as exc:
-            logger.warning("[AgentFactory] Failed to load custom skills from %s: %s", current_custom_dir, exc)
+            log_safe_exception(
+                logger,
+                "Agent factory custom skill loading failed",
+                exc,
+                error_code="agent_factory_custom_skill_load_failed",
+                level=logging.WARNING,
+            )
 
     _SKILL_MANAGER_PROTOTYPE = skill_manager
     _SKILL_MANAGER_CUSTOM_DIR = current_custom_dir

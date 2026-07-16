@@ -39,11 +39,11 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
 
 from src.patches.eastmoney_patch import eastmoney_patch
 from src.config import get_config
+from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 from .base import BaseFetcher, DataFetchError, RateLimitError, STANDARD_COLUMNS, is_bse_code, is_st_stock, is_kc_cy_stock, normalize_stock_code
 from .realtime_types import (
     UnifiedRealtimeQuote, ChipDistribution, RealtimeSource,
@@ -417,7 +417,13 @@ class AkshareFetcher(BaseFetcher):
             random_ua = random.choice(USER_AGENTS)
             logger.debug(f"设置 User-Agent: {random_ua[:50]}...")
         except Exception as e:
-            logger.debug(f"设置 User-Agent 失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare user agent selection failed",
+                e,
+                error_code="akshare_user_agent_selection_failed",
+                level=logging.DEBUG,
+            )
     
     def _enforce_rate_limit(self) -> None:
         """
@@ -444,7 +450,12 @@ class AkshareFetcher(BaseFetcher):
         stop=stop_after_attempt(3),  # 最多重试3次
         wait=wait_exponential(multiplier=1, min=2, max=30),  # 指数退避：2, 4, 8... 最大30秒
         retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Akshare daily data retry scheduled",
+            error_code="akshare_daily_data_retry",
+        ),
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -505,7 +516,14 @@ class AkshareFetcher(BaseFetcher):
                     return df
             except Exception as e:
                 last_error = e
-                logger.warning(f"[数据源] {source_name} 获取失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Akshare historical data source failed",
+                    e,
+                    error_code="akshare_history_source_failed",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "source": source_name},
+                )
                 # 继续尝试下一个
 
         # 所有都失败
@@ -704,7 +722,14 @@ class AkshareFetcher(BaseFetcher):
             
             # 检测反爬封禁
             if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
-                logger.warning(f"检测到可能被封禁: {e}")
+                log_safe_exception(
+                    logger,
+                    "Akshare rate limit detected",
+                    e,
+                    error_code="akshare_rate_limit_detected",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "instrument_type": "etf"},
+                )
                 raise RateLimitError(f"Akshare 可能被限流: {e}") from e
             
             raise DataFetchError(f"Akshare 获取 ETF 数据失败: {e}") from e
@@ -799,7 +824,14 @@ class AkshareFetcher(BaseFetcher):
             
             # 检测反爬封禁
             if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
-                logger.warning(f"检测到可能被封禁: {e}")
+                log_safe_exception(
+                    logger,
+                    "Akshare rate limit detected",
+                    e,
+                    error_code="akshare_rate_limit_detected",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "market": "us"},
+                )
                 raise RateLimitError(f"Akshare 可能被限流: {e}") from e
             
             raise DataFetchError(f"Akshare 获取美股数据失败: {e}") from e
@@ -863,7 +895,14 @@ class AkshareFetcher(BaseFetcher):
             
             # 检测反爬封禁
             if any(keyword in error_msg for keyword in ['banned', 'blocked', '频率', 'rate', '限制']):
-                logger.warning(f"检测到可能被封禁: {e}")
+                log_safe_exception(
+                    logger,
+                    "Akshare rate limit detected",
+                    e,
+                    error_code="akshare_rate_limit_detected",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "market": "hk"},
+                )
                 raise RateLimitError(f"Akshare 可能被限流: {e}") from e
             
             raise DataFetchError(f"Akshare 获取港股数据失败: {e}") from e
@@ -972,7 +1011,6 @@ class AkshareFetcher(BaseFetcher):
             else:
                 # 触发全量刷新
                 logger.info(f"[缓存未命中] 触发全量刷新 A股实时行情(东财)")
-                last_error: Optional[Exception] = None
                 df = None
                 for attempt in range(1, 3):
                     try:
@@ -991,14 +1029,25 @@ class AkshareFetcher(BaseFetcher):
                         circuit_breaker.record_success(source_key)
                         break
                     except Exception as e:
-                        last_error = e
-                        logger.info(f"[API错误] ak.stock_zh_a_spot_em 获取失败 (attempt {attempt}/2): {e}")
+                        log_safe_exception(
+                            logger,
+                            "Akshare A-share realtime snapshot attempt failed",
+                            e,
+                            error_code="akshare_a_share_realtime_snapshot_failed",
+                            level=logging.INFO,
+                            context={"attempt": attempt},
+                        )
                         time.sleep(min(2 ** attempt, 5))
 
                 # 更新缓存：成功缓存数据；失败也缓存空数据，避免同一轮任务对同一接口反复请求
                 if df is None:
-                    logger.info(f"[API错误] ak.stock_zh_a_spot_em 最终失败: {last_error}")
-                    circuit_breaker.record_failure(source_key, str(last_error))
+                    logger.info(
+                        "Akshare A-share realtime snapshot failed after retries"
+                    )
+                    circuit_breaker.record_failure(
+                        source_key,
+                        "akshare_a_share_realtime_snapshot_failed",
+                    )
                     df = pd.DataFrame()
                 _realtime_cache['data'] = df
                 _realtime_cache['timestamp'] = current_time
@@ -1046,8 +1095,18 @@ class AkshareFetcher(BaseFetcher):
             return quote
             
         except Exception as e:
-            logger.info(f"[API错误] 获取 {stock_code} 实时行情(东财)失败: {e}")
-            circuit_breaker.record_failure(source_key, str(e))
+            log_safe_exception(
+                logger,
+                "Akshare Eastmoney realtime quote failed",
+                e,
+                error_code="akshare_eastmoney_realtime_quote_failed",
+                level=logging.INFO,
+                context={"symbol": stock_code},
+            )
+            circuit_breaker.record_failure(
+                source_key,
+                "akshare_eastmoney_realtime_quote_failed",
+            )
             return None
     
     def _get_stock_realtime_quote_sina(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
@@ -1185,20 +1244,23 @@ class AkshareFetcher(BaseFetcher):
             return quote
             
         except Exception as e:
-            api_elapsed = time.time() - api_start
-            category, detail = _classify_realtime_http_error(e)
-            failure_message = _build_realtime_failure_message(
-                source_name="新浪",
-                endpoint=SINA_REALTIME_ENDPOINT,
-                stock_code=stock_code,
-                symbol=symbol,
-                category=category,
-                detail=detail,
-                elapsed=api_elapsed,
-                error_type=type(e).__name__,
+            category, _ = _classify_realtime_http_error(e)
+            log_safe_exception(
+                logger,
+                "Akshare Sina realtime quote failed",
+                e,
+                error_code="akshare_sina_realtime_quote_failed",
+                level=logging.INFO,
+                context={
+                    "symbol": symbol,
+                    "endpoint": SINA_REALTIME_ENDPOINT,
+                    "category": category,
+                },
             )
-            logger.info(failure_message)
-            circuit_breaker.record_failure(source_key, failure_message)
+            circuit_breaker.record_failure(
+                source_key,
+                "akshare_sina_realtime_quote_failed",
+            )
             return None
     
     def _get_stock_realtime_quote_tencent(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
@@ -1338,20 +1400,23 @@ class AkshareFetcher(BaseFetcher):
             return quote
             
         except Exception as e:
-            api_elapsed = time.time() - api_start
-            category, detail = _classify_realtime_http_error(e)
-            failure_message = _build_realtime_failure_message(
-                source_name="腾讯",
-                endpoint=TENCENT_REALTIME_ENDPOINT,
-                stock_code=stock_code,
-                symbol=symbol,
-                category=category,
-                detail=detail,
-                elapsed=api_elapsed,
-                error_type=type(e).__name__,
+            category, _ = _classify_realtime_http_error(e)
+            log_safe_exception(
+                logger,
+                "Akshare Tencent realtime quote failed",
+                e,
+                error_code="akshare_tencent_realtime_quote_failed",
+                level=logging.INFO,
+                context={
+                    "symbol": symbol,
+                    "endpoint": TENCENT_REALTIME_ENDPOINT,
+                    "category": category,
+                },
             )
-            logger.info(failure_message)
-            circuit_breaker.record_failure(source_key, failure_message)
+            circuit_breaker.record_failure(
+                source_key,
+                "akshare_tencent_realtime_quote_failed",
+            )
             return None
     
     def _get_etf_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
@@ -1379,7 +1444,6 @@ class AkshareFetcher(BaseFetcher):
                 df = _etf_realtime_cache['data']
                 logger.debug(f"[缓存命中] 使用缓存的ETF实时行情数据")
             else:
-                last_error: Optional[Exception] = None
                 df = None
                 for attempt in range(1, 3):
                     try:
@@ -1398,13 +1462,22 @@ class AkshareFetcher(BaseFetcher):
                         circuit_breaker.record_success(source_key)
                         break
                     except Exception as e:
-                        last_error = e
-                        logger.info(f"[API错误] ak.fund_etf_spot_em 获取失败 (attempt {attempt}/2): {e}")
+                        log_safe_exception(
+                            logger,
+                            "Akshare ETF realtime snapshot attempt failed",
+                            e,
+                            error_code="akshare_etf_realtime_snapshot_failed",
+                            level=logging.INFO,
+                            context={"attempt": attempt},
+                        )
                         time.sleep(min(2 ** attempt, 5))
 
                 if df is None:
-                    logger.info(f"[API错误] ak.fund_etf_spot_em 最终失败: {last_error}")
-                    circuit_breaker.record_failure(source_key, str(last_error))
+                    logger.info("Akshare ETF realtime snapshot failed after retries")
+                    circuit_breaker.record_failure(
+                        source_key,
+                        "akshare_etf_realtime_snapshot_failed",
+                    )
                     df = pd.DataFrame()
                 _etf_realtime_cache['data'] = df
                 _etf_realtime_cache['timestamp'] = current_time
@@ -1449,8 +1522,18 @@ class AkshareFetcher(BaseFetcher):
             return quote
             
         except Exception as e:
-            logger.info(f"[API错误] 获取 ETF {stock_code} 实时行情失败: {e}")
-            circuit_breaker.record_failure(source_key, str(e))
+            log_safe_exception(
+                logger,
+                "Akshare ETF realtime quote failed",
+                e,
+                error_code="akshare_etf_realtime_quote_failed",
+                level=logging.INFO,
+                context={"symbol": stock_code},
+            )
+            circuit_breaker.record_failure(
+                source_key,
+                "akshare_etf_realtime_quote_failed",
+            )
             return None
     
     def _get_hk_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
@@ -1527,8 +1610,18 @@ class AkshareFetcher(BaseFetcher):
                     return quote
 
             except Exception as e:
-                logger.warning(f"[API错误] ak.stock_hk_spot_em 获取港股 {stock_code} 失败: {e}，尝试 stock_hk_spot 备用接口")
-                circuit_breaker.record_failure(em_key, str(e))
+                log_safe_exception(
+                    logger,
+                    "Akshare Eastmoney HK realtime quote failed; trying Sina fallback",
+                    e,
+                    error_code="akshare_hk_eastmoney_realtime_quote_failed",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code},
+                )
+                circuit_breaker.record_failure(
+                    em_key,
+                    "akshare_hk_eastmoney_realtime_quote_failed",
+                )
         else:
             logger.info(f"[熔断] 数据源 {em_key} 处于熔断状态，尝试使用备用链路")
 
@@ -1568,8 +1661,18 @@ class AkshareFetcher(BaseFetcher):
             return quote
 
         except Exception as e:
-            logger.info(f"[API错误] ak.stock_hk_spot 备用接口也失败: {e}")
-            circuit_breaker.record_failure(sina_key, str(e))
+            log_safe_exception(
+                logger,
+                "Akshare Sina HK realtime quote fallback failed",
+                e,
+                error_code="akshare_hk_sina_realtime_quote_failed",
+                level=logging.INFO,
+                context={"symbol": stock_code},
+            )
+            circuit_breaker.record_failure(
+                sina_key,
+                "akshare_hk_sina_realtime_quote_failed",
+            )
             return None
     
     def get_chip_distribution(self, stock_code: str) -> Optional[ChipDistribution]:
@@ -1647,7 +1750,14 @@ class AkshareFetcher(BaseFetcher):
             return chip
             
         except Exception as e:
-            logger.error(f"[API错误] 获取 {stock_code} 筹码分布失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare chip distribution fetch failed",
+                e,
+                error_code="akshare_chip_distribution_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code},
+            )
             return None
     
     def get_enhanced_data(self, stock_code: str, days: int = 60) -> Dict[str, Any]:
@@ -1673,7 +1783,14 @@ class AkshareFetcher(BaseFetcher):
             df = self.get_daily_data(stock_code, days=days)
             result['daily_data'] = df
         except Exception as e:
-            logger.error(f"获取 {stock_code} 日线数据失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare daily data fetch failed",
+                e,
+                error_code="akshare_daily_data_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code},
+            )
         
         # 获取实时行情
         result['realtime_quote'] = self.get_realtime_quote(stock_code)
@@ -1746,7 +1863,14 @@ class AkshareFetcher(BaseFetcher):
             return results
 
         except Exception as e:
-            logger.error(f"[Akshare] 获取指数行情失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare market indices fetch failed",
+                e,
+                error_code="akshare_market_indices_failed",
+                level=logging.ERROR,
+                context={"market": region},
+            )
             return None
 
     def get_market_stats(self) -> Optional[Dict[str, Any]]:
@@ -1783,10 +1907,12 @@ class AkshareFetcher(BaseFetcher):
                 "api=ak.stock_zh_a_spot_em action=parse status=empty"
             )
         except Exception as e:
-            logger.warning(
-                "[MarketStats] component=market_stats provider=AkshareFetcher "
-                "api=ak.stock_zh_a_spot_em action=failed error=%s fallback=ak.stock_zh_a_spot",
+            log_safe_exception(
+                logger,
+                "Akshare Eastmoney market statistics failed; trying Sina fallback",
                 e,
+                error_code="akshare_eastmoney_market_stats_failed",
+                level=logging.WARNING,
             )
 
         # 东财失败后，尝试新浪接口
@@ -1813,10 +1939,12 @@ class AkshareFetcher(BaseFetcher):
                 "api=ak.stock_zh_a_spot action=parse status=empty"
             )
         except Exception as e:
-            logger.error(
-                "[MarketStats] component=market_stats provider=AkshareFetcher "
-                "api=ak.stock_zh_a_spot action=failed error=%s",
+            log_safe_exception(
+                logger,
+                "Akshare Sina market statistics fallback failed",
                 e,
+                error_code="akshare_sina_market_stats_failed",
+                level=logging.ERROR,
             )
 
         return None
@@ -1951,7 +2079,13 @@ class AkshareFetcher(BaseFetcher):
                 return _get_rank_top_n(df, change_col, name, n)
             
         except Exception as e:
-            logger.warning(f"[Akshare] 东财接口获取行业板块排行失败: {e}，尝试新浪接口")
+            log_safe_exception(
+                logger,
+                "Akshare Eastmoney sector ranking failed; trying Sina fallback",
+                e,
+                error_code="akshare_eastmoney_sector_ranking_failed",
+                level=logging.WARNING,
+            )
 
         # 东财失败后，尝试新浪接口
         try:
@@ -1967,7 +2101,13 @@ class AkshareFetcher(BaseFetcher):
             return _get_rank_top_n(df, change_col, name, n)
         
         except Exception as e:
-            logger.error(f"[Akshare] 新浪接口获取板块排行也失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare Sina sector ranking fallback failed",
+                e,
+                error_code="akshare_sina_sector_ranking_failed",
+                level=logging.ERROR,
+            )
             return None
 
     def get_concept_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
@@ -2004,7 +2144,13 @@ class AkshareFetcher(BaseFetcher):
                 ],
             )
         except Exception as e:
-            logger.warning(f"[Akshare] 获取概念排行失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare concept ranking fetch failed",
+                e,
+                error_code="akshare_concept_ranking_failed",
+                level=logging.WARNING,
+            )
             return None
 
     def get_hot_stocks(self, n: int = 10) -> Optional[List[Dict[str, Any]]]:
@@ -2016,17 +2162,24 @@ class AkshareFetcher(BaseFetcher):
             ("东方财富飙升榜", lambda top_n: self._get_eastmoney_hot_up_stocks(ak, top_n)),
             ("雪球关注榜", lambda top_n: self._get_xueqiu_hot_stocks(ak, top_n)),
         )
-        last_error = ""
+        had_error = False
         for source, fetch in fetch_attempts:
             try:
                 rows = fetch(n)
                 if rows:
                     return rows[:n]
             except Exception as e:
-                last_error = f"{source}: {e}"
-                logger.debug("[Akshare] 人气股候选源失败 source=%s: %s", source, e)
-        if last_error:
-            logger.warning("[Akshare] 获取人气股全部候选源失败: %s", last_error)
+                had_error = True
+                log_safe_exception(
+                    logger,
+                    "Akshare hot stock source failed",
+                    e,
+                    error_code="akshare_hot_stock_source_failed",
+                    level=logging.DEBUG,
+                    context={"source": source},
+                )
+        if had_error:
+            logger.warning("Akshare hot stock sources returned no data")
         return None
 
     def _get_eastmoney_hot_stocks(self, ak: Any, n: int = 10) -> Optional[List[Dict[str, Any]]]:
@@ -2152,7 +2305,13 @@ class AkshareFetcher(BaseFetcher):
                 })
             return rows
         except Exception as e:
-            logger.warning(f"[Akshare] 获取涨停池失败: {e}")
+            log_safe_exception(
+                logger,
+                "Akshare limit-up pool fetch failed",
+                e,
+                error_code="akshare_limit_up_pool_failed",
+                level=logging.WARNING,
+            )
             return None
 
     @staticmethod

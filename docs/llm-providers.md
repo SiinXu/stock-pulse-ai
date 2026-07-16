@@ -54,7 +54,7 @@ Phase 6a Tool Surface 只补充 AgentBackend 前置的内部工具面：统一 D
 
 任务路由中的历史值如果不在当前可用模型目录中会保留并标记“当前配置不可用”，保存不会静默删除。删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 会列出全部引用并允许在同一草稿中选择替代模型；直接 API 请求会返回 `model_in_use` 和 `details.referenced_by`。替换引用与删除模型在同一次更新中可原子成功，未替换的历史失效值仍按 `unknown_model` 处理。
 
-Provider 的 protocol、默认 Base URL、Key/端点要求、发现能力以及获取凭据、控制台、模型列表和文档地址都来自后端 Catalog；缺少链接时 Web 不渲染空操作。配置 Schema 同时是字段 ownership 与条件契约的唯一真源：AI 字段缺失或携带未知 `ui_placement` 时只进入「高级」只读诊断，未知条件保持可见但锁定，滚动部署不会重新暴露第二套普通模型表单。
+Provider 身份、双语标签、protocol、默认 Base URL、发现能力、本地/自定义属性以及获取凭据、控制台、模型列表和文档地址都来自后端 Catalog；缺少链接时 Web 不渲染空操作。动态 Connection 的 required/visible/enabled 与可写字段集合只来自同一 API 返回的 `connection_fields` Schema：只要该属性存在（包括显式 `[]`），Web 就不读取 Catalog 的 legacy requirement flags；只有旧后端完全省略该属性时才启用隔离的 rolling-upgrade fallback。AND 条件中任一未知 operator 都优先于更早的未满足条件，字段保持可见、只读并显示诊断，同时阻止保存。通用配置 Schema 仍是字段 ownership 与条件契约的唯一真源：AI 字段缺失或携带未知 `ui_placement` 时只进入「高级」只读诊断，滚动部署不会重新暴露第二套普通模型表单。
 
 ## Channels 示例
 

@@ -406,7 +406,8 @@ class MainScheduleModeTestCase(unittest.TestCase):
         )
         run_full_analysis.assert_called_once_with(config, args, None)
         warning_log.assert_any_call(
-            "定时模式下检测到 --stocks 参数；计划执行将忽略启动时股票快照，并在每次运行前重新读取最新的 STOCK_LIST。"
+            "Scheduled mode received --stocks; scheduled runs ignore the startup snapshot "
+            "and reload the latest STOCK_LIST before each run"
         )
 
     def test_standalone_run_resolves_stocks_before_run_full_analysis(self) -> None:
@@ -511,7 +512,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             background_task["task"]()
 
         worker.run_once.assert_called_once_with()
-        info_log.assert_any_call("[EventMonitor] 本轮触发 %d 条提醒", 2)
+        info_log.assert_any_call("[EventMonitor] Triggered %d alerts in this run", 2)
 
     def test_schedule_mode_registers_event_monitor_worker_without_legacy_rules(self) -> None:
         args = self._make_args(schedule=True)
@@ -586,12 +587,19 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main.prepare_webui_frontend_assets", return_value=True), \
              patch("main.start_api_server", side_effect=RuntimeError("port busy")), \
              patch("main.start_bot_stream_clients") as start_bots, \
-             patch("main.logger.error") as error_log:
+             patch("main.log_safe_exception") as safe_log:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 1)
         start_bots.assert_not_called()
-        error_log.assert_called_once()
+        safe_log.assert_called_once()
+        self.assertIs(safe_log.call_args.args[0], main.logger)
+        self.assertEqual(safe_log.call_args.args[1], "FastAPI service startup failed")
+        self.assertIsInstance(safe_log.call_args.args[2], RuntimeError)
+        self.assertEqual(
+            safe_log.call_args.kwargs,
+            {"error_code": "main_fastapi_start_failed"},
+        )
 
     def test_webui_only_maps_to_serve_only_and_exits_when_api_server_start_fails(self) -> None:
         args = self._make_args(webui_only=True, host="127.0.0.1", port=8000)
@@ -604,13 +612,20 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main.start_api_server", side_effect=RuntimeError("port busy")), \
              patch("main.start_bot_stream_clients") as start_bots, \
              patch("main.run_full_analysis") as run_full_analysis, \
-             patch("main.logger.error") as error_log:
+             patch("main.log_safe_exception") as safe_log:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 1)
         start_bots.assert_not_called()
         run_full_analysis.assert_not_called()
-        error_log.assert_called_once()
+        safe_log.assert_called_once()
+        self.assertIs(safe_log.call_args.args[0], main.logger)
+        self.assertEqual(safe_log.call_args.args[1], "FastAPI service startup failed")
+        self.assertIsInstance(safe_log.call_args.args[2], RuntimeError)
+        self.assertEqual(
+            safe_log.call_args.kwargs,
+            {"error_code": "main_fastapi_start_failed"},
+        )
 
     def test_serve_mode_continues_single_analysis_when_api_server_start_fails(self) -> None:
         args = self._make_args(serve=True, host="127.0.0.1", port=8000)
@@ -624,14 +639,21 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main.start_bot_stream_clients") as start_bots, \
              patch("main.run_full_analysis") as run_full_analysis, \
              patch("main._run_analysis_with_runtime_scheduler_lock") as run_with_lock, \
-             patch("main.logger.error") as error_log:
+             patch("main.log_safe_exception") as safe_log:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
         start_bots.assert_not_called()
         run_with_lock.assert_called_once_with(config, args, None)
         run_full_analysis.assert_not_called()
-        error_log.assert_called_once()
+        safe_log.assert_called_once()
+        self.assertIs(safe_log.call_args.args[0], main.logger)
+        self.assertEqual(safe_log.call_args.args[1], "FastAPI service startup failed")
+        self.assertIsInstance(safe_log.call_args.args[2], RuntimeError)
+        self.assertEqual(
+            safe_log.call_args.kwargs,
+            {"error_code": "main_fastapi_start_failed"},
+        )
 
     def test_serve_schedule_mode_continues_scheduler_when_api_server_start_fails(self) -> None:
         args = self._make_args(serve=True, schedule=True, host="127.0.0.1", port=8000)
@@ -660,7 +682,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main.start_bot_stream_clients") as start_bots, \
              patch("main.run_full_analysis") as run_full_analysis, \
              patch("src.scheduler.run_with_schedule", side_effect=fake_run_with_schedule), \
-             patch("main.logger.error") as error_log:
+             patch("main.log_safe_exception") as safe_log:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
@@ -669,7 +691,14 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(scheduled_call["schedule_time"], "18:00")
         self.assertEqual(scheduled_call["run_immediately"], True)
         self.assertEqual(scheduled_call["background_tasks"], [])
-        error_log.assert_called_once()
+        safe_log.assert_called_once()
+        self.assertIs(safe_log.call_args.args[0], main.logger)
+        self.assertEqual(safe_log.call_args.args[1], "FastAPI service startup failed")
+        self.assertIsInstance(safe_log.call_args.args[2], RuntimeError)
+        self.assertEqual(
+            safe_log.call_args.kwargs,
+            {"error_code": "main_fastapi_start_failed"},
+        )
 
     def test_serve_with_enabled_schedule_uses_api_runtime_scheduler(self) -> None:
         from src.services.runtime_scheduler import (
@@ -1995,6 +2024,11 @@ class MainScheduleModeTestCase(unittest.TestCase):
         import io
 
         args = self._make_args()
+        canary = "main-config-canary"
+        sensitive_error = (
+            f"config failed api_key={canary} at "
+            f"https://private.example.invalid/config?token={canary}"
+        )
 
         capture_stream = io.StringIO()
         capture_handler = logging.StreamHandler(capture_stream)
@@ -2004,7 +2038,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         root_logger = logging.getLogger()
 
         with patch("main.parse_arguments", return_value=args), \
-             patch("main.get_config", side_effect=RuntimeError("config boom")):
+             patch("main.get_config", side_effect=RuntimeError(sensitive_error)):
             root_logger.addHandler(capture_handler)
             try:
                 exit_code = main.main()
@@ -2014,8 +2048,14 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         self.assertEqual(exit_code, 1)
         output = capture_stream.getvalue()
-        self.assertIn("加载配置失败", output)
-        self.assertIn("config boom", output)
+        self.assertIn("Configuration loading failed", output)
+        self.assertIn("error_code=main_configuration_load_failed", output)
+        self.assertIn("exception_type=RuntimeError", output)
+        self.assertIn("[REDACTED]", output)
+        self.assertIn("[REDACTED_URL]", output)
+        self.assertNotIn(canary, output)
+        self.assertNotIn("private.example.invalid", output)
+        self.assertNotIn("Traceback (most recent call last)", output)
 
     def test_bootstrap_logging_failure_does_not_block_startup(self) -> None:
         """Bootstrap log dir unwritable must not prevent startup (P1 regression)."""
@@ -2062,9 +2102,13 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         run_mock.assert_called_once()
         output = capture_stream.getvalue()
-        self.assertIn("文件日志初始化失败，已降级为控制台日志输出", output)
-        self.assertIn("/app/logs", output)
-        self.assertIn("官方 Docker 镜像启动入口会自动修复默认挂载目录权限", output)
+        self.assertIn("File logging initialization failed; using console output", output)
+        self.assertIn("error_code=main_file_logging_setup_failed", output)
+        self.assertIn("log_dir=/app/logs", output)
+        self.assertIn("Docker mount permissions", output)
+        self.assertIn("read-only mounts", output)
+        self.assertIn("rootless Docker", output)
+        self.assertIn("NFS", output)
 
     def test_run_full_analysis_import_failure_propagates(self) -> None:
         """P1: import failures in run_full_analysis must propagate, not be swallowed."""

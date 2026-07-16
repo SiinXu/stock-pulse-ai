@@ -16,6 +16,7 @@ from src.analysis_context_pack_prompt import (
 )
 from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.schemas.analysis_context_pack import ContextFieldStatus
+from src.utils.sanitize import log_safe_exception
 
 
 ANALYSIS_CONTEXT_PACK_OVERVIEW_KEY = "analysis_context_pack_overview"
@@ -86,7 +87,13 @@ def render_analysis_context_pack_overview(
             },
         }
     except Exception as exc:
-        logger.debug("render analysis context pack overview failed: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Analysis context pack overview rendering failed",
+            exc,
+            error_code="analysis_context_pack_overview_render_failed",
+            level=logging.DEBUG,
+        )
         return None
 
 

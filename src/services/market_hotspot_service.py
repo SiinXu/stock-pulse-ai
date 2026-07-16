@@ -28,6 +28,7 @@ from src.schemas.market_structure import (
     ThemeRankSource,
     dump_market_structure_model,
 )
+from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 
 logger = logging.getLogger(__name__)
@@ -384,14 +385,22 @@ class MarketHotspotService:
                 )
             )
         except Exception as exc:
-            logger.debug("market hotspot ranking fetch failed dataset=%s: %s", dataset, exc)
-            errors.append(f"{dataset}: {exc}")
+            safe_error = sanitize_exception_chain(exc)
+            log_safe_exception(
+                logger,
+                "Market hotspot ranking lookup failed",
+                exc,
+                error_code="market_hotspot_ranking_lookup_failed",
+                level=logging.DEBUG,
+                context={"dataset": dataset},
+            )
+            errors.append(f"{dataset}: {safe_error}")
             sources.append(
                 MarketStructureSource(
                     provider="dsa",
                     dataset=dataset,
                     status="failed",
-                    message=str(exc),
+                    message=safe_error,
                 )
             )
         return [], []

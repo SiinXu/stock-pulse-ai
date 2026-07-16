@@ -18,6 +18,7 @@ from src.agent.skills.defaults import (
     get_default_router_skill_ids,
     get_regime_skill_ids,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,14 @@ class SkillRouter:
 
             config = get_config()
             return getattr(config, "agent_skill_routing", "auto")
-        except Exception:
-            logger.warning("Failed to get routing mode, falling back to auto", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Failed to get routing mode; using automatic routing",
+                exc,
+                error_code="agent_skill_routing_mode_failed",
+                level=logging.WARNING,
+            )
             return "auto"
 
     @staticmethod
@@ -125,8 +132,14 @@ class SkillRouter:
 
             sm = get_skill_manager()
             return list(sm.list_skills())
-        except Exception:
-            logger.warning("Failed to get available skills", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Failed to get available skills",
+                exc,
+                error_code="agent_available_skills_lookup_failed",
+                level=logging.WARNING,
+            )
             return []
 
     @classmethod
@@ -141,8 +154,14 @@ class SkillRouter:
                 for skill_id in getattr(config, "agent_skills", []) or []
                 if isinstance(skill_id, str) and skill_id
             ]
-        except Exception:
-            logger.warning("Failed to get manual skills config", exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Failed to get manual skills config",
+                exc,
+                error_code="agent_manual_skill_config_failed",
+                level=logging.WARNING,
+            )
             configured = []
 
         available_skills = cls._get_available_skills()

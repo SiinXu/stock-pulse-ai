@@ -13,6 +13,7 @@ from typing import Any, List, Optional
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +63,11 @@ class MarketCommand(BotCommand):
         try:
             thread.start()
         except Exception as exc:
-            logger.error(
-                "[MarketCommand] 大盘复盘后台线程启动失败: %s",
+            log_safe_exception(
+                logger,
+                "[MarketCommand] Market review worker failed to start",
                 exc,
+                error_code="bot_market_worker_start_failed",
             )
             self._release_market_review_lock(lock_token)
             return BotResponse.error_response(
@@ -109,7 +112,13 @@ class MarketCommand(BotCommand):
                 open_markets,
             )
         except Exception as exc:
-            logger.warning("交易日过滤失败，按配置继续执行大盘复盘: %s", exc)
+            log_safe_exception(
+                logger,
+                "[MarketCommand] Trading calendar filter failed; using configured market review region",
+                exc,
+                error_code="bot_market_calendar_filter_failed",
+                level=logging.WARNING,
+            )
             return None
 
     def _run_market_review(
@@ -124,7 +133,9 @@ class MarketCommand(BotCommand):
             if override_region == "":
                 from src.notification import NotificationService
                 notifier = NotificationService(source_message=message)
-                logger.info("[MarketCommand] 今日相关市场休市，跳过大盘复盘")
+                logger.info(
+                    "[MarketCommand] Relevant markets are closed; skipping market review"
+                )
                 if notifier.is_available():
                     notifier.send(
                         "🎯 大盘复盘\n\n今日相关市场休市，已跳过大盘复盘。",
@@ -149,11 +160,15 @@ class MarketCommand(BotCommand):
                 trigger_source="bot",
             )
             if review_report:
-                logger.info("[MarketCommand] 大盘复盘完成并已推送")
+                logger.info("[MarketCommand] Market review completed and delivered")
             else:
-                logger.warning("[MarketCommand] 大盘复盘返回空结果")
-        except Exception as e:
-            logger.error("[MarketCommand] 大盘复盘失败: %s", e)
-            logger.exception(e)
+                logger.warning("[MarketCommand] Market review returned an empty result")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[MarketCommand] Market review failed",
+                exc,
+                error_code="bot_market_review_failed",
+            )
         finally:
             self._release_market_review_lock(lock_token)

@@ -71,9 +71,10 @@ from datetime import date, datetime, timezone, timedelta
 
 from src.webui_frontend import prepare_webui_frontend_assets
 from src.config import get_config, Config
-from src.logging_config import setup_logging
+from src.logging_config import RelativePathFormatter, setup_logging
 from src.services.stock_list_parser import split_stock_list
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,13 @@ def _read_active_env_values() -> Optional[Dict[str, str]]:
     try:
         values = dotenv_values(env_path)
     except Exception as exc:  # pragma: no cover - defensive branch
-        logger.warning("读取配置文件 %s 失败，继续沿用当前环境变量: %s", env_path, exc)
+        log_safe_exception(
+            logger,
+            "Environment file read failed; keeping current process environment",
+            exc,
+            error_code="main_environment_file_read_failed",
+            level=logging.WARNING,
+        )
         return None
 
     return {
@@ -184,7 +191,9 @@ def _setup_bootstrap_logging(debug: bool = False) -> None:
         handler = logging.StreamHandler(sys.stderr)
         handler.setLevel(level)
         handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+            RelativePathFormatter(
+                "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+            )
         )
         root.addHandler(handler)
 
@@ -195,12 +204,13 @@ def _setup_runtime_logging(log_dir: str, debug: bool = False) -> bool:
         setup_logging(log_prefix="stock_analysis", debug=debug, log_dir=log_dir)
         return True
     except OSError as exc:
-        logger.warning(
-            "文件日志初始化失败，已降级为控制台日志输出；日志目录 %r 当前不可写或不可创建: %s。"
-            "官方 Docker 镜像启动入口会自动修复默认挂载目录权限；若仍失败，"
-            "请检查是否使用了 --user、只读挂载、rootless Docker 或 NFS 等限制写入的环境。",
-            log_dir,
+        log_safe_exception(
+            logger,
+            "File logging initialization failed; using console output. Check Docker mount permissions, read-only mounts, rootless Docker, NFS, or --user restrictions",
             exc,
+            error_code="main_file_logging_setup_failed",
+            level=logging.WARNING,
+            context={"log_dir": log_dir},
         )
         return False
 
@@ -486,7 +496,7 @@ def _run_market_review_with_shared_lock(
 
     lock_token = try_acquire_market_review_lock(config)
     if lock_token is None:
-        logger.warning("大盘复盘正在执行中，跳过本次大盘复盘")
+        logger.warning("Market review is already running; skipping this run")
         return None
 
     try:
@@ -517,11 +527,20 @@ def _refresh_stock_index_cache_for_analysis(config: Config) -> None:
 
         result = refresh_remote_stock_index_cache(settings_from_config(config))
         if result.refreshed:
-            logger.info("[stock-index] 分析前已刷新股票索引缓存: %s", result.cache_path)
+            logger.info("[stock-index] Refreshed the stock index cache before analysis: %s", result.cache_path)
         elif result.error:
-            logger.debug("[stock-index] 分析前刷新未完成，继续使用本地索引: %s", result.error)
+            logger.debug(
+                "[stock-index] Refresh did not complete; continuing with the local index: %s",
+                result.error,
+            )
     except Exception as exc:  # noqa: BLE001 - stock index freshness must not block analysis.
-        logger.warning("[stock-index] 分析前刷新股票索引失败，继续执行分析: %s", exc)
+        log_safe_exception(
+            logger,
+            "Stock index refresh failed; continuing with the local index",
+            exc,
+            error_code="main_stock_index_refresh_failed",
+            level=logging.WARNING,
+        )
 
 
 def _prime_daily_market_context(
@@ -657,7 +676,14 @@ def _save_reused_market_review_report(
             filepath,
         )
     except Exception as exc:
-        logger.warning("复用大盘上下文保存大盘复盘报告失败: %s", exc)
+        log_safe_exception(
+            logger,
+            "Reused market context report save failed",
+            exc,
+            error_code="main_reused_market_report_save_failed",
+            level=logging.WARNING,
+            context={"trigger_source": trigger_source, "region": region},
+        )
 
 
 def run_full_analysis(
@@ -691,12 +717,13 @@ def run_full_analysis(
         )
         if should_skip:
             logger.info(
-                "今日所有相关市场均为非交易日，跳过执行。可使用 --force-run 强制执行。"
+                "All relevant markets are closed today; skipping the run. "
+                "Use --force-run to override."
             )
             return True
         if set(filtered_codes) != set(effective_codes):
             skipped = set(effective_codes) - set(filtered_codes)
-            logger.info("今日休市股票已跳过: %s", skipped)
+            logger.info("Skipped stocks whose markets are closed today: %s", skipped)
         stock_codes = filtered_codes
 
         # 命令行参数 --single-notify 覆盖配置（#55）
@@ -828,7 +855,7 @@ def run_full_analysis(
             if can_skip_market_review:
                 market_report = market_context_full_report or market_context_summary
                 logger.info(
-                    "复盘上下文可复用，跳过重复大盘复盘并复用上下文内容。"
+                    "Reusable market-review context is available; skipping duplicate generation"
                 )
                 _save_reused_market_review_report(
                     pipeline.notifier,
@@ -848,14 +875,17 @@ def run_full_analysis(
                         email_send_to_all=True,
                         route_type="report",
                     ):
-                        logger.info("复用本轮大盘上下文推送大盘复盘成功")
+                        logger.info("Delivered the market review from this run's reusable context")
                     else:
-                        logger.warning("复用本轮大盘上下文推送大盘复盘失败")
+                        logger.warning("Failed to deliver the market review from reusable context")
 
             review_result = None
             if not can_skip_market_review:
                 if analysis_delay > 0:
-                    logger.info(f"等待 {analysis_delay} 秒后执行大盘复盘（避免API限流）...")
+                    logger.info(
+                        "Waiting %s seconds before market review to reduce API throttling",
+                        analysis_delay,
+                    )
                     time.sleep(analysis_delay)
 
                 review_result = _run_market_review_with_shared_lock(
@@ -913,21 +943,21 @@ def run_full_analysis(
                 combined_content = "\n\n---\n\n".join(parts)
                 if pipeline.notifier.is_available():
                     if pipeline.notifier.send(combined_content, email_send_to_all=True, route_type="report"):
-                        logger.info("已合并推送（个股+大盘复盘）")
+                        logger.info("Delivered the combined stock-analysis and market-review report")
                     else:
-                        logger.warning("合并推送失败")
+                        logger.warning("Failed to deliver the combined analysis report")
 
         # 输出摘要
         if results:
-            logger.info("\n===== 分析结果摘要 =====")
+            logger.info("\n===== Analysis result summary =====")
             for r in sorted(results, key=lambda x: x.sentiment_score, reverse=True):
                 emoji = r.get_emoji()
                 logger.info(
                     f"{emoji} {r.name}({r.code}): {r.operation_advice} | "
-                    f"评分 {r.sentiment_score} | {r.trend_prediction}"
+                    f"score {r.sentiment_score} | {r.trend_prediction}"
                 )
 
-        logger.info("\n任务执行完成")
+        logger.info("\nAnalysis run completed")
 
         # === 新增：生成飞书云文档 ===
         try:
@@ -935,7 +965,7 @@ def run_full_analysis(
 
             feishu_doc = FeishuDocManager()
             if feishu_doc.is_configured() and (results or market_report):
-                logger.info("正在创建飞书云文档...")
+                logger.info("Creating a Feishu document")
 
                 # 1. 准备标题 "01-01 13:01大盘复盘"
                 tz_cn = timezone(timedelta(hours=8))
@@ -960,7 +990,7 @@ def run_full_analysis(
                 # 3. 创建文档
                 doc_url = feishu_doc.create_daily_doc(doc_title, full_content)
                 if doc_url:
-                    logger.info(f"飞书云文档创建成功: {doc_url}")
+                    logger.info("Feishu document created: %s", doc_url)
                     # 可选：将文档链接也推送到群里
                     if not args.no_notify:
                         pipeline.notifier.send(
@@ -968,15 +998,20 @@ def run_full_analysis(
                             route_type="report",
                         )
 
-        except Exception as e:
-            logger.error(f"飞书文档生成失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu document generation failed",
+                exc,
+                error_code="main_feishu_document_generation_failed",
+            )
 
         # === Auto backtest ===
         try:
             if getattr(config, 'backtest_enabled', False):
                 from src.services.backtest_service import BacktestService
 
-                logger.info("开始自动回测...")
+                logger.info("Starting automated backtest")
                 service = BacktestService()
                 stats = service.run_backtest(
                     force=False,
@@ -985,16 +1020,27 @@ def run_full_analysis(
                     limit=200,
                 )
                 logger.info(
-                    f"自动回测完成: processed={stats.get('processed')} saved={stats.get('saved')} "
+                    f"Automated backtest completed: processed={stats.get('processed')} saved={stats.get('saved')} "
                     f"completed={stats.get('completed')} insufficient={stats.get('insufficient')} errors={stats.get('errors')}"
                 )
-        except Exception as e:
-            logger.warning(f"自动回测失败（已忽略）: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Automated backtest failed; continuing without backtest results",
+                exc,
+                error_code="main_automated_backtest_failed",
+                level=logging.WARNING,
+            )
 
         return True
 
-    except Exception as e:
-        logger.exception(f"分析流程执行失败: {e}")
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Analysis workflow failed",
+            exc,
+            error_code="main_analysis_workflow_failed",
+        )
         if raise_errors:
             raise
         return False
@@ -1106,7 +1152,7 @@ def start_api_server(host: str, port: int, config: Config) -> None:
                 f"FastAPI server failed to start: {host}:{port}; {startup_error[0]}"
             )
         if uvicorn_server.started:
-            logger.info(f"FastAPI 服务已启动: http://{host}:{port}")
+            logger.info("FastAPI server started: http://%s:%s", host, port)
             return
         if not thread.is_alive():
             break
@@ -1115,7 +1161,7 @@ def start_api_server(host: str, port: int, config: Config) -> None:
     if startup_error:
         raise RuntimeError(f"FastAPI server failed to start: {host}:{port}; {startup_error[0]}")
     if uvicorn_server.started:
-        logger.info(f"FastAPI 服务已启动: http://{host}:{port}")
+        logger.info("FastAPI server started: http://%s:%s", host, port)
         return
     if not thread.is_alive():
         raise RuntimeError(f"FastAPI 服务器启动后立即退出: {host}:{port}")
@@ -1144,7 +1190,12 @@ def start_bot_stream_clients(config: Config) -> None:
                 logger.warning("[Main] Dingtalk Stream enabled but SDK is missing.")
                 logger.warning("[Main] Run: pip install dingtalk-stream")
         except Exception as exc:
-            logger.error(f"[Main] Failed to start Dingtalk Stream client: {exc}")
+            log_safe_exception(
+                logger,
+                "DingTalk Stream client failed to start",
+                exc,
+                error_code="main_dingtalk_stream_start_failed",
+            )
 
     # 启动飞书 Stream 客户端
     if getattr(config, 'feishu_stream_enabled', False):
@@ -1159,14 +1210,20 @@ def start_bot_stream_clients(config: Config) -> None:
                 logger.warning("[Main] Feishu Stream enabled but SDK is missing.")
                 logger.warning("[Main] Run: pip install lark-oapi")
         except Exception as exc:
-            logger.error(f"[Main] Failed to start Feishu Stream client: {exc}")
+            log_safe_exception(
+                logger,
+                "Feishu Stream client failed to start",
+                exc,
+                error_code="main_feishu_stream_start_failed",
+            )
 
 
 def _resolve_scheduled_stock_codes(stock_codes: Optional[List[str]]) -> Optional[List[str]]:
     """Scheduled runs should always read the latest persisted watchlist."""
     if stock_codes is not None:
         logger.warning(
-            "定时模式下检测到 --stocks 参数；计划执行将忽略启动时股票快照，并在每次运行前重新读取最新的 STOCK_LIST。"
+            "Scheduled mode received --stocks; scheduled runs ignore the startup snapshot "
+            "and reload the latest STOCK_LIST before each run"
         )
     return None
 
@@ -1254,25 +1311,47 @@ def main() -> int:
             format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
             stream=sys.stderr,
         )
-        logger.warning("Bootstrap 日志初始化失败，已回退到 stderr: %s", exc)
+        for handler in logging.getLogger().handlers:
+            handler.setFormatter(
+                RelativePathFormatter(
+                    "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+                )
+            )
+        log_safe_exception(
+            logger,
+            "Bootstrap logging initialization failed; using stderr",
+            exc,
+            error_code="main_bootstrap_logging_setup_failed",
+            level=logging.WARNING,
+        )
 
     # 加载配置（在 bootstrap logging 之后执行，确保异常有日志）
     try:
         config = get_config()
     except Exception as exc:
-        logger.exception("加载配置失败: %s", exc)
+        log_safe_exception(
+            logger,
+            "Configuration loading failed",
+            exc,
+            error_code="main_configuration_load_failed",
+        )
         return 1
 
     # 配置日志（输出到控制台和文件）
     try:
         _setup_runtime_logging(config.log_dir, debug=args.debug)
     except Exception as exc:
-        logger.exception("切换到配置日志目录失败: %s", exc)
+        log_safe_exception(
+            logger,
+            "Configured runtime logging setup failed",
+            exc,
+            error_code="main_runtime_logging_setup_failed",
+        )
         return 1
 
     logger.info("=" * 60)
-    logger.info("A股自选股智能分析系统 启动")
-    logger.info(f"运行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info("StockPulse analysis service starting")
+    logger.info("Start time: %s", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     logger.info("=" * 60)
 
     # 验证配置
@@ -1298,7 +1377,7 @@ def main() -> int:
             for c in split_stock_list(args.stocks)
             if (c or "").strip()
         ]
-        logger.info(f"使用命令行指定的股票列表: {stock_codes}")
+        logger.info("Using the stock list supplied on the command line: %s", stock_codes)
 
     # === 处理 --webui / --webui-only 参数，映射到 --serve / --serve-only ===
     if args.webui:
@@ -1361,12 +1440,19 @@ def main() -> int:
             "workers": getattr(args, "workers", None),
         })
         if not prepare_webui_frontend_assets():
-            logger.warning("前端静态资源未就绪，继续启动 FastAPI 服务（Web 页面可能不可用）")
+            logger.warning(
+                "Frontend assets are not ready; starting FastAPI without a usable Web page"
+            )
         try:
             start_api_server(host=args.host, port=args.port, config=config)
             bot_clients_started = True
-        except Exception as e:
-            logger.error(f"启动 FastAPI 服务失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "FastAPI service startup failed",
+                exc,
+                error_code="main_fastapi_start_failed",
+            )
             if args.serve_only:
                 return 1
             start_serve = False
@@ -1376,22 +1462,22 @@ def main() -> int:
 
     # === 仅 Web 服务模式：不自动执行分析 ===
     if args.serve_only:
-        logger.info("模式: 仅 Web 服务")
-        logger.info(f"Web 服务运行中: http://{args.host}:{args.port}")
-        logger.info("通过 /api/v1/analysis/analyze 接口触发分析")
-        logger.info(f"API 文档: http://{args.host}:{args.port}/docs")
-        logger.info("按 Ctrl+C 退出...")
+        logger.info("Mode: Web service only")
+        logger.info("Web service running at http://%s:%s", args.host, args.port)
+        logger.info("Trigger analysis through /api/v1/analysis/analyze")
+        logger.info("API documentation: http://%s:%s/docs", args.host, args.port)
+        logger.info("Press Ctrl+C to exit")
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            logger.info("\n用户中断，程序退出")
+            logger.info("\nInterrupted by the user; exiting")
         return 0
 
     try:
         # 模式0: 回测
         if getattr(args, 'backtest', False):
-            logger.info("模式: 回测")
+            logger.info("Mode: backtest")
             from src.services.backtest_service import BacktestService
 
             service = BacktestService()
@@ -1401,7 +1487,7 @@ def main() -> int:
                 eval_window_days=getattr(args, 'backtest_days', None),
             )
             logger.info(
-                f"回测完成: processed={stats.get('processed')} saved={stats.get('saved')} "
+                f"Backtest completed: processed={stats.get('processed')} saved={stats.get('saved')} "
                 f"completed={stats.get('completed')} insufficient={stats.get('insufficient')} errors={stats.get('errors')}"
             )
             return 0
@@ -1423,10 +1509,13 @@ def main() -> int:
                     getattr(config, 'market_review_region', 'cn') or 'cn', open_markets
                 )
                 if effective_region == '':
-                    logger.info("今日大盘复盘相关市场均为非交易日，跳过执行。可使用 --force-run 强制执行。")
+                    logger.info(
+                        "All markets relevant to the review are closed today; skipping the run. "
+                        "Use --force-run to override."
+                    )
                     return 0
 
-            logger.info("模式: 仅大盘复盘")
+            logger.info("Mode: market review only")
             notifier, analyzer, search_service = build_market_review_runtime(config)
 
             _run_market_review_with_shared_lock(
@@ -1444,19 +1533,22 @@ def main() -> int:
         # 模式2: 定时任务模式
         if args.schedule or config.schedule_enabled:
             if start_serve:
-                logger.info("模式: Web/API runtime scheduler")
-                logger.info(f"Web 服务运行中: http://{args.host}:{args.port}")
-                logger.info("Web/API runtime scheduler 已接管定时任务，保存设置会作用于当前进程")
-                logger.info("按 Ctrl+C 退出...")
+                logger.info("Mode: Web/API runtime scheduler")
+                logger.info("Web service running at http://%s:%s", args.host, args.port)
+                logger.info(
+                    "The Web/API runtime scheduler owns scheduled runs; "
+                    "saved settings apply to this process"
+                )
+                logger.info("Press Ctrl+C to exit")
                 try:
                     while True:
                         time.sleep(1)
                 except KeyboardInterrupt:
-                    logger.info("\n用户中断，程序退出")
+                    logger.info("\nInterrupted by the user; exiting")
                 return 0
 
-            logger.info("模式: 定时任务")
-            logger.info(f"每日执行时间: {config.schedule_time}")
+            logger.info("Mode: scheduled analysis")
+            logger.info("Daily run time: %s", config.schedule_time)
 
             # Determine whether to run immediately:
             # Command line arg --no-run-immediately overrides config if present.
@@ -1465,7 +1557,7 @@ def main() -> int:
             if getattr(args, 'no_run_immediately', False):
                 should_run_immediately = False
 
-            logger.info(f"启动时立即执行: {should_run_immediately}")
+            logger.info("Run immediately at startup: %s", should_run_immediately)
 
             from src.scheduler import run_with_schedule
             scheduled_stock_codes = _resolve_scheduled_stock_codes(stock_codes)
@@ -1487,7 +1579,7 @@ def main() -> int:
                     stats = alert_worker.run_once()
                     triggered_count = stats.get("triggered", 0)
                     if triggered_count:
-                        logger.info("[EventMonitor] 本轮触发 %d 条提醒", triggered_count)
+                        logger.info("[EventMonitor] Triggered %d alerts in this run", triggered_count)
 
                 background_tasks.append({
                     "task": event_monitor_task,
@@ -1513,14 +1605,14 @@ def main() -> int:
         if config.run_immediately:
             _run_analysis_with_runtime_scheduler_lock(config, args, stock_codes)
         else:
-            logger.info("配置为不立即运行分析 (RUN_IMMEDIATELY=false)")
+            logger.info("Immediate analysis is disabled (RUN_IMMEDIATELY=false)")
 
-        logger.info("\n程序执行完成")
+        logger.info("\nProgram execution completed")
 
         # 如果启用了服务且是非定时任务模式，保持程序运行
         keep_running = start_serve and not (args.schedule or config.schedule_enabled)
         if keep_running:
-            logger.info("API 服务运行中 (按 Ctrl+C 退出)...")
+            logger.info("API service is running (press Ctrl+C to exit)")
             try:
                 while True:
                     time.sleep(1)
@@ -1530,11 +1622,16 @@ def main() -> int:
         return 0
 
     except KeyboardInterrupt:
-        logger.info("\n用户中断，程序退出")
+        logger.info("\nInterrupted by the user; exiting")
         return 130
 
-    except Exception as e:
-        logger.exception(f"程序执行失败: {e}")
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Main execution failed",
+            exc,
+            error_code="main_execution_failed",
+        )
         return 1
 
 

@@ -15,14 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Web 用户可见文案与通知测试默认文案中的旧 DSA 品牌统一为 StockPulse；环境变量、API 字段、协议标识、内部模块名和历史载荷中的兼容标识保持不变。
 - [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
-- [修复] System Config、Backtest、图片提取、Agent 与 AlphaSift 的错误边界统一收口：未知下游异常返回安全的结构化 500，诊断递归移除凭据、URL query token 与私有端点，SSE/history/日志不再回显敏感原文，预期校验错误仍保留明确的 4xx 语义。
+- [修复] API、Agent、Bot、System Config、Backtest、图片提取与 AlphaSift 的异常日志统一通过共享安全入口记录：保留 trace ID、稳定错误码和异常类型，同时递归移除凭据、Authorization/Cookie、URL query token 与私有端点，限制诊断长度且不再附带原始 traceback；未知下游异常仍返回安全的结构化 500，预期校验错误保留明确的 4xx 语义。
 - [修复] 全局 422 请求校验 envelope 删除 Pydantic `input` 与异常上下文，只保留安全的字段位置、类型和通用文案，避免登录或配置请求中的 password/API key 被响应与浏览器 trace 复制。
-- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触 mask token；新增失败 trace 与 artifact 扫描防泄漏回归，并修复整数 `timeout_seconds` 被 Pydantic 规范为浮点数后造成的模型解析 smoke 误报。
+- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触专用 canary/mask token；含 canary 的 E2E 运行关闭 screenshot、video、trace screenshot 和媒体附件，并在受扫描目录输出 JSON 结果。CI 严格扫描文本、日志、JSON、HAR、trace/ZIP 条目与原始二进制 canary，拒绝 PNG/JPEG/WebM 扩展名或媒体签名且不使用 OCR；只有扫描成功才上传同一运行目录，测试失败但扫描通过时仍保留安全诊断。
 - [改进] Web 配置备份入口从普通“系统与安全”页移入“高级”，保留原有 `.env` 导入导出、鉴权和冲突保护契约，避免普通设置路径暴露内部部署细节。
-- [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交新增持久化 operation ID 幂等契约；提交成功后超时重试与并发同 key 请求回放首次响应而不重复入账，同 key 异 payload 稳定返回冲突，Web 重试复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
+- [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交的持久化 operation ID 按操作类型、账户、owner 与客户端 key 隔离；默认 7 天 replay window 内同 payload 回放首次响应、异 payload 稳定冲突，窗口外记录在既有写事务中原子惰性清理且不影响 ledger 数据；旧 SQLite 表采用 additive migration，无法证明历史 owner 的 raw-key 行保持 unscoped，legacy 写入保护 trigger 在代码回滚期间阻止 v2 key 重复入账，并保证再次升级不发生索引冲突。Web 重试继续复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
 - [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据；快捷链接仅接受不含内嵌用户名或密码的 HTTPS URL，并在规范化后去重，删除按 Provider ID 维护的前端业务外链表。
 - [修复] 配置 Schema API 完整透传字段条件契约；Web 对 AI 字段缺失/未知 `uiPlacement` 统一隔离到“高级”只读诊断，对未知条件保持可见但锁定，避免旧 Schema 或滚动部署重新暴露第二套普通编辑入口。
-- [改进] Web-facing API 错误统一为稳定 `error/message/params/details/trace_id` envelope，前端按 UI language 映射主错误并将 legacy 原文保留在诊断详情；任务 POST、SSE 与轮询载荷补齐 `message_code/message_params`，切换语言时已有任务即时重渲染，断线恢复按 task ID 去重合并。
+- [改进] Web-facing API 错误统一为稳定 `error/message/params/details/trace_id` envelope，并在弃用窗口内以只读 legacy `detail` 同值别名兼容旧消费者；5xx 两字段都只携带相同安全结构或 `null`。前端优先读取 `details` 并兼容任意 JSON 形态的旧 `detail`，按 UI language 映射主错误并保留安全诊断；任务 POST、SSE 与轮询载荷补齐 `message_code/message_params`，切换语言时已有任务即时重渲染，断线恢复按 task ID 去重合并。
 - [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
 - [修复] 移除上游 AIHubMix referral `APP-Code` 自动注入及 Anspire/AIHubMix/SerpAPI 推荐参数和优惠宣称；用户显式配置的自定义 headers 保持不变。
 - [改进] Workflow、邮件默认发件人、HTTP User-Agent、Web fallback 标题与 OpenAPI 标题统一使用 StockPulse；部署、桌面发布校验和远程股票索引切换到当前仓库。
@@ -37,25 +37,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 登录页品牌标题统一为可访问的 `StockPulse`，隔离 Playwright 登录 smoke 不再依赖旧 `DAILY STOCK / Analysis Engine` 文案。
 - [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测。
 - [修复] 删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 模型管理弹窗列出全部引用并支持在统一草稿中选择替代模型，后端以结构化 `model_in_use/details.referenced_by` 阻止 API 绕过；替换引用与删除可在同一事务原子成功，历史失效值仍保留并标记不可用。
-- [改进] Provider Catalog 成为模型接入业务元数据唯一来源：Custom、字段要求与 `supportsDiscovery` 均由后端返回，Ollama 使用 `/api/tags` 空 Key 发现；模型多选收起为可搜索 listbox，连接卡补齐 Provider 标识与组合状态，字段错误关联 `aria-invalid/aria-describedby`，模型接入页移除外层装饰卡片。
+- [改进] Provider Catalog 成为 Provider 身份、双语标签、默认端点、协议、发现能力与本地/自定义属性的唯一元数据来源；同一 API 返回的 `connection_fields` Schema 成为动态 Connection required/visible/enabled 与可写字段集合的唯一权威来源。该属性存在时（包括显式 `[]`）不读取 Catalog 的 legacy requirement flags，仅在旧后端完全省略属性时启用隔离的 rolling-upgrade fallback；AND 中任一未知 operator 优先于更早的未满足条件，字段保持可见、只读、诊断并阻止保存。显式空 `display_name` 由前后端一致拒绝，仅兼容完全省略该字段的旧配置；内置 Provider 提供 `label_zh`/`label_en`，旧 `label`/`is_required` 仅为 deprecated 兼容输出；Ollama 使用 `/api/tags` 空 Key 发现，模型多选收起为可搜索 listbox。
 - [测试] Playwright 使用隔离 `.env`、SQLite、密码哈希与 session secret，启动时确定性播种 Markdown 报告，结束后清理 runtime，并保留后端/Vite/fake-provider 服务日志；登录 smoke 按当前 StockPulse 首次设密/登录流程执行，不再依赖开发者状态或整套 skip。
 - [文档] 中英文贡献指南、模型配置指南、Provider 指南、设置帮助与 `.env.example` 同步 Provider/Connection/Model/Task Assignment、多连接、发现、stale 值保留和 E2E 隔离语义；设置路径统一为「AI 与模型 → 模型接入」。
 - [改进] Web 设置页任务模型（报告/Agent/Vision）与备用模型添加控件改为严格列表选择器（`SearchableSelect`，listbox 语义、支持搜索/键盘/读屏）：仅可从后端可用模型目录选择，删除自由输入组件 `CreatableCombobox`；目录外已存值标注「当前配置不可用」，空值显示占位提示而非误报不可用。
 - [改进] 后端配置 Schema 新增 `ui_placement` 标记（model_access/task_routing/developer_diagnostics/hidden_legacy）作为字段 UI 归属唯一权威源：Web 通用分类视图按该标记排除专属界面字段与隐藏 legacy Provider 字段，删除前端手写的 legacy Provider 分组名单（`LEGACY_MODEL_PROVIDER_GROUP_IDS`）；不改配置保存/读取契约。
 - [改进] Web 设置页普通路径术语与设计收敛：运行时注入密钥的提示不再引用 `.env`/内部变量名，模型备用顺序说明去除内部实现名词；设置面与基础控件清理魔法字号/圆角（`text-[11px]`→`text-xs`、`rounded-[10px]`→`rounded-lg`、`rounded-[6px]`→`rounded-md`）。
-- [改进] Web 的 Modal、Drawer、ConfirmDialog 与移动历史面板统一使用 Overlay stack：只允许顶层响应 Escape/Tab，背景 inert、滚动锁定、打开聚焦和关闭焦点恢复行为一致，Confirm 层级高于 Drawer/Modal，Home/Chat 不再保留自制移动侧栏。
-- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`，每次运行通过 artifact v6 保留 7 天的截图、trace、video 与服务日志，用于 PR 可视验收与失败诊断。
+- [改进] Web 的 Modal、Drawer、ConfirmDialog、Settings Help 与移动历史面板统一使用 Overlay stack：只允许顶层响应 Escape/Tab，背景 inert、引用计数滚动锁定、打开聚焦和关闭焦点恢复行为一致，Confirm 层级高于 Drawer/Modal，Home/Chat/Help 不再保留自制 Overlay 状态机。
+- [改进] Home 以 query 参数作为报告与 Run Flow 对象真源：`recordId`、task/history flow 深链支持刷新、分享与 Back/Forward 恢复，关闭 Drawer 只移除对应 flow 参数；非法/失效参数使用 replace 规范化，快速切换采用 latest-request-wins 且保留无关参数。
+- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`；含凭据 canary 的运行只保留扫描通过的文本日志、JSON 结果与无媒体 trace/ZIP 诊断 7 天，PR 页面截图改由不含凭据的独立证据提供。
 - [文档] 补充前端开发代理变量 `DSA_WEB_DEV_API_PROXY` 到 `.env.example` 与贡献指南；修正本段中「模型供应商面板/高级视图」删除与保留的矛盾描述，统一为最终四视图状态；LLM 配置指南（中英）的旧术语统一为「设置 → AI 与模型 → 模型接入」。
 - [改进] Web 设置页「AI 与模型」收敛为 总览/模型接入/任务路由/可靠性 四个视图：删除「高级」二级视图与遗留「模型供应商」子页映射，legacy Provider 凭据键保持后端（env/YAML）兼容但不再形成 Web 第二编辑入口；模型接入页只展示紧凑连接卡片，内部配置来源、生成后端、CLI 与冒烟测试统一移入顶层「高级 → 开发者诊断」并默认折叠。
 - [改进] Web 设置页模型输入全面改为选择器交互：新增 `ModelMultiSelect` 多选组件，连接编辑器「发现的模型」改为搜索并勾选启用；手动添加模型改为每次回车/点击添加一项，粘贴逗号/空白分隔列表自动拆分去重；模型下拉搜索同时匹配显示名/模型路由/所属连接/服务商；可靠性页备用模型列表支持上移/下移排序，目录外的已配置路由保留并标注「当前配置不可用」而不静默清除。
-- [修复] 首次配置向导对 Ollama 等免密钥服务的首次配置不再受阻：API 密钥按服务商目录标注「（可选）/可留空」；「自动发现模型」结果不再整批自动启用，改为展示候选列表由用户勾选确认；手动输入逐项添加并兼容粘贴逗号分隔列表。
+- [修复] 首次配置向导对 Ollama 等免密钥服务的首次配置不再受阻：API 密钥按后端 `connection_fields` Schema 标注「（可选）/可留空」；「自动发现模型」结果不再整批自动启用，改为展示候选列表由用户勾选确认；手动输入逐项添加并兼容粘贴逗号分隔列表。
 - [改进] 模型接入术语与文案降低理解成本：统一「主要模型 / 备用模型 / 服务地址 / API 密钥」用语，连接编辑器表单示例从 `KEY=value` 环境变量形式改为纯值示例（如 `https://api.deepseek.com`、`sk-xxxx`），中英文界面与帮助文案术语对齐（model connections）。
 - [改进] Web 设置页多值枚举字段（`NOTIFICATION_REPORT_CHANNELS`/`NOTIFICATION_ALERT_CHANNELS`/`NOTIFICATION_SYSTEM_ERROR_CHANNELS`、`MARKET_REVIEW_REGION`）渲染为勾选组，不再要求手输逗号分隔字符串；目录外的已存值保持可见、可取消，保存不静默丢弃；未显式设置的字段回填后端默认值展示（密码控件除外）；后端注册表为上述字段标注 `multi_value` 并修正英文描述措辞。
 - [改进] 后端配置保存校验补齐 Vision 模型引用保护：当本次更新触及渠道结构（删除/停用连接、修改 `LLM_CHANNELS` 或渠道键）导致 `VISION_MODEL` 指向已启用连接中不存在的模型时，保存被拒绝（`unknown_model`），与主模型/备用模型引用保护一致；历史失效的 Vision 引用仍不阻断无关配置保存。
 - [新功能] 大盘复盘报告页接入市场结构上下文卡片：持久化报告包含市场结构字段时，在复盘报告视图渲染题材主线与个股位置（`MarketStructureCard`），旧报告无该字段时静默跳过。
-- [改进] 上游 UI 设计规范修复与守卫增强：首页股票工作区移除魔法像素字号（`text-[11px]` 改用 Tailwind 字号刻度）；设计守卫测试新增「禁止魔法像素字号」与「按钮保持胶囊形状（禁 rounded-lg/rounded-md）」断言，并对按钮提取正则做自检防止断言空转。
+- [改进] Web 设计守卫扫描全部生产 CSS/TSX，阻断非胶囊按钮覆盖、组件内 hardcoded hex/颜色函数、魔法像素字号/尺寸/圆角和原始 `100vh`；独立 fixture 覆盖每类规则，原生按钮由全局胶囊基线兜底，且不牺牲 44px 触控目标或可访问 focus ring。后端本轮触及的开发日志同步改为英文。
 - [文档] 修正模型接入相关文档与帮助文案的矛盾与过时描述：UI 路径统一为「设置 → AI 与模型 → 模型接入」（FAQ、LLM 配置指南、设置帮助、文档索引，中英文同步）；历史失效模型引用明确保留并标记不可用，删除在用模型由 `model_in_use` 阻断；market-support 中 `MARKET_REVIEW_REGION` 的「文本框输入逗号分隔」描述更新为勾选组现状。
-- [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，只保留 provider id/label/protocol/默认端点/是否需要凭据/是否需要 Base URL/是否支持发现/capabilities/是否本地/自定义。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
+- [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，保留 provider id/label/protocol/默认端点/发现能力/capabilities/本地或自定义属性；`requires_api_key`/`requires_base_url` 仅作为旧后端 compatibility fallback，不在 `connection_fields` 存在时参与字段规则。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
 - [修复] 修复全量测试在本地开发 `.env` 存在时的模型与认证状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原；Auth API 与 ConfigManager 测试恢复原 `ENV_FILE`/`DATABASE_PATH`，Intelligence/Usage API 测试显式隔离认证状态，避免开发配置 `ADMIN_AUTH_ENABLED=true` 造成无关 401（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。仅剩 3 个与模型接入无关、单独运行也失败的既有 `test_decision_signal_service` 时序相关基线用例。
 - [改进] Web 设置页「AI 与模型 → 模型接入」收敛为唯一的模型服务/连接/模型配置入口：主页只保留标题、一个「添加模型服务」主操作、紧凑连接卡片与空状态；添加、编辑和模型管理统一使用同一个 Modal（390px 下为底部面板），服务商选择、凭据、模型发现/多选与手动 token 添加不再平铺到主页；同一服务商可创建多条连接，底层存储格式与 YAML/Legacy 兼容不变。
 - [改进] Web 设置页删除 AI 与模型「高级」下的独立「模型供应商」面板（`ModelProvidersPanel`）与前端 `modelProviders.ts` 映射：Provider 凭据/端点/模型不再有第二套编辑入口，模型服务商元数据统一来自后端 Provider Catalog（AI 与模型的「高级」二级视图随后在本轮收敛中整体移除，最终态见上文四视图条目）。

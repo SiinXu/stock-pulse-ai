@@ -13,6 +13,7 @@ import time
 import re
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -106,10 +107,13 @@ class TelegramSender:
                     timeout_seconds=timeout_seconds,
                 )
 
-        except Exception as e:
-            logger.error(f"发送 Telegram 消息失败: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Telegram message delivery failed",
+                exc,
+                error_code="telegram_delivery_failed",
+            )
             return False
 
     def _send_telegram_message(
@@ -140,15 +144,31 @@ class TelegramSender:
         for attempt in range(1, max_retries + 1):
             try:
                 response = requests.post(api_url, json=payload, timeout=timeout_seconds or 10)
-            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
                 if attempt < max_retries:
                     delay = 2 ** attempt  # 2s, 4s
-                    logger.warning(f"Telegram request failed (attempt {attempt}/{max_retries}): {e}, "
-                                   f"retrying in {delay}s...")
+                    log_safe_exception(
+                        logger,
+                        "Telegram request failed; retry scheduled",
+                        exc,
+                        error_code="telegram_request_retry",
+                        level=logging.WARNING,
+                        context={
+                            "attempt": attempt,
+                            "max_attempts": max_retries,
+                            "retry_in_seconds": delay,
+                        },
+                    )
                     time.sleep(delay)
                     continue
                 else:
-                    logger.error(f"Telegram request failed after {max_retries} attempts: {e}")
+                    log_safe_exception(
+                        logger,
+                        "Telegram request failed after retries",
+                        exc,
+                        error_code="telegram_request_retries_exhausted",
+                        context={"attempt": attempt},
+                    )
                     return False
 
             if response.status_code == 200:
@@ -223,8 +243,13 @@ class TelegramSender:
 
         try:
             response = requests.post(api_url, json=plain_payload, timeout=timeout_seconds or 10)
-        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            logger.error(f"Telegram plain-text fallback failed: {e}")
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as exc:
+            log_safe_exception(
+                logger,
+                "Telegram plain-text fallback failed",
+                exc,
+                error_code="telegram_plain_text_fallback_failed",
+            )
             return False
 
         if response.status_code == 200:
@@ -354,8 +379,13 @@ class TelegramSender:
                 return True
             logger.error("Telegram 图片发送失败: %s", response.text[:200])
             return False
-        except Exception as e:
-            logger.error("Telegram 图片发送异常: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Telegram image delivery failed",
+                exc,
+                error_code="telegram_image_delivery_failed",
+            )
             return False
 
     def _convert_to_telegram_markdown(self, text: str) -> str:

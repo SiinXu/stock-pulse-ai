@@ -10,6 +10,7 @@ Tools:
 import logging
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -73,11 +74,13 @@ def _persist_news_response(
             saved_count,
         )
     except Exception as exc:
-        logger.warning(
-            "Agent news intel persistence failed for %s (dimension=%s): %s",
-            code,
-            dimension,
+        log_safe_exception(
+            logger,
+            "Agent news intelligence persistence failed",
             exc,
+            error_code="agent_news_persistence_failed",
+            level=logging.WARNING,
+            context={"stock_code": code, "dimension": dimension},
         )
 
 

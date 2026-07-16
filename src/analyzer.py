@@ -293,6 +293,11 @@ class _AllModelsFailedError(Exception):
 
 
 from src.utils.data_processing import normalize_report_signal_attribution
+from src.utils.sanitize import (
+    exception_chain_redaction_values,
+    log_safe_exception,
+    sanitize_diagnostic_text as sanitize_shared_diagnostic_text,
+)
 
 
 def check_content_integrity(
@@ -934,7 +939,13 @@ def fill_chip_structure_if_needed(result: "AnalysisResult", chip_data: Any) -> N
             dp["chip_structure"] = merged
             logger.info("[chip_structure] Filled placeholder chip fields from data source (Issue #589)")
     except Exception as e:
-        logger.warning("[chip_structure] Fill failed, skipping: %s", e)
+        log_safe_exception(
+            logger,
+            "Chip structure fallback fill failed",
+            e,
+            error_code="chip_structure_fallback_fill_failed",
+            level=logging.WARNING,
+        )
 
 
 _PRICE_POS_KEYS = ("ma5", "ma10", "ma20", "bias_ma5", "bias_status", "current_price", "support_level", "resistance_level")
@@ -988,7 +999,13 @@ def fill_price_position_if_needed(
             dp["price_position"] = pp
             logger.info("[price_position] Filled placeholder fields from computed data")
     except Exception as e:
-        logger.warning("[price_position] Fill failed, skipping: %s", e)
+        log_safe_exception(
+            logger,
+            "Price position fallback fill failed",
+            e,
+            error_code="price_position_fallback_fill_failed",
+            level=logging.WARNING,
+        )
 
 
 def stabilize_decision_with_structure(
@@ -1166,7 +1183,13 @@ def stabilize_decision_with_structure(
                 )
         _sync_stability_dashboard_fields(result)
     except Exception as exc:
-        logger.warning("[decision_stability] skipped: %s", exc)
+        log_safe_exception(
+            logger,
+            "Decision stability calibration skipped",
+            exc,
+            error_code="decision_stability_calibration_failed",
+            level=logging.WARNING,
+        )
 
 
 def _has_structural_risk_alert(result: "AnalysisResult") -> bool:
@@ -1649,7 +1672,14 @@ def get_stock_name_multi_source(
             from data_provider.base import DataFetcherManager
             data_manager = DataFetcherManager()
         except Exception as e:
-            logger.debug(f"无法初始化 DataFetcherManager: {e}")
+            log_safe_exception(
+                logger,
+                "Data fetcher manager initialization failed",
+                e,
+                error_code="data_fetcher_manager_initialization_failed",
+                level=logging.DEBUG,
+                context={"symbol": stock_code},
+            )
 
     if data_manager:
         try:
@@ -1659,7 +1689,14 @@ def get_stock_name_multi_source(
                 STOCK_NAME_MAP[stock_code] = name
                 return name
         except Exception as e:
-            logger.debug(f"从数据源获取股票名称失败: {e}")
+            log_safe_exception(
+                logger,
+                "Stock name lookup from data providers failed",
+                e,
+                error_code="stock_name_provider_lookup_failed",
+                level=logging.DEBUG,
+                context={"symbol": stock_code},
+            )
 
     # 4. 返回默认名称
     return f'股票{stock_code}'
@@ -2632,7 +2669,18 @@ class GeminiAnalyzer:
             try:
                 candidates.add(canonicalize_hermes_model_ref(raw_model).route_model)
             except (TypeError, ValueError) as exc:
-                logger.debug("Failed to canonicalize selected Hermes route candidate %r: %s", raw_model, exc)
+                log_safe_exception(
+                    logger,
+                    "Selected Hermes route canonicalization failed",
+                    exc,
+                    error_code="hermes_route_canonicalization_failed",
+                    level=logging.DEBUG,
+                    context={"model": raw_model},
+                    redaction_values=self.get_generation_log_redaction_values(
+                        raw_model,
+                        fallback_error=exc,
+                    ),
+                )
             matched = candidates & blocked_routes
             if matched:
                 selected_blocked_route = sorted(matched)[0]
@@ -2718,10 +2766,7 @@ class GeminiAnalyzer:
 
     def _litellm_redaction_values_for_model(self, config: Config, model: str = "") -> set[str]:
         redactions = self._hermes_redaction_values_for_model(config, model)
-        try:
-            redactions.update(build_hermes_redaction_values(*get_api_keys_for_model(model, config)))
-        except Exception:
-            pass
+        redactions.update(build_hermes_redaction_values(*get_api_keys_for_model(model, config)))
         origins = route_deployment_origins(getattr(config, "llm_model_list", []) or [], model)
         for deployment in (*origins.hermes_deployments, *origins.non_hermes_deployments):
             params = deployment.get("litellm_params") if isinstance(deployment, dict) else None
@@ -2736,10 +2781,53 @@ class GeminiAnalyzer:
         config: Optional[Config] = None,
         model: str = "",
     ) -> str:
-        runtime_config = config or self._get_runtime_config()
-        redactions = self._litellm_redaction_values_for_model(runtime_config, model)
-        sanitized = sanitize_hermes_error_text(exc, redaction_values=redactions)
-        return redact_diagnostic_text(sanitized, limit=500)
+        try:
+            runtime_config = config or self._get_runtime_config()
+            redactions = self._litellm_redaction_values_for_model(runtime_config, model)
+            sanitized = sanitize_hermes_error_text(exc, redaction_values=redactions)
+            return redact_diagnostic_text(sanitized, limit=500)
+        except Exception:
+            return sanitize_shared_diagnostic_text(
+                exc,
+                max_length=500,
+                redaction_values=exception_chain_redaction_values(exc),
+            ) or "Generation diagnostic unavailable"
+
+    def get_generation_log_redaction_values(
+        self,
+        model: str = "",
+        *,
+        fallback_error: Any = None,
+    ) -> set[str]:
+        """Return exact configured secrets that generation diagnostics must redact."""
+        try:
+            runtime_config = self._get_runtime_config()
+            selected_model = model or str(getattr(runtime_config, "litellm_model", "") or "")
+            return self._litellm_redaction_values_for_model(
+                runtime_config,
+                selected_model,
+            )
+        except Exception:
+            if fallback_error is None:
+                raise
+            return exception_chain_redaction_values(fallback_error)
+
+    def sanitize_generation_diagnostic(self, error: Any, model: str = "") -> str:
+        """Sanitize a generation failure for logs, diagnostics, and returned errors."""
+        try:
+            runtime_config = self._get_runtime_config()
+            selected_model = model or str(getattr(runtime_config, "litellm_model", "") or "")
+            return self._sanitize_litellm_exception_text(
+                error,
+                config=runtime_config,
+                model=selected_model,
+            )
+        except Exception:
+            return sanitize_shared_diagnostic_text(
+                error,
+                max_length=500,
+                redaction_values=exception_chain_redaction_values(error),
+            ) or "Generation diagnostic unavailable"
 
     def _dispatch_litellm_completion(
         self,
@@ -3344,7 +3432,16 @@ class GeminiAnalyzer:
         except GenerationError:
             raise
         except Exception as exc:
-            logger.error("[generate_text] LLM call failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Text generation LLM call failed",
+                exc,
+                error_code="text_generation_llm_call_failed",
+                level=logging.ERROR,
+                redaction_values=self.get_generation_log_redaction_values(
+                    fallback_error=exc,
+                ),
+            )
             return None
 
     def analyze(
@@ -3377,7 +3474,16 @@ class GeminiAnalyzer:
             try:
                 progress_callback(progress, message)
             except Exception as exc:
-                logger.debug("[analyzer] progress callback skipped: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "Analyzer progress callback failed",
+                    exc,
+                    error_code="analyzer_progress_callback_failed",
+                    level=logging.DEBUG,
+                    redaction_values=self.get_generation_log_redaction_values(
+                        fallback_error=exc,
+                    ),
+                )
 
         code = context.get('code', 'Unknown')
         config = self._get_runtime_config()
@@ -3644,7 +3750,7 @@ class GeminiAnalyzer:
             return result
             
         except Exception as e:
-            safe_error = self._sanitize_hermes_exception_text(e)
+            safe_error = self.sanitize_generation_diagnostic(e)
             logger.error("AI 分析 %s(%s) 失败: %s", name, code, safe_error)
             return AnalysisResult(
                 code=code,
@@ -4440,9 +4546,15 @@ class GeminiAnalyzer:
         try:
             AnalysisReportSchema.model_validate(data)
         except Exception as exc:
-            logger.warning(
-                "AnalysisReportSchema validation failed; continuing with raw parser contract: %s",
-                str(exc)[:200],
+            log_safe_exception(
+                logger,
+                "Analysis report schema validation failed; continuing with parser fallback",
+                exc,
+                error_code="analysis_report_schema_validation_failed",
+                level=logging.WARNING,
+                redaction_values=self.get_generation_log_redaction_values(
+                    fallback_error=exc,
+                ),
             )
         minimal_keys = {
             "sentiment_score",
@@ -4511,7 +4623,17 @@ class GeminiAnalyzer:
                 _json_str, data = self._extract_analysis_json_object(response_text)
                 self._validate_analysis_minimal_contract(data)
             except Exception as exc:
-                logger.warning("无法从响应中提取唯一有效 JSON，标记为解析失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "Unique analysis JSON extraction failed; using text fallback",
+                    exc,
+                    error_code="analysis_json_extraction_failed",
+                    level=logging.WARNING,
+                    context={"symbol": code},
+                    redaction_values=self.get_generation_log_redaction_values(
+                        fallback_error=exc,
+                    ),
+                )
                 return self._parse_text_response(response_text, code, name)
 
             # 提取 dashboard 数据
@@ -4593,7 +4715,17 @@ class GeminiAnalyzer:
             )
                 
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON 解析失败: {e}，标记为解析失败")
+            log_safe_exception(
+                logger,
+                "Analysis JSON parsing failed; using text fallback",
+                e,
+                error_code="analysis_json_parsing_failed",
+                level=logging.WARNING,
+                context={"symbol": code},
+                redaction_values=self.get_generation_log_redaction_values(
+                    fallback_error=e,
+                ),
+            )
             return self._parse_text_response(response_text, code, name)
     
     def _fix_json_string(self, json_str: str) -> str:

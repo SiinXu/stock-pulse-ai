@@ -20,7 +20,13 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => navigateMock,
+    useNavigate: () => {
+      const navigate = actual.useNavigate();
+      return (...args: Parameters<typeof navigate>) => {
+        navigateMock(...args);
+        return navigate(...args);
+      };
+    },
   };
 });
 
@@ -2196,7 +2202,15 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith(
+      {
+        pathname: '/',
+        search: `?recordId=${marketReviewHistoryReport.meta.id}`,
+        hash: '',
+      },
+      { replace: true, state: null },
+    );
   });
 
   it('clears live market review output when switching to a history report', async () => {

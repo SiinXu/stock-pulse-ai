@@ -157,7 +157,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       </div>
 
       {rules.length === 0 ? (
-        <div className="flex min-h-[220px] flex-1 items-center justify-center">
+        <div className="flex min-h-56 flex-1 items-center justify-center">
           <EmptyState
             icon={<Bell className="h-6 w-6" />}
             title={isLoading ? text.loadingRules : text.emptyTitle}
@@ -166,7 +166,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
+          <table className="w-full min-w-240 text-left text-sm">
             <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
               <tr>
                 <th className="px-3 py-2 font-medium">{text.rule}</th>

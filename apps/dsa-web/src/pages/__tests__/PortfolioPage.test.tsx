@@ -1178,8 +1178,8 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByLabelText('数量')).toBeDisabled();
     expect(screen.getByRole('button', { name: '提交中' })).toBeDisabled();
     expect(screen.getByLabelText('交易日期').closest('.grid')).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
-    expect(within(dialog).getByRole('button', { name: '关闭抽屉' })).toBeDisabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
+    expect(within(dialog).getByRole('button', { name: '关闭' })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('dialog', { name: '手工录入：交易' })).toBeInTheDocument();
 
     await act(async () => {

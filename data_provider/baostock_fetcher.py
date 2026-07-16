@@ -26,8 +26,9 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
+
+from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 
 from .base import (
     BaseFetcher,
@@ -127,7 +128,13 @@ class BaostockFetcher(BaseFetcher):
                 else:
                     logger.warning(f"Baostock 登出异常: {logout_result.error_msg}")
             except Exception as e:
-                logger.warning(f"Baostock 登出时发生错误: {e}")
+                log_safe_exception(
+                    logger,
+                    "Baostock logout failed",
+                    e,
+                    error_code="baostock_logout_failed",
+                    level=logging.WARNING,
+                )
     
     def _convert_stock_code(self, stock_code: str) -> str:
         """
@@ -185,7 +192,12 @@ class BaostockFetcher(BaseFetcher):
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
         retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Baostock daily data retry scheduled",
+            error_code="baostock_daily_data_retry",
+        ),
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -330,7 +342,14 @@ class BaostockFetcher(BaseFetcher):
                             return name
                 
         except Exception as e:
-            logger.warning(f"Baostock 获取股票名称失败 {stock_code}: {e}")
+            log_safe_exception(
+                logger,
+                "Baostock stock name lookup failed",
+                e,
+                error_code="baostock_stock_name_lookup_failed",
+                level=logging.WARNING,
+                context={"symbol": stock_code},
+            )
         
         return None
     
@@ -370,7 +389,13 @@ class BaostockFetcher(BaseFetcher):
                         return df[['code', 'name']]
                 
         except Exception as e:
-            logger.warning(f"Baostock 获取股票列表失败: {e}")
+            log_safe_exception(
+                logger,
+                "Baostock stock list lookup failed",
+                e,
+                error_code="baostock_stock_list_lookup_failed",
+                level=logging.WARNING,
+            )
         
         return None
 

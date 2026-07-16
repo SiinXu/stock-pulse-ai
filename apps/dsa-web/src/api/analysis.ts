@@ -1,4 +1,4 @@
-import apiClient from './index';
+import apiClient, { locallyRecoverableResourceConfig } from './index';
 import {
   createApiError,
   createParsedApiError,
@@ -189,7 +189,8 @@ export const analysisApi = {
    */
   getTaskFlow: async (taskId: string): Promise<RunFlowSnapshot> => {
     const response = await apiClient.get<Record<string, unknown>>(
-      `/api/v1/analysis/tasks/${encodeURIComponent(taskId)}/flow`
+      `/api/v1/analysis/tasks/${encodeURIComponent(taskId)}/flow`,
+      locallyRecoverableResourceConfig(),
     );
 
     return toCamelCase<RunFlowSnapshot>(response.data);

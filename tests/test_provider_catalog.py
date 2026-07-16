@@ -61,13 +61,22 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
 
     def test_catalog_only_declares_the_allowed_metadata_fields(self) -> None:
         allowed = {
-            "id", "label", "protocol", "default_base_url", "capabilities",
+            "id", "label", "label_zh", "label_en", "protocol", "default_base_url", "capabilities",
             "requires_api_key", "requires_base_url", "supports_discovery",
             "is_local", "is_custom", "credential_url", "console_url",
             "models_url", "docs_url",
         }
         for entry in get_provider_catalog():
             self.assertEqual(set(entry.keys()), allowed)
+
+    def test_every_builtin_provider_has_bilingual_labels(self) -> None:
+        chinese_script = re.compile(r"[\u3400-\u9fff]")
+        for entry in get_provider_catalog():
+            self.assertTrue(entry["label_zh"].strip(), entry["id"])
+            self.assertTrue(entry["label_en"].strip(), entry["id"])
+            self.assertIsNone(chinese_script.search(entry["label_en"]), entry["id"])
+            # `label` remains the deprecated compatibility spelling.
+            self.assertEqual(entry["label"], entry["label_zh"])
 
     def test_catalog_exposes_optional_provider_owned_quick_links(self) -> None:
         providers = {entry["id"]: entry for entry in get_provider_catalog()}

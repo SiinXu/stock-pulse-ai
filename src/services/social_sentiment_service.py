@@ -22,8 +22,9 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
+
+from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,12 @@ _REQUEST_RETRY_WAIT_CAP = 5  # wait_exponential(..., max=5)
     stop=stop_after_attempt(2),
     wait=wait_exponential(multiplier=1, min=1, max=5),
     retry=retry_if_exception_type(_TRANSIENT_EXCEPTIONS),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
+    before_sleep=safe_before_sleep_log(
+        logger,
+        logging.WARNING,
+        event="Social sentiment request retry scheduled",
+        error_code="social_sentiment_request_retry",
+    ),
     reraise=True,
 )
 def _get_with_retry(url: str, *, headers: Dict[str, str], params: Optional[Dict[str, Any]] = None,
@@ -96,10 +102,22 @@ class SocialSentimentService:
             if resp.status_code == 200:
                 return resp.json()
             logger.warning("Social sentiment API %s returned %s", url, resp.status_code)
-        except _TRANSIENT_EXCEPTIONS as e:
-            logger.warning("Social sentiment API %s network error: %s", url, e)
-        except Exception as e:
-            logger.warning("Social sentiment API %s unexpected error: %s", url, e)
+        except _TRANSIENT_EXCEPTIONS as exc:
+            log_safe_exception(
+                logger,
+                "Social sentiment API network request failed",
+                exc,
+                error_code="social_sentiment_network_request_failed",
+                level=logging.WARNING,
+            )
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Social sentiment API request failed",
+                exc,
+                error_code="social_sentiment_request_failed",
+                level=logging.WARNING,
+            )
         return None
 
     @classmethod

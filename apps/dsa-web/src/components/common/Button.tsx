@@ -55,7 +55,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const { t } = useUiLanguage();
-  const glowStyles = glow ? 'shadow-glow-cyan settings-glow-cyan-hover' : '';
+  const emphasisStyles = glow ? 'shadow-soft-card hover:shadow-soft-card-strong' : '';
 
   return (
     <button
@@ -68,7 +68,7 @@ export const Button: React.FC<ButtonProps> = ({
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none',
         BUTTON_SIZE_STYLES[size],
         BUTTON_VARIANT_STYLES[variant],
-        glowStyles,
+        emphasisStyles,
         className,
       )}
       disabled={disabled || isLoading}

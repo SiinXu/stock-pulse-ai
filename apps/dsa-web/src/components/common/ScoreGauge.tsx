@@ -15,16 +15,8 @@ interface ScoreGaugeProps {
 
 type SentimentKey = 'greed' | 'neutral' | 'fear';
 
-type GaugeVisualStyle = {
-  svgFilter?: string;
-  glowBlur: number;
-  glowOpacity: number;
-  glowStrokeExtra: number;
-  valueTextShadow?: string;
-};
-
 /**
- * Sentiment score gauge with an animated glowing ring.
+ * Sentiment score gauge with an animated progress ring.
  * Dynamically calculates colors based on sentiment score.
  */
 export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
@@ -82,12 +74,12 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
 
   // Size configuration for each gauge variant.
   const sizeConfig = {
-    sm: { width: 100, stroke: 8, fontSize: 'text-2xl', labelSize: 'text-xs', gap: 6 },
-    md: { width: 140, stroke: 10, fontSize: 'text-4xl', labelSize: 'text-sm', gap: 8 },
-    lg: { width: 180, stroke: 12, fontSize: 'text-5xl', labelSize: 'text-base', gap: 10 },
+    sm: { width: 100, stroke: 8, fontSize: 'text-2xl', labelSize: 'text-xs' },
+    md: { width: 140, stroke: 10, fontSize: 'text-4xl', labelSize: 'text-sm' },
+    lg: { width: 180, stroke: 12, fontSize: 'text-5xl', labelSize: 'text-base' },
   };
 
-  const { width, stroke, fontSize, labelSize, gap } = sizeConfig[size];
+  const { width, stroke, fontSize, labelSize } = sizeConfig[size];
   const radius = (width - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -95,26 +87,22 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   const arcLength = circumference * 0.75;
   const progress = (animatedScore / 100) * arcLength;
 
-  // Sentiment colors - dynamically computed based on score thresholds.
-  // Light theme uses a restrained glow; dark theme keeps the stronger terminal-style glow.
+  // Sentiment colors are dynamically computed based on score thresholds.
   const sentimentConfig = {
     greed: {
-      color: '#41B83D',       // Brand green
-      glowFilter: 'rgba(65, 184, 61, 0.4)',
-      lightColor: '#5CC957',  // Lighter green
-      lightEndColor: '#2E9A2B', // Darker green
+      color: 'hsl(var(--primary))',
+      lightColor: 'hsl(var(--primary))',
+      lightEndColor: 'hsl(var(--primary))',
     },
     neutral: {
-      color: '#878980',       // Neutral gray
-      glowFilter: 'rgba(135, 137, 128, 0.35)',
-      lightColor: '#9CA096',  // Lighter gray
-      lightEndColor: '#6E7268', // Darker gray
+      color: 'hsl(var(--secondary-text))',
+      lightColor: 'hsl(var(--secondary-text))',
+      lightEndColor: 'hsl(var(--secondary-text))',
     },
     fear: {
-      color: '#E9415D',       // Error red
-      glowFilter: 'rgba(233, 65, 93, 0.4)',
-      lightColor: '#F8778D',  // Lighter rose
-      lightEndColor: '#C42B44', // Darker rose
+      color: 'hsl(var(--destructive))',
+      lightColor: 'hsl(var(--destructive))',
+      lightEndColor: 'hsl(var(--destructive))',
     },
   };
 
@@ -128,21 +116,6 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   const sentimentKey = getSentimentKey(animatedScore);
   const colors = sentimentConfig[sentimentKey];
   const uniqueId = `${sentimentKey}-${score}-${animatedScore.toFixed(0)}`;
-  const gaugeTheme: GaugeVisualStyle = isDark
-    ? {
-        svgFilter: `drop-shadow(0 0 12px ${colors.glowFilter})`,
-        glowBlur: 4,
-        glowOpacity: 0.3,
-        glowStrokeExtra: gap,
-        valueTextShadow: `0 0 30px ${colors.glowFilter}`,
-      }
-    : {
-        svgFilter: `drop-shadow(0 0 8px ${colors.glowFilter.replace('0.66', '0.28')})`,
-        glowBlur: 3.4,
-        glowOpacity: 0.26,
-        glowStrokeExtra: Math.max(3, gap * 0.55),
-        valueTextShadow: `0 0 16px ${colors.glowFilter.replace('0.66', '0.22')}`,
-      };
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
@@ -157,10 +130,9 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
           className="gauge-ring overflow-visible"
           width={width}
           height={width}
-          style={gaugeTheme.svgFilter ? { filter: gaugeTheme.svgFilter } : {}}
         >
           <defs>
-            {/* Gradient definition - dark: glow gradient; light: clean gradient */}
+            {/* Keep the progress gradient theme-aware without decorative effects. */}
             <linearGradient id={`gauge-gradient-${uniqueId}`} x1="0%" y1="0%" x2="100%" y2="100%">
               {isDark ? (
                 <>
@@ -174,14 +146,6 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
                 </>
               )}
             </linearGradient>
-
-            <filter id={`gauge-glow-${uniqueId}`}>
-              <feGaussianBlur stdDeviation={gaugeTheme.glowBlur} result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
           </defs>
 
           {/* Background track */}
@@ -195,20 +159,6 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
             strokeLinecap="round"
             strokeDasharray={`${arcLength} ${circumference}`}
             transform={`rotate(135 ${width / 2} ${width / 2})`}
-          />
-
-          <circle
-            cx={width / 2}
-            cy={width / 2}
-            r={radius}
-            fill="none"
-            stroke={isDark ? colors.color : colors.lightColor}
-            strokeWidth={stroke + gaugeTheme.glowStrokeExtra}
-            strokeLinecap="round"
-            strokeDasharray={`${progress} ${circumference}`}
-            transform={`rotate(135 ${width / 2} ${width / 2})`}
-            opacity={gaugeTheme.glowOpacity}
-            filter={`url(#gauge-glow-${uniqueId})`}
           />
 
           {/* Progress arc */}
@@ -227,10 +177,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
 
         {/* Center value */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className={cn('font-bold', fontSize, isDark ? 'text-white' : 'text-foreground')}
-            style={gaugeTheme.valueTextShadow ? { textShadow: gaugeTheme.valueTextShadow } : {}}
-          >
+          <span className={cn('font-bold', fontSize, isDark ? 'text-white' : 'text-foreground')}>
             {displayScore}
           </span>
           {showLabel && (
