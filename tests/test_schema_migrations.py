@@ -1499,8 +1499,14 @@ def test_upgrade_cannot_control_runner_transaction(
     assert _table_exists(database._engine, "migration_transaction_control_probe") is False
 
 
+@pytest.mark.parametrize(
+    "open_replacement_transaction",
+    [False, True],
+    ids=["direct-commit", "replacement-transaction"],
+)
 def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
     tmp_path: Path,
+    open_replacement_transaction: bool,
 ) -> None:
     db_path = tmp_path / "forbidden-authorizer-clear-commit.sqlite"
     database = DatabaseManager(db_url=_database_url(db_path))
@@ -1513,6 +1519,12 @@ def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
         dbapi_connection = connection.connection.driver_connection
         dbapi_connection.set_authorizer(None)
         dbapi_connection.commit()
+        if open_replacement_transaction:
+            dbapi_connection.execute("BEGIN IMMEDIATE")
+            connection.exec_driver_sql(
+                "CREATE TABLE migration_replacement_transaction_probe "
+                "(id INTEGER PRIMARY KEY)"
+            )
 
     migration = _custom_migration(
         1,
@@ -1527,6 +1539,11 @@ def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
     assert migration.id not in _applied_ids(database._engine)
     # Detection happens after the prohibited DBAPI commit, which cannot be undone.
     assert _table_exists(database._engine, "migration_authorizer_bypass_probe") is True
+    if open_replacement_transaction:
+        assert (
+            _table_exists(database._engine, "migration_replacement_transaction_probe")
+            is False
+        )
 
 
 def test_failed_migration_can_be_fixed_and_retried_forward(tmp_path: Path) -> None:

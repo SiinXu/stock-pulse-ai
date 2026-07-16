@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
+import secrets
 import sqlite3
 from typing import Dict, Iterator, Optional, Sequence, Tuple, Union
 
@@ -467,6 +468,7 @@ class MigrationRunner:
         guarded_attributes = []
         missing = object()
         blocked_transaction_control = []
+        allow_savepoint_release = False
 
         def forbidden(*_args, **_kwargs):
             raise MigrationError(
@@ -489,6 +491,15 @@ class MigrationRunner:
                 migration_id,
             )
 
+        savepoint_name = f"stockpulse_migration_guard_{secrets.token_hex(16)}"
+        try:
+            dbapi_connection.execute(f"SAVEPOINT {savepoint_name}").close()
+        except sqlite3.Error as exc:
+            raise MigrationError(
+                "migration_transaction_guard_unavailable",
+                migration_id,
+            ) from exc
+
         for method_name in (
             "begin",
             "begin_nested",
@@ -509,10 +520,17 @@ class MigrationRunner:
         def authorize_sqlite_operation(
             action_code,
             operation,
-            _argument,
+            argument,
             _database,
             _trigger,
         ) -> int:
+            if (
+                action_code == sqlite3.SQLITE_SAVEPOINT
+                and allow_savepoint_release
+                and str(operation or "").upper() == "RELEASE"
+                and argument == savepoint_name
+            ):
+                return sqlite3.SQLITE_OK
             if action_code in {
                 sqlite3.SQLITE_TRANSACTION,
                 sqlite3.SQLITE_SAVEPOINT,
@@ -536,6 +554,20 @@ class MigrationRunner:
                 blocked_transaction_control
                 or not dbapi_connection.in_transaction
             ):
+                forbidden()
+            allow_savepoint_release = True
+            try:
+                dbapi_connection.execute(
+                    f"RELEASE SAVEPOINT {savepoint_name}"
+                ).close()
+            except sqlite3.Error as exc:
+                raise MigrationError(
+                    "migration_transaction_control_forbidden",
+                    migration_id,
+                ) from exc
+            finally:
+                allow_savepoint_release = False
+            if not dbapi_connection.in_transaction:
                 forbidden()
         except MigrationError:
             raise

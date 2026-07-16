@@ -59,7 +59,7 @@ Migration 在 `DatabaseManager` 初始化调用内同步完成，不会在后台
 
 - SQLite 初始化先用一个 `BEGIN IMMEDIATE` 串行化 `create_all + _ensure_* + baseline`；之后每个正式 migration 再单独取得数据库级写锁，并复用应用现有 busy timeout 契约。
 - 每个 migration 单独提交。该 migration 的 DDL/DML 与 applied row 位于同一事务。
-- Runner 独占事务控制；`upgrade` 不得调用 `begin`、`commit`、`rollback`、`close` 或直接访问底层 DBAPI 事务。公开 SQLAlchemy 事务控制会被阻断，SQLite authorizer 还会拒绝显式 SQL 和底层 DBAPI 发出的 transaction/savepoint opcode。`upgrade` 返回后，Runner 会重新安装 authorizer 并确认其 DBAPI transaction 仍处于活动状态，再写 applied row；如果 migration 清除 authorizer 后直接提交或回滚，transaction ownership 检查会拒绝成功记录并报告稳定迁移错误。检查发生在违规调用之后，因此只能保证不写 applied row，不能撤销已经绕过 guard 提交的数据库状态。
+- Runner 独占事务控制；`upgrade` 不得调用 `begin`、`commit`、`rollback`、`close` 或直接访问底层 DBAPI 事务。公开 SQLAlchemy 事务控制会被阻断，SQLite authorizer 还会拒绝显式 SQL 和底层 DBAPI 发出的 transaction/savepoint opcode。Runner 在调用 `upgrade` 前创建随机 savepoint 作为原事务标记；`upgrade` 返回后会重新安装 authorizer、确认 DBAPI transaction 仍处于活动状态，并释放该标记后才写 applied row。migration 清除 authorizer 后直接提交或回滚会销毁标记，即使它随后开启替代 transaction，也会被拒绝成功记录并报告稳定迁移错误。检查发生在违规调用之后，因此只能保证不写 applied row，不能撤销已经绕过 guard 提交的数据库状态。
 - 第一个 migration 失败后，后续 migration 不执行。
 - 两个进程同时启动时，第二个进程等待写锁，然后重新读取 applied registry。同一 upgrade 不会执行两次。
 - busy timeout 会返回稳定迁移错误，不会靠进程内 `threading.Lock` 掩盖跨进程竞争。
