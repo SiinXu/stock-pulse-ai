@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
 - [修复] API、Agent、Bot、System Config、Backtest、图片提取与 AlphaSift 的异常日志统一通过共享安全入口记录：保留 trace ID、稳定错误码和异常类型，同时递归移除凭据、Authorization/Cookie、URL query token 与私有端点，限制诊断长度且不再附带原始 traceback；未知下游异常仍返回安全的结构化 500，预期校验错误保留明确的 4xx 语义。
 - [修复] 全局 422 请求校验 envelope 删除 Pydantic `input` 与异常上下文，只保留安全的字段位置、类型和通用文案，避免登录或配置请求中的 password/API key 被响应与浏览器 trace 复制。
-- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触专用 canary/mask token；含 canary 的 E2E 运行关闭 screenshot、video、trace screenshot 和媒体附件，并在受扫描目录输出 JSON 结果。CI 严格扫描文本、日志、JSON、HAR、trace/ZIP 条目与原始二进制 canary，拒绝 PNG/JPEG/WebM 扩展名或媒体签名且不使用 OCR；只有扫描成功才上传同一运行目录，测试失败但扫描通过时仍保留安全诊断。
+- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触专用 canary/mask token；含 canary 的 E2E 运行关闭 screenshot、video、trace screenshot 和媒体附件，并在受扫描目录输出 JSON 结果，JSON reporter 显式关闭 commit 与 PR diff 元数据采集，避免把源码差异复制进可上传产物。CI 严格扫描文本、日志、JSON、HAR、trace/ZIP 条目与原始二进制 canary，拒绝 PNG/JPEG/WebM 扩展名或媒体签名且不使用 OCR；只有扫描成功才上传同一运行目录，测试失败但扫描通过时仍保留安全诊断。
 - [改进] Web 配置备份入口从普通“系统与安全”页移入“高级”，保留原有 `.env` 导入导出、鉴权和冲突保护契约，避免普通设置路径暴露内部部署细节。
 - [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交的持久化 operation ID 按操作类型、账户、owner 与客户端 key 隔离；默认 7 天 replay window 内同 payload 回放首次响应、异 payload 稳定冲突，窗口外记录在既有写事务中原子惰性清理且不影响 ledger 数据；旧 SQLite 表采用 additive migration，无法证明历史 owner 的 raw-key 行保持 unscoped，legacy 写入保护 trigger 在代码回滚期间阻止 v2 key 重复入账，并保证再次升级不发生索引冲突。Web 重试继续复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
 - [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据；快捷链接仅接受不含内嵌用户名或密码的 HTTPS URL，并在规范化后去重，删除按 Provider ID 维护的前端业务外链表。

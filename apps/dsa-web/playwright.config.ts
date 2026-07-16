@@ -60,6 +60,7 @@ function resolveBackendCommand() {
 }
 
 export default defineConfig({
+  captureGitInfo: { commit: false, diff: false },
   testDir: './e2e',
   outputDir: path.join(resultDir, 'playwright'),
   fullyParallel: false,

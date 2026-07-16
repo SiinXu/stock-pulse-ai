@@ -649,6 +649,7 @@ def test_secret_bearing_playwright_run_is_text_only_and_emits_json_report() -> N
 
     assert "['list']" in config
     assert "['json', { outputFile: path.join(resultDir, 'playwright-results.json') }]" in config
+    assert "captureGitInfo: { commit: false, diff: false }" in config
     assert "screenshot: 'off'" in config
     assert "video: 'off'" in config
     assert "screenshots: false" in config
