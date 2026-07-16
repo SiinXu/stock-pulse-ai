@@ -352,7 +352,7 @@ describe('HomePage URL state', () => {
     const router = renderHome('/?recordId=1&keep=yes&runFlow=history&runFlowRecordId=404');
 
     await waitFor(() => expect(router.state.location.search).toBe('?recordId=1&keep=yes'));
-    expect(await screen.findByText('未找到请求的内容')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '运行流' })).not.toBeInTheDocument());
+    expect(screen.getByText('未找到请求的内容')).toBeInTheDocument();
   });
 });

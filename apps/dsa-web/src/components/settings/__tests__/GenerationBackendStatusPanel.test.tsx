@@ -244,6 +244,8 @@ describe('GenerationBackendStatusPanel', () => {
 
   it('renders generation backend status labels in English when UI language is English', async () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    const statusRequest = deferred<GenerationBackendStatusResponse>();
+    getGenerationBackendStatus.mockReturnValueOnce(statusRequest.promise);
 
     render(
       <UiLanguageProvider>
@@ -252,8 +254,14 @@ describe('GenerationBackendStatusPanel', () => {
     );
 
     expect(await screen.findByText('Generation backend status')).toBeInTheDocument();
-    expect(screen.getByText('Primary backend')).toBeInTheDocument();
-    expect(screen.getByText('Generation only')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /JSON smoke test/ })).toBeInTheDocument();
+
+    await act(async () => {
+      statusRequest.resolve(localCliStatus);
+      await statusRequest.promise;
+    });
+
+    expect(await screen.findByText('Primary backend')).toBeInTheDocument();
+    expect(screen.getByText('Generation only')).toBeInTheDocument();
   });
 });
