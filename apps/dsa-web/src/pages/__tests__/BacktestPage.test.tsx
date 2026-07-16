@@ -224,13 +224,30 @@ describe('BacktestPage', () => {
   });
 
   it('renders backtest controls and result headings in English UI mode', async () => {
+    type ResultsResponse = {
+      total: number;
+      page: number;
+      limit: number;
+      items: Array<typeof baseResultItem>;
+    };
+    let resolveResults!: (response: ResultsResponse) => void;
+    const delayedResults = new Promise<ResultsResponse>((resolve) => {
+      resolveResults = resolve;
+    });
+    mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('h-11');
     expect(screen.getByText('Evaluation window')).toBeInTheDocument();
-    expect(screen.getAllByText('Phase').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
-    expect(screen.getByText('Window return')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveResults({ total: 1, page: 1, limit: 20, items: [baseResultItem] });
+      await delayedResults;
+    });
+
+    expect(await screen.findByText('Window return')).toBeInTheDocument();
     expect(screen.getByText('Direction match')).toBeInTheDocument();
     expect(screen.getByText('Direction accuracy')).toBeInTheDocument();
     expect(screen.queryByText('运行回测')).not.toBeInTheDocument();
