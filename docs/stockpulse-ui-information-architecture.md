@@ -1,0 +1,1109 @@
+# StockPulse UI 信息架构审计与冻结（UI-01）
+
+> 状态：**Ready for HITL review, not approved**
+> 审计日期：2026-07-16
+> 审计基线：`ed729c1b579fcf7c4f11f6e7beddc7230b71302b`
+> 建议 IA：`今日 / 研究 / 组合 / 信号 / 更多 / 设置`
+> 范围：只读审计与文档冻结；不包含 UI-02 及之后的生产代码修改。
+
+## 1. Baseline、方法、环境和限制
+
+### 1.1 Git 与运行基线
+
+| 项目 | 结论 |
+| --- | --- |
+| C-01～C-09 handoff | 候选对象存在，`fix/c01-c09-contract-convergence` 与远端 `mine/fix/c01-c09-contract-convergence` 均指向 `ed729c1b`。本审计据此执行。 |
+| 审计分支 / worktree | `codex/ui-information-architecture`，位于 `.context/worktrees/ui-information-architecture`，运行与取证期间 tracked worktree 保持 clean。 |
+| 与目标分支关系 | `ed729c1b` 相对 `origin/main` 为 41 commits ahead、1 commit behind。它是 C-01～C-09 handoff，不是最新 upstream；正式合入前必须重新核对那 1 个 upstream commit。 |
+| HITL 修正工作区 | 在原 Conductor workspace 的 `SiinXu/analyze-image` 分支继续，修正开始 HEAD 为 `dec60eb2b81dc696858ef790b7882e550cea7874`；固定审计基线仍为 `ed729c1b`。工作区已有 Provider/Settings 等用户改动，本轮未覆盖、stash、reset 或回退。 |
+| 生产变更 | 禁止且未执行；交付只包含本文件与 `apps/dsa-web/DESIGN_GUIDE.md` 的权威边界修订。 |
+| 远端操作 | 仅执行 `git fetch --all --prune`；未 commit、push、tag、创建 PR 或 Release。 |
+
+### 1.2 方法与证据层级
+
+1. 代码事实：读取路由、Shell、Sidebar、公共 Overlay、全部页面、Settings IA、i18n、URL hooks、API clients、单元测试与 Playwright specs。
+2. 运行事实：使用仓库 `run-backend-fixture.py` 启动隔离真实后端、临时 SQLite、Vite 与本地 fake provider；未读取用户数据库或 ambient provider credentials。
+3. 视口事实：对 10 个 authenticated Shell route state（含 404，不含独立 `/login`）记录
+   `1440x900`、`1024x768`、`390x844`、`320x720` 结构化观察；标准 route screenshot
+   为 `38/40`，另有 desktop Settings theme 图。`/login` 只有一份 desktop 证据，详见 §19。
+4. 自动验证：ESLint、Vitest、生产构建、Playwright smoke 与定向响应式验收。
+5. 外部参考：未使用 Figma MCP，未读取或猜测 Coinstax exact variables/styles；本文件只评估执行 prompt 已确认的布局模式。
+
+### 1.3 产品与领域契约核对
+
+以下六份产品/领域文档与 UI-01 prompt 是用户明确提供的外部规划输入。它们不在审计基线
+的 committed refs 中，但本轮已按提供版本完整读取。引用只使用逻辑文件名；文档头部状态、
+工作跟踪器和代码事实共同决定“现有 / 规划 / 待批准”，不能因章节写得详细就视为已批准。
+核对版本为 tracker v0.1、feature catalog v0.3、product overview（2026-07-15 Draft）、
+enhancement PRD v0.4、multi-asset PRD v0.4、domain decisions v0.2、UI-01 prompt v0.3。
+
+| 来源文档 | 相关章节 / 决策 | 与当前 IA 是否一致 | 冲突或缺口 | 处理方式 | 是否需要 HITL |
+| --- | --- | --- | --- | --- | --- |
+| `stockpulse-work-tracker.md` | §1、§5、§8；UI-01=`Next`，UI-02～UI-07=`Planned` | **部分一致**：UI-01 保持 HITL gate，后续 slice 未实施 | tracker 尚未反映本次 UI-01 已交付审查稿；推荐顺序还要求横向基线/决策先收敛 | tracker 继续作为工作状态唯一索引；HITL 通过后另行更新状态，不在本轮篡改 | **是**：批准 UI-01 与后续执行顺序；不是由审计自行改状态 |
+| `stockpulse-work-tracker.md` | §6 Agent Framework；AR-01～AR-08 | **一致**：Ask Stock 是 Research 用户任务，Agent 行为/运行诊断归 Settings，Usage 归 More | 当前正式体系是 Single/Multi/Deep Research；Technical/Intel/Risk/Decision/Portfolio/Skill 是角色，不是独立 Runtime。外部 Runtime 仍为 Planned/POC | 不为 CrewAI/CAMEL/Hermes 等建产品导航或平行配置；Native + Adapter 决策由 AR-01 单独审批 | UI IA **否**；AR-01/Runtime lifecycle 是独立架构 gate |
+| `stockpulse-feature-catalog.md` | §§2～5；F01～F16 现有，F17～F38 规划，F39 增强 | **一致**：当前路由能力保留，数字资产/配置/时间线/对比等只在 target/backlog | 原 IA 对完整 Today、Research timeline 的 API readiness 过于乐观 | 以 catalog 状态为 capability 基线；planned 能力不得进入可点击 production nav | capability 状态本身**不需要**；目标归属随主 IA 一并批准 |
+| `stockpulse-product-overview.md` | §5 当前页面；§10.1 全局导航建议 | **大体一致** | §10.1 用“持仓”，增强 PRD §27 与本审计用“组合”；overview 为 Draft、不是契约 | 当前页面清单用于交叉检查；一级术语交给 HITL，不把 overview 建议写成批准事实 | **是**：`持仓` 与 `组合` 的 canonical term |
+| `stockpulse-product-enhancement-prd.md` | 头部、§6.1、§27 | **方向一致**：同为“今日 / 研究 / 组合 / 信号 / 更多 / 设置” | 状态是 `Draft / Program Review Required` 且明确未批准；§27 是推荐，不是既成导航权威 | 作为主推荐的产品依据；在维护者批准前继续保持 candidate | **是**：六项导航、二级归属与 canonical route |
+| `stockpulse-product-enhancement-prd.md` | E04 今日工作台 | **部分一致** | 完整 E04 需要 Today aggregation、服务端 P0～P4 排序原因、区块级错误、已读/处理与个性化状态；现有 API 只能支持 current Home 重排 | UI-02 分成“现有数据层级/响应式修复”和“E04 完整工作台”；后者等待薄规格与 API | **是**：批准 UI-02 的两阶段边界；完整 E04 仍 blocked |
+| `stockpulse-product-enhancement-prd.md` | E06 研究时间线 | **位置一致，能力未就绪** | 稳定 ResearchEvent ID、发生/入库时间、去重、游标和 tombstone 尚为规划 | `/research` shell 可先承载现有报告/问股/选股；timeline 不显示空壳入口，等待事件 contract | 位置随 Research IA **是**；数据契约不由 UI-01 决定 |
+| `stockpulse-product-enhancement-prd.md` | E08 股票横向对比 | **一致**：标为 `DEFER` | 2～5 股、统一币种/期间、保存对比均无当前 API | 只保留 target IA 位置；不得把 query 名当成已实现 contract | **否**（是否开发由 tracker/PRD 审批）；Research 归属随主 IA 决定 |
+| `stockpulse-product-enhancement-prd.md` | E10 观察清单分组与标签 | **部分一致** | 当前只有默认 watchlist；多清单、标签、批量预览与稳定 ID 均为规划 | UI-02 只复用当前 watchlist，不承诺多清单；旧 API 兼容要求留给 E10 薄规格 | **否**；不阻塞 current Home 修复，阻塞多清单 UI |
+| `stockpulse-product-enhancement-prd.md` | E12 使用模式与配置模板 | **一致**：Settings 保持单一草稿/保存/字段归属 | 模式、模板和 diff preview 尚未实现 | 未来仍进入现有 Settings；禁止第二套配置、Provider 清单或自由文本模型入口 | **否**；不属于本轮 IA 未决项 |
+| `stockpulse-product-enhancement-prd.md` | E18 一致空状态与降级体验 | **一致**：UI-05 是增强而非重建 | 现有公共状态组件是基础，但缺跨页词汇、source/as-of/quality 的完整 API 映射 | UI-05 先做 additive primitive 与单页 pilot；缺字段时显式列依赖，不用 broad fallback | **否**（方向已由 current code + PRD 约束）；执行仍受 UI-01 gate 阻断 |
+| `stockpulse-multi-asset-prd.md` | 头部、§6.1 MVP 决策 | **边界一致** | PRD 自称 development baseline，但头部仍是 Product + Architecture + Compliance Review Required；D-01～D-09 也未批准 | 不替维护者化解内部状态冲突；资产身份、Decimal、账本、secret、Job 只作未来硬前置 | **是**：D-01～D-09/合规批准；不阻塞当前股票 UI bugfix |
+| `stockpulse-multi-asset-prd.md` | §9.1 新增一级页面 | **冲突** | 提议“数字资产 / 总资产 / 资产配置 / 再平衡 / 情景分析”五个新增一级页；增强 PRD §27 与本审计要求有限六项主导航 | 推荐在达到 Beta 后按 Research/Portfolio 二级归组；备选是批准专用一级页。UI-01 不自行裁决 | **是**：实质性跨 PRD 冲突，影响 UI-03/UI-04/UI-06 与未来多资产 |
+| `stockpulse-multi-asset-prd.md` | §9.2、§10 核心交互 | **大体一致** | “Token 用量、设置和系统诊断保持独立”可表示 route 独立，也可能表示一级入口独立；与 More/Settings 分组存在解释空间 | 保留现有 paths；分组不合并数据/权限语义。未来数字资产用独立 7×24/venue/chain contract | **是**：只确认导航归属；首次流程、Preview 非交易语义不改写 |
+| `stockpulse-domain-decisions.md` | D-01～D-09、§11 待批准决策 | **边界一致** | 全文状态为 `Draft / Architecture Review Required`，tracker X-04=`Blocked`；不能称为 Approved | UI 只记录依赖：单工作区、账本真源、Asset/Instrument、Decimal、secret、Job、Evidence/event、合规 | **是**：按审批者批准；影响未来 UI-03 timeline/Evidence 和 UI-04 allocation，不阻塞现有路由修复 |
+| `stockpulse-ui01-information-architecture-audit-prompt.md` | §§4、9、12、16 | **一致**：不可回退能力、候选六项 IA、未来边界和 HITL gate 均保留 | §9 明确是“待验证目标方向”，不能把执行 prompt 本身误读为产品批准 | prompt 是本次审计范围/完成标准的权威，不是目标 IA 的批准记录 | **是**：UI-02～UI-07 在明确批准前继续 blocked |
+
+核对后的结论分层：
+
+- **当前事实，不再列为待定**：现有 route/capability 状态；Settings 两级 IA、Provider Catalog、
+  统一 Overlay、双主题/i18n 等不可回退能力；planned 功能不得伪装为 Existing；UI-01 完成后必须
+  等待 HITL，UI-02～UI-07 当前均为 Planned/blocked。
+- **候选，仍未批准**：六项一级导航、`/research`、问股/选股/告警/回测/用量的目标归属、
+  Today 的迁移边界、multi-asset 五个一级页与有限导航的冲突、旧 URL 兼容期和 slice 顺序。
+- **不由 UI-01 决定**：D-01～D-09、E04/E06/E08/E10/E12 的新数据/API/合规契约；UI-01
+  只能记录依赖、非目标与不可提前暴露规则。
+
+### 1.4 证据限制
+
+应用内 Browser 在本次会话没有可用 browser backend；实际页面走查改用仓库自带 Playwright
+和隔离 fixture。未执行真实读屏器会话或浏览器原生 200% zoom；以 ARIA snapshot、系统化
+Tab/Escape、`320px` 窄布局和 `prefers-reduced-motion` 作为替代证据。PNG 按仓库 gate
+属于不可扫描媒体，只做人工脱敏检查；两份 JSON 证据通过现有 artifact scanner。
+
+`/login` 的视觉证据仅有 `login-deep-link-settings.png`：`1440x900`、dark、中文、返回管理员
+登录。没有 `1024x768`、`390x844`、`320x720`、light、英文或首次设密截图；
+`ui01-observations.json` 的 `firstRunBefore` 虽为 desktop viewport，但 DOM 采集为空，不能补足
+该缺口。本轮不新增截图，Login 多视口、双主题/双语和首次设密布局列入 UI-06/UI-07 验收。
+
+## 2. 用户角色与最高频任务
+
+当前系统只有可选的单管理员会话，不存在多用户 RBAC。以下是按行为划分的 task personas，不代表权限角色。
+
+| Persona | 最高频目标 | 成功判据 |
+| --- | --- | --- |
+| 日常研究用户 | 看今日待办、自选状态，分析股票，读报告，从报告追问 | 当前股票、报告、任务与返回位置不丢失；降级数据可见 |
+| 持仓管理用户 | 管账户/持仓/流水/导入，看快照、诊断与风险 | 写操作幂等；结果可追踪；账户与 Tab 可恢复 |
+| 信号与风险复核者 | 从信号回到证据报告，查看后验结果，建立告警 | 信号、来源报告、告警和筛选上下文形成闭环 |
+| 系统管理员 / 部署者 | 首次配置，管理模型、数据源、通知、调度、认证、用量与诊断 | 单一配置权威、原子保存、冲突可恢复、敏感信息不泄漏 |
+
+最高频任务按审计优先级记录为：
+
+1. 今日状态 -> 选择股票 -> 分析/继续任务 -> 阅读报告。
+2. 报告 -> 问股 -> 返回报告，保持当前股票与会话。
+3. 自选/历史 -> 切换股票/报告 -> Back/Forward 恢复。
+4. 持仓 -> 诊断/风险 -> 来源信号或报告 -> 返回原工作区。
+5. 信号 -> 来源报告 -> 告警 -> 返回原筛选。
+6. 首次配置 / 设置深链 -> 保存或处理冲突 -> 回到发起任务。
+
+## 3. 当前路由、导航、页面和 Overlay 清单
+
+### 3.1 一级导航事实
+
+`App.tsx` 始终注册 11 个页面路由；`SidebarNav.tsx` 定义 9 个产品入口，但 `/screening` 仅在 AlphaSift 状态 API 返回 enabled 时出现。审计 fixture 中实际显示 8 项：`首页 / 问股 / 持仓 / AI 建议 / 回测 / 告警 / 用量 / 设置`。
+
+| 路由 | 当前用户目标与主要任务 | 入口 / 返回 | 主要、次要、危险操作 | URL、状态与 API | 响应式 / a11y | 当前主决定 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `/` | 分析、大盘复盘、历史/自选/今日、报告、追问、运行流 | Home；筛选结果可带 `location.state` 返回 | 分析；大盘复盘、追问、趋势、完整报告；删除历史 | `recordId/runFlow/runFlowRecordId/runFlowTaskId` 可刷新与 Back/Forward；工作区 Tab 与策略仍本地 | Desktop 三列；移动端历史 Drawer；1024 出现内容裁切 | `REFACTOR` 为“今日” |
+| `/chat` | 多轮问股、会话、策略、SSE、停止/重试、导出/通知 | Sidebar 或报告“追问 AI” | 发送/停止；新会话、策略、导出、通知；删除会话 | `session` 可分享；报告带来的 `stock/name/recordId` 会被消费后从 URL 清理 | Desktop 会话 rail；移动会话 Drawer；IME 已处理 | `MERGE` 到研究 |
+| `/portfolio` | 账户、快照、持仓、信号、风险、交易/资金/公司行动/CSV/流水 | Sidebar；无跨页 return contract | 添加账户/分析；交易/资金/公司行动/导入；删除账户/流水 | 无 URL 状态；多个 Portfolio API；分析仅显示 task id | Desktop 长工作台；移动单列；6 Modal + 2 Confirm | `REFACTOR` |
+| `/decision-signals` | 列表、统计、当前股票、时间线、重评估、详情/反馈/状态 | Sidebar；Portfolio 有弱关联 | 筛选/刷新；重评估/反馈；关闭/归档 | 多个 query，但主要直接 `history.replaceState`；`signal` 只查已加载集合 | Mobile 先展示完整筛选表，主结果被推到首屏后 | `REFACTOR` 为“信号”主入口 |
+| `/screening` | AlphaSift 状态、热点、策略参数、异步任务与候选 | 条件式 Sidebar 或直达；候选跳 Home | 运行选股；热点/策略；启用 AlphaSift | `strategy/market/count` mount-only；任务在 `sessionStorage`；结果本地 | 页面很长；disabled 状态重复说明；无 Modal | `MERGE` 到研究 |
+| `/backtest` | 参数、运行、表现、结果与分页 | Sidebar | 运行；筛选/1 日验证/强制重跑 | `code/window/from/to/phase/page` mount-only；运行结果不持久 | 无页面级 H1；320 工具栏可用但很高；宽表横滚 | `DEMOTE` 到组合 |
+| `/alerts` | 规则、dry-run、触发历史、通知尝试 | Sidebar；设置中有通知入口 | 创建规则；筛选/测试/启停；删除规则 | 无 URL 状态；三块 API 失败边界分开 | Mobile 首屏被筛选与空规则占满；三张宽表横滚 | `MERGE` 到信号 |
+| `/usage` | 时段、KPI、模型/调用类型、最近调用 | Sidebar | 刷新；时段切换 | period 为本地状态；usage dashboard API | Mobile KPI 单列；error/retry 清楚 | `DEMOTE` 到更多/管理员 |
+| `/settings` | 11 section，AI/Data Sources 二级 view，导入、调度、认证 | Sidebar；Home setup CTA；深链 | 分组自动保存、向导、测试；导入/重置；危险配置操作 | Router 驱动 `section/view`，legacy migration、409、leave guard | Desktop 左 rail；mobile section select；`overview/readiness` 在 390/320 内容区横向裁切 | `KEEP`（保留 IA，不代表响应式无缺陷） |
+| `/login` | 首次设密与登录 | 认证深链 | 登录/设密；语言/密码显示 | `redirect` 只接受站内路径；代码存在两个 post-auth navigation owner 的竞态风险，运行证据需重测 | 独立页面；代码有 label；仅有 1440 dark/zh 截图，移动布局未验证 | `KEEP`，先收敛深链 owner |
+| `*` / 404 | 解释错误并返回首页 | 任意失效 URL | 返回首页 | 保留原 URL 直到点击 | Desktop/mobile 可读 | `KEEP` |
+
+### 3.2 Overlay 与浮层
+
+| 类型 | 当前实例 | 决策 |
+| --- | --- | --- |
+| Shared Drawer | 移动导航、Home 历史、Chat 会话、信号详情、报告 Markdown、运行流 | 冻结并复用；不得新增页面私有 Drawer primitive |
+| Shared Modal | 告警创建、Portfolio 写操作、首次向导、模型 Connection | Desktop 居中、mobile bottom sheet；保持同一组件 |
+| ConfirmDialog | 删除、退出、状态变更、设置离开/导入/重置 | 保持最高 z-index；危险动作应使用 danger 语义 |
+| Popover / menu | autocomplete、Select、SearchableSelect、Theme、Home 策略、LLM 更多菜单 | 收敛为公共 Menu/Popover；Theme 与 LLM menu 补键盘模型 |
+| Tooltip | 公共 Tooltip、Recharts tooltip | 辅助信息，不承载唯一操作或关键事实 |
+
+`overlayZ.ts` 已统一 `pageDrawer=40` 到 `confirm=200` 的层级。Shared Drawer/Modal/Confirm 已覆盖 portal、焦点进入/陷阱/恢复、Escape、背景 inert 和 scroll lock，是不可回退基线。
+
+### 3.3 按页面的 Overlay / 浮层实例
+
+| 页面 | Drawer | Modal / Confirm | Popover / 其它 | 当前边界 |
+| --- | --- | --- | --- | --- |
+| Home | mobile 历史、完整报告、Run Flow | 删除历史 Confirm | 股票 autocomplete、策略 menu、Tooltip | report/run identity 已部分进 URL；mobile nav 与历史 opener 名称需区分 |
+| Chat | mobile session list | 删除会话 Confirm | 策略 disclosure、Tooltip | disclosure 不冒充 ARIA menu；session/source context 见 P1-07 |
+| Portfolio | 无共享详情 Drawer | 交易、资金、公司行动、导入等 6 个 Modal；账户/流水 2 个 Confirm | chart Tooltip | 写操作使用既有 Modal/Confirm；分析 task 目前无可恢复 overlay |
+| Decision Signals | signal detail Drawer | stock selector Modal、status Confirm | 固定处理提示 | `?signal=` 应按 ID 读取；关闭恢复列表 trigger/filter |
+| Screening | 无 | 无 | 无 | 长任务/结果当前在页面内，不应新增 transient Modal 代替可恢复 route |
+| Backtest | 无 | 无 | Recharts Tooltip | 结果和 filter 属页面/URL，不放 Drawer |
+| Alerts | 无 | create rule Modal、delete Confirm | table row actions | 规则、触发、投递未来用 page tabs；不嵌套 Modal |
+| Usage | 无 | 无 | chart Tooltip（如有数据） | error/retry 保持页面区块，不用 blocking Modal |
+| Settings | 无 page Drawer | FirstRunWizard 与 connection 相关 Modal；leave/import/reset 等 Confirm | Select/SearchableSelect、LLM more menu | 保留统一 z-index/focus；UI-06E/F 不另建 overlay system |
+| Login / 404 | 无 | 无 | password visibility / language controls | 独立页面；不把 auth redirect error 放 transient overlay |
+
+### 3.4 当前页面状态覆盖与缺口
+
+下表区分“代码/运行中已有表达”和“仍需 UI-05 contract”。`—` 表示该状态对当前页面不适用，
+不是已通过验收；“部分”表示领域自有文案存在，但尚未统一到 §9.2。
+
+| 页面 | loading / running | empty | partial / degraded / stale | error / retry | permission / unsupported | UI-05 主要缺口 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Home | 股票、报告、task/run flow | 无股票/无历史/无今日结果 | 报告数据块有部分质量语义；全页 stale 不统一 | 分析/历史局部错误，重试路径不一 | setup missing CTA；市场 unsupported 主要运行后出现 | 区块级 as-of/source、Today 聚合不可由前端猜 |
+| Chat | session load、SSE running/cancelling | 无会话/无消息 | source context 与模型 fallback 未统一展示 | send/stream retry，停止生成已实现 | 未配置模型可阻断；tool unsupported 表达分散 | source report、actual route、partial response 状态 |
+| Portfolio | account/holding/snapshot API；分析 task 只显示 ID | 无账户/持仓/流水 | valuation/risk partial 语义分散，stale 未统一 | 多区块/写操作错误；任务无恢复 | 当前单管理员，无 RBAC；跨市场能力差异弱 | 无法估值、source/as-of、task terminal state |
+| Decision Signals | list/stats/timeline/reassess | 无 signal | expired/status 存在，degraded/stale 与 data freshness 未统一 | API 错误；任意 ID not-found 不明确 | 无独立 permission state | source report/alert/outcome link 与列表独立失败 |
+| Screening | status、job running | 无 hotspot/result | AlphaSift disabled/unavailable 存在；结果 freshness 不持久 | status/job error | disabled 与 health error 会导致入口消失 | enabled/degraded/unavailable 分离、task/result 恢复 |
+| Backtest | run/loading | 无历史/结果 | 缺样本/口径限制有领域文案，stale 不统一 | run/list error | unsupported market/phase 不完整 | 样本口径、task/result persist、局部失败 |
+| Alerts | rules/triggers/deliveries 独立 loading | 三个集合各自 empty | notification failure 可局部存在；stale 未统一 | 三块 API error 隔离，retry 不完全一致 | channel unconfigured 主要跳 Settings | rule/trigger/delivery tabs、as-of 与 degraded delivery |
+| Usage | dashboard loading | 无调用 | period 数据 freshness 未显式 | 已有 error + retry 运行证据 | — | as-of/unknown cost 与 stale 区分 |
+| Settings | page/catalog/setup/save states | 无配置项/目录 | stale model selection、restart-required、source 状态已有 | page summary、field jump、409/retry 已较完整 | unconfigured/unsupported/read-only diagnostic | 保持既有 contract；补 responsive 与跨 view 词汇一致性 |
+| Login | auth/setup loading | — | — | credential/setup error | unauthenticated 是页面前置，不等同 403 | 四视口/双主题/双语/first-run 证据与单一 navigation owner |
+| 404 | — | — | — | route not found + Home action | unsupported route | 保留原 URL；不要自动吞掉到 Home |
+
+## 4. 当前 IA 图与目标 IA 图
+
+### 4.1 当前 IA
+
+```mermaid
+flowchart TD
+  Shell --> Home[首页 /]
+  Shell --> Chat[问股 /chat]
+  Shell -. AlphaSift enabled .-> Screening[选股 /screening]
+  Shell --> Portfolio[持仓 /portfolio]
+  Shell --> Signals[AI 建议 /decision-signals]
+  Shell --> Backtest[回测 /backtest]
+  Shell --> Alerts[告警 /alerts]
+  Shell --> Usage[用量 /usage]
+  Shell --> Settings[设置 /settings]
+  Home --> EmbeddedReport[嵌入报告/历史/今日/自选]
+  EmbeddedReport --> Chat
+```
+
+当前结构按功能模块平铺，不按用户任务组织；报告没有独立信息归属，信号、告警、后验与回测分散，Usage 与高频研究并列。
+
+### 4.2 主推荐目标 IA
+
+```mermaid
+flowchart TD
+  Shell --> Today[今日 /]
+  Shell --> Research[研究 /research]
+  Shell --> PortfolioIA[组合 /portfolio]
+  Shell --> SignalIA[信号 /decision-signals]
+  Shell --> More[更多 disclosure]
+  Shell --> SettingsIA[设置 /settings]
+
+  Research --> Asset[单资产研究]
+  Research --> Reports[报告/历史]
+  Research --> Ask[问股]
+  Research --> ScreeningIA[选股]
+  Research -. E06 contract 后 .-> Timeline[研究时间线]
+  Research -. contract 后 .-> Compare[对比/假设]
+
+  PortfolioIA --> Overview[总览]
+  PortfolioIA --> Positions[持仓/账户]
+  PortfolioIA --> Diagnostics[诊断]
+  PortfolioIA --> BacktestIA[回测]
+  PortfolioIA -. contract 后 .-> Allocation[配置/计划]
+
+  SignalIA --> SignalList[建议/时间线]
+  SignalIA --> Validation[后验验证]
+  SignalIA --> AlertIA[告警]
+
+  More --> UsageIA[用量]
+  More -. contract 后 .-> Experiments[策略实验/评测]
+```
+
+主推荐结论：
+
+- 首页演进为“今日”，保留 `/`；HomeStockWorkspace 的“今日/自选”进入今日工作台，“历史/报告详情”迁入研究。
+- 问股不再作为一级项；它同时是研究二级视图和报告/股票上下文命令。
+- 选股属于研究；报告、历史、时间线、未来对比与假设也属于研究。
+- Portfolio 更名为“组合”；当前账户/持仓/诊断保留，回测降为组合二级入口。资产配置与计划只进入 backlog。
+- 决策信号、后验验证与告警归入“信号”；任何合并只改入口，不删除能力。
+- 用量进入“更多”；运行诊断与数据源健康归设置，报告级数据质量归研究报告。
+- Desktop 侧栏和 mobile Drawer 使用同一分组树、同一名称、同一 canonical link builder。
+
+## 5. 关键任务流 current / target 对照
+
+| # | 任务流 | Current（约步骤 / 丢失点） | Target | 验收重点 |
+| --- | --- | --- | --- | --- |
+| 1 | 首次进入 -> 配置 -> 可运行 | `4+`：登录 -> Home 缺口提示 -> Settings 检查 -> 配置/向导；不是直接向导，fixture 也可能因本地 CLI 被判 ready | 登录后回原 URL；Today 显示单一 setup CTA；向导完成回发起任务 | 无第二 Provider；失败留在向导；ready 状态可复核 |
+| 2 | 搜索 -> 分析 -> 状态 -> 报告 | `4-5`，Home 内完成；任务/报告 URL 已部分恢复 | Today 提交，任务摘要持续可见；结果进入 Research report | pending 到 terminal 全状态；刷新不等于取消 |
+| 3 | 自选 -> 切股 -> 历史 -> 返回 | `4`，Home Tab 不在 URL；报告有 `recordId` | Today 保存 watchlist view；Research URL 保存 stock/report/view | Back/Forward 恢复股票、Tab、报告与滚动锚点 |
+| 4 | 报告 -> 问股 -> 停止 -> 返回 | `4-6`；报告参数被消费后 URL 只剩 session，发送前刷新有丢上下文风险 | Research report 的 Ask 命令创建带来源的 session；Back 返回原 report | session、stock、record 来源可验证；停止不删除部分回复 |
+| 5 | 信号 -> 报告 -> 告警 -> 返回 | 当前无直接来源报告/创建告警入口，需全局导航与重新筛选，`6+` | 信号详情提供“来源报告”“基于此信号建告警”，带 return URL | 返回保留 filters/page/signal；旧 URL 不变 |
+| 6 | Portfolio -> 账户/持仓/快照/诊断 | 单长页、无 URL Tab；刷新回默认；分析只给 task id | `/portfolio?view=...&account=...`；任务摘要与结果可返回 | 写操作幂等；partial/stale 可见；mobile 单列 |
+| 7 | 回测 -> 参数 -> 运行 -> 结果 -> 历史 | 同页完成，但运行结果不持久、无独立历史 view | 组合 > 回测；filters 在 URL，task/result 可恢复 | run 与 filter 分开；phase 只筛结果的语义不回退 |
+| 8 | 告警规则 -> 触发 -> 通知 | 当前一页三段，规则/触发/通知无 URL view | 信号 > 告警 tabs；从规则回到触发/通知保留 rule | empty 不等于 error；通知失败不阻断规则 |
+| 9 | Settings 深链 -> 修改 -> 冲突 | 已较完整；`section/view`、autosave、409、leave guard 已实现 | 保持现有行为，仅统一入口/return URL | 不恢复 global Save；字段定位与 retry 可见 |
+| 10 | Mobile nav -> 页面 -> Overlay | Drawer focus/escape 可用；Home/Chat 又有第二个相似汉堡按钮 | 全局汉堡固定；页内历史用明确 History 图标/标签 | 320/390 无歧义；关闭回触发点 |
+| 11 | 认证深链 -> 登录 -> 原 URL | **代码风险，运行结论待确认**：`AppLayout` 与 `LoginPage` 都可能在 auth transition 后导航；现有 JSON 被先前 Home URL 污染，不能证明最终目标 | 登录事务只有一个 navigation owner，原 path/query/hash 原样恢复 | 独立上下文下三类非 Home 深链集成测试，2.5s 后断言最终 URL |
+| 12 | 刷新 / Back / Forward / 直达 | Home/Settings 完整；Signals/Screening/Backtest mount-only；Portfolio/Alerts/Usage 无 URL 状态 | 所有业务状态经 Router 管理；无效参数 replace 规范化 | push/replace 语义逐页测试 |
+
+## 6. Findings（P0～P3）
+
+### P0
+
+未发现 P0。没有证据表明当前页面会直接造成数据破坏、配置误写或完全阻断所有用户的核心任务。
+
+### P1
+
+| ID | page / flow / evidence | current behavior / user impact / root cause | recommended IA decision / dependency / acceptance evidence |
+| --- | --- | --- | --- |
+| `UI01-P1-01` | Auth deep link。代码：`App.tsx:61-75`、`LoginPage.tsx:23-26,63-65`、`AuthContext.tsx:70-78`；`auth-deep-link-recheck.json` 仅作非结论性记录 | AppLayout 与 LoginPage 同时拥有 auth transition 后导航，存在目标 route 被后续 Home navigation 覆盖的竞态风险。现有 JSON 受先前 `/?recordId=1` 状态污染，不能作为可重复 runtime failure；实际影响待隔离复测。 | UI-06A 只保留一个 post-auth navigation owner；原 path/query/hash 与站内 redirect 校验不变。依赖：无新 API。验收：全新 browser context 下设置、信号、报告三个未登录深链分别登录，等待 2.5s 后仍为目标 URL，并覆盖 Back/Forward。兼容/回滚：不放宽外域 redirect；bugfix 不随 nav flag 回退。 |
+| `UI01-P1-02` | Home / 1024。截图：`tablet-1024x768-home.png`；代码：`Shell.tsx:58-88`、`HomePage.tsx:1540-1543` | 1024 同时显示 220px 全局侧栏、272px Home rail 和右侧指标列，市场情绪仪表被裁切。document 无横向 overflow，现有测试因此漏报。 | 1024 使用 collapsed global rail 或隐藏 Home rail；报告区域最多两列。依赖：UI-02/06。验收：1024、200% 等价布局中图表完整、无内容 occlusion。 |
+| `UI01-P1-03` | Signals -> report -> alert。`DecisionSignalDisplay.tsx:279,373` | 来源报告仅为文本，详情无“打开来源报告”或“创建告警”；用户必须离开并重新搜索，返回筛选也丢失。根因是模块按页面实现，没有 contextual link contract。 | 信号详情加入来源报告和告警命令，统一 return URL。依赖：现有 history/alerts API 足够。验收：完整往返保留 filters/page/signal。 |
+| `UI01-P1-04` | Signal deep link。`DecisionSignalsPage.tsx:490`、`api/decisionSignals.ts:275` | `?signal=` 只在当前加载集合查找；不在第一页时静默不打开，尽管已有 get-by-id API。 | 详情深链按 ID 直接读取；列表只是背景上下文。验收：任意有效 ID 直达/刷新打开 Drawer；404 显式反馈并清参数。 |
+| `UI01-P1-05` | Portfolio analysis。`PortfolioPage.tsx:595` | 提交分析只展示 task id，没有轮询、TaskPanel、Run Flow、结果或返回路径。离开页面后任务等同失联。 | 组合复用 `useTaskStream/TaskPanel/RunFlowPanel`，结果链接到 Research。依赖：现有 task API。验收：离开、刷新、返回后任务仍可追踪。 |
+| `UI01-P1-06` | Screening -> Home。`StockScreeningPage.tsx:739-754` | 候选研究依赖 `location.state` 携带股票与 auto-analyze 意图；刷新或复制 URL 即丢。 | 进入 `/research?stock=...` 或 Today 的显式 query；自动执行必须二次确认，不放瞬态 state。验收：刷新/新标签页仍保持候选上下文。 |
+| `UI01-P1-07` | Report -> Chat。`ChatPage.tsx:602-650`；运行 report-to-chat URL 证据在 `ui01-observations.json` | `stock/name/recordId` 在 session 建立/发送前从 URL 删除；窗口在消费与持久化之间刷新可丢待发送上下文。 | session URL 保留来源或后端原子持久化 source context 后再 replace。依赖：确认 chat session contract。验收：导航后立即刷新仍显示正确股票与来源报告。 |
+| `UI01-P1-08` | Shared Pagination / 320。`Pagination.tsx:61`、`Shell.tsx:88` | 最多 9 个 44px 按钮且不 wrap/scroll；Shell 隐藏横向 overflow，Signals/Backtest/Alerts 高页数时可裁首尾操作。 | 扩展公共 Pagination 的 compact 模式，保留首/尾/当前/前后。验收：320px、999 pages 下全部关键动作可达且读屏顺序正确。 |
+| `UI01-P1-09` | Settings `?section=overview&view=readiness`。`ui01-observations.json`、`mobile-390x844-settings.png`、`mobile-320x720-settings.png`；`SettingsPage.tsx:425-559,2443-2516`、`Shell.tsx:88` | 390px 下内容区 `clientWidth=364` / `scrollWidth=442`，320px 下为 `294/442`，分别有 78px/148px 内部内容不可见；document 本身报告无 overflow，Shell 又不提供横向访问。该采样 view 的 `tableCount=0` 可排除宽表；`formCount=0` 只表示没有 `<form>` 元素，不能排除 input/button 等控件。证据尚不足以锁定 card、控件、动态长文本或内容容器中的具体 descendant，根因待 DOM overflow 诊断确认。 | Settings 仍 `KEEP`，UI-06F 修复 responsive composition，不改 `section/view`、配置草稿或 API。依赖：无新 API，先记录最宽 descendant/computed style。验收：390/320 与 1440@200% 等价布局下内容区 `scrollWidth <= clientWidth`，长模型名/路径/connection/中英文、11 section / 15 section-view 组合和主操作可见；兼容/回滚只涉及布局样式，保留回归测试。 |
+
+### P2
+
+#### `UI01-P2-01` 功能平铺导航与实验入口静默消失
+
+- **页面 / 任务流**：全局 Sidebar 与 mobile navigation；用户从任意页面进入选股或建立任务心智模型。
+- **证据**：`SidebarNav.tsx:27-37,54-75`；`flow-mobile-navigation.png`、
+  `flow-mobile-navigation-320.png`；§1.3 的增强 PRD §27 / 多资产 PRD §9 冲突。
+- **当前行为**：8～9 个功能入口平铺；AlphaSift status API 失败时“选股”入口完全消失，
+  但 `/screening` 仍可直达并能说明 unavailable。
+- **用户影响**：导航不表达 Today/Research/Portfolio/Signals 的任务关系；服务健康问题被误解为
+  功能不存在，用户难以恢复或定位设置。
+- **根因**：当前 route descriptor 按功能模块构建，并把“入口是否存在”和“实验服务是否健康”
+  绑定在同一条件；目标六项 IA 尚未获批。
+- **推荐决策**：HITL 通过后采用有限任务导航；实验页在 Research 内保留稳定入口并显示
+  enabled/degraded/unavailable，不因健康查询失败静默消失。
+- **依赖**：HITL-H1/H2；UI-06B 的共享 navigation descriptor；UI-03A 的 Research route 决定。
+- **验收证据**：flag on/off、AlphaSift enabled/disabled/error 三态的 desktop/mobile screenshot、
+  keyboard/ARIA snapshot；直达 `/screening` 和导航入口表达同一状态。
+- **实施归属**：`UI-06B` 独占 `Shell/SidebarNav/navigation descriptors`；Research 页面内容由
+  `UI-03C` 后续接入，不并行修改 Sidebar。
+- **兼容 / 回滚**：不删除任何 route；关闭 `task_navigation_v1` 恢复旧导航，服务状态表达测试保留。
+
+#### `UI01-P2-02` URL 与 Back/Forward 契约不一致
+
+- **页面 / 任务流**：Signals、Screening、Backtest、Portfolio、Alerts、Usage 的分享、刷新和浏览器返回。
+- **证据**：`DecisionSignalsPage.tsx:229`、`StockScreeningPage.tsx:90`、
+  `BacktestPage.tsx:61`；Home/Settings 的 Router-driven 对照；§5 flow 6～12。
+- **当前行为**：前三页直接调用 `history.replaceState` 且主要只在 mount 解析；后三页关键 view/filter
+  仍是 local state。相同用户动作在不同页面有不同 history 语义。
+- **用户影响**：复制链接、刷新或 Back/Forward 后筛选、对象、页码或 Tab 丢失，跨页 return URL 不可靠。
+- **根因**：各页面独立增补 URL 能力，没有共享 parser/normalizer 和 push/replace contract。
+- **推荐决策**：先由 `UI-03A` 建立 additive Router helper 与 invalid-param 规范，再由领域页面 owner
+  顺序接入；identity/filter/view 进入 query，轮询与规范化只用 replace。
+- **依赖**：HITL-H2/H6；不需要新 API，但 source-context 原子性另见 `UI01-P1-07`。
+- **验收证据**：每页 direct/refresh/share/Back/Forward/invalid-ID table test；canonical 与 legacy URL
+  同时跑，且无关 query/hash 不被清除。
+- **实施归属**：`UI-03A` 独占共享 route contract 与 `App.tsx`；`UI-04` 在其后接 Portfolio/Backtest，
+  Alerts/Signals 由 `UI-03E` 接入，避免并行改共享 helper。
+- **兼容 / 回滚**：新 query additive；旧页忽略未知参数仍能运行。关闭领域 flag 回到旧 view，parser
+  继续接受已发布 URL；不得用 rollback 吞掉新链接。
+
+#### `UI01-P2-03` 移动端筛选压过主要结果
+
+- **页面 / 任务流**：320/390 下查看 Signals、Alerts、Backtest 的首屏结果与主操作。
+- **证据**：`mobile-320x720-decision-signals.png`、`mobile-320x720-alerts.png`、
+  `mobile-320x720-backtest.png` 及对应 390 图；`BacktestPage.tsx:529,638`。
+- **当前行为**：Signals 首屏几乎只有筛选；Alerts 先展示规则空态；Backtest 无页面 H1，控件语义
+  部分依赖 placeholder。任务仍可完成，但必须长距离滚动才看到结果或下一步。
+- **用户影响**：高频扫描与复核变慢，空态可能被误读为整个告警中心无数据，读屏缺少页面定位。
+- **根因**：desktop filter composition 直接堆叠为单列，没有 active-filter summary 或移动优先顺序。
+- **推荐决策**：移动端先展示页面标题、active summary、结果/主操作；高级筛选进入明确 disclosure
+  或 Drawer。Backtest 使用公共 PageHeader 与分区，不改变其领域计算。
+- **依赖**：UI-06C 的 landmark/PageHeader contract；Signals/Alerts 等目标归属需要 HITL-H5。
+- **验收证据**：320/390、200% zoom 等价布局截图；首个结果/主操作可在一次合理滚动内到达；
+  filters 展开/关闭恢复焦点，active filters 可读。
+- **实施归属**：Signals/Alerts composition 由 `UI-03E`；Backtest composition 由 `UI-04`，两者只消费
+  已完成的 UI-06C primitive。
+- **兼容 / 回滚**：API/filter keys 不变；responsive composition 可按页面 flag 回退，URL 筛选不得丢失。
+
+#### `UI01-P2-04` Landmark、label 与 ARIA menu 行为不完整
+
+- **页面 / 任务流**：全站读屏 landmark；Home/Backtest 标题；Backtest 输入；Theme 与 LLM 更多菜单。
+- **证据**：`AppPage.tsx:11`、`BacktestPage.tsx:529,638`、`ThemeToggle.tsx:111`、
+  `LLMChannelEditor.tsx:839`；结构化 headings/buttons 与 keyboard 观察。
+- **当前行为**：Shell `<main>` 内再次创建 `<main>`；Home/Backtest 无页面级 H1；部分 input 无关联
+  label；声明 `menu` role 的浮层缺 Up/Down/Home/End/Escape 与焦点返回模型。
+- **用户影响**：读屏 landmark 树含歧义，表单目的和菜单状态不易理解，键盘用户可能必须 Tab 穿越
+  全菜单或无法按预期关闭。
+- **根因**：公共容器错误拥有 page landmark；多个页面私有菜单分别模拟 ARIA role，没有共享行为原语。
+- **推荐决策**：拆成 UI-06C landmark 与 UI-06E Menu/Popover 两个独立 slice；Pagination 由
+  `UI01-P1-08` 对应的 UI-06D 单独处理；
+  每页一个 H1，role 与键盘模型同时实现。
+- **依赖**：无新 API；LLM 文件存在并发 Provider 工作时须等该工作合并后再接入，不覆盖用户改动。
+- **验收证据**：axe/ARIA snapshot + 人工 Tab/Shift+Tab/Enter/Space/方向键/Escape；每页恰有一个 main/H1，
+  menu 关闭后 focus 返回 opener。
+- **实施归属**：`UI-06C/D/E` 分别独占对应 public primitive；page owner 仅在 successor 中消费。
+- **兼容 / 回滚**：公共 props additive；可逐 consumer 回退视觉容器，但修正后的 semantic element、label
+  与 focus behavior 不应回退。
+
+#### `UI01-P2-05` 视觉权威、Token 快照与 tracking 规则漂移
+
+- **页面 / 任务流**：所有视觉实现和后续 UI slice 的设计依据。
+- **证据**：修正前 `DESIGN_GUIDE.md:1-74`；审计基线 `index.css:28-72,314-350`；§1.3 契约表。
+- **当前行为**：旧指南曾把外部 Coinstax exact values 当权威、合并不同的 secondary/muted token、
+  记录不存在的固定状态底/边色，并把未批准 UI-01 指向为交互权威。
+- **用户影响**：实现 Agent 可能复制错误颜色、建立第二套状态样式或提前执行候选 IA，产生跨主题与契约漂移。
+- **根因**：外部参考语言遗留、token 表未按 runtime 复核、视觉施工规则和产品 IA authority 未分层。
+- **推荐决策**：本轮已修正文档：`index.css`/公共组件是 executable facts，指南是已采纳视觉规则权威，
+  UI-01 仅 candidate；所有颜色以 baseline HSL 分行记录，tracking 规则为 `letter-spacing: 0`。
+- **依赖**：文档修正无代码依赖；runtime 中仍不一致的 tracking 声明需要未来获批视觉 slice，不能在本轮改 CSS。
+- **验收证据**：逐 token 对照 `:root/.dark`；搜索不再出现已禁 tracking guidance；Coinstax 边界与
+  `Ready for HITL review, not approved` 同时可见。
+- **实施归属**：UI-01 docs 关闭 authority/token finding；runtime typography alignment 由维护者另批视觉
+  slice，UI-07 只负责回归证据。
+- **兼容 / 回滚**：本轮 docs-only；回滚仅恢复文档，但会重新引入已知错误权威，因此不建议与 IA 决策绑定回退。
+
+#### `UI01-P2-06` Runtime 图表与时间线使用 raw hex
+
+- **页面 / 任务流**：报告图表、Decision Signal timeline 在 light/dark 和状态语义下的辨识。
+- **证据**：`types/analysis.ts:651-655`、`utils/decisionSignalTimeline.ts:63-66`；现有 design guard scope。
+- **当前行为**：9 个图表/时间线颜色 hex 位于 `index.css` 之外；guard 未覆盖 types/utils。
+- **用户影响**：颜色无法随主题/token 修正同步，状态可能只靠颜色或与中国市场涨跌语义串色。
+- **根因**：颜色由数据 helper 返回 raw presentation value，semantic color ownership 穿透到类型/工具层。
+- **推荐决策**：数据层返回 semantic key，渲染层解析现有 chart/sentiment token；扩展 guard 到 types/utils，
+  不从 Coinstax 增加 raw value。
+- **依赖**：先确认现有 token 是否足够；缺口需单独更新 DESIGN_GUIDE + `index.css` 并获视觉批准。
+- **验收证据**：light/dark、涨/跌/中性/风险截图与非颜色 label；源码扫描只允许 token 定义和合法 fixture。
+- **实施归属**：未来 semantic-chart slice 独占相关 type/helper/renderers；`UI-07` 增加 guard 与视觉证据，
+  不在测试中偷偷改业务映射。
+- **兼容 / 回滚**：保留 semantic enum/key 的兼容映射；flag/回滚可恢复旧 renderer，但不能删除新 guard 的白名单说明。
+
+#### `UI01-P2-07` 用户可见术语不稳定
+
+- **页面 / 任务流**：Sidebar、page title、breadcrumbs/return links、zh/en 文档与状态提示。
+- **证据**：当前 Sidebar/page titles；`stockpulse-product-overview.md` §10.1 的“持仓”与增强 PRD §27 的
+  “组合”；页面中“AI 建议 / 决策信号 / 信号”的并存。
+- **当前行为**：一级对象、领域实体和页面动作混用同义词；同一目的地在不同入口显示不同名称。
+- **用户影响**：用户难以判断“AI 建议”是否等同 DecisionSignal、“持仓”是否包含账户/回测/未来配置。
+- **根因**：历史页面按模块命名，目标任务术语尚未 HITL；文档之间也存在 `持仓/组合` 冲突。
+- **推荐决策**：推荐一级使用“信号 / 组合”，领域实体保留“决策信号 / 账户 / 持仓”；英文分别使用
+  `Signals / Portfolio`。最终以 HITL-H1/H3 为准。
+- **依赖**：HITL-H1/H3；typed locale key 与插值同步；不更名 API entity 或 route。
+- **验收证据**：zh/en nav/page/return-link terminology matrix；i18n tests；旧 deep link screenshot 仍到同一实体。
+- **实施归属**：`UI-06B` 统一 Shell labels，领域页 title 由 `UI-03E/UI-04` 顺序接入。
+- **兼容 / 回滚**：只改展示词与 locale，不改 ID/path/schema；导航 flag 可回退 label，领域术语保持稳定。
+
+### P3
+
+#### `UI01-P3-01` 危险确认仍使用品牌主操作视觉
+
+- **页面 / 任务流**：删除历史/账户/规则、退出或状态变更的 ConfirmDialog。
+- **证据**：`ConfirmDialog.tsx:92`；desktop danger confirmation 的公共组件代码路径。
+- **当前行为**：`isDanger` 影响文案/语义，但确认按钮仍使用 primary variant。
+- **用户影响**：危险与普通确认的视觉层级不稳定，增加快速操作时的误判概率；当前未观察到数据误删。
+- **根因**：ConfirmDialog 暴露 danger state，但 Button variant mapping 没有消费该 state。
+- **推荐决策**：公共 ConfirmDialog 将 danger state 映射到现有 destructive/danger semantic variant，
+  文本与 icon 同时表达，不仅依赖红色。
+- **依赖**：DESIGN_GUIDE §2.2 状态源色；无需 API。
+- **验收证据**：light/dark、zh/en、键盘 focus、普通/危险并列 component test 与 screenshot。
+- **实施归属**：UI-05 public state/action primitive；独占 `ConfirmDialog/Button` 相关文件。
+- **兼容 / 回滚**：props 与 callback 不变；视觉可单独回滚，但 destructive accessible name/测试保留。
+
+#### `UI01-P3-02` 展开 Sidebar 截断产品名
+
+- **页面 / 任务流**：desktop 展开全局 Sidebar，识别应用与折叠导航。
+- **证据**：desktop route screenshots；`Shell.tsx` / `SidebarNav.tsx` 的 220px expanded layout。
+- **当前行为**：展开侧栏品牌名显示为 `StockPul...`；collapsed 状态与内容区功能不受影响。
+- **用户影响**：品牌识别和成品感下降，长 locale/系统字号下截断更明显，但不阻断导航。
+- **根因**：品牌容器、toggle 与固定 rail 宽度之间的空间预算未为完整名称建立稳定约束。
+- **推荐决策**：expanded 模式保证完整名称；空间不足时采用明确的 icon-only collapsed rail，不能在“展开”态
+  显示不稳定省略名。
+- **依赖**：UI-06B Shell responsive contract；与六项 IA label 决策无数据依赖。
+- **验收证据**：1440/1024、200% zoom、zh/en、system font scaling；toggle 不引发布局跳动或遮挡。
+- **实施归属**：`UI-06B` 与 Shell/Sidebar 同一独占窗口完成。
+- **兼容 / 回滚**：route/nav state 不变；关闭 responsive flag 回旧 rail，品牌尺寸 test 继续记录已知差异。
+
+#### `UI01-P3-03` Settings 二级视图注释与实际结构漂移
+
+- **页面 / 任务流**：维护者扩展 Settings section/view；Chat 的上下文压缩快捷控制回到统一设置。
+- **证据**：`settingsInformationArchitecture.ts:49-79` 同时存在“只有 AI 多视图”的注释和 Data Sources
+  的 `sources/providers` 两视图；`settingsFieldPlacement.ts:68`、`ChatPage.tsx:475`。
+- **当前行为**：运行结构正确，但注释会误导后续实现；Chat 快捷控制容易被误解为第二套配置入口。
+- **用户影响**：当前用户行为不受阻；维护者可能新增平行 view/配置状态，长期造成 IA 漂移。
+- **根因**：Data Sources 扩展后注释未同步，context command 与配置权威边界未在同处说明。
+- **推荐决策**：修正注释并明确 Chat 只操作同一 context-compression config key；Settings 仍是配置权威。
+- **依赖**：无 API/产品决策；需与当前 Provider/Settings 用户改动完成合并后处理，禁止覆盖。
+- **验收证据**：Settings IA unit test 覆盖 AI/Data Sources views；Chat 与 Settings 读取/写入同一 key 的 contract test。
+- **实施归属**：后续 Settings maintenance slice，不纳入本轮 docs-only diff。
+- **兼容 / 回滚**：注释/测试修正不改 runtime；若 Chat 快捷 UI 调整，旧 config key 与值保持。
+
+## 7. 页面处置矩阵
+
+| 现有 / 规划页面 | 建议 canonical route | 决定 | 保留与调整 | 数据/API 前置 | URL 兼容 / 灰度 | Desktop / mobile | 后续任务 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Home | `/` | `REFACTOR` | 保留搜索、今日、自选、任务；报告详情迁研究 | 现有 API 仅足够 current-data phase；完整 E04 等 Today contract | `/` 永久保留；feature flag 新 Today composition | Desktop 2 列；mobile 单主任务 | UI-02 |
+| Embedded report/history | `/research?view=report&reportId=...&stock=...` | `MERGE` | 保留报告、诊断、趋势、Markdown、Run Flow | 现有 history API | `/?recordId=` 至少跨两个 minor release；先双向 link | 报告主列 + contextual rail；mobile page | UI-03 |
+| Chat | `/research?view=chat&session=...` | `MERGE` | 保留会话、SSE、技能、停止、导出 | 需确认 session source-context 原子性 | `/chat` 保留兼容；迁移期不强制 redirect | Desktop optional session rail；mobile Drawer | UI-03 |
+| Screening | `/research?view=screening` | `MERGE` | 保留 AlphaSift、热点、任务、候选 | 现有 API；实验状态显式 | `/screening` 保留；flag 只控制能力，不隐藏路由 | Advanced filters 可折叠 | UI-03/05 |
+| Portfolio | `/portfolio?view=overview|positions|diagnostics|activity` | `REFACTOR` | 保留所有账户/账本/导入/风险能力，拆工作区 | 现有 API；任务追踪复用 | `/portfolio` 默认 overview；query additive | Desktop tabs/workspace；mobile select | UI-04 |
+| Backtest | `/portfolio?view=backtest` | `DEMOTE` | 不删功能；作为组合验证工具 | 现有 backtest API | `/backtest` 保留兼容并 link 到新 view | Filters compact；table row-detail | UI-04/05 |
+| Decision Signals | `/decision-signals` | `REFACTOR` | 成为“信号”入口，含列表/详情/后验 | get-by-id 已有 | 现 path 永久；additive `view` | 首屏 summary；mobile filters Drawer | UI-03/05 |
+| Alerts | `/decision-signals?view=alerts` | `MERGE` | 保留规则、触发、通知结果 | 现有 alerts API | `/alerts` 保留兼容；迁移期双向 link | Tabs；mobile list/row detail | UI-03/05 |
+| Usage | `/usage`（More 内） | `DEMOTE` | 保留 dashboard | 现有 API | path 保留；More disclosure 不需 redirect | KPI responsive | UI-06 |
+| Settings | `/settings?section=&view=` | `KEEP` | 两级 IA、autosave、409、Provider Catalog 全保留；修复已证实的 mobile 内容裁切 | 无新 API；具体 overflow descendant 待确认 | legacy category/sub replace migration 保留 | 保留 nav 模式；UI-06F 覆盖 320/390/200% | UI-06F + UI-07 evidence |
+| Login | `/login?redirect=` | `KEEP` | 设密、登录、双语 | 收敛 navigation owner 并确定性复测 | 不接受外域 redirect | 仅 desktop 已取证；其余 viewport 待验 | UI-06A/07 |
+| 404 | `*` | `KEEP` | 明确错误和返回 | 无 | 不自动吞掉原 URL | 当前模式 | UI-06 |
+| Research hub | `/research`（候选；当前 paths 仍 canonical） | `DEFER` | 可先组合现有单资产、报告、问股、选股；时间线只作 future 归属 | 现有页面/API 足够做 shell；E06 timeline 需 ResearchEvent/游标 contract | UI-03 flag；未启用前不暴露，不预建空 timeline | Desktop workspace/mobile page | UI-03A～F |
+| Compare / hypothesis | `/research?view=compare|hypothesis` | `DEFER` | 只进 target IA/backlog | 需要 comparison/hypothesis contract | 不显示生产入口 | 待设计 | 后续 PRD |
+| Allocation / plan | `/portfolio?view=allocation|plan` | `DEFER` | 只进 target IA/backlog | 资产身份、Decimal、许可、API | 不显示生产入口 | 待设计 | 后续 PRD |
+| Digital assets | Research + Portfolio 的 asset scope | `DEFER` | 不复制股票语义 | 交易对、链/平台、7x24 freshness、许可 | feature flag 之前无可点击入口 | 待设计 | 后续 multi-asset PRD |
+| Data Source Doctor | `/settings?section=data_sources&view=health` | `DEFER` | 全局数据源健康归设置 | health API 尚未产品化 | 不显示空壳入口 | status table/mobile details | 后续 PRD |
+
+## 8. 推荐一级/二级导航与 canonical route
+
+### 8.1 一级导航 HITL 候选建议
+
+| 顺序 | 一级项 | 图标语义 | 默认 route | 二级内容 | 当前迁移策略 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 今日 / Today | calendar/check 或 home | `/` | 今日、待处理任务、自选摘要、最近结果 | 首轮直接改 label/compose；`/` 不变 |
+| 2 | 研究 / Research | search/chart | `/research` | 单资产、报告、历史、时间线、问股、选股 | UI-03 创建 hub；此前 `/chat`、`/screening`、Home report 保持 |
+| 3 | 组合 / Portfolio | briefcase/pie chart | `/portfolio` | 总览、持仓、诊断、活动、回测；未来配置/计划 | `/portfolio` 保持；Backtest 降级入口 |
+| 4 | 信号 / Signals | activity/wave | `/decision-signals` | 建议、后验验证、告警 | 现 route 保持；Alerts 合并入口但路径兼容 |
+| 5 | 更多 / More | ellipsis/menu | 无页面，打开 disclosure | 用量；未来评测/实验 | `/usage` 保持；不为一个入口先造空 `/more` |
+| 6 | 设置 / Settings | settings | `/settings` | 当前 11 section / 二级 view | 完全保留现有 IA |
+
+### 8.2 canonical 与 compatibility 规则
+
+- UI-02～UI-07 期间：所有现有路由仍是各自 current canonical；禁止先做 redirect 再补目标页面。
+- 若 HITL 批准 `/research`：它先是 additive flagged hub，只组合现有能力；`/chat`、`/screening`、
+  `/?recordId=` 继续直接渲染，不自动 replace。是否提升 `/research` 为 canonical 由兼容使用证据和
+  后续 HITL 决定。
+- `/portfolio`、`/decision-signals`、`/usage`、`/settings` 保持稳定，不因导航分组改路径。
+- 未来获批的 compatibility redirect 必须保留 query/hash，使用 `replace`，且不得清除无关参数；
+  本轮不预先批准 redirect。
+- 任何 planned 页面在数据/API contract 完成前不得进入 production nav、搜索建议或可点击空状态。
+
+## 9. URL、状态、上下文、Overlay 与长任务契约
+
+### 9.1 URL 状态
+
+必须进入 path/query：
+
+- 当前 instrument identity（现阶段 stock code）、report ID、chat session、signal ID、account、主要 view/Tab。
+- 用户期望分享或 Back/Forward 恢复的筛选、排序、分页、对比对象。
+- task/run-flow identity、设置 `section/view`、从其他页面进入时的受控 return URL。
+
+只属于瞬态组件状态：hover、tooltip、未确认 popover、纯视觉 collapse、toast、未提交 Modal draft、焦点位置。未保存配置 draft 继续由 Settings draft/leave guard 管理，不塞进 URL。
+
+统一规则：
+
+1. 使用 React Router，不直接调用 `window.history.replaceState`。
+2. 用户显式选择对象/Tab/筛选使用 `push`；规范化无效参数、轮询刷新和 transient cleanup 使用 `replace`。
+3. 无效参数显示本地化提示后只删除无效字段；不回退到一个看似成功但不同的对象。
+4. 当前股票由 route + 当前资源派生，不新增第二个全局 store 真源。跨页只传 identity，目标页自行读取权威实体。
+5. report -> chat 创建 session 时，source report 和 stock context 必须先原子持久化，再缩短 URL。
+
+### 9.2 页面状态词汇
+
+| 状态 | 统一含义 | 页面行为 |
+| --- | --- | --- |
+| `initial` | 尚未请求或等待用户输入 | 显示任务入口，不伪装 empty |
+| `loading` | 首次请求中 | 保持稳定布局与可感知 loading label |
+| `success` | 权威结果已到达 | 显示 as-of/source |
+| `empty` | 请求成功但集合为空 | 解释如何产生数据；不显示 retry |
+| `partial/degraded` | 部分区块失败或 fallback | 成功区块继续；标出缺口、来源和影响 |
+| `stale` | 有旧值但 freshness 超阈值 | 保留数据并显式 stale；不得冒充实时 |
+| `error` | 当前请求失败且无可用结果 | 错误边界局部化；保留用户输入 |
+| `retrying` | 用户或系统重试中 | 保留旧结果，禁重复提交 |
+| `permission/unsupported` | 权限或市场/能力不支持 | 解释边界，不用 empty 文案 |
+
+页面级 shell/auth/route 失败可阻断整页；领域区块失败只阻断该区块。单一通知、数据源、统计或图表失败不得拖垮报告、组合或信号主页面。
+
+### 9.3 Overlay 决策
+
+| 场景 | 容器 |
+| --- | --- |
+| 可分享、有历史、承担主任务 | 页面或子路由 |
+| 查看上下文详情且关闭后回原对象 | Drawer；mobile 可转 full-height sheet |
+| 短、原子、必须完成/取消的写操作 | Modal；mobile bottom sheet |
+| 单一轻量选择或说明 | Popover/Menu/Tooltip |
+| 危险确认 | ConfirmDialog，始终为最上层 |
+
+禁止卡片套卡片式页面分区、无限 Drawer 嵌套，或在 Modal 内再打开同层 Modal。每个 Overlay 都必须声明 opener、initial focus、Escape、背景 inert、scroll lock 和 focus return。
+
+### 9.4 长任务
+
+统一状态为 `pending / running / cancelling / succeeded / failed / cancelled`。提交后立即生成稳定 task identity；前端断开不等于后端取消。离开、刷新和返回后从 task API 恢复；重试生成新 attempt 或明确复用幂等 operation ID。结果归属领域页面（报告 -> Research、portfolio snapshot -> Portfolio、screening -> Research、backtest -> Portfolio），全局 TaskPanel 只做摘要与跳转。
+
+## 10. Desktop / tablet / 390px / 320px 响应式策略
+
+| 宽度 | Shell | 页面布局 | 关键约束 |
+| --- | --- | --- | --- |
+| `>=1280` | 展开 Sidebar | 最多主内容 + 1 contextual rail | 侧栏品牌完整；表格可横滚但主操作固定可见 |
+| `1024-1279` | 默认 collapsed rail，允许展开 | 最多两列；Home history rail 与指标 rail 不同时出现 | 修复 `UI01-P1-02`；图表不得靠 document overflow 检查替代 occlusion 检查 |
+| `768-1023` | navigation Drawer | 单主列 + 可选 Drawer | 不保留桌面左 rail；Filters 可折叠 |
+| `390x844` | Drawer | 单列，44px touch target | 全局 nav 与页内历史使用不同图标/名称 |
+| `320x720` | Drawer | 单列，compact pagination、无固定宽控件 | 长单词/英文换行；Overlay 全高可滚；所有 primary action 可达 |
+
+200% zoom 按等价窄布局验收：在 1440 CSS viewport 下启用原生 200% zoom，行为至少不差于 720px breakpoint；必须补一次人工浏览器 zoom 检查。`prefers-reduced-motion` 下取消非必要 transition/animation，但 loading 必须仍有文本或 ARIA 状态。
+
+## 11. 键盘、焦点、读屏和颜色非唯一语义
+
+### 11.1 键盘与焦点
+
+- 每页只能有一个 `main` landmark 和一个页面级 H1；Shell 已提供 `main` 时，`AppPage` 使用 `div/section`。
+- Tab/Shift+Tab 顺序遵循视觉任务顺序：全局导航 -> 页面标题/主操作 -> filters -> result -> contextual actions。
+- Button 使用 Enter/Space；link 使用 Enter；Select/Menu 支持 Up/Down/Home/End/Escape；不得只模拟 ARIA role 而缺键盘模型。
+- Drawer/Modal/Confirm 保留现有焦点陷阱、Escape、inert、scroll lock、关闭后回 opener；嵌套时只关闭 topmost overlay。
+- 长任务状态使用 `aria-live=polite`；错误汇总和提交失败使用可感知 alert，但不重复朗读整页。
+- 图表提供同等文本摘要或 table；Tooltip 不是唯一信息源。
+
+### 11.2 表单与名称
+
+- 股票代码、评估窗口、日期、筛选和 switch 必须有关联 `label` / `aria-label`，不能只靠 placeholder。
+- 图标按钮使用公共 Tooltip + accessible name；相邻两个 hamburger 禁止共享相同语义。
+- 分页读屏名称包含当前页与总页数；compact 视觉不能减少键盘可达页首/页尾能力。
+- zh/en 是当前全部 UI 语言；英文长文案在 320px 必须自然换行，不通过 viewport 字号缩放。
+
+### 11.3 颜色
+
+- 中国市场“红涨绿跌”与品牌绿色继续分离，必须同时使用文本、图标、方向或 sign，不让颜色成为唯一语义。
+- success/warning/error/partial/stale 都使用现有 semantic token + 文本 label。
+- 图表、时间线和 Gauge 不再返回 raw hex；token 缺口先修改设计规则和 `index.css`，不得从外部截图吸色。
+
+## 12. Settings 与 Provider Catalog 不可回退基线
+
+以下能力已经实现，UI-02～UI-07 不得重做或回退：
+
+- Settings 两级 IA；`section/view` 深链、legacy migration、刷新与 Back/Forward。
+- 按配置组统一 draft、自动/原子保存、页面错误汇总、字段定位、restart-required、来源说明。
+- 409 显示本地/远端版本，用户选择保留本地或刷新；离开保护覆盖失败 draft。
+- Provider Catalog 是 Provider identity、capability 和 field contract 的唯一权威。
+- Connection、Available Models、Report/Agent/Vision task routing 和 fallback 使用稳定 ModelRef；历史 stale selection 保留并显式标记。
+- 首次向导复用同一 Connection contract 与保存事务；不新增页面内自由文本 Provider 凭据表。
+- 正常 AI views 不暴露 raw config key；developer diagnostics 保持折叠和二级。
+- Modal/Drawer、主题和语言继续复用公共实现。
+
+`KEEP` 只冻结上述信息架构、配置权威和保存/冲突契约，不代表当前 responsive implementation
+无缺陷。`UI01-P1-09` 已证明 `overview/readiness` 的 mobile content region 在 390/320 下宽于
+可视区域；UI-06F 必须修复横向裁切，同时保持所有 `section/view` URL、draft、原子保存、409、
+leave guard 和 Provider Catalog 行为不变。
+
+分界：
+
+- 报告本次数据质量属于 Research report。
+- 单个数据源配置与全局健康属于 Settings > Data Sources。
+- runtime scheduler/auth/log/update 属于 Settings > System & Security。
+- Usage 属于 More，不与 Provider credential 或系统诊断混在同一页。
+
+## 13. 多资产、数字资产与资产配置的未来位置
+
+目标 IA 为未来能力预留位置，但当前不暴露入口：
+
+| 未来能力 | 目标位置 | 必须先完成的 contract | 禁止套用的股票假设 |
+| --- | --- | --- | --- |
+| 数字资产单资产研究 | 研究 > 资产研究 | canonical asset identity、交易对、venue/chain、Decimal、freshness、许可 | 交易日、收盘价、A 股涨跌颜色、股票代码 |
+| 数字资产持仓 | 组合 > 持仓 | account/venue identity、Decimal、估值货币、7x24 price source | 单一券商账户、日终快照 |
+| 统一 Portfolio | 组合 > 总览/持仓/诊断 | 跨市场 valuation、FX、partial/stale contract | 将 partial 当完整、将缺失 FX 当 0 |
+| 资产配置 | 组合 > 配置 | target allocation、约束、rebalance proposal API | 把建议直接当订单 |
+| 计划 | 组合 > 计划 | approval/status/audit contract | 在无执行边界时显示“可执行” |
+| 跨资产对比/假设 | 研究 > 对比/假设 | comparable metric、scenario、provenance contract | 混用不同时间/币种/freshness |
+
+当前 JP/KR/TW Portfolio 仍有 FX、成本、行业和风险口径 partial 边界（`docs/market-support.md:37-44,116-138`）。这证明现有系统不是 crypto-ready；多资产页面只能在目标 IA 与 backlog 中出现。
+
+## 14. Coinstax 外部模式采用、适配和拒绝矩阵
+
+本次没有 Figma MCP，故不声明 exact styles/variables/variants。`0:1` 与 `117:279` 只来自执行 prompt 提供的外部节点标识。
+
+| external page/node | visual/component pattern | StockPulse use case | existing semantic token | existing public component | 决定 | 理由 | future owner |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Design `0:1` | light/dark 对称、紧凑 sidebar | 全局 Shell | `background/card/foreground/border/primary` | `Shell/SidebarNav/ThemeToggle` | `reuse` | 复用现有 Shell/主题；只参考层级，不取外部值或扩展第二套组件 | UI-06B |
+| Style Guide `117:279` | Button/Card/Badge/Modal variants | 公共操作与状态 | 现有 status/button tokens | `Button/Card/Badge/Modal/Drawer` | `reuse` | StockPulse 已有公共组件，不建平行 kit | UI-05/06 |
+| Dashboard（node 未核验） | 数据密集工作台 | Today summary | dashboard/home tokens | `DashboardStateBlock/StatCard` | `reuse` | 复用当前状态/统计组件并重排；任务语义由 StockPulse 定义 | UI-02 |
+| Markets / Currency Details（node 未核验） | 列表到详情、context rail | Research asset/report | semantic tokens | report/history components | `reuse` | 用现有 report/history 组件组合 master-detail，不复制 crypto entity 或新 kit | UI-03C |
+| Portfolio / Empty State（node 未核验） | 总览与空状态 | Portfolio overview | status/surface tokens | `EmptyState/Card/StatCard` | `reuse` | 当前组件已覆盖；需要 IA 拆分而非新视觉 kit | UI-04 |
+| Settings（node 未核验） | 二级设置导航 | Settings | settings tokens | `SettingsNavigation` + field components | `reuse` | 当前两级 IA 是不可回退基线 | regression only |
+| Transactions / wallet / transfer / exchange | Web3 交易工作流 | 无已批准场景 | n/a | n/a | `reject` | 未批准产品能力，不能从参考反推需求 | n/a |
+| 外部 raw color/shadow/spacing | exact values | 任何页面 | 项目现有 tokens | n/a | `reject` | Coinstax 不是项目设计源；禁止复制魔法值 | design owner |
+| 大量独立卡片/嵌套卡片 | decorative grouping | data pages | surface tokens | `Card/SectionCard` | `reject` | 页面分区应无框，避免卡片套卡片和信息碎片化 | all UI slices |
+
+## 15. 公共组件复用、扩展与禁止重复实现
+
+### 15.1 必须直接复用
+
+| 领域 | 组件 / 模块 |
+| --- | --- |
+| Shell/navigation | `Shell`, `SidebarNav`, `ThemeToggle`, `UiLanguageToggle` |
+| 基础 controls | `Button`, `Input`, `Select`, `SearchableSelect`, `Checkbox`, `Pagination`, `Tooltip` |
+| 状态 | `EmptyState`, `Loading`, `InlineAlert`, `ApiErrorAlert`, `DashboardStateBlock`, `StatusDot` |
+| 容器 | `AppPage`, `PageHeader`, `Card`, `SectionCard`, `Toolbar`, `ScrollArea` |
+| Overlay | `Drawer`, `Modal`, `ConfirmDialog`, `useDialogA11y`, `overlayZ` |
+| 领域 | report components、history components、`TaskPanel`、Run Flow components、Settings IA/field placement |
+
+### 15.2 允许扩展
+
+- `AppPage`：允许配置 element/landmark，避免 nested main。
+- `Pagination`：增加 compact/wrap 模式，不另建 MobilePagination。
+- Tabs/segmented workspace：从 Settings/Home 的真实重复中抽公共 primitive。
+- ContextLink / return URL helper：集中编码 stock/report/signal/account context 和兼容 redirect。
+- Task summary：基于 `TaskPanel/useTaskStream/RunFlowPanel` 统一，不另建 Portfolio polling。
+- State composition：组合 `initial/loading/empty/partial/stale/error/retrying`，不强迫所有页面使用一张万能卡。
+- Responsive data view：同一数据模型支持 desktop table 与 mobile row-detail，不复制 API/state logic。
+- Menu/Popover：收敛 Theme、Home 和 LLM 菜单的键盘/focus 行为。
+
+### 15.3 禁止
+
+- 第二套 Provider Catalog、Settings IA、Theme、Modal/Drawer/Button/Card 或全局当前股票 store。
+- 每页私有 status vocabulary、error parser、pagination、toast 或 task polling。
+- 用 `location.state`、组件 local state 或 sessionStorage 承担应刷新恢复的业务 identity。
+- 因导航合并删除功能、吞掉旧 URL、把 planned 功能伪装成 disabled production item。
+
+## 16. 数据/API 依赖与阻塞矩阵
+
+| UI 项 | 当前 contract | 是否可立即实施 | 阻塞 / owner |
+| --- | --- | --- | --- |
+| 六项导航分组、label、mobile tree | routes + i18n 已有 | HITL 后可做 | HITL 批准名称/顺序；UI-06B |
+| Current Home hierarchy、1024 修复 | Home/history/task APIs 已有 | HITL 后可做 | UI-02 current-data phase；不冒充完整 E04 |
+| 完整 E04 Today | Today aggregation/sorting/preferences API 未实现 | 否 | E04 薄规格、服务端排序、区块错误/已读处理 contract |
+| Research shell、现有报告/问股/选股归组 | history/chat/AlphaSift APIs 已有 | HITL 后可做兼容层 | route + source context 决策；UI-03A～D |
+| E06 Research timeline | 稳定 event/link/cursor API 未实现 | 否 | D-08 批准 + E06 薄规格；不得显示空壳入口 |
+| Signal get-by-id、来源报告 link | API 已有 | 是 | UI-03 |
+| Signal -> create alert | alerts create contract 已有 | 是，需定义 prefill mapping | UI-03 |
+| Portfolio view URL、task tracking | Portfolio + task APIs 已有 | 是 | UI-04 |
+| State vocabulary、responsive Pagination/Menu | 无新 API | 是 | UI-05/06 |
+| 四阶段每日研究独立结果 UI | 只有 runtime 摘要，无独立 API/持久化 | 否 | approved product/data thin spec |
+| Data Source Doctor | E16 只有 Draft Program PRD | 否 | health API + low-sensitive metrics/privacy contract |
+| Compare / hypothesis | E08/E09 只有 Draft Program contract，无批准薄规格/API | 否 | product/data contract |
+| Allocation / plan | 多资产 PRD/API 仍 Draft，D-01～D-09 未批准 | 否 | portfolio domain/Decimal/migration/compliance/API |
+| Digital assets | asset identity/Decimal/许可/freshness 缺失 | 否 | multi-asset PRD/data/API |
+| 多用户/角色化 IA | 仅单管理员 auth | 否 | auth/RBAC PRD |
+
+`origin/main` 相对 handoff 对 decision-signal reassess persistence 有额外改动；在 merge 后重跑 UI-01 contract diff，避免把 preview-only 或 persisted result 写错。
+
+## 17. UI-02～UI-07 实施切片
+
+### UI-02 Current-data 今日信息层级（完整 E04 仍 blocked）
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 打开 `/` 先看到现有数据能可靠表达的今日覆盖、运行任务、自选摘要与最近结果；1024 不再裁切 gauge。 |
+| 范围 | 重排当前 Home/history/watchlist/task/setup 数据、恢复 view query、修 1024 composition；不新增 PRD planned section。 |
+| 非目标 | 不伪造 E04 的持仓风险/事件/昨日表现/失败聚合，不在前端复制 P0～P4 排序，不实现多观察清单。 |
+| 依赖 | 现有 history/watchlist/tasks/setup status；完整 E04 等 Today API、服务端排序原因、区块错误与已读/处理 contract。 |
+| 主要文件 | `HomePage.tsx`, `components/watchlist/HomeStockWorkspace.tsx`, `components/dashboard/*`, `useHome*`, Home locales。 |
+| URL/状态 | `/` 保留；把工作区 view 放 query；继续兼容 `recordId/runFlow*`。 |
+| 测试/截图 | 1440/1024/390/320，empty/partial/stale/task；1024 gauge occlusion regression；light/dark zh/en。 |
+| flag/兼容 | `today_workspace_v2` composition flag；旧 Home 可一键回退。 |
+| 回滚 | 关闭 flag，保留新增 URL parser 的向后兼容。 |
+| 前置 / 后置 | 前置：HITL-H1/H4，UI-06C public landmark；后置：E04 薄规格/API 完成后另开 full-Today slice，UI-03D 再消费 Home context link。 |
+
+### UI-03 Research 与 Signals 上下文闭环
+
+完整 E06 timeline、E08 compare、E09 hypothesis 不属于以下 current-capability slices；它们等待各自
+薄规格、D-08 和数据/API contract，不能通过空 Tab 预告为已实现。
+
+#### UI-03A Routing 与 compatibility contract
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 现有 `/chat`、`/screening`、`/?recordId=` 始终可直达；若 HITL 批准 `/research`，它只作为 additive flagged route，并能恢复同一 identity/view。 |
+| 范围 | React Router route/parser/normalizer、受控 return URL、legacy-to-candidate mapping、invalid param 反馈。 |
+| 非目标 | 不移动页面内容、不实现 timeline/compare/hypothesis、不 redirect 掉当前 canonical path。 |
+| 文件所有权 | `App.tsx`，新增 `routing/researchRouteContract.ts`（最终目录按现有 convention），对应 unit tests；本 slice 独占这些文件。 |
+| API/数据依赖 | 无新 API；需要 HITL-H2/H6 决定是否创建 `/research` 及兼容策略。 |
+| URL/状态 | identity 使用 `stock/reportId/session/signal/view/returnTo`；用户动作 push，invalid normalization replace；query/hash 透传白名单化。 |
+| flag/灰度 | `research_routes_v1`；off 时只有当前 paths，on 时 additive alias，当前 paths 仍 canonical 直到另批迁移。 |
+| 验收测试 | direct/refresh/share/Back/Forward；合法/非法 return URL；legacy 与 candidate 语义等价；flag on/off matrix。 |
+| 回滚 | 关闭 flag 移除新入口；parser 继续接受已发出的 additive URL 并给安全 fallback，不删除旧 route。 |
+| 前置 / 后置 | 前置：UI-06A 完成并释放 `App.tsx`；后置：UI-03C/D/E。若 HITL 不批 `/research`，本 slice 缩为共享 URL helper。 |
+
+#### UI-03B 公共 workspace navigation primitive
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | Desktop 使用一致的二级 tabs/segmented navigation，mobile 使用同一 view model 的紧凑 selector；键盘与读屏名称稳定。 |
+| 范围 | 新的公共 workspace view selector、roving/standard tab behavior、responsive presentation 与 tests。 |
+| 非目标 | 不决定 Research page names，不读取 route/API，不复制 Settings IA 或建页面私有 Tabs。 |
+| 文件所有权 | 新增 `components/common/WorkspaceNavigation.tsx` 及 tests/exports；不修改 `App.tsx`、Shell 或领域页面。 |
+| API/数据依赖 | 无；使用现有 semantic tokens/public controls。token 缺口先停下更新视觉规则。 |
+| URL/状态 | controlled `value/onChange`；component 不直接写 history，由 consumer 的 Router contract 持有。 |
+| flag/灰度 | additive public primitive，无全局 flag；只在获批 consumer flag 内渲染。 |
+| 验收测试 | Up/Down 或 Left/Right（按最终 role）、Home/End、Enter/Space、focus-visible、320/390/desktop、长 zh/en label。 |
+| 回滚 | consumer 回旧 selector；public export 保留到所有 consumer 退出，避免破坏并行 branch。 |
+| 前置 / 后置 | 前置：UI-05 的 common-component ownership window结束；后置：UI-03C，未来 UI-04 可消费但不并行改此文件。 |
+
+#### UI-03C Research page composition 与二级导航
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | flag on 时，一个 Research shell 可在当前已实现的资产概览、报告/历史、问股、选股视图间切换；planned view 不出现。 |
+| 范围 | 新 Research page/composition、现有组件 wrapper、二级 view 配置、loading/unsupported 边界。 |
+| 非目标 | 不重写 Chat/Screening 业务逻辑，不实现 E06/E08/E09，不处理 Signal 报告/告警 loop。 |
+| 文件所有权 | 新 `pages/ResearchPage.tsx`、`components/research/*`、Research locales/tests；消费 UI-03A/B，不再修改 `App.tsx`。 |
+| API/数据依赖 | 现有 history/report/chat/AlphaSift API；AlphaSift unavailable 必须显式，不隐藏整个 Research。 |
+| URL/状态 | candidate `view=asset|report|chat|screening` + identity；当前 `/chat`/`/screening` 仍直接工作。 |
+| flag/灰度 | `research_workspace_v1`；先 internal/deep-link，未验收前不进 production nav。 |
+| 验收测试 | 每个现有 view 的 direct/refresh/Back；AlphaSift 三态；1440/1024/390/320、light/dark、zh/en、keyboard。 |
+| 回滚 | 关闭 composition flag，旧页面继续直接渲染；不删除新 URL parser 或兼容 test。 |
+| 前置 / 后置 | 前置：UI-03A/B；后置：UI-03D/E 与 UI-06B nav entry。 |
+
+#### UI-03D Research context connections
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 报告 -> 问股 -> 返回报告、Screening candidate -> Research/analysis 都保留股票、来源与返回筛选；立即刷新不丢上下文。 |
+| 范围 | contextual-link helper、report/chat source context、Screening transition 与 focus/return behavior。 |
+| 非目标 | 不修改 Home/Portfolio（由 UI-02/UI-04 后续消费 helper），不处理 Signal loop，不改变 Chat generation。 |
+| 文件所有权 | `ChatPage.tsx`、`StockScreeningPage.tsx`、必要 report/history components、新 `components/research/ContextLink.tsx` 及 tests。 |
+| API/数据依赖 | 确认 chat session 是否能原子保存 `source_report_id/stock`；若不能，URL 保留 source 到后端确认持久化后再 replace。 |
+| URL/状态 | returnTo 使用站内白名单；source identity 可刷新；`location.state` 只承载纯瞬态 UI，不承载 auto-analyze。 |
+| flag/灰度 | `research_context_links_v1`；每条 connection 可独立开关，先 report/chat，再 screening。 |
+| 验收测试 | 导航后 0ms/刷新/新标签/Back/Forward；停止生成后返回；invalid/deleted report；IME 不回归。 |
+| 回滚 | 关闭 context-link flag 回旧入口；旧 route/session 可用，不删除已持久化 source metadata。 |
+| 前置 / 后置 | 前置：UI-03A/C；避免与 UI-02 同时修改 Home。后置：UI-02/UI-04 只消费冻结 helper，UI-03F 汇总证据。 |
+
+#### UI-03E Signals 来源报告与告警闭环
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 任意有效 `signal` ID 可直达详情；详情能打开来源报告、预填告警并返回原 filters/page/signal。 |
+| 范围 | get-by-id fallback、source-report command、alert prefill mapping、return URL、局部 error/not-found。 |
+| 非目标 | 不合并 Signals/Alerts 数据模型、不实现完整 E05/E06 生命周期、不改变 reassess persistence。 |
+| 文件所有权 | `DecisionSignalsPage.tsx`、`components/decision-signals/*`、Alerts prefill consumer、对应 API/type tests；不改 Shell/App。 |
+| API/数据依赖 | 现有 signal get-by-id/history detail/alerts create；需薄 mapping 说明 signal fields 如何预填 rule，未知字段不猜。 |
+| URL/状态 | `signal/filters/page/returnTo` Router-driven；Alert prefill 是显式 draft，取消返回 Signal；404 只清 invalid signal。 |
+| flag/灰度 | `signal_context_loop_v1`；source report 与 alert command 可分阶段启用。 |
+| 验收测试 | 不在第一页的 signal direct/refresh；source report deleted；create/cancel alert；Back 恢复完整筛选；320 Drawer focus。 |
+| 回滚 | 关闭 flag 隐藏新命令；原 signal/alert routes、API payload 和用户规则不变。 |
+| 前置 / 后置 | 前置：UI-03A；若消费 Research candidate route则等待 UI-03C，否则先链接现有 report URL。后置：UI-03F。 |
+
+#### UI-03F Research/Signals compatibility evidence
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 无新增行为；提供可复验的 current/candidate route 与跨页闭环证据。 |
+| 范围 | contract/unit/integration/Playwright journeys、截图索引、artifact hygiene、flag matrix。 |
+| 非目标 | 不在 fixture 中重写业务页面，不用 mock 绕过 Router/chat/signal/alert 的真实风险层。 |
+| 文件所有权 | Research/Signals 专用 `e2e/*` 与 test fixtures；生产文件在 A～E 完成后冻结。 |
+| API/数据依赖 | 隔离真实 backend/Vite/fake provider；稳定脱敏 report/signal/alert fixture。 |
+| URL/状态 | 覆盖 current canonical、additive candidate、invalid、Back/Forward、refresh、returnTo 安全边界。 |
+| flag/灰度 | CI 同时跑 flag off compatibility smoke 与 flag on journey；旧 path gate 保留到 HITL 定义的退出条件。 |
+| 验收测试 | report-chat-back、screening-context、signal-report-alert-back、任意 signal ID、四视口、zh/en、light/dark。 |
+| 回滚 | 测试随 flag lifecycle 调整，但当前 path smoke 不因关闭 candidate UI 删除。 |
+| 前置 / 后置 | 前置：UI-03A～E；后置：UI-07 汇总 visual/real-interaction evidence。 |
+
+### UI-04 当前股票 Portfolio 总览/诊断工作区
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户行为 | 在当前已实现的总览、持仓、诊断、活动、回测之间切换；账户与任务可恢复。 |
+| 范围 | 拆现有 1923 行单页、URL view/account、任务摘要、responsive data view；不实现资产配置/计划/多资产。 |
+| 依赖 | 现有 Portfolio/DecisionSignal/task/backtest API。完整 tracker UI-04（M-04～M-11）仍等待 D-01～D-09、稳定 identity、Decimal、migration 和 Approved allocation rules。 |
+| 主要文件 | `PortfolioPage.tsx`, `BacktestPage.tsx`, portfolio API/types/utils, `TaskPanel`, Run Flow components。 |
+| URL/状态 | `/portfolio?view=&account=`；`/backtest` compatibility；filters/page 进入 query。 |
+| 测试/截图 | 幂等写操作、timeout-after-commit、partial/stale、任务离开/返回、320 modal/table。 |
+| flag/兼容 | `portfolio_workspace_v2`; existing mutations/API payload 不变。 |
+| 回滚 | 关闭 composition flag；保持兼容 query 被旧页忽略。 |
+
+### UI-05 状态体系统一
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户行为 | 用户能区分 loading、empty、degraded、stale、error 和 retrying，并在区块失败时继续其它任务。 |
+| 范围 | 状态词汇、公共 composition、error boundary、retry；不改变领域 API fallback，不修改 landmark/PageHeader。 |
+| 依赖 | 需要各 API 提供/保留 source、as-of、quality/limitations；缺字段只在事实充分时局部映射，否则标记 dependency，不用 broad fallback。 |
+| 主要文件 | `EmptyState/Loading/InlineAlert/ApiErrorAlert/DashboardStateBlock` 等状态 primitive 及 tests；完成后释放 common ownership 给 UI-03B/UI-06C/D/E。 |
+| URL/状态 | retry 不污染历史；invalid identity 清理遵循 §9。 |
+| 测试/截图 | 每页 state matrix；区块失败不阻断页；长内容、light/dark、zh/en。 |
+| flag/兼容 | 按页面渐进接入；公共组件 props additive。 |
+| 回滚 | 单页回到旧状态组件，不回滚 API/error parser。 |
+| 前置/后置 | HITL-H7 后先执行；后置 UI-06C/D/E 与各 page pilot。完整 capability-aware state 等 E01/E16 contract。 |
+
+### UI-06 移动导航和无障碍
+
+该任务拆成以下独立 slice。共享文件按 `UI-06A -> UI-03A -> UI-06B` 顺序移交；C/D/E/F
+各自独占不同 primitive/page，G 在生产文件冻结后取证。不得让两个 Agent 同时编辑同一核心文件。
+
+#### UI-06A Post-auth deep-link restoration
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 未登录打开 Settings/Signal/Report 深链，登录或首次设密后稳定回到原 path/query/hash，不再有双 owner 竞态。 |
+| 范围 | 收敛 auth transition navigation owner、站内 redirect validation、loading transition 与确定性 tests。 |
+| 非目标 | 不改变主导航、不新增 `/research`、不放宽 `//`/外域 URL、不重构认证后端。 |
+| 文件所有权 | `App.tsx`、`LoginPage.tsx`、必要 `AuthContext.tsx` 与 auth/login tests；本 slice 完成后释放 `App.tsx` 给 UI-03A。 |
+| API/数据依赖 | 现有 session/status/password API；无需新 contract。现有 `auth-deep-link-recheck.json` 非结论性，必须新 context 重测。 |
+| URL/状态 | redirect 保留 path/query/hash；login transient state 不写业务 URL；Back 不重复提交登录。 |
+| flag/灰度 | correctness/security bugfix 不放在 IA flag 后；可先以 integration test gate 上线。 |
+| 验收测试 | 全新 browser context，Settings/Signal/Report + invalid external redirect；登录后等待 2.5s、refresh、Back/Forward；首次设密和 returning-admin。 |
+| 回滚 | 只在认证阻断回归时 revert owner change；安全 redirect validation 和回归测试不得回退。 |
+| 前置 / 后置 | 前置：无 UI IA 决策；后置：UI-03A 才能编辑 `App.tsx`，UI-06G 补全四视口证据。 |
+
+#### UI-06B Shell / Sidebar responsive navigation
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | HITL 批准后 desktop/mobile 使用同一有限导航树；1024 使用稳定 rail/Drawer，expanded brand 完整，页面内容不被双 rail 裁切。 |
+| 范围 | Shell breakpoint、Sidebar/Drawer route descriptors、brand/active/unavailable state、mobile opener/focus return。 |
+| 非目标 | 不修改领域页面 composition、不实现 planned nav item、不修改 Login/App route parser。 |
+| 文件所有权 | `Shell.tsx`、`SidebarNav.tsx`、新 navigation descriptor、Shell/nav locales/tests；独占窗口。 |
+| API/数据依赖 | HITL-H1/H2/H3/H5；AlphaSift status 只影响 capability state，不删除 route descriptor。若 `/research` 获批，依赖 UI-03A/C 已可用。 |
+| URL/状态 | navigation target 由 descriptor 提供；collapsed/open 只属 UI state；当前 business query 不因跨 breakpoint 清除。 |
+| flag/灰度 | `task_navigation_v1`；internal -> desktop -> mobile，flag off 完整恢复旧 tree，route 均保留。 |
+| 验收测试 | 1440/1024/768/390/320、1440@200%、zh/en、light/dark、reduced motion；Drawer Escape/inert/focus return；Home gauge 无 occlusion。 |
+| 回滚 | 关闭 flag；保留 responsive overflow/brand bug tests和所有旧 routes。 |
+| 前置 / 后置 | 前置：HITL 和（如采用 `/research`）UI-03A/C；后置：UI-06G compatibility evidence。 |
+
+#### UI-06C Landmark / PageHeader / label contract
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 每页恰有一个 `main` 与 H1；读屏可跳到页面标题，表单控件不靠 placeholder 命名。 |
+| 范围 | `AppPage` semantic element、`PageHeader` contract、公共 label guidance/tests；先修 public primitive，领域页由 owner 顺序接入。 |
+| 非目标 | 不重排页面业务内容、不改 API/filter value、不同时接管 Home/Backtest 等领域文件。 |
+| 文件所有权 | `components/common/AppPage.tsx`、`PageHeader.tsx` 及 tests/exports；page adoption 分别归 UI-02/UI-03/UI-04。 |
+| API/数据依赖 | 无；遵循现有 typed locale 和 DESIGN_GUIDE。 |
+| URL/状态 | 无 URL change；heading/label 不重置 filters 或 focus state。 |
+| flag/灰度 | public props additive；可先在一个无争议页面 pilot，再由 page owner 消费。 |
+| 验收测试 | semantic DOM/ARIA snapshot、axe、Tab/Shift+Tab；每个 route 一个 main/H1，long zh/en 不溢出。 |
+| 回滚 | consumer 可暂时回旧 wrapper；修正后的 semantic default/label tests 保留，避免重新引入 nested main。 |
+| 前置 / 后置 | 前置：UI-05 common ownership完成；后置：UI-02、UI-03C、UI-04 page composition。 |
+
+#### UI-06D Compact Pagination primitive
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 320px、999 pages 下页首/页尾/当前/前后操作均可见、可触达、可读屏，不被 Shell 裁掉。 |
+| 范围 | 公共 Pagination compact/wrap algorithm、stable dimensions、accessible labels、tests。 |
+| 非目标 | 不修改 Signals/Backtest/Alerts data fetching 或 page query parser，不新建 MobilePagination。 |
+| 文件所有权 | `components/common/Pagination.tsx` 及 unit/component fixture tests；领域 consumers 只传 additive props。 |
+| API/数据依赖 | 无；总页数/当前页沿用现有 contract。 |
+| URL/状态 | component 只发 `onPageChange`；page owner 决定 Router push，compact 不能改变 page identity。 |
+| flag/灰度 | additive `compact/responsive` behavior；先 opt-in，验证后可成为窄屏 default。 |
+| 验收测试 | 1/2/9/999 pages、320/390/200%、keyboard order、触控 target、RTL 非目标明确；无 layout shift。 |
+| 回滚 | consumer 移除 opt-in；旧 props 行为不变，已发布页码 URL 继续有效。 |
+| 前置 / 后置 | 前置：UI-05 common ownership完成；后置：UI-03E/UI-04 consumer adoption，UI-06G visual evidence。 |
+
+#### UI-06E Public Menu / Popover primitive
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | Theme menu 先使用完整键盘模型；后续 Home strategy 与 LLM more menu 复用同一 primitive，Escape 后回 opener。 |
+| 范围 | 公共 Menu/Popover、position/focus/outside-click/keyboard behavior；ThemeToggle 作为唯一 pilot consumer。 |
+| 非目标 | 首片不修改正有 Provider/Settings 用户改动的 `LLMChannelEditor.tsx`，不把 disclosure 强行声明为 menu。 |
+| 文件所有权 | 新 `components/common/Menu.tsx`/`Popover.tsx`（按既有 convention）、`ThemeToggle.tsx`、tests；consumer migration 后续顺序执行。 |
+| API/数据依赖 | 无；overlay z-index/focus contract 复用现有公共 helper，不另建 overlay stack。 |
+| URL/状态 | open/highlight 属 transient state，不进 URL；选择 theme 继续写现有 theme storage。 |
+| flag/灰度 | additive primitive；Theme pilot 可组件级 flag/逐 consumer rollout。 |
+| 验收测试 | Up/Down/Home/End/Enter/Space/Escape/Tab/outside-click、nested overlay、320/desktop、reduced motion、focus return。 |
+| 回滚 | Theme 回旧 selector；public primitive 保留给已迁移 consumer。不得回退现有 theme storage/value。 |
+| 前置 / 后置 | 前置：UI-05 common ownership；后置：Provider work合并后单独迁 LLM menu，UI-02 完成后迁 Home strategy menu。 |
+
+#### UI-06F Settings mobile overflow
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | Settings 所有 section/view 在 320/390 和 200% zoom 下无隐藏横向裁切；长 model/path/connection 与操作可换行或局部受控滚动。 |
+| 范围 | 先用最宽-descendant/computed-style 诊断定位，再修 Settings content/card/import responsive constraints 和回归测试。 |
+| 非目标 | 不改变 Settings IA、`section/view`、draft/autosave/409/leave guard、Provider Catalog 或任何 config value。 |
+| 文件所有权 | `SettingsPage.tsx`、`SettingsSectionCard.tsx`、必要 `IntelligentImport.tsx` 与 Settings responsive tests；不得与当前 Provider/Settings工作并行编辑。 |
+| API/数据依赖 | 无新 API；当前证据只覆盖 15 个组合中的 `overview/readiness` 1 个，具体 overflow descendant 根因待确认。 |
+| URL/状态 | 原样保持 `section/view`、legacy normalization、Back/Forward 与 focus-to-error。 |
+| flag/灰度 | responsive bugfix 优先无 flag；若 composition 变化大，使用局部 `settings_responsive_v2`，不 fork config state。 |
+| 验收测试 | 枚举 11 section / 15 section-view；320/390/1024/1440@200%，zh/en、light/dark、long path/model/connection、document/main width 和 actionable bounds 断言。 |
+| 回滚 | 只回布局 class/composition；配置/URL contract 与新增 overflow regression test 保留。 |
+| 前置 / 后置 | 前置：用户 Provider/Settings改动完成合并并取得独占文件窗口；后置：UI-06G + UI-07 evidence。 |
+
+#### UI-06G Accessibility / responsive compatibility evidence
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户可见结果 | 无新增行为；提供 Shell、Login、Settings 与公共 primitive 的可复验证据和剩余人工风险。 |
+| 范围 | Playwright/ARIA/axe/visual evidence、四视口、200% zoom、reduced motion、人工读屏 checklist、artifact hygiene。 |
+| 非目标 | 不用 test-only CSS 掩盖 overflow，不 mock 掉 auth/router/overlay 风险，不把空 DOM 当 Login 证据。 |
+| 文件所有权 | UI-06 专用 `e2e/*`、accessibility fixtures 与 artifact index；A～F production files 冻结。 |
+| API/数据依赖 | 隔离 backend/Vite/fake provider；脱敏 auth/setup fixture；不读取开发者 credentials。 |
+| URL/状态 | 当前 routes + approved candidate aliases；Login redirect、Back/Forward、invalid params 和 flag on/off。 |
+| flag/灰度 | CI 跑 navigation flag on/off；bugfix 无 flag 路径始终跑。 |
+| 验收测试 | `/login` 补 1440/1024/390/320、light/dark、zh/en、first-run/returning-admin、keyboard/reduced-motion/200%；Settings 15 views；人工读屏结果单列。 |
+| 回滚 | evidence 随正式兼容期收敛，当前 route/auth/security tests 不删除；一次性 PNG 留 PR/artifact，不入仓库。 |
+| 前置 / 后置 | 前置：UI-06A～F；后置：UI-07 汇总跨 slice visual gate。 |
+
+### UI-07 视觉回归与真实交互证据
+
+| 字段 | 定义 |
+| --- | --- |
+| 用户行为 | 无新增产品行为；证明 UI-02～06 在真实后端/fixture 下可完成。 |
+| 范围 | Playwright journeys、visual snapshots、contrast/occlusion、artifact hygiene；不在测试中重做业务实现。 |
+| 依赖 | 稳定脱敏 fixture、四视口、fake provider、最终 routes/flags。 |
+| 主要文件 | `e2e/*`, `playwright.config.ts`, test fixtures, artifact scanner；一次性图片不入库。 |
+| URL/状态 | 覆盖 canonical + legacy + invalid + Back/Forward。 |
+| 测试/截图 | 12 条关键流程、全状态、light/dark zh/en、长内容、读屏人工记录；PR 附前后对比。 |
+| flag/兼容 | 同时跑 flag on/off 的 compatibility smoke。 |
+| 回滚 | 测试可随 feature flag 生命周期收敛；保留 legacy smoke 至兼容期结束。 |
+
+文件所有权总门禁：UI-05 先完成 common state ownership；`App.tsx` 严格按 UI-06A -> UI-03A
+移交；UI-06B 独占 Shell/Sidebar；UI-02 独占 Home；UI-03C/D/E 分别独占 Research composition、
+Chat/Screening context、Signals/Alerts loop；UI-04 独占 Portfolio/Backtest；UI-06F 只在用户当前
+Provider/Settings 工作结束后取得 Settings 文件窗口。Evidence slice 在生产文件冻结后运行。
+
+## 18. 必须由维护者批准的 HITL 决策
+
+已从 pending 清单移除：六份文档可读性、current/planned capability classification、Settings/
+Provider/Overlay 不可回退基线、Coinstax 外部参考边界、DESIGN_GUIDE authority 修正、planned 页面
+不提前暴露。这些已有明确输入或已由本轮文档修正，不再要求维护者重复批准。
+
+| ID | 未决决定 | 推荐方案 | 备选方案 | 影响 | 阻塞 slice |
+| --- | --- | --- | --- | --- | --- |
+| `HITL-H1` | Shell 一级 IA 与 zh/en canonical terms | 批准 `今日/Today · 研究/Research · 组合/Portfolio · 信号/Signals · 更多/More · 设置/Settings` | 保持当前 8～9 个功能入口平铺，先只修 bug | 决定用户任务模型、Sidebar/mobile tree、所有 page return labels；不改变 route 本身 | UI-02 label/entry、UI-03C、UI-04 label、UI-06B；UI-05 可设计但仍不得开工 |
+| `HITL-H2` | 问股、选股与 Research hub | 问股作为 Research 二级页 + report/asset contextual command，选股归 Research；当前 `/chat`、`/screening` 保持 canonical，`/research` 先作 additive flagged shell | 问股继续一级；只做 Sidebar 分组，不新增 `/research` | 推荐方案减少顶层项但需要 context/compat contract；备选迁移小但研究信息仍分散 | UI-03A～D、UI-06B |
+| `HITL-H3` | “持仓”还是“组合”，以及多资产五页如何落位 | 一级用“组合”，当前 `/portfolio`/`/backtest` 为二级；未来总资产/配置/再平衡/情景归组合，数字资产研究归 Research，达到 Beta 后再显示 | 一级继续“持仓”；或按多资产 PRD §9.1 增加五个 Shell 项 | 推荐保持有限导航和单一 Portfolio；备选更直达但产生 10+ 一级入口及更大迁移/认知成本 | UI-04、UI-06B；未来 multi-asset UI |
+| `HITL-H4` | UI-02 与完整 E04 的边界 | 先交付 current-data Home 层级、view URL 和 1024 修复；完整 E04 等 Today aggregation/排序/区块状态薄规格后另开 slice | UI-02 整体等待完整 E04 API 后一次上线 | 推荐可先关闭已证实缺陷且不伪造 planned data，但会有后续 composition；备选减少阶段数但延后当前可用性修复 | UI-02；UI-03D 的 Home consumer |
+| `HITL-H5` | Signals、Alerts 与后验/Backtest 的归属 | Signals 一级下放 Decision Signals、Alerts 和单 signal outcome；历史 AI 建议 Backtest 仍在 Portfolio 二级，所有现 path 保留 | Signals/Alerts/Backtest 继续各自一级；或把全部 Backtest 迁 Signals | 推荐区分“信号生命周期”和“组合/历史验证工具”；备选更少迁移但闭环继续分散，或使 Portfolio 验证入口消失 | UI-03E、UI-04、UI-06B |
+| `HITL-H6` | 新旧 Web path 策略与退出条件 | UI-02～UI-07 期间当前 paths 继续 canonical；新 path 只 additive alias，退出条件基于 usage、兼容测试和另一次 HITL，不预先写死日期 | 立即把 `/research` 等设为 canonical，并 replace redirect legacy URL | 推荐风险最小、可回滚但双入口期更长；备选更快收敛 URL 但可能破坏书签/Desktop/通知链接 | UI-03A/F、UI-04 compatibility、UI-06B/G |
+| `HITL-H7` | 执行顺序、flag 与文件所有权 | 批准 §17 的小 slice 与独占顺序：UI-05 primitives；UI-06A -> UI-03A；UI-06C/D/E；UI-06B；UI-02；UI-03C/D/E；UI-04 current-only；UI-06F 等 Provider work；UI-07 持续 | 仍按 UI-02～UI-07 六个大任务逐项托管 | 推荐可独立验收/回滚并避免同文件并发；备选管理简单但 UI-03/UI-06 过大、容易 patch 堆叠和文件冲突 | UI-02、UI-03、UI-04、UI-05、UI-06、UI-07 全部 |
+
+以下是外部前置，不是 UI-01 应重复裁决的 IA 选择：
+
+| 前置 | 状态 / 影响 |
+| --- | --- |
+| D-01～D-09 与合规/许可 | 仍是 Draft + tracker Blocked；阻塞 Evidence/event、multi-asset、allocation 等 planned capability，不阻塞当前 auth/overflow/landmark bugfix。 |
+| E04/E06/E08/E10/E12/E18 薄规格/API | 分别按 §1.3 约束完整 Today、timeline、compare、多 watchlist、template 和 capability-aware state；UI 不得猜 contract。 |
+| 实施基线 | 审计固定在 `ed729c1b`；正式实现前必须在不覆盖用户改动的前提下核对目标 branch 最新 ref 与 signal reassess 等 drift。 |
+| Provider/Settings 用户改动 | 当前工作区已有未提交工作；UI-06F/06E 的 Settings consumer 必须等其完成并取得独占文件窗口。 |
+
+在 `HITL-H1`～`HITL-H7` 明确记录批准/修改结论前，状态保持
+`Ready for HITL review, not approved`，UI-02～UI-07 均不得启动。
+
+## 19. 截图、录像与 artifact 索引
+
+临时证据位于 `.context/ui01-artifacts/`，不加入 Git。共 49 个文件（47 PNG + 2 JSON），
+约 4 MB，无录像。
+
+| 证据 | 文件 | 说明 |
+| --- | --- | --- |
+| 结构化四视口 Shell routes | `ui01-observations.json` | 10 个 authenticated Shell route state（404 + 9 页面，不含 `/login`）× 4 viewport = 40 组观察 |
+| 标准 route screenshot matrix | `{desktop,tablet,mobile}-<route>.png` | `38/40`：1440 与 1024 各 9/10，均缺标准 Settings；390 与 320 各 10/10。desktop Settings 另有 theme 图，tablet Settings 无 PNG |
+| 1024 Home 裁切 | `tablet-1024x768-home.png` | 证明内容 occlusion，不只是 document overflow |
+| 320 核心页面 | `mobile-320x720-home.png`, `...decision-signals.png`, `...backtest.png` | 任务层级与窄屏控件 |
+| Settings mobile overflow | `mobile-390x844-settings.png`, `mobile-320x720-settings.png`, `ui01-observations.json` | 仅覆盖 `overview/readiness`（15 个 section-view 中 1 个）；main 分别为 `364/442` 与 `294/442` |
+| 移动导航 | `flow-mobile-navigation.png`, `flow-mobile-navigation-320.png` | Drawer 完整、Escape 后 focus return |
+| 主题 | `theme-light-home.png`, `theme-dark-home.png`, `theme-light-settings.png`, `theme-dark-settings.png` | 明暗对称；settings 使用二级安全页面 |
+| Login rendering | `login-deep-link-settings.png` | 唯一可用登录图：1440x900、dark、中文、returning-admin；1024/390/320、light/en/first-run 均未取证 |
+| Auth navigation recheck | `auth-deep-link-recheck.json` | 不含 cookie/password，但受先前 Home URL 污染，**非结论性**；不能证明成功恢复或稳定复现失败 |
+| Error/retry | `state-usage-error-390.png` | 区分 error 与 empty，并显示 retry |
+| 结构化清单 | `ui01-observations.json` | 路由标题、headings、controls、overflow、focus 和 flows；绝对路径已替换为 `<workspace>`；`login.firstRunBefore` DOM 为空，不能作 Login 证据 |
+
+泄密处理：fixture 在 import 前清空 ambient product credentials，截图中无真实持仓/聊天/密钥；设置概览路径图已删除。两份 JSON 复制到 `.context/ui01-artifacts-text/` 后通过 `scripts/scan_playwright_artifacts.py`（2 files scanned）。PNG/JPEG/WebM 被该 scanner 按策略直接拒绝，不能声称“图片扫描通过”；图片只做人工检查并应上传到 PR/Actions artifact，不提交仓库。
+
+## 20. 推荐实施顺序、验证、风险与回滚
+
+### 20.1 推荐顺序
+
+以下顺序只有在 `HITL-H1`～`HITL-H7` 批准/修改并记录后才可启动：
+
+1. `UI-05`：先冻结 additive state vocabulary/public composition；缺 capability 字段只记录依赖。
+2. `UI-06A`：收敛 post-auth navigation owner，完成后释放 `App.tsx`。
+3. `UI-03A`：建立 route/compat helper；随后 `UI-03B` 建 public workspace navigation。
+4. `UI-06C/D/E`：分别完成 landmark、Pagination、Menu/Popover public primitives。
+5. `UI-03C` 建现有能力 Research shell 后，`UI-06B` 才接获批 Shell tree；避免 nav 指向空 route。
+6. `UI-02`：只做 current-data Today hierarchy 与 1024 修复；完整 E04 留待 API 薄规格。
+7. `UI-03D/E`：依次关闭 report/chat/screening context 与 signal/report/alert loop；不实现 E06 timeline。
+8. `UI-04`：只拆当前股票 Portfolio/Backtest、URL 和 task tracking；不夹带 M-04～M-11。
+9. `UI-06F`：等当前 Provider/Settings 工作完成后，独占修复 15 个 Settings view 的 responsive contract。
+10. `UI-03F`、`UI-06G` 和 `UI-07`：证据随每片积累，最终执行 flag on/off、legacy、visual/a11y gate。
+
+### 20.2 本次验证结果
+
+| 命令 / 检查 | 结果 |
+| --- | --- |
+| 初次审计：`npm ci` | 通过；463 packages installed；npm 报 16 个既有 audit vulnerabilities，未执行自动升级 |
+| 初次审计：`npm run lint` | 通过；本次仅文档契约修正，未重跑 |
+| 初次审计：`npm test` | 132 test files passed；1428 passed、2 skipped；本次未重跑 |
+| 初次审计：`npm run build` | 通过；3279 modules transformed；本次未重跑 |
+| 初次审计：`npm run test:smoke -- e2e/smoke.spec.ts` | 8/8 passed，39.0s；本次未重跑 |
+| 初次审计：定向 infrastructure responsive/theme tests | 4/4 passed；本次未重跑 |
+| 初次审计：`scripts/scan_playwright_artifacts.py` | 手工走查 JSON 2 files passed；定向 E2E 9 files passed；PNG 按策略不扫描 |
+| 本轮：`.venv/bin/python scripts/check_ai_assets.py` | 通过，`[ai-assets] OK` |
+| 本轮：`git diff --check` | 通过；untracked IA 另以 `git diff --no-index --check /dev/null ...` 验证通过 |
+| 本轮：tracking guidance search | `负字距` 与禁用数值 0 matches；环境无 `rg`，按 brief 使用 `grep -nE` 替代 |
+| 本轮：status / diff scope | task-owned 仅 `DESIGN_GUIDE.md` 与 untracked IA 文档；起始即存在的 Provider/Settings 等用户改动原样保留；`.context` 未加入 Git |
+
+### 20.3 未验证项与风险
+
+- 未使用真实 provider、行情、用户数据库、真实持仓或通知；在线 timeout/retry 只依据现有 tests 和 code contract。
+- 未完成真实屏幕阅读器、原生 200% zoom 和所有页面 Shift+Tab 全量人工会话；UI-06G/UI-07 必须补齐。
+- `/login` 只有 1440 dark/zh returning-admin 渲染证据；1024/390/320、light/en、first-run、keyboard、reduced-motion 和 zoom 均未验证。
+- Settings mobile overflow 只在 `overview/readiness`（15 个 section-view 中 1 个）被证明；具体最宽 descendant 与其余 14 views 待 UI-06F 验证。
+- Auth deep-link 的双 navigation owner 是 code-level race risk；现有 JSON 被先前 Home URL 污染，既不能证明恢复成功，也不能作为稳定失败复现。
+- 首次向导在 fixture 中因本地 CLI/default setup 被判 ready，未完整提交到“可运行”终态；组件与 E2E contract 已审阅。
+- Signal 有数据、Portfolio 有真实长账本、Backtest 有宽结果表的视觉证据主要来自既有测试和代码，不是本次空数据截图。
+- handoff 比 `origin/main` 少 1 commit；合并后可能产生 signal/domain drift。
+- 六份外部产品/领域资料已核对，但增强 PRD、多资产 PRD 与 D-01～D-09 均为 Draft/未批准；不能用文档完整度绕过审批。
+- 完整 E04/E06/E08/E10/E12 与 multi-asset 页面仍缺批准的薄规格或数据/API；本 IA 只记录候选归属，不证明可实现性。
+
+### 20.4 回滚
+
+本次为 docs-only。回滚只需删除本文件并恢复 `apps/dsa-web/DESIGN_GUIDE.md` 的文字修订；不会影响 route、API、数据库、配置或运行时。后续 slice 必须各自用 feature flag 和旧路径兼容回滚，不共享不可逆 migration。
+
+## 21. 建议 PR 标题与正文
+
+建议英文标题：
+
+```text
+docs: prepare StockPulse UI information architecture for HITL review
+```
+
+建议英文 PR body：
+
+```markdown
+## Summary
+
+- audit the current StockPulse routes, navigation, overlays, URL state, responsive behavior, and core task flows at the C-01 to C-09 handoff
+- recommend a task-based IA: Today, Research, Portfolio, Signals, More, and Settings
+- compare the candidate IA against the provided product, enhancement, multi-asset, tracker, and domain-decision documents
+- define compatibility, state, overlay, long-task, accessibility, and multi-asset boundaries for UI-02 through UI-07
+- clarify that Coinstax is an external pattern reference, not the project design source
+
+## Baseline
+
+- audited commit: `ed729c1b579fcf7c4f11f6e7beddc7230b71302b`
+- status: Ready for HITL review, not approved
+- note: the handoff is 41 commits ahead of and 1 commit behind `origin/main`
+
+## Evidence
+
+- captured structured observations for 10 authenticated Shell route states at 1440x900, 1024x768, 390x844, and 320x720; the standard screenshot matrix is 38/40
+- recorded the Settings overview/readiness overflow at 390px and 320px; the remaining 14 Settings views still need responsive verification
+- captured only one rendered Login state (1440x900, dark, Chinese, returning admin); tablet/mobile, light/English, and first-run Login remain unverified
+- checked targeted light/dark, Chinese/English, reduced motion, keyboard focus, empty/error states, and legacy URL behavior without claiming full-route coverage for each variant
+- attach the affected page screenshots from the local `.context/ui01-artifacts/` directory to this PR; do not commit them
+
+## Validation
+
+- `npm run lint`
+- `npm test` (1428 passed, 2 skipped)
+- `npm run build`
+- `npm run test:smoke -- e2e/smoke.spec.ts` (8 passed)
+- `.venv/bin/python scripts/check_ai_assets.py`
+- `git diff --check`
+
+## Risks and limitations
+
+- the externally provided enhancement PRD, multi-asset PRD, and D-01 through D-09 are drafts and do not approve the candidate IA or planned capabilities
+- the multi-asset PRD's five proposed top-level pages conflict with the enhancement PRD's limited six-item navigation and require HITL resolution
+- Login multi-viewport evidence, native 200% zoom, and a screen reader session remain unverified
+- no real provider, user database, holdings, or notification delivery was used
+- the audited handoff must be reconciled with the latest `origin/main` before implementation
+
+## Rollback
+
+Revert the documentation-only changes. No production UI, API, database, configuration, dependency, test, or workflow behavior is changed.
+
+## HITL decisions requested
+
+- approve or revise the six-item primary navigation
+- decide the Research hub, Ask Stock, and Screening placement while retaining current canonical paths
+- resolve Portfolio terminology and the multi-asset top-level-page conflict
+- confirm the current-data Today phase versus the full E04 API-dependent phase
+- confirm Signals/Alerts/outcome ownership versus Portfolio Backtest
+- choose additive URL compatibility and evidence-based exit conditions
+- approve the decomposed UI-02 to UI-07 order, flags, and exclusive file ownership
+```
