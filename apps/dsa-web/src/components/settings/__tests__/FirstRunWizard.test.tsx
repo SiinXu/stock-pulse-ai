@@ -93,8 +93,9 @@ describe('FirstRunWizard', () => {
     expect(byKey.get('LLM_DEEPSEEK_API_KEY')).toBe('sk-test-123');
     expect(byKey.get('LLM_DEEPSEEK_MODELS')).toBe('deepseek-v4-flash,deepseek-v4-pro');
     expect(byKey.get('LLM_DEEPSEEK_ENABLED')).toBe('true');
-    // Canonical provider/model route, not a bare model name (backend rejects bare).
-    expect(byKey.get('LITELLM_MODEL')).toBe('deepseek/deepseek-v4-flash');
+    expect(byKey.get('LITELLM_MODEL')).toBe(
+      'modelref:v1:deepseek:deepseek%2Fdeepseek-v4-flash',
+    );
   });
 
   it('creates a second connection for the same provider without overwriting the existing one', async () => {
@@ -126,6 +127,9 @@ describe('FirstRunWizard', () => {
     expect(byKey.get('LLM_DEEPSEEK2_PROVIDER')).toBe('deepseek');
     expect(byKey.get('LLM_DEEPSEEK2_MODELS')).toBe('deepseek-v4-flash');
     expect(items.some((item) => item.key === 'LLM_DEEPSEEK_MODELS')).toBe(false);
+    expect(byKey.get('LITELLM_MODEL')).toBe(
+      'modelref:v1:deepseek2:deepseek%2Fdeepseek-v4-flash',
+    );
   });
 
   it('does not require a Base URL for Gemini (SDK default endpoint)', () => {
@@ -172,7 +176,7 @@ describe('FirstRunWizard', () => {
     const byKey = new Map(items.map((item) => [item.key, item.value]));
     expect(byKey.has('LLM_OLLAMA_API_KEY')).toBe(false);
     expect(byKey.get('LLM_OLLAMA_BASE_URL')).toBe('http://127.0.0.1:11434');
-    expect(byKey.get('LITELLM_MODEL')).toBe('ollama/llama3.2');
+    expect(byKey.get('LITELLM_MODEL')).toBe('modelref:v1:ollama:ollama%2Fllama3.2');
   });
 
   it('blocks Custom until a Base URL is provided (backend requiresBaseUrl)', () => {
@@ -289,6 +293,9 @@ describe('FirstRunWizard', () => {
     expect(screen.getByLabelText('移除模型 model-a')).toBeInTheDocument();
     expect(screen.getByLabelText('移除模型 model-b')).toBeInTheDocument();
     expect(within(screen.getByTestId('wizard-model-chips')).getAllByRole('button')).toHaveLength(2);
+    for (const removeButton of within(screen.getByTestId('wizard-model-chips')).getAllByRole('button')) {
+      expect(removeButton).toHaveClass('h-11', 'w-11');
+    }
   });
 
   it('shows a backend save error in the modal and keeps it open', async () => {

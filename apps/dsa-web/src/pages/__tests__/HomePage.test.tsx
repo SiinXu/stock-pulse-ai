@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { agentApi } from '../../api/agent';
+import { createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { systemConfigApi } from '../../api/systemConfig';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
@@ -118,6 +119,19 @@ function configureWatchlistBatch(count: number): string[] {
     items: [],
   });
   return codes;
+}
+
+function duplicateTaskFailure() {
+  return createParsedApiError({
+    title: 'Request failed',
+    message: 'The request could not be completed.',
+    rawMessage: 'provider worker 7 is still running',
+    category: 'http_error',
+    code: 'duplicate_task',
+    params: { stock_code: '600519', existing_task_id: 'task-1' },
+    details: { worker: 7 },
+    traceId: 'trace-duplicate',
+  });
 }
 
 const marketReviewHistoryItem = {
@@ -263,6 +277,8 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('h-11');
+    expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-11');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -1359,14 +1375,15 @@ describe('HomePage', () => {
     await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
 
     act(() => {
-      useStockPoolStore.setState({ duplicateError: '股票 600519 正在分析中，请等待完成' });
+      useStockPoolStore.setState({ duplicateError: duplicateTaskFailure() });
     });
 
-    expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+    expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
+    expect(screen.queryByText(/provider worker 7/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
 
-    expect(screen.queryByText(/股票 600519 正在分析中/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/600519 已有分析任务/)).not.toBeInTheDocument();
   });
 
   it('auto-dismisses the duplicate task banner after 5 seconds', async () => {
@@ -1390,20 +1407,20 @@ describe('HomePage', () => {
       });
 
       act(() => {
-        useStockPoolStore.setState({ duplicateError: '股票 600519 正在分析中，请等待完成' });
+        useStockPoolStore.setState({ duplicateError: duplicateTaskFailure() });
       });
 
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(4999);
       });
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1);
       });
-      expect(screen.queryByText(/股票 600519 正在分析中/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/600519 已有分析任务/)).not.toBeInTheDocument();
     } finally {
       vi.runOnlyPendingTimers();
       vi.useRealTimers();
@@ -1431,33 +1448,33 @@ describe('HomePage', () => {
       });
 
       act(() => {
-        useStockPoolStore.setState({ duplicateError: '股票 600519 正在分析中，请等待完成' });
+        useStockPoolStore.setState({ duplicateError: duplicateTaskFailure() });
       });
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(4000);
       });
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
 
       // Trigger the duplicate prompt again (the store clears then re-sets the message).
       act(() => {
         useStockPoolStore.setState({ duplicateError: null });
       });
       act(() => {
-        useStockPoolStore.setState({ duplicateError: '股票 600519 正在分析中，请等待完成' });
+        useStockPoolStore.setState({ duplicateError: duplicateTaskFailure() });
       });
 
       // 4s after the restart: still within the fresh 5s window because the countdown reset.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(4000);
       });
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
 
       // Crossing the fresh 5s threshold finally closes the banner.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
-      expect(screen.queryByText(/股票 600519 正在分析中/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/600519 已有分析任务/)).not.toBeInTheDocument();
     } finally {
       vi.runOnlyPendingTimers();
       vi.useRealTimers();
@@ -2076,8 +2093,12 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '策略' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /成长质量/ }));
+    const strategyTrigger = await screen.findByRole('button', { name: '策略' });
+    expect(strategyTrigger).toHaveClass('h-11');
+    fireEvent.click(strategyTrigger);
+    const growthOption = screen.getByRole('menuitemradio', { name: /成长质量/ });
+    expect(growthOption).toHaveClass('min-h-11');
+    fireEvent.click(growthOption);
 
     const input = screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     fireEvent.change(input, { target: { value: '600519' } });

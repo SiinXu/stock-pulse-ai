@@ -1,5 +1,6 @@
 import type { Message } from '../stores/agentChatStore';
 import type { UiLanguage } from '../i18n/uiText';
+import { getChatMessageDisplayContent } from './chatMessage';
 import { formatUiDateTime } from './uiLocale';
 
 /**
@@ -30,7 +31,7 @@ export function formatSessionAsMarkdown(messages: Message[], language: UiLanguag
       lines.push(heading);
     }
     lines.push('');
-    lines.push(msg.content);
+    lines.push(getChatMessageDisplayContent(msg, language));
     lines.push('');
   }
 

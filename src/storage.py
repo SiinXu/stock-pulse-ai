@@ -56,7 +56,10 @@ from sqlalchemy.orm import (
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from src.agent.provider_trace import PROVIDER_TRACE_RETENTION_LIMIT
-from src.agent.public_contract import sanitize_agent_history_content
+from src.agent.public_contract import (
+    agent_history_public_fields,
+    sanitize_agent_history_content,
+)
 from src.config import get_config
 from src.schemas.decision_profile import extract_legacy_decision_profile
 from src.utils.sniper_points import extract_sniper_points, parse_sniper_value
@@ -3256,7 +3259,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 {
                     "id": str(msg.id),
                     "role": msg.role,
-                    "content": sanitize_agent_history_content(msg.role, msg.content),
+                    **agent_history_public_fields(msg.role, msg.content),
                     "created_at": msg.created_at.isoformat() if msg.created_at else None,
                 }
                 for msg in messages

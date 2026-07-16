@@ -168,6 +168,64 @@ def test_ambiguous_route_registers_only_exact_connection_aliases(tmp_path, monke
     assert config.litellm_model == ""
 
 
+def test_explicit_ambiguous_legacy_agent_route_is_unavailable(tmp_path, monkeypatch) -> None:
+    content = (
+        _DUPLICATE_CONNECTIONS
+        + "LITELLM_MODEL=openai/gpt-4o\n"
+        + "AGENT_LITELLM_MODEL=openai/gpt-4o\n"
+        + "AGENT_MODE=true\n"
+    )
+    with _isolated_service(tmp_path, monkeypatch, content):
+        config = Config.get_instance()
+
+    assert config.is_agent_available() is False
+
+
+@pytest.mark.parametrize(
+    "selected_model",
+    [
+        encode_model_ref("deleted_connection", "openai/gpt-4o"),
+        "modelref:v1:missing-route-separator",
+    ],
+)
+def test_unknown_or_malformed_model_ref_is_not_agent_available(
+    tmp_path,
+    monkeypatch,
+    selected_model: str,
+) -> None:
+    with _isolated_service(tmp_path, monkeypatch, _DUPLICATE_CONNECTIONS):
+        config = Config.get_instance()
+        config.agent_litellm_model = selected_model
+        config.litellm_model = selected_model
+        config.agent_mode = True
+        config._agent_mode_explicit = True
+
+        assert config.is_agent_available() is False
+
+
+@pytest.mark.parametrize(
+    "reserved_ref",
+    [
+        "modelref:v2:openai_work:openai%2Fgpt-4o",
+        "modelref:",
+        "modelref:not-a-version",
+    ],
+)
+def test_reserved_model_ref_namespace_is_not_agent_available(
+    tmp_path,
+    monkeypatch,
+    reserved_ref: str,
+) -> None:
+    with _isolated_service(tmp_path, monkeypatch, _DUPLICATE_CONNECTIONS):
+        config = Config.get_instance()
+        config.agent_litellm_model = reserved_ref
+        config.litellm_model = reserved_ref
+        config.agent_mode = True
+        config._agent_mode_explicit = True
+
+        assert config.is_agent_available() is False
+
+
 def test_connection_display_name_does_not_change_model_ref(tmp_path, monkeypatch) -> None:
     content = _DUPLICATE_CONNECTIONS.replace(
         "LLM_CHANNELS=openai_personal,openai_work",

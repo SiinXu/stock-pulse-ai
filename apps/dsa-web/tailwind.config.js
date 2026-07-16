@@ -130,6 +130,7 @@ export default {
       fontSize: {
         xxs: '10px',
         label: '11px',
+        'heading-2': ['1.75rem', { lineHeight: '1.2' }],
       },
       spacing: {
         18: '4.5rem',

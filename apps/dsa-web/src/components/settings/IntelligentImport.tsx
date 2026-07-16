@@ -379,18 +379,18 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
             message={t('settings.intelligentImportReviewWarning')}
             className="rounded-xl px-3 py-2 text-xs shadow-none"
           />
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs text-secondary-text">
               {t('settings.intelligentImportSelectionSummary', { valid: validCount, checked: checkedCount })}
             </span>
-            <div className="flex gap-2">
-              <button type="button" className="text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(true)}>
+            <div className="flex flex-wrap gap-1">
+              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(true)}>
                 {t('common.selectAllCurrent')}
               </button>
-              <button type="button" className="text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(false)}>
+              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={() => toggleAll(false)}>
                 {t('common.cancel')}
               </button>
-              <button type="button" className="text-xs text-secondary-text transition-colors hover:text-foreground" onClick={clearAll}>
+              <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-2 text-xs text-secondary-text transition-colors hover:text-foreground" onClick={clearAll}>
                 {t('settings.intelligentImportClear')}
               </button>
             </div>
@@ -407,24 +407,26 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
                     it.code ? 'settings-border bg-[var(--settings-surface-strong)]' : 'border-danger/25 bg-danger/10'
                   }`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={it.checked}
-                    onChange={() => toggleChecked(it.id)}
-                    disabled={!it.code || disabled}
-                    className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                  />
-                  <span className={it.code ? 'font-medium text-foreground' : 'font-medium text-danger'}>
-                    {it.code || t('settings.intelligentImportParseFailed')}
-                  </span>
-                  {it.name && <span className="text-secondary-text">({it.name})</span>}
+                  <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={it.checked}
+                      onChange={() => toggleChecked(it.id)}
+                      disabled={!it.code || disabled}
+                      className="settings-input-checkbox h-4 w-4 shrink-0 rounded border-border/70 bg-base"
+                    />
+                    <span className={it.code ? 'font-medium text-foreground' : 'font-medium text-danger'}>
+                      {it.code || t('settings.intelligentImportParseFailed')}
+                    </span>
+                    {it.name && <span className="min-w-0 truncate text-secondary-text">({it.name})</span>}
+                  </label>
                   <div className="ml-auto flex items-center gap-2">
                     <Badge variant={confidenceMeta.badge} size="sm">
                       {confidenceMeta.label}
                     </Badge>
                     <button
                       type="button"
-                      className="text-secondary-text transition-colors hover:text-foreground"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-text transition-colors hover:text-foreground"
                       onClick={() => removeItem(it.id)}
                       disabled={disabled}
                     >

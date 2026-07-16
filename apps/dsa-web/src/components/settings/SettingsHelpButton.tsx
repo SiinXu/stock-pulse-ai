@@ -210,7 +210,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
           <button
             ref={buttonRef}
             type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-muted-text transition-colors hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)] hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-muted-text transition-colors hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)] hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
             aria-label={helpButtonLabel}
             aria-expanded={open}
             aria-controls={open ? titleId : undefined}
@@ -264,7 +264,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
                     ref={closeButtonRef}
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
                     aria-label={t('settings.helpClose')}
                   >
                     <X aria-hidden="true" className="h-4 w-4" />
@@ -314,7 +314,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
                       <div className="flex flex-wrap gap-2">
                         {docs.map((doc) => (
                           <a
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
                             href={doc.href}
                             key={`${doc.label}-${doc.href}`}
                             rel="noreferrer"

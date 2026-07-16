@@ -7,18 +7,14 @@ import { getRequestedPhaseLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatTaskMessage } from '../../utils/taskMessage';
 
-/**
- * 任务项组件属性
- */
+/** Task item properties. */
 interface TaskItemProps {
   task: TaskInfo;
   onOpenRunFlow?: (task: TaskInfo) => void;
   onDismiss?: (taskId: string) => void;
 }
 
-/**
- * 单个任务项
- */
+/** Individual task item. */
 const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) => {
   const { language, t } = useUiLanguage();
   const isPending = task.status === 'pending';
@@ -86,8 +82,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
                 <Button
                   type="button"
                   variant="ghost"
-                  size="xsm"
-                  className="h-8 w-8 px-0"
+                  size="icon"
                   onClick={(event) => {
                     event.stopPropagation();
                     onOpenRunFlow(task);
@@ -113,8 +108,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             <Button
               type="button"
               variant="ghost"
-              size="xsm"
-              className="h-8 w-8 px-0"
+              size="icon"
               onClick={(event) => {
                 event.stopPropagation();
                 onDismiss(task.taskId);
@@ -158,7 +152,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
       {traceId ? (
         <details className="group/task text-xs">
           <summary
-            className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-muted-text"
+            className="grid min-h-11 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-muted-text"
             data-testid="task-panel-diagnostics-summary"
           >
             <span className="whitespace-nowrap">{t('taskPanel.diagnostics')}</span>
@@ -168,7 +162,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open/task:rotate-180" aria-hidden="true" />
           </summary>
           <div className="mt-1 rounded-lg border border-subtle bg-base/50 px-2 py-1.5 text-muted-text">
-            <span className="mr-1">Trace:</span>
+            <span className="mr-1">{t('taskPanel.trace')}</span>
             <code className="break-all font-mono text-xs text-secondary-text">
               {traceId}
             </code>
@@ -179,28 +173,23 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   );
 };
 
-/**
- * 任务面板属性
- */
+/** Task panel properties. */
 interface TaskPanelProps {
-  /** 任务列表 */
+  /** Tasks to render. */
   tasks: TaskInfo[];
-  /** 是否显示 */
+  /** Whether the panel is visible. */
   visible?: boolean;
-  /** 标题 */
+  /** Optional panel title. */
   title?: string;
-  /** 自定义类名 */
+  /** Additional class names. */
   className?: string;
-  /** 打开运行流面板 */
+  /** Opens the run-flow panel. */
   onOpenRunFlow?: (task: TaskInfo) => void;
-  /** 关闭（移除）一个已结束的任务 */
+  /** Dismisses a terminal task. */
   onDismiss?: (taskId: string) => void;
 }
 
-/**
- * 任务面板组件
- * 显示进行中的分析任务列表
- */
+/** Displays active and recently completed analysis tasks. */
 export const TaskPanel: React.FC<TaskPanelProps> = ({
   tasks,
   visible = true,
@@ -210,8 +199,8 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
   onDismiss,
 }) => {
   const { t } = useUiLanguage();
-  // 活跃任务（pending / processing / cancel requested）在前，最近结束的任务
-  // （completed / failed / cancelled，仍在宽限期内）在后，便于用户看到结果并关闭。
+  // Keep active tasks first and recently terminal tasks after them so users can
+  // see the latest result before dismissing it.
   const activeTasks = tasks.filter(
     (t) => t.status === 'pending' || t.status === 'processing' || t.status === 'cancel_requested'
   );
@@ -220,7 +209,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
   );
   const orderedTasks = [...activeTasks, ...terminalTasks];
 
-  // 无任务或不可见时不渲染
+  // Avoid mounting an empty or hidden panel.
   if (!visible || orderedTasks.length === 0) {
     return null;
   }

@@ -1,5 +1,10 @@
 const MODEL_REF_PREFIX = 'modelref:v1:';
 
+export interface DecodedModelRef {
+  connectionId: string;
+  runtimeRoute: string;
+}
+
 function encodePart(value: string): string {
   return encodeURIComponent(value).replace(/[!'()*]/g, (character) => (
     `%${character.charCodeAt(0).toString(16).toUpperCase()}`
@@ -14,6 +19,28 @@ export function encodeModelRef(connectionId: string, runtimeRoute: string): stri
     throw new Error('connectionId and runtimeRoute are required');
   }
   return `${MODEL_REF_PREFIX}${encodePart(normalizedConnectionId)}:${encodePart(normalizedRuntimeRoute)}`;
+}
+
+/** Decode a valid v1 ModelRef without throwing on stale or malformed input. */
+export function decodeModelRef(value: string): DecodedModelRef | null {
+  const normalized = value.trim();
+  if (!normalized.startsWith(MODEL_REF_PREFIX)) {
+    return null;
+  }
+
+  const payload = normalized.slice(MODEL_REF_PREFIX.length);
+  const separatorIndex = payload.indexOf(':');
+  if (separatorIndex <= 0 || separatorIndex === payload.length - 1) {
+    return null;
+  }
+
+  try {
+    const connectionId = decodeURIComponent(payload.slice(0, separatorIndex)).trim();
+    const runtimeRoute = decodeURIComponent(payload.slice(separatorIndex + 1)).trim();
+    return connectionId && runtimeRoute ? { connectionId, runtimeRoute } : null;
+  } catch {
+    return null;
+  }
 }
 
 export function isModelRef(value: string): boolean {

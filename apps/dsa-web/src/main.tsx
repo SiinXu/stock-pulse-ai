@@ -12,7 +12,7 @@ if (import.meta.env.DEV) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore optional dependency, may be unresolved in a clean checkout
     const { installAnnotator } = await import("@loupe/dev-annotator")
-    installAnnotator({ appName: "DSA Web" })
+    installAnnotator({ appName: "StockPulse Web" })
   } catch {
     // no-op: optional dependency not present in this environment
   }

@@ -292,7 +292,7 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
         <button
           type="button"
           onClick={() => onSelect?.(item)}
-          className="btn-secondary inline-flex items-center gap-1.5 !px-3 !py-1.5 !text-xs"
+          className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-1.5 !px-3 !py-1.5 !text-xs"
           aria-label={t('decisionSignals.viewDetailsFor', { stock: item.stockName || item.stockCode })}
         >
           <PanelRightOpen className="h-3.5 w-3.5" />
@@ -443,7 +443,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-secondary !px-3 !py-1.5 !text-xs"
+                className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
                 disabled={feedbackSaving}
                 onClick={() => onFeedbackSubmit('useful')}
               >
@@ -451,7 +451,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
               </button>
               <button
                 type="button"
-                className="btn-secondary !px-3 !py-1.5 !text-xs"
+                className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
                 disabled={feedbackSaving}
                 onClick={() => onFeedbackSubmit('not_useful')}
               >

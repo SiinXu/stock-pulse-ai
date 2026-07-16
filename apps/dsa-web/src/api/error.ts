@@ -631,7 +631,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   if (errorCode === 'alphasift_install_failed') {
     return createParsedApiError({
       title: 'AlphaSift 修复安装失败',
-      message: 'DSA 已尝试修复安装 AlphaSift，但 pip 安装未成功。请检查 ALPHASIFT_INSTALL_SPEC、网络代理或后端 Python 环境。',
+      message: 'StockPulse 已尝试修复安装 AlphaSift，但 pip 安装未成功。请检查 ALPHASIFT_INSTALL_SPEC、网络代理或后端 Python 环境。',
       rawMessage,
       status,
       category: 'http_error',
@@ -671,7 +671,7 @@ export function parseApiError(error: unknown): ParsedApiError {
   if (errorCode === 'alphasift_adapter_unavailable') {
     return createParsedApiError({
       title: 'AlphaSift 适配层不可用',
-      message: '当前 AlphaSift 版本缺少 DSA 稳定适配层。请重新安装或升级 AlphaSift 后再试。',
+      message: '当前 AlphaSift 版本缺少 StockPulse 稳定适配层。请重新安装或升级 AlphaSift 后再试。',
       category: 'http_error',
       rawMessage,
       status,

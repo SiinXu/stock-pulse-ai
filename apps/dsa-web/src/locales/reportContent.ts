@@ -175,6 +175,8 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
 };
 
 type MarketReviewContent = {
+  eyebrow: string;
+  defaultTitle: string;
   fullReview: string;
   overview: string;
   defaultSectionTitle: string;
@@ -203,6 +205,8 @@ type MarketReviewContent = {
 
 export const MARKET_REVIEW_CONTENT_TEXT: Record<ReportLanguage, MarketReviewContent> = {
   zh: {
+    eyebrow: '大盘复盘',
+    defaultTitle: '大盘复盘',
     fullReview: '复盘正文',
     overview: '复盘概览',
     defaultSectionTitle: '复盘',
@@ -229,6 +233,8 @@ export const MARKET_REVIEW_CONTENT_TEXT: Record<ReportLanguage, MarketReviewCont
     lagging: '领跌',
   },
   en: {
+    eyebrow: 'MARKET REVIEW',
+    defaultTitle: 'Market Review',
     fullReview: 'Full Review',
     overview: 'Review Overview',
     defaultSectionTitle: 'Review',
@@ -255,6 +261,8 @@ export const MARKET_REVIEW_CONTENT_TEXT: Record<ReportLanguage, MarketReviewCont
     lagging: 'Lagging',
   },
   ko: {
+    eyebrow: '시장 리뷰',
+    defaultTitle: '시장 리뷰',
     fullReview: '전체 리뷰',
     overview: '리뷰 개요',
     defaultSectionTitle: '리뷰',

@@ -354,6 +354,29 @@ describe('agentChatStore.switchSession', () => {
     ]);
   });
 
+  it('preserves stable failure metadata from persisted session history', async () => {
+    vi.mocked(agentApi.getChatSessionMessages).mockResolvedValue([
+      {
+        id: 'msg-failed',
+        role: 'assistant',
+        content: 'Agent chat failed',
+        created_at: null,
+        error: 'agent_chat_failed',
+        params: {},
+      },
+    ]);
+
+    await useAgentChatStore.getState().switchSession('failed-session');
+
+    expect(useAgentChatStore.getState().messages).toEqual([{
+      id: 'msg-failed',
+      role: 'assistant',
+      content: 'Agent chat failed',
+      error: 'agent_chat_failed',
+      params: {},
+    }]);
+  });
+
   it('does not let a late session history response overwrite the current session', async () => {
     const sessionA = createDeferred<
       Array<{ id: string; role: 'user' | 'assistant'; content: string; created_at: string | null }>

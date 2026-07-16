@@ -3,6 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { Input } from '../Input';
 
 describe('Input', () => {
+  it('keeps the default input target at least 44px tall and wide', () => {
+    render(<Input aria-label="Search" />);
+
+    expect(screen.getByRole('textbox', { name: 'Search' })).toHaveClass(
+      'h-11',
+      'min-h-11',
+      'min-w-11'
+    );
+  });
+
+  it('retains the minimum target size when a caller requests compact visual height', () => {
+    render(<Input aria-label="Compact search" className="h-9" />);
+
+    expect(screen.getByRole('textbox', { name: 'Compact search' })).toHaveClass('h-9', 'min-h-11');
+  });
+
   it('wires label and hint text to the input', () => {
     render(<Input label="API Key" hint="Stored locally" name="api_key" />);
 

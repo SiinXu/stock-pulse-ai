@@ -48,8 +48,7 @@ function renderHighlightedLine(line: string): React.ReactNode[] {
 }
 
 /**
- * JSON 结构化展示组件
- * 支持语法高亮和折叠
+ * Structured JSON viewer with syntax highlighting and copy support.
  */
 export const JsonViewer: React.FC<JsonViewerProps> = ({
   data,
@@ -85,17 +84,18 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
 
   return (
     <div className={`relative ${className}`}>
-      {/* 复制按钮 */}
+      {/* Copy action */}
       <button
+        type="button"
         onClick={handleCopy}
-        className="absolute top-2 right-2 px-2 py-1 text-xs rounded-full
+        className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-full
           border border-border bg-elevated hover:bg-hover text-secondary-text
           transition-colors z-10"
       >
         {copied ? t('common.copied') : t('common.copy')}
       </button>
 
-      {/* JSON 内容 */}
+      {/* JSON content */}
       <div
         className="bg-elevated/80 rounded-lg p-4 overflow-auto custom-scrollbar
           border border-border/60 font-mono text-sm text-secondary-text"

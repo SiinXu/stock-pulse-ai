@@ -16,6 +16,7 @@ describe('ModelMultiSelect', () => {
       />,
     );
     const trigger = screen.getByRole('button', { name: '选择模型' });
+    expect(trigger).toHaveClass('min-h-11');
     expect(trigger).toHaveTextContent('已选 1 / 3');
     expect(screen.getByTestId('model-multi-select')).toHaveTextContent('deepseek-v4-pro');
     expect(screen.queryByLabelText('搜索模型')).not.toBeInTheDocument();
@@ -23,6 +24,8 @@ describe('ModelMultiSelect', () => {
 
     fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toHaveAttribute('aria-multiselectable', 'true');
+    expect(screen.getByLabelText('搜索模型')).toHaveClass('min-h-11');
+    expect(screen.getByLabelText('deepseek-v4-flash').closest('label')).toHaveClass('min-h-11');
     expect(screen.getByLabelText('deepseek-v4-flash')).not.toBeChecked();
     expect(screen.getByLabelText('deepseek-v4-pro')).toBeChecked();
     expect(screen.getByLabelText('gpt-5.5')).not.toBeChecked();
@@ -68,7 +71,9 @@ describe('ModelMultiSelect', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '移除模型 deepseek-v4-pro' }));
+    const removeButton = screen.getByRole('button', { name: '移除模型 deepseek-v4-pro' });
+    expect(removeButton).toHaveClass('h-11', 'w-11');
+    fireEvent.click(removeButton);
     expect(onToggle).toHaveBeenCalledWith('deepseek-v4-pro');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });

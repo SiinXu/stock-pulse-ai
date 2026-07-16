@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
+- [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。
+- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息。
+- [修复] Web 异步分析仅在 409 envelope 的 `error` 为 `duplicate_task` 时构造重复任务错误，其它分析冲突与大盘复盘 409 统一走共享错误解析，并完整保留 `params`、`details` 和 `trace_id` 诊断元数据。
+- [修复] Web 用户可见文案与通知测试默认文案中的旧 DSA 品牌统一为 StockPulse；环境变量、API 字段、协议标识、内部模块名和历史载荷中的兼容标识保持不变。
 - [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
 - [修复] System Config、Backtest、图片提取、Agent 与 AlphaSift 的错误边界统一收口：未知下游异常返回安全的结构化 500，诊断递归移除凭据、URL query token 与私有端点，SSE/history/日志不再回显敏感原文，预期校验错误仍保留明确的 4xx 语义。
@@ -15,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触 mask token；新增失败 trace 与 artifact 扫描防泄漏回归，并修复整数 `timeout_seconds` 被 Pydantic 规范为浮点数后造成的模型解析 smoke 误报。
 - [改进] Web 配置备份入口从普通“系统与安全”页移入“高级”，保留原有 `.env` 导入导出、鉴权和冲突保护契约，避免普通设置路径暴露内部部署细节。
 - [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交新增持久化 operation ID 幂等契约；提交成功后超时重试与并发同 key 请求回放首次响应而不重复入账，同 key 异 payload 稳定返回冲突，Web 重试复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
-- [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据并使用安全外链，删除按 Provider ID 维护的前端业务外链表。
+- [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据；快捷链接仅接受不含内嵌用户名或密码的 HTTPS URL，并在规范化后去重，删除按 Provider ID 维护的前端业务外链表。
 - [修复] 配置 Schema API 完整透传字段条件契约；Web 对 AI 字段缺失/未知 `uiPlacement` 统一隔离到“高级”只读诊断，对未知条件保持可见但锁定，避免旧 Schema 或滚动部署重新暴露第二套普通编辑入口。
 - [改进] Web-facing API 错误统一为稳定 `error/message/params/details/trace_id` envelope，前端按 UI language 映射主错误并将 legacy 原文保留在诊断详情；任务 POST、SSE 与轮询载荷补齐 `message_code/message_params`，切换语言时已有任务即时重渲染，断线恢复按 task ID 去重合并。
 - [chore] GitHub workflows、Issue/PR 模板、自动审查、step summary、bot 评论与自动 Release notes 统一使用英文；动态输出拒绝非英文字母脚本和 HTML 字符实体，并转义非 ASCII / `&` 路径与诊断，手动 Docker 发布 tag 使用 ASCII 格式校验与安全环境变量传递；CODEOWNERS、发布链接和桌面端更新目标切换到 SiinXu/stock-pulse-ai。
@@ -27,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [文档] 三语 README 将 StockPulse 明确为 ZhuLinsen/daily_stock_analysis 的 MIT License 独立维护 fork，并将当前仓库、CI、文档与反馈入口切换到 SiinXu/stock-pulse-ai。
 - [改进] StockPulse Web 补齐 Chat、Screening、Alerts、Portfolio、Settings、公共选择器、股票搜索和报告外围诊断的中英文界面，并将 UI language、report language 与动态原文边界分离。
 - [改进] Web 翻译按 alerts、portfolio、screening、settings、stock search、report chrome 等领域拆分为 typed locale 文件，便于后续扩展更多语言，避免单一字典持续膨胀。
-- [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 硬编码文案守卫及 30 项 Playwright i18n 验收；CI `web-gate` 显式执行 i18n 门禁。
+- [测试] 新增字典 key/空值/插值/重复项一致性、生产 TSX 中英文硬编码文案守卫及 30 项 Playwright i18n 验收；硬编码扫描扩展到 JSX 表达式、`aria-description`、`alt`、`label`、`message` 等用户可见语境，并要求 allowlist 精确到文件、字符串、语境和用途且仍被实际使用；CI `web-gate` 显式执行 i18n 门禁。
 - [文档] 新增中英文 Web 国际化开发约定，说明界面/报告语言边界、动态内容、错误码、locale-aware 格式化和验证命令。
 - [修复] 登录页品牌标题统一为可访问的 `StockPulse`，隔离 Playwright 登录 smoke 不再依赖旧 `DAILY STOCK / Analysis Engine` 文案。
 - [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测。
@@ -65,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [新功能] 后端可用模型目录 `GET /api/v1/system/config/llm/available-models` 使用 connection-aware `ModelRef`（`connection_id + runtime_route`）区分多 Connection 同名模型；报告/Agent/Vision/fallback 保存并解析到具体 Connection。legacy 裸 route 唯一匹配时兼容，多重匹配返回 `ambiguous_model_route` 要求确认；删除、停用和替换引用按 ModelRef 精确处理，不影响另一 Connection 的同名模型。
 - [改进] Web 设置页 AI 与模型「总览」任务矩阵的生效状态改为权威判定，不再以模型字符串非空猜测：任务主模型被某个已启用连接声明为可用路由时才显示「生效」，已设置但当前配置不可路由显示「当前配置不可用」，未设置显示「待配置」；本地 CLI 后端按自身可用判定。可用路由集来自 `GET /api/v1/system/config/llm/available-models`，与保存校验一致。
 - [改进] Web 设置页字段控件与数据语义对齐：任何带有限枚举 `options` 的字段一律渲染下拉选择（不再因 `ui_control` 提示退化为自由文本框）；普通字段正文不再内联渲染 `schema.docs` 外部文档链接与 `KEY=value` 示例，这些改由字段帮助弹窗提供，普通路径保持无环境变量/配置指南干扰。
-- [修复] Web 设置页首次配置向导保存的配置无法通过后端校验：主模型 `LITELLM_MODEL` 现写入规范 `provider/model` 路由（如 `deepseek/deepseek-v4-flash`），不再保存被后端拒绝的裸模型名；Gemini/Anthropic 官方端点不再强制填写 Base URL（走 SDK 默认端点），Ollama 等本地运行时不再强制 API Key；新建连接合并进已有 `LLM_CHANNELS` 而不是整体覆盖；显式写入 `LLM_CONFIG_MODE=channels` 确保配置的渠道生效、不被 YAML/Legacy 静默覆盖；保存失败时错误在向导内当前步骤展示并保留草稿；摘要页只展示"执行方式/模型服务/可用模型/报告主模型"等用户文案，不再显示 `LLM_CHANNELS`、`API_KEY` 等内部 key。新增真实后端契约测试覆盖上述路径（裸模型名被拒、路由通过、Gemini 空 Base URL、Ollama 免 Key、合并已有渠道）。
+- [修复] Web 设置页首次配置向导保存的配置无法通过后端校验：主模型 `LITELLM_MODEL` 现写入包含 Connection 身份与规范运行路由的 ModelRef，不再保存被后端拒绝的裸模型名，也不会因同名模型来自不同 Connection 而丢失身份；Gemini/Anthropic 官方端点不再强制填写 Base URL（走 SDK 默认端点），Ollama 等本地运行时不再强制 API Key；新建连接合并进已有 `LLM_CHANNELS` 而不是整体覆盖；显式写入 `LLM_CONFIG_MODE=channels` 确保配置的渠道生效、不被 YAML/Legacy 静默覆盖；保存失败时错误在向导内当前步骤展示并保留草稿；摘要页只展示"执行方式/模型服务/可用模型/报告主模型"等用户文案，不再显示 `LLM_CHANNELS`、`API_KEY` 等内部 key。新增真实后端契约测试覆盖上述路径（裸模型名被拒、ModelRef 通过、Gemini 空 Base URL、Ollama 免 Key、合并已有渠道）。
 - [新功能] Web 设置页新增首次配置向导：在「概览」点击「启动向导」即可分步完成最小可运行配置——选择云 API 或本机 CLI；云 API 下选服务商、填写必要凭据、获取模型候选并由用户多选确认（不再预填或自动全选示例模型），也可逐项手动添加；最后统一「保存并应用」。达到最低可运行配置即可完成，不强制配置通知或高级项；移动端 390×844 全流程可用。
 - [改进] Web 设置页顶层「高级」section 按字段 placement 聚合内部/底层配置，并将配置来源、执行后端选择与调优、CLI 状态、冒烟测试等全部收进默认折叠的「开发者诊断」；这些字段不再出现在模型接入、任务路由或可靠性普通路径。
 - [改进] Web 设置页移动端（窄屏）用紧凑下拉选择一级 section 后，焦点自动移入内容区并滚动到所选 section，便于屏幕阅读器播报与继续操作；桌面端点击侧栏不受影响。

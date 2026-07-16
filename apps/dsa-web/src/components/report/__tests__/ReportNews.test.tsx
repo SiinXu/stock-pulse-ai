@@ -33,12 +33,15 @@ describe('ReportNews', () => {
 
     expect(await screen.findByText('茅台发布最新经营数据')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '跳转' })).toHaveAttribute('href', 'https://example.com/news');
+    expect(screen.getByRole('link', { name: '跳转' })).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByText('相关资讯/后续检索')).toBeVisible();
     expect(screen.getByText('来源：报告页补充资讯；是否用于分析以输入数据块为准。')).toBeVisible();
     expect(container.querySelector('.home-panel-card')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    const refreshButton = screen.getByRole('button', { name: '刷新' });
+    expect(refreshButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(refreshButton);
 
     await waitFor(() => {
       expect(historyApi.getNews).toHaveBeenCalledTimes(2);

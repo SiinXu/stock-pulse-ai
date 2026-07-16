@@ -588,7 +588,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
               onClick={onManageModels}
               disabled={busy}
-              className="mt-1.5 flex max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+              className="mt-1.5 flex min-h-11 min-w-11 max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
               data-testid={`connection-models-${channel.id}`}
             >
               {selectedModels.slice(0, 4).map((model) => (
@@ -609,7 +609,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
               onClick={onManageModels}
               disabled={busy}
-              className="mt-1.5 rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+              className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
             >
               {text.noModels}
             </button>
@@ -662,7 +662,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full rounded-full px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
+                  className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
                   onClick={() => {
                     setMenuOpen(false);
                     onToggleEnabled();
@@ -673,7 +673,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 <button
                   type="button"
                   role="menuitem"
-                  className="block w-full rounded-full px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
+                  className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
                   onClick={() => {
                     setMenuOpen(false);
                     onRemove();
@@ -1134,7 +1134,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <div className="flex items-center gap-2 text-xs text-danger">
               <span>{text.catalogFailed}</span>
               {onReloadCatalog ? (
-                <button type="button" className="underline underline-offset-2" onClick={onReloadCatalog}>
+                <button type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
                   {text.retry}
                 </button>
               ) : null}
@@ -1237,7 +1237,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               </span>
               <button
                 type="button"
-                className="settings-accent-text shrink-0 underline-offset-2 hover:underline"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center underline-offset-2 hover:underline"
                 onClick={() => setCustomBaseUrl(true)}
               >
                 {text.customUrl}
@@ -1258,7 +1258,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               {provider?.defaultBaseUrl ? (
                 <button
                   type="button"
-                  className="settings-accent-text mt-1 text-xs underline-offset-2 hover:underline"
+                  className="settings-accent-text mt-1 inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
                   onClick={() => {
                     updateDraft('baseUrl', provider.defaultBaseUrl);
                     setCustomBaseUrl(false);
@@ -1336,7 +1336,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
                       onClick={() => requestRemoveModel(model)}
-                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
                     >
                       ×
                     </button>
@@ -1481,7 +1481,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             ) : (
               <button
                 type="button"
-                className="settings-accent-text text-xs underline-offset-2 hover:underline"
+                className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
                 onClick={() => setShowManualModelInput(true)}
               >
                 {text.manualModel}
@@ -1525,15 +1525,21 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               aria-checked={draft.enabled}
               aria-label={text.enableAria}
               onClick={() => updateDraft('enabled', !draft.enabled)}
-              className={`relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors ${
-                draft.enabled ? 'bg-foreground' : 'bg-border'
-              }`}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
             >
               <span
-                className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                  draft.enabled ? 'translate-x-3' : 'translate-x-0.5'
+                data-testid="connection-enabled-switch-visual"
+                aria-hidden="true"
+                className={`relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors ${
+                  draft.enabled ? 'bg-foreground' : 'bg-border'
                 }`}
-              />
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
+                    draft.enabled ? 'translate-x-3' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
             </button>
           </div>
 
@@ -2065,7 +2071,7 @@ function channelAllowsEmptyApiKey(
   return connectionAllowsEmptyApiKey(channel.protocol, channel.baseUrl, emptyApiKeyHosts);
 }
 
-// Fields required to run the channel; surfaced as "未完成" while missing.
+// Fields required to run the channel; surfaced as incomplete while missing.
 function getChannelCompletenessIssues(
   channel: ChannelConfig,
   providers: LlmProviderCatalogEntry[],
@@ -2572,7 +2578,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           {onViewDiagnostics ? (
             <button
               type="button"
-              className="settings-accent-text underline-offset-2 hover:underline"
+              className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
               onClick={onViewDiagnostics}
             >
               {editorText.viewDetails}
@@ -2585,7 +2591,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         <div className="flex items-center gap-2 px-1 text-xs text-danger">
           <span>{editorText.catalogFailed}</span>
           {onReloadCatalog ? (
-            <button type="button" className="underline underline-offset-2" onClick={onReloadCatalog}>
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
               {editorText.retry}
             </button>
           ) : null}
@@ -2651,7 +2657,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         <div className="flex items-center justify-end px-1">
           <button
             type="button"
-            className="settings-accent-text text-xs underline-offset-2 hover:underline"
+            className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
             onClick={onManageModels}
           >
             {editorText.assignModels}

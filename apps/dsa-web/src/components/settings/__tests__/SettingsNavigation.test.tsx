@@ -14,6 +14,7 @@ describe('SettingsSectionNav', () => {
     );
     const aiButton = screen.getByRole('button', { name: /AI 与模型/ });
     expect(aiButton).toHaveAttribute('aria-current', 'page');
+    expect(aiButton).toHaveClass('min-h-11');
     // A non-active section is present without aria-current.
     const dataButton = screen.getByRole('button', { name: /数据源/ });
     expect(dataButton).not.toHaveAttribute('aria-current');
@@ -45,6 +46,7 @@ describe('SettingsSectionNav', () => {
     );
     const select = screen.getByRole('combobox', { name: '设置导航' });
     expect(select).toHaveValue('ai_models');
+    expect(select).toHaveClass('min-h-11');
     // Every section is reachable in one tap from the current section.
     expect(within(select).getAllByRole('option')).toHaveLength(11);
     fireEvent.change(select, { target: { value: 'notifications' } });
@@ -113,6 +115,9 @@ describe('SettingsViewTabs', () => {
       'Reliability',
     ]);
     expect(screen.getByRole('tab', { name: 'Task Routing' })).toHaveAttribute('aria-selected', 'true');
+    for (const tab of tabs) {
+      expect(tab).toHaveClass('min-h-11');
+    }
   });
 
   it('invokes onSelectView with the view id', () => {

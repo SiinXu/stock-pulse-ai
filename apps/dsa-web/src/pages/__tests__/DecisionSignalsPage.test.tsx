@@ -425,6 +425,8 @@ describe('DecisionSignalsPage', () => {
       });
     });
     expect(screen.getByLabelText('来源报告 ID')).toHaveValue(3001);
+    expect(screen.getByLabelText('股票代码')).toHaveClass('h-11');
+    expect(screen.getByLabelText('来源报告 ID')).toHaveClass('h-11');
   });
 
   it('renders decision signal enum filter labels in Chinese', async () => {
@@ -536,7 +538,9 @@ describe('DecisionSignalsPage', () => {
     expect(await screen.findByText('决策风格重评估预览')).toBeInTheDocument();
     vi.mocked(decisionSignalsApi.list).mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: '生成预览' }));
+    const reassessButton = screen.getByRole('button', { name: '生成预览' });
+    expect(reassessButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(reassessButton);
 
     await waitFor(() => {
       expect(decisionSignalsApi.reassess).toHaveBeenCalledWith({
@@ -694,7 +698,9 @@ describe('DecisionSignalsPage', () => {
     openStockContextModal();
 
     expect(await screen.findByText('最近分析')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /600519/ }));
+    const candidateButton = screen.getByRole('button', { name: /600519/ });
+    expect(candidateButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(candidateButton);
 
     await waitFor(() => {
       expect(decisionSignalsApi.getLatest).toHaveBeenCalledWith('600519', {
@@ -1448,7 +1454,7 @@ describe('DecisionSignalsPage', () => {
     submitCurrentStock('AAPL');
 
     expect(await screen.findByText('Latest lookup risk')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '查看 贵州茅台 AI 建议详情' }).at(-1)!);
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
   });
 
@@ -1533,6 +1539,9 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByRole('button', { name: '关闭信号' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '标记失效' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '归档' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '关闭信号' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '标记失效' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '归档' })).toHaveClass('min-h-11', 'min-w-11');
     expect(within(dialog).queryByRole('button', { name: '有效' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '已过期' })).not.toBeInTheDocument();
 

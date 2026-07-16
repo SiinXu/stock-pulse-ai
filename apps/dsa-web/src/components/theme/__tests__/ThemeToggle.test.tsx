@@ -27,9 +27,15 @@ describe('ThemeToggle', () => {
       </ThemeProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '切换主题' }));
+    const toggle = screen.getByRole('button', { name: '切换主题' });
+    expect(toggle).toHaveClass('h-11', 'min-h-11', 'min-w-11');
+
+    fireEvent.click(toggle);
 
     expect(await screen.findByRole('menu', { name: '主题模式' })).toBeInTheDocument();
+    for (const option of screen.getAllByRole('menuitemradio')) {
+      expect(option).toHaveClass('min-h-11');
+    }
     expect(screen.getByRole('menuitemradio', { name: '浅色' })).toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: '深色' })).toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: '跟随系统' })).toBeInTheDocument();

@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'gradient' | 'danger' | 'danger-subtle' | 'settings-primary' | 'settings-secondary' | 'action-primary' | 'action-secondary' | 'home-action-ai' | 'home-action-report';
-  size?: 'xsm' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xsm' | 'sm' | 'md' | 'lg' | 'xl' | 'icon';
   isLoading?: boolean;
   /** Custom loading text. */
   loadingText?: string;
@@ -12,11 +12,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BUTTON_SIZE_STYLES = {
-  xsm: 'h-6 min-h-11 rounded-full px-2.5 text-xs sm:min-h-0',
-  sm: 'h-8 min-h-11 rounded-full px-3.5 text-xs sm:min-h-0',
-  md: 'h-9 min-h-11 rounded-full px-4 text-sm sm:min-h-0',
-  lg: 'h-10 min-h-11 rounded-full px-5 text-sm sm:min-h-0',
-  xl: 'h-11 rounded-full px-6 text-sm',
+  xsm: 'h-6 min-h-11 min-w-11 rounded-full px-2.5 text-xs',
+  sm: 'h-8 min-h-11 min-w-11 rounded-full px-3.5 text-xs',
+  md: 'h-9 min-h-11 min-w-11 rounded-full px-4 text-sm',
+  lg: 'h-10 min-h-11 min-w-11 rounded-full px-5 text-sm',
+  xl: 'h-11 min-h-11 min-w-11 rounded-full px-6 text-sm',
+  icon: 'h-11 min-h-11 w-11 min-w-11 shrink-0 rounded-full p-0 text-sm',
 } as const;
 
 const ACTION_AI_STYLES = 'bg-[var(--home-action-ai-bg)] border border-[var(--home-action-ai-border)] text-[var(--home-action-ai-text)] hover:bg-[var(--home-action-ai-hover-bg)]';
@@ -80,6 +81,7 @@ export const Button: React.FC<ButtonProps> = ({
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <circle
               className="opacity-25"
@@ -95,7 +97,7 @@ export const Button: React.FC<ButtonProps> = ({
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             />
           </svg>
-          {loadingText ?? t('common.processing')}
+          {size === 'icon' ? null : (loadingText ?? t('common.processing'))}
         </span>
       ) : (
         children

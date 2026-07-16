@@ -88,7 +88,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
       <label htmlFor="settings-section-select" className="sr-only">{navLabel}</label>
       <select
         id="settings-section-select"
-        className="w-full rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm text-foreground"
+        className="min-h-11 w-full rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm text-foreground"
         value={activeSection}
         onChange={(event) => (onMobileSelectSection ?? onSelectSection)(event.target.value as SettingsSectionId)}
       >
@@ -115,7 +115,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
             <button
               type="button"
               className={cn(
-                'flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
+                'flex min-h-11 w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
                 isActive
                   ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground'
                   : 'border-transparent bg-transparent text-secondary-text hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]',
@@ -174,7 +174,7 @@ export const SettingsViewTabs: React.FC<SettingsViewTabsProps> = ({
             role="tab"
             aria-selected={isActive}
             className={cn(
-              'whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors duration-200',
+              'min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors duration-200',
               isActive
                 ? 'border-foreground font-medium text-foreground'
                 : 'border-transparent text-secondary-text hover:text-foreground',

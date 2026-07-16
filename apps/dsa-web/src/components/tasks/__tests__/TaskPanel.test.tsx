@@ -99,6 +99,7 @@ describe('TaskPanel', () => {
 
     const diagnosticsSummary = screen.getByTestId('task-panel-diagnostics-summary');
     expect(diagnosticsSummary).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(diagnosticsSummary).toHaveClass('min-h-11');
     expect(screen.getByText('运行诊断')).toHaveClass('whitespace-nowrap');
     expect(screen.getByText('c5b9665a64...')).toHaveClass('truncate');
     expect(screen.getByRole('button', { name: '查看 长飞光纤 运行流' })).toBeInTheDocument();
@@ -113,7 +114,9 @@ describe('TaskPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 运行流' }));
+    const runFlowButton = screen.getByRole('button', { name: '查看 贵州茅台 运行流' });
+    expect(runFlowButton).toHaveClass('h-11', 'w-11');
+    fireEvent.click(runFlowButton);
 
     expect(onOpenRunFlow).toHaveBeenCalledWith(baseTask);
   });
@@ -153,7 +156,9 @@ describe('TaskPanel', () => {
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
     expect(screen.getByLabelText('任务状态：已完成')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭 贵州茅台 任务' }));
+    const dismissButton = screen.getByRole('button', { name: '关闭 贵州茅台 任务' });
+    expect(dismissButton).toHaveClass('h-11', 'w-11');
+    fireEvent.click(dismissButton);
     expect(onDismiss).toHaveBeenCalledWith('task-1');
   });
 

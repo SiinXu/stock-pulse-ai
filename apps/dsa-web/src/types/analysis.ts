@@ -510,8 +510,15 @@ export interface TaskListResponse {
 export interface DuplicateTaskError {
   error: 'duplicate_task';
   message: string;
-  stockCode: string;
-  existingTaskId: string;
+  params?: {
+    stockCode?: string;
+    existingTaskId?: string;
+  };
+  /** Legacy pre-envelope fields retained for rolling-upgrade compatibility. */
+  stockCode?: string;
+  existingTaskId?: string;
+  details?: unknown;
+  traceId?: string;
 }
 
 // ============ History Types ============

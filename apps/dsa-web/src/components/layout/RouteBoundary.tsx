@@ -76,14 +76,14 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
-              className="btn-primary"
+              className="btn-primary min-h-11 min-w-11"
               onClick={() => window.location.reload()}
             >
               {this.props.text.reload}
             </button>
             <button
               type="button"
-              className="rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
+              className="min-h-11 min-w-11 rounded-xl border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
               onClick={() => window.location.assign('/')}
             >
               {this.props.text.backHome}

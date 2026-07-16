@@ -42,7 +42,11 @@ from src.agent.protocols import (
     StageStatus,
     normalize_decision_signal,
 )
-from src.agent.public_contract import AGENT_CHAT_FAILURE_HISTORY_MESSAGE
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.agent.risk_override import build_risk_override_plan
 from src.agent.runner import parse_dashboard_json
 from src.agent.stock_scope import resolve_stock_scope
@@ -366,25 +370,43 @@ class AgentOrchestrator:
         # Persist user turn
         conversation_manager.add_message(session_id, "user", message)
 
-        orch_result = self._execute_pipeline(
-            ctx,
-            parse_dashboard=False,
-            progress_callback=progress_callback,
-        )
+        try:
+            orch_result = self._execute_pipeline(
+                ctx,
+                parse_dashboard=False,
+                progress_callback=progress_callback,
+            )
+        except Exception as exc:
+            logger.error(
+                "Agent orchestrator chat raised: session_id=%s exception_type=%s diagnostic=%s",
+                session_id,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            conversation_manager.add_message(
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+            )
+            return AgentResult(
+                success=False,
+                content="",
+                error=AGENT_CHAT_FAILURE_MESSAGE,
+            )
 
         # Persist assistant response
         if orch_result.success:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
         else:
             logger.error(
-                "Agent orchestrator chat failed: session_id=%s error=%s",
+                "Agent orchestrator chat failed: session_id=%s diagnostic=%s",
                 session_id,
-                orch_result.error,
+                sanitize_agent_diagnostic(orch_result.error),
             )
             conversation_manager.add_message(
                 session_id,
                 "assistant",
-                AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
             )
 
         return AgentResult(
@@ -583,17 +605,25 @@ class AgentOrchestrator:
             #   - skill agents (specialist evaluation, optional)
             if result.status == StageStatus.FAILED:
                 if not self._is_non_critical_stage(agent.agent_name):
-                    logger.error("[Orchestrator] critical stage '%s' failed: %s", agent.agent_name, result.error)
+                    logger.error(
+                        "[Orchestrator] critical stage '%s' failed: diagnostic=%s",
+                        agent.agent_name,
+                        sanitize_agent_diagnostic(result.error),
+                    )
                     return OrchestratorResult(
                         success=False,
-                        error=f"Stage '{agent.agent_name}' failed: {result.error}",
+                        error=f"Stage '{agent.agent_name}' failed",
                         stats=stats,
                         total_tokens=stats.total_tokens,
                         tool_calls_log=all_tool_calls,
                     )
                 else:
                     self._record_degraded_stage(ctx, agent.agent_name, result)
-                    logger.warning("[Orchestrator] stage '%s' failed (non-critical, degrading): %s", agent.agent_name, result.error)
+                    logger.warning(
+                        "[Orchestrator] stage '%s' failed (non-critical, degrading): diagnostic=%s",
+                        agent.agent_name,
+                        sanitize_agent_diagnostic(result.error),
+                    )
 
             index += 1
 
@@ -700,7 +730,12 @@ class AgentOrchestrator:
                 agents.append(agent)
             return agents
         except Exception as exc:
-            logger.warning("[Orchestrator] failed to build skill agents: %s", exc)
+            logger.warning(
+                "[Orchestrator] failed to build skill agents: "
+                "exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             return []
 
     def _build_skill_agents(self, ctx: AgentContext) -> list:
@@ -739,7 +774,12 @@ class AgentOrchestrator:
             else:
                 logger.info("[Orchestrator] no skill opinions to aggregate")
         except Exception as exc:
-            logger.warning("[Orchestrator] skill aggregation failed: %s", exc)
+            logger.warning(
+                "[Orchestrator] skill aggregation failed: "
+                "exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
 
     def _aggregate_strategy_opinions(self, ctx: AgentContext) -> None:
         """Compatibility wrapper for legacy tests/imports."""

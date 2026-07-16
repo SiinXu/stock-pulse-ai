@@ -211,6 +211,7 @@ describe('AlertsPage', () => {
       }));
     });
     expect(await screen.findByText(/已创建告警规则/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11', 'min-w-11');
   });
 
   it('keeps create form values when create API fails', async () => {

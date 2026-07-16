@@ -34,6 +34,10 @@ from src.agent.provider_trace import (
     resolved_provider_namespace,
     trace_model_matches,
 )
+from src.agent.public_contract import (
+    AGENT_LLM_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.llm.errors import call_litellm_with_param_recovery
 from src.llm.backend_registry import (
     AUTO_AGENT_BACKEND_ID,
@@ -614,16 +618,16 @@ class LLMToolAdapter:
         started_at = time.time()
         providers = [self._get_model_provider(model) for model in models_to_try]
 
-        last_error = None
+        last_diagnostic = "unknown"
         hit_rate_limit = False
         for idx, model in enumerate(models_to_try):
             remaining_timeout = timeout
             if timeout is not None and timeout > 0:
                 remaining_timeout = max(0.0, float(timeout) - (time.time() - started_at))
                 if remaining_timeout <= 0:
-                    last_error = TimeoutError(
+                    last_diagnostic = sanitize_agent_diagnostic(TimeoutError(
                         f"LLM completion timed out before trying fallback model {model}"
-                    )
+                    ))
                     break
             try:
                 return self._call_litellm_model(
@@ -635,9 +639,15 @@ class LLMToolAdapter:
                     timeout=remaining_timeout,
                 )
             except Exception as e:
+                diagnostic = sanitize_agent_diagnostic(e)
+                last_diagnostic = diagnostic
                 if isinstance(e, _resolve_litellm_exception("RateLimitError")):
-                    logger.warning("Agent LLM rate-limited on %s: %s", model, e)
-                    last_error = e
+                    logger.warning(
+                        "Agent LLM rate-limited on %s: exception_type=%s diagnostic=%s",
+                        model,
+                        type(e).__name__,
+                        diagnostic,
+                    )
                     hit_rate_limit = True
 
                     # Avoid blind backoff across different providers; cross-provider
@@ -656,17 +666,32 @@ class LLMToolAdapter:
                             time.sleep(backoff_sleep)
                     continue
                 if isinstance(e, _resolve_litellm_exception("ContextWindowExceededError")):
-                    logger.warning("Agent LLM context window exceeded on %s: %s", model, e)
-                    last_error = e
+                    logger.warning(
+                        "Agent LLM context window exceeded on %s: exception_type=%s diagnostic=%s",
+                        model,
+                        type(e).__name__,
+                        diagnostic,
+                    )
                     continue
-                logger.warning("Agent LLM call failed with %s: %s", model, e)
-                last_error = e
+                logger.warning(
+                    "Agent LLM call failed with %s: exception_type=%s diagnostic=%s",
+                    model,
+                    type(e).__name__,
+                    diagnostic,
+                )
                 continue
 
-        suffix = " (rate-limit encountered during fallback)" if hit_rate_limit else ""
-        error_msg = f"All LLM models failed{suffix}. Last error: {last_error}"
-        logger.error(error_msg)
-        return LLMResponse(content=error_msg, provider="error")
+        public_message = (
+            f"{AGENT_LLM_FAILURE_MESSAGE} (rate-limit encountered during fallback)."
+            if hit_rate_limit
+            else AGENT_LLM_FAILURE_MESSAGE
+        )
+        logger.error(
+            "%s diagnostic=%s",
+            public_message,
+            last_diagnostic,
+        )
+        return LLMResponse(content=public_message, provider="error")
 
     @staticmethod
     def _get_model_provider(model: str) -> str:

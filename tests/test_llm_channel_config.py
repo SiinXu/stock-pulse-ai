@@ -26,6 +26,7 @@ from src.llm.generation_params import (
     apply_litellm_generation_params,
     resolve_litellm_temperature_directive,
 )
+from src.llm.model_ref import encode_model_ref
 from src.services.system_config_service import SystemConfigService
 
 
@@ -485,13 +486,37 @@ class LLMChannelConfigTestCase(unittest.TestCase):
 
     @patch("src.config.setup_env")
     @patch.object(Config, "_parse_litellm_yaml", return_value=[])
-    def test_agent_mode_true_allows_mixed_route_via_non_hermes_deployment(
+    def test_agent_mode_true_rejects_ambiguous_mixed_legacy_route(
         self,
         _mock_parse_yaml,
         _mock_setup_env,
     ) -> None:
         env = {
             "AGENT_MODE": "true",
+            "LLM_CHANNELS": "hermes,remote",
+            "LLM_HERMES_API_KEY": "sk-hermes-test-value",
+            "LLM_HERMES_MODELS": "shared-route",
+            "LLM_REMOTE_PROTOCOL": "openai",
+            "LLM_REMOTE_BASE_URL": "https://api.example.com/v1",
+            "LLM_REMOTE_API_KEY": "sk-remote-test-value",
+            "LLM_REMOTE_MODELS": "shared-route",
+        }
+
+        with patch.dict(os.environ, env, clear=True):
+            config = Config._load_from_env()
+
+        self.assertFalse(config.is_agent_available())
+
+    @patch("src.config.setup_env")
+    @patch.object(Config, "_parse_litellm_yaml", return_value=[])
+    def test_agent_mode_true_allows_explicit_non_hermes_model_ref_for_mixed_route(
+        self,
+        _mock_parse_yaml,
+        _mock_setup_env,
+    ) -> None:
+        env = {
+            "AGENT_MODE": "true",
+            "AGENT_LITELLM_MODEL": encode_model_ref("remote", "openai/shared-route"),
             "LLM_CHANNELS": "hermes,remote",
             "LLM_HERMES_API_KEY": "sk-hermes-test-value",
             "LLM_HERMES_MODELS": "shared-route",

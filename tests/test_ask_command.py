@@ -15,7 +15,17 @@ except ModuleNotFoundError:
 
 from bot.commands.ask import AskCommand
 from bot.models import BotMessage, ChatType
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+)
 from src.agent.skills.base import Skill
+
+
+SENSITIVE_PROVIDER_ERROR = (
+    "provider rejected token=super-secret api_key=super-secret at "
+    "https://private.example/v1/chat?token=super-secret"
+)
 
 
 class AskCommandSkillSelectionTestCase(unittest.TestCase):
@@ -343,6 +353,135 @@ class TestAskCommandMultiStock(unittest.TestCase):
         self.assertEqual(captured["context"]["skills"], ["chan_theory"])
         self.assertEqual(captured["context"]["strategies"], ["chan_theory"])
 
+    def test_analyze_single_failure_returns_only_public_message(self):
+        command = AskCommand()
+        executor = MagicMock()
+        executor.chat.return_value = SimpleNamespace(
+            success=False,
+            content=SENSITIVE_PROVIDER_ERROR,
+            error=SENSITIVE_PROVIDER_ERROR,
+        )
+
+        with patch("src.agent.factory.build_agent_executor", return_value=executor):
+            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                response = command._analyze_single(
+                    SimpleNamespace(),
+                    self._message(),
+                    "600519",
+                    "",
+                    "",
+                )
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_analyze_single_exception_returns_only_public_message(self):
+        command = AskCommand()
+
+        with patch(
+            "src.agent.factory.build_agent_executor",
+            side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR),
+        ):
+            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                response = command._analyze_single(
+                    SimpleNamespace(),
+                    self._message(),
+                    "600519",
+                    "",
+                    "",
+                )
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_analyze_multi_failure_and_exception_use_public_history_sentinel(self):
+        command = AskCommand()
+
+        class FakeExecutor:
+            def run(self, task, context=None):
+                if context["stock_code"] == "000858":
+                    raise RuntimeError(SENSITIVE_PROVIDER_ERROR)
+                return SimpleNamespace(
+                    success=False,
+                    content=SENSITIVE_PROVIDER_ERROR,
+                    dashboard=None,
+                    error=SENSITIVE_PROVIDER_ERROR,
+                )
+
+        with patch("bot.commands.ask.get_db"):
+            with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
+                with patch.object(command, "_build_portfolio_section", return_value=""):
+                    with patch("src.agent.conversation.conversation_manager") as mock_cm:
+                        with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                            response = command._analyze_multi(
+                                SimpleNamespace(),
+                                self._message(),
+                                ["600519", "000858"],
+                                "",
+                                "",
+                            )
+
+        assistant_messages = [
+            call.args[2]
+            for call in mock_cm.add_message.call_args_list
+            if len(call.args) >= 3 and call.args[1] == "assistant"
+        ]
+        self.assertEqual(
+            assistant_messages,
+            [
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+            ],
+        )
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertEqual(response.text.count(AGENT_CHAT_FAILURE_MESSAGE), 2)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_execute_configuration_exception_returns_only_public_message(self):
+        command = AskCommand()
+
+        with patch("bot.commands.ask.get_config", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
+            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                response = command.execute(self._message(), ["600519"])
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_analyze_multi_storage_exception_returns_only_public_message(self):
+        command = AskCommand()
+
+        with patch("bot.commands.ask.get_db", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
+            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                response = command._analyze_multi(
+                    SimpleNamespace(),
+                    self._message(),
+                    ["600519", "000858"],
+                    "",
+                    "",
+                )
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
 
 class TestAskCommandSilentExceptionFix(unittest.TestCase):
     """Verify that _load_skills and _get_default_skill_id log warnings on failure."""
@@ -353,7 +492,7 @@ class TestAskCommandSilentExceptionFix(unittest.TestCase):
             with self.assertLogs("bot.commands.ask", level="WARNING") as cm:
                 result = AskCommand._load_skills()
         self.assertEqual(result, [])
-        self.assertTrue(any("_load_skills failed" in line for line in cm.output))
+        self.assertTrue(any("Failed to load skills" in line for line in cm.output))
 
     def test_get_default_skill_id_logs_warning_and_returns_empty_string(self):
         boom = RuntimeError("defaults unavailable")
@@ -362,7 +501,7 @@ class TestAskCommandSilentExceptionFix(unittest.TestCase):
                 with self.assertLogs("bot.commands.ask", level="WARNING") as cm:
                     result = AskCommand._get_default_skill_id()
         self.assertEqual(result, "")
-        self.assertTrue(any("_get_default_skill_id failed" in line for line in cm.output))
+        self.assertTrue(any("Failed to resolve default skill id" in line for line in cm.output))
 
 
 if __name__ == "__main__":

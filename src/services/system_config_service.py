@@ -515,8 +515,8 @@ class SystemConfigService:
         channel: str,
         items: Sequence[Dict[str, str]],
         mask_token: str = "******",
-        title: str = "DSA 通知测试",
-        content: str = "这是一条来自 DSA Web 设置页的通知测试消息。",
+        title: str = "StockPulse 通知测试",
+        content: str = "这是一条来自 StockPulse Web 设置页的通知测试消息。",
         timeout_seconds: float = 20.0,
     ) -> Dict[str, Any]:
         """Send one real notification test without persisting submitted values."""
@@ -4166,7 +4166,7 @@ class SystemConfigService:
                 True,
                 "needs_action",
                 (
-                    "已选择 codex_cli，但 DSA 后端进程当前 PATH 中找不到 codex 可执行文件。"
+                    "已选择 codex_cli，但 StockPulse 后端进程当前 PATH 中找不到 codex 可执行文件。"
                     if generation_backend == CODEX_CLI_BACKEND_ID
                     else f"已选择 {generation_backend}，但未找到 {preset.executable} 可执行文件。"
                 ),

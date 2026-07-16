@@ -193,6 +193,24 @@ describe('LLMChannelEditor', () => {
     expect(within(card).getByText('未测试')).toBeInTheDocument();
   });
 
+  it('keeps native connection actions on 44px targets with a compact switch visual', () => {
+    render(<LLMChannelEditor items={OPENAI_ITEMS} providers={PROVIDERS} maskToken="******" />);
+
+    const card = connectionCard();
+    expect(within(card).getByRole('button', { name: '管理模型 openai' })).toHaveClass('min-h-11', 'min-w-11');
+    const menu = openConnectionMenu();
+    for (const menuItem of within(menu).getAllByRole('menuitem')) {
+      expect(menuItem).toHaveClass('min-h-11');
+    }
+
+    const dialog = editConnection();
+    expect(within(dialog).getByRole('button', { name: '移除模型 gpt-4o-mini' })).toHaveClass('h-11', 'w-11');
+    expect(within(dialog).getByRole('button', { name: /手动添加模型/ })).toHaveClass('min-h-11', 'min-w-11');
+    const enabledSwitch = within(dialog).getByRole('switch', { name: '启用此连接' });
+    expect(enabledSwitch).toHaveClass('h-11', 'w-11');
+    expect(within(dialog).getByTestId('connection-enabled-switch-visual')).toHaveClass('h-5', 'w-8');
+  });
+
   it('keeps stable connection identity when its display name changes', async () => {
     const onDraftItemsChange = vi.fn();
     const renamedItems = OPENAI_ITEMS.map((item) => ({

@@ -64,6 +64,10 @@ describe('StockHistoryTrendDrawer', () => {
 
     expect(screen.getAllByText('回避').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('买入')).not.toBeInTheDocument();
+    for (const rangeButton of ['全部历史', '近30天', '近90天'].map((name) => screen.getByRole('button', { name }))) {
+      expect(rangeButton).toHaveClass('min-h-11', 'min-w-11');
+    }
+    expect(screen.getByRole('button', { name: '查看报告' })).toHaveClass('min-h-11', 'min-w-11');
   });
 
   it('keeps full legacy operation advice when structured action is absent', () => {

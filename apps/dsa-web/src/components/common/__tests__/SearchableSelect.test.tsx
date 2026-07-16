@@ -50,6 +50,30 @@ describe('SearchableSelect', () => {
     expect(within(listbox).queryByRole('option', { name: /GPT-5.5/ })).not.toBeInTheDocument();
   });
 
+  it('keeps the trigger, clear action, search, and options at least 44px at every breakpoint', () => {
+    render(
+      <SearchableSelect
+        value="openai/gpt-5.5"
+        onChange={() => {}}
+        options={options}
+        ariaLabel="主要模型"
+        clearable
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '主要模型' });
+    expect(trigger).toHaveClass('h-11', 'min-h-11');
+    expect(trigger).not.toHaveClass('sm:min-h-0');
+    expect(screen.getByRole('button', { name: '清除 主要模型' })).toHaveClass('h-11', 'w-11');
+
+    fireEvent.click(trigger);
+    expect(screen.getByRole('combobox', { name: '搜索选项: 主要模型' })).toHaveClass('h-11', 'min-h-11');
+    for (const option of screen.getAllByRole('option')) {
+      expect(option).toHaveClass('min-h-11');
+      expect(option).not.toHaveClass('sm:min-h-0');
+    }
+  });
+
   it('supports Arrow keys, aria-activedescendant, Enter, and Escape', () => {
     const onChange = vi.fn();
     render(
@@ -78,11 +102,13 @@ describe('SearchableSelect', () => {
         options={options}
         ariaLabel="主要模型"
         staleValueLabel="当前配置不可用"
+        staleValueText="retired-model · retired-connection"
       />,
     );
     const trigger = screen.getByRole('button', { name: '主要模型' });
     const staleMessage = screen.getByText('当前配置不可用');
-    expect(trigger).toHaveTextContent('legacy/retired-model');
+    expect(trigger).toHaveTextContent('retired-model · retired-connection');
+    expect(trigger).toHaveAttribute('data-value', 'legacy/retired-model');
     expect(trigger).toHaveAttribute('aria-describedby', staleMessage.id);
     expect(onChange).not.toHaveBeenCalled();
   });

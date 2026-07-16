@@ -156,6 +156,8 @@ class TestAlphaSiftFieldsRegistered(unittest.TestCase):
 
         self.assertTrue(field["is_sensitive"])
         self.assertEqual(field["ui_control"], "password")
+        self.assertIn("StockPulse", field["description"])
+        self.assertNotIn("DSA's", field["description"])
 
 
 class TestLLMUsageHMACFieldsRegistered(unittest.TestCase):

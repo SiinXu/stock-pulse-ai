@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analysisApi, DuplicateTaskError } from '../../api/analysis';
+import { createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import type {
   AnalysisReport,
@@ -503,15 +504,30 @@ describe('stockPoolStore', () => {
   });
 
   it('surfaces duplicate task errors without replacing the dashboard error state', async () => {
+    const parsedError = createParsedApiError({
+      title: 'Task already running',
+      message: 'An analysis task is already running.',
+      rawMessage: 'provider worker 7 is still running',
+      category: 'http_error',
+      code: 'duplicate_task',
+      params: { stock_code: '600519', existing_task_id: 'task-1' },
+      details: { worker: 7 },
+      traceId: 'trace-duplicate',
+    });
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
-      new DuplicateTaskError('600519', 'task-1', '股票 600519 正在分析中'),
+      new DuplicateTaskError('600519', 'task-1', parsedError),
     );
 
     useStockPoolStore.getState().setQuery('600519');
     await useStockPoolStore.getState().submitAnalysis();
 
     const state = useStockPoolStore.getState();
-    expect(state.duplicateError).toContain('600519');
+    expect(state.duplicateError).toMatchObject({
+      code: 'duplicate_task',
+      rawMessage: 'provider worker 7 is still running',
+      details: { worker: 7 },
+      traceId: 'trace-duplicate',
+    });
     expect(state.error).toBeNull();
     expect(state.isAnalyzing).toBe(false);
   });

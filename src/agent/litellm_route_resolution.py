@@ -18,6 +18,7 @@ from src.llm.hermes import (
     route_deployment_origins,
     route_identity_candidates,
 )
+from src.llm.model_ref import decode_model_ref, is_model_ref
 
 
 @dataclass(frozen=True)
@@ -33,12 +34,30 @@ def _is_model_agent_safe(config: Any, model: str, provenance: Dict[str, Any]) ->
     if not model:
         return False
     route = route_deployment_origins(getattr(config, "llm_model_list", []) or [], model)
+    if _model_ref_failure_reason(model, route):
+        return False
     if route.has_hermes or route.has_non_hermes:
-        return route.has_non_hermes
+        return route.has_non_hermes and not route.requires_connection_confirmation
     route = provenance.get(model)
     if route is not None:
         return route.has_non_hermes
     return True
+
+
+def _model_ref_failure_reason(model: str, route: Any) -> str:
+    """Return why a versioned ModelRef cannot resolve to a deployment."""
+    normalized = str(model or "").strip()
+    if not normalized.startswith("modelref:"):
+        return ""
+    if not is_model_ref(normalized):
+        return "invalid_model_ref"
+    try:
+        decode_model_ref(normalized)
+    except ValueError:
+        return "invalid_model_ref"
+    if not route.has_hermes and not route.has_non_hermes:
+        return "unknown_model_ref"
+    return ""
 
 
 def _matched_route_alias(model: str, provenance: Dict[str, Any]) -> str:
@@ -69,6 +88,21 @@ def resolve_agent_litellm_route(config: Any) -> AgentLiteLLMRouteResolution:
     configured_agent_model = bool((getattr(config, "agent_litellm_model", "") or "").strip())
 
     primary_route = route_deployment_origins(model_list, primary)
+    model_ref_failure = _model_ref_failure_reason(primary, primary_route)
+    if model_ref_failure:
+        return AgentLiteLLMRouteResolution(
+            False,
+            primary_model=primary,
+            model_list=filtered_model_list,
+            reason=model_ref_failure,
+        )
+    if primary_route.requires_connection_confirmation:
+        return AgentLiteLLMRouteResolution(
+            False,
+            primary_model=primary,
+            model_list=filtered_model_list,
+            reason="ambiguous_legacy_model_route",
+        )
     if primary_route is not None and primary_route.has_hermes and not primary_route.has_non_hermes:
         return AgentLiteLLMRouteResolution(
             False,

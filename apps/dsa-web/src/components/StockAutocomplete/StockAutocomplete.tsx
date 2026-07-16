@@ -18,7 +18,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
 
 const AUTOCOMPLETE_INPUT_CLASS =
-  'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 min-h-11 min-w-11 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 
 export interface StockAutocompleteProps {
   /** Input value */

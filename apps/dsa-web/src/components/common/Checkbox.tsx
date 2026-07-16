@@ -8,7 +8,7 @@ interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>
 }
 
 /**
- * 定制化的大尺寸勾选框组件
+ * Compact visual checkbox with a 44px interactive target.
  */
 export const Checkbox: React.FC<CheckboxProps> = ({
   label,
@@ -21,7 +21,14 @@ export const Checkbox: React.FC<CheckboxProps> = ({
   const checkboxId = id ?? generatedId;
 
   return (
-    <div className={cn('flex items-center gap-3', containerClassName)}>
+    <label
+      htmlFor={checkboxId}
+      className={cn(
+        'flex min-h-11 min-w-11 items-center gap-3 select-none',
+        props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        containerClassName
+      )}
+    >
       <input
         id={checkboxId}
         type="checkbox"
@@ -33,14 +40,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         )}
         {...props}
       />
-      {label && (
-        <label
-          htmlFor={checkboxId}
-          className="cursor-pointer select-none text-sm font-medium text-foreground"
-        >
-          {label}
-        </label>
-      )}
-    </div>
+      {label ? <span className="text-sm font-medium text-foreground">{label}</span> : null}
+    </label>
   );
 };

@@ -170,4 +170,34 @@ describe('IntelligentImport', () => {
       expect(onMerged).toHaveBeenCalledWith('SH600000,SH600519,AAPL,HK00700');
     });
   });
+
+  it('keeps review actions and compact row controls on 44px touch targets', async () => {
+    parseImport.mockResolvedValue({
+      items: [{ code: 'SZ000001', name: 'Ping An Bank', confidence: 'high' }],
+      codes: [],
+    });
+
+    render(
+      <IntelligentImport
+        stockListValue="SH600000"
+        configVersion="v1"
+        maskToken="******"
+        onMerged={onMerged}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('或粘贴 CSV/Excel 复制的文本...'), {
+      target: { value: '000001' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '解析' }));
+
+    await screen.findByText('SZ000001');
+    for (const actionName of ['全选当前', '取消', '清空']) {
+      expect(screen.getByRole('button', { name: actionName })).toHaveClass('min-h-11', 'min-w-11');
+    }
+    const checkbox = screen.getByRole('checkbox');
+    expect(checkbox.closest('label')).toHaveClass('min-h-11');
+    expect(checkbox).toHaveClass('h-4', 'w-4');
+    expect(screen.getByRole('button', { name: '×' })).toHaveClass('h-11', 'w-11');
+  });
 });

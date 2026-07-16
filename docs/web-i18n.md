@@ -30,6 +30,10 @@ locales/reportContent.ts
 
 面向 Web 的后端错误使用统一 envelope：`error` 是稳定业务码，`params` 是本地化插值参数，`message`、`details` 和可选 `trace_id` 只提供诊断信息。前端按 UI language 将 `error + params` 映射为主错误；未知 code 显示通用本地化错误，legacy 裸字符串通过兼容适配器保留到 Details，不能直接成为主提示。
 
+Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
+
+诊断回退必须保持分层：已知 `error` 使用对应本地化文案和 `params`；未知 `error` 使用通用本地化错误；legacy 原始字符串、`message`、`details` 和 `trace_id` 只能保留在诊断入口，不能提升为主错误文案。历史记录的安全 `content` 仅用于旧客户端兼容，不能覆盖稳定错误码的本地化结果。
+
 任务的 SSE、轮询和 POST 响应使用稳定 `message_code` 与 `message_params`。组件应在渲染时按当前 UI language 格式化任务消息，确保切换语言后已有任务立即更新；服务端 legacy `message` 只作为兼容诊断，不能绕过本地化成为主状态文案。
 
 日期、数字、货币和列表使用 `src/utils/uiLocale.ts`。显示 locale 与市场业务时区分离；ISO 表单值、股票代码和模型 ID 不做本地化。
@@ -49,4 +53,4 @@ npm run build
 npm run test:smoke
 ```
 
-`test:i18n` 会检查中英文 key、空翻译、插值参数、重复 key，并扫描生产 TSX 的 JSXText、字符串、模板字符串、aria、placeholder、title、toast 和 document title。允许项必须按具体文件、字符串和用途精确登记，禁止整目录或整文件忽略。Playwright 场景应使用独立、可读的 test 名称和关键断言，不得用循环或注释编号代替语义覆盖。
+`test:i18n` 会检查中英文 key、空翻译、插值参数、重复 key，并扫描生产 TSX 中中英文用户可见的 JSX 文本/表达式、模板字符串、`aria-label`、`aria-description`、`alt`、`placeholder`、`title`、`label`、`message`、`description`、通知/错误 setter、toast 和 document title。扫描器会解析本地 `const` 的直接或间接引用（包括别名与嵌套解构）、对象属性、对象 spread 与 JSX spread，避免硬编码文案通过中间变量绕过检查；动态值和可变绑定不会被当作静态文案。允许项必须按具体文件、字符串、语境和用途精确登记，并保持仍被实际使用；禁止整目录或整文件忽略。Playwright 场景应使用独立、可读的 test 名称和关键断言，不得用循环或注释编号代替语义覆盖。

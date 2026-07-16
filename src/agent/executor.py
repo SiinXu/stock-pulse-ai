@@ -25,7 +25,8 @@ from src.agent.chat_context import build_agent_chat_context_bundle
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
-    AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
+    AGENT_CHAT_FAILURE_MESSAGE,
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import run_agent_loop, parse_dashboard_json
@@ -665,13 +666,31 @@ class AgentExecutor:
         # Persist the user turn immediately so the session appears in history during processing
         user_message_id = conversation_manager.add_message(session_id, "user", message)
 
-        result = self._run_loop(
-            messages,
-            tool_decls,
-            parse_dashboard=False,
-            progress_callback=progress_callback,
-            stock_scope=scope_resolution.stock_scope,
-        )
+        try:
+            result = self._run_loop(
+                messages,
+                tool_decls,
+                parse_dashboard=False,
+                progress_callback=progress_callback,
+                stock_scope=scope_resolution.stock_scope,
+            )
+        except Exception as exc:
+            logger.error(
+                "Agent chat execution raised: session_id=%s exception_type=%s diagnostic=%s",
+                session_id,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            conversation_manager.add_message(
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+            )
+            return AgentResult(
+                success=False,
+                content="",
+                error=AGENT_CHAT_FAILURE_MESSAGE,
+            )
 
         # Persist assistant reply (or error note) for context continuity
         if result.success:
@@ -693,7 +712,7 @@ class AgentExecutor:
             conversation_manager.add_message(
                 session_id,
                 "assistant",
-                AGENT_CHAT_FAILURE_HISTORY_MESSAGE,
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
             )
 
         return result
@@ -716,12 +735,14 @@ class AgentExecutor:
                 anchor_user_message_id=user_message_id,
                 anchor_assistant_message_id=assistant_message_id,
             )
-        except Exception:
+        except Exception as exc:
             logger.warning(
-                "Provider trace extraction failed for session %s run %s",
+                "Provider trace extraction failed for session %s run %s "
+                "exception_type=%s diagnostic=%s",
                 session_id,
                 run_id,
-                exc_info=True,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
             )
             return
 
@@ -737,12 +758,14 @@ class AgentExecutor:
 
         try:
             db = get_db()
-        except Exception:
+        except Exception as exc:
             logger.warning(
-                "Provider trace storage unavailable for session %s run %s",
+                "Provider trace storage unavailable for session %s run %s "
+                "exception_type=%s diagnostic=%s",
                 session_id,
                 run_id,
-                exc_info=True,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
             )
             return
 
@@ -762,14 +785,16 @@ class AgentExecutor:
                     must_roundtrip=turn.must_roundtrip,
                     estimated_tokens=turn.estimated_tokens,
                 )
-            except Exception:
+            except Exception as exc:
                 logger.warning(
-                    "Provider trace persistence failed for session %s run %s provider=%s model=%s",
+                    "Provider trace persistence failed for session %s run %s "
+                    "provider=%s model=%s exception_type=%s diagnostic=%s",
                     session_id,
                     run_id,
                     turn.provider,
                     turn.model,
-                    exc_info=True,
+                    type(exc).__name__,
+                    sanitize_agent_diagnostic(exc),
                 )
 
     def _run_loop(

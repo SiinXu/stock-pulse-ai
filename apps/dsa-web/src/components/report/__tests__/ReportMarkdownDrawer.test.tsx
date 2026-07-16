@@ -40,7 +40,9 @@ describe('ReportMarkdownDrawer', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
       expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+      const closeButton = screen.getByRole('button', { name: '关闭' });
+      expect(closeButton).toHaveClass('min-h-11', 'min-w-11');
+      fireEvent.click(closeButton);
 
       await waitFor(() => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

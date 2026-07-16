@@ -1349,7 +1349,7 @@ const HomePage: React.FC = () => {
                     onClick={() => setStrategyMenuOpen((open) => !open)}
                     onKeyDown={handleStrategyButtonKeyDown}
                     disabled={isAnalyzing}
-                    className="home-surface-button flex h-10 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
+                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-xl px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                   >
                     <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
@@ -1375,7 +1375,7 @@ const HomePage: React.FC = () => {
                             aria-checked={selected}
                             tabIndex={-1}
                             onClick={() => selectStrategy(option.id)}
-                            className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                            className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
                           >
                             <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
                             <span className="min-w-0">
@@ -1391,7 +1391,7 @@ const HomePage: React.FC = () => {
               ) : null}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2.5 md:flex-nowrap md:flex-shrink-0">
-              <label className="flex h-10 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
+              <label className="flex h-11 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
                 <input
                   type="checkbox"
                   checked={notify}
@@ -1416,7 +1416,7 @@ const HomePage: React.FC = () => {
                 type="button"
                 onClick={() => handleSubmitAnalysis()}
                 disabled={!query || isAnalyzing}
-                className="btn-primary flex h-10 min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none md:basis-auto"
+                className="btn-primary flex h-11 min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none md:basis-auto"
               >
                 {isAnalyzing ? (
                   <>
@@ -1450,13 +1450,13 @@ const HomePage: React.FC = () => {
                 title={t('home.duplicateTask')}
                 message={duplicateTask
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
-                  : duplicateError}
+                  : getParsedApiError(duplicateError, uiLanguage).message}
                 action={(
                   <button
                     type="button"
                     onClick={dismissDuplicateBanner}
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>

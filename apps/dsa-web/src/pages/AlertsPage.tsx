@@ -322,7 +322,7 @@ const AlertsPage: React.FC = () => {
           message={createSuccess}
           variant="success"
           action={(
-            <button type="button" className="text-sm underline" onClick={() => setCreateSuccess(null)}>
+            <button type="button" className="min-h-11 min-w-11 text-sm underline" onClick={() => setCreateSuccess(null)}>
               {t('common.close')}
             </button>
           )}

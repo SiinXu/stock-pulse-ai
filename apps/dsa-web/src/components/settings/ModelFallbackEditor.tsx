@@ -4,6 +4,7 @@ import type { UiLang } from './settingsInformationArchitecture';
 import { ModelMultiSelect } from './ModelMultiSelect';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
+import { decodeModelRef } from '../../utils/modelRef';
 
 interface ModelFallbackEditorProps {
   /** Comma-separated list of fallback model routes. */
@@ -13,6 +14,8 @@ interface ModelFallbackEditorProps {
   options: SearchableSelectOption[];
   /** The primary model route — excluded from the add list (it's the primary). */
   primaryRoute?: string;
+  /** Resolve a persisted legacy runtime route to a unique Connection ModelRef. */
+  resolveConfiguredModelRef?: (value: string) => string;
   language: UiLang;
   disabled?: boolean;
 }
@@ -31,13 +34,17 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
   onChange,
   options,
   primaryRoute,
+  resolveConfiguredModelRef,
   language,
   disabled = false,
 }) => {
   const text = SETTINGS_CONTROLS_TEXT[language];
   const routes = splitRoutes(value);
+  const resolveRoute = (route: string) => (
+    resolveConfiguredModelRef?.(route) ?? route.trim()
+  );
   const labelFor = (route: string) => {
-    const option = options.find((candidate) => candidate.value === route);
+    const option = options.find((candidate) => candidate.value === resolveRoute(route));
     if (!option) {
       return route;
     }
@@ -45,9 +52,23 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
   };
   // A configured route that is no longer in the available catalog is kept (never
   // silently cleared) and marked as unavailable so the user can decide.
-  const isStale = (route: string) => !options.some((option) => option.value === route);
+  const isStale = (route: string) => (
+    !options.some((option) => option.value === resolveRoute(route))
+  );
 
   const setRoutes = (next: string[]) => onChange(next.join(','));
+  const canonicalizeRoutes = (next: string[]) => {
+    const seen = new Set<string>();
+    return next
+      .map(resolveRoute)
+      .filter((route) => {
+        if (!route || seen.has(route)) {
+          return false;
+        }
+        seen.add(route);
+        return true;
+      });
+  };
   const removeAt = (index: number) => setRoutes(routes.filter((_, position) => position !== index));
   const moveUp = (index: number) => {
     if (index <= 0) {
@@ -71,11 +92,17 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
     option.sublabel ? `${option.label} · ${option.sublabel}` : option.label,
   ]));
   const toggleRoute = (route: string) => {
-    if (routes.includes(route)) {
-      setRoutes(routes.filter((entry) => entry !== route));
+    if (routes.some((entry) => resolveRoute(entry) === route)) {
+      setRoutes(routes.filter((entry) => resolveRoute(entry) !== route));
       return;
     }
-    setRoutes([...routes, route]);
+    const selectedModelRef = decodeModelRef(route);
+    const nextRoutes = selectedModelRef
+      ? routes.filter((entry) => (
+        decodeModelRef(entry) !== null || entry !== selectedModelRef.runtimeRoute
+      ))
+      : routes;
+    setRoutes(canonicalizeRoutes([...nextRoutes, route]));
   };
 
   return (
@@ -88,7 +115,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
         <ul className="space-y-1.5">
           {routes.map((route, index) => (
             <li
-              key={route}
+              key={`${route}-${index}`}
               className="flex items-center justify-between gap-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-1.5 text-xs"
             >
               <span className="flex min-w-0 items-center gap-2">
@@ -106,7 +133,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === 0}
                   aria-label={formatUiText(text.moveUp, { model: labelFor(route) })}
                   onClick={() => moveUp(index)}
-                  className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↑
                 </button>
@@ -115,7 +142,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === routes.length - 1}
                   aria-label={formatUiText(text.moveDown, { model: labelFor(route) })}
                   onClick={() => moveDown(index)}
-                  className="rounded-full px-1 text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↓
                 </button>
@@ -124,7 +151,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled}
                   aria-label={formatUiText(text.removeFallback, { model: labelFor(route) })}
                   onClick={() => removeAt(index)}
-                  className="rounded-full px-1 text-secondary-text hover:text-danger"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-danger"
                 >
                   ✕
                 </button>
@@ -135,7 +162,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
       )}
       <ModelMultiSelect
         options={selectableOptions.map((option) => option.value)}
-        isSelected={(route) => routes.includes(route)}
+        isSelected={(route) => routes.some((entry) => resolveRoute(entry) === route)}
         onToggle={toggleRoute}
         disabled={disabled}
         language={language}

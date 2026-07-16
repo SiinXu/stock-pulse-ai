@@ -196,7 +196,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
                           {attempt.success ? t('common.success') : t('common.failure')}
                         </Badge>
                         <span className="text-sm font-medium text-foreground">
-                          Attempt {index + 1}
+                          {t('settings.notificationTestAttempt', { number: index + 1 })}
                         </span>
                         {typeof attempt.httpStatus === 'number' ? (
                           <span className="text-xs text-muted-text">HTTP {attempt.httpStatus}</span>

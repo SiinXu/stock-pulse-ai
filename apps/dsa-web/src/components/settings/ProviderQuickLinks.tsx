@@ -32,7 +32,7 @@ export function ProviderQuickLinks({
   const seen = new Set<string>();
   const links = candidates.flatMap((candidate) => {
     const href = candidate.href?.trim();
-    if (!href || seen.has(href)) {
+    if (!href) {
       return [];
     }
     let parsed: URL;
@@ -41,11 +41,15 @@ export function ProviderQuickLinks({
     } catch {
       return [];
     }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
       return [];
     }
-    seen.add(href);
-    return [{ href, label: candidate.label, hostname: parsed.hostname }];
+    const normalizedHref = parsed.href;
+    if (seen.has(normalizedHref)) {
+      return [];
+    }
+    seen.add(normalizedHref);
+    return [{ href: normalizedHref, label: candidate.label, hostname: parsed.hostname }];
   });
 
   if (links.length === 0) {
@@ -61,7 +65,7 @@ export function ProviderQuickLinks({
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`${link.label} (${text.opensInNewTab}; ${link.hostname})`}
-          className="settings-accent-text inline-flex items-center gap-1 underline-offset-2 hover:underline"
+          className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center gap-1 underline-offset-2 hover:underline"
         >
           <span>{link.label}</span>
           <ExternalLink className="h-3 w-3" aria-hidden="true" />
