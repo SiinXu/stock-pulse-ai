@@ -104,6 +104,7 @@ describe('TokenUsagePage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(document.title).toBe('Token 用量监控 - StockPulse');
     expect(await screen.findByText('400')).toBeInTheDocument();
     expect(screen.getAllByText('openai/gpt-test')).toHaveLength(2);
     expect(screen.getAllByText('个股分析')).toHaveLength(2);
@@ -119,7 +120,8 @@ describe('TokenUsagePage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Token usage' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
+    expect(document.title).toBe('Token usage - StockPulse');
+    expect(screen.getByRole('button', { name: 'Today' })).toHaveClass('min-h-11', 'min-w-11');
     expect(await screen.findAllByText('Stock analysis')).toHaveLength(2);
     expect(screen.getByText('Latest 50 LLM token audit records.')).toBeInTheDocument();
     expect(screen.queryByText('Token 用量监控')).not.toBeInTheDocument();

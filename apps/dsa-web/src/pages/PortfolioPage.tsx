@@ -113,9 +113,9 @@ function resolveOperationAttempt(
 }
 
 const PORTFOLIO_INPUT_CLASS =
-  'h-8 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const PORTFOLIO_FILE_PICKER_CLASS =
-  'flex h-8 w-full cursor-pointer items-center justify-center rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'flex h-11 w-full cursor-pointer items-center justify-center rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 
 function getSignalTime(item: DecisionSignalItem): number {
   return parseDecisionSignalDate(item.createdAt)?.getTime()
@@ -1121,7 +1121,7 @@ const PortfolioPage: React.FC = () => {
             action={(
               <button
                 type="button"
-                className="btn-secondary inline-flex items-center gap-2 text-xs"
+                className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-2 text-xs"
                 onClick={() => {
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
@@ -1256,7 +1256,7 @@ const PortfolioPage: React.FC = () => {
             <p className="text-xs text-secondary">{text.fxStatus}</p>
             <button
               type="button"
-              className="btn-secondary !px-3 !py-1 !text-xs shrink-0"
+              className="btn-secondary min-h-11 min-w-11 !px-3 !py-1 !text-xs shrink-0"
               onClick={() => void handleRefreshFx()}
               disabled={!hasAccounts || isLoading || fxRefreshing}
             >
@@ -1360,7 +1360,7 @@ const PortfolioPage: React.FC = () => {
                           type="button"
                           onClick={() => void handleAnalyzePosition(row)}
                           disabled={analyzing}
-                          className="btn-secondary px-2 py-1 text-xs disabled:cursor-wait disabled:opacity-60"
+                          className="btn-secondary min-h-11 min-w-11 px-2 py-1 text-xs disabled:cursor-wait disabled:opacity-60"
                         >
                           {analyzing ? text.submitting : text.analyze}
                         </button>
@@ -1675,7 +1675,7 @@ const PortfolioPage: React.FC = () => {
                 </label>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs text-secondary">
+            <label htmlFor="csv-dry-run" className="flex min-h-11 cursor-pointer items-center gap-2 text-xs text-secondary">
               <input
                 id="csv-dry-run"
                 type="checkbox"
@@ -1685,8 +1685,8 @@ const PortfolioPage: React.FC = () => {
                   csvOperationRef.current = null;
                 }}
               />
-              <label htmlFor="csv-dry-run">{text.dryRun}</label>
-            </div>
+              <span>{text.dryRun}</span>
+            </label>
             <div className="flex gap-2">
               <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing || csvCommitting} onClick={() => void handleParseCsv()}>
                 {csvParsing ? text.parsing : text.parseFile}
@@ -1797,7 +1797,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
+                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
                         id: item.id,
@@ -1817,7 +1817,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
+                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
                         id: item.id,
@@ -1837,7 +1837,7 @@ const PortfolioPage: React.FC = () => {
                   {!writeBlocked ? (
                     <button
                       type="button"
-                      className="btn-secondary shrink-0 !px-3 !py-1 !text-xs"
+                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
                         id: item.id,
@@ -1863,11 +1863,11 @@ const PortfolioPage: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-secondary">
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
-                <button type="button" className="btn-secondary text-xs px-3 py-1" disabled={eventPage <= 1}
+                <button type="button" className="btn-secondary min-h-11 min-w-11 text-xs px-3 py-1" disabled={eventPage <= 1}
                   onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
                   {text.prevPage}
                 </button>
-                <button type="button" className="btn-secondary text-xs px-3 py-1" disabled={eventPage >= totalEventPages}
+                <button type="button" className="btn-secondary min-h-11 min-w-11 text-xs px-3 py-1" disabled={eventPage >= totalEventPages}
                   onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
                   {text.nextPage}
                 </button>

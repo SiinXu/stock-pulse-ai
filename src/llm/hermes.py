@@ -70,6 +70,8 @@ class RouteDeploymentOrigins:
     has_non_hermes: bool
     hermes_deployments: Tuple[Dict[str, Any], ...] = field(default_factory=tuple)
     non_hermes_deployments: Tuple[Dict[str, Any], ...] = field(default_factory=tuple)
+    connection_ids: Tuple[str, ...] = field(default_factory=tuple)
+    requires_connection_confirmation: bool = False
 
     @property
     def is_hermes_only(self) -> bool:
@@ -387,21 +389,34 @@ def is_hermes_deployment(deployment: Dict[str, Any]) -> bool:
 
 
 def route_deployment_origins(model_list: Sequence[Dict[str, Any]], route_name: str) -> RouteDeploymentOrigins:
-    hermes: List[Dict[str, Any]] = []
-    non_hermes: List[Dict[str, Any]] = []
+    exact_matches: List[Dict[str, Any]] = []
+    runtime_route_matches: List[Dict[str, Any]] = []
     candidates = route_identity_candidates(route_name)
     for deployment in model_list or []:
         if not isinstance(deployment, dict):
             continue
         deployment_route_name = str(deployment.get("model_name") or "").strip()
-        deployment_candidates = route_identity_candidates(deployment_route_name)
+        if candidates.intersection(route_identity_candidates(deployment_route_name)):
+            exact_matches.append(deployment)
+            continue
+        model_info = deployment.get("model_info")
+        if not isinstance(model_info, dict):
+            continue
+        if candidates.intersection(
+            route_identity_candidates(model_info.get("dsa_runtime_route"))
+        ):
+            runtime_route_matches.append(deployment)
+
+    matched_deployments = exact_matches or runtime_route_matches
+    hermes: List[Dict[str, Any]] = []
+    non_hermes: List[Dict[str, Any]] = []
+    connection_ids: List[str] = []
+    for deployment in matched_deployments:
         model_info = deployment.get("model_info")
         if isinstance(model_info, dict):
-            deployment_candidates.update(
-                route_identity_candidates(model_info.get("dsa_runtime_route"))
-            )
-        if not candidates.intersection(deployment_candidates):
-            continue
+            connection_id = str(model_info.get("dsa_connection_id") or "").strip()
+            if connection_id and connection_id not in connection_ids:
+                connection_ids.append(connection_id)
         if is_hermes_deployment(deployment):
             hermes.append(deployment)
         else:
@@ -412,6 +427,10 @@ def route_deployment_origins(model_list: Sequence[Dict[str, Any]], route_name: s
         has_non_hermes=bool(non_hermes),
         hermes_deployments=tuple(hermes),
         non_hermes_deployments=tuple(non_hermes),
+        connection_ids=tuple(connection_ids),
+        requires_connection_confirmation=(
+            not exact_matches and len(connection_ids) > 1
+        ),
     )
 
 

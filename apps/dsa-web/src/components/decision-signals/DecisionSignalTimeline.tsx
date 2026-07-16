@@ -85,6 +85,8 @@ type TimelineShapeProps = {
   cx?: number;
   cy?: number;
   payload?: TimelineDatum;
+  accessibleLabel?: string;
+  onSelect?: (item: DecisionSignalItem) => void;
 };
 
 function getTimelineDatumFromClick(value: unknown): TimelineDatum | null {
@@ -95,9 +97,40 @@ function getTimelineDatumFromClick(value: unknown): TimelineDatum | null {
   return null;
 }
 
-const TimelinePointShape: React.FC<TimelineShapeProps> = ({ cx = 0, cy = 0, payload }) => {
+const TimelinePointShape: React.FC<TimelineShapeProps> = ({
+  cx = 0,
+  cy = 0,
+  payload,
+  accessibleLabel,
+  onSelect,
+}) => {
   if (!payload) return null;
   const opacity = payload.terminal ? 0.46 : 0.92;
+  const hitTarget = (
+    <circle
+      data-testid={`timeline-hit-target-${payload.item.id}`}
+      cx={cx}
+      cy={cy}
+      r={22}
+      fill="transparent"
+      stroke="transparent"
+      strokeWidth={2}
+      role="button"
+      tabIndex={0}
+      aria-label={accessibleLabel}
+      className="cursor-pointer focus:outline-none focus-visible:stroke-primary"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect?.(payload.item);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect?.(payload.item);
+      }}
+    />
+  );
   const statusRing = (
     <circle
       data-testid={`timeline-status-ring-${payload.item.id}`}
@@ -129,6 +162,7 @@ const TimelinePointShape: React.FC<TimelineShapeProps> = ({ cx = 0, cy = 0, payl
           strokeWidth={payload.strokeWidth}
           transform={`rotate(45 ${cx} ${cy})`}
         />
+        {hitTarget}
       </g>
     );
   }
@@ -145,6 +179,7 @@ const TimelinePointShape: React.FC<TimelineShapeProps> = ({ cx = 0, cy = 0, payl
         stroke={payload.stroke}
         strokeWidth={payload.strokeWidth}
       />
+      {hitTarget}
     </g>
   );
 };
@@ -259,7 +294,19 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
                 const datum = getTimelineDatumFromClick(value);
                 if (datum) onSelect(datum.item);
               }}
-              shape={(props: unknown) => <TimelinePointShape {...(props as TimelineShapeProps)} />}
+              shape={(props: unknown) => {
+                const shapeProps = props as TimelineShapeProps;
+                const item = shapeProps.payload?.item;
+                return (
+                  <TimelinePointShape
+                    {...shapeProps}
+                    accessibleLabel={item
+                      ? t('decisionSignals.viewDetailsFor', { stock: item.stockName || item.stockCode })
+                      : undefined}
+                    onSelect={onSelect}
+                  />
+                );
+              }}
             />
           </ScatterChart>
         </ResponsiveContainer>

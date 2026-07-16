@@ -90,7 +90,7 @@ export interface StockPoolState {
   selectionSource: SelectionSource;
   notify: boolean;
   inputError?: string;
-  duplicateError: string | null;
+  duplicateError: ParsedApiError | null;
   duplicateTask: { stockCode: string; existingTaskId: string } | null;
   error: ParsedApiError | null;
   isAnalyzing: boolean;
@@ -1071,7 +1071,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
 
       if (error instanceof DuplicateTaskError) {
         set({
-          duplicateError: error.message,
+          duplicateError: error.parsedError,
           duplicateTask: {
             stockCode: error.stockCode,
             existingTaskId: error.existingTaskId,

@@ -141,6 +141,14 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
+async function expectMinimumTouchTarget(locator: Locator, minimum = 44) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThanOrEqual(minimum);
+  expect(box!.height).toBeGreaterThanOrEqual(minimum);
+}
+
 async function login(page: Page, language: 'zh' | 'en' = 'zh') {
   await loginAsE2eAdmin(page);
   if (language === 'en') {
@@ -1245,6 +1253,74 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         stock_name: 'Polling Complete',
       });
     });
+    await page.route('**/api/v1/analysis/tasks/poll-fallback-task/flow', async (route) => {
+      await fulfillJson(route, {
+        task_id: 'poll-fallback-task',
+        trace_id: 'poll-fallback-trace',
+        stock_code: 'AAPL',
+        stock_name: 'Polling Complete',
+        status: 'degraded',
+        generated_at: '2026-07-15T10:00:00Z',
+        summary: {
+          elapsed_ms: 1200,
+          failed_attempts: 1,
+          fallback_count: 1,
+          model: 'fixture-model',
+          data_source_count: 1,
+          event_count: 0,
+        },
+        lanes: [
+          { id: 'entry', label: '入口', order: 1 },
+          { id: 'data_source', label: '数据来源', order: 2 },
+          { id: 'analysis', label: '分析引擎', order: 3 },
+        ],
+        nodes: [
+          {
+            id: 'task_queue',
+            lane: 'entry',
+            kind: 'queue',
+            label: '任务队列',
+            status: 'success',
+          },
+          {
+            id: 'provider_realtime_quote_tickflowfetcher_1',
+            lane: 'data_source',
+            kind: 'data_source',
+            label: '实时行情 · TickFlowFetcher',
+            provider: 'TickFlowFetcher',
+            status: 'failed',
+            metadata: { data_type: 'realtime_quote', attempt: 1 },
+          },
+          {
+            id: 'provider_realtime_quote_aksharefetcher_2',
+            lane: 'data_source',
+            kind: 'data_source',
+            label: '实时行情 · AkshareFetcher',
+            provider: 'AkshareFetcher',
+            status: 'success',
+            record_count: 1,
+            metadata: { data_type: 'realtime_quote', attempt: 2 },
+          },
+          {
+            id: 'context_pack',
+            lane: 'analysis',
+            kind: 'analysis',
+            label: 'ContextPack',
+            status: 'success',
+          },
+        ],
+        edges: [
+          {
+            id: 'quote-fallback',
+            from: 'provider_realtime_quote_tickflowfetcher_1',
+            to: 'provider_realtime_quote_aksharefetcher_2',
+            kind: 'fallback',
+            status: 'success',
+          },
+        ],
+        events: [],
+      });
+    });
     await login(page);
     const input = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
     await input.fill('AAPL');
@@ -1253,7 +1329,12 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(task).toBeVisible();
     await expect(task.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });
     expect(statusCalls).toBeGreaterThan(0);
-    await expect(task.getByRole('button', { name: /查看.*运行流/ })).toBeVisible();
+    const runFlowButton = task.getByRole('button', { name: /查看.*运行流/ });
+    await expectMinimumTouchTarget(runFlowButton);
+    await runFlowButton.click();
+    await expectMinimumTouchTarget(
+      page.getByTestId('run-flow-node-topology_data_realtime_quote-toggle'),
+    );
   });
 
   test('32 rapid history switching discards the older report response', async ({ page }) => {
@@ -1576,5 +1657,48 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await attachScreenshot(page, testInfo, 'acceptance-settings-desktop-light');
     await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
+  });
+
+  test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page);
+    const alphaRef = encodeModelRef('alpha_conn', 'openai/model-alpha');
+    const betaRef = encodeModelRef('beta_conn', 'openai/model-beta');
+    await configureConnections(page, [
+      { id: 'alpha_conn', model: 'model-alpha' },
+      { id: 'beta_conn', model: 'model-beta' },
+    ], [
+      { key: 'LITELLM_MODEL', value: alphaRef },
+      { key: 'LITELLM_FALLBACK_MODELS', value: betaRef },
+    ]);
+
+    await page.goto('/settings?section=ai_models&view=task_routing');
+    const primaryModel = page.getByRole('button', { name: '主要模型', exact: true });
+    await expectMinimumTouchTarget(primaryModel);
+    await primaryModel.click();
+    const betaOption = page.locator(`[role="option"][data-value="${betaRef}"]`);
+    await expectMinimumTouchTarget(betaOption);
+    await page.keyboard.press('Escape');
+
+    await page.goto('/settings?section=ai_models&view=reliability');
+    const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
+    await expectMinimumTouchTarget(fallbackSelector);
+    await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
+    await fallbackSelector.click();
+    await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
+    const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
+    await expectMinimumTouchTarget(fallbackCheckbox.locator('..'));
+    await attachScreenshot(page, testInfo, 'acceptance-settings-touch-targets-390');
+
+    await page.goto('/settings?section=system_security&view=runtime');
+    const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
+    await expectMinimumTouchTarget(logLevelSelect);
+    await logLevelSelect.click();
+    await expectMinimumTouchTarget(page.locator('[role="option"][data-value="INFO"]'));
+    await page.keyboard.press('Escape');
+
+    await page.goto('/chat');
+    await expectMinimumTouchTarget(page.getByRole('switch', { name: '上下文压缩' }));
+    await attachScreenshot(page, testInfo, 'acceptance-chat-touch-targets-390');
   });
 });

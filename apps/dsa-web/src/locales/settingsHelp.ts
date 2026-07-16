@@ -39,7 +39,7 @@ const settingsHelpZhCN: SettingsHelpMap = {
     usage: '通常保持“默认模型配置”。只有在本机已安装并登录对应 CLI，且你信任它处理分析内容时，才选择本地 CLI 生成方式（实验）。',
     valueNotes: [
       '本地 CLI 生成方式是本机启动的命令行程序，不等于离线模型；背后的服务可能处理股票代码、新闻、持仓上下文、分析请求和报告草稿。',
-      'Docker、云服务器、CI 不天然拥有你本机的登录状态；DSA 不读取 Codex/Claude/OpenCode 登录凭据文件，但对应 CLI 自己可能使用它的登录状态。',
+      'Docker、云服务器、CI 不天然拥有你本机的登录状态；StockPulse 不读取 Codex/Claude/OpenCode 登录凭据文件，但对应 CLI 自己可能使用它的登录状态。',
     ],
     impact: ['影响普通分析、大盘复盘和文本生成入口，不改变问股助手的工具执行规则。'],
     notes: [
@@ -67,8 +67,8 @@ const settingsHelpZhCN: SettingsHelpMap = {
   'settings.ai_model.OPENCODE_CLI_MODEL': {
     title: 'OpenCode CLI 模型',
     showFieldKey: true,
-    summary: '可选：指定 DSA 调用 OpenCode run 时传给 --model 的模型名。',
-    usage: '仅在“分析生成方式”选择 OpenCode CLI 时生效。留空时 DSA 不传 --model，使用你本机 OpenCode 的默认模型配置。',
+    summary: '可选：指定 StockPulse 调用 OpenCode run 时传给 --model 的模型名。',
+    usage: '仅在“分析生成方式”选择 OpenCode CLI 时生效。留空时 StockPulse 不传 --model，使用你本机 OpenCode 的默认模型配置。',
     valueNotes: [
       '模型是否可用、如何认证由你本机的 OpenCode 配置负责。',
       '配置时该值会作为单个 argv 参数传给 OpenCode，不能包含空白或 shell 元字符。',
@@ -343,9 +343,9 @@ const settingsHelpZhCN: SettingsHelpMap = {
     title: 'AlphaSift 选股',
     summary: '控制是否启用内置 AlphaSift 选股页。',
     usage: '默认关闭。设为 true 后，Web 会检查随后端依赖安装的 alphasift.dsa_adapter；若缺失，请先执行 pip install -r requirements.txt 或重建后端产物。',
-    valueNotes: ['AlphaSift 作为 DSA 后端依赖安装，/install 仅作为显式修复入口保留。', '选股结果仅用于研究辅助，不构成投资建议。'],
+    valueNotes: ['AlphaSift 作为 StockPulse 后端依赖安装，/install 仅作为显式修复入口保留。', '选股结果仅用于研究辅助，不构成投资建议。'],
     impact: ['影响 Web 选股入口、AlphaSift 策略读取和选股 API。'],
-    notes: ['AlphaSift 初筛候选，DSA 补充行情、基本面和新闻上下文；关闭时不影响原有分析、报告和通知流程。'],
+    notes: ['AlphaSift 初筛候选，StockPulse 补充行情、基本面和新闻上下文；关闭时不影响原有分析、报告和通知流程。'],
   },
   'settings.data_source.ALPHASIFT_INSTALL_SPEC': {
     title: 'AlphaSift 安装来源',
@@ -1237,7 +1237,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     usage: 'Usually keep Default model settings. Choose a local CLI backend only when the corresponding CLI is installed and logged in on this machine and you trust it to handle analysis content.',
     valueNotes: [
       'Local CLI backends are local command-line programs, not offline models. The service behind them may process stock symbols, news, position context, analysis requests, and report drafts.',
-      'Docker, cloud servers, and CI do not automatically have your local login state. DSA does not read Codex/Claude/OpenCode credential files, but the corresponding CLI itself may use its login state.',
+      'Docker, cloud servers, and CI do not automatically have your local login state. StockPulse does not read Codex/Claude/OpenCode credential files, but the corresponding CLI itself may use its login state.',
     ],
     impact: ['Affects regular analysis, market review, and text generation entry points. It does not change how the ask-stock assistant runs tools.'],
     notes: [
@@ -1266,7 +1266,7 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'OpenCode CLI Model',
     showFieldKey: true,
     summary: 'Optional model name passed to OpenCode run through --model.',
-    usage: 'Only applies when Analysis Generation Method is OpenCode CLI. Leave it empty and DSA will not pass --model, so OpenCode uses its local default model configuration.',
+    usage: 'Only applies when Analysis Generation Method is OpenCode CLI. Leave it empty and StockPulse will not pass --model, so OpenCode uses its local default model configuration.',
     valueNotes: [
       'Model availability and authentication are handled by your local OpenCode setup.',
       'When set, the value is passed as one argv token and must not contain whitespace or shell metacharacters.',
@@ -1522,9 +1522,9 @@ const settingsHelpEnUS: SettingsHelpMap = {
     title: 'AlphaSift Screening',
     summary: 'Controls the built-in AlphaSift stock screening page.',
     usage: 'Disabled by default. When true, the Web app checks alphasift.dsa_adapter installed with backend dependencies; if it is missing, run pip install -r requirements.txt or rebuild the backend artifact.',
-    valueNotes: ['AlphaSift is installed as a DSA backend dependency; /install is retained only as an explicit repair action.', 'Screening output is for research support only and is not investment advice.'],
+    valueNotes: ['AlphaSift is installed as a StockPulse backend dependency; /install is retained only as an explicit repair action.', 'Screening output is for research support only and is not investment advice.'],
     impact: ['Affects the Web screening entry, AlphaSift strategy loading, and screening API.'],
-    notes: ['AlphaSift generates candidates, while DSA enriches them with quote, fundamental, and news context; disabling it does not affect existing analysis, reports, or notifications.'],
+    notes: ['AlphaSift generates candidates, while StockPulse enriches them with quote, fundamental, and news context; disabling it does not affect existing analysis, reports, or notifications.'],
   },
   'settings.data_source.ALPHASIFT_INSTALL_SPEC': {
     title: 'AlphaSift Install Source',

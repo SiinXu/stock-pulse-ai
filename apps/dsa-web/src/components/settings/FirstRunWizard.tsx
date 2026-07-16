@@ -12,6 +12,7 @@ import {
 } from './llmConnectionContract';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
+import { encodeModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 
 export interface WizardDraftItem {
@@ -268,9 +269,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     const name = suggestConnectionName(existingChannelNames, provider.id);
     const up = name.toUpperCase();
     const primaryModel = reportModel || modelOptions[0] || '';
-    // The backend routes channel models as `<protocol>/<model>` and rejects a
-    // bare model name; the user only ever sees/selects the display model.
+    // Persist Connection-aware identity; execution resolves it to this route.
     const primaryRoute = canonicalModelRoute(protocol, primaryModel);
+    const primaryModelRef = encodeModelRef(name, primaryRoute);
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
     const items: WizardDraftItem[] = [
@@ -283,7 +284,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       { key: `LLM_${up}_PROTOCOL`, value: protocol },
       { key: `LLM_${up}_MODELS`, value: modelOptions.join(',') },
       { key: `LLM_${up}_ENABLED`, value: 'true' },
-      { key: 'LITELLM_MODEL', value: primaryRoute },
+      { key: 'LITELLM_MODEL', value: primaryModelRef },
     ];
     // Base URL: official providers with a blank template endpoint use the SDK
     // default; only emit an explicit endpoint when one is provided.
@@ -470,7 +471,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
                       onClick={() => removeModelToken(model)}
-                      className="shrink-0 text-muted-text hover:text-danger"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
                     >
                       ×
                     </button>

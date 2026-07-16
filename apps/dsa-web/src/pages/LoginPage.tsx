@@ -126,7 +126,7 @@ const LoginPage: React.FC = () => {
               <span className="bg-gradient-to-r from-[var(--login-brand-start)] to-[var(--login-brand-end)] bg-clip-text text-transparent drop-shadow-[0_0_20px_var(--login-accent-glow)]">StockPulse</span>
             </h2>
             <h3 className="mt-1 text-xl font-bold uppercase tracking-[0.5em] text-[var(--login-text-muted)]">
-              Market Intelligence
+              {t('login.brandTagline')}
             </h3>
           </div>
 
@@ -137,7 +137,7 @@ const LoginPage: React.FC = () => {
             className="mt-6 flex items-center gap-2 rounded-full border border-[var(--login-accent-border)] bg-[var(--login-accent-soft)] px-3 py-1 text-xs font-medium text-[var(--login-accent-text)] backdrop-blur-sm"
           >
             <Network className="h-3 w-3" />
-            <span>V3.X QUANTITATIVE SYSTEM</span>
+            <span>{t('login.systemBadge')}</span>
           </motion.div>
         </motion.div>
 
@@ -255,7 +255,7 @@ const LoginPage: React.FC = () => {
           transition={{ delay: 0.6 }}
           className="mt-8 text-center font-mono text-xs uppercase tracking-wider text-[var(--login-text-muted)]"
         >
-          Secure Connection Established via DSA-V3-TLS
+          {t('login.secureConnection')}
         </motion.p>
       </div>
 

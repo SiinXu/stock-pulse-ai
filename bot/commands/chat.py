@@ -8,6 +8,10 @@ from typing import List, Optional
 
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse, ChatType
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -40,7 +44,11 @@ def _resolve_chat_session_id(message: BotMessage) -> str:
         if legacy_exists and not current_exists:
             return legacy_session_id
     except Exception as exc:
-        logger.debug("Chat session compatibility check failed: %s", exc)
+        logger.debug(
+            "Chat session compatibility check failed: exception_type=%s diagnostic=%s",
+            type(exc).__name__,
+            sanitize_agent_diagnostic(exc),
+        )
 
     return session_id
 
@@ -76,7 +84,15 @@ class ChatCommand(BotCommand):
 
     def execute(self, message: BotMessage, args: list[str]) -> BotResponse:
         """Execute the chat command."""
-        config = get_config()
+        try:
+            config = get_config()
+        except Exception as exc:
+            logger.error(
+                "Chat command configuration failed: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
 
         if not config.agent_mode:
             return BotResponse.text_response(
@@ -99,9 +115,18 @@ class ChatCommand(BotCommand):
             if result.success:
                 return BotResponse.text_response(result.content)
             else:
-                return BotResponse.text_response(f"⚠️ 对话失败: {result.error}")
+                logger.error(
+                    "Chat command Agent result failed: session_id=%s diagnostic=%s",
+                    session_id,
+                    sanitize_agent_diagnostic(result.error),
+                )
+                return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
                 
-        except Exception as e:
-            logger.error(f"Chat command failed: {e}")
-            logger.exception("Chat error details:")
-            return BotResponse.text_response(f"⚠️ 对话执行出错: {str(e)}")
+        except Exception as exc:
+            logger.error(
+                "Chat command failed: session_id=%s exception_type=%s diagnostic=%s",
+                session_id,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")

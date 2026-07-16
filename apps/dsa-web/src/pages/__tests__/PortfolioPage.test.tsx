@@ -374,7 +374,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(await screen.findByText('过期')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新汇率' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('min-h-11', 'min-w-11');
   });
 
   it('shows aggregate partial valuation limitations near summary totals', async () => {
@@ -873,7 +873,9 @@ describe('PortfolioPage FX refresh', () => {
 
     const row = screen.getByText('HK00700').closest('tr');
     expect(row).not.toBeNull();
-    fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
+    const analyzeButton = within(row as HTMLTableRowElement).getByRole('button', { name: '分析' });
+    expect(analyzeButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(analyzeButton);
 
     await waitFor(() => {
       expect(analyzePosition).toHaveBeenCalledWith('HK00700', {
@@ -1162,6 +1164,10 @@ describe('PortfolioPage FX refresh', () => {
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
+    expect(screen.getByLabelText('股票代码')).toHaveClass('h-11');
+    expect(screen.getByLabelText('交易日期')).toHaveClass('h-11');
+    expect(screen.getByLabelText('数量')).toHaveClass('h-11');
+    expect(screen.getByLabelText('成交价')).toHaveClass('h-11');
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
     fireEvent.change(screen.getByLabelText('数量'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '210' } });
@@ -1203,6 +1209,8 @@ describe('PortfolioPage FX refresh', () => {
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByLabelText('选择 CSV').closest('label')).toHaveClass('h-11');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));

@@ -1,4 +1,10 @@
 import apiClient from './index';
+import {
+  createApiError,
+  createParsedApiError,
+  parseApiError,
+  type ParsedApiError,
+} from './error';
 import { toCamelCase } from './utils';
 import type {
   AnalysisRequest,
@@ -84,17 +90,27 @@ export const analysisApi = {
 
     // Handle duplicate submission compatibility.
     if (response.status === 409) {
-      const errorData = toCamelCase<{
-        error: string;
-        message: string;
-        params?: { stockCode?: string; existingTaskId?: string };
-        stockCode?: string;
-        existingTaskId?: string;
-      }>(response.data);
+      const responseLike = { status: response.status, data: response.data };
+      const parsed = parseApiError({ response: responseLike });
+      if (parsed.code !== 'duplicate_task') {
+        throw createApiError(parsed, { response: responseLike });
+      }
+      const stockCode = String(
+        parsed.params?.stock_code
+          ?? parsed.params?.stockCode
+          ?? data.stockCode
+          ?? (data.stockCodes?.length === 1 ? data.stockCodes[0] : '')
+          ?? '',
+      );
+      const existingTaskId = String(
+        parsed.params?.existing_task_id
+          ?? parsed.params?.existingTaskId
+          ?? '',
+      );
       throw new DuplicateTaskError(
-        errorData.params?.stockCode || errorData.stockCode || data.stockCode || '',
-        errorData.params?.existingTaskId || errorData.existingTaskId || '',
-        errorData.message,
+        stockCode,
+        existingTaskId,
+        parsed,
       );
     }
 
@@ -117,11 +133,11 @@ export const analysisApi = {
     );
 
     if (response.status === 409) {
-      const detail = response.data?.detail;
-      const message = detail && typeof detail === 'object' && 'message' in detail
-        ? String((detail as { message?: unknown }).message || '')
-        : String(response.data?.message || '');
-      throw new Error(message || '大盘复盘正在执行中，请稍后再试');
+      const responseLike = { status: response.status, data: response.data };
+      throw createApiError(
+        parseApiError({ response: responseLike }),
+        { response: responseLike },
+      );
     }
 
     return toCamelCase<MarketReviewAccepted>(response.data);
@@ -195,13 +211,36 @@ export const analysisApi = {
  * Duplicate task error.
  */
 export class DuplicateTaskError extends Error {
-  stockCode: string;
-  existingTaskId: string;
+  readonly code = 'duplicate_task' as const;
+  readonly stockCode: string;
+  readonly existingTaskId: string;
+  readonly params: Record<string, unknown>;
+  readonly details?: unknown;
+  readonly traceId?: string;
+  readonly parsedError: ParsedApiError;
 
-  constructor(stockCode: string, existingTaskId: string, message?: string) {
-    super(message || `股票 ${stockCode} 正在分析中`);
+  constructor(stockCode: string, existingTaskId: string, error?: string | ParsedApiError) {
+    const params = typeof error === 'string'
+      ? { stock_code: stockCode, existing_task_id: existingTaskId }
+      : { stock_code: stockCode, existing_task_id: existingTaskId, ...(error?.params ?? {}) };
+    const parsed = typeof error === 'string' || error === undefined
+      ? createParsedApiError({
+        title: '任务已在运行',
+        message: '该股票已有分析任务，请等待当前任务完成。',
+        rawMessage: error || `股票 ${stockCode} 正在分析中`,
+        status: 409,
+        category: 'http_error',
+        code: 'duplicate_task',
+        params,
+      })
+      : { ...error, params };
+    super(parsed.rawMessage);
     this.name = 'DuplicateTaskError';
     this.stockCode = stockCode;
     this.existingTaskId = existingTaskId;
+    this.params = params;
+    this.details = parsed.details;
+    this.traceId = parsed.traceId;
+    this.parsedError = parsed;
   }
 }

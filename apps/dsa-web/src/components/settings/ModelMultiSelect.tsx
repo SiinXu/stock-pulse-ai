@@ -77,7 +77,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
 
   return (
     <div ref={rootRef} className="relative" data-testid="model-multi-select">
-      <div className="flex min-h-8 w-full items-center gap-1.5 rounded-lg border border-border bg-transparent px-2 py-1 text-xs text-foreground transition-colors focus-within:border-muted-text">
+      <div className="flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-border bg-transparent px-2 py-1 text-xs text-foreground transition-colors focus-within:border-muted-text">
         <button
           ref={triggerRef}
           type="button"
@@ -87,7 +87,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
           aria-expanded={isOpen}
           aria-controls={isOpen ? listboxId : undefined}
           onClick={() => (isOpen ? close(false) : setIsOpen(true))}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-1 py-0.5 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="shrink-0 text-muted-text">
             {formatUiText(text.selectedModels, { selected: selectedModels.length, total: options.length })}
@@ -95,14 +95,14 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
         </button>
         {selectedModels.slice(0, 2).map((model) => (
-          <span key={model} className="inline-flex min-w-0 max-w-36 items-center gap-0.5 rounded-full border border-border px-1.5 py-0.5">
+          <span key={model} className="inline-flex min-h-11 min-w-0 max-w-36 items-center gap-0.5 rounded-full border border-border pl-1.5">
             <span className="truncate">{getOptionLabel(model)}</span>
             <button
               type="button"
               disabled={disabled}
               aria-label={formatUiText(text.removeModel, { model: getOptionLabel(model) })}
               onClick={() => onToggle(model)}
-              className="shrink-0 rounded-full text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
             >
               <X className="h-3 w-3" aria-hidden="true" />
             </button>
@@ -128,6 +128,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
               }}
               aria-label={text.searchModels}
               placeholder={text.searchModelsPlaceholder}
+              className="min-h-11"
             />
           </div>
           <ul
@@ -148,7 +149,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
                 aria-selected={isSelected(model)}
                 className="rounded-md hover:bg-hover"
               >
-                <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-secondary-text">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-secondary-text">
                   <input
                     type="checkbox"
                     checked={isSelected(model)}

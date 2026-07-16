@@ -39,6 +39,7 @@ describe('ProviderQuickLinks', () => {
       expect(link).not.toHaveAttribute('title');
       expect(link).toHaveAccessibleName(/opens in a new tab/);
       expect(link).toHaveAccessibleName(/console\.example\.com/);
+      expect(link).toHaveClass('min-h-11', 'min-w-11');
     }
   });
 
@@ -64,5 +65,62 @@ describe('ProviderQuickLinks', () => {
       />,
     );
     expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('rejects plaintext HTTP catalog URLs', () => {
+    render(
+      <ProviderQuickLinks
+        provider={{
+          ...provider,
+          modelsUrl: 'http://docs.example.com/models',
+          docsUrl: 'https://docs.example.com/',
+        }}
+        context="models"
+        language="en"
+        primaryLabel="Models"
+        secondaryLabel="Docs"
+      />,
+    );
+
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('href', 'https://docs.example.com/');
+  });
+
+  it('rejects HTTPS catalog URLs containing credentials', () => {
+    render(
+      <ProviderQuickLinks
+        provider={{
+          ...provider,
+          modelsUrl: 'https://user:secret@docs.example.com/models',
+          docsUrl: undefined,
+        }}
+        context="models"
+        language="en"
+        primaryLabel="Models"
+        secondaryLabel="Docs"
+      />,
+    );
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('normalizes catalog URLs before deduplicating them', () => {
+    render(
+      <ProviderQuickLinks
+        provider={{
+          ...provider,
+          modelsUrl: 'HTTPS://DOCS.EXAMPLE.COM:443/models',
+          docsUrl: 'https://docs.example.com/models',
+        }}
+        context="models"
+        language="en"
+        primaryLabel="Models"
+        secondaryLabel="Docs"
+      />,
+    );
+
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', 'https://docs.example.com/models');
   });
 });

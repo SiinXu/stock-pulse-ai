@@ -58,7 +58,9 @@ describe('DecisionSignalCard', () => {
     expect(screen.getByText('1600 - 1620')).toBeInTheDocument();
     expect(screen.getByText('业绩窗口')).toBeInTheDocument();
     expect(screen.getByText('跌破 1550')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const detailsButton = screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' });
+    expect(detailsButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(detailsButton);
 
     expect(onSelect).toHaveBeenCalledWith(signal);
     expect(screen.getByText('3 日')).toBeInTheDocument();
@@ -220,7 +222,10 @@ describe('DecisionSignalDetails', () => {
     expect(screen.getByText('业绩窗口')).toBeInTheDocument();
     expect(screen.getByText('失效条件')).toBeInTheDocument();
     expect(screen.getByText('跌破 1550')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '无用' }));
+    expect(screen.getByRole('button', { name: '有用' })).toHaveClass('min-h-11', 'min-w-11');
+    const notUsefulButton = screen.getByRole('button', { name: '无用' });
+    expect(notUsefulButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(notUsefulButton);
     expect(onFeedbackSubmit).toHaveBeenCalledWith('not_useful');
   });
 

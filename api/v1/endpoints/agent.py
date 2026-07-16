@@ -229,9 +229,19 @@ class SessionItem(BaseModel):
 class SessionsResponse(BaseModel):
     sessions: List[SessionItem]
 
+
+class SessionMessage(BaseModel):
+    id: str
+    role: str
+    content: str
+    created_at: Optional[str] = None
+    error: Optional[str] = None
+    params: Optional[Dict[str, Any]] = None
+
+
 class SessionMessagesResponse(BaseModel):
     session_id: str
-    messages: List[Dict[str, Any]]
+    messages: List[SessionMessage]
 
 
 @router.get("/chat/sessions", response_model=SessionsResponse)
@@ -255,7 +265,11 @@ async def list_chat_sessions(limit: int = 50, user_id: Optional[str] = None):
     return SessionsResponse(sessions=sessions)
 
 
-@router.get("/chat/sessions/{session_id}", response_model=SessionMessagesResponse)
+@router.get(
+    "/chat/sessions/{session_id}",
+    response_model=SessionMessagesResponse,
+    response_model_exclude_none=True,
+)
 async def get_chat_session_messages(session_id: str, limit: int = 100):
     """获取单个会话的完整消息"""
     from src.storage import get_db

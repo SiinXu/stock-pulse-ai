@@ -988,6 +988,28 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertIn("technical", result.error)
         self.assertEqual(result.total_tokens, 0)
 
+    def test_execute_pipeline_sanitizes_critical_stage_failure(self):
+        orch = self._make_orchestrator()
+        technical = MagicMock(agent_name="technical")
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+        technical.run.return_value = self._stage_result(
+            "technical",
+            StageStatus.FAILED,
+            error=raw_error,
+        )
+
+        with patch.object(orch, "_build_agent_chain", return_value=[technical]):
+            with self.assertLogs("src.agent.orchestrator", level="ERROR") as logs:
+                result = orch._execute_pipeline(AgentContext(query="test"))
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.error, "Stage 'technical' failed")
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+
     def test_execute_pipeline_degrades_on_intel_failure(self):
         orch = self._make_orchestrator()
         ctx = AgentContext(query="test", stock_code="600519")
@@ -1029,6 +1051,51 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertIn("Analysis Summary", result.content)
         skill.run.assert_called_once()
         decision.run.assert_called_once()
+
+    def test_build_specialist_agents_sanitizes_construction_failure_log(self):
+        orch = self._make_orchestrator()
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/skills?token=super-secret"
+        )
+
+        with patch(
+            "src.agent.skills.router.SkillRouter.select_skills",
+            side_effect=RuntimeError(raw_error),
+        ):
+            with self.assertLogs("src.agent.orchestrator", level="WARNING") as logs:
+                agents = orch._build_specialist_agents(AgentContext(query="test"))
+
+        self.assertEqual(agents, [])
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("exception_type=RuntimeError", rendered_logs)
+        self.assertIn("diagnostic=", rendered_logs)
+        self.assertIn("[REDACTED]", rendered_logs)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
+        self.assertNotIn("Traceback", rendered_logs)
+
+    def test_aggregate_skill_opinions_sanitizes_failure_log(self):
+        orch = self._make_orchestrator()
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/skills?token=super-secret"
+        )
+
+        with patch(
+            "src.agent.skills.aggregator.SkillAggregator.aggregate",
+            side_effect=RuntimeError(raw_error),
+        ):
+            with self.assertLogs("src.agent.orchestrator", level="WARNING") as logs:
+                orch._aggregate_skill_opinions(AgentContext(query="test"))
+
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("exception_type=RuntimeError", rendered_logs)
+        self.assertIn("diagnostic=", rendered_logs)
+        self.assertIn("[REDACTED]", rendered_logs)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
+        self.assertNotIn("Traceback", rendered_logs)
 
     def test_pipeline_summary_and_risk_override_share_disabled_override_contract(self):
         orch = self._make_orchestrator(config=SimpleNamespace(agent_risk_override=False))
@@ -1728,7 +1795,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         add_message.assert_any_call(
             "session-2",
             "assistant",
-            "[分析失败] Agent chat failed",
+            "agent_error:v1:agent_chat_failed",
         )
         persisted_content = "\n".join(
             call.args[2]
@@ -1737,7 +1804,33 @@ class TestOrchestratorExecution(unittest.TestCase):
         )
         self.assertNotIn("super-secret", persisted_content)
         self.assertNotIn("private.example", persisted_content)
-        self.assertIn(raw_error, "\n".join(logs.output))
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_chat_exception_returns_safe_failure_and_persists_sentinel(self):
+        orch = self._make_orchestrator()
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+
+        with patch.object(orch, "_execute_pipeline", side_effect=RuntimeError(raw_error)):
+            with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+                with self.assertLogs("src.agent.orchestrator", level="ERROR") as logs:
+                    result = orch.chat("hello", "exception-orchestrator")
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.content, "")
+        self.assertEqual(result.error, "Agent chat failed")
+        add_message.assert_any_call(
+            "exception-orchestrator",
+            "assistant",
+            "agent_error:v1:agent_chat_failed",
+        )
+        rendered_logs = "\n".join(logs.output)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
 
     def test_execute_pipeline_fails_when_dashboard_parse_fails(self):
         orch = self._make_orchestrator()
@@ -1987,6 +2080,27 @@ class TestBaseAgentMessageAssembly(unittest.TestCase):
 
         self.assertEqual(result.status, StageStatus.COMPLETED)
         self.assertIs(run_loop.call_args.kwargs["stock_scope"], ctx.meta["stock_scope"])
+
+    def test_run_exception_returns_safe_stage_failure_and_sanitizes_log(self):
+        agent = self._make_agent()
+        ctx = AgentContext(query="hello")
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+
+        with patch(
+            "src.agent.agents.base_agent.run_agent_loop",
+            side_effect=RuntimeError(raw_error),
+        ):
+            with self.assertLogs("src.agent.agents.base_agent", level="ERROR") as logs:
+                result = agent.run(ctx)
+
+        self.assertEqual(result.status, StageStatus.FAILED)
+        self.assertEqual(result.error, "Agent execution failed")
+        rendered_logs = "\n".join(logs.output)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
 
 
 # ============================================================

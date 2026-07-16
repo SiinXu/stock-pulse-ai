@@ -641,10 +641,12 @@ def normalize_agent_litellm_model(
         return ""
     from src.llm.model_ref import is_model_ref, normalize_model_ref
 
-    # Preserve both valid and malformed versioned values for authoritative
-    # validation. Never reinterpret a ModelRef as a bare OpenAI model.
-    if is_model_ref(normalized_model):
-        return normalize_model_ref(normalized_model)
+    # Preserve the reserved namespace for authoritative version validation.
+    # Never reinterpret a ModelRef as a bare OpenAI model.
+    if normalized_model.startswith("modelref:"):
+        if is_model_ref(normalized_model):
+            return normalize_model_ref(normalized_model)
+        return normalized_model
     if "/" not in normalized_model:
         if configured_models and normalized_model in configured_models:
             return normalized_model
@@ -2844,18 +2846,28 @@ class Config:
         if (self.agent_generation_backend or AUTO_AGENT_BACKEND_ID).strip().lower() in GENERATION_ONLY_BACKEND_IDS:
             return False
         # Phase 3 no longer lets AGENT_MODE=true bypass tool-route safety.
-        if self._agent_mode_explicit:
-            if not self.agent_mode:
-                return False
-            primary_model = get_effective_agent_primary_model(self)
-            origins = route_deployment_origins(self.llm_model_list, primary_model)
-            return not origins.is_hermes_only
-        # Auto-detect: Agent inherits global model when AGENT_LITELLM_MODEL is empty.
+        if self._agent_mode_explicit and not self.agent_mode:
+            return False
+        # Auto-detect inherits the global model when AGENT_LITELLM_MODEL is empty.
         primary_model = get_effective_agent_primary_model(self)
         if not primary_model:
             return False
         origins = route_deployment_origins(self.llm_model_list, primary_model)
-        return not origins.is_hermes_only
+        from src.llm.model_ref import decode_model_ref, is_model_ref
+
+        if primary_model.startswith("modelref:"):
+            if not is_model_ref(primary_model):
+                return False
+            try:
+                decode_model_ref(primary_model)
+            except ValueError:
+                return False
+            if not origins.has_hermes and not origins.has_non_hermes:
+                return False
+        return (
+            not origins.is_hermes_only
+            and not origins.requires_connection_confirmation
+        )
 
     def refresh_stock_list(self) -> None:
         """
@@ -3022,7 +3034,7 @@ class Config:
                     message=(
                         "OPENCODE_CLI_MODEL 是可选的 OpenCode 模型覆盖值。"
                         "配置时会作为单个 --model 参数传给 OpenCode，不能包含空白或 shell 元字符；"
-                        "不配置时 DSA 将使用 OpenCode 自身默认模型。"
+                        "不配置时 StockPulse 将使用 OpenCode 自身默认模型。"
                     ),
                     field="OPENCODE_CLI_MODEL",
                 ))

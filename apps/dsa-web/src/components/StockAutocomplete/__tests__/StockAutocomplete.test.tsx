@@ -153,6 +153,7 @@ describe('StockAutocomplete', () => {
 
     const input = screen.getByPlaceholderText(/输入股票代码或名称/);
     expect(input).toBeInTheDocument();
+    expect(input).toHaveClass('h-11', 'min-h-11', 'min-w-11');
   });
 
   it('renders a custom placeholder', () => {
@@ -272,6 +273,7 @@ describe('StockAutocomplete', () => {
 
       const input = screen.getByPlaceholderText(/输入股票代码或名称/);
       expect(input).toHaveAttribute('data-autocomplete-mode', 'fallback');
+      expect(input).toHaveClass('h-11', 'min-h-11', 'min-w-11');
     });
 
     it('renders a plain input when autocomplete runtime fallback is active', () => {

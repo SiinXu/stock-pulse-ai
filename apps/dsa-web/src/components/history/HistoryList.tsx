@@ -11,10 +11,10 @@ interface HistoryListProps {
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
-  selectedId?: number;  // 当前选中的历史记录 ID
+  selectedId?: number;  // Currently selected history record ID.
   selectedIds: Set<number>;
   isDeleting?: boolean;
-  onItemClick: (recordId: number) => void;  // 点击记录的回调
+  onItemClick: (recordId: number) => void;
   onLoadMore: () => void;
   onToggleItemSelection: (recordId: number) => void;
   onToggleSelectAll: () => void;
@@ -25,10 +25,7 @@ interface HistoryListProps {
   className?: string;
 }
 
-/**
- * 历史记录列表组件 (升级版)
- * 使用新设计系统组件实现，支持批量选择和滚动加载
- */
+/** History list with batch selection and incremental loading. */
 export const HistoryList: React.FC<HistoryListProps> = ({
   items,
   isLoading,
@@ -57,7 +54,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   const allVisibleSelected = items.length > 0 && selectedCount === items.length;
   const someVisibleSelected = selectedCount > 0 && !allVisibleSelected;
 
-  // 使用 IntersectionObserver 检测滚动到底部
+  // Load the next page when the bottom sentinel enters the scroll viewport.
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const target = entries[0];
@@ -122,7 +119,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           {items.length > 0 && (
             <div className="flex items-center gap-2">
               <label
-                className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
+                className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
                 htmlFor={selectAllId}
               >
                 <input

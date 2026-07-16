@@ -295,7 +295,7 @@ class TestAgentExecutor(unittest.TestCase):
         add_message.assert_any_call(
             "private-executor",
             "assistant",
-            "[分析失败] Agent chat failed",
+            "agent_error:v1:agent_chat_failed",
         )
         persisted_content = "\n".join(
             call.args[2]
@@ -306,6 +306,38 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertNotIn("private.example", persisted_content)
         rendered_logs = "\n".join(logs.output)
         self.assertNotIn(raw_error, rendered_logs)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
+
+    def test_chat_exception_returns_safe_failure_and_persists_sentinel(self):
+        registry = _make_registry_with_echo()
+        adapter = _make_mock_adapter()
+        adapter._config = MagicMock()
+        executor = AgentExecutor(registry, adapter, max_steps=2)
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+
+        with patch.object(executor, "_run_loop", side_effect=RuntimeError(raw_error)):
+            with patch(
+                "src.agent.executor.build_agent_chat_context_bundle",
+                return_value=SimpleNamespace(context_messages=[], diagnostics={}),
+            ):
+                with patch("src.agent.conversation.conversation_manager.get_or_create"):
+                    with patch("src.agent.conversation.conversation_manager.add_message") as add_message:
+                        with self.assertLogs("src.agent.executor", level="ERROR") as logs:
+                            result = executor.chat("当前问题", "exception-executor")
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.content, "")
+        self.assertEqual(result.error, "Agent chat failed")
+        add_message.assert_any_call(
+            "exception-executor",
+            "assistant",
+            "agent_error:v1:agent_chat_failed",
+        )
+        rendered_logs = "\n".join(logs.output)
         self.assertNotIn("super-secret", rendered_logs)
         self.assertNotIn("private.example", rendered_logs)
 
@@ -1298,6 +1330,10 @@ class TestAgentExecutor(unittest.TestCase):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
         executor = AgentExecutor(registry, adapter, max_steps=2)
+        raw_error = (
+            "provider rejected token=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
         messages = [
             {"role": "user", "content": "question"},
             {
@@ -1310,7 +1346,9 @@ class TestAgentExecutor(unittest.TestCase):
             },
             {"role": "tool", "tool_call_id": "call_1", "content": "tool-result"},
         ]
-        db = SimpleNamespace(save_agent_provider_turn=MagicMock(side_effect=RuntimeError("db down")))
+        db = SimpleNamespace(
+            save_agent_provider_turn=MagicMock(side_effect=RuntimeError(raw_error))
+        )
 
         with patch("src.agent.executor.get_db", return_value=db):
             with self.assertLogs("src.agent.executor", level="WARNING") as logs:
@@ -1323,7 +1361,11 @@ class TestAgentExecutor(unittest.TestCase):
                     assistant_message_id=11,
                 )
 
-        self.assertIn("Provider trace persistence failed", "\n".join(logs.output))
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("Provider trace persistence failed", rendered_logs)
+        self.assertNotIn("super-secret", rendered_logs)
+        self.assertNotIn("private.example", rendered_logs)
+        self.assertNotIn("Traceback (most recent call last)", rendered_logs)
 
     def test_multiple_tool_calls_in_one_step(self):
         """Agent requests multiple tool calls in a single response."""

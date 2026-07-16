@@ -23,26 +23,18 @@ vi.mock('recharts', () => ({
   Tooltip: () => null,
   Scatter: ({
     data,
-    onClick,
     shape,
   }: {
     data: Array<{ item: DecisionSignalItem; radius: number; strokeWidth: number }>;
-    onClick: (datum: { item: DecisionSignalItem }) => void;
     shape: (props: unknown) => React.ReactNode;
   }) => (
-    <div>
+    <svg>
       {data.map((datum, index) => (
-        <button
-          key={datum.item.id}
-          type="button"
-          data-testid={`timeline-click-${datum.item.id}`}
-          onClick={() => onClick(datum)}
-        >
+        <g key={datum.item.id}>
           {shape({ cx: 20 + index * 20, cy: 20, payload: datum })}
-          {datum.item.stockCode}
-        </button>
+        </g>
       ))}
-    </div>
+    </svg>
   ),
 }));
 
@@ -144,7 +136,20 @@ describe('DecisionSignalTimeline', () => {
     const { onSelect } = renderTimeline({ truncated: true });
 
     expect(screen.getByText('仅展示最近 100 条信号，请缩小时间范围。')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('timeline-click-1'));
+    const hitTarget = screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' });
+    expect(hitTarget).toHaveAttribute('r', '22');
+    expect(hitTarget).toHaveAttribute('tabindex', '0');
+    expect(hitTarget).toHaveAttribute('data-testid', 'timeline-hit-target-1');
+    fireEvent.click(hitTarget);
+
+    expect(onSelect).toHaveBeenCalledWith(baseSignal);
+  });
+
+  it.each(['Enter', ' '])('opens a focused point with the %s key', (key) => {
+    const { onSelect } = renderTimeline();
+    const hitTarget = screen.getByTestId('timeline-hit-target-1');
+
+    fireEvent.keyDown(hitTarget, { key });
 
     expect(onSelect).toHaveBeenCalledWith(baseSignal);
   });

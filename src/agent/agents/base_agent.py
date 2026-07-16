@@ -18,6 +18,10 @@ from typing import Any, Callable, Dict, List, Optional
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.memory import AgentMemory
 from src.agent.protocols import AgentContext, AgentOpinion, StageResult, StageStatus
+from src.agent.public_contract import (
+    AGENT_EXECUTION_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.agent.runner import RunLoopResult, run_agent_loop
 from src.agent.skills.defaults import extract_skill_id
 from src.agent.tools.registry import ToolRegistry
@@ -147,9 +151,14 @@ class BaseAgent(ABC):
             result.status = StageStatus.COMPLETED
 
         except Exception as exc:
-            logger.error("[%s] execution failed: %s", self.agent_name, exc, exc_info=True)
+            logger.error(
+                "[%s] execution failed: exception_type=%s diagnostic=%s",
+                self.agent_name,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             result.status = StageStatus.FAILED
-            result.error = str(exc)
+            result.error = AGENT_EXECUTION_FAILURE_MESSAGE
         finally:
             result.duration_s = round(time.time() - t0, 2)
 

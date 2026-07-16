@@ -803,14 +803,19 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       event.stopPropagation();
                       onToggleExpanded?.(node.id);
                     }}
-                    className="absolute bottom-2 right-2 z-40 inline-flex h-[18px] items-center gap-0.5 rounded-md border border-subtle bg-base/80 px-1 text-xs font-medium leading-none text-secondary-text shadow-sm transition-colors hover:border-primary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
+                    className="absolute bottom-0 right-0 z-40 inline-flex h-11 min-w-11 items-end justify-end p-2 text-xs font-medium leading-none text-secondary-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
                   >
-                    {expanded ? (
-                      <ChevronDown className="h-2 w-2" aria-hidden="true" />
-                    ) : (
-                      <ChevronRight className="h-2 w-2" aria-hidden="true" />
-                    )}
-                    {expanded ? t('runFlow.graph.collapse') : t('runFlow.graph.expand')}
+                    <span
+                      data-testid={`run-flow-node-${node.id}-toggle-visual`}
+                      className="inline-flex h-5 items-center gap-0.5 rounded-md border border-subtle bg-base/80 px-1 shadow-sm transition-colors hover:border-primary/60 hover:text-foreground"
+                    >
+                      {expanded ? (
+                        <ChevronDown className="h-2 w-2" aria-hidden="true" />
+                      ) : (
+                        <ChevronRight className="h-2 w-2" aria-hidden="true" />
+                      )}
+                      {expanded ? t('runFlow.graph.collapse') : t('runFlow.graph.expand')}
+                    </span>
                   </button>
                 ) : null}
               </div>

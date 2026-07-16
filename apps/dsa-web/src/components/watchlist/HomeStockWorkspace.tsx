@@ -151,8 +151,7 @@ const WatchlistRowItem: React.FC<{
           <Button
             type="button"
             variant="ghost"
-            size="xsm"
-            className="h-7 w-7 px-0"
+            size="icon"
             disabled={disabled}
             aria-label={t('watchlist.removeAria', { code: row.code })}
             onClick={() => void onRemove(row.code)}
@@ -259,7 +258,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             key={tab.key}
             type="button"
             aria-pressed={selected}
-            className={`h-8 rounded-full px-2 text-xs font-medium transition-colors ${
+            className={`h-11 rounded-full px-2 text-xs font-medium transition-colors ${
               selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
             }`}
             onClick={() => onTabChange(tab.key)}
@@ -344,15 +343,14 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 value={draftCode}
                 onChange={(event) => setDraftCode(event.target.value)}
                 placeholder={t('watchlist.addPlaceholder')}
-                className="h-9 px-3 text-xs"
+                className="h-11 px-3 text-xs"
                 disabled={watchlistActioning}
                 aria-label={t('watchlist.addPlaceholder')}
               />
               <Button
                 type="submit"
-                size="sm"
+                size="icon"
                 variant="secondary"
-                className="h-9 w-9 px-0"
                 disabled={!draftCode.trim() || watchlistActioning}
                 isLoading={watchlistActioning}
                 aria-label={t('watchlist.add')}

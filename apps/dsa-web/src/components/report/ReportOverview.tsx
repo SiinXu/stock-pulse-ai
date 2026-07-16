@@ -240,7 +240,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
             <div className="flex items-start justify-between mb-5">
               <div className="flex-1">
                 <div className="flex items-center gap-3">
-                  <h2 className="text-3xl font-bold leading-tight text-foreground">
+                  <h2 className="text-heading-2 font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
                   {/* 价格和涨跌幅 */}

@@ -1183,7 +1183,9 @@ const StockScreeningPage: React.FC = () => {
 
             {hotspotDetail && ((hotspotDetail.missingFields || []).length > 0 || (hotspotDetail.sourceErrors || []).length > 0) ? (
               <details className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                <summary className="cursor-pointer font-semibold">{text.degradedDetail}</summary>
+                <summary className="min-h-11 cursor-pointer font-semibold">
+                  <span className="inline-flex min-h-11 items-center">{text.degradedDetail}</span>
+                </summary>
                 <div className="mt-2 space-y-1 leading-5">
                   {(hotspotDetail.missingFields || []).length > 0 ? (
                     <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(language === 'en' ? ', ' : '、') })}</p>
@@ -1234,11 +1236,13 @@ const StockScreeningPage: React.FC = () => {
                               <button
                                 type="button"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 text-xs font-semibold text-cyan transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground"
+                                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs font-semibold text-cyan"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
-                                <Play className="h-3 w-3" />
-                                {text.analyze}
+                                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-cyan/30 bg-cyan/10 px-2 transition-colors hover:border-cyan hover:bg-cyan/15 hover:text-foreground">
+                                  <Play className="h-3 w-3" />
+                                  {text.analyze}
+                                </span>
                               </button>
                             ) : null}
                           </div>
@@ -1393,7 +1397,7 @@ const StockScreeningPage: React.FC = () => {
           </div>
           <div className="grid gap-1 text-xs text-secondary-text sm:text-right">
             <span>{formatUiText(text.task, { id: activeTaskId ? activeTaskId.slice(0, 12) : '-' })}</span>
-            <span>Run ID：{screenMeta?.runId || '-'}</span>
+            <span>{formatUiText(text.runId, { id: screenMeta?.runId || '-' })}</span>
             <span>
               {formatUiText(text.taskStats, { snapshot: screenMeta?.snapshotCount ?? '-', filtered: screenMeta?.afterFilterCount ?? '-', candidates: screenMeta?.candidateCount ?? candidates.length })}
             </span>
@@ -1476,12 +1480,12 @@ const StockScreeningPage: React.FC = () => {
                         <td className="px-4 py-3 text-secondary-text">{llmDegraded ? text.notReranked : formatScore(item.llmScore)}</td>
                         <td className="px-4 py-3">
                           <span className="rounded-lg bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-                            {item.riskLevel || 'unknown'}
+                            {item.riskLevel || text.unknown}
                           </span>
                         </td>
                         <td className="px-4 py-3">
                           <button
-                            className="text-sm font-semibold text-cyan transition-colors hover:text-foreground"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-semibold text-cyan transition-colors hover:text-foreground"
                             type="button"
                             onClick={() => setExpandedCode(expanded ? null : item.code)}
                           >

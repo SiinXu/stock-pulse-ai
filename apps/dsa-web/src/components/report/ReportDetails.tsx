@@ -8,13 +8,11 @@ import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 
 interface ReportDetailsProps {
   details?: ReportDetailsType;
-  recordId?: number;  // 分析历史记录主键 ID
+  recordId?: number;  // Analysis history record ID.
   language?: ReportLanguage;
 }
 
-/**
- * 透明度与追溯区组件 - 终端风格
- */
+/** Transparency and traceability panel. */
 export const ReportDetails: React.FC<ReportDetailsProps> = ({
   details,
   recordId,
@@ -78,7 +76,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
           <button
             type="button"
             onClick={() => copyToClipboard(jsonStr, panel)}
-            className="home-accent-link text-xs text-muted-text"
+            className="home-accent-link inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-text"
             aria-label={copiedPanels[panel] ? text.copied : text.copy}
           >
             {copiedPanels[panel] ? text.copied : text.copy}
@@ -109,15 +107,15 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         </div>
       )}
 
-      {/* 折叠区域 */}
+      {/* Collapsible sections */}
       <div className="space-y-2">
-        {/* 原始分析结果 */}
+        {/* Raw analysis result */}
         {details?.rawResult && (
           <div>
             <button
               type="button"
               onClick={() => setShowRaw(!showRaw)}
-              className="home-surface-button home-trace-toggle flex w-full items-center justify-between rounded-lg p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.rawResult}</span>
               <svg
@@ -137,13 +135,13 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
           </div>
         )}
 
-        {/* 分析快照 */}
+        {/* Analysis snapshot */}
         {details?.contextSnapshot && (
           <div>
             <button
               type="button"
               onClick={() => setShowSnapshot(!showSnapshot)}
-              className="home-surface-button home-trace-toggle flex w-full items-center justify-between rounded-lg p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.analysisSnapshot}</span>
               <svg

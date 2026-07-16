@@ -1308,6 +1308,15 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(ntfy_request.channel, "ntfy")
         self.assertEqual(gotify_request.channel, "gotify")
 
+    def test_notification_channel_schema_uses_stockpulse_defaults(self) -> None:
+        request = TestNotificationChannelRequest(channel="wechat")
+
+        self.assertEqual(request.title, "StockPulse 通知测试")
+        self.assertEqual(
+            request.content,
+            "这是一条来自 StockPulse Web 设置页的通知测试消息。",
+        )
+
     def test_validate_returns_user_facing_model_message_without_internal_env_key_name(self) -> None:
         validation = self.service.validate(
             items=[

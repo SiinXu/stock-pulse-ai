@@ -1643,7 +1643,7 @@ def _ensure_alphasift_available_for_use() -> None:
     normalized_diagnostics = _include_alphasift_diagnostic_suffix(diagnostics)
     if _is_missing_alphasift_module(diagnostics):
         raise _alphasift_unavailable_exception(
-            "AlphaSift 是 DSA 的项目依赖，但当前运行环境未安装适配层。请先执行 `pip install -r requirements.txt`，或重建 Docker/桌面后端产物。",
+            "AlphaSift 是 StockPulse 的项目依赖，但当前运行环境未安装适配层。请先执行 `pip install -r requirements.txt`，或重建 Docker/桌面后端产物。",
             diagnostics=normalized_diagnostics,
         )
     raise _alphasift_unavailable_exception(
@@ -3742,7 +3742,7 @@ def _build_dsa_analysis_summary(
     price = _first_non_empty(quote.get("price"), candidate.get("price"))
     change_pct = _first_non_empty(quote.get("change_pct"), candidate.get("change_pct"))
     if price is not None:
-        text = f"DSA行情：现价 {price}"
+        text = f"StockPulse 行情：现价 {price}"
         if change_pct is not None:
             text += f"，涨跌幅 {change_pct}%"
         parts.append(text)
@@ -3751,14 +3751,14 @@ def _build_dsa_analysis_summary(
     if isinstance(coverage, dict) and coverage:
         available_blocks = [key for key, value in coverage.items() if str(value).lower() in {"available", "partial"}]
         if available_blocks:
-            parts.append(f"DSA基本面覆盖：{', '.join(available_blocks[:4])}")
+            parts.append(f"StockPulse 基本面覆盖：{', '.join(available_blocks[:4])}")
 
     news_results = news.get("results") if isinstance(news, dict) else []
     if isinstance(news_results, list) and news_results:
         titles = [str(item.get("title") or "").strip() for item in news_results if isinstance(item, dict)]
         titles = [title for title in titles if title]
         if titles:
-            parts.append(f"DSA新闻：{'；'.join(titles[:2])}")
+            parts.append(f"StockPulse 新闻：{'；'.join(titles[:2])}")
 
     if not parts:
         return ""

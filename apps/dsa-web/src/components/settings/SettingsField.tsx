@@ -131,7 +131,7 @@ function renderFieldControl(
         data-testid={`multi-enum-${item.key}`}
       >
         {normalizedOptions.map((option, index) => (
-          <label key={option.value} className="flex items-center gap-2 text-xs text-secondary-text">
+          <label key={option.value} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
             <input
               id={index === 0 ? controlId : undefined}
               type="checkbox"
@@ -144,7 +144,7 @@ function renderFieldControl(
           </label>
         ))}
         {unknownValues.map((entry) => (
-          <label key={`unknown-${entry}`} className="flex items-center gap-2 text-xs text-secondary-text">
+          <label key={`unknown-${entry}`} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
             <input
               type="checkbox"
               checked
@@ -208,19 +208,25 @@ function renderFieldControl(
           disabled={isDisabled}
           onClick={() => onChange(checked ? 'false' : 'true')}
           className={cn(
-            'relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors',
-            checked
-              ? 'bg-foreground'
-              : 'bg-border',
+            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
             isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           )}
         >
           <span
             className={cn(
-              'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-              checked ? 'translate-x-3' : 'translate-x-0.5',
+              'relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors',
+              checked ? 'bg-foreground' : 'bg-border',
             )}
-          />
+            data-testid={`${controlId}-switch-visual`}
+            aria-hidden="true"
+          >
+            <span
+              className={cn(
+                'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+                checked ? 'translate-x-3' : 'translate-x-0.5',
+              )}
+            />
+          </span>
         </button>
       </div>
     );
@@ -321,7 +327,7 @@ function renderFieldControl(
       type={inputType}
       aria-invalid={hasError || undefined}
       aria-describedby={ariaDescribedBy}
-      className={cn(commonClass, 'block h-8 md:ml-auto md:w-44', hasError && 'border-danger')}
+      className={cn(commonClass, 'block h-11 md:ml-auto md:w-44', hasError && 'border-danger')}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}

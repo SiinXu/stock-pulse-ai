@@ -238,14 +238,16 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('标准题材：算力')).toBeInTheDocument();
     expect(screen.getByText('质量 stale')).toBeInTheDocument();
     expect(screen.getByText('缓存回退 2.5h')).toBeInTheDocument();
-    expect(screen.getByText('详情数据已降级，展开查看原因')).toBeInTheDocument();
+    expect(screen.getByText('详情数据已降级，展开查看原因').closest('summary')).toHaveClass('min-h-11');
     expect(screen.getByText(/缺失字段：live_stocks/)).toBeInTheDocument();
     expect(screen.getByText('盘中发酵')).toBeInTheDocument();
     expect(screen.getByText('概念股')).toBeInTheDocument();
     expect(screen.getByText('中际旭创')).toBeInTheDocument();
     expect(screen.getByText(/来源 last_good_cache\.leader_stocks · 置信 65% · 回退/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '分析 中际旭创' }));
+    const analyzeButton = screen.getByRole('button', { name: '分析 中际旭创' });
+    expect(analyzeButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(analyzeButton);
     expect(navigate).toHaveBeenCalledWith('/', {
       state: {
         stockCode: '300000',
@@ -1029,6 +1031,7 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('本次 LLM 重排失败或未返回判断，当前展示的是本地因子评分结果。')).toBeInTheDocument();
     expect(screen.getByText('LLM 元数据未返回')).toBeInTheDocument();
     expect(screen.getAllByText('未返回（LLM 已降级）')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /^(展开|收起)$/ })).toHaveClass('min-h-11', 'min-w-11');
   });
 
   it('localizes stable AlphaSift diagnostic codes without exposing internal codes', async () => {
@@ -1132,7 +1135,7 @@ describe('StockScreeningPage', () => {
     expect(screen.queryByText(/RemoteDisconnected/)).not.toBeInTheDocument();
   });
 
-  it('shows DSA enrichment summary, news, and enrichment metadata', async () => {
+  it('shows StockPulse enrichment summary, news, and enrichment metadata', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,
       available: true,
@@ -1147,7 +1150,7 @@ describe('StockScreeningPage', () => {
           name: '贵州茅台',
           score: 91.2,
           reason: 'AlphaSift pick',
-          dsaAnalysisSummary: 'DSA行情：现价 1688，涨跌幅 1.2%；DSA新闻：贵州茅台最新公告',
+          dsaAnalysisSummary: 'StockPulse 行情：现价 1688，涨跌幅 1.2%；StockPulse 新闻：贵州茅台最新公告',
           dsaNews: [{ title: '贵州茅台最新公告', source: '测试源' }],
           dsaContext: {
             enriched: true,
@@ -1169,13 +1172,13 @@ describe('StockScreeningPage', () => {
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
-    expect(await screen.findByText('DSA 增强：1 / 1')).toBeInTheDocument();
+    expect(await screen.findByText('StockPulse 增强：1 / 1')).toBeInTheDocument();
 
-    expect(screen.getByText('DSA 增强摘要')).toBeInTheDocument();
-    expect(screen.getByText(/DSA行情：现价 1688/)).toBeInTheDocument();
-    expect(screen.getByText('DSA 新闻')).toBeInTheDocument();
+    expect(screen.getByText('StockPulse 增强摘要')).toBeInTheDocument();
+    expect(screen.getByText(/StockPulse 行情：现价 1688/)).toBeInTheDocument();
+    expect(screen.getByText('StockPulse 新闻')).toBeInTheDocument();
     expect(screen.getByText('贵州茅台最新公告')).toBeInTheDocument();
-    expect(screen.getByText('DSA 增强提示')).toBeInTheDocument();
+    expect(screen.getByText('StockPulse 增强提示')).toBeInTheDocument();
     expect(screen.getByText('数据源暂时不可用')).toBeInTheDocument();
     expect(screen.queryByText('stock_news_unavailable')).not.toBeInTheDocument();
   });

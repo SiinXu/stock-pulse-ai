@@ -300,7 +300,10 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   const error = loadError && loadError.recordId === recordId ? loadError.error : null;
   const hasStructuredContent = Boolean(marketReviewPayload?.sections?.length || marketReviewPayload?.markets);
   const isLoading = Boolean(recordId && !providedContent && !hasStructuredContent && loadedMarkdown?.recordId !== recordId && !error);
-  const displayTitle = marketReviewPayload?.rootTitle || marketReviewPayload?.title || meta?.stockName || 'Market Review';
+  const displayTitle = marketReviewPayload?.rootTitle
+    || marketReviewPayload?.title
+    || meta?.stockName
+    || marketReviewText.defaultTitle;
   const structuredContent = useMemo(
     () => stripTopHeading(content, displayTitle),
     [content, displayTitle],
@@ -395,9 +398,9 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold text-secondary-text">
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
-              <span>MARKET REVIEW</span>
+              <span>{marketReviewText.eyebrow}</span>
             </div>
-            <h2 className="text-2xl font-bold leading-tight text-foreground sm:text-3xl">
+            <h2 className="text-heading-2 font-bold leading-tight text-foreground">
               {displayTitle}
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-text">
@@ -415,7 +418,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenRunFlow(recordId)}
-                    className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
+                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
                     aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
                   >
                     <Workflow className="h-5 w-5" aria-hidden="true" />
@@ -429,7 +432,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   type="button"
                   onClick={() => void handleCopy('markdown')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyMarkdownSource}
                 >
                   {copiedType === 'markdown' ? (
@@ -448,7 +451,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   type="button"
                   onClick={() => void handleCopy('text')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-10 w-10 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyPlainText}
                 >
                   {copiedType === 'text' ? (

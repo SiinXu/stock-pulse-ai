@@ -113,20 +113,20 @@ describe('NotificationTestPanel', () => {
     const titleInput = screen.getByLabelText('标题');
     const contentInput = screen.getByLabelText('正文');
 
-    expect(titleInput).toHaveValue('DSA 通知测试');
-    expect(contentInput).toHaveValue('这是一条来自 DSA Web 设置页的通知测试消息。');
+    expect(titleInput).toHaveValue('StockPulse 通知测试');
+    expect(contentInput).toHaveValue('这是一条来自 StockPulse Web 设置页的通知测试消息。');
 
     fireEvent.click(screen.getByText('switch-language'));
 
     await waitFor(() => {
-      expect(titleInput).toHaveValue('DSA notification test');
-      expect(contentInput).toHaveValue('This is a test notification from the DSA Web settings page.');
+      expect(titleInput).toHaveValue('StockPulse notification test');
+      expect(contentInput).toHaveValue('This is a test notification from the StockPulse Web settings page.');
     });
 
     fireEvent.click(screen.getByRole('button', { name: /发送测试|Send test/ }));
     await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledWith(expect.objectContaining({
-      title: 'DSA notification test',
-      content: 'This is a test notification from the DSA Web settings page.',
+      title: 'StockPulse notification test',
+      content: 'This is a test notification from the StockPulse Web settings page.',
       timeoutSeconds: 20,
     })));
   });

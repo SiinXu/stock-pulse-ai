@@ -264,6 +264,7 @@ describe('HistoryList', () => {
       />,
     );
 
+    expect(screen.getByRole('checkbox', { name: '全选当前已加载历史记录' }).closest('label')).toHaveClass('min-h-11');
     fireEvent.click(screen.getByText('全选当前'));
 
     expect(onToggleSelectAll).toHaveBeenCalledTimes(1);

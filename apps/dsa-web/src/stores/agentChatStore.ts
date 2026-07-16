@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { agentApi } from '../api/agent';
-import type { ChatSessionItem, ChatStreamRequest } from '../api/agent';
+import type { ChatSessionItem, ChatSessionMessage, ChatStreamRequest } from '../api/agent';
 import {
   createParsedApiError,
   getParsedApiError,
@@ -40,6 +40,19 @@ export interface Message {
   skillNames?: string[];
   skillName?: string;
   thinkingSteps?: ProgressStep[];
+  /** Stable server error code for a persisted failure message. */
+  error?: string;
+  params?: Record<string, unknown>;
+}
+
+function fromSessionMessage(message: ChatSessionMessage): Message {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    ...(message.error ? { error: message.error } : {}),
+    ...(message.params ? { params: message.params } : {}),
+  };
 }
 
 export interface StreamMeta {
@@ -221,11 +234,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         return;
       }
       set({
-        messages: msgs.map((message) => ({
-          id: message.id,
-          role: message.role,
-          content: message.content,
-        })),
+        messages: msgs.map(fromSessionMessage),
       });
     } catch {
       // Ignore
@@ -263,11 +272,7 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
         return;
       }
       set({
-        messages: msgs.map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-        })),
+        messages: msgs.map(fromSessionMessage),
       });
     } catch {
       // Ignore

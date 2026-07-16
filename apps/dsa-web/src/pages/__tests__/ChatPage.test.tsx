@@ -6,6 +6,8 @@ import { historyApi } from '../../api/history';
 import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import ChatPage from '../ChatPage';
 import { extractStockCodeFromMessage, extractStockCodesFromMessage } from '../../utils/chatStockCode';
+import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
+import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
@@ -16,6 +18,15 @@ function createDeferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+const LanguageSwitchButton = () => {
+  const { language, setLanguage } = useUiLanguage();
+  return (
+    <button type="button" onClick={() => setLanguage(language === 'zh' ? 'en' : 'zh')}>
+      switch language
+    </button>
+  );
+};
 
 const {
   mockGetSkills,
@@ -204,6 +215,37 @@ beforeEach(() => {
 });
 
 describe('ChatPage', () => {
+  it('localizes persisted failure messages and updates them when UI language changes', async () => {
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
+    mockStoreState.messages = [{
+      id: 'failed-history-message',
+      role: 'assistant',
+      content: 'Agent chat failed',
+      error: 'agent_chat_failed',
+      params: {},
+    }];
+
+    render(
+      <UiLanguageProvider>
+        <MemoryRouter initialEntries={['/chat']}>
+          <LanguageSwitchButton />
+          <ChatPage />
+        </MemoryRouter>
+      </UiLanguageProvider>,
+    );
+
+    expect(await screen.findByText('Agent 请求失败')).toBeInTheDocument();
+    expect(screen.getByText('Agent 未能完成本次请求，请重试。')).toBeInTheDocument();
+    expect(screen.queryByText('Agent chat failed')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'switch language' }));
+
+    expect(await screen.findByText('Agent request failed')).toBeInTheDocument();
+    expect(screen.getByText('The Agent could not complete this request. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText('Agent 请求失败')).not.toBeInTheDocument();
+    expect(screen.queryByText('Agent chat failed')).not.toBeInTheDocument();
+  });
+
   it('renders a fixed workspace shell with independent session and message viewports', async () => {
     render(
       <MemoryRouter initialEntries={['/chat']}>
@@ -288,6 +330,8 @@ describe('ChatPage', () => {
       expect(compressionToggle).not.toBeDisabled();
     });
 
+    expect(compressionToggle).toHaveClass('h-11', 'w-11');
+    expect(screen.getByTestId('context-compression-switch-visual')).toHaveClass('h-5', 'w-9');
     expect(compressionToggle).not.toBeChecked();
 
     fireEvent.click(compressionToggle);
@@ -596,6 +640,8 @@ describe('ChatPage', () => {
 
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
+    expect(mobileToggle).toHaveClass('h-11');
+    expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
 
@@ -604,6 +650,8 @@ describe('ChatPage', () => {
     expect(screen.getByRole('button', { name: '收起策略选择' })).toHaveAttribute('aria-expanded', 'true');
     expect(skillPanel).not.toHaveClass('hidden');
     expect(skillPanel).toHaveClass('flex');
+    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-11');
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {

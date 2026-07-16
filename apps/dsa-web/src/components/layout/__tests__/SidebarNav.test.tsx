@@ -36,6 +36,27 @@ vi.mock('../../theme/ThemeToggle', () => ({
 }));
 
 describe('SidebarNav', () => {
+  it('keeps icon-only collapse and search controls at least 44px square', () => {
+    const onToggleCollapse = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav onToggleCollapse={onToggleCollapse} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: '折叠侧边栏' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '搜索' })).toHaveClass('min-h-11');
+
+    rerender(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav collapsed onToggleCollapse={onToggleCollapse} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: '展开侧边栏' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '搜索' })).toHaveClass('h-11', 'w-11');
+  });
+
   it('hides the screening navigation item while AlphaSift is disabled', () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 

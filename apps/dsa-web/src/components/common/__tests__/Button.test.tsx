@@ -3,12 +3,26 @@ import { describe, expect, it } from 'vitest';
 import { Button } from '../Button';
 
 describe('Button', () => {
-  it('keeps compact variants at least 44px tall on touch viewports', () => {
-    render(<Button size="xsm">Compact action</Button>);
+  it.each(['xsm', 'sm', 'md', 'lg', 'xl'] as const)(
+    'keeps the %s variant at least 44px in both dimensions at every breakpoint',
+    (size) => {
+      render(<Button size={size}>Action</Button>);
 
-    expect(screen.getByRole('button', { name: 'Compact action' })).toHaveClass(
+      const button = screen.getByRole('button', { name: 'Action' });
+      expect(button).toHaveClass('min-h-11', 'min-w-11');
+      expect(button).not.toHaveClass('sm:min-h-0');
+    },
+  );
+
+  it('provides a stable 44px square size for icon-only actions', () => {
+    render(<Button size="icon" aria-label="Open details">+</Button>);
+
+    expect(screen.getByRole('button', { name: 'Open details' })).toHaveClass(
+      'h-11',
       'min-h-11',
-      'sm:min-h-0',
+      'w-11',
+      'min-w-11',
+      'p-0',
     );
   });
 
@@ -34,6 +48,22 @@ describe('Button', () => {
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Saving')).toBeInTheDocument();
+  });
+
+  it('keeps icon loading states spinner-only without losing accessibility metadata', () => {
+    render(
+      <Button size="icon" isLoading loadingText="Saving" aria-label="Save item">
+        Save
+      </Button>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Save item' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button.textContent).toBe('');
+    expect(button.querySelector('svg.animate-spin')).toBeInTheDocument();
+    expect(button.querySelector('svg.animate-spin')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText('Saving')).not.toBeInTheDocument();
   });
 
   it('supports the danger-subtle variant', () => {

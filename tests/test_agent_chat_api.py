@@ -9,6 +9,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILED,
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+)
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -25,6 +30,12 @@ def teardown_function() -> None:
     Config.reset_instance()
 
 
+def test_deprecated_agent_chat_failure_history_message_remains_importable() -> None:
+    from src.agent.public_contract import AGENT_CHAT_FAILURE_HISTORY_MESSAGE
+
+    assert AGENT_CHAT_FAILURE_HISTORY_MESSAGE == "[分析失败] Agent chat failed"
+
+
 def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path) -> None:
     DatabaseManager.reset_instance()
     Config.reset_instance()
@@ -36,6 +47,11 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
         session_id,
         "assistant",
         f"[分析失败] {SENSITIVE_PROVIDER_ERROR}",
+    )
+    db.save_conversation_message(
+        session_id,
+        "assistant",
+        AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     )
     db.save_agent_provider_turn(
         session_id=session_id,
@@ -62,11 +78,9 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
 
     assert db.get_conversation_history(session_id)[-1] == {
         "role": "assistant",
-        "content": "[分析失败] Agent chat failed",
+        "content": AGENT_CHAT_FAILURE_MESSAGE,
     }
-    assert db.get_visible_conversation_messages(session_id)[-1]["content"] == (
-        "[分析失败] Agent chat failed"
-    )
+    assert db.get_visible_conversation_messages(session_id)[-1]["content"] == AGENT_CHAT_FAILURE_MESSAGE
 
     with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
@@ -78,8 +92,17 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     assert [(msg["role"], msg["content"]) for msg in payload["messages"]] == [
         ("user", "visible question"),
         ("assistant", "visible answer"),
-        ("assistant", "[分析失败] Agent chat failed"),
+        ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
+        ("assistant", AGENT_CHAT_FAILURE_MESSAGE),
     ]
+    assert "error" not in payload["messages"][0]
+    assert "params" not in payload["messages"][0]
+    assert "error" not in payload["messages"][1]
+    assert "params" not in payload["messages"][1]
+    assert payload["messages"][2]["error"] == AGENT_CHAT_FAILED
+    assert payload["messages"][2]["params"] == {}
+    assert payload["messages"][3]["error"] == AGENT_CHAT_FAILED
+    assert payload["messages"][3]["params"] == {}
     assert "SECRET_REASONING" not in response.text
     assert "SECRET_TOOL_RESULT" not in response.text
     assert "tool_calls" not in response.text

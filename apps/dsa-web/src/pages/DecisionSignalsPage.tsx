@@ -1024,7 +1024,7 @@ const DecisionSignalsPage: React.FC = () => {
             />
             <button
               type="button"
-              className="btn-secondary inline-flex h-10 items-center justify-center gap-2"
+              className="btn-secondary inline-flex min-h-11 min-w-11 items-center justify-center gap-2"
               onClick={() => void handleReassess()}
               disabled={!reassessSourceReportId || reassessLoading}
             >
@@ -1223,7 +1223,7 @@ const DecisionSignalsPage: React.FC = () => {
                   <button
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
-                    className="rounded-full border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
+                    className="min-h-11 min-w-11 rounded-full border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);
@@ -1255,7 +1255,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
               <input
-                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-11 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.stockCode}
                 onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
                 placeholder={t('decisionSignals.stockCode')}
@@ -1292,7 +1292,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
               <input
-                className="h-8 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-11 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.sourceReportId}
                 onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
                 placeholder={t('decisionSignals.sourceReportId')}
@@ -1572,7 +1572,7 @@ const DecisionSignalsPage: React.FC = () => {
                 <button
                   key={status}
                   type="button"
-                  className="btn-secondary !px-3 !py-1.5 !text-xs"
+                  className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
                   onClick={() => setPendingStatus({
                     item: selected.item,
                     status,

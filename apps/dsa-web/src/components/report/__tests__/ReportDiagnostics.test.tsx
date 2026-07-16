@@ -65,12 +65,14 @@ describe('ReportDiagnostics', () => {
     const panel = screen.getByTestId('run-diagnostics');
     expect(panel).not.toHaveAttribute('open');
     expect(screen.getByText('部分降级')).toBeInTheDocument();
+    expect(screen.getByText('运行状态').closest('summary')).toHaveClass('min-h-11');
 
     fireEvent.click(screen.getByText('运行状态'));
 
     expect(panel).toHaveAttribute('open');
     expect(screen.getByText('最近失败后已降级')).toBeInTheDocument();
     expect(screen.getByText('未配置')).toBeInTheDocument();
+    expect(screen.getByText('高级字段').closest('summary')).toHaveClass('min-h-11');
 
     fireEvent.click(screen.getByRole('button', { name: '复制排障信息' }));
 

@@ -72,7 +72,7 @@ class ToolSurface:
                 return self._error_result(
                     tool_name=tool_name,
                     code="invalid_tool_name",
-                    message="Tool name must exactly match a registered DSA tool.",
+                    message="Tool name must exactly match a registered StockPulse tool.",
                     started_at=started_at,
                     context=ctx,
                     retriable=False,

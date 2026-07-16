@@ -140,11 +140,11 @@ export const Input = ({
           className={cn(
             isLoginAppearance
               ? 'input-surface input-focus-glow input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none'
-              : `${defaultTrailingAction ? 'h-11' : 'h-8'} w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text`,
+              : 'h-11 w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text',
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
             finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',
-            'disabled:cursor-not-allowed disabled:opacity-60',
+            'min-h-11 min-w-11 disabled:cursor-not-allowed disabled:opacity-60',
             className,
           )}
           {...props}

@@ -2403,7 +2403,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(candidate["price"], 1688.0)
         self.assertTrue(candidate["dsa_context"]["enriched"])
         self.assertEqual(candidate["dsa_news"][0]["title"], "贵州茅台最新公告")
-        self.assertIn("DSA行情", candidate["dsa_analysis_summary"])
+        self.assertIn("StockPulse 行情", candidate["dsa_analysis_summary"])
+        self.assertNotIn("DSA行情", candidate["dsa_analysis_summary"])
         self.assertEqual(payload["dsa_enrichment"]["enriched_count"], 1)
 
     def test_screen_reuses_alphasift_dsa_context_without_refetch(self) -> None:

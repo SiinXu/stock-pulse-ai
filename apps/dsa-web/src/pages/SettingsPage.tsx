@@ -63,6 +63,7 @@ import {
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
 import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
 import { WEB_BUILD_INFO } from '../utils/constants';
+import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle, getFieldTitleZh } from '../utils/systemConfigI18n';
 import {
@@ -736,7 +737,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
-                <label className="flex items-start gap-3">
+                <label className="flex min-h-11 items-start gap-3">
                   <input
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-border text-foreground focus:ring-foreground/20"
@@ -764,14 +765,14 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {scheduleTimes.map((time, index) => (
                   <div
                     key={index}
-                    className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border settings-border bg-card/90 p-1 shadow-inner"
+                    className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border settings-border bg-card/90 px-1 shadow-inner"
                   >
                     <input
                       data-testid={`scheduler-time-input-${index}`}
                       type="time"
                       value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
                       aria-label={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="h-9 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
+                      className="h-11 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
                       disabled={disabled}
                       onChange={(event) => {
                         const nextTimes = scheduleTimes.map((currentTime, currentIndex) => (
@@ -784,8 +785,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                       <Button
                         type="button"
                         variant="settings-secondary"
-                        size="sm"
-                        className="h-8 w-8 rounded-lg px-0"
+                        size="icon"
                         aria-label={t('settings.schedulerRemoveTime')}
                         title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
@@ -1586,41 +1586,12 @@ const SettingsPage: React.FC = () => {
     const resolved = resolveConfiguredModelRef(value);
     const entry = availableModels.find((model) => (model.modelRef || model.route) === resolved);
     if (!entry) {
-      return value;
+      const decoded = decodeModelRef(value);
+      return decoded ? `${decoded.runtimeRoute} · ${decoded.connectionId}` : value.trim();
     }
     const connectionLabel = entry.connectionName ?? entry.connection ?? entry.connectionId;
     return connectionLabel ? `${entry.display} · ${connectionLabel}` : entry.display;
   }, [availableModels, resolveConfiguredModelRef]);
-
-  // Migrate only unambiguous legacy runtime routes. Duplicate routes remain
-  // untouched so validation can require an explicit Connection choice.
-  useEffect(() => {
-    if (availableModelsLoading || availableModelsError || availableModels.length === 0) {
-      return;
-    }
-    for (const key of ['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']) {
-      const current = (allValuesByKey[key] || '').trim();
-      const resolved = resolveConfiguredModelRef(current);
-      if (resolved && resolved !== current) {
-        setDraftValue(key, resolved);
-      }
-    }
-    const currentFallbacks = (allValuesByKey.LITELLM_FALLBACK_MODELS || '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-    const resolvedFallbacks = currentFallbacks.map(resolveConfiguredModelRef);
-    if (resolvedFallbacks.some((entry, index) => entry !== currentFallbacks[index])) {
-      setDraftValue('LITELLM_FALLBACK_MODELS', Array.from(new Set(resolvedFallbacks)).join(','));
-    }
-  }, [
-    allValuesByKey,
-    availableModels,
-    availableModelsError,
-    availableModelsLoading,
-    resolveConfiguredModelRef,
-    setDraftValue,
-  ]);
   // Task -> route references, used by the model-access manager to show which
   // tasks use each connection and to protect referenced connections on delete.
   const taskModelRefs = useMemo(() => {
@@ -2149,8 +2120,8 @@ const SettingsPage: React.FC = () => {
   const activeCategoryTitle = getCategoryTitle(activeCategory as SystemConfigCategory, t('settings.activePanelTitle'), uiLanguage);
   const activeCategoryDescription = getCategoryDescription(activeCategory as SystemConfigCategory, '', uiLanguage);
   // Sections split out of a shared backend category get their own title/copy so
-  // the panel doesn't reuse the sibling category's heading (e.g. Reports must
-  // not read "通知规则", Conversation must not read the Agent heading).
+  // the panel doesn't reuse the sibling category's heading (for example,
+  // Reports must not use the Notifications heading).
   const splitSectionCopy: Partial<Record<SettingsSectionId, { title: string; description: string }>> = {
     reports: {
       title: sectionLabel('reports', uiLanguage),
@@ -2310,7 +2281,7 @@ const SettingsPage: React.FC = () => {
             {visibleGroupSaveStates.map(([group, state]) => (
               <span
                 key={group}
-                className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
               >
                 {state.status === 'saved' ? (
                   <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
@@ -2321,12 +2292,12 @@ const SettingsPage: React.FC = () => {
                 )}
                 <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
                 {state.status === 'failed' ? (
-                  <button type="button" className="settings-accent-text underline" onClick={() => retryAutosaveGroup(group)}>
+                  <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
                     {settingsText.autosaveRetry}
                   </button>
                 ) : null}
                 {state.status === 'failed' || state.status === 'conflicted' ? (
-                  <button type="button" className="text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+                  <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
                     {settingsText.autosaveRestore}
                   </button>
                 ) : null}
@@ -2832,7 +2803,9 @@ const SettingsPage: React.FC = () => {
                       <div className="mt-4 space-y-1 text-left text-xs text-warning">
                         {configuredTaskRoutes.map((route) => (
                           <p key={route.key}>
-                            {formatUiText(settingsText.staleValue, { value: route.value })}
+                            {formatUiText(settingsText.staleValue, {
+                              value: formatConfiguredModel(route.value),
+                            })}
                           </p>
                         ))}
                       </div>
@@ -2866,7 +2839,10 @@ const SettingsPage: React.FC = () => {
                                 .join(' ') || undefined}
                               emptyText={settingsText.noModelOptions}
                               searchPlaceholder={settingsText.searchModels}
-                              staleValueLabel={formatUiText(settingsText.staleValue, { value: item.value })}
+                              staleValueText={formatConfiguredModel(item.value)}
+                              staleValueLabel={formatUiText(settingsText.staleValue, {
+                                value: formatConfiguredModel(item.value),
+                              })}
                               clearable={item.key !== 'LITELLM_MODEL'}
                             />
                             {(issueByKey[item.key] || []).map((issue) => (
@@ -2918,7 +2894,7 @@ const SettingsPage: React.FC = () => {
                   {hasSafeFallbackPlacement ? (
                     <button
                       type="button"
-                      className="settings-accent-text underline-offset-2 hover:underline"
+                      className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
                       onClick={() => selectSectionView('ai_models', 'reliability')}
                     >
                       {settingsText.editReliability}
@@ -2940,6 +2916,7 @@ const SettingsPage: React.FC = () => {
                     onChange={(next) => setDraftValue('LITELLM_FALLBACK_MODELS', next)}
                     options={modelSelectorOptions}
                     primaryRoute={resolveConfiguredModelRef(allValuesByKey.LITELLM_MODEL || '')}
+                    resolveConfiguredModelRef={resolveConfiguredModelRef}
                     language={uiLanguage}
                     disabled={isSaving || !isFieldEnabledByContract(fallbackRoutingItem?.schema?.contract, allValuesByKey)}
                   />

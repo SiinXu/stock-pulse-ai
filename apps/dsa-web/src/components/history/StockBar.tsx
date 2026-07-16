@@ -19,8 +19,8 @@ interface StockBarProps {
 }
 
 /**
- * 个股栏组件：以股票维度展示历史分析记录，每只股票只显示一条。
- * 大盘复盘可作为 MARKET 项参与展示，并按最近分析时间排序。
+ * Shows the latest analysis record for each stock.
+ * Market reviews participate as the MARKET item and use the same recency order.
  */
 export const StockBar: React.FC<StockBarProps> = ({
   items,
@@ -137,7 +137,7 @@ export const StockBar: React.FC<StockBarProps> = ({
           {items.length > 0 && onDeleteStock && (
             <div className="flex items-center gap-2">
               <label
-                className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg py-1"
+                className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-lg py-1"
                 htmlFor={selectAllId}
               >
                 <input
@@ -199,7 +199,7 @@ export const StockBar: React.FC<StockBarProps> = ({
               return (
                 <div key={`${code}-${item.id}`} className="flex items-start gap-2 group">
                   {onDeleteStock && (
-                    <div className="pt-5">
+                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-center">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -208,7 +208,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                         aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
                         className="chat-skill-checkbox cursor-pointer"
                       />
-                    </div>
+                    </label>
                   )}
                   <StockBarItemComponent
                     item={item}

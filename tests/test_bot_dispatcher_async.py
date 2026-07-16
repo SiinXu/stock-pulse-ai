@@ -278,6 +278,87 @@ class TestChatCommandCompatibility(unittest.TestCase):
         executor.chat.assert_called_once()
         self.assertEqual(executor.chat.call_args.kwargs["session_id"], "feishu_u1:group-1:chat")
 
+    def test_chat_command_failure_returns_only_public_message(self):
+        from bot.commands.chat import ChatCommand
+        from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
+
+        sensitive_error = (
+            "provider rejected token=super-secret api_key=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+        config = SimpleNamespace(agent_mode=True)
+        executor = MagicMock()
+        executor.chat.return_value = SimpleNamespace(
+            success=False,
+            content=sensitive_error,
+            error=sensitive_error,
+        )
+        db = MagicMock()
+        db.conversation_session_exists.return_value = False
+
+        with patch("bot.commands.chat.get_config", return_value=config), \
+             patch("src.storage.get_db", return_value=db), \
+             patch("src.agent.factory.build_agent_executor", return_value=executor):
+            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+                response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_chat_command_exception_returns_only_public_message(self):
+        from bot.commands.chat import ChatCommand
+        from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
+
+        sensitive_error = (
+            "provider rejected token=super-secret api_key=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+        config = SimpleNamespace(agent_mode=True)
+        db = MagicMock()
+        db.conversation_session_exists.return_value = False
+
+        with patch("bot.commands.chat.get_config", return_value=config), \
+             patch("src.storage.get_db", return_value=db), \
+             patch(
+                 "src.agent.factory.build_agent_executor",
+                 side_effect=RuntimeError(sensitive_error),
+             ):
+            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+                response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
+    def test_chat_command_configuration_exception_returns_only_public_message(self):
+        from bot.commands.chat import ChatCommand
+        from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
+
+        sensitive_error = (
+            "provider rejected token=super-secret api_key=super-secret at "
+            "https://private.example/v1/chat?token=super-secret"
+        )
+        with patch(
+            "bot.commands.chat.get_config",
+            side_effect=RuntimeError(sensitive_error),
+        ):
+            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+                response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
+
+        self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
+        self.assertNotIn("super-secret", response.text)
+        self.assertNotIn("private.example", response.text)
+        self.assertNotIn("super-secret", "\n".join(logs.output))
+        self.assertNotIn("private.example", "\n".join(logs.output))
+        self.assertIn("[REDACTED]", "\n".join(logs.output))
+
 
 class TestHistoryCommandCompatibility(unittest.TestCase):
     def test_history_clear_uses_group_scoped_session(self):

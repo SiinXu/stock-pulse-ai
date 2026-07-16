@@ -977,7 +977,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "ALPHASIFT_INSTALL_SPEC": {
         "title": "AlphaSift Install Spec",
-        "description": "Pinned AlphaSift pip source used for explicit repair installs and source verification. It is not used for normal runtime calls after startup dependency installation; runtime compatibility is built from DSA's resolved LLM/runtime context.",
+        "description": "Pinned AlphaSift pip source used for explicit repair installs and source verification. It is not used for normal runtime calls after startup dependency installation; runtime compatibility is built from StockPulse's resolved LLM/runtime context.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",

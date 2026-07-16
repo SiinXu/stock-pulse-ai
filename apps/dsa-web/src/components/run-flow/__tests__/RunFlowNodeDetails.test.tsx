@@ -15,7 +15,7 @@ describe('RunFlowNodeDetails', () => {
       message: '任务进入运行队列',
     };
 
-    render(<RunFlowNodeDetails node={node} />);
+    render(<RunFlowNodeDetails node={node} onClose={() => undefined} />);
 
     expect(screen.getByText('任务队列')).toBeInTheDocument();
     expect(screen.getByText('类型')).toBeInTheDocument();
@@ -25,6 +25,7 @@ describe('RunFlowNodeDetails', () => {
     expect(screen.queryByText('耗时')).not.toBeInTheDocument();
     expect(screen.queryByText('尝试次数')).not.toBeInTheDocument();
     expect(screen.queryByText('记录数')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关闭节点详情' })).toHaveClass('h-11', 'w-11');
   });
 
   it('renders ContextPack quality metadata as structured details instead of raw JSON', () => {

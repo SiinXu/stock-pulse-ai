@@ -151,6 +151,18 @@ def test_backend_startup_check_silent_when_bundle_consistent(
     )
 
 
+def test_frontend_not_built_fallback_uses_stockpulse_brand(tmp_path: Path) -> None:
+    from api.app import create_app
+
+    client = TestClient(create_app(static_dir=tmp_path / "missing-static"))
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "<title>StockPulse - Frontend Not Built</title>" in response.text
+    assert "DSA - Frontend Not Built" not in response.text
+
+
 def test_missing_asset_returns_safe_404_content_types(tmp_path: Path) -> None:
     from api.app import create_app
 

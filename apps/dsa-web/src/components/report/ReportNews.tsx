@@ -12,14 +12,12 @@ import { getReportText, normalizeReportLanguage } from '../../utils/reportLangua
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
 interface ReportNewsProps {
-  recordId?: number;  // 分析历史记录主键 ID
+  recordId?: number;  // Analysis history record ID.
   limit?: number;
   language?: ReportLanguage;
 }
 
-/**
- * 资讯区组件 - 终端风格
- */
+/** Related-news panel. */
 export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, language = 'zh' }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
@@ -74,7 +72,7 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
             <button
               type="button"
               onClick={() => void fetchNews()}
-              className="home-accent-link text-xs"
+              className="home-accent-link inline-flex min-h-11 min-w-11 items-center justify-center text-xs"
               aria-label={t('usage.refresh')}
             >
               {t('usage.refresh')}
@@ -139,7 +137,7 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="home-accent-pill-link shrink-0 whitespace-nowrap px-2.5 py-1 text-xs"
+                    className="home-accent-pill-link inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap px-2.5 py-1 text-xs"
                     aria-label={chromeText.openLink}
                   >
                     {chromeText.openLink}

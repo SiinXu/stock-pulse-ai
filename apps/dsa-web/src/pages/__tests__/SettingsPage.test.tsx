@@ -252,6 +252,7 @@ vi.mock('../../components/settings', async () => ({
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
     </div>
   ),
+  ModelFallbackEditor: (await import('../../components/settings/ModelFallbackEditor')).ModelFallbackEditor,
   LLMConfigModeBanner: ({ onMigrated }: { onMigrated?: () => void }) => (
     <div data-testid="llm-config-mode-banner">
       <button type="button" onClick={() => onMigrated?.()}>trigger migration</button>
@@ -1464,7 +1465,9 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(/自动保存失败/, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(resetDraftKeys).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    const retryButton = screen.getByRole('button', { name: '重试' });
+    expect(retryButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(retryButton);
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/已自动保存/)).toBeInTheDocument();
@@ -1482,7 +1485,9 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     expect(await screen.findByText(/保存冲突/, {}, { timeout: 2000 })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '恢复服务器值' }));
+    const restoreButton = screen.getByRole('button', { name: '恢复服务器值' });
+    expect(restoreButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(restoreButton);
     expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
   });
 
@@ -1720,7 +1725,9 @@ describe('SettingsPage', () => {
     expect(screen.getByText(/deepseek-v4-pro · deepseek/)).toBeInTheDocument();
 
     // The jump link routes to the Reliability view (the canonical fallback editor).
-    fireEvent.click(screen.getByRole('button', { name: /前往可靠性设置/ }));
+    const reliabilityButton = screen.getByRole('button', { name: /前往可靠性设置/ });
+    expect(reliabilityButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(reliabilityButton);
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('ai_models');
     expect(nextParams?.get('view')).toBe('reliability');
@@ -1796,6 +1803,177 @@ describe('SettingsPage', () => {
       'LITELLM_MODEL',
       'modelref:v1:work:openai%2Fgpt-4o',
     );
+  });
+
+  it('resolves one legacy route for display without dirtying or saving config on load', async () => {
+    const modelField = {
+      key: 'LITELLM_MODEL',
+      value: 'openai/gpt-4o',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'LITELLM_MODEL',
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: true,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        uiPlacement: 'task_routing' as const,
+      },
+    };
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: { ...configState.itemsByCategory, ai_model: [modelField] },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+    getLlmAvailableModels.mockResolvedValue({
+      models: [{
+        modelRef: 'modelref:v1:personal:openai%2Fgpt-4o',
+        route: 'openai/gpt-4o',
+        display: 'GPT-4o',
+        connection: 'personal',
+        connectionId: 'personal',
+        connectionName: 'Personal Connection',
+        provider: 'openai',
+        providerId: 'openai',
+        providerLabel: 'OpenAI',
+        available: true,
+      }],
+    });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute(
+        'data-value',
+        'modelref:v1:personal:openai%2Fgpt-4o',
+      );
+      expect(trigger).toHaveTextContent('GPT-4o');
+      expect(trigger).toHaveTextContent('Personal Connection');
+    });
+    expect(setDraftValue).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(updateSystemConfig).not.toHaveBeenCalled();
+  });
+
+  it('resolves a unique legacy fallback for display without mutating or saving config on load', async () => {
+    const fallbackModelRef = 'modelref:v1:personal:openai%2Fgpt-4o';
+    const fallbackField = {
+      key: 'LITELLM_FALLBACK_MODELS',
+      value: 'openai/gpt-4o',
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'LITELLM_FALLBACK_MODELS',
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+        uiPlacement: 'task_routing' as const,
+      },
+    };
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: { ...configState.itemsByCategory, ai_model: [fallbackField] },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'reliability' });
+    getLlmAvailableModels.mockResolvedValue({
+      models: [{
+        modelRef: fallbackModelRef,
+        route: 'openai/gpt-4o',
+        display: 'GPT-4o',
+        connection: 'personal',
+        connectionId: 'personal',
+        connectionName: 'Personal Connection',
+        provider: 'openai',
+        providerId: 'openai',
+        providerLabel: 'OpenAI',
+        available: true,
+      }],
+    });
+
+    render(<SettingsPage />);
+
+    expect((await screen.findAllByText('GPT-4o · OpenAI · Personal Connection')).length)
+      .toBeGreaterThan(0);
+    expect(screen.queryByText('当前配置不可用')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '选择备用模型' }));
+    expect(screen.getByRole('checkbox', {
+      name: 'GPT-4o · OpenAI · Personal Connection',
+    })).toBeChecked();
+    expect(setDraftValue).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(updateSystemConfig).not.toHaveBeenCalled();
+  });
+
+  it('decodes a stale ModelRef for display while preserving its stored value', async () => {
+    const staleModelRef = 'modelref:v1:retired_connection:openai%2Fretired-model';
+    const modelField = {
+      key: 'LITELLM_MODEL',
+      value: staleModelRef,
+      rawValueExists: true,
+      isMasked: false,
+      schema: {
+        key: 'LITELLM_MODEL',
+        category: 'ai_model' as const,
+        dataType: 'string' as const,
+        uiControl: 'text' as const,
+        isSensitive: false,
+        isRequired: true,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 1,
+        uiPlacement: 'task_routing' as const,
+      },
+    };
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      activeSubCategory: 'model',
+      itemsByCategory: { ...configState.itemsByCategory, ai_model: [modelField] },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'ai_models', view: 'task_routing' });
+    getLlmAvailableModels.mockResolvedValue({
+      models: [{
+        modelRef: 'modelref:v1:current:openai%2Fgpt-4o',
+        route: 'openai/gpt-4o',
+        display: 'GPT-4o',
+        connection: 'current',
+        connectionId: 'current',
+        connectionName: 'Current Connection',
+        provider: 'openai',
+        providerId: 'openai',
+        providerLabel: 'OpenAI',
+        available: true,
+      }],
+    });
+
+    render(<SettingsPage />);
+
+    const trigger = await screen.findByRole('button', { name: '主要模型' });
+    await waitFor(() => expect(trigger).toHaveTextContent(
+      'openai/retired-model · retired_connection',
+    ));
+    expect(trigger).toHaveAttribute('data-value', staleModelRef);
+    expect(screen.getByText(
+      '当前配置不可用：openai/retired-model · retired_connection',
+    )).toBeInTheDocument();
+    expect(setDraftValue).not.toHaveBeenCalled();
   });
 
   it('splits notification fields so Reports and Alerts render independent field sets', () => {
@@ -2527,6 +2705,9 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-11', 'w-11');
+    expect(screen.getByTestId('scheduler-enabled-checkbox').closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByTestId('scheduler-time-input-0')).toHaveClass('h-11');
 
     fireEvent.change(screen.getByTestId('scheduler-time-input-0'), {
       target: { value: '10:30' },

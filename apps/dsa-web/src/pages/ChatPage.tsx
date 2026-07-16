@@ -33,6 +33,7 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiTextKey } from '../i18n/uiText';
 import { formatUiDateTime } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
+import { getChatMessageDisplayContent } from '../utils/chatMessage';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTION_DEFINITIONS: Array<{ labelKey: UiTextKey; skill: string }> = [
@@ -752,7 +753,7 @@ const ChatPage: React.FC = () => {
     const heading = msg.role === 'user'
       ? `# ${t('chat.userMessageHeading')}`
       : `# ${t('chat.aiReplyHeading')}${skillLabel ? ` · ${skillLabel}` : ''}`;
-    const content = [heading, '', msg.content].join('\n');
+    const content = [heading, '', getChatMessageDisplayContent(msg, language)].join('\n');
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -762,7 +763,7 @@ const ChatPage: React.FC = () => {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
-  }, [t]);
+  }, [language, t]);
 
   const getCurrentStage = (steps: ProgressStep[]): string => {
     if (steps.length === 0) return t('chat.connecting');
@@ -1229,6 +1230,7 @@ const ChatPage: React.FC = () => {
             ) : (
               messages.map((msg) => {
                 const skillLabel = getMessageSkillLabel(msg);
+                const displayContent = getChatMessageDisplayContent(msg, language);
                 return (
                 <div
                   key={msg.id}
@@ -1278,7 +1280,7 @@ const ChatPage: React.FC = () => {
                         <div className="chat-message-actions">
                           <button
                             type="button"
-                            onClick={() => copyMessageToClipboard(msg.id, msg.content)}
+                            onClick={() => copyMessageToClipboard(msg.id, displayContent)}
                             className="chat-copy-btn"
                             aria-label={copiedMessages.has(msg.id) ? text.copied : text.copy}
                           >
@@ -1295,7 +1297,7 @@ const ChatPage: React.FC = () => {
                         </div>
                         <div className="chat-prose pr-20 sm:pr-24">
                           <Markdown remarkPlugins={[remarkGfm]}>
-                            {msg.content}
+                            {displayContent}
                           </Markdown>
                         </div>
                       </div>
@@ -1403,8 +1405,7 @@ const ChatPage: React.FC = () => {
                     disabled={!contextCompressionLoaded || contextCompressionSaving}
                     onClick={() => void updateContextCompressionEnabled(!contextCompressionEnabled)}
                     className={cn(
-                      'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
-                      contextCompressionEnabled ? 'border-transparent bg-primary' : 'border-border bg-muted',
+                      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
                       !contextCompressionLoaded || contextCompressionSaving
                         ? 'cursor-not-allowed opacity-60'
                         : 'cursor-pointer',
@@ -1412,10 +1413,19 @@ const ChatPage: React.FC = () => {
                   >
                     <span
                       className={cn(
-                        'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-                        contextCompressionEnabled ? 'translate-x-4' : 'translate-x-0.5',
+                        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
+                        contextCompressionEnabled ? 'border-transparent bg-primary' : 'border-border bg-muted',
                       )}
-                    />
+                      data-testid="context-compression-switch-visual"
+                      aria-hidden="true"
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
+                          contextCompressionEnabled ? 'translate-x-4' : 'translate-x-0.5',
+                        )}
+                      />
+                    </span>
                   </button>
                 </div>
               </div>
@@ -1431,7 +1441,7 @@ const ChatPage: React.FC = () => {
                 <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-10 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm text-foreground"
+                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-xl px-3 text-left text-sm text-foreground"
                     aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"
@@ -1458,7 +1468,7 @@ const ChatPage: React.FC = () => {
                       'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
                     )}
                   >
-                    <label className="flex items-center gap-1.5 text-sm cursor-pointer group">
+                    <label className="flex min-h-11 items-center gap-1.5 text-sm cursor-pointer group">
                       <input
                         type="checkbox"
                         name="general-analysis"
@@ -1480,7 +1490,7 @@ const ChatPage: React.FC = () => {
                       return (
                         <label
                           key={s.id}
-                          className={`flex items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`flex min-h-11 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                           onMouseEnter={() => setShowSkillDesc(s.id)}
                           onMouseLeave={() => setShowSkillDesc(null)}
                         >
@@ -1538,7 +1548,7 @@ const ChatPage: React.FC = () => {
                   placeholder={t('chat.inputPlaceholder')}
                   disabled={loading}
                   rows={1}
-                  className="flex-1 min-h-[40px] max-h-[200px] rounded-[10px] border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 min-h-11 max-h-[200px] rounded-[10px] border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60"
                   style={{ height: 'auto' }}
                   onInput={(e) => {
                     const t = e.target as HTMLTextAreaElement;

@@ -210,7 +210,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
   return (
     <Card variant="bordered" padding="none" className="home-panel-card text-left">
       <details data-testid="run-diagnostics" className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan/10 text-cyan">
               <Activity className="h-4 w-4" aria-hidden="true" />
@@ -326,7 +326,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
 
           {hasAdvancedPayload ? (
             <details className="home-subpanel group/advanced p-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
                 <span className="text-sm font-medium text-foreground">{text.advanced}</span>
                 <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open/advanced:rotate-180" aria-hidden="true" />
               </summary>

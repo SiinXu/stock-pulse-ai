@@ -236,10 +236,9 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
             <Button
               type="button"
               variant="ghost"
-              size="xsm"
+              size="icon"
               onClick={onClose}
               aria-label={t('runFlow.nodeDetails.close')}
-              className="h-7 w-7 px-0"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>

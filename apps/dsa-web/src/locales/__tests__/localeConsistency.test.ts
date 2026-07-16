@@ -124,4 +124,19 @@ describe('locale registries', () => {
     }
     expect(failures).toEqual([]);
   });
+
+  it('keeps the stale DSA product name out of registered user-facing copy', () => {
+    const failures: string[] = [];
+    for (const [registryName, registry] of Object.entries(registries)) {
+      for (const language of ['zh', 'en'] as const) {
+        for (const [key, value] of flatten(registry[language])) {
+          if (/\bDSA\b/.test(value)) {
+            failures.push(`${registryName}.${language}.${key}: ${JSON.stringify(value)}`);
+          }
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  });
 });

@@ -168,6 +168,18 @@ const marketReviewReportWithStructure: AnalysisReport = {
 };
 
 describe('MarketReviewReportView', () => {
+  it('uses the report locale for the fallback title', () => {
+    render(
+      <MarketReviewReportView
+        content=""
+        reportLanguage="ko"
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: '시장 리뷰' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Market Review' })).not.toBeInTheDocument();
+  });
+
   it('uses localized summary card labels and fallbacks for English reports', () => {
     render(
       <MarketReviewReportView
@@ -390,7 +402,12 @@ describe('MarketReviewReportView', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '查看历史记录 7 运行流' }));
+    const runFlowButton = screen.getByRole('button', { name: '查看历史记录 7 运行流' });
+    expect(runFlowButton).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '复制 Markdown 源码' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '复制纯文本' })).toHaveClass('h-11', 'w-11');
+
+    fireEvent.click(runFlowButton);
 
     expect(onOpenRunFlow).toHaveBeenCalledWith(7);
   });

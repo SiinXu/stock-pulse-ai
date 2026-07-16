@@ -2288,6 +2288,8 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         checks = {check["key"]: check for check in status["checks"]}
         self.assertEqual(checks["llm_primary"]["status"], "needs_action")
+        self.assertIn("StockPulse 后端进程", checks["llm_primary"]["message"])
+        self.assertNotIn("DSA 后端进程", checks["llm_primary"]["message"])
         self.assertIn("后端进程当前 PATH", checks["llm_primary"]["message"])
         self.assertIn("Codex CLI 交互窗口", checks["llm_primary"]["next_step"])
         self.assertNotIn("请先安装并登录", checks["llm_primary"]["next_step"])

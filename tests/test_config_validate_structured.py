@@ -241,6 +241,8 @@ class TestValidateStructuredLLM:
 
             error = next(i for i in issues if i.field == "OPENCODE_CLI_MODEL")
             assert error.severity == "error"
+            assert "StockPulse" in error.message
+            assert " DSA " not in error.message
 
     def test_unknown_generation_fallback_backend_is_structured_config_error(self):
         cfg = _make_config(generation_fallback_backend="claude_code")

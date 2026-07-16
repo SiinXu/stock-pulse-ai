@@ -18,6 +18,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
 from data_provider.base import canonical_stock_code
+from src.agent.public_contract import (
+    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+    AGENT_CHAT_FAILURE_MESSAGE,
+    sanitize_agent_diagnostic,
+)
 from src.config import get_config
 from src.storage import get_db
 
@@ -128,8 +133,12 @@ class AskCommand(BotCommand):
 
             sm = get_skill_manager()
             return list(sm.list_skills())
-        except Exception as e:
-            logger.warning("_load_skills failed: Failed to load skills: %s", e, exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "Failed to load skills: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             return []
 
     @classmethod
@@ -138,8 +147,12 @@ class AskCommand(BotCommand):
             from src.agent.skills.defaults import get_primary_default_skill_id
 
             return get_primary_default_skill_id(cls._load_skills())
-        except Exception as e:
-            logger.warning("_get_default_skill_id failed: Failed to resolve default skill id: %s", e, exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "Failed to resolve default skill id: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             return ""
 
     @classmethod
@@ -205,7 +218,15 @@ class AskCommand(BotCommand):
 
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
         """Execute the ask command via Agent pipeline. Supports multi-stock."""
-        config = get_config()
+        try:
+            config = get_config()
+        except Exception as exc:
+            logger.error(
+                "Ask command configuration failed: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
 
         if not config.agent_mode:
             return BotResponse.text_response(
@@ -249,12 +270,21 @@ class AskCommand(BotCommand):
                 skill_name = self._resolve_skill_name(skill_id)
                 header = f"📊 {code} | 技能: {skill_name}\n{'─' * 30}\n"
                 return BotResponse.text_response(header + result.content)
-            return BotResponse.text_response(f"⚠️ 分析失败: {result.error}")
+            logger.error(
+                "Ask command Agent result failed: stock_code=%s diagnostic=%s",
+                code,
+                sanitize_agent_diagnostic(result.error),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
 
         except Exception as exc:
-            logger.error("Ask command failed: %s", exc)
-            logger.exception("Ask error details:")
-            return BotResponse.text_response(f"⚠️ 问股执行出错: {str(exc)}")
+            logger.error(
+                "Ask command failed: stock_code=%s exception_type=%s diagnostic=%s",
+                code,
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
 
     def _analyze_multi(
         self,
@@ -277,14 +307,17 @@ class AskCommand(BotCommand):
         user_id = message.user_id
 
         def _run_one(stock_code: str) -> Tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+            session_id = f"{platform}_{user_id}:ask_{stock_code}_{uuid.uuid4()}"
+            conversation_manager = None
+            history_started = False
             try:
                 from src.agent.conversation import conversation_manager
                 from src.agent.factory import build_agent_executor
 
-                executor = build_agent_executor(config, skills=[skill_id] if skill_id else None)
                 user_msg = self._build_user_message(stock_code, skill_id, skill_text)
-                session_id = f"{platform}_{user_id}:ask_{stock_code}_{uuid.uuid4()}"
                 conversation_manager.add_message(session_id, "user", user_msg)
+                history_started = True
+                executor = build_agent_executor(config, skills=[skill_id] if skill_id else None)
 
                 result = executor.run(
                     task=user_msg,
@@ -309,14 +342,52 @@ class AskCommand(BotCommand):
                         None,
                     )
 
-                error_note = f"[分析失败] {result.error or '未知错误'}"
-                conversation_manager.add_message(session_id, "assistant", error_note)
-                return (stock_code, None, result.error or "未知错误")
+                logger.error(
+                    "Multi-stock Ask Agent result failed: stock_code=%s diagnostic=%s",
+                    stock_code,
+                    sanitize_agent_diagnostic(result.error),
+                )
+                conversation_manager.add_message(
+                    session_id,
+                    "assistant",
+                    AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+                )
+                return (stock_code, None, AGENT_CHAT_FAILURE_MESSAGE)
             except Exception as exc:
-                return (stock_code, None, str(exc))
+                logger.error(
+                    "Multi-stock Ask execution failed: stock_code=%s "
+                    "exception_type=%s diagnostic=%s",
+                    stock_code,
+                    type(exc).__name__,
+                    sanitize_agent_diagnostic(exc),
+                )
+                if conversation_manager is not None and history_started:
+                    try:
+                        conversation_manager.add_message(
+                            session_id,
+                            "assistant",
+                            AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+                        )
+                    except Exception as history_exc:
+                        logger.error(
+                            "Failed to persist public Agent failure: stock_code=%s "
+                            "exception_type=%s diagnostic=%s",
+                            stock_code,
+                            type(history_exc).__name__,
+                            sanitize_agent_diagnostic(history_exc),
+                        )
+                return (stock_code, None, AGENT_CHAT_FAILURE_MESSAGE)
 
         # Warm up DB connections before parallel history writes.
-        get_db()
+        try:
+            get_db()
+        except Exception as exc:
+            logger.error(
+                "Multi-stock Ask storage prewarm failed: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
+            return BotResponse.text_response(f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
         pool = ThreadPoolExecutor(max_workers=min(len(codes), 5))
         future_map = {pool.submit(_run_one, code): code for code in codes}
         try:
@@ -329,7 +400,14 @@ class AskCommand(BotCommand):
                         errors[code] = error or "未知错误"
                 except Exception as exc:
                     code = future_map[future]
-                    errors[code] = f"执行异常: {exc}"
+                    logger.error(
+                        "Multi-stock Ask future failed: stock_code=%s "
+                        "exception_type=%s diagnostic=%s",
+                        code,
+                        type(exc).__name__,
+                        sanitize_agent_diagnostic(exc),
+                    )
+                    errors[code] = AGENT_CHAT_FAILURE_MESSAGE
         except FutureTimeoutError:
             logger.warning("[AskCommand] Multi-stock analysis hit overall timeout (%.1fs)", overall_timeout_s)
             for future, code in future_map.items():
@@ -343,7 +421,14 @@ class AskCommand(BotCommand):
                         else:
                             errors[code] = error or "未知错误"
                     except Exception as exc:
-                        errors[code] = f"执行异常: {exc}"
+                        logger.error(
+                            "Multi-stock Ask completed future failed: stock_code=%s "
+                            "exception_type=%s diagnostic=%s",
+                            code,
+                            type(exc).__name__,
+                            sanitize_agent_diagnostic(exc),
+                        )
+                        errors[code] = AGENT_CHAT_FAILURE_MESSAGE
                 else:
                     errors[code] = "分析超时（未在 150 秒内完成）"
         finally:
@@ -656,7 +741,11 @@ class AskCommand(BotCommand):
             try:
                 return _render_overlay()
             except Exception as exc:
-                logger.warning("[AskCommand] Portfolio overlay failed: %s", exc)
+                logger.warning(
+                    "[AskCommand] Portfolio overlay failed: exception_type=%s diagnostic=%s",
+                    type(exc).__name__,
+                    sanitize_agent_diagnostic(exc),
+                )
                 return ""
 
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
@@ -669,7 +758,11 @@ class AskCommand(BotCommand):
             logger.warning("[AskCommand] Portfolio overlay timed out after %.2fs", timeout_s)
             return ""
         except Exception as exc:
-            logger.warning("[AskCommand] Portfolio overlay failed: %s", exc)
+            logger.warning(
+                "[AskCommand] Portfolio overlay failed: exception_type=%s diagnostic=%s",
+                type(exc).__name__,
+                sanitize_agent_diagnostic(exc),
+            )
             return ""
         finally:
             pool.shutdown(wait=False, cancel_futures=True)

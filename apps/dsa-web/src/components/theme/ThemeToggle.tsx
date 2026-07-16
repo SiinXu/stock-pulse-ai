@@ -90,7 +90,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
               ? 'flex h-[var(--nav-item-height)] w-full items-center justify-center gap-2.5 rounded-2xl border border-transparent px-2 text-sm leading-none text-secondary-text transition-all hover:bg-[var(--nav-hover-bg)] hover:text-foreground data-[state=open]:border-[var(--nav-active-border)] data-[state=open]:bg-[var(--nav-active-bg)] data-[state=open]:text-[hsl(var(--primary))]'
               : isNavVariant
                 ? 'group relative flex h-12 w-full select-none items-center gap-3 rounded-[1.35rem] border border-transparent px-4 text-sm text-secondary-text transition-all duration-300 hover:bg-hover hover:text-foreground data-[state=open]:border-subtle data-[state=open]:bg-subtle data-[state=open]:text-foreground'
-                : 'inline-flex h-10 items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
+                : 'inline-flex h-11 min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
           triggerClassName && open ? triggerActiveClassName : '',
           isNavVariant && collapsed ? 'justify-center px-2' : ''
         )}
@@ -132,7 +132,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
                   setOpen(false);
                 }}
                 className={cn(
-                  'flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors',
+                  'flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors',
                   isActive
                     ? 'bg-cyan/10 text-foreground'
                     : 'text-secondary-text hover:bg-hover hover:text-foreground'

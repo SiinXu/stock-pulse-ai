@@ -2721,8 +2721,11 @@ class TestAgentConstructionChain(unittest.TestCase):
             result = adapter.call_completion(messages=[{"role": "user", "content": "hi"}], tools=[])
 
         self.assertEqual(result.provider, "error")
-        self.assertIn("All LLM models failed (rate-limit encountered during fallback).", result.content)
-        self.assertIn("window exceeded", result.content)
+        self.assertEqual(
+            result.content,
+            "All LLM models failed (rate-limit encountered during fallback).",
+        )
+        self.assertNotIn("window exceeded", result.content)
         mock_sleep.assert_not_called()
 
     @patch("src.agent.llm_adapter.Router")

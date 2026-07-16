@@ -472,6 +472,10 @@ describe('SettingsField', () => {
     const group = screen.getByTestId('multi-enum-MARKET_REVIEW_REGION');
     const checkboxes = within(group).getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
+    for (const checkbox of checkboxes) {
+      expect(checkbox.closest('label')).toHaveClass('min-h-11');
+      expect(checkbox).toHaveClass('h-4', 'w-4');
+    }
     expect(checkboxes[0]).toBeChecked(); // cn
     expect(checkboxes[3]).toBeChecked(); // jp
     expect(checkboxes[1]).not.toBeChecked(); // hk
@@ -558,6 +562,7 @@ describe('SettingsField', () => {
     );
 
     const integerInput = screen.getByLabelText('TickFlow 日 K 优先级');
+    expect(integerInput).toHaveClass('h-11');
     expect(integerInput).toHaveAttribute('min', '0');
     expect(integerInput).toHaveAttribute('max', '99');
     expect(integerInput).toHaveAttribute('step', '1');
@@ -647,7 +652,10 @@ describe('SettingsField', () => {
 
     // Unset fields show the effective backend default instead of a blank control.
     expect(screen.getByRole('spinbutton')).toHaveValue(300);
-    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).toHaveClass('h-11', 'w-11');
+    expect(screen.getByTestId('setting-ENABLE_MARKET_REVIEW-switch-visual')).toHaveClass('h-5', 'w-8');
   });
 
   it('never backfills defaults into password controls', () => {
@@ -856,18 +864,22 @@ describe('SettingsField', () => {
 
     // The field itself now renders the doc link + examples inline, so scope
     // the help-dialog assertions to the dialog to avoid ambiguity.
-    fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
+    const helpTrigger = screen.getByRole('button', { name: '查看 自选股列表 配置说明' });
+    expect(helpTrigger).toHaveClass('h-11', 'w-11');
+    fireEvent.click(helpTrigger);
 
     const helpDialog = screen.getByRole('dialog', { name: '自选股列表' });
     expect(helpDialog).toBeInTheDocument();
     expect(within(helpDialog).getByText('STOCK_LIST=600519,300750,002594')).toBeInTheDocument();
     const docLink = within(helpDialog).getByRole('link', { name: /完整指南/ });
     expect(docLink).toHaveAttribute('href', 'https://example.com/full-guide');
+    expect(docLink).toHaveClass('min-h-11', 'min-w-11');
 
     const closeButtons = screen.getAllByRole('button', { name: '关闭配置说明' });
     expect(closeButtons[0].tabIndex).toBe(-1);
     const closeButton = closeButtons.find((button) => button.tabIndex !== -1);
     expect(closeButton).toBeDefined();
+    expect(closeButton).toHaveClass('h-11', 'w-11');
 
     closeButton?.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });

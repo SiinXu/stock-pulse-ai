@@ -47,6 +47,8 @@ export interface ChatSessionMessage {
   role: 'user' | 'assistant';
   content: string;
   created_at: string | null;
+  error?: string;
+  params?: Record<string, unknown>;
 }
 
 export const agentApi = {
