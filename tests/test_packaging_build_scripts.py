@@ -91,6 +91,28 @@ def test_docker_smoke_imports_and_validates_migration_registry() -> None:
     assert "assert TARGET_VERSION == '202607160001_migration_runner_registry'" not in workflow
 
 
+def test_docker_smoke_migrates_a_legacy_data_volume_and_restarts() -> None:
+    workflow = _read_text(REPO_ROOT / ".github" / "workflows" / "ci.yml")
+    step_start = workflow.index("- name: 🗃️ Docker legacy volume migration smoke")
+    smoke = workflow[step_start : workflow.index("\n  web-gate:", step_start)]
+
+    assert "tests/fixtures/schema_migrations/v3_20_0.sql" in smoke
+    assert "type=volume,source=${volume_name},target=/app/data" in smoke
+    assert "database_path = Path('/app/data/stock_analysis.db')" in smoke
+    assert "--user" not in smoke
+    assert "assert os.getuid() == 1000" in smoke
+    assert "database = DatabaseManager()" in smoke
+    assert "SELECT version, description, checksum, applied_at" in smoke
+    assert "[row[:3] for row in migration_rows] == expected_migrations" in smoke
+    assert "fixture-query-001" in smoke
+    assert "fixture-owner" in smoke
+    assert "fixture-trade-001" in smoke
+    assert "MigrationRunner().verify(database._engine)" in smoke
+    assert "migration-smoke-applied-at.txt" in smoke
+    assert "run_migration_smoke initial" in smoke
+    assert "run_migration_smoke restart" in smoke
+
+
 def test_backend_gate_uses_an_isolated_temporary_database() -> None:
     script = _read_text(REPO_ROOT / "scripts" / "ci_gate.sh")
 

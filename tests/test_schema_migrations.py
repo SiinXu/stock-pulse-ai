@@ -95,6 +95,27 @@ def _custom_migration(
     )
 
 
+def _source_bound_migration_from_source(tmp_path: Path, source: str) -> Migration:
+    module_name = "migration_source_guard_probe"
+    source_path = tmp_path / f"{module_name}.py"
+    source_path.write_text(source, encoding="utf-8")
+    namespace = {"__name__": module_name, "Connection": Connection}
+    exec(compile(source, str(source_path), "exec"), namespace)
+    return Migration.from_source_file(
+        id="209901010001_source_guard_probe",
+        description="Source guard probe",
+        upgrade=namespace["upgrade"],
+        source_file=source_path,
+    )
+
+
+def _source_bound_migration_from_body(tmp_path: Path, body: str) -> Migration:
+    source = "def upgrade(connection):\n" + "\n".join(
+        f"    {line}" for line in body.splitlines()
+    ) + "\n"
+    return _source_bound_migration_from_source(tmp_path, source)
+
+
 def _runner_with(*migrations: Migration) -> MigrationRunner:
     return MigrationRunner((*get_migrations(), *migrations))
 
@@ -467,6 +488,123 @@ def test_source_bound_migration_rejects_a_different_module_file() -> None:
             upgrade=_no_op_upgrade,
             source_file=REGISTRY_METADATA_MIGRATION.upgrade.__code__.co_filename,
         )
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        "connection.begin()",
+        "connection.close()",
+        "connection.commit()",
+        "connection.rollback()",
+    ),
+)
+def test_source_bound_migration_rejects_transaction_control(
+    tmp_path: Path,
+    body: str,
+) -> None:
+    with pytest.raises(ValueError, match="forbidden transaction control"):
+        _source_bound_migration_from_body(tmp_path, body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    (
+        "raw_connection = connection.connection",
+        "connection.connection.driver_connection.set_authorizer(None)",
+    ),
+)
+def test_source_bound_migration_rejects_raw_dbapi_access(
+    tmp_path: Path,
+    body: str,
+) -> None:
+    with pytest.raises(ValueError, match="forbidden raw DBAPI access"):
+        _source_bound_migration_from_body(tmp_path, body)
+
+
+def test_source_bound_migration_rejects_nested_closure_raw_dbapi_access(
+    tmp_path: Path,
+) -> None:
+    source = "\n".join(
+        (
+            "def upgrade(connection):",
+            "    def helper():",
+            "        dbapi = connection.connection",
+            "        dbapi.set_authorizer(None)",
+            "        dbapi.commit()",
+            "    helper()",
+            "",
+        )
+    )
+
+    with pytest.raises(ValueError, match="forbidden raw DBAPI access"):
+        _source_bound_migration_from_source(tmp_path, source)
+
+
+def test_source_guard_ignores_transaction_control_text(tmp_path: Path) -> None:
+    migration = _source_bound_migration_from_body(
+        tmp_path,
+        '# connection.commit() is forbidden\nreturn "connection.connection"',
+    )
+
+    assert migration.source_bound is True
+
+
+def test_source_guard_allows_unrelated_domain_attributes(tmp_path: Path) -> None:
+    migration = _source_bound_migration_from_body(
+        tmp_path,
+        "\n".join(
+            (
+                'row = type("Row", (), {"close": 10.5, "connection": "feed"})()',
+                'result = type("Result", (), {"close": lambda self: None})()',
+                "result.close()",
+                'connection.exec_driver_sql("SELECT 1").close()',
+                "return row.close, row.connection",
+            )
+        ),
+    )
+
+    assert migration.source_bound is True
+
+
+def test_source_guard_keeps_connection_names_scoped_to_their_function(
+    tmp_path: Path,
+) -> None:
+    migration = _source_bound_migration_from_source(
+        tmp_path,
+        "\n".join(
+            (
+                "def typed_helper(record: Connection):",
+                "    return record",
+                "",
+                "def domain_helper(record):",
+                "    return record.close",
+                "",
+                "def upgrade(connection):",
+                "    return domain_helper(type('Row', (), {'close': 10.5})())",
+                "",
+            )
+        ),
+    )
+
+    assert migration.source_bound is True
+
+
+def test_source_guard_respects_nested_parameter_shadowing(tmp_path: Path) -> None:
+    migration = _source_bound_migration_from_source(
+        tmp_path,
+        "\n".join(
+            (
+                "def upgrade(connection):",
+                "    def domain_helper(connection):",
+                "        return connection.close",
+                "    return domain_helper(type('Row', (), {'close': 10.5})())",
+                "",
+            )
+        ),
+    )
+
+    assert migration.source_bound is True
 
 
 def test_fresh_memory_database_has_core_tables_and_two_applied_migrations() -> None:
@@ -1359,6 +1497,36 @@ def test_upgrade_cannot_control_runner_transaction(
     assert result.failed_migration_id == migration.id
     assert migration.id not in _applied_ids(database._engine)
     assert _table_exists(database._engine, "migration_transaction_control_probe") is False
+
+
+def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "forbidden-authorizer-clear-commit.sqlite"
+    database = DatabaseManager(db_url=_database_url(db_path))
+
+    def bypass_transaction_guard(connection: Connection) -> None:
+        connection.exec_driver_sql(
+            "CREATE TABLE migration_authorizer_bypass_probe "
+            "(id INTEGER PRIMARY KEY)"
+        )
+        dbapi_connection = connection.connection.driver_connection
+        dbapi_connection.set_authorizer(None)
+        dbapi_connection.commit()
+
+    migration = _custom_migration(
+        1,
+        "forbidden_authorizer_clear_commit",
+        upgrade=bypass_transaction_guard,
+    )
+    result = _runner_with(migration).apply_pending(database._engine)
+
+    assert result.success is False
+    assert result.failure_code == "migration_transaction_control_forbidden"
+    assert result.failed_migration_id == migration.id
+    assert migration.id not in _applied_ids(database._engine)
+    # Detection happens after the prohibited DBAPI commit, which cannot be undone.
+    assert _table_exists(database._engine, "migration_authorizer_bypass_probe") is True
 
 
 def test_failed_migration_can_be_fixed_and_retried_forward(tmp_path: Path) -> None:

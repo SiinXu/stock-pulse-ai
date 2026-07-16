@@ -21,6 +21,8 @@ Each migration has these stable properties:
 
 Production migrations use `Migration.from_source_file()` so the checksum covers the complete module containing the real `upgrade`, helper functions, and constants. Normalization changes only CRLF/CR physical line endings to LF; every other character, including semantic whitespace inside strings and the final file newline, remains covered. Absolute paths never enter the hash. A released migration must never be edited, reordered, or deleted. Add a migration with a higher ID whenever schema or data behavior must change. Editing an applied migration causes checksum verification to fail and the application to fail closed.
 
+Production migrations are reviewed, trusted code shipped with the repository. They are not user scripts, plugins, or remote payloads. The runner statically checks the Python AST of source-bound production migrations and rejects direct access to the underlying DBAPI connection and known transaction-control calls. Runtime guards also block public SQLAlchemy transaction APIs and SQLite transaction or savepoint opcodes. These checks are defense in depth against mistakes and regressions, not a Python security sandbox, and they cannot make untrusted migration code safe to execute. Every new migration still requires source review and complete tests; never load upgrade code dynamically from configuration, a database, or the network.
+
 ## Applied Registry
 
 `schema_migrations` preserves the historical `version`, `description`, and `applied_at` semantics and persists checksums through an additive change.
@@ -49,7 +51,7 @@ create engine / install SQLite PRAGMAs / create Session factory
   -> mark DatabaseManager initialized
 ```
 
-Migrations finish synchronously inside `DatabaseManager` initialization and never continue as a background task. SQLite also serializes the `create_all + _ensure_* + baseline` compatibility phase under one database-level write lock and transaction, preventing two fresh processes from racing before they enter the runner. The first backend path that needs `DatabaseManager` returns only after migration finishes. If any step fails, `DatabaseManager` remains uninitialized, the current transaction rolls back, and no applied row is recorded.
+Migrations finish synchronously inside `DatabaseManager` initialization and never continue as a background task. SQLite also serializes the `create_all + _ensure_* + baseline` compatibility phase under one database-level write lock and transaction, preventing two fresh processes from racing before they enter the runner. The first backend path that needs `DatabaseManager` returns only after migration finishes. On a normal migration failure, `DatabaseManager` remains uninitialized, the runner-owned current transaction rolls back, and no applied row is recorded. If trusted migration code bypasses the source guard and commits the underlying DBAPI transaction directly, the runner still refuses the applied row but cannot undo DDL or DML committed outside its control; that contract violation requires backup restoration or an explicit forward repair.
 
 The general `/api/health` endpoint is not currently a database readiness probe, so a health response does not promise eager database initialization. This lazy boundary does not create a background migration: the first call that actually enters `DatabaseManager` still waits for the runner to succeed or fail completely.
 
@@ -57,7 +59,7 @@ The general `/api/health` endpoint is not currently a database readiness probe, 
 
 - SQLite initialization first uses `BEGIN IMMEDIATE` to serialize `create_all + _ensure_* + baseline`. Each formal migration then obtains its own database-level write lock and reuses the application's existing busy timeout contract.
 - Each migration commits independently. Its DDL or DML and applied row share one transaction.
-- The runner exclusively owns transaction control. An `upgrade` must not call `begin`, `commit`, `rollback`, or `close`, or access the underlying DBAPI transaction. Public SQLAlchemy controls are blocked, and a SQLite authorizer rejects transaction or savepoint opcodes issued through explicit SQL or the underlying DBAPI before the migration is rolled back.
+- The runner exclusively owns transaction control. An `upgrade` must not call `begin`, `commit`, `rollback`, or `close`, or access the underlying DBAPI transaction. Public SQLAlchemy controls are blocked, and a SQLite authorizer rejects transaction or savepoint opcodes issued through explicit SQL or the underlying DBAPI. After `upgrade` returns, the runner reinstalls the authorizer and confirms that its DBAPI transaction remains active before writing the applied row. If a migration clears the authorizer and commits or rolls back directly, the transaction-ownership check refuses to record success and reports a stable migration failure. Because detection follows the prohibited call, it guarantees only that no applied row is written; it cannot undo database state already committed around the guard.
 - Later migrations do not run after the first failure.
 - When two processes start together, the second process waits for the write lock and then reloads the applied registry. The same upgrade does not run twice.
 - A busy timeout returns a stable migration error. An in-process `threading.Lock` is not used as a substitute for cross-process locking.
@@ -126,6 +128,8 @@ The normal recovery path is to correct the problem and retry forward. Do not del
 4. Restart with a fixed application release containing the same published registry. A failed migration has no applied row, so it runs again.
 5. Run `status` and `verify`; confirm that current equals target and that there are no mismatches or unknown IDs.
 
+Step 4 applies to normal failures while the runner still owns the transaction. A transaction-ownership violation may have committed partial state through the underlying DBAPI. Do not blindly retry the same DDL and do not insert an applied row manually. Compare the database with its pre-upgrade backup, then either restore that backup or publish a forward migration that explicitly proves and repairs the state.
+
 For a checksum mismatch, do not edit the migration or manually alter registry rows. Restore a matching application and database pair, or upgrade with a release containing a new explicit migration. For an unknown higher migration ID, use an application version that recognizes it instead of forcing the older application to start.
 
 ## Backup, Rollback, and Disaster Recovery
@@ -135,7 +139,7 @@ The Migration Runner is not a backup system and does not create deployment backu
 - Stop all writers before an upgrade. Prefer the SQLite Online Backup API or a tested volume snapshot.
 - Make file-level copies only after the application fully exits, and keep the main database, `-wal`, and `-shm` files consistent. Never copy only the live `.db` file.
 - Back up or snapshot the Docker `./data/` volume before upgrading. Fully exit Desktop first; back up the `data/` folder beside the executable on packaged Windows and the `data/` folder under Electron `userData` on packaged macOS.
-- Restore a backup for database corruption or another disaster. A normal migration failure uses transaction rollback and a forward retry.
+- Restore a backup for database corruption, a transaction-ownership violation, or another disaster. A normal migration failure while the runner still owns the transaction uses transaction rollback and a forward retry.
 - After a code rollback, the older application can fail closed because the database contains an unknown higher migration. Restore a matching code and backup pair; never delete an applied row to simulate a downgrade.
 
 After restoring, run SQLite integrity checks and migration `verify` in an isolated environment before reopening the service.
@@ -152,15 +156,15 @@ Fresh Desktop databases and databases retained from an older release follow the 
 
 The Docker image uses the same importable migration package as source runs, CLI, and Desktop. The first `DatabaseManager` initialization in a new image upgrades an old volume synchronously before that call returns. Database write locking serializes migrations when multiple containers point to one SQLite file, but an upgrade should still run with only one writer whenever possible.
 
-The CI Docker smoke imports `src.migrations.registry`, calls `get_migrations()`, and asserts that the final entry equals `TARGET_VERSION`. Resource discovery does not depend on an absolute development-machine path.
+In addition to importing `src.migrations.registry`, calling `get_migrations()`, and asserting that the final entry equals `TARGET_VERSION`, the CI Docker smoke mounts a supported legacy SQLite fixture as the image's `/app/data` volume. It uses the image's default entrypoint to initialize the real `DatabaseManager` as the dropped-privilege `dsa` user (UID 1000), verifies business canaries, applied checksums, and the target version, and then starts a second container against the same volume to prove idempotency. This covers container permissions, the volume path, startup migration, migration resource discovery, and restart recovery without depending on an absolute development-machine path or touching a default or real user database.
 
 ## Adding a Migration
 
 1. Add a stable ID higher than the current target under `src/migrations/versions/`.
 2. Use a stable English description, and do not let business configuration change the schema shape.
-3. Keep `upgrade` limited to this migration's DDL or DML. Do not begin, commit, roll back, close, or access the underlying DBAPI transaction.
+3. Keep `upgrade` limited to this migration's DDL or DML. Do not begin, commit, roll back, close, or access the underlying DBAPI transaction, and make sure the source-bound guard passes. Do not treat the guard as a sandbox for untrusted migrations.
 4. Register it explicitly in strictly increasing order. Do not use directory auto-discovery.
 5. Add fresh, historical, repeat, failure and recovery, checksum, and concurrency tests.
-6. Pass the Desktop package probe, Docker import smoke, and complete backend gate before release.
+6. Pass the Desktop package probe, Docker legacy-volume startup and restart smoke, and complete backend gate before release.
 
 Never edit the original migration after release. Every correction moves forward under a new ID.

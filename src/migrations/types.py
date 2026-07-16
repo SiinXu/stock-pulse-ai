@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 import hashlib
 import json
@@ -14,6 +15,36 @@ from sqlalchemy.engine import Connection
 
 MigrationUpgrade = Callable[[Connection], None]
 _MIGRATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_RAW_DBAPI_SOURCE_ATTRIBUTES = frozenset(
+    {
+        "dbapi_connection",
+        "driver_connection",
+        "raw_connection",
+    }
+)
+_RAW_DBAPI_SOURCE_NAMES = frozenset(
+    {
+        "dbapi_connection",
+        "driver_connection",
+        "raw_connection",
+    }
+)
+_TRANSACTION_CONTROL_SOURCE_ATTRIBUTES = frozenset(
+    {
+        "begin",
+        "begin_nested",
+        "begin_twophase",
+        "close",
+        "commit",
+        "detach",
+        "execution_options",
+        "get_nested_transaction",
+        "get_transaction",
+        "invalidate",
+        "rollback",
+        "set_authorizer",
+    }
+)
 
 
 def normalize_checksum_source(source: str) -> str:
@@ -62,6 +93,130 @@ def read_checksum_source(source_file: Union[str, Path]) -> str:
         raise ValueError("Migration source file cannot be read") from exc
 
 
+def _function_connection_parameter_names(
+    node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+) -> frozenset[str]:
+    names = set()
+    positional = (*node.args.posonlyargs, *node.args.args)
+    if node.name == "upgrade" and positional:
+        names.add(positional[0].arg)
+    for argument in (*positional, *node.args.kwonlyargs):
+        annotation = argument.annotation
+        if annotation is not None and any(
+            (
+                isinstance(part, ast.Name) and part.id == "Connection"
+            ) or (
+                isinstance(part, ast.Attribute) and part.attr == "Connection"
+            )
+            for part in ast.walk(annotation)
+        ):
+            names.add(argument.arg)
+    return frozenset(names)
+
+
+def _attribute_root_name(node: ast.AST) -> Optional[str]:
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _receiver_attribute_names(node: ast.AST) -> frozenset[str]:
+    names = set()
+    while isinstance(node, ast.Attribute):
+        names.add(node.attr)
+        node = node.value
+    return frozenset(names)
+
+
+class _SourceBoundMigrationGuard(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self._connection_scopes = [frozenset()]
+
+    @property
+    def _connection_names(self) -> frozenset[str]:
+        return self._connection_scopes[-1]
+
+    def _visit_function(
+        self,
+        node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+    ) -> None:
+        parameters = (
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        )
+        parameter_names = {argument.arg for argument in parameters}
+        if node.args.vararg is not None:
+            parameter_names.add(node.args.vararg.arg)
+        if node.args.kwarg is not None:
+            parameter_names.add(node.args.kwarg.arg)
+        inherited_names = self._connection_names - parameter_names
+        self._connection_scopes.append(
+            inherited_names | _function_connection_parameter_names(node)
+        )
+        try:
+            self.generic_visit(node)
+        finally:
+            self._connection_scopes.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        self._visit_function(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        self._visit_function(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        root_name = _attribute_root_name(node.value)
+        receiver_attributes = _receiver_attribute_names(node.value)
+        chain_attributes = receiver_attributes | {node.attr}
+        raw_attribute = next(
+            (
+                name
+                for name in chain_attributes
+                if name in _RAW_DBAPI_SOURCE_ATTRIBUTES
+            ),
+            None,
+        )
+        if raw_attribute is None and (
+            "connection" in chain_attributes
+            and root_name in self._connection_names
+        ):
+            raw_attribute = "connection"
+        if raw_attribute is not None:
+            raise ValueError(
+                "Migration source contains forbidden raw DBAPI access "
+                f"({raw_attribute}) at line {node.lineno}"
+            )
+
+        if (
+            node.attr in _TRANSACTION_CONTROL_SOURCE_ATTRIBUTES
+            and (
+                root_name
+                in self._connection_names | _RAW_DBAPI_SOURCE_NAMES
+                or receiver_attributes & _RAW_DBAPI_SOURCE_ATTRIBUTES
+            )
+        ):
+            raise ValueError(
+                "Migration source contains forbidden transaction control "
+                f"({node.attr}) at line {node.lineno}"
+            )
+        self.generic_visit(node)
+
+
+def _validate_source_bound_migration_source(source: str) -> None:
+    """Reject direct transaction escape hatches in trusted migration modules.
+
+    This source guard is defense in depth for repository-owned code. It does not
+    attempt to make an arbitrary Python migration a security sandbox.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as exc:
+        raise ValueError("Migration source cannot be parsed") from exc
+
+    _SourceBoundMigrationGuard().visit(tree)
+
+
 @dataclass(frozen=True)
 class Migration:
     """One immutable, explicitly registered migration."""
@@ -93,11 +248,13 @@ class Migration:
         if tuple(source_module_parts) != module_parts:
             raise ValueError("Migration source file does not match upgrade module")
 
+        checksum_source = read_checksum_source(source_path)
+        _validate_source_bound_migration_source(checksum_source)
         migration = cls(
             id=id,
             description=description,
             upgrade=upgrade,
-            checksum_source=read_checksum_source(source_path),
+            checksum_source=checksum_source,
             is_legacy_baseline=is_legacy_baseline,
             bootstraps_registry=bootstraps_registry,
         )

@@ -126,6 +126,96 @@ jobs:
           from api.app import app; print('✅ api')
           print('✅ All Docker imports OK')
           "
+      - name: 🗃️ Docker legacy volume migration smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          volume_name="stockpulse-migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          fixture_path="${GITHUB_WORKSPACE}/tests/fixtures/schema_migrations/v3_20_0.sql"
+          docker volume create "${volume_name}" >/dev/null
+          trap 'docker volume rm -f "${volume_name}" >/dev/null' EXIT
+
+          docker run --rm \
+            --mount "type=volume,source=${volume_name},target=/app/data" \
+            --mount "type=bind,source=${fixture_path},target=/tmp/v3_20_0.sql,readonly" \
+            stock-analysis:test python -c "
+          from pathlib import Path
+          import os
+          import sqlite3
+
+          database_path = Path('/app/data/stock_analysis.db')
+          assert os.getuid() == 1000
+          assert not database_path.exists()
+          with sqlite3.connect(database_path) as connection:
+              connection.executescript(
+                  Path('/tmp/v3_20_0.sql').read_text(encoding='utf-8')
+              )
+          print('✅ Legacy v3.20.0 fixture loaded into /app/data')
+          "
+
+          run_migration_smoke() {
+            local phase="$1"
+            docker run --rm \
+              --env "MIGRATION_SMOKE_PHASE=${phase}" \
+              --mount "type=volume,source=${volume_name},target=/app/data" \
+              stock-analysis:test python -c "
+          from pathlib import Path
+          import os
+
+          from src.migrations.registry import TARGET_VERSION, get_migrations
+          from src.migrations.runner import MigrationRunner
+          from src.storage import DatabaseManager
+
+          assert os.getuid() == 1000
+          database = DatabaseManager()
+          expected_migrations = [
+              (migration.id, migration.description, migration.checksum)
+              for migration in get_migrations()
+          ]
+          with database._engine.connect() as connection:
+              migration_rows = [
+                  tuple(row)
+                  for row in connection.exec_driver_sql(
+                      'SELECT version, description, checksum, applied_at '
+                      'FROM schema_migrations ORDER BY version'
+                  ).fetchall()
+              ]
+              assert [row[:3] for row in migration_rows] == expected_migrations
+              assert all(row[2] and len(row[2]) == 64 for row in migration_rows)
+              assert connection.exec_driver_sql(
+                  'SELECT code, data_source FROM stock_daily WHERE id = 1'
+              ).one() == ('TEST0001', 'fixture')
+              assert connection.exec_driver_sql(
+                  'SELECT query_id FROM analysis_history WHERE id = 1'
+              ).scalar_one() == 'fixture-query-001'
+              assert connection.exec_driver_sql(
+                  'SELECT owner_id FROM portfolio_accounts WHERE id = 1'
+              ).scalar_one() == 'fixture-owner'
+              assert connection.exec_driver_sql(
+                  'SELECT trade_uid FROM portfolio_trades WHERE id = 1'
+              ).scalar_one() == 'fixture-trade-001'
+
+          verification = MigrationRunner().verify(database._engine)
+          assert verification.success is True
+          assert verification.current_version == TARGET_VERSION
+          assert verification.pending_ids == ()
+
+          snapshot_path = Path('/app/data/migration-smoke-applied-at.txt')
+          applied_at_snapshot = '\n'.join(
+              f'{row[0]}\t{row[3]}' for row in migration_rows
+          )
+          assert all(row[3] for row in migration_rows)
+          if os.environ['MIGRATION_SMOKE_PHASE'] == 'initial':
+              snapshot_path.write_text(applied_at_snapshot, encoding='utf-8')
+          else:
+              assert snapshot_path.read_text(encoding='utf-8') == applied_at_snapshot
+          print(f'✅ Legacy volume migration {os.environ[\"MIGRATION_SMOKE_PHASE\"]}')
+          "
+          }
+
+          run_migration_smoke initial
+          run_migration_smoke restart
 
   web-gate:
     name: web-gate

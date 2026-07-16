@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
 - [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。
+- [改进] Migration Runner 对 source-bound production migration 增加源码 guard，并在 upgrade 返回后恢复 SQLite authorizer、校验 runner transaction ownership；production migration 仍是受审查的仓库内受信代码，这些机制属于纵深防御而非 Python 安全沙箱。
+- [测试] Docker CI 将受支持的 legacy SQLite fixture 作为 `/app/data` volume 启动真实 `DatabaseManager`，校验业务 canary、migration checksum 和 target version，并复用同一 volume 二次启动验证幂等。
 - [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
 - [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。
 - [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息。

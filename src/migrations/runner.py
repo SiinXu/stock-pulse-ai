@@ -492,8 +492,11 @@ class MigrationRunner:
         for method_name in (
             "begin",
             "begin_nested",
+            "begin_twophase",
             "close",
             "commit",
+            "detach",
+            "execution_options",
             "get_nested_transaction",
             "get_transaction",
             "invalidate",
@@ -522,7 +525,17 @@ class MigrationRunner:
 
         try:
             yield
-            if blocked_transaction_control:
+            try:
+                dbapi_connection.set_authorizer(authorize_sqlite_operation)
+            except Exception as exc:
+                raise MigrationError(
+                    "migration_transaction_control_forbidden",
+                    migration_id,
+                ) from exc
+            if (
+                blocked_transaction_control
+                or not dbapi_connection.in_transaction
+            ):
                 forbidden()
         except MigrationError:
             raise
@@ -534,12 +547,21 @@ class MigrationRunner:
                 ) from exc
             raise
         finally:
-            dbapi_connection.set_authorizer(None)
+            authorizer_cleanup_error = None
+            try:
+                dbapi_connection.set_authorizer(None)
+            except sqlite3.Error as exc:
+                authorizer_cleanup_error = exc
             for target, name, previous in reversed(guarded_attributes):
                 if previous is missing:
                     delattr(target, name)
                 else:
                     setattr(target, name, previous)
+            if authorizer_cleanup_error is not None:
+                raise MigrationError(
+                    "migration_transaction_control_forbidden",
+                    migration_id,
+                ) from authorizer_cleanup_error
 
     @staticmethod
     def _insert_applied(connection: Connection, migration: Migration) -> None:
