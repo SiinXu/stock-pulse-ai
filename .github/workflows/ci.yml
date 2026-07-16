@@ -114,6 +114,10 @@ jobs:
           docker run --rm stock-analysis:test python -c "
           from src.config import get_config; print('✅ config')
           from src.storage import DatabaseManager; print('✅ storage')
+          from src.migrations.registry import TARGET_VERSION, get_migrations
+          migration_ids = [migration.id for migration in get_migrations()]
+          assert migration_ids and migration_ids[-1] == TARGET_VERSION
+          print(f'✅ migrations target {TARGET_VERSION}')
           from src.notification import NotificationService; print('✅ notification')
           from data_provider import DataFetcherManager; print('✅ data_provider')
           from src.analyzer import GeminiAnalyzer; print('✅ analyzer')

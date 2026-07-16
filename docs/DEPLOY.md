@@ -97,6 +97,8 @@ docker-compose -f ./docker/docker-compose.yml exec -u dsa stock-analyzer python 
 - `./logs/` - 日志文件
 - `./reports/` - 分析报告
 
+新镜像首次初始化 `DatabaseManager` 时会同步执行有序数据库 migration。Fresh DB 和受支持的旧 `./data/` volume 使用同一 registry；`v3.0.0`、`v3.4.0`、`v3.20.0` 无 registry 数据库通过固定 release profile 识别，`v3.21.0`、`v3.26.3` 通过 legacy baseline 识别。迁移失败时不记录 applied row，数据库依赖路径也不会继续。通用 health 端点不是数据库 readiness probe。镜像升级前应停止写入者并备份或快照 `./data/`。`status` / `verify` 以 SQLite read-only URI 和 `query_only` 检查现有 volume，不应用 pending migration、不创建缺失数据库；应用 startup 仍同步 apply。详细信任边界和向前恢复流程见 [数据库迁移指南](database-migrations.md)。
+
 ### 6. 权限说明
 
 Docker 镜像启动入口会自动创建并修复 `./data`、`./logs`、`./reports` 对应挂载目录的权限，然后降权为非 root 用户 (`dsa`, UID 1000) 运行应用。普通部署不需要手动 `chown` / `chmod`。

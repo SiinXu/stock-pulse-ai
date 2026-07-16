@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 import src.auth as auth
@@ -26,12 +26,20 @@ from src.services.portfolio_service import (
 )
 from src.storage import (
     DatabaseManager,
+    PortfolioAccount,
     PortfolioCashLedger,
     PortfolioCorporateAction,
     PortfolioDailySnapshot,
     PortfolioIdempotencyRecord,
     PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER,
     PortfolioTrade,
+)
+
+MIGRATION_FIXTURE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "schema_migrations"
+    / "v3_26_3.sql"
 )
 
 
@@ -896,18 +904,10 @@ class PortfolioIdempotencyMigrationTestCase(unittest.TestCase):
         db_path = Path(temp_dir.name) / "legacy_portfolio_idempotency.db"
         try:
             with sqlite3.connect(db_path) as connection:
-                connection.execute(
-                    """CREATE TABLE portfolio_accounts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    owner_id VARCHAR(64)
-                    )"""
+                connection.executescript(
+                    MIGRATION_FIXTURE.read_text(encoding="utf-8")
                 )
-                connection.execute(
-                    """CREATE TABLE portfolio_cash_ledger (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    account_id INTEGER NOT NULL
-                    )"""
-                )
+                connection.execute("DROP TABLE portfolio_idempotency_records")
                 connection.execute(
                     """CREATE TABLE portfolio_idempotency_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -919,12 +919,16 @@ class PortfolioIdempotencyMigrationTestCase(unittest.TestCase):
                     )"""
                 )
                 connection.execute(
-                    "INSERT INTO portfolio_accounts (id, owner_id) VALUES (?, ?)",
-                    (42, "legacy-owner"),
+                    "INSERT INTO portfolio_accounts "
+                    "(id, owner_id, name, market, base_currency, is_active) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (42, "legacy-owner", "Legacy", "cn", "CNY", 1),
                 )
                 connection.execute(
-                    "INSERT INTO portfolio_cash_ledger (id, account_id) VALUES (?, ?)",
-                    (1, 42),
+                    "INSERT INTO portfolio_cash_ledger "
+                    "(id, account_id, event_date, direction, amount, currency) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (1, 42, "2026-01-01", "in", 100.0, "CNY"),
                 )
                 connection.execute(
                     """INSERT INTO portfolio_idempotency_records (

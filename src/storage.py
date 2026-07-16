@@ -32,6 +32,7 @@ from sqlalchemy import (
     DateTime,
     Integer,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     UniqueConstraint,
     Text,
@@ -61,6 +62,14 @@ from src.agent.public_contract import (
     sanitize_agent_history_content,
 )
 from src.config import get_config
+from src.migrations.engine import create_database_engine
+from src.migrations.legacy_profiles import (
+    match_legacy_schema_profile,
+    sqlite_type_affinity,
+)
+from src.migrations.registry import LEGACY_BASELINE_MIGRATION
+from src.migrations.runner import apply_pending, preflight_existing
+from src.migrations.types import MigrationError
 from src.portfolio_idempotency import build_portfolio_idempotency_storage_id
 from src.schemas.decision_profile import extract_legacy_decision_profile
 from src.utils.sanitize import log_safe_exception
@@ -68,7 +77,7 @@ from src.utils.sniper_points import extract_sniper_points, parse_sniper_value
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
-CURRENT_SCHEMA_VERSION = "2026-06-05-create-all-baseline"
+CURRENT_SCHEMA_VERSION = LEGACY_BASELINE_MIGRATION.id
 INTELLIGENCE_ITEM_NULL_SCOPE_VALUE = "__dsa_null_scope__"
 PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER = (
     "trg_portfolio_idempotency_legacy_key_guard"
@@ -103,6 +112,7 @@ class DatabaseSchemaMigration(Base):
     version = Column(String(64), primary_key=True)
     description = Column(String(255), nullable=False)
     applied_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
+    checksum = Column(String(64), nullable=True)
 
 
 class StockDaily(Base):
@@ -1220,19 +1230,11 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             self._sqlite_write_retry_max = config.sqlite_write_retry_max
             self._sqlite_write_retry_base_delay = config.sqlite_write_retry_base_delay
 
-            engine_kwargs = {
-                "echo": False,
-                "pool_pre_ping": True,
-            }
-            if str(db_url).startswith("sqlite:") and self._sqlite_busy_timeout_ms > 0:
-                engine_kwargs["connect_args"] = {
-                    "timeout": self._sqlite_busy_timeout_ms / 1000,
-                }
-
             # 创建数据库引擎
-            created_engine = create_engine(
+            created_engine = create_database_engine(
                 db_url,
-                **engine_kwargs,
+                sqlite_busy_timeout_ms=self._sqlite_busy_timeout_ms,
+                engine_factory=create_engine,
             )
             self._engine = created_engine
             self._is_sqlite_engine = self._engine.url.get_backend_name() == 'sqlite'
@@ -1246,14 +1248,51 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 autoflush=False,
             )
 
-            # 创建所有表
-            Base.metadata.create_all(self._engine)
-            self._ensure_llm_usage_telemetry_columns()
-            self._ensure_decision_signal_profile_schema()
-            self._ensure_portfolio_idempotency_scope_schema()
-            self._ensure_intelligence_item_scope_values()
-            self._ensure_schema_migration_record()
-            self._ensure_intelligence_items_unique_index()
+            with self._schema_initialization_scope() as connection:
+                self._schema_initialization_connection = connection
+                try:
+                    preexisting_tables = self._sqlite_user_tables(connection)
+                    preflight = preflight_existing(connection)
+                    if not preflight.success:
+                        raise MigrationError.from_state(preflight)
+
+                    baseline_already_applied = (
+                        CURRENT_SCHEMA_VERSION in preflight.applied_ids
+                    )
+                    can_stamp_baseline = (
+                        not preexisting_tables
+                        or self._has_known_baseline_anchor(
+                            connection,
+                            preexisting_tables,
+                        )
+                    )
+                    if not baseline_already_applied and not can_stamp_baseline:
+                        raise MigrationError(
+                            "legacy_baseline_untrusted",
+                            CURRENT_SCHEMA_VERSION,
+                        )
+
+                    # Keep the established compatibility sequence, but serialize
+                    # it across processes before the ordered runner takes over.
+                    Base.metadata.create_all(connection)
+                    self._ensure_llm_usage_telemetry_columns()
+                    self._ensure_decision_signal_profile_schema()
+                    self._ensure_portfolio_idempotency_scope_schema()
+                    self._ensure_intelligence_item_scope_values()
+                    self._ensure_intelligence_items_unique_index()
+                    if not baseline_already_applied:
+                        self._verify_create_all_baseline(connection)
+                    self._ensure_schema_migration_record(
+                        allow_insert=can_stamp_baseline,
+                    )
+                finally:
+                    self._schema_initialization_connection = None
+
+            migration_result = apply_pending(self._engine)
+            if not migration_result.success:
+                raise MigrationError.from_state(migration_result)
+
+            self._enable_sqlite_wal_mode()
 
             self._initialized = True
             logger.info(
@@ -1281,31 +1320,330 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             self.__class__._instance = None
             raise
 
-    def _ensure_schema_migration_record(self) -> None:
-        session = self._SessionLocal()
+    @contextmanager
+    def _schema_initialization_scope(self):
+        """Serialize create_all and legacy compatibility work across processes."""
+        with self._engine.connect() as connection:
+            try:
+                if self._is_sqlite_engine:
+                    connection.exec_driver_sql("BEGIN IMMEDIATE")
+                else:
+                    connection.begin()
+            except OperationalError as exc:
+                code = (
+                    "database_locked"
+                    if self._is_sqlite_locked_error(exc)
+                    else "initialization_lock_failed"
+                )
+                raise MigrationError(code) from exc
+            except Exception as exc:
+                raise MigrationError("initialization_lock_failed") from exc
+
+            try:
+                yield connection
+                connection.commit()
+            except Exception:
+                try:
+                    connection.rollback()
+                except Exception as rollback_exc:
+                    log_safe_exception(
+                        logger,
+                        "Database initialization rollback failed",
+                        rollback_exc,
+                        error_code="storage_database_init_rollback_failed",
+                        level=logging.WARNING,
+                    )
+                raise
+
+    @contextmanager
+    def _schema_connection(self):
+        """Reuse the initialization transaction or open one for direct repairs."""
+        connection = getattr(self, "_schema_initialization_connection", None)
+        if connection is not None:
+            yield connection
+            return
+        with self._engine.begin() as standalone_connection:
+            yield standalone_connection
+
+    def _schema_bind(self):
+        connection = getattr(self, "_schema_initialization_connection", None)
+        return connection if connection is not None else self._engine
+
+    @staticmethod
+    def _sqlite_user_tables(connection) -> set[str]:
+        if connection.dialect.name != "sqlite":
+            return set()
+        rows = connection.exec_driver_sql(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        return {str(row[0]) for row in rows}
+
+    @staticmethod
+    def _has_known_baseline_anchor(connection, table_names: set[str]) -> bool:
+        """Match an immutable supported release profile before any schema write."""
+        return match_legacy_schema_profile(connection, table_names) is not None
+
+    @staticmethod
+    def _sqlite_ddl_tokens(create_sql: str) -> Tuple[str, ...]:
+        """Tokenize SQLite DDL outside quoted values, identifiers, and comments."""
+        tokens = []
+        token = []
+        index = 0
+        length = len(create_sql)
+
+        def finish_token() -> None:
+            if token:
+                tokens.append("".join(token).upper())
+                token.clear()
+
+        while index < length:
+            character = create_sql[index]
+            following = create_sql[index + 1] if index + 1 < length else ""
+
+            if character in ("'", '"', "`"):
+                finish_token()
+                quote = character
+                index += 1
+                while index < length:
+                    if create_sql[index] == quote:
+                        if index + 1 < length and create_sql[index + 1] == quote:
+                            index += 2
+                            continue
+                        index += 1
+                        break
+                    index += 1
+                continue
+            if character == "[":
+                finish_token()
+                closing = create_sql.find("]", index + 1)
+                index = length if closing < 0 else closing + 1
+                continue
+            if character == "-" and following == "-":
+                finish_token()
+                newline = create_sql.find("\n", index + 2)
+                index = length if newline < 0 else newline + 1
+                continue
+            if character == "/" and following == "*":
+                finish_token()
+                closing = create_sql.find("*/", index + 2)
+                index = length if closing < 0 else closing + 2
+                continue
+            if character.isalnum() or character == "_":
+                token.append(character)
+            else:
+                finish_token()
+            index += 1
+
+        finish_token()
+        return tuple(tokens)
+
+    @staticmethod
+    def _sqlite_has_explicit_conflict_policy(create_sql: str) -> bool:
+        """Detect an explicit ON CONFLICT clause in SQLite table DDL."""
+        tokens = DatabaseManager._sqlite_ddl_tokens(create_sql)
+        return any(
+            current == "ON" and following == "CONFLICT"
+            for current, following in zip(tokens, tokens[1:])
+        )
+
+    @staticmethod
+    def _verify_create_all_baseline(connection) -> None:
+        """Prove compatibility work produced a complete runnable metadata shape."""
+        actual_tables = DatabaseManager._sqlite_user_tables(connection)
+        if not set(Base.metadata.tables).issubset(actual_tables):
+            raise MigrationError(
+                "legacy_baseline_unproven",
+                CURRENT_SCHEMA_VERSION,
+            )
+
+        inspector = inspect(connection)
+        table_options = {
+            str(row[1]): (bool(row[4]), bool(row[5]))
+            for row in connection.exec_driver_sql("PRAGMA table_list").fetchall()
+            if len(row) > 5 and str(row[2]).lower() == "table"
+        }
+
+        def reject_unproven_baseline() -> None:
+            raise MigrationError(
+                "legacy_baseline_unproven",
+                CURRENT_SCHEMA_VERSION,
+            )
+
+        for table_name, table in Base.metadata.tables.items():
+            create_sql = connection.exec_driver_sql(
+                "SELECT sql FROM sqlite_master "
+                "WHERE type = 'table' AND name = ?",
+                (table_name,),
+            ).scalar_one_or_none()
+            if (
+                create_sql is None
+                or DatabaseManager._sqlite_has_explicit_conflict_policy(
+                    str(create_sql)
+                )
+            ):
+                reject_unproven_baseline()
+
+            ddl_tokens = DatabaseManager._sqlite_ddl_tokens(str(create_sql))
+            actual_table_options = table_options.get(table_name)
+            if actual_table_options is None:
+                actual_table_options = (
+                    any(
+                        current == "WITHOUT" and following == "ROWID"
+                        for current, following in zip(
+                            ddl_tokens,
+                            ddl_tokens[1:],
+                        )
+                    ),
+                    ddl_tokens[-1:] == ("STRICT",),
+                )
+            expected_table_options = (
+                not bool(
+                    table.dialect_options["sqlite"].get("with_rowid", True)
+                ),
+                bool(table.dialect_options["sqlite"].get("strict", False)),
+            )
+            if actual_table_options != expected_table_options:
+                reject_unproven_baseline()
+
+            column_rows = connection.exec_driver_sql(
+                f'PRAGMA table_xinfo("{table_name}")'
+            ).fetchall()
+            if any(
+                len(row) < 7 or int(row[6]) != 0
+                for row in column_rows
+            ):
+                reject_unproven_baseline()
+            actual_columns = {
+                str(row[1]): (
+                    sqlite_type_affinity(str(row[2] or "")),
+                    bool(row[5]),
+                    bool(row[3]) and not bool(row[5]),
+                )
+                for row in column_rows
+            }
+            expected_columns = {
+                column.name: (
+                    sqlite_type_affinity(str(column.type)),
+                    bool(column.primary_key),
+                    bool(not column.nullable and not column.primary_key),
+                )
+                for column in table.columns
+            }
+            if actual_columns != expected_columns:
+                reject_unproven_baseline()
+
+            expected_unique_keys = {
+                (
+                    tuple(column.name for column in constraint.columns),
+                    tuple(
+                        str(getattr(column.type, "collation", None) or "BINARY").upper()
+                        for column in constraint.columns
+                    ),
+                )
+                for constraint in table.constraints
+                if isinstance(constraint, UniqueConstraint)
+            }
+            expected_unique_keys.update(
+                (
+                    tuple(column.name for column in index.columns),
+                    tuple(
+                        str(getattr(column.type, "collation", None) or "BINARY").upper()
+                        for column in index.columns
+                    ),
+                )
+                for index in table.indexes
+                if index.unique
+            )
+            actual_unique_keys = set()
+            unsupported_unique_index = False
+            for index in connection.exec_driver_sql(
+                f'PRAGMA index_list("{table_name}")'
+            ).fetchall():
+                if not bool(index[2]) or str(index[3]).lower() == "pk":
+                    continue
+                if len(index) > 4 and bool(index[4]):
+                    unsupported_unique_index = True
+                    continue
+                index_name = str(index[1]).replace('"', '""')
+                key_terms = tuple(
+                    info
+                    for info in connection.exec_driver_sql(
+                        f'PRAGMA index_xinfo("{index_name}")'
+                    ).fetchall()
+                    if bool(info[5])
+                )
+                if any(int(info[1]) < 0 or info[2] is None for info in key_terms):
+                    unsupported_unique_index = True
+                    continue
+                columns = tuple(str(info[2]) for info in key_terms)
+                collations = tuple(
+                    str(info[4] or "BINARY").upper()
+                    for info in key_terms
+                )
+                if columns:
+                    actual_unique_keys.add((columns, collations))
+            if unsupported_unique_index or actual_unique_keys != expected_unique_keys:
+                reject_unproven_baseline()
+
+            expected_foreign_keys = {
+                (
+                    tuple(element.parent.name for element in constraint.elements),
+                    str(constraint.referred_table.schema or ""),
+                    constraint.referred_table.name,
+                    tuple(element.column.name for element in constraint.elements),
+                    (constraint.ondelete or "").upper(),
+                    (constraint.onupdate or "").upper(),
+                    bool(constraint.deferrable),
+                    (constraint.initially or "").upper(),
+                    (constraint.match or "").upper(),
+                )
+                for constraint in table.foreign_key_constraints
+            }
+            actual_foreign_keys = {
+                (
+                    tuple(foreign_key.get("constrained_columns") or ()),
+                    str(foreign_key.get("referred_schema") or ""),
+                    str(foreign_key.get("referred_table") or ""),
+                    tuple(foreign_key.get("referred_columns") or ()),
+                    str((foreign_key.get("options") or {}).get("ondelete") or "").upper(),
+                    str((foreign_key.get("options") or {}).get("onupdate") or "").upper(),
+                    bool((foreign_key.get("options") or {}).get("deferrable")),
+                    str((foreign_key.get("options") or {}).get("initially") or "").upper(),
+                    str((foreign_key.get("options") or {}).get("match") or "").upper(),
+                )
+                for foreign_key in inspector.get_foreign_keys(table_name)
+            }
+            if actual_foreign_keys != expected_foreign_keys:
+                reject_unproven_baseline()
+
+        if connection.exec_driver_sql("PRAGMA foreign_key_check").fetchone() is not None:
+            reject_unproven_baseline()
+
+    def _ensure_schema_migration_record(self, *, allow_insert: bool = True) -> None:
         values = {
             "version": CURRENT_SCHEMA_VERSION,
-            "description": "Baseline schema created through SQLAlchemy metadata.create_all",
+            "description": LEGACY_BASELINE_MIGRATION.description,
         }
-        try:
+        with self._schema_connection() as connection:
+            existing_versions = set(
+                connection.execute(select(DatabaseSchemaMigration.version)).scalars()
+            )
+            if CURRENT_SCHEMA_VERSION in existing_versions:
+                return
+            if existing_versions or not allow_insert:
+                raise MigrationError(
+                    "legacy_baseline_untrusted",
+                    CURRENT_SCHEMA_VERSION,
+                )
             if self._is_sqlite_engine:
                 statement = sqlite_insert(DatabaseSchemaMigration).values(**values)
                 statement = statement.on_conflict_do_nothing(index_elements=["version"])
-                session.execute(statement)
+                connection.execute(statement)
             else:
-                session.execute(DatabaseSchemaMigration.__table__.insert().values(**values))
-            session.commit()
-        except IntegrityError:
-            session.rollback()
-            with self._SessionLocal() as verify_session:
-                existing = verify_session.get(DatabaseSchemaMigration, CURRENT_SCHEMA_VERSION)
-            if existing is None:
-                raise
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+                connection.execute(
+                    DatabaseSchemaMigration.__table__.insert().values(**values)
+                )
 
     def _ensure_portfolio_idempotency_scope_schema(self) -> None:
         """Add scoped idempotency columns to existing SQLite databases."""
@@ -1313,7 +1651,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if not self._is_sqlite_engine:
             return
         table_name = PortfolioIdempotencyRecord.__tablename__
-        inspector = inspect(self._engine)
+        inspector = inspect(self._schema_bind())
         if not inspector.has_table(table_name):
             return
 
@@ -1331,7 +1669,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             if column_name in existing_columns:
                 continue
             try:
-                with self._engine.begin() as connection:
+                with self._schema_connection() as connection:
                     connection.exec_driver_sql(
                         f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
                     )
@@ -1342,13 +1680,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         self._backfill_portfolio_idempotency_scopes()
         index_name = "uix_portfolio_idempotency_scope_operation"
         expected_columns = ["operation_type", "scope_key", "client_operation_id"]
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             connection.exec_driver_sql(
                 f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
                 f"ON {table_name} ({', '.join(expected_columns)})"
             )
 
-        refreshed_inspector = inspect(self._engine)
+        refreshed_inspector = inspect(self._schema_bind())
         actual_columns = {
             column["name"]
             for column in refreshed_inspector.get_columns(table_name)
@@ -1378,7 +1716,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         """Preserve raw-key legacy rows without inventing historical owner scope."""
 
         table_name = PortfolioIdempotencyRecord.__tablename__
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             rows = connection.execute(
                 text(
                     f"SELECT id, operation_id, operation_type, "
@@ -1423,7 +1761,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         table_name = PortfolioIdempotencyRecord.__tablename__
         trigger_name = PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             connection.exec_driver_sql(
                 f"""CREATE TRIGGER IF NOT EXISTS {trigger_name}
                 BEFORE INSERT ON {table_name}
@@ -1457,7 +1795,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         if not self._is_sqlite_engine:
             return
-        inspector = inspect(self._engine)
+        inspector = inspect(self._schema_bind())
         if not inspector.has_table(DecisionSignalRecord.__tablename__):
             return
 
@@ -1478,7 +1816,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         if "decision_profile" not in existing:
             try:
-                with self._engine.begin() as connection:
+                with self._schema_connection() as connection:
                     connection.exec_driver_sql(
                         f"ALTER TABLE {DecisionSignalRecord.__tablename__} "
                         "ADD COLUMN decision_profile VARCHAR(16)"
@@ -1507,7 +1845,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 "decision_profile", "action", "horizon", "market_phase",
             ],
         }
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             for index_name, columns in expected_indexes.items():
                 connection.exec_driver_sql(
                     f"CREATE INDEX IF NOT EXISTS {index_name} "
@@ -1516,7 +1854,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
         actual_indexes = {
             index["name"]: index["column_names"]
-            for index in inspect(self._engine).get_indexes(
+            for index in inspect(self._schema_bind()).get_indexes(
                 DecisionSignalRecord.__tablename__
             )
         }
@@ -1540,7 +1878,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             "invalid_profile_count": 0,
             "skipped_existing_profile_count": 0,
         }
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             stats["skipped_existing_profile_count"] = connection.execute(
                 text(
                     "SELECT COUNT(*) FROM decision_signals "
@@ -1639,7 +1977,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if not self._is_sqlite_engine:
             return
 
-        if not inspect(self._engine).has_table("intelligence_items"):
+        if not inspect(self._schema_bind()).has_table("intelligence_items"):
             return
 
         try:
@@ -1676,13 +2014,23 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         scoped_index_name = "uix_intel_item_scope"
 
         tmp_metadata = MetaData()
+        Table(
+            IntelligenceSource.__tablename__,
+            tmp_metadata,
+            Column("id", Integer, primary_key=True),
+        )
         tmp_table = Table(
             temporary_table,
             tmp_metadata,
             *(column.copy() for column in IntelligenceItem.__table__.columns),
+            ForeignKeyConstraint(
+                ["source_id"],
+                [f"{IntelligenceSource.__tablename__}.id"],
+                ondelete="SET NULL",
+            ),
         )
         logger.info("Rebuilding intelligence_items table to align composite uniqueness constraints.")
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             connection.execute(text(f'DROP TABLE IF EXISTS "{temporary_table}"'))
             tmp_table.create(connection)
             connection.execute(
@@ -1704,7 +2052,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def _ensure_intelligence_items_scoped_unique_index_once(self) -> None:
         target_index_name = "uix_intel_item_scope"
-        with self._engine.begin() as connection:
+        with self._schema_connection() as connection:
             rows = connection.execute(
                 text("PRAGMA index_list(intelligence_items)")
             ).fetchall()
@@ -1720,7 +2068,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             )
 
     def _list_sqlite_unique_indexes(self, table_name: str):
-        with self._engine.connect() as connection:
+        with self._schema_connection() as connection:
             rows = connection.execute(
                 text(f"PRAGMA index_list({table_name})")
             ).fetchall()
@@ -1749,7 +2097,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         try:
             existing = {
                 column["name"]
-                for column in inspect(self._engine).get_columns(LLMUsage.__tablename__)
+                for column in inspect(self._schema_bind()).get_columns(LLMUsage.__tablename__)
             }
         except Exception as exc:
             log_safe_exception(
@@ -1767,7 +2115,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 continue
             for attempt in range(max_retries + 1):
                 try:
-                    with self._engine.begin() as connection:
+                    with self._schema_connection() as connection:
                         connection.exec_driver_sql(
                             f"ALTER TABLE {LLMUsage.__tablename__} "
                             f"ADD COLUMN {column} {column_type}"
@@ -1800,7 +2148,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         try:
             existing = {
                 column["name"]
-                for column in inspect(self._engine).get_columns(IntelligenceItem.__tablename__)
+                for column in inspect(self._schema_bind()).get_columns(IntelligenceItem.__tablename__)
             }
         except Exception as exc:
             log_safe_exception(
@@ -1814,7 +2162,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         if "scope_value" not in existing:
             return
         try:
-            with self._engine.begin() as connection:
+            with self._schema_connection() as connection:
                 connection.exec_driver_sql(
                     f"UPDATE {IntelligenceItem.__tablename__} "
                     "SET scope_value = ? "
@@ -1881,18 +2229,54 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             cursor = dbapi_connection.cursor()
             try:
                 cursor.execute(f"PRAGMA busy_timeout={int(self._sqlite_busy_timeout_ms)}")
-                if self._sqlite_file_db and self._sqlite_wal_enabled:
-                    cursor.execute("PRAGMA journal_mode=WAL")
             except Exception as exc:
                 log_safe_exception(
                     logger,
-                    "SQLite PRAGMA initialization failed",
+                    "SQLite busy timeout initialization failed",
                     exc,
-                    error_code="storage_sqlite_pragma_initialization_failed",
+                    error_code="storage_sqlite_busy_timeout_initialization_failed",
                     level=logging.WARNING,
                 )
             finally:
                 cursor.close()
+
+    def _enable_sqlite_wal_mode(self) -> None:
+        """Enable persistent WAL only after the database is proven and migrated."""
+        if not (
+            self._is_sqlite_engine
+            and self._sqlite_file_db
+            and self._sqlite_wal_enabled
+        ):
+            return
+
+        raw_connection = None
+        cursor = None
+        try:
+            raw_connection = self._engine.raw_connection()
+            cursor = raw_connection.cursor()
+            row = cursor.execute("PRAGMA journal_mode=WAL").fetchone()
+            if row is None or str(row[0]).lower() != "wal":
+                raise RuntimeError("sqlite_wal_mode_unavailable")
+        except Exception as exc:
+            error_text = str(exc).lower()
+            if any(token in error_text for token in ("locked", "busy")):
+                logger.debug(
+                    "SQLite WAL initialization deferred because another "
+                    "process holds the database write lock"
+                )
+            else:
+                log_safe_exception(
+                    logger,
+                    "SQLite WAL initialization failed",
+                    exc,
+                    error_code="storage_sqlite_wal_initialization_failed",
+                    level=logging.WARNING,
+                )
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if raw_connection is not None:
+                raw_connection.close()
 
     def _is_file_sqlite_database(self) -> bool:
         database = (self._engine.url.database or "").strip()

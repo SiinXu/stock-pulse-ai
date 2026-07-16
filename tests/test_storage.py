@@ -6,6 +6,7 @@ import sqlite3
 import tempfile
 import threading
 from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
@@ -16,16 +17,57 @@ from sqlalchemy.sql import func
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.config import Config
+from src.migrations.registry import TARGET_VERSION, get_migrations
+from src.migrations.types import MigrationError, MigrationResult
 from src.storage import (
     AgentProviderTurn,
     Base,
     CURRENT_SCHEMA_VERSION,
     DatabaseManager,
     DatabaseSchemaMigration,
+    DecisionSignalRecord,
     StockDaily,
 )
 
+MIGRATION_FIXTURE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "schema_migrations"
+    / "v3_26_3.sql"
+)
+
+
 class TestStorage(unittest.TestCase):
+
+    @staticmethod
+    def _load_current_legacy_fixture(db_path: str) -> None:
+        with sqlite3.connect(db_path) as connection:
+            connection.executescript(MIGRATION_FIXTURE.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _create_decision_signal_schema(
+        db_path: str,
+        *,
+        include_profile: bool,
+    ) -> None:
+        TestStorage._load_current_legacy_fixture(db_path)
+        engine = sqlalchemy_create_engine(f"sqlite:///{db_path}")
+        try:
+            if include_profile:
+                return
+            with engine.begin() as connection:
+                for index in DecisionSignalRecord.__table__.indexes:
+                    if "decision_profile" in {
+                        column.name for column in index.columns
+                    }:
+                        connection.exec_driver_sql(
+                            f'DROP INDEX IF EXISTS "{index.name}"'
+                        )
+                connection.exec_driver_sql(
+                    "ALTER TABLE decision_signals DROP COLUMN decision_profile"
+                )
+        finally:
+            engine.dispose()
 
     @staticmethod
     def _list_sqlite_indexes(db_path: str, table_name: str) -> dict[str, list[str]]:
@@ -64,7 +106,10 @@ class TestStorage(unittest.TestCase):
         db_path = os.path.join(temp_dir.name, "legacy_intel.sqlite")
 
         try:
+            self._load_current_legacy_fixture(db_path)
             with sqlite3.connect(db_path) as conn:
+                conn.execute("DROP TABLE intelligence_items")
+                conn.execute("DROP TABLE intelligence_sources")
                 conn.execute(
                     """CREATE TABLE intelligence_sources (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +119,8 @@ class TestStorage(unittest.TestCase):
                     scope_type TEXT NOT NULL DEFAULT 'market',
                     scope_value TEXT,
                     market TEXT NOT NULL DEFAULT 'cn',
-                    enabled INTEGER NOT NULL DEFAULT 1,
+                    description TEXT,
+                    enabled BOOLEAN NOT NULL DEFAULT 1,
                     last_status TEXT,
                     last_error TEXT,
                     last_fetched_at DATETIME,
@@ -163,10 +209,14 @@ class TestStorage(unittest.TestCase):
 
         with db.get_session() as session:
             row = session.get(DatabaseSchemaMigration, CURRENT_SCHEMA_VERSION)
+            target_row = session.get(DatabaseSchemaMigration, TARGET_VERSION)
 
         self.assertIsNotNone(row)
         self.assertEqual(row.version, CURRENT_SCHEMA_VERSION)
         self.assertIn("metadata.create_all", row.description)
+        self.assertEqual(len(row.checksum), 64)
+        self.assertIsNotNone(target_row)
+        self.assertEqual(len(target_row.checksum), 64)
 
         DatabaseManager.reset_instance()
 
@@ -201,7 +251,7 @@ class TestStorage(unittest.TestCase):
                 select(func.count()).select_from(DatabaseSchemaMigration)
             ).scalar_one()
 
-        self.assertEqual(count, 1)
+        self.assertEqual(count, len(get_migrations()))
 
         DatabaseManager.reset_instance()
 
@@ -252,32 +302,11 @@ class TestStorage(unittest.TestCase):
         deeply_nested_json = "[" * 10_000 + "]" * 10_000
 
         try:
+            self._create_decision_signal_schema(
+                db_path,
+                include_profile=False,
+            )
             with sqlite3.connect(db_path) as conn:
-                conn.execute(
-                    """CREATE TABLE decision_signals (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    stock_code TEXT,
-                    market TEXT,
-                    source_type TEXT,
-                    source_report_id INTEGER,
-                    trace_id TEXT,
-                    action TEXT,
-                    horizon TEXT,
-                    market_phase TEXT,
-                    created_at DATETIME,
-                    metadata_json TEXT
-                )"""
-                )
-                conn.execute(
-                    "CREATE INDEX ix_decision_signal_report_type_market_stock_action_horizon_phase "
-                    "ON decision_signals "
-                    "(source_report_id, source_type, market, stock_code, action, horizon, market_phase)"
-                )
-                conn.execute(
-                    "CREATE INDEX ix_decision_signal_trace_type_market_stock_action_horizon_phase "
-                    "ON decision_signals "
-                    "(trace_id, source_type, market, stock_code, action, horizon, market_phase)"
-                )
                 conn.executemany(
                     """INSERT INTO decision_signals (
                     stock_code,
@@ -285,29 +314,31 @@ class TestStorage(unittest.TestCase):
                     source_type,
                     source_report_id,
                     trace_id,
+                    trigger_source,
                     action,
                     horizon,
                     market_phase,
+                    plan_quality,
+                    status,
                     created_at,
                     metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     [
-                        ("600519", "cn", "analysis", 1, "trace-1", "buy", "3d", "intraday", "2026-01-01", '{"decision_profile":"balanced"}'),
-                        ("600519", "cn", "analysis", 2, "trace-2", "buy", "3d", "intraday", "2026-01-01", None),
-                        ("600519", "cn", "analysis", 3, "trace-3", "buy", "3d", "intraday", "2026-01-01", ""),
-                        ("600519", "cn", "analysis", 4, "trace-4", "buy", "3d", "intraday", "2026-01-01", "   "),
-                        ("600519", "cn", "analysis", 5, "trace-5", "buy", "3d", "intraday", "2026-01-01", "{not-json"),
-                        ("600519", "cn", "analysis", 6, "trace-6", "buy", "3d", "intraday", "2026-01-01", sqlite3.Binary(b"\xff")),
-                        ("600519", "cn", "analysis", 7, "trace-7", "buy", "3d", "intraday", "2026-01-01", "null"),
-                        ("600519", "cn", "analysis", 8, "trace-8", "buy", "3d", "intraday", "2026-01-01", "[]"),
-                        ("600519", "cn", "analysis", 9, "trace-9", "buy", "3d", "intraday", "2026-01-01", '"balanced"'),
-                        ("600519", "cn", "analysis", 10, "trace-10", "buy", "3d", "intraday", "2026-01-01", "1"),
-                        ("600519", "cn", "analysis", 11, "trace-11", "buy", "3d", "intraday", "2026-01-01", "{}"),
-                        ("600519", "cn", "analysis", 12, "trace-12", "buy", "3d", "intraday", "2026-01-01", '{"decision_profile":null}'),
-                        ("600519", "cn", "analysis", 13, "trace-13", "buy", "3d", "intraday", "2026-01-01", '{"decision_profile":""}'),
-                        ("600519", "cn", "analysis", 14, "trace-14", "buy", "3d", "intraday", "2026-01-01", '{"decision_profile":"   "}'),
-                        ("600519", "cn", "analysis", 15, "trace-15", "buy", "3d", "intraday", "2026-01-01", '{"decision_profile":"reckless"}'),
-                        ("600519", "cn", "analysis", 16, "trace-16", "buy", "3d", "intraday", "2026-01-01", deeply_nested_json),
+                        (
+                            "600519", "cn", "analysis", number, f"trace-{number}",
+                            "migration_test", "buy", "3d", "intraday", "unknown",
+                            "active", "2026-01-01", metadata_json,
+                        )
+                        for number, metadata_json in enumerate(
+                            (
+                                '{"decision_profile":"balanced"}', None, "", "   ",
+                                "{not-json", sqlite3.Binary(b"\xff"), "null", "[]",
+                                '"balanced"', "1", "{}", '{"decision_profile":null}',
+                                '{"decision_profile":""}', '{"decision_profile":"   "}',
+                                '{"decision_profile":"reckless"}', deeply_nested_json,
+                            ),
+                            start=1,
+                        )
                     ],
                 )
 
@@ -391,30 +422,27 @@ class TestStorage(unittest.TestCase):
         db_path = os.path.join(temp_dir.name, "existing_decision_profile.db")
 
         try:
+            self._create_decision_signal_schema(
+                db_path,
+                include_profile=True,
+            )
             with sqlite3.connect(db_path) as conn:
-                conn.execute(
-                    """CREATE TABLE decision_signals (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    stock_code TEXT,
-                    market TEXT,
-                    source_type TEXT,
-                    source_report_id INTEGER,
-                    trace_id TEXT,
-                    action TEXT,
-                    horizon TEXT,
-                    market_phase TEXT,
-                    created_at DATETIME,
-                    metadata_json TEXT,
-                    decision_profile VARCHAR(16)
-                )"""
-                )
                 conn.executemany(
-                    "INSERT INTO decision_signals (metadata_json, decision_profile) VALUES (?, ?)",
+                    "INSERT INTO decision_signals "
+                    "(stock_code, market, source_type, trigger_source, action, "
+                    "plan_quality, status, metadata_json, decision_profile) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
-                        ('{"decision_profile":"aggressive"}', None),
-                        (None, None),
-                        ('{"decision_profile":"balanced"}', "conservative"),
-                        ('{"decision_profile":"balanced"}', ""),
+                        (
+                            "600519", "cn", "analysis", "migration_test", "buy",
+                            "unknown", "active", metadata_json, decision_profile,
+                        )
+                        for metadata_json, decision_profile in (
+                            ('{"decision_profile":"aggressive"}', None),
+                            (None, None),
+                            ('{"decision_profile":"balanced"}', "conservative"),
+                            ('{"decision_profile":"balanced"}', ""),
+                        )
                     ],
                 )
 
@@ -1069,6 +1097,13 @@ class TestStorage(unittest.TestCase):
 
     def test_init_cleanup_preserves_original_initialization_error(self):
         DatabaseManager.reset_instance()
+        temp_dir = tempfile.TemporaryDirectory()
+        original_database_path = os.environ.get("DATABASE_PATH")
+        os.environ["DATABASE_PATH"] = os.path.join(
+            temp_dir.name,
+            "initialization-error.sqlite",
+        )
+        Config.reset_instance()
         original_error = RuntimeError("create all failed")
         canary = "STORAGE_INIT_CLEANUP_CANARY"
         cleanup_error = RuntimeError(
@@ -1102,6 +1137,81 @@ class TestStorage(unittest.TestCase):
             self.assertNotIn(canary, log_text)
         finally:
             DatabaseManager.reset_instance()
+            Config.reset_instance()
+            if original_database_path is None:
+                os.environ.pop("DATABASE_PATH", None)
+            else:
+                os.environ["DATABASE_PATH"] = original_database_path
+            temp_dir.cleanup()
+
+    def test_migration_failure_clears_singleton_and_allows_forward_retry(self):
+        DatabaseManager.reset_instance()
+        temp_dir = tempfile.TemporaryDirectory()
+        db_path = os.path.join(temp_dir.name, "migration-retry.sqlite")
+        failure = MigrationResult(
+            target_version=TARGET_VERSION,
+            pending_ids=(TARGET_VERSION,),
+            success=False,
+            failure_code="migration_upgrade_failed",
+            failed_migration_id=TARGET_VERSION,
+        )
+
+        try:
+            with patch("src.storage.apply_pending", return_value=failure):
+                with self.assertRaises(MigrationError) as ctx:
+                    DatabaseManager(db_url=f"sqlite:///{db_path}")
+
+            self.assertEqual(ctx.exception.failure_code, "migration_upgrade_failed")
+            self.assertEqual(ctx.exception.migration_id, TARGET_VERSION)
+            self.assertIsNone(DatabaseManager._instance)
+
+            recovered = DatabaseManager(db_url=f"sqlite:///{db_path}")
+            self.assertTrue(recovered._initialized)
+            with recovered.get_session() as session:
+                target_row = session.get(DatabaseSchemaMigration, TARGET_VERSION)
+            self.assertIsNotNone(target_row)
+        finally:
+            DatabaseManager.reset_instance()
+            Config.reset_instance()
+            temp_dir.cleanup()
+
+    def test_cleanup_failure_does_not_replace_migration_error(self):
+        DatabaseManager.reset_instance()
+        failure = MigrationResult(
+            target_version=TARGET_VERSION,
+            pending_ids=(TARGET_VERSION,),
+            success=False,
+            failure_code="migration_upgrade_failed",
+            failed_migration_id=TARGET_VERSION,
+        )
+        canary = "MIGRATION_CLEANUP_SECRET_CANARY"
+
+        def create_engine_with_failing_dispose(*args, **kwargs):
+            engine = sqlalchemy_create_engine(*args, **kwargs)
+
+            def failing_dispose() -> None:
+                raise RuntimeError(f"cleanup Authorization: Bearer {canary}")
+
+            engine.dispose = failing_dispose
+            return engine
+
+        try:
+            with patch(
+                "src.storage.create_engine",
+                side_effect=create_engine_with_failing_dispose,
+            ):
+                with patch("src.storage.apply_pending", return_value=failure):
+                    with self.assertLogs("src.storage", level="WARNING") as logs:
+                        with self.assertRaises(MigrationError) as ctx:
+                            DatabaseManager(db_url="sqlite:///:memory:")
+
+            self.assertEqual(ctx.exception.failure_code, "migration_upgrade_failed")
+            self.assertIsNone(DatabaseManager._instance)
+            log_text = "\n".join(logs.output)
+            self.assertIn("storage_database_init_cleanup_failed", log_text)
+            self.assertNotIn(canary, log_text)
+        finally:
+            DatabaseManager._instance = None
 
     def test_sqlite_write_transactions_begin_immediate(self):
         DatabaseManager.reset_instance()
