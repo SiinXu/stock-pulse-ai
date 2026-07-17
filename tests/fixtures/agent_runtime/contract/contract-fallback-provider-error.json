@@ -1,0 +1,38 @@
+{
+  "id": "contract-fallback-provider-error",
+  "notes": "Fallback behavior (single-agent): the adapter returns a response whose provider field is the literal string 'error' (how the production LiteLLM adapter reports call failure in-band). Characterizes that the runner turns this into success=False with the response content as the error message, and that 'error' is excluded from models_used.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": "LLM provider unavailable: connection refused (synthetic)",
+      "tool_calls": [],
+      "usage": {},
+      "provider": "error",
+      "model": ""
+    }
+  ],
+  "expected": {
+    "success": false,
+    "signal": null,
+    "stage_sequence": [
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [],
+    "total_steps": 1,
+    "total_tokens": 0,
+    "provider": "error",
+    "model": "",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "",
+    "error": "LLM provider unavailable: connection refused (synthetic)"
+  }
+}

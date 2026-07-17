@@ -1,0 +1,137 @@
+{
+  "id": "contract-timeout-pipeline-budget-skip",
+  "notes": "Timeout behavior (orchestrator): agent_orchestrator_timeout_s=10 is below the pipeline's minimum per-stage budget (15s). The technical stage completes normally, then the orchestrator skips before the intel stage. Characterizes that the budget skip is NOT fatal: the pipeline degrades to a synthesized dashboard built from the completed stages ('[降级结果]' summary, budget warning in risk_warning), reports success=true with signal=buy, while still recording the volatile 'Pipeline skipped before stage ... due to insufficient budget' error (frozen as error_prefix). No sleeping is required, so this case is fast and fully deterministic.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "standard",
+    "agent_orchestrator_timeout_s": 10
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_bt1",
+          "name": "analyze_trend",
+          "arguments": {
+            "stock_code": "600519"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 560,
+        "completion_tokens": 30,
+        "total_tokens": 590
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"buy\", \"confidence\": 0.72, \"reasoning\": \"均线多头排列且量能配合，趋势延续概率较高。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 78, \"ma_alignment\": \"bullish\", \"volume_status\": \"normal\", \"pattern\": \"ascending_channel\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 712,
+        "completion_tokens": 96,
+        "total_tokens": 808
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "buy",
+    "stage_sequence": [
+      "technical",
+      "technical"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "analyze_trend",
+        "arguments": {
+          "stock_code": "600519"
+        },
+        "success": true,
+        "result_length": 179,
+        "cached": false
+      }
+    ],
+    "total_steps": 1,
+    "total_tokens": 1398,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "贵州茅台",
+      "sentiment_score": 75,
+      "trend_prediction": "技术面bullish，趋势评分 78",
+      "operation_advice": "买入",
+      "decision_type": "buy",
+      "confidence_level": "中",
+      "analysis_summary": "[降级结果] 均线多头排列且量能配合，趋势延续概率较高。",
+      "key_points": [
+        "均线多头排列且量能配合，趋势延续概率较高。"
+      ],
+      "risk_warning": "多 Agent 预算不足，以下结论基于已完成阶段自动降级生成。 暂无额外风险提示",
+      "dashboard": {
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "bullish",
+            "trend_score": 78,
+            "is_bullish": true
+          }
+        },
+        "core_conclusion": {
+          "one_sentence": "[降级结果] 均线多头排列且量能配合，趋势延续概率较高。",
+          "time_sensitivity": "本周内",
+          "signal_type": "🟢买入信号",
+          "position_advice": {
+            "no_position": "可结合支撑位分批试仓，避免一次性追高。",
+            "has_position": "可继续持有，回踩关键位不破再考虑加仓。"
+          }
+        },
+        "intelligence": {
+          "risk_alerts": []
+        },
+        "battle_plan": {
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "轻仓试仓",
+            "entry_plan": "可结合支撑位分批试仓，避免一次性追高。",
+            "risk_control": "止损参考 95.0"
+          }
+        }
+      }
+    },
+    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 75,\n  \"trend_prediction\": \"技术面bullish，趋势评分 78\",\n  \"operation_advice\": \"买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"analysis_summary\": \"[降级结果] 均线多头排列且量能配合，趋势延续概率较高。\",\n  \"key_points\": [\n    \"均线多头排列且量能配合，趋势延续概率较高。\"\n  ],\n  \"risk_warning\": \"多 Agent 预算不足，以下结论基于已完成阶段自动降级生成。 暂无额外风险提示\",\n  \"dashboard\": {\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"core_conclusion\": {\n      \"one_sentence\": \"[降级结果] 均线多头排列且量能配合，趋势延续概率较高。\",\n      \"time_sensitivity\": \"本周内\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"has_position\": \"可继续持有，回踩关键位不破再考虑加仓。\"\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    },\n    \"battle_plan\": {\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"可结合支撑位分批试仓，避免一次性追高。\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    }\n  }\n}",
+    "error_prefix": "Pipeline skipped before stage 'intel' due to insufficient budget"
+  }
+}

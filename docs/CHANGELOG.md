@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [测试] 新增 Agent Runtime characterization 回放数据集与兼容性门禁：36 个 fixture（24 个 A/HK/US 财务场景 + 12 个 ModelRef/fallback/工具范围/超时/取消竞态/畸形输出契约场景）经严格 transcript 回放冻结当前 Native runtime 行为，`tests/test_agent_runtime_compatibility.py` 校验回放期望、manifest 覆盖矩阵与工厂契约（模型路由不可变、数值回退、ToolRegistry 共享、SkillManager 克隆与失效、`build_executor` 别名、Risk(Intel) 输入契约）。
 - [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
 - [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。
 - [改进] Migration Runner 只向 upgrade 提供受限且仅在同步调用期间有效的 SQL execution capability；返回或抛错时先拒绝新调用和排队调用，等待已进入 driver path 的语句在同一事务内完成并物化结果后再撤销连接租约；语句失败与禁用能力请求使用不可清除 latch，migration 捕获异常也不能提交；`execute` 只接受精确 `sqlalchemy.text()` 的单次 SQL 快照，`exec_driver_sql` 只接受内建字符串，任意 executable、实例覆写回调和并发 statement mutation 都不能获得真实 Connection；事务控制 SQL（含注释、空语句或 BOM 前缀）在进入 Connection 前 fail closed，调用方 SQLite authorizer 保持不变，DDL/DML 与 applied row 仍由 runner 独占同一事务，source guard、随机 savepoint 与 transaction 状态检查保留为纵深防御而非 Python 安全沙箱。
