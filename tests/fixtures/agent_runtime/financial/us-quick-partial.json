@@ -1,0 +1,162 @@
+{
+  "id": "us-quick-partial",
+  "notes": "US quick pipeline where the technical stage LLM marks chip/volume data as missing and lowers its confidence (0.4); the decision stage produces a conservative hold dashboard. Frozen behavior (looks like a bug): confidence_level is always recomputed as _confidence_label(decision opinion confidence), and the decision opinion's confidence is sentiment_score/100 (decision_agent.py). Here sentiment_score 50 -> 0.5 -> '中', silently overriding the LLM's explicit '低'.",
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "quick"
+  },
+  "input": {
+    "task": "分析苹果公司的投资价值",
+    "context": {
+      "stock_code": "AAPL",
+      "stock_name": "Apple"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_up1",
+          "name": "get_realtime_quote",
+          "arguments": {
+            "stock_code": "AAPL"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 26,
+        "total_tokens": 666
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"hold\", \"confidence\": 0.4, \"reasoning\": \"仅有行情数据，趋势与筹码数据缺失，无法确认趋势结构。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 50, \"ma_alignment\": \"unknown\", \"volume_status\": \"unknown\", \"pattern\": \"insufficient_data\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 712,
+        "completion_tokens": 94,
+        "total_tokens": 806
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "decision",
+      "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 50,\n  \"trend_prediction\": \"数据不足，短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"低\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"技术面数据不完整，暂不给出方向判断\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入，等待数据修复\",\n        \"has_position\": \"持有观察，不加仓\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"部分数据源异常\",\n      \"action_window\": \"数据恢复后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势与筹码数据恢复\",\n      \"next_check_time\": \"次日开盘\",\n      \"confidence_reason\": \"技术面数据缺失，置信度低\",\n      \"data_limitations\": \"趋势与筹码数据缺失，仅有行情数据\"\n    }\n  },\n  \"analysis_summary\": \"技术面数据不完整，无法确认趋势结构，建议观望。\",\n  \"key_points\": \"数据缺失；现价100.0\",\n  \"risk_warning\": \"数据不完整，结论可靠性低\"\n}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 930,
+        "completion_tokens": 240,
+        "total_tokens": 1170
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "technical",
+      "technical",
+      "decision"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "get_realtime_quote",
+        "arguments": {
+          "stock_code": "AAPL"
+        },
+        "success": true,
+        "result_length": 124,
+        "cached": false
+      }
+    ],
+    "total_steps": 2,
+    "total_tokens": 2642,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "Apple",
+      "sentiment_score": 50,
+      "trend_prediction": "数据不足，短期中性",
+      "operation_advice": "观望",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "技术面数据不完整，暂不给出方向判断",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "暂不介入，等待数据修复",
+            "has_position": "持有观察，不加仓"
+          },
+          "time_sensitivity": "本周内"
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0,
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "控制仓位",
+            "entry_plan": "暂不介入，等待数据修复",
+            "risk_control": "止损参考 95.0"
+          }
+        },
+        "phase_decision": {
+          "phase_context": "部分数据源异常",
+          "action_window": "数据恢复后",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "趋势与筹码数据恢复",
+          "next_check_time": "次日开盘",
+          "confidence_reason": "技术面数据缺失，置信度低",
+          "data_limitations": "趋势与筹码数据缺失，仅有行情数据"
+        },
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "unknown",
+            "trend_score": 50,
+            "is_bullish": false
+          }
+        },
+        "intelligence": {
+          "risk_alerts": []
+        }
+      },
+      "analysis_summary": "技术面数据不完整，无法确认趋势结构，建议观望。",
+      "key_points": [
+        "仅有行情数据，趋势与筹码数据缺失，无法确认趋势结构。",
+        "技术面数据不完整，无法确认趋势结构，建议观望。"
+      ],
+      "risk_warning": "数据不完整，结论可靠性低"
+    },
+    "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 50,\n  \"trend_prediction\": \"数据不足，短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"技术面数据不完整，暂不给出方向判断\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入，等待数据修复\",\n        \"has_position\": \"持有观察，不加仓\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"控制仓位\",\n        \"entry_plan\": \"暂不介入，等待数据修复\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"部分数据源异常\",\n      \"action_window\": \"数据恢复后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势与筹码数据恢复\",\n      \"next_check_time\": \"次日开盘\",\n      \"confidence_reason\": \"技术面数据缺失，置信度低\",\n      \"data_limitations\": \"趋势与筹码数据缺失，仅有行情数据\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"unknown\",\n        \"trend_score\": 50,\n        \"is_bullish\": false\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面数据不完整，无法确认趋势结构，建议观望。\",\n  \"key_points\": [\n    \"仅有行情数据，趋势与筹码数据缺失，无法确认趋势结构。\",\n    \"技术面数据不完整，无法确认趋势结构，建议观望。\"\n  ],\n  \"risk_warning\": \"数据不完整，结论可靠性低\"\n}",
+    "error": null
+  }
+}

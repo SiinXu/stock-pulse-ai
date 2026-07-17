@@ -1,0 +1,86 @@
+{
+  "id": "us-single-chat-normal",
+  "notes": "US single-agent chat: one quote tool round-trip then a natural-language answer; freezes conversation rows.",
+  "input": {
+    "message": "AAPL 现在适合加仓吗？",
+    "session_id": "replay-us-chat-normal",
+    "context": {
+      "stock_code": "AAPL",
+      "stock_name": "Apple"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_chat",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_uc1",
+          "name": "get_realtime_quote",
+          "arguments": {
+            "stock_code": "AAPL"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 480,
+        "completion_tokens": 24,
+        "total_tokens": 504
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_chat",
+      "content": "根据最新行情，Apple 现价 100.0 美元，今日上涨 1.5%，量比 1.2 属正常水平。\n\n**加仓建议：暂缓追高。**\n\n- 当前价格略高于 MA5，今日已上涨，追高性价比一般。\n- 更稳妥的做法是等缩量回踩 98 美元附近企稳后再加仓。\n- 若已有底仓，可继续持有，跌破 95 美元止损。",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 560,
+        "completion_tokens": 140,
+        "total_tokens": 700
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": null,
+    "stage_sequence": [
+      "single_chat",
+      "single_chat"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "get_realtime_quote",
+        "arguments": {
+          "stock_code": "AAPL"
+        },
+        "success": true,
+        "result_length": 124,
+        "cached": false
+      }
+    ],
+    "total_steps": 2,
+    "total_tokens": 1204,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "根据最新行情，Apple 现价 100.0 美元，今日上涨 1.5%，量比 1.2 属正常水平。\n\n**加仓建议：暂缓追高。**\n\n- 当前价格略高于 MA5，今日已上涨，追高性价比一般。\n- 更稳妥的做法是等缩量回踩 98 美元附近企稳后再加仓。\n- 若已有底仓，可继续持有，跌破 95 美元止损。",
+    "error": null,
+    "conversation": [
+      {
+        "role": "user",
+        "content": "AAPL 现在适合加仓吗？"
+      },
+      {
+        "role": "assistant",
+        "content": "根据最新行情，Apple 现价 100.0 美元，今日上涨 1.5%，量比 1.2 属正常水平。\n\n**加仓建议：暂缓追高。**\n\n- 当前价格略高于 MA5，今日已上涨，追高性价比一般。\n- 更稳妥的做法是等缩量回踩 98 美元附近企稳后再加仓。\n- 若已有底仓，可继续持有，跌破 95 美元止损。"
+      }
+    ],
+    "provider_turns": []
+  }
+}
