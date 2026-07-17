@@ -433,10 +433,19 @@ class TavilySearchProvider(BaseSearchProvider):
             response = client.search(
                 **search_kwargs,
             )
-            
-            # 记录原始响应到日志
-            logger.info(f"[Tavily] 搜索完成，query='{query}', 返回 {len(response.get('results', []))} 条结果")
-            logger.debug(f"[Tavily] 原始响应: {response}")
+
+            if isinstance(response, dict) and "error" in response:
+                _log_search_failure(
+                    provider=self.name,
+                    error_code="tavily_api_response_failed",
+                )
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider=self.name,
+                    success=False,
+                    error_message=_SEARCH_REQUEST_FAILED,
+                )
             
             # 解析结果
             results = []
@@ -448,6 +457,12 @@ class TavilySearchProvider(BaseSearchProvider):
                     source=self._extract_domain(item.get('url', '')),
                     published_date=item.get('published_date') or item.get('publishedDate'),
                 ))
+
+            logger.info(
+                "Search provider response parsed provider=%s result_count=%s",
+                self.name,
+                len(results),
+            )
             
             return SearchResponse(
                 query=query,
@@ -628,9 +643,19 @@ class SerpAPISearchProvider(BaseSearchProvider):
             
             search = GoogleSearch(params)
             response = search.get_dict()
-            
-            # 记录原始响应到日志
-            logger.debug(f"[SerpAPI] 原始响应 keys: {response.keys()}")
+
+            if isinstance(response, dict) and "error" in response:
+                _log_search_failure(
+                    provider=self.name,
+                    error_code="serpapi_api_response_failed",
+                )
+                return SearchResponse(
+                    query=query,
+                    results=[],
+                    provider=self.name,
+                    success=False,
+                    error_message=_SEARCH_REQUEST_FAILED,
+                )
             
             # 解析结果
             results = []
@@ -1099,9 +1124,7 @@ class BochaSearchProvider(BaseSearchProvider):
                     error_message=error_msg
                 )
             
-            # 记录原始响应到日志
             logger.info(f"[Bocha] 搜索完成，query='{query}'")
-            logger.debug(f"[Bocha] 原始响应: {data}")
             
             # 解析搜索结果
             results = []
@@ -1302,9 +1325,7 @@ class AnspireSearchProvider(BaseSearchProvider):
                     error_message=error_msg
                 )
             
-            # 记录原始响应到日志
             logger.info(f"[Anspire] 搜索完成，query='{query}'")
-            logger.debug(f"[Anspire] 原始响应：{data}")
             
             results = []
             value_list = data.get('results', [])
@@ -1548,7 +1569,6 @@ class MiniMaxSearchProvider(BaseSearchProvider):
                 )
 
             logger.info(f"[MiniMax] Search done, query='{query}'")
-            logger.debug(f"[MiniMax] Raw response keys: {list(data.keys())}")
 
             # Parse organic results
             results: List[SearchResult] = []
@@ -1732,7 +1752,6 @@ class BraveSearchProvider(BaseSearchProvider):
                 )
 
             logger.info(f"[Brave] 搜索完成，query='{query}'")
-            logger.debug(f"[Brave] 原始响应: {data}")
 
             # 解析搜索结果
             results = []

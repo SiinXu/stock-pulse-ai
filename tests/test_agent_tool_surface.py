@@ -126,6 +126,17 @@ def test_rejects_unregistered_namespaced_and_unknown_tools() -> None:
     assert surface.execute_tool("missing", {}, None)["error"]["code"] == "tool_not_found"
 
 
+def test_rejects_non_string_tool_names_without_rendering_them() -> None:
+    surface = ToolSurface(_registry_with_echo())
+
+    for malformed_name in (None, 7, ["echo"]):
+        result = surface.execute_tool(malformed_name, {}, None)
+
+        assert result["ok"] is False
+        assert result["tool_name"] == ""
+        assert result["error"]["code"] == "invalid_tool_name"
+
+
 def test_registered_dotted_name_uses_exact_match_only() -> None:
     registry = ToolRegistry()
     registry.register(

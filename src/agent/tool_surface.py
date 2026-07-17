@@ -65,8 +65,18 @@ class ToolSurface:
         """Execute one registered tool by exact name and return structured output."""
         ctx = context or ToolAccessContext()
         started_at = time.time()
-        tool_name = name if isinstance(name, str) else str(name)
-        tool_def = self._registry.resolve(tool_name) if isinstance(name, str) else None
+        tool_name = name if type(name) is str else ""
+        if not tool_name.strip():
+            return self._error_result(
+                tool_name="",
+                code="invalid_tool_name",
+                message="Tool name must exactly match a registered StockPulse tool.",
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                arguments=arguments,
+            )
+        tool_def = self._registry.resolve(tool_name)
 
         if tool_def is None:
             if isinstance(name, str) and (":" in name or "." in name):

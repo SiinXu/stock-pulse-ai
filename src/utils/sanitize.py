@@ -105,6 +105,93 @@ _EXACT_REDACTION_VALUE_LIMIT = 64
 _EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT = _EXACT_REDACTION_VALUE_LIMIT + 1
 _SAFE_RENDER_FAILURE = "[UNRENDERABLE]"
 _UNSAFE_EXCEPTION_ACCESS = object()
+_EXCEPTION_REDACTION_PROVENANCE = "\0stockpulse-exception-redaction\0"
+
+
+class _ExceptionRedactionSnapshot:
+    def __init__(self, root_id: int) -> None:
+        self.root_id = root_id
+        self.summary = _SAFE_RENDER_FAILURE
+
+
+class _ExceptionRedactionValue(str):
+    """Carry snapshot provenance without changing the public set contract."""
+
+    def __new__(cls, value: str, snapshot: _ExceptionRedactionSnapshot):
+        instance = super().__new__(cls, value)
+        instance.snapshot = snapshot
+        return instance
+
+
+class _ExceptionRedactionMarker(str):
+    """Keep provenance when an empty or failed snapshot is copied or merged."""
+
+    def __new__(cls, snapshot: _ExceptionRedactionSnapshot):
+        instance = super().__new__(cls, _EXCEPTION_REDACTION_PROVENANCE)
+        instance.snapshot = snapshot
+        return instance
+
+    def __hash__(self) -> int:
+        return object.__hash__(self)
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
+
+    def __ne__(self, other: object) -> bool:
+        return self is not other
+
+
+class _ExceptionRedactionValues(set[str]):
+    """Exact redactions paired with a single-render sanitized chain snapshot."""
+
+    def __init__(self, root_id: int) -> None:
+        super().__init__()
+        self.snapshot = _ExceptionRedactionSnapshot(root_id)
+        super().add(_ExceptionRedactionMarker(self.snapshot))
+
+    def add_snapshot_value(self, value: str) -> None:
+        super().add(_ExceptionRedactionValue(value, self.snapshot))
+
+    def __copy__(self) -> set[str]:
+        return set(self)
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> set[str]:
+        del memo
+        return set(self)
+
+    @property
+    def root_id(self) -> int:
+        return self.snapshot.root_id
+
+    @property
+    def summary(self) -> str:
+        return self.snapshot.summary
+
+    @summary.setter
+    def summary(self, value: str) -> None:
+        self.snapshot.summary = value
+
+
+class _NormalizedRedactionValues(tuple):
+    """Normalized exact values with optional exception snapshot provenance."""
+
+    def __new__(
+        cls,
+        values: Iterable[str],
+        *,
+        exception_snapshots: Iterable[_ExceptionRedactionSnapshot] = (),
+    ):
+        instance = super().__new__(cls, values)
+        instance.exception_snapshots = tuple(exception_snapshots)
+        return instance
+
+    def __init__(
+        self,
+        values: Iterable[str],
+        *,
+        exception_snapshots: Iterable[_ExceptionRedactionSnapshot] = (),
+    ) -> None:
+        del values, exception_snapshots
 
 
 def _bounded_render_failure(max_length: Any) -> str:
@@ -126,8 +213,16 @@ def _safe_string(value: Any) -> str:
         return _SAFE_RENDER_FAILURE
 
 
-def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
+def _safe_structured_string(
+    value: Any,
+    *,
+    nested: bool = False,
+    _custom_values: Optional[dict[int, str]] = None,
+) -> str:
     """Render built-in containers without invoking repr on nested custom objects."""
+
+    if _custom_values is None:
+        _custom_values = {}
 
     if type(value) is str:
         return repr(value) if nested else value
@@ -138,8 +233,8 @@ def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
     if type(value) is dict:
         try:
             items = (
-                f"{_safe_structured_string(key, nested=True)}: "
-                f"{_safe_structured_string(item, nested=True)}"
+                f"{_safe_structured_string(key, nested=True, _custom_values=_custom_values)}: "
+                f"{_safe_structured_string(item, nested=True, _custom_values=_custom_values)}"
                 for key, item in value.items()
             )
             return "{" + ", ".join(items) + "}"
@@ -148,14 +243,24 @@ def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
     if type(value) is list:
         try:
             return "[" + ", ".join(
-                _safe_structured_string(item, nested=True) for item in value
+                _safe_structured_string(
+                    item,
+                    nested=True,
+                    _custom_values=_custom_values,
+                )
+                for item in value
             ) + "]"
         except BaseException:
             return _SAFE_RENDER_FAILURE
     if type(value) is tuple:
         try:
             rendered = ", ".join(
-                _safe_structured_string(item, nested=True) for item in value
+                _safe_structured_string(
+                    item,
+                    nested=True,
+                    _custom_values=_custom_values,
+                )
+                for item in value
             )
             if len(value) == 1:
                 rendered += ","
@@ -165,7 +270,12 @@ def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
     if type(value) in {set, frozenset}:
         try:
             rendered_items = sorted(
-                _safe_structured_string(item, nested=True) for item in value
+                _safe_structured_string(
+                    item,
+                    nested=True,
+                    _custom_values=_custom_values,
+                )
+                for item in value
             )
             if type(value) is set:
                 return "set()" if not rendered_items else "{" + ", ".join(rendered_items) + "}"
@@ -175,16 +285,22 @@ def _safe_structured_string(value: Any, *, nested: bool = False) -> str:
         except BaseException:
             return _SAFE_RENDER_FAILURE
 
-    rendered = _safe_string(value)
+    identity = id(value)
+    rendered = _custom_values.get(identity)
+    if rendered is None:
+        rendered = _safe_string(value)
+        _custom_values[identity] = rendered
     return repr(rendered) if nested else rendered
 
 
 def _normalize_redaction_values(
     redaction_values: Optional[Iterable[Any]],
-) -> Optional[tuple[str, ...]]:
+) -> Optional[_NormalizedRedactionValues]:
     """Return bounded exact-match values, or None when normalization is unsafe."""
+    if isinstance(redaction_values, _NormalizedRedactionValues):
+        return redaction_values
     if redaction_values is None:
-        return ()
+        return _NormalizedRedactionValues(())
     candidates: Iterable[Any]
     if isinstance(redaction_values, (str, bytes)):
         candidates = (redaction_values,)
@@ -192,6 +308,9 @@ def _normalize_redaction_values(
         candidates = redaction_values
 
     normalized: set[str] = set()
+    snapshots: dict[int, _ExceptionRedactionSnapshot] = {}
+    if isinstance(redaction_values, _ExceptionRedactionValues):
+        snapshots[redaction_values.root_id] = redaction_values.snapshot
     try:
         iterator = iter(candidates)
     except TypeError:
@@ -202,11 +321,18 @@ def _normalize_redaction_values(
         for value in iterator:
             if value is None:
                 continue
+            if isinstance(value, (_ExceptionRedactionValue, _ExceptionRedactionMarker)):
+                snapshot = value.snapshot
+                snapshots[snapshot.root_id] = snapshot
+                if isinstance(value, _ExceptionRedactionMarker):
+                    continue
             rendered = (
                 value.decode("utf-8", errors="replace")
                 if isinstance(value, bytes)
                 else str(value)
             )
+            if rendered == _EXCEPTION_REDACTION_PROVENANCE:
+                return None
             if rendered == _SAFE_RENDER_FAILURE:
                 continue
             if rendered.strip():
@@ -215,7 +341,38 @@ def _normalize_redaction_values(
                     return None
     except BaseException:
         return None
-    return tuple(sorted(normalized, key=len, reverse=True))
+    return _NormalizedRedactionValues(
+        sorted(normalized, key=len, reverse=True),
+        exception_snapshots=snapshots.values(),
+    )
+
+
+def _matching_exception_snapshot(
+    values: _NormalizedRedactionValues,
+    error: Any,
+) -> Optional[_ExceptionRedactionSnapshot]:
+    root_id = id(error)
+    return next(
+        (
+            snapshot
+            for snapshot in values.exception_snapshots
+            if snapshot.root_id == root_id
+        ),
+        None,
+    )
+
+
+def has_matching_exception_snapshot(
+    error: Any,
+    redaction_values: Optional[Iterable[Any]],
+) -> bool:
+    """Return whether values carry a single-render snapshot for ``error``."""
+
+    exact_values = _normalize_redaction_values(redaction_values)
+    return (
+        exact_values is not None
+        and _matching_exception_snapshot(exact_values, error) is not None
+    )
 
 
 def _redact_exact_values(text: str, redaction_values: tuple[str, ...]) -> str:
@@ -235,6 +392,18 @@ def sanitize_diagnostic_text(
     """Redact common secrets and URLs from diagnostic text."""
     exact_values = _normalize_redaction_values(redaction_values)
     if exact_values is None:
+        return _bounded_render_failure(max_length)
+    snapshot = (
+        _matching_exception_snapshot(exact_values, text)
+        if isinstance(text, BaseException)
+        else None
+    )
+    if snapshot is not None:
+        return sanitize_diagnostic_text(
+            snapshot.summary,
+            max_length=max_length,
+        )
+    if isinstance(text, BaseException) and exact_values.exception_snapshots:
         return _bounded_render_failure(max_length)
     try:
         structured_text = (
@@ -330,11 +499,25 @@ def sanitize_exception_chain(
     *,
     max_length: int = _SAFE_EXCEPTION_SUMMARY_MAX_LENGTH,
     redaction_values: Optional[Iterable[Any]] = None,
+    redact_diagnostics: bool = False,
 ) -> str:
     """Return a bounded, sanitized summary of an exception and its causes."""
     exact_values = _normalize_redaction_values(redaction_values)
     if exact_values is None:
         return _bounded_render_failure(max_length)
+    snapshot = _matching_exception_snapshot(exact_values, exc)
+    if snapshot is not None:
+        return sanitize_diagnostic_text(
+            snapshot.summary,
+            max_length=max_length,
+        )
+    if exact_values.exception_snapshots:
+        return sanitize_exception_chain(
+            exc,
+            max_length=max_length,
+            redaction_values=tuple(exact_values),
+            redact_diagnostics=True,
+        )
     try:
         parts: list[str] = []
         current: Optional[BaseException] = exc
@@ -345,14 +528,17 @@ def sanitize_exception_chain(
                 break
             seen.add(identity)
 
-            diagnostic_source = _safe_exception_diagnostic_source(current)
-            if diagnostic_source is _UNSAFE_EXCEPTION_ACCESS:
-                return _bounded_render_failure(max_length)
-            diagnostic = sanitize_diagnostic_text(
-                diagnostic_source,
-                max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
-                redaction_values=exact_values,
-            ) or "no diagnostic message"
+            if redact_diagnostics:
+                diagnostic = _REDACTED
+            else:
+                diagnostic_source = _safe_exception_diagnostic_source(current)
+                if diagnostic_source is _UNSAFE_EXCEPTION_ACCESS:
+                    return _bounded_render_failure(max_length)
+                diagnostic = sanitize_diagnostic_text(
+                    diagnostic_source,
+                    max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
+                    redaction_values=exact_values,
+                ) or "no diagnostic message"
             exception_type = safe_exception_type_name(current, max_length=80)
             parts.append(
                 sanitize_diagnostic_text(
@@ -376,11 +562,13 @@ def sanitize_exception_chain(
 
 
 def exception_chain_redaction_values(error: Any) -> set[str]:
-    """Return bounded exact values matching each rendered chain diagnostic source."""
+    """Return bounded exact values with opaque single-render provenance."""
 
-    values: set[str] = set()
+    values = _ExceptionRedactionValues(id(error))
+    summary_parts: list[str] = []
     current = error
     seen: set[int] = set()
+    rendered_custom_values: dict[int, str] = {}
     while current is not None and len(seen) < _SAFE_EXCEPTION_CHAIN_LIMIT:
         identity = id(current)
         if identity in seen:
@@ -391,27 +579,49 @@ def exception_chain_redaction_values(error: Any) -> set[str]:
 
         diagnostic_source = _safe_exception_diagnostic_source(current)
         if diagnostic_source is _UNSAFE_EXCEPTION_ACCESS:
-            break
-        try:
-            rendered = _safe_structured_string(diagnostic_source).strip()
-        except BaseException:
-            rendered = ""
+            return values
+        rendered = _safe_structured_string(
+            diagnostic_source,
+            _custom_values=rendered_custom_values,
+        ).strip()
+        if rendered == _SAFE_RENDER_FAILURE:
+            return values
         if rendered and rendered != _SAFE_RENDER_FAILURE:
             examined_chunks = 0
             for offset in range(0, len(rendered), _SAFE_EXCEPTION_PART_MAX_LENGTH):
                 chunk = rendered[offset : offset + _SAFE_EXCEPTION_PART_MAX_LENGTH]
                 if chunk:
-                    values.add(chunk)
+                    values.add_snapshot_value(chunk)
                 examined_chunks += 1
                 if len(values) >= _EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT:
                     return values
                 if examined_chunks >= _EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT:
                     break
 
+        diagnostic_markers = [_REDACTED]
+        if rendered:
+            sanitized_rendered = sanitize_diagnostic_text(
+                rendered,
+                max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
+            )
+            if "[REDACTED_URL]" in sanitized_rendered:
+                diagnostic_markers.append("[REDACTED_URL]")
+        diagnostic = " ".join(diagnostic_markers)
+        summary_parts.append(
+            sanitize_diagnostic_text(
+                f"{safe_exception_type_name(current, max_length=80)}: {diagnostic}",
+                max_length=_SAFE_EXCEPTION_PART_MAX_LENGTH,
+            )
+        )
+
         next_exception = _safe_next_exception(current)
         if next_exception is _UNSAFE_EXCEPTION_ACCESS:
-            break
+            return values
         current = next_exception
+    values.summary = sanitize_diagnostic_text(
+        " <- ".join(summary_parts),
+        max_length=_SAFE_EXCEPTION_SUMMARY_MAX_LENGTH,
+    ) or _SAFE_RENDER_FAILURE
     return values
 
 
@@ -469,6 +679,10 @@ def log_safe_exception(
         message = _SAFE_RENDER_FAILURE
     else:
         try:
+            snapshot = (
+                _matching_exception_snapshot(exception_values, exc)
+                or _matching_exception_snapshot(structural_values, exc)
+            )
             summary_values = _normalize_redaction_values(
                 (*structural_values, *exception_values)
             )
@@ -500,7 +714,27 @@ def log_safe_exception(
             fields.extend(
                 _safe_log_context_fields(context, redaction_values=structural_values)
             )
-            summary = sanitize_exception_chain(exc, redaction_values=summary_values)
+            if snapshot is not None:
+                summary = sanitize_diagnostic_text(
+                    snapshot.summary,
+                    max_length=_SAFE_EXCEPTION_SUMMARY_MAX_LENGTH,
+                    redaction_values=summary_values,
+                )
+            elif (
+                structural_values.exception_snapshots
+                or exception_values.exception_snapshots
+                or exception_redaction_values is not None
+            ):
+                summary = sanitize_exception_chain(
+                    exc,
+                    redaction_values=summary_values,
+                    redact_diagnostics=True,
+                )
+            else:
+                summary = sanitize_exception_chain(
+                    exc,
+                    redaction_values=summary_values,
+                )
             fields.extend(
                 (
                     f"exception_type={safe_exception_type_name(exc)}",

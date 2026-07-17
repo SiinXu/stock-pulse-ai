@@ -38,6 +38,22 @@ def _http_failure(*, status_code: int, body: str, json_payload=None) -> MagicMoc
     return response
 
 
+def _log_record_surfaces(records) -> str:
+    surfaces = []
+    for record in records:
+        surfaces.extend(
+            (
+                record.getMessage(),
+                str(record.msg),
+                repr(record.args),
+                repr(record.exc_info),
+                str(record.exc_text or ""),
+                str(record.stack_info or ""),
+            )
+        )
+    return "\n".join(surfaces)
+
+
 def test_bocha_http_failure_does_not_return_or_log_response_body(caplog) -> None:
     canary = "BOCHA_HTTP_BODY_CANARY"
     private_url = "https://private.example.invalid/internal/search?token=secret"
@@ -224,6 +240,172 @@ def test_sdk_provider_exceptions_are_stabilized_at_the_real_catch_boundary(caplo
         assert raw_path not in visible
         assert "provider failed" not in visible
         assert f"error_code={expected_error_code}" in visible
+
+
+def test_malformed_success_payloads_do_not_leak_across_any_log_record_surface(caplog) -> None:
+    canary = "SEARCH_MALFORMED_SUCCESS_CANARY"
+    raw_path = "/Users/private-user/.config/stockpulse/malformed-provider.json"
+    private_url = "https://private.example.invalid/internal/search?token=secret"
+    api_key = "real-secret-search-key-123456789"
+    diagnostic = f"provider body {canary} at {raw_path} via {private_url} key={api_key}"
+
+    tavily_client = MagicMock()
+    tavily_client.search.return_value = {
+        canary: diagnostic,
+        "results": [diagnostic],
+    }
+    tavily_module = SimpleNamespace(TavilyClient=MagicMock(return_value=tavily_client))
+
+    serpapi_search = MagicMock()
+    serpapi_search.get_dict.return_value = {
+        canary: diagnostic,
+        "organic_results": [diagnostic],
+    }
+    serpapi_module = SimpleNamespace(GoogleSearch=MagicMock(return_value=serpapi_search))
+
+    cases = [
+        (
+            TavilySearchProvider([api_key]),
+            lambda: patch.dict(sys.modules, {"tavily": tavily_module}),
+            "tavily_search_failed",
+        ),
+        (
+            SerpAPISearchProvider([api_key]),
+            lambda: patch.dict(sys.modules, {"serpapi": serpapi_module}),
+            "serpapi_search_failed",
+        ),
+        (
+            BochaSearchProvider([api_key]),
+            lambda: patch(
+                "src.search_service._post_with_retry",
+                return_value=_http_failure(
+                    status_code=200,
+                    body=diagnostic,
+                    json_payload={
+                        "code": 200,
+                        canary: diagnostic,
+                        "data": {"webPages": {"value": [diagnostic]}},
+                    },
+                ),
+            ),
+            "bocha_search_failed",
+        ),
+        (
+            AnspireSearchProvider([api_key]),
+            lambda: patch(
+                "src.search_service._get_with_retry",
+                return_value=_http_failure(
+                    status_code=200,
+                    body=diagnostic,
+                    json_payload={"code": 200, canary: diagnostic, "results": [diagnostic]},
+                ),
+            ),
+            "anspire_search_failed",
+        ),
+        (
+            MiniMaxSearchProvider([api_key]),
+            lambda: patch(
+                "src.search_service._post_with_retry",
+                return_value=_http_failure(
+                    status_code=200,
+                    body=diagnostic,
+                    json_payload={
+                        "base_resp": {"status_code": 0},
+                        canary: diagnostic,
+                        "organic": [diagnostic],
+                    },
+                ),
+            ),
+            "minimax_search_failed",
+        ),
+        (
+            BraveSearchProvider([api_key]),
+            lambda: patch(
+                "src.search_service.requests.get",
+                return_value=_http_failure(
+                    status_code=200,
+                    body=diagnostic,
+                    json_payload={
+                        canary: diagnostic,
+                        "web": {"results": [diagnostic]},
+                    },
+                ),
+            ),
+            "brave_search_failed",
+        ),
+    ]
+    caplog.set_level(logging.DEBUG, logger="src.search_service")
+
+    for provider, install_boundary, expected_error_code in cases:
+        caplog.clear()
+        with install_boundary():
+            result = provider.search("query", max_results=3)
+
+        assert result.success is False
+        visible = json.dumps(result.__dict__, ensure_ascii=False) + "\n" + _log_record_surfaces(
+            caplog.records
+        )
+        assert canary not in visible
+        assert raw_path not in visible
+        assert private_url not in visible
+        assert api_key not in visible
+        assert "provider body" not in visible
+        assert f"error_code={expected_error_code}" in visible
+        assert all(record.exc_info is None for record in caplog.records)
+        assert all(record.exc_text is None for record in caplog.records)
+        assert all(record.stack_info is None for record in caplog.records)
+
+
+def test_sdk_error_payloads_fail_before_success_accounting_without_leaks(caplog) -> None:
+    canary = "SEARCH_SDK_ERROR_PAYLOAD_CANARY"
+    raw_path = "/Users/private-user/.config/stockpulse/sdk-error-payload.json"
+    private_url = "https://private.example.invalid/internal/sdk?token=secret"
+    api_key = "real-secret-sdk-key-123456789"
+    diagnostic = f"provider body {canary} at {raw_path} via {private_url} key={api_key}"
+
+    tavily_client = MagicMock()
+    tavily_client.search.return_value = {"error": diagnostic, canary: diagnostic}
+    tavily_module = SimpleNamespace(TavilyClient=MagicMock(return_value=tavily_client))
+
+    serpapi_search = MagicMock()
+    serpapi_search.get_dict.return_value = {"error": diagnostic, canary: diagnostic}
+    serpapi_module = SimpleNamespace(GoogleSearch=MagicMock(return_value=serpapi_search))
+
+    cases = [
+        (
+            TavilySearchProvider([api_key]),
+            lambda: patch.dict(sys.modules, {"tavily": tavily_module}),
+            "tavily_api_response_failed",
+        ),
+        (
+            SerpAPISearchProvider([api_key]),
+            lambda: patch.dict(sys.modules, {"serpapi": serpapi_module}),
+            "serpapi_api_response_failed",
+        ),
+    ]
+    caplog.set_level(logging.DEBUG, logger="src.search_service")
+
+    for provider, install_boundary, expected_error_code in cases:
+        caplog.clear()
+        with install_boundary():
+            result = provider.search("query", max_results=3)
+
+        assert result.success is False
+        assert result.error_message == "Search request failed."
+        assert provider._key_usage[api_key] == 0
+        assert provider._key_errors[api_key] == 1
+        visible = json.dumps(result.__dict__, ensure_ascii=False) + "\n" + _log_record_surfaces(
+            caplog.records
+        )
+        assert canary not in visible
+        assert raw_path not in visible
+        assert private_url not in visible
+        assert api_key not in visible
+        assert "provider body" not in visible
+        assert f"error_code={expected_error_code}" in visible
+        assert all(record.exc_info is None for record in caplog.records)
+        assert all(record.exc_text is None for record in caplog.records)
+        assert all(record.stack_info is None for record in caplog.records)
 
 
 def test_comprehensive_intel_normalizes_provider_error_before_result_and_log(caplog) -> None:

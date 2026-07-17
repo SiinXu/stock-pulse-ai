@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Security regressions for exception logging at HTTP boundaries."""
 
+import copy
 import logging
 from types import SimpleNamespace
 
@@ -43,6 +44,46 @@ class BrokenBaseExceptionStringError(Exception):
 
     def __repr__(self) -> str:
         return "BROKEN_BASE_EXCEPTION_REPR_CANARY"
+
+
+class RotatingDiagnosticError(Exception):
+    secret = "ARBITRARY_SECRET_SECOND_RENDER_987654321"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.render_count = 0
+
+    def __str__(self) -> str:
+        self.render_count += 1
+        if self.render_count == 1:
+            return "harmless-first-render"
+        return self.secret
+
+
+class EmptyFirstRotatingDiagnosticError(Exception):
+    secret = "EMPTY_FIRST_PRIVATE_CANARY_987654321"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.render_count = 0
+
+    def __str__(self) -> str:
+        self.render_count += 1
+        return "" if self.render_count == 1 else self.secret
+
+
+class RaiseFirstRotatingDiagnosticError(Exception):
+    secret = "RAISE_FIRST_PRIVATE_CANARY_987654321"
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.render_count = 0
+
+    def __str__(self) -> str:
+        self.render_count += 1
+        if self.render_count == 1:
+            raise RuntimeError("first diagnostic render failed")
+        return self.secret
 
 
 class MultiArgumentError(Exception):
@@ -245,11 +286,10 @@ def test_exception_chain_uses_fixed_placeholder_when_exception_string_fails() ->
 
 
 def test_exception_chain_redaction_values_catches_base_exception_from_string() -> None:
-    values = exception_chain_redaction_values(
-        BrokenBaseExceptionStringError("RAW_BASE_EXCEPTION_CANARY")
-    )
+    error = BrokenBaseExceptionStringError("RAW_BASE_EXCEPTION_CANARY")
+    values = exception_chain_redaction_values(error)
 
-    assert values == set()
+    assert sanitize_exception_chain(error, redaction_values=values) == SAFE_RENDER_FAILURE
 
 
 def test_exception_chain_redaction_values_match_key_error_diagnostic_source() -> None:
@@ -678,13 +718,17 @@ def test_exception_chain_redaction_values_never_propagates_attribute_failures() 
     ):
         escaped = None
         try:
-            values = exception_chain_redaction_values(error_type("ordinary diagnostic"))
+            error = error_type("ordinary diagnostic")
+            values = exception_chain_redaction_values(error)
         except BaseException as exc:  # pragma: no cover - asserted below
             escaped = exc
             values = set()
 
         assert escaped is None
-        assert values == {"ordinary diagnostic"}
+        assert sanitize_exception_chain(
+            error,
+            redaction_values=values,
+        ) == SAFE_RENDER_FAILURE
 
 
 def test_diagnostic_text_redacts_sensitive_mapping_values() -> None:
@@ -890,6 +934,306 @@ def test_exception_redactions_do_not_corrupt_stable_log_fields(caplog) -> None:
     assert "summary=RuntimeError: [REDACTED]" in rendered
     assert "diagnostic=RuntimeError: [REDACTED]" in rendered
     assert "tavily_search_[REDACTED]" not in rendered
+
+
+def test_exception_redaction_does_not_rerender_dynamic_diagnostic(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_rotating_exception")
+    target_logger = logging.getLogger("tests.safe_rotating_exception")
+    error = RotatingDiagnosticError()
+    exception_values = exception_chain_redaction_values(error)
+
+    assert error.render_count == 1
+    log_safe_exception(
+        target_logger,
+        "Search provider failed",
+        error,
+        error_code="search_provider_failed",
+        exception_redaction_values=exception_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert RotatingDiagnosticError.secret not in rendered
+    assert "summary=RotatingDiagnosticError: [REDACTED]" in rendered
+    assert "diagnostic=RotatingDiagnosticError: [REDACTED]" in rendered
+
+
+def test_exception_chain_helper_does_not_rerender_dynamic_diagnostic() -> None:
+    error = RotatingDiagnosticError()
+    exception_values = exception_chain_redaction_values(error)
+
+    assert error.render_count == 1
+    rendered = sanitize_exception_chain(error, redaction_values=exception_values)
+
+    assert error.render_count == 1
+    assert rendered == "RotatingDiagnosticError: [REDACTED]"
+    assert RotatingDiagnosticError.secret not in rendered
+
+
+def test_diagnostic_text_helper_does_not_rerender_dynamic_exception() -> None:
+    error = RotatingDiagnosticError()
+    exception_values = exception_chain_redaction_values(error)
+
+    assert error.render_count == 1
+    rendered = sanitize_diagnostic_text(error, redaction_values=exception_values)
+
+    assert error.render_count == 1
+    assert rendered == "RotatingDiagnosticError: [REDACTED]"
+    assert RotatingDiagnosticError.secret not in rendered
+
+
+def test_exception_snapshot_survives_plain_set_copy_in_legacy_log_argument(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_copied_exception_snapshot")
+    target_logger = logging.getLogger("tests.safe_copied_exception_snapshot")
+    error = RotatingDiagnosticError()
+    copied_values = set(exception_chain_redaction_values(error))
+
+    assert error.render_count == 1
+    log_safe_exception(
+        target_logger,
+        "Provider failed",
+        error,
+        error_code="provider_failed",
+        redaction_values=copied_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert RotatingDiagnosticError.secret not in rendered
+    assert "Provider failed" in rendered
+    assert "error_code=provider_failed" in rendered
+    assert "summary=RotatingDiagnosticError: [REDACTED]" in rendered
+
+
+def test_empty_exception_snapshot_set_copy_fails_closed_without_rerender(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_empty_copied_snapshot")
+    target_logger = logging.getLogger("tests.safe_empty_copied_snapshot")
+    error = EmptyFirstRotatingDiagnosticError()
+    copied_values = set(exception_chain_redaction_values(error))
+
+    assert copied_values
+    assert error.render_count == 1
+    assert sanitize_diagnostic_text(error, redaction_values=copied_values) == (
+        "EmptyFirstRotatingDiagnosticError: [REDACTED]"
+    )
+    assert sanitize_exception_chain(error, redaction_values=copied_values) == (
+        "EmptyFirstRotatingDiagnosticError: [REDACTED]"
+    )
+    log_safe_exception(
+        target_logger,
+        "Provider failed",
+        error,
+        error_code="provider_failed",
+        exception_redaction_values=copied_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert EmptyFirstRotatingDiagnosticError.secret not in rendered
+    assert "summary=EmptyFirstRotatingDiagnosticError: [REDACTED]" in rendered
+
+
+def test_raising_exception_snapshot_set_copy_fails_closed_without_rerender(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_raising_copied_snapshot")
+    target_logger = logging.getLogger("tests.safe_raising_copied_snapshot")
+    error = RaiseFirstRotatingDiagnosticError()
+    copied_values = set(exception_chain_redaction_values(error))
+
+    assert copied_values
+    assert error.render_count == 1
+    assert sanitize_diagnostic_text(error, redaction_values=copied_values) == SAFE_RENDER_FAILURE
+    assert sanitize_exception_chain(error, redaction_values=copied_values) == SAFE_RENDER_FAILURE
+    log_safe_exception(
+        target_logger,
+        "Provider failed",
+        error,
+        error_code="provider_failed",
+        exception_redaction_values=copied_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert RaiseFirstRotatingDiagnosticError.secret not in rendered
+    assert "summary=[UNRENDERABLE]" in rendered
+
+
+def test_empty_exception_snapshot_markers_survive_set_union() -> None:
+    left = EmptyFirstRotatingDiagnosticError()
+    right = RaiseFirstRotatingDiagnosticError()
+    merged_values = set(exception_chain_redaction_values(left)) | set(
+        exception_chain_redaction_values(right)
+    )
+
+    assert sanitize_diagnostic_text(left, redaction_values=merged_values) == (
+        "EmptyFirstRotatingDiagnosticError: [REDACTED]"
+    )
+    assert sanitize_diagnostic_text(right, redaction_values=merged_values) == (
+        SAFE_RENDER_FAILURE
+    )
+    assert left.render_count == 1
+    assert right.render_count == 1
+
+
+def test_exception_snapshot_survives_shallow_and_deep_copy() -> None:
+    error = EmptyFirstRotatingDiagnosticError()
+    values = exception_chain_redaction_values(error)
+
+    for copied_values in (copy.copy(values), copy.deepcopy(values)):
+        assert sanitize_diagnostic_text(error, redaction_values=copied_values) == (
+            "EmptyFirstRotatingDiagnosticError: [REDACTED]"
+        )
+
+    assert error.render_count == 1
+
+
+def test_empty_snapshot_copy_merged_with_structural_redactions_stays_safe(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_merged_empty_snapshot")
+    target_logger = logging.getLogger("tests.safe_merged_empty_snapshot")
+    error = EmptyFirstRotatingDiagnosticError()
+    structural_canary = "MERGED_STRUCTURAL_CANARY_987654321"
+    copied_values = set(exception_chain_redaction_values(error))
+    copied_values.add(structural_canary)
+
+    log_safe_exception(
+        target_logger,
+        f"Provider {structural_canary} failed",
+        error,
+        error_code="provider_failed",
+        redaction_values=copied_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert EmptyFirstRotatingDiagnosticError.secret not in rendered
+    assert structural_canary not in rendered
+    assert "Provider [REDACTED] failed" in rendered
+    assert "summary=EmptyFirstRotatingDiagnosticError: [REDACTED]" in rendered
+
+
+def test_exception_snapshot_preserves_exact_redaction_for_ordinary_text() -> None:
+    error = RotatingDiagnosticError()
+    exception_values = exception_chain_redaction_values(error)
+
+    rendered = sanitize_diagnostic_text(
+        "prefix harmless-first-render suffix",
+        redaction_values=exception_values,
+    )
+
+    assert error.render_count == 1
+    assert rendered == "prefix [REDACTED] suffix"
+
+
+def test_legacy_exception_snapshot_redacts_structured_log_fields(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_legacy_structural_snapshot")
+    target_logger = logging.getLogger("tests.safe_legacy_structural_snapshot")
+    canary = "STRUCTURAL_PRIVATE_CANARY_987654321"
+    error = RuntimeError(canary)
+    exception_values = exception_chain_redaction_values(error)
+
+    log_safe_exception(
+        target_logger,
+        f"Provider {canary} failed",
+        error,
+        error_code="provider_failed",
+        context={"detail": canary},
+        redaction_values=exception_values,
+    )
+
+    rendered = caplog.records[0].getMessage()
+    assert canary not in rendered
+    assert "Provider [REDACTED] failed" in rendered
+    assert "detail=[REDACTED]" in rendered
+    assert "summary=RuntimeError: [REDACTED]" in rendered
+
+
+def test_exception_snapshot_does_not_rerender_nested_dynamic_value(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_nested_rotating_exception")
+    target_logger = logging.getLogger("tests.safe_nested_rotating_exception")
+    nested = RotatingDiagnosticError()
+    error = RuntimeError([nested])
+    exception_values = exception_chain_redaction_values(error)
+
+    assert nested.render_count == 1
+    log_safe_exception(
+        target_logger,
+        "Search provider failed",
+        error,
+        error_code="search_provider_failed",
+        exception_redaction_values=exception_values,
+    )
+
+    assert nested.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert RotatingDiagnosticError.secret not in rendered
+    assert "summary=RuntimeError: [REDACTED]" in rendered
+
+
+def test_exception_snapshot_renders_repeated_nested_alias_once(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_repeated_nested_alias")
+    target_logger = logging.getLogger("tests.safe_repeated_nested_alias")
+    containers = (
+        lambda value: [value, value],
+        lambda value: (value, value),
+        lambda value: {"first": value, "second": value},
+    )
+
+    for build_container in containers:
+        caplog.clear()
+        nested = RotatingDiagnosticError()
+        error = RuntimeError(build_container(nested))
+        copied_values = set(exception_chain_redaction_values(error))
+
+        assert nested.render_count == 1
+        log_safe_exception(
+            target_logger,
+            "Provider failed",
+            error,
+            error_code="provider_failed",
+            exception_redaction_values=copied_values,
+        )
+
+        assert nested.render_count == 1
+        rendered = caplog.records[0].getMessage()
+        assert RotatingDiagnosticError.secret not in rendered
+        assert "summary=RuntimeError: [REDACTED]" in rendered
+
+
+def test_exception_snapshot_does_not_rerender_alias_across_cause_chain() -> None:
+    cause = RotatingDiagnosticError()
+    error = RuntimeError([cause])
+    error.__cause__ = cause
+
+    copied_values = set(exception_chain_redaction_values(error))
+
+    assert cause.render_count == 1
+    assert sanitize_diagnostic_text(cause, redaction_values=copied_values) == (
+        SAFE_RENDER_FAILURE
+    )
+    assert sanitize_exception_chain(cause, redaction_values=copied_values) == (
+        "RotatingDiagnosticError: [REDACTED]"
+    )
+    assert cause.render_count == 1
+
+
+def test_legacy_redaction_argument_reuses_exception_snapshot(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_legacy_exception_snapshot")
+    target_logger = logging.getLogger("tests.safe_legacy_exception_snapshot")
+    error = RotatingDiagnosticError()
+    exception_values = exception_chain_redaction_values(error)
+
+    assert error.render_count == 1
+    log_safe_exception(
+        target_logger,
+        "Provider failed",
+        error,
+        error_code="provider_failed",
+        redaction_values=exception_values,
+    )
+
+    assert error.render_count == 1
+    rendered = caplog.records[0].getMessage()
+    assert RotatingDiagnosticError.secret not in rendered
+    assert "summary=RotatingDiagnosticError: [REDACTED]" in rendered
 
 
 def test_retry_log_redacts_arbitrary_exception_without_corrupting_fields(caplog) -> None:

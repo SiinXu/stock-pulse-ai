@@ -23,6 +23,18 @@ for _mod in ("litellm", "google.generativeai", "google.genai", "anthropic"):
 import pytest
 
 
+class RotatingGenerationError(RuntimeError):
+    secret = "MARKET_REVIEW_SECOND_RENDER_CANARY_987654321"
+
+    def __init__(self):
+        super().__init__()
+        self.render_count = 0
+
+    def __str__(self):
+        self.render_count += 1
+        return "first render" if self.render_count == 1 else self.secret
+
+
 @pytest.fixture(autouse=True)
 def _llm_usage_hmac_env(monkeypatch):
     monkeypatch.setenv("LLM_USAGE_HMAC_SECRET", "test-usage-hmac-secret")
@@ -2647,6 +2659,93 @@ class TestMarketAnalyzerBypassFix:
         diagnostic = mock_record_llm_run.call_args.kwargs["error_message"]
         assert opaque_secret not in diagnostic
         assert "[REDACTED]" in diagnostic
+
+    def test_market_review_preserves_single_render_exception_snapshot(self):
+        from src.utils.sanitize import exception_chain_redaction_values
+
+        ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
+        error = RotatingGenerationError()
+        snapshot = exception_chain_redaction_values(error)
+
+        with patch.object(
+            ma.analyzer,
+            "get_generation_log_redaction_values",
+            return_value=snapshot,
+        ), patch.object(
+            ma.analyzer,
+            "sanitize_generation_diagnostic",
+            side_effect=lambda value, **_kwargs: str(value),
+        ) as analyzer_sanitizer:
+            diagnostic = ma._sanitize_generation_diagnostic(error)
+
+        assert error.render_count == 1
+        analyzer_sanitizer.assert_not_called()
+        assert RotatingGenerationError.secret not in diagnostic
+        assert diagnostic == "RotatingGenerationError: [REDACTED]"
+
+    def test_backend_error_reuses_single_exception_snapshot(self):
+        from src.market_analyzer import MarketOverview
+
+        ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
+        error = RotatingGenerationError()
+        overview = MarketOverview(date="2026-03-05")
+
+        with patch.object(
+            ma,
+            "_get_analyzer_generation_backend_config_error",
+            return_value=error,
+        ), patch.object(
+            ma.analyzer,
+            "get_generation_log_redaction_values",
+            side_effect=RuntimeError("redaction lookup unavailable"),
+        ) as redaction_lookup, patch.object(
+            ma.analyzer,
+            "sanitize_generation_diagnostic",
+            side_effect=lambda value, **_kwargs: str(value),
+        ) as analyzer_sanitizer, patch(
+            "src.market_analyzer.record_llm_run"
+        ) as mock_record_llm_run:
+            with pytest.raises(RotatingGenerationError):
+                ma.generate_market_review(overview, [])
+
+        assert error.render_count == 1
+        redaction_lookup.assert_called_once()
+        analyzer_sanitizer.assert_not_called()
+        diagnostic = mock_record_llm_run.call_args.kwargs["error_message"]
+        assert RotatingGenerationError.secret not in diagnostic
+        assert diagnostic == "RotatingGenerationError: [REDACTED]"
+
+    def test_backend_error_adds_snapshot_to_normal_redaction_lookup(self):
+        from src.market_analyzer import MarketOverview
+
+        ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
+        error = RotatingGenerationError()
+        overview = MarketOverview(date="2026-03-05")
+
+        with patch.object(
+            ma,
+            "_get_analyzer_generation_backend_config_error",
+            return_value=error,
+        ), patch.object(
+            ma.analyzer,
+            "get_generation_log_redaction_values",
+            return_value=set(),
+        ) as redaction_lookup, patch.object(
+            ma.analyzer,
+            "sanitize_generation_diagnostic",
+            side_effect=lambda value, **_kwargs: str(value),
+        ) as analyzer_sanitizer, patch(
+            "src.market_analyzer.record_llm_run"
+        ) as mock_record_llm_run:
+            with pytest.raises(RotatingGenerationError):
+                ma.generate_market_review(overview, [])
+
+        assert error.render_count == 1
+        redaction_lookup.assert_called_once()
+        analyzer_sanitizer.assert_not_called()
+        diagnostic = mock_record_llm_run.call_args.kwargs["error_message"]
+        assert RotatingGenerationError.secret not in diagnostic
+        assert diagnostic == "RotatingGenerationError: [REDACTED]"
 
     def test_generation_backend_config_error_without_analyzer_does_not_template_fallback(self):
         from src.llm.generation_backend import GenerationError

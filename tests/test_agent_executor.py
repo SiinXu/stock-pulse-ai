@@ -38,6 +38,7 @@ from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.runner import parse_dashboard_json, run_agent_loop, serialize_tool_result
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.data_tools import get_capital_flow_tool
+from src.agent.tools.execution import execute_runner_tool_call
 from src.agent.tools.registry import ToolRegistry, ToolDefinition, ToolParameter
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.config import Config
@@ -1629,6 +1630,116 @@ class TestAgentExecutor(unittest.TestCase):
             },
         )
         self.assertNotIn("Available", tool_messages[0]["content"])
+
+    def test_malformed_tool_names_return_stable_error(self):
+        registry = ToolRegistry()
+
+        for malformed_name in (None, 7, ["echo"]):
+            with self.subTest(malformed_name=malformed_name):
+                tool_call = ToolCall(id="bad", name=malformed_name, arguments={})
+                _, result_text, success, _, cached, guard_result = execute_runner_tool_call(
+                    tool_call=tool_call,
+                    tool_registry=registry,
+                )
+
+                self.assertFalse(success)
+                self.assertFalse(cached)
+                self.assertIsNone(guard_result)
+                self.assertEqual(
+                    json.loads(result_text),
+                    {
+                        "error": "Tool name must exactly match a registered StockPulse tool.",
+                        "code": "invalid_tool_name",
+                        "retriable": False,
+                    },
+                )
+
+    def test_run_agent_loop_normalizes_malformed_tool_names_before_all_surfaces(self):
+        canary = "NON_STRING_TOOL_NAME_CANARY_SECRET"
+
+        class _SensitiveToolName:
+            def __str__(self):
+                return canary
+
+        for malformed_names in (
+            [_SensitiveToolName()],
+            [_SensitiveToolName(), [canary]],
+        ):
+            with self.subTest(call_count=len(malformed_names)):
+                adapter = _make_mock_adapter()
+                malformed_response = LLMResponse(
+                    content="",
+                    tool_calls=[
+                        ToolCall(
+                            id=f"bad-{index}",
+                            name=name,
+                            arguments={},
+                        )
+                        for index, name in enumerate(malformed_names)
+                    ],
+                    usage={"total_tokens": 10},
+                    provider="openai",
+                )
+                adapter.call_with_tools.side_effect = [
+                    malformed_response,
+                    LLMResponse(
+                        content=json.dumps(SAMPLE_DASHBOARD),
+                        tool_calls=[],
+                        usage={"total_tokens": 10},
+                        provider="openai",
+                    ),
+                ]
+                progress_events = []
+
+                with self.assertLogs("src.agent.runner", level="INFO") as captured_logs:
+                    result = run_agent_loop(
+                        messages=[{"role": "user", "content": "Run malformed tools"}],
+                        tool_registry=ToolRegistry(),
+                        llm_adapter=adapter,
+                        max_steps=3,
+                        progress_callback=progress_events.append,
+                    )
+
+                self.assertTrue(result.success)
+                self.assertEqual(len(result.tool_calls_log), len(malformed_names))
+                self.assertTrue(
+                    all(
+                        tool_call.name is original_name
+                        for tool_call, original_name in zip(
+                            malformed_response.tool_calls,
+                            malformed_names,
+                        )
+                    )
+                )
+                visible = json.dumps(
+                    {
+                        "messages": result.messages,
+                        "tool_calls_log": result.tool_calls_log,
+                        "progress_events": progress_events,
+                        "logs": captured_logs.output,
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                self.assertNotIn(canary, visible)
+                self.assertTrue(all(entry["tool"] == "" for entry in result.tool_calls_log))
+                assistant_tool_calls = next(
+                    message["tool_calls"]
+                    for message in result.messages
+                    if message.get("role") == "assistant" and message.get("tool_calls")
+                )
+                self.assertTrue(all(call["name"] == "" for call in assistant_tool_calls))
+                tool_messages = [
+                    message for message in result.messages if message.get("role") == "tool"
+                ]
+                self.assertTrue(all(message["name"] == "" for message in tool_messages))
+                self.assertTrue(
+                    all(
+                        event.get("tool", "") == ""
+                        for event in progress_events
+                        if event.get("type") in {"tool_start", "tool_done"}
+                    )
+                )
 
     def test_non_retriable_tool_failure_is_cached_across_hk_variants(self):
         """Equivalent HK code variants should not re-execute a non-retriable failing tool."""
