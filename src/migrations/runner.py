@@ -9,20 +9,25 @@ import inspect
 import logging
 import secrets
 import sqlite3
-from typing import Dict, Iterator, Optional, Sequence, Tuple, Union
+from threading import Event, RLock
+from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError
+from sqlalchemy.sql.elements import TextClause
 
 from src.migrations.legacy_profiles import sqlite_type_affinity
 from src.migrations.registry import get_migrations
 from src.migrations.types import (
     Migration,
     MigrationError,
+    MigrationMappingResult,
+    MigrationParameters,
     MigrationRegistryError,
     MigrationResult,
     MigrationState,
+    MigrationStatementResult,
     MigrationStatus,
     VerificationResult,
     validate_registry,
@@ -45,6 +50,268 @@ class _RegistryColumn:
     affinity: str
     not_null: bool
     primary_key_position: int
+
+
+class _ForbiddenMigrationCapabilityAccess(AttributeError):
+    """A migration requested connection state outside its execution capability."""
+
+
+_FORBIDDEN_CAPABILITY_ATTRIBUTES = frozenset(
+    {
+        "begin",
+        "begin_nested",
+        "begin_twophase",
+        "close",
+        "commit",
+        "connection",
+        "context",
+        "cursor",
+        "dbapi_connection",
+        "detach",
+        "driver_connection",
+        "engine",
+        "executescript",
+        "execution_options",
+        "get_nested_transaction",
+        "get_transaction",
+        "in_transaction",
+        "invalidate",
+        "raw_connection",
+        "rollback",
+        "savepoint",
+        "set_authorizer",
+    }
+)
+_TRANSACTION_CONTROL_SQL_KEYWORDS = frozenset(
+    {
+        "BEGIN",
+        "COMMIT",
+        "END",
+        "RELEASE",
+        "ROLLBACK",
+        "SAVEPOINT",
+    }
+)
+
+
+def _leading_sql_keyword(statement: str) -> str:
+    """Return SQLite's first keyword after empty statements and comments."""
+    offset = 0
+    statement_length = len(statement)
+    while offset < statement_length:
+        if (
+            statement[offset].isspace()
+            or statement[offset] == ";"
+            or statement[offset] == "\ufeff"
+        ):
+            offset += 1
+            continue
+        if statement.startswith("--", offset):
+            newline = statement.find("\n", offset + 2)
+            if newline < 0:
+                return ""
+            offset = newline + 1
+            continue
+        if statement.startswith("/*", offset):
+            comment_end = statement.find("*/", offset + 2)
+            if comment_end < 0:
+                return ""
+            offset = comment_end + 2
+            continue
+        break
+
+    keyword_start = offset
+    while offset < statement_length and (
+        statement[offset].isalpha() or statement[offset] == "_"
+    ):
+        offset += 1
+    return statement[keyword_start:offset].upper()
+
+
+def _is_transaction_control_sql(statement: str) -> bool:
+    return _leading_sql_keyword(statement) in _TRANSACTION_CONTROL_SQL_KEYWORDS
+
+
+class _MigrationMappingResult:
+    """Detached mapping rows with no SQLAlchemy cursor or connection surface."""
+
+    __slots__ = ("__lease", "__rows")
+
+    def __init__(
+        self,
+        rows: Tuple[Mapping[str, Any], ...],
+        lease: _MigrationExecutionLease,
+    ) -> None:
+        self.__lease = lease
+        self.__rows = rows
+
+    def one_or_none(self) -> Optional[Mapping[str, Any]]:
+        if len(self.__rows) > 1:
+            raise RuntimeError("Expected at most one migration result row")
+        if not self.__rows:
+            return None
+        return dict(self.__rows[0])
+
+    def __getattr__(self, name: str):
+        if name in _FORBIDDEN_CAPABILITY_ATTRIBUTES:
+            self.__lease.reject_capability_access(name)
+        raise AttributeError(name)
+
+
+class _MigrationStatementResult:
+    """Detached statement result exposed to trusted migration code."""
+
+    __slots__ = ("__keys", "__lease", "__rows")
+
+    def __init__(
+        self,
+        *,
+        keys: Tuple[str, ...],
+        lease: _MigrationExecutionLease,
+        rows: Tuple[Tuple[Any, ...], ...],
+    ) -> None:
+        self.__keys = keys
+        self.__lease = lease
+        self.__rows = rows
+
+    def fetchall(self) -> list[Tuple[Any, ...]]:
+        return list(self.__rows)
+
+    def mappings(self) -> MigrationMappingResult:
+        rows = tuple(
+            dict(zip(self.__keys, row))
+            for row in self.__rows
+        )
+        return _MigrationMappingResult(rows, self.__lease)
+
+    def __getattr__(self, name: str):
+        if name in _FORBIDDEN_CAPABILITY_ATTRIBUTES:
+            self.__lease.reject_capability_access(name)
+        raise AttributeError(name)
+
+
+@dataclass(frozen=True)
+class _MigrationExecutionOutcome:
+    """Latched capability violations and statement failures for one upgrade."""
+
+    capability_violation: bool
+    statement_failed: bool
+
+
+class _MigrationExecutionLease:
+    """Runner-owned lifetime for one migration execution capability."""
+
+    __slots__ = (
+        "__capability_violation",
+        "__connection",
+        "__lock",
+        "__migration_id",
+        "__revoked",
+        "__statement_failed",
+    )
+
+    def __init__(self, connection: Connection, migration_id: str) -> None:
+        self.__connection: Optional[Connection] = connection
+        self.__capability_violation = Event()
+        self.__lock = RLock()
+        self.__migration_id = migration_id
+        self.__revoked = Event()
+        self.__statement_failed = Event()
+
+    @contextmanager
+    def connection_scope(self) -> Iterator[Connection]:
+        with self.__lock:
+            connection = self.__connection
+            if self.__revoked.is_set() or connection is None:
+                raise MigrationError(
+                    "migration_transaction_control_forbidden",
+                    self.__migration_id,
+                )
+            try:
+                yield connection
+            except BaseException:
+                self.__statement_failed.set()
+                raise
+
+    def reject_capability_access(self, name: str) -> None:
+        self.__capability_violation.set()
+        raise _ForbiddenMigrationCapabilityAccess(name)
+
+    def revoke(self) -> _MigrationExecutionOutcome:
+        self.__revoked.set()
+        with self.__lock:
+            self.__connection = None
+            return _MigrationExecutionOutcome(
+                capability_violation=self.__capability_violation.is_set(),
+                statement_failed=self.__statement_failed.is_set(),
+            )
+
+
+class _MigrationExecutionFacade:
+    """Expose statement execution while keeping transaction ownership in runner."""
+
+    __slots__ = ("__lease",)
+
+    def __init__(self, lease: _MigrationExecutionLease) -> None:
+        self.__lease = lease
+
+    def execute(
+        self,
+        statement: TextClause,
+        parameters: MigrationParameters = None,
+    ) -> MigrationStatementResult:
+        # SQLAlchemy's executable protocol can invoke a statement-owned callback
+        # with the real Connection. Extract only the plain SQL from the exact
+        # object produced by sqlalchemy.text(), then use the runner-owned driver
+        # path so instance-level callback overrides are never invoked.
+        sql = statement.text if type(statement) is TextClause else None
+        if type(sql) is not str:
+            self.__lease.reject_capability_access("statement")
+        if _is_transaction_control_sql(sql):
+            self.__lease.reject_capability_access("statement")
+        with self.__lease.connection_scope() as connection:
+            if parameters is None:
+                result = connection.exec_driver_sql(sql)
+            else:
+                result = connection.exec_driver_sql(sql, parameters)
+            return self._materialize(result)
+
+    def exec_driver_sql(
+        self,
+        statement: str,
+        parameters: MigrationParameters = None,
+    ) -> MigrationStatementResult:
+        if type(statement) is not str:
+            self.__lease.reject_capability_access("statement")
+        if _is_transaction_control_sql(statement):
+            self.__lease.reject_capability_access("statement")
+        with self.__lease.connection_scope() as connection:
+            if parameters is None:
+                result = connection.exec_driver_sql(statement)
+            else:
+                result = connection.exec_driver_sql(statement, parameters)
+            return self._materialize(result)
+
+    def _materialize(self, result) -> MigrationStatementResult:
+        try:
+            if result.returns_rows:
+                keys = tuple(str(key) for key in result.keys())
+                rows = tuple(tuple(row) for row in result.fetchall())
+            else:
+                keys = ()
+                rows = ()
+            return _MigrationStatementResult(
+                keys=keys,
+                lease=self.__lease,
+                rows=rows,
+            )
+        finally:
+            result.close()
+
+    def __getattr__(self, name: str):
+        if name in _FORBIDDEN_CAPABILITY_ATTRIBUTES:
+            self.__lease.reject_capability_access(name)
+        raise AttributeError(name)
 
 
 class MigrationRunner:
@@ -249,7 +516,26 @@ class MigrationRunner:
 
                 try:
                     with self._guard_upgrade_transaction(connection, migration.id):
-                        upgrade_result = migration.upgrade(connection)
+                        execution_lease = _MigrationExecutionLease(
+                            connection,
+                            migration.id,
+                        )
+                        try:
+                            upgrade_result = migration.upgrade(
+                                _MigrationExecutionFacade(execution_lease)
+                            )
+                        finally:
+                            execution_outcome = execution_lease.revoke()
+                        if execution_outcome.capability_violation:
+                            raise MigrationError(
+                                "migration_transaction_control_forbidden",
+                                migration.id,
+                            )
+                        if execution_outcome.statement_failed:
+                            raise MigrationError(
+                                "migration_upgrade_failed",
+                                migration.id,
+                            )
                         if upgrade_result is not None:
                             cleanup_error = None
                             if inspect.iscoroutine(upgrade_result) or inspect.isgenerator(
@@ -268,6 +554,11 @@ class MigrationRunner:
                             raise invalid_return
                 except MigrationError:
                     raise
+                except _ForbiddenMigrationCapabilityAccess as exc:
+                    raise MigrationError(
+                        "migration_transaction_control_forbidden",
+                        migration.id,
+                    ) from exc
                 except Exception as exc:
                     raise MigrationError("migration_upgrade_failed", migration.id) from exc
 
@@ -484,8 +775,6 @@ class MigrationRunner:
         """Keep transaction ownership inside the runner while upgrade executes."""
         guarded_attributes = []
         missing = object()
-        blocked_transaction_control = []
-        allow_savepoint_release = False
 
         def forbidden(*_args, **_kwargs):
             raise MigrationError(
@@ -534,45 +823,10 @@ class MigrationRunner:
         for method_name in ("close", "commit", "rollback"):
             guard_attribute(raw_connection, method_name)
 
-        def authorize_sqlite_operation(
-            action_code,
-            operation,
-            argument,
-            _database,
-            _trigger,
-        ) -> int:
-            if (
-                action_code == sqlite3.SQLITE_SAVEPOINT
-                and allow_savepoint_release
-                and str(operation or "").upper() == "RELEASE"
-                and argument == savepoint_name
-            ):
-                return sqlite3.SQLITE_OK
-            if action_code in {
-                sqlite3.SQLITE_TRANSACTION,
-                sqlite3.SQLITE_SAVEPOINT,
-            }:
-                blocked_transaction_control.append(str(operation or ""))
-                return sqlite3.SQLITE_DENY
-            return sqlite3.SQLITE_OK
-
-        dbapi_connection.set_authorizer(authorize_sqlite_operation)
-
         try:
             yield
-            try:
-                dbapi_connection.set_authorizer(authorize_sqlite_operation)
-            except Exception as exc:
-                raise MigrationError(
-                    "migration_transaction_control_forbidden",
-                    migration_id,
-                ) from exc
-            if (
-                blocked_transaction_control
-                or not dbapi_connection.in_transaction
-            ):
+            if not dbapi_connection.in_transaction:
                 forbidden()
-            allow_savepoint_release = True
             try:
                 dbapi_connection.execute(
                     f"RELEASE SAVEPOINT {savepoint_name}"
@@ -582,35 +836,14 @@ class MigrationRunner:
                     "migration_transaction_control_forbidden",
                     migration_id,
                 ) from exc
-            finally:
-                allow_savepoint_release = False
             if not dbapi_connection.in_transaction:
                 forbidden()
-        except MigrationError:
-            raise
-        except Exception as exc:
-            if blocked_transaction_control:
-                raise MigrationError(
-                    "migration_transaction_control_forbidden",
-                    migration_id,
-                ) from exc
-            raise
         finally:
-            authorizer_cleanup_error = None
-            try:
-                dbapi_connection.set_authorizer(None)
-            except sqlite3.Error as exc:
-                authorizer_cleanup_error = exc
             for target, name, previous in reversed(guarded_attributes):
                 if previous is missing:
                     delattr(target, name)
                 else:
                     setattr(target, name, previous)
-            if authorizer_cleanup_error is not None:
-                raise MigrationError(
-                    "migration_transaction_control_forbidden",
-                    migration_id,
-                ) from authorizer_cleanup_error
 
     @staticmethod
     def _insert_applied(connection: Connection, migration: Migration) -> None:

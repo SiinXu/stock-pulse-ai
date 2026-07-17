@@ -10,13 +10,57 @@ import inspect
 import json
 from pathlib import Path
 import re
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Mapping, Optional, Protocol, Sequence, Tuple, Union
 
-from sqlalchemy.engine import Connection
+from sqlalchemy.sql.elements import TextClause
 
 
-MigrationUpgrade = Callable[[Connection], None]
+MigrationParameters = Optional[Union[Mapping[str, Any], Sequence[Any]]]
+
+
+class MigrationMappingResult(Protocol):
+    """Safe mapping rows returned by a migration statement."""
+
+    def one_or_none(self) -> Optional[Mapping[str, Any]]:
+        """Return the only mapping row, failing if more than one exists."""
+
+
+class MigrationStatementResult(Protocol):
+    """Materialized statement result without a raw cursor or connection handle."""
+
+    def fetchall(self) -> list[Tuple[Any, ...]]:
+        """Return all rows as detached tuples."""
+
+    def mappings(self) -> MigrationMappingResult:
+        """Return detached rows keyed by their selected column names."""
+
+
+class MigrationExecution(Protocol):
+    """Restricted SQL execution capability supplied to migration upgrades."""
+
+    def execute(
+        self,
+        statement: TextClause,
+        parameters: MigrationParameters = None,
+    ) -> MigrationStatementResult:
+        """Execute one exact ``sqlalchemy.text()`` statement in the transaction."""
+
+    def exec_driver_sql(
+        self,
+        statement: str,
+        parameters: MigrationParameters = None,
+    ) -> MigrationStatementResult:
+        """Execute one driver SQL statement inside the runner-owned transaction."""
+
+
+MigrationUpgrade = Callable[[MigrationExecution], None]
 _MIGRATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_MIGRATION_EXECUTION_ANNOTATION_NAMES = frozenset(
+    {
+        "Connection",
+        "MigrationExecution",
+    }
+)
 _RAW_DBAPI_SOURCE_ATTRIBUTES = frozenset(
     {
         "dbapi_connection",
@@ -139,7 +183,7 @@ def read_checksum_source(source_file: Union[str, Path]) -> str:
         raise ValueError("Migration source file cannot be read") from exc
 
 
-def _function_connection_parameter_names(
+def _function_migration_parameter_names(
     node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
 ) -> frozenset[str]:
     names = set()
@@ -150,9 +194,11 @@ def _function_connection_parameter_names(
         annotation = argument.annotation
         if annotation is not None and any(
             (
-                isinstance(part, ast.Name) and part.id == "Connection"
+                isinstance(part, ast.Name)
+                and part.id in _MIGRATION_EXECUTION_ANNOTATION_NAMES
             ) or (
-                isinstance(part, ast.Attribute) and part.attr == "Connection"
+                isinstance(part, ast.Attribute)
+                and part.attr in _MIGRATION_EXECUTION_ANNOTATION_NAMES
             )
             for part in ast.walk(annotation)
         ):
@@ -176,11 +222,11 @@ def _receiver_attribute_names(node: ast.AST) -> frozenset[str]:
 
 class _SourceBoundMigrationGuard(ast.NodeVisitor):
     def __init__(self) -> None:
-        self._connection_scopes = [frozenset()]
+        self._migration_scopes = [frozenset()]
 
     @property
-    def _connection_names(self) -> frozenset[str]:
-        return self._connection_scopes[-1]
+    def _migration_names(self) -> frozenset[str]:
+        return self._migration_scopes[-1]
 
     def _visit_function(
         self,
@@ -196,14 +242,14 @@ class _SourceBoundMigrationGuard(ast.NodeVisitor):
             parameter_names.add(node.args.vararg.arg)
         if node.args.kwarg is not None:
             parameter_names.add(node.args.kwarg.arg)
-        inherited_names = self._connection_names - parameter_names
-        self._connection_scopes.append(
-            inherited_names | _function_connection_parameter_names(node)
+        inherited_names = self._migration_names - parameter_names
+        self._migration_scopes.append(
+            inherited_names | _function_migration_parameter_names(node)
         )
         try:
             self.generic_visit(node)
         finally:
-            self._connection_scopes.pop()
+            self._migration_scopes.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_function(node)
@@ -225,7 +271,7 @@ class _SourceBoundMigrationGuard(ast.NodeVisitor):
         )
         if raw_attribute is None and (
             "connection" in chain_attributes
-            and root_name in self._connection_names
+            and root_name in self._migration_names
         ):
             raw_attribute = "connection"
         if raw_attribute is not None:
@@ -238,7 +284,7 @@ class _SourceBoundMigrationGuard(ast.NodeVisitor):
             node.attr in _TRANSACTION_CONTROL_SOURCE_ATTRIBUTES
             and (
                 root_name
-                in self._connection_names | _RAW_DBAPI_SOURCE_NAMES
+                in self._migration_names | _RAW_DBAPI_SOURCE_NAMES
                 or receiver_attributes & _RAW_DBAPI_SOURCE_ATTRIBUTES
             )
         ):

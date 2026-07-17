@@ -18,10 +18,11 @@ from typing import Callable, Iterable
 import warnings
 
 import pytest
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.pool import NullPool
 
+import src.migrations.runner as migration_runner_module
 from src.config import Config
 from src.migrations.legacy_profiles import (
     LEGACY_SCHEMA_PROFILES,
@@ -37,6 +38,7 @@ from src.migrations.cli import main as migration_cli_main
 from src.migrations.runner import MigrationRunner
 from src.migrations.types import (
     Migration,
+    MigrationExecution,
     MigrationError,
     MigrationRegistryError,
     calculate_checksum,
@@ -77,44 +79,44 @@ def _reset_database_singletons() -> Iterable[None]:
     Config.reset_instance()
 
 
-def _no_op_upgrade(_connection: Connection) -> None:
+def _no_op_upgrade(_execution: MigrationExecution) -> None:
     return None
 
 
-async def _async_no_op_upgrade(_connection: Connection) -> None:
+async def _async_no_op_upgrade(_execution: MigrationExecution) -> None:
     return None
 
 
-async def _async_generator_no_op_upgrade(_connection: Connection):
+async def _async_generator_no_op_upgrade(_execution: MigrationExecution):
     yield None
 
 
-def _generator_no_op_upgrade(_connection: Connection):
+def _generator_no_op_upgrade(_execution: MigrationExecution):
     yield None
 
 
 @asynccontextmanager
-async def _async_contextmanager_upgrade(_connection: Connection):
+async def _async_contextmanager_upgrade(_execution: MigrationExecution):
     yield None
 
 
 @contextmanager
-def _contextmanager_upgrade(_connection: Connection):
+def _contextmanager_upgrade(_execution: MigrationExecution):
     yield None
 
 
 class _AsyncCallableUpgrade:
-    async def __call__(self, _connection: Connection) -> None:
+    async def __call__(self, _execution: MigrationExecution) -> None:
         return None
 
 
 class _AsyncGeneratorCallableUpgrade:
-    async def __call__(self, _connection: Connection):
+    async def __call__(self, _execution: MigrationExecution):
         yield None
 
 
 class _GeneratorCallableUpgrade:
-    def __call__(self, _connection: Connection):
+    def __call__(self, _execution: MigrationExecution):
         yield None
 
 
@@ -122,7 +124,7 @@ def _custom_migration(
     sequence: int,
     name: str,
     *,
-    upgrade: Callable[[Connection], None] = _no_op_upgrade,
+    upgrade: Callable[[MigrationExecution], None] = _no_op_upgrade,
     source: str | None = None,
     description: str | None = None,
 ) -> Migration:
@@ -140,7 +142,11 @@ def _source_bound_migration_from_source(tmp_path: Path, source: str) -> Migratio
     module_name = "migration_source_guard_probe"
     source_path = tmp_path / f"{module_name}.py"
     source_path.write_text(source, encoding="utf-8")
-    namespace = {"__name__": module_name, "Connection": Connection}
+    namespace = {
+        "__name__": module_name,
+        "Connection": Connection,
+        "MigrationExecution": MigrationExecution,
+    }
     exec(compile(source, str(source_path), "exec"), namespace)
     return Migration.from_source_file(
         id="209901010001_source_guard_probe",
@@ -161,8 +167,59 @@ def _runner_with(*migrations: Migration) -> MigrationRunner:
     return MigrationRunner((*get_migrations(), *migrations))
 
 
+def _request_transaction_control(
+    execution: MigrationExecution,
+    operation: str,
+) -> None:
+    getattr(execution, operation)()
+
+
+def _request_raw_dbapi_connection(execution: MigrationExecution):
+    return getattr(getattr(execution, "connection"), "driver_connection")
+
+
+def _assert_execution_capability_revoked(
+    execution: MigrationExecution,
+    migration_id: str,
+) -> None:
+    with pytest.raises(MigrationError) as error:
+        execution.exec_driver_sql("SELECT 1")
+
+    assert error.value.failure_code == "migration_transaction_control_forbidden"
+    assert error.value.migration_id == migration_id
+    assert str(error.value) == (
+        "Database migration failed: "
+        "code=migration_transaction_control_forbidden "
+        f"migration_id={migration_id}"
+    )
+
+
 def _database_url(path: Path) -> str:
     return f"sqlite:///{path}"
+
+
+def _engine_with_applied_production_registry(path: Path) -> Engine:
+    engine = create_engine(_database_url(path))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in get_migrations():
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
 
 
 def _applied_rows(bind: Engine) -> list[tuple[str, str, str | None]]:
@@ -608,11 +665,11 @@ def test_migration_registration_rejects_lazy_callable(upgrade) -> None:
 
 def test_migration_registration_rejects_wrapped_lazy_chain() -> None:
     @wraps(_generator_no_op_upgrade)
-    def middle(_connection: Connection) -> None:
+    def middle(_execution: MigrationExecution) -> None:
         return None
 
     @wraps(middle)
-    def outer(_connection: Connection) -> None:
+    def outer(_execution: MigrationExecution) -> None:
         return None
 
     with pytest.raises(TypeError, match="upgrade must be synchronous"):
@@ -620,7 +677,7 @@ def test_migration_registration_rejects_wrapped_lazy_chain() -> None:
 
 
 def test_migration_registration_rejects_wrapped_cycle() -> None:
-    def cyclic_upgrade(_connection: Connection) -> None:
+    def cyclic_upgrade(_execution: MigrationExecution) -> None:
         return None
 
     cyclic_upgrade.__wrapped__ = cyclic_upgrade
@@ -677,6 +734,24 @@ def test_source_bound_migration_rejects_nested_closure_raw_dbapi_access(
     )
 
     with pytest.raises(ValueError, match="forbidden raw DBAPI access"):
+        _source_bound_migration_from_source(tmp_path, source)
+
+
+def test_source_bound_migration_rejects_typed_helper_transaction_control(
+    tmp_path: Path,
+) -> None:
+    source = "\n".join(
+        (
+            "def helper(execution: MigrationExecution):",
+            "    execution.commit()",
+            "",
+            "def upgrade(execution):",
+            "    helper(execution)",
+            "",
+        )
+    )
+
+    with pytest.raises(ValueError, match="forbidden transaction control"):
         _source_bound_migration_from_source(tmp_path, source)
 
 
@@ -1504,7 +1579,7 @@ def test_failure_before_ddl_records_nothing(tmp_path: Path) -> None:
     db_path = tmp_path / "failure-before-ddl.sqlite"
     database = DatabaseManager(db_url=_database_url(db_path))
 
-    def fail_before_ddl(_connection: Connection) -> None:
+    def fail_before_ddl(_execution: MigrationExecution) -> None:
         raise RuntimeError("injected before DDL")
 
     migration = _custom_migration(1, "failure_before_ddl", upgrade=fail_before_ddl)
@@ -1536,12 +1611,15 @@ def test_invalid_upgrade_return_rolls_back_ddl_dml_without_applied_row_or_warnin
     db_path = tmp_path / f"{invalid_kind}-upgrade.sqlite"
     database = DatabaseManager(db_url=_database_url(db_path))
     table_name = f"migration_{invalid_kind.replace('-', '_')}_upgrade_probe"
+    retained_execution: MigrationExecution | None = None
 
-    def return_invalid_result(connection: Connection):
-        connection.exec_driver_sql(
+    def return_invalid_result(execution: MigrationExecution):
+        nonlocal retained_execution
+        retained_execution = execution
+        execution.exec_driver_sql(
             f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             f"INSERT INTO {table_name} (id, value) VALUES (1, 'must-roll-back')"
         )
 
@@ -1561,9 +1639,9 @@ def test_invalid_upgrade_return_rolls_back_ddl_dml_without_applied_row_or_warnin
         if invalid_kind == "generator":
             return generator_upgrade()
         if invalid_kind == "async-contextmanager":
-            return _async_contextmanager_upgrade(connection)
+            return _async_contextmanager_upgrade(execution)
         if invalid_kind == "contextmanager":
-            return _contextmanager_upgrade(connection)
+            return _contextmanager_upgrade(execution)
         return "unexpected return value"
 
     migration = _custom_migration(
@@ -1588,18 +1666,23 @@ def test_invalid_upgrade_return_rolls_back_ddl_dml_without_applied_row_or_warnin
         for warning in caught_warnings
         if issubclass(warning.category, RuntimeWarning)
     ]
+    assert retained_execution is not None
+    _assert_execution_capability_revoked(retained_execution, migration.id)
 
 
 def test_failure_after_real_ddl_and_dml_rolls_back_everything(tmp_path: Path) -> None:
     db_path = tmp_path / "failure-after-dml.sqlite"
     database = DatabaseManager(db_url=_database_url(db_path))
     table_name = "migration_failure_after_dml_probe"
+    retained_execution: MigrationExecution | None = None
 
-    def fail_after_dml(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def fail_after_dml(execution: MigrationExecution) -> None:
+        nonlocal retained_execution
+        retained_execution = execution
+        execution.exec_driver_sql(
             f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             f"INSERT INTO {table_name} (id, value) VALUES (1, 'written-before-failure')"
         )
         raise RuntimeError("injected after DDL and DML")
@@ -1612,6 +1695,8 @@ def test_failure_after_real_ddl_and_dml_rolls_back_everything(tmp_path: Path) ->
     assert result.failure_code == "migration_upgrade_failed"
     assert _table_exists(database._engine, table_name) is False
     assert _applied_ids(database._engine) == before_ids
+    assert retained_execution is not None
+    _assert_execution_capability_revoked(retained_execution, migration.id)
 
 
 def test_applied_insert_failure_rolls_back_real_ddl_and_dml(tmp_path: Path) -> None:
@@ -1619,11 +1704,11 @@ def test_applied_insert_failure_rolls_back_real_ddl_and_dml(tmp_path: Path) -> N
     database = DatabaseManager(db_url=_database_url(db_path))
     table_name = "migration_applied_insert_failure_probe"
 
-    def upgrade(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def upgrade(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             f"INSERT INTO {table_name} (id, value) VALUES (1, 'transactional')"
         )
 
@@ -1646,16 +1731,658 @@ def test_applied_insert_failure_rolls_back_real_ddl_and_dml(tmp_path: Path) -> N
     assert _applied_rows(database._engine) == before_rows
 
 
+def test_upgrade_receives_restricted_execution_capability_with_safe_results(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "restricted-execution-capability.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    observed: dict[str, object] = {}
+    retained: dict[str, object] = {}
+
+    def inspect_capability(execution: MigrationExecution) -> None:
+        retained["execution"] = execution
+        driver_result = execution.exec_driver_sql("SELECT 7 AS value")
+        retained["driver_result"] = driver_result
+        observed["driver_rows"] = driver_result.fetchall()
+        mapping_result = execution.execute(
+            text("SELECT :value AS value"),
+            {"value": 9},
+        ).mappings()
+        retained["mapping_result"] = mapping_result
+        mapping = mapping_result.one_or_none()
+        observed["mapping"] = None if mapping is None else dict(mapping)
+
+    migration = _custom_migration(
+        1,
+        "restricted_execution_capability",
+        upgrade=inspect_capability,
+    )
+    try:
+        result = _runner_with(migration).apply_pending(engine)
+        observed["forbidden_execution_attributes"] = {
+            name: hasattr(retained["execution"], name)
+            for name in (
+                "begin",
+                "close",
+                "commit",
+                "connection",
+                "cursor",
+                "driver_connection",
+                "engine",
+                "executescript",
+                "raw_connection",
+                "rollback",
+                "savepoint",
+            )
+        }
+        observed["forbidden_result_attributes"] = {
+            name: hasattr(retained["driver_result"], name)
+            for name in (
+                "begin",
+                "close",
+                "commit",
+                "connection",
+                "context",
+                "cursor",
+                "driver_connection",
+                "engine",
+                "executescript",
+                "raw_connection",
+                "rollback",
+                "savepoint",
+            )
+        }
+        observed["forbidden_mapping_result_attributes"] = {
+            name: hasattr(retained["mapping_result"], name)
+            for name in (
+                "begin",
+                "close",
+                "commit",
+                "connection",
+                "context",
+                "cursor",
+                "driver_connection",
+                "engine",
+                "executescript",
+                "raw_connection",
+                "rollback",
+                "savepoint",
+            )
+        }
+    finally:
+        engine.dispose()
+
+    assert result.success is True
+    assert observed == {
+        "driver_rows": [(7,)],
+        "forbidden_execution_attributes": {
+            "begin": False,
+            "close": False,
+            "commit": False,
+            "connection": False,
+            "cursor": False,
+            "driver_connection": False,
+            "engine": False,
+            "executescript": False,
+            "raw_connection": False,
+            "rollback": False,
+            "savepoint": False,
+        },
+        "forbidden_result_attributes": {
+            "begin": False,
+            "close": False,
+            "commit": False,
+            "connection": False,
+            "context": False,
+            "cursor": False,
+            "driver_connection": False,
+            "engine": False,
+            "executescript": False,
+            "raw_connection": False,
+            "rollback": False,
+            "savepoint": False,
+        },
+        "forbidden_mapping_result_attributes": {
+            "begin": False,
+            "close": False,
+            "commit": False,
+            "connection": False,
+            "context": False,
+            "cursor": False,
+            "driver_connection": False,
+            "engine": False,
+            "executescript": False,
+            "raw_connection": False,
+            "rollback": False,
+            "savepoint": False,
+        },
+        "mapping": {"value": 9},
+    }
+
+
+@pytest.mark.parametrize(
+    "caught_request",
+    ("helper_commit", "result_cursor", "sql_commit"),
+)
+def test_caught_capability_violation_still_rolls_back_migration(
+    tmp_path: Path,
+    caught_request: str,
+) -> None:
+    db_path = tmp_path / f"caught-capability-violation-{caught_request}.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_caught_capability_violation_probe"
+
+    def catch_forbidden_request(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+        )
+        try:
+            if caught_request == "helper_commit":
+                _request_transaction_control(execution, "commit")
+            elif caught_request == "result_cursor":
+                getattr(execution.exec_driver_sql("SELECT 1"), "cursor")
+            else:
+                execution.exec_driver_sql("COMMIT")
+        except AttributeError:
+            pass
+
+    migration = _custom_migration(
+        1,
+        f"caught_capability_violation_{caught_request}",
+        upgrade=catch_forbidden_request,
+    )
+    try:
+        result = _runner_with(migration).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "migration_transaction_control_forbidden"
+        assert result.failed_migration_id == migration.id
+        assert _table_exists(engine, table_name) is False
+        assert migration.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_custom_sqlalchemy_executable_cannot_receive_connection_or_commit_ddl(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "custom-executable-callback.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_custom_executable_probe"
+    callback_calls: list[str] = []
+
+    class ConnectionCapturingStatement:
+        def _execute_on_connection(
+            self,
+            connection: Connection,
+            _distilled_parameters,
+            _execution_options,
+        ):
+            callback_calls.append("called")
+            dbapi_connection = connection.connection.driver_connection
+            dbapi_connection.set_authorizer(None)
+            dbapi_connection.commit()
+            return connection.exec_driver_sql("SELECT 1")
+
+    def attempt_callback_escape(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+        )
+        execution.execute(ConnectionCapturingStatement())  # type: ignore[arg-type]
+
+    migration = _custom_migration(
+        1,
+        "custom_executable_callback",
+        upgrade=attempt_callback_escape,
+    )
+    try:
+        result = _runner_with(migration).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "migration_transaction_control_forbidden"
+        assert result.failed_migration_id == migration.id
+        assert callback_calls == []
+        assert _table_exists(engine, table_name) is False
+        assert migration.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_exec_driver_sql_rejects_custom_string_subclass_and_rolls_back(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "custom-driver-sql-string.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_custom_driver_sql_string_probe"
+
+    class CustomSqlString(str):
+        pass
+
+    def attempt_custom_string(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+        )
+        execution.exec_driver_sql(CustomSqlString("SELECT 1"))
+
+    migration = _custom_migration(
+        1,
+        "custom_driver_sql_string",
+        upgrade=attempt_custom_string,
+    )
+    try:
+        result = _runner_with(migration).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "migration_transaction_control_forbidden"
+        assert result.failed_migration_id == migration.id
+        assert _table_exists(engine, table_name) is False
+        assert migration.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_mutated_text_clause_callback_cannot_receive_connection_or_commit_ddl(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "mutated-text-clause-callback.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_mutated_text_clause_probe"
+    callback_calls: list[str] = []
+
+    def attempt_callback_escape(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+        )
+        statement = text("SELECT 1")
+
+        def capture_connection(
+            connection: Connection,
+            _distilled_parameters,
+            _execution_options,
+        ):
+            callback_calls.append("called")
+            dbapi_connection = connection.connection.driver_connection
+            dbapi_connection.set_authorizer(None)
+            dbapi_connection.commit()
+            return connection.exec_driver_sql("SELECT 1")
+
+        statement._execute_on_connection = capture_connection  # type: ignore[method-assign]
+        execution.execute(statement)
+
+    migration = _custom_migration(
+        1,
+        "mutated_text_clause_callback",
+        upgrade=attempt_callback_escape,
+    )
+    try:
+        result = _runner_with(migration).apply_pending(engine)
+
+        assert result.success is True
+        assert callback_calls == []
+        assert _table_exists(engine, table_name) is True
+        assert migration.id in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_retained_execution_capability_is_revoked_for_caller_owned_connection(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "retained-execution-capability.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    retained: dict[str, MigrationExecution] = {}
+
+    def retain_capability(execution: MigrationExecution) -> None:
+        retained["execution"] = execution
+
+    migration = _custom_migration(
+        1,
+        "retained_execution_capability",
+        upgrade=retain_capability,
+    )
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql(
+                "CREATE TABLE migration_retained_dml_probe "
+                "(id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
+            )
+            connection.commit()
+
+            result = _runner_with(migration).apply_pending(connection)
+
+            assert result.success is True
+            assert connection.closed is False
+            retained_execution = retained["execution"]
+            with pytest.raises(MigrationError) as execute_error:
+                retained_execution.execute(
+                    text(
+                        "INSERT INTO migration_retained_dml_probe (id, value) "
+                        "VALUES (:id, :value)"
+                    ),
+                    {"id": 1, "value": "must-not-persist"},
+                )
+            with pytest.raises(MigrationError) as driver_error:
+                retained_execution.exec_driver_sql(
+                    "CREATE TABLE migration_retained_ddl_probe "
+                    "(id INTEGER PRIMARY KEY)"
+                )
+
+            for error in (execute_error.value, driver_error.value):
+                assert error.failure_code == "migration_transaction_control_forbidden"
+                assert error.migration_id == migration.id
+            row_count = connection.exec_driver_sql(
+                "SELECT COUNT(*) FROM migration_retained_dml_probe"
+            ).scalar_one()
+            escaped_table = connection.exec_driver_sql(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                ("migration_retained_ddl_probe",),
+            ).scalar_one_or_none()
+
+        assert row_count == 0
+        assert escaped_table is None
+    finally:
+        engine.dispose()
+
+
+def test_caller_owned_sqlite_authorizer_remains_installed_after_migration(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "caller-owned-authorizer.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    migration = _custom_migration(1, "preserve_caller_authorizer")
+
+    def preserve_user_version_policy(
+        action_code,
+        argument,
+        _second_argument,
+        _database,
+        _trigger,
+    ) -> int:
+        if (
+            action_code == sqlite3.SQLITE_PRAGMA
+            and str(argument or "").lower() == "user_version"
+        ):
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    try:
+        with engine.connect() as connection:
+            dbapi_connection = connection.connection.driver_connection
+            dbapi_connection.set_authorizer(preserve_user_version_policy)
+            try:
+                result = _runner_with(migration).apply_pending(connection)
+
+                assert result.success is True
+                assert migration.id in _applied_ids(engine)
+                with pytest.raises(sqlite3.DatabaseError):
+                    dbapi_connection.execute("PRAGMA user_version").fetchall()
+            finally:
+                dbapi_connection.set_authorizer(None)
+    finally:
+        engine.dispose()
+
+
+def test_in_flight_execution_finishes_before_capability_is_revoked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "in-flight-execution-capability.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_in_flight_execution_probe"
+    probe_sql = f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+    statement_entered = threading.Event()
+    allow_statement = threading.Event()
+    revoke_started = threading.Event()
+    revoke_finished = threading.Event()
+    apply_finished = threading.Event()
+    worker_threads: list[threading.Thread] = []
+    worker_errors: list[BaseException] = []
+    late_errors: list[BaseException] = []
+    apply_results = []
+    apply_errors: list[BaseException] = []
+    retained: dict[str, MigrationExecution] = {}
+
+    original_exec_driver_sql = Connection.exec_driver_sql
+
+    def blocking_exec_driver_sql(
+        connection: Connection,
+        statement: str,
+        parameters=None,
+        execution_options=None,
+    ):
+        if statement == probe_sql:
+            statement_entered.set()
+            if not allow_statement.wait(timeout=5):
+                raise RuntimeError("Timed out waiting to release migration statement")
+        return original_exec_driver_sql(
+            connection,
+            statement,
+            parameters,
+            execution_options=execution_options,
+        )
+
+    original_revoke = migration_runner_module._MigrationExecutionLease.revoke
+
+    def observed_revoke(lease):
+        revoke_started.set()
+        try:
+            return original_revoke(lease)
+        finally:
+            revoke_finished.set()
+
+    monkeypatch.setattr(Connection, "exec_driver_sql", blocking_exec_driver_sql)
+    monkeypatch.setattr(
+        migration_runner_module._MigrationExecutionLease,
+        "revoke",
+        observed_revoke,
+    )
+
+    def start_in_flight_statement(execution: MigrationExecution) -> None:
+        retained["execution"] = execution
+
+        def execute_statement() -> None:
+            try:
+                execution.exec_driver_sql(probe_sql)
+            except BaseException as exc:
+                worker_errors.append(exc)
+
+        worker = threading.Thread(target=execute_statement)
+        worker_threads.append(worker)
+        worker.start()
+        if not statement_entered.wait(timeout=5):
+            raise RuntimeError("Migration statement did not start")
+
+    migration = _custom_migration(
+        1,
+        "in_flight_execution_capability",
+        upgrade=start_in_flight_statement,
+    )
+    runner = _runner_with(migration)
+
+    try:
+        with engine.connect() as connection:
+            def apply_migration() -> None:
+                try:
+                    apply_results.append(runner.apply_pending(connection))
+                except BaseException as exc:
+                    apply_errors.append(exc)
+                finally:
+                    apply_finished.set()
+
+            apply_thread = threading.Thread(target=apply_migration)
+            apply_thread.start()
+
+            assert statement_entered.wait(timeout=5)
+            assert revoke_started.wait(timeout=5)
+            lease = getattr(
+                retained["execution"],
+                "_MigrationExecutionFacade__lease",
+            )
+            revoked = getattr(lease, "_MigrationExecutionLease__revoked")
+            assert revoked.wait(timeout=5)
+            assert revoke_finished.wait(timeout=0.2) is False
+            assert apply_finished.is_set() is False
+
+            late_table_name = "migration_late_execution_probe"
+
+            def execute_after_revoke() -> None:
+                try:
+                    retained["execution"].exec_driver_sql(
+                        f"CREATE TABLE {late_table_name} (id INTEGER PRIMARY KEY)"
+                    )
+                except BaseException as exc:
+                    late_errors.append(exc)
+
+            late_thread = threading.Thread(target=execute_after_revoke)
+            late_thread.start()
+
+            allow_statement.set()
+            apply_thread.join(timeout=5)
+            late_thread.join(timeout=5)
+            for worker in worker_threads:
+                worker.join(timeout=5)
+
+            assert apply_thread.is_alive() is False
+            assert late_thread.is_alive() is False
+            assert all(worker.is_alive() is False for worker in worker_threads)
+            assert revoke_finished.is_set() is True
+            assert apply_errors == []
+            assert worker_errors == []
+            assert len(late_errors) == 1
+            assert isinstance(late_errors[0], MigrationError)
+            assert late_errors[0].failure_code == "migration_transaction_control_forbidden"
+            assert late_errors[0].migration_id == migration.id
+            assert len(apply_results) == 1
+            assert apply_results[0].success is True
+            assert _table_exists(engine, table_name) is True
+            assert _table_exists(engine, late_table_name) is False
+            assert migration.id in _applied_ids(engine)
+    finally:
+        allow_statement.set()
+        engine.dispose()
+
+
+def test_in_flight_statement_failure_rolls_back_without_applied_row(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "in-flight-statement-failure.sqlite"
+    engine = _engine_with_applied_production_registry(db_path)
+    table_name = "migration_in_flight_failure_probe"
+    failing_sql = "SELECT migration_in_flight_failure()"
+    statement_entered = threading.Event()
+    allow_failure = threading.Event()
+    retained: dict[str, object] = {}
+    worker_errors: list[BaseException] = []
+    apply_results = []
+
+    original_exec_driver_sql = Connection.exec_driver_sql
+
+    def failing_exec_driver_sql(
+        connection: Connection,
+        statement: str,
+        parameters=None,
+        execution_options=None,
+    ):
+        if statement == failing_sql:
+            statement_entered.set()
+            if not allow_failure.wait(timeout=5):
+                raise RuntimeError("Timed out waiting to release failing statement")
+            raise sqlite3.OperationalError("injected migration statement failure")
+        return original_exec_driver_sql(
+            connection,
+            statement,
+            parameters,
+            execution_options=execution_options,
+        )
+
+    monkeypatch.setattr(Connection, "exec_driver_sql", failing_exec_driver_sql)
+
+    def start_failing_statement(execution: MigrationExecution) -> None:
+        retained["execution"] = execution
+        execution.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY)"
+        )
+
+        def execute_statement() -> None:
+            try:
+                execution.exec_driver_sql(failing_sql)
+            except BaseException as exc:
+                worker_errors.append(exc)
+
+        worker = threading.Thread(target=execute_statement)
+        retained["worker"] = worker
+        worker.start()
+        if not statement_entered.wait(timeout=5):
+            raise RuntimeError("Failing migration statement did not start")
+
+    migration = _custom_migration(
+        1,
+        "in_flight_statement_failure",
+        upgrade=start_failing_statement,
+    )
+    runner = _runner_with(migration)
+
+    try:
+        with engine.connect() as connection:
+            apply_thread = threading.Thread(
+                target=lambda: apply_results.append(runner.apply_pending(connection))
+            )
+            apply_thread.start()
+
+            assert statement_entered.wait(timeout=5)
+            lease = getattr(
+                retained["execution"],
+                "_MigrationExecutionFacade__lease",
+            )
+            revoked = getattr(lease, "_MigrationExecutionLease__revoked")
+            assert revoked.wait(timeout=5)
+
+            allow_failure.set()
+            apply_thread.join(timeout=5)
+            worker = retained["worker"]
+            assert isinstance(worker, threading.Thread)
+            worker.join(timeout=5)
+
+            assert apply_thread.is_alive() is False
+            assert worker.is_alive() is False
+            assert len(worker_errors) == 1
+            assert isinstance(worker_errors[0], sqlite3.OperationalError)
+            assert len(apply_results) == 1
+            result = apply_results[0]
+            assert result.success is False
+            assert result.failure_code == "migration_upgrade_failed"
+            assert result.failed_migration_id == migration.id
+            assert _table_exists(engine, table_name) is False
+            assert migration.id not in _applied_ids(engine)
+    finally:
+        allow_failure.set()
+        engine.dispose()
+
+
 @pytest.mark.parametrize(
     "transaction_control",
     (
+        "begin",
         "commit",
         "rollback",
+        "savepoint",
+        "helper_begin",
+        "helper_commit",
+        "helper_rollback",
+        "helper_savepoint",
+        "sql_begin",
+        "sql_bom_commit",
         "sql_commit",
+        "sql_end",
         "sql_rollback",
+        "sql_savepoint",
+        "sql_release",
         "sql_commented_commit",
         "sql_commented_rollback",
         "sql_semicolon_commit",
+        "executescript",
+        "result_cursor",
         "raw_commit",
         "raw_rollback",
         "raw_cursor_commit",
@@ -1666,48 +2393,65 @@ def test_upgrade_cannot_control_runner_transaction(
     transaction_control: str,
 ) -> None:
     db_path = tmp_path / f"forbidden-{transaction_control}.sqlite"
-    database = DatabaseManager(db_url=_database_url(db_path))
+    engine = _engine_with_applied_production_registry(db_path)
 
-    def control_transaction(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def control_transaction(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             "CREATE TABLE migration_transaction_control_probe "
             "(id INTEGER PRIMARY KEY)"
         )
         sql_controls = {
+            "sql_begin": "BEGIN",
+            "sql_bom_commit": " \ufeffCOMMIT",
             "sql_commit": "COMMIT",
+            "sql_end": "END",
             "sql_rollback": "ROLLBACK",
+            "sql_savepoint": "SAVEPOINT migration_forbidden_savepoint",
+            "sql_release": "RELEASE SAVEPOINT migration_forbidden_savepoint",
             "sql_commented_commit": "/* helper */ COMMIT",
             "sql_commented_rollback": "-- helper\nROLLBACK",
             "sql_semicolon_commit": ";COMMIT",
         }
         if transaction_control in sql_controls:
-            connection.exec_driver_sql(sql_controls[transaction_control])
+            execution.exec_driver_sql(sql_controls[transaction_control])
+        elif transaction_control.startswith("helper_"):
+            _request_transaction_control(
+                execution,
+                transaction_control.removeprefix("helper_"),
+            )
+        elif transaction_control == "executescript":
+            getattr(execution, "executescript")("COMMIT")
+        elif transaction_control == "result_cursor":
+            getattr(execution.exec_driver_sql("SELECT 1"), "cursor")
         elif transaction_control == "raw_cursor_commit":
-            cursor = connection.connection.driver_connection.cursor()
+            cursor = _request_raw_dbapi_connection(execution).cursor()
             try:
                 cursor.execute("/* helper */ COMMIT")
             finally:
                 cursor.close()
         elif transaction_control.startswith("raw_"):
             getattr(
-                connection.connection.driver_connection,
+                _request_raw_dbapi_connection(execution),
                 transaction_control.removeprefix("raw_"),
             )()
         else:
-            getattr(connection, transaction_control)()
+            getattr(execution, transaction_control)()
 
     migration = _custom_migration(
         1,
         f"forbidden_{transaction_control}",
         upgrade=control_transaction,
     )
-    result = _runner_with(migration).apply_pending(database._engine)
+    try:
+        result = _runner_with(migration).apply_pending(engine)
 
-    assert result.success is False
-    assert result.failure_code == "migration_transaction_control_forbidden"
-    assert result.failed_migration_id == migration.id
-    assert migration.id not in _applied_ids(database._engine)
-    assert _table_exists(database._engine, "migration_transaction_control_probe") is False
+        assert result.success is False
+        assert result.failure_code == "migration_transaction_control_forbidden"
+        assert result.failed_migration_id == migration.id
+        assert migration.id not in _applied_ids(engine)
+        assert _table_exists(engine, "migration_transaction_control_probe") is False
+    finally:
+        engine.dispose()
 
 
 @pytest.mark.parametrize(
@@ -1715,24 +2459,24 @@ def test_upgrade_cannot_control_runner_transaction(
     [False, True],
     ids=["direct-commit", "replacement-transaction"],
 )
-def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
+def test_restricted_capability_blocks_authorizer_clear_and_commit_atomically(
     tmp_path: Path,
     open_replacement_transaction: bool,
 ) -> None:
     db_path = tmp_path / "forbidden-authorizer-clear-commit.sqlite"
-    database = DatabaseManager(db_url=_database_url(db_path))
+    engine = _engine_with_applied_production_registry(db_path)
 
-    def bypass_transaction_guard(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def bypass_transaction_guard(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             "CREATE TABLE migration_authorizer_bypass_probe "
             "(id INTEGER PRIMARY KEY)"
         )
-        dbapi_connection = connection.connection.driver_connection
+        dbapi_connection = _request_raw_dbapi_connection(execution)
         dbapi_connection.set_authorizer(None)
         dbapi_connection.commit()
         if open_replacement_transaction:
             dbapi_connection.execute("BEGIN IMMEDIATE")
-            connection.exec_driver_sql(
+            execution.exec_driver_sql(
                 "CREATE TABLE migration_replacement_transaction_probe "
                 "(id INTEGER PRIMARY KEY)"
             )
@@ -1742,19 +2486,17 @@ def test_runtime_guard_detects_authorizer_clear_and_commit_before_applied_row(
         "forbidden_authorizer_clear_commit",
         upgrade=bypass_transaction_guard,
     )
-    result = _runner_with(migration).apply_pending(database._engine)
+    try:
+        result = _runner_with(migration).apply_pending(engine)
 
-    assert result.success is False
-    assert result.failure_code == "migration_transaction_control_forbidden"
-    assert result.failed_migration_id == migration.id
-    assert migration.id not in _applied_ids(database._engine)
-    # Detection happens after the prohibited DBAPI commit, which cannot be undone.
-    assert _table_exists(database._engine, "migration_authorizer_bypass_probe") is True
-    if open_replacement_transaction:
-        assert (
-            _table_exists(database._engine, "migration_replacement_transaction_probe")
-            is False
-        )
+        assert result.success is False
+        assert result.failure_code == "migration_transaction_control_forbidden"
+        assert result.failed_migration_id == migration.id
+        assert migration.id not in _applied_ids(engine)
+        assert _table_exists(engine, "migration_authorizer_bypass_probe") is False
+        assert _table_exists(engine, "migration_replacement_transaction_probe") is False
+    finally:
+        engine.dispose()
 
 
 def test_failed_migration_can_be_fixed_and_retried_forward(tmp_path: Path) -> None:
@@ -1762,11 +2504,11 @@ def test_failed_migration_can_be_fixed_and_retried_forward(tmp_path: Path) -> No
     database = DatabaseManager(db_url=_database_url(db_path))
     table_name = "migration_forward_retry_probe"
 
-    def broken_upgrade(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def broken_upgrade(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             f"INSERT INTO {table_name} (id, value) VALUES (1, 'rolled-back')"
         )
         raise RuntimeError("injected migration defect")
@@ -1782,11 +2524,11 @@ def test_failed_migration_can_be_fixed_and_retried_forward(tmp_path: Path) -> No
     assert broken.id not in _applied_ids(database._engine)
     assert _table_exists(database._engine, table_name) is False
 
-    def fixed_upgrade(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def fixed_upgrade(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             f"INSERT INTO {table_name} (id, value) VALUES (1, 'recovered')"
         )
 
@@ -1813,15 +2555,15 @@ def test_later_migration_does_not_run_after_prior_failure(tmp_path: Path) -> Non
     database = DatabaseManager(db_url=_database_url(db_path))
     later_calls: list[str] = []
 
-    def first_upgrade(connection: Connection) -> None:
-        connection.exec_driver_sql(
+    def first_upgrade(execution: MigrationExecution) -> None:
+        execution.exec_driver_sql(
             "CREATE TABLE migration_first_failure_probe (id INTEGER PRIMARY KEY)"
         )
         raise RuntimeError("first migration failed")
 
-    def later_upgrade(connection: Connection) -> None:
+    def later_upgrade(execution: MigrationExecution) -> None:
         later_calls.append("called")
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             "CREATE TABLE migration_later_probe (id INTEGER PRIMARY KEY)"
         )
 
@@ -1848,14 +2590,14 @@ def test_two_independent_engines_execute_pending_migration_once(tmp_path: Path) 
     calls: list[str] = []
     call_lock = threading.Lock()
 
-    def upgrade(connection: Connection) -> None:
+    def upgrade(execution: MigrationExecution) -> None:
         with call_lock:
             calls.append("called")
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             "CREATE TABLE migration_concurrency_probe "
             "(id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
         )
-        connection.exec_driver_sql(
+        execution.exec_driver_sql(
             "INSERT INTO migration_concurrency_probe (id, value) VALUES (1, 'once')"
         )
         time.sleep(0.15)
@@ -1986,7 +2728,7 @@ def test_held_write_lock_returns_database_locked_without_registry_damage(
     migration = _custom_migration(
         1,
         "held_lock",
-        upgrade=lambda connection: connection.exec_driver_sql(
+        upgrade=lambda execution: execution.exec_driver_sql(
             "CREATE TABLE migration_held_lock_probe (id INTEGER PRIMARY KEY)"
         ),
     )
