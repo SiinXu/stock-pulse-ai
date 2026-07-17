@@ -1,0 +1,43 @@
+{
+  "notes": {
+    "provider_trace_differences": "The two runtime paths report provider identity differently and any replacement runtime must preserve both. Single-agent path (AgentExecutor.run/.chat): result.provider is the adapter-reported provider string ('openai', 'anthropic', or the literal in-band failure marker 'error'), result.model is the model name; a chat whose adapter raises before any response leaves provider ''. Orchestrator path (quick/standard/full/specialist): result.provider carries the aggregated model identifier(s) from models_used, not a provider name (e.g. 'gpt-4o-mini', or 'gpt-4o-mini, deepseek-chat' when stages used different models), and 'error' entries are excluded from the aggregation. Chat cases additionally persist per-turn provider/model rows in agent provider turns (frozen in the chat fixtures' provider_turns)."
+  },
+  "cases": [
+    {"id": "a-single-run-normal", "kind": "financial", "market": "A", "mode": "single_run", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-single-run-normal.json"},
+    {"id": "a-single-chat-normal", "kind": "financial", "market": "A", "mode": "single_chat", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-single-chat-normal.json"},
+    {"id": "a-quick-normal", "kind": "financial", "market": "A", "mode": "quick", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-quick-normal.json"},
+    {"id": "a-standard-normal", "kind": "financial", "market": "A", "mode": "standard", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-standard-normal.json"},
+    {"id": "a-full-normal", "kind": "financial", "market": "A", "mode": "full", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-full-normal.json"},
+    {"id": "a-specialist-normal", "kind": "financial", "market": "A", "mode": "specialist", "profile": "normal", "license": "synthetic-fixture", "file": "financial/a-specialist-normal.json"},
+    {"id": "a-single-run-partial", "kind": "financial", "market": "A", "mode": "single_run", "profile": "partial", "license": "synthetic-fixture", "file": "financial/a-single-run-partial.json"},
+    {"id": "a-standard-partial", "kind": "financial", "market": "A", "mode": "standard", "profile": "partial", "license": "synthetic-fixture", "file": "financial/a-standard-partial.json"},
+    {"id": "hk-single-run-normal", "kind": "financial", "market": "HK", "mode": "single_run", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-single-run-normal.json"},
+    {"id": "hk-single-chat-normal", "kind": "financial", "market": "HK", "mode": "single_chat", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-single-chat-normal.json"},
+    {"id": "hk-quick-normal", "kind": "financial", "market": "HK", "mode": "quick", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-quick-normal.json"},
+    {"id": "hk-standard-normal", "kind": "financial", "market": "HK", "mode": "standard", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-standard-normal.json"},
+    {"id": "hk-full-normal", "kind": "financial", "market": "HK", "mode": "full", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-full-normal.json"},
+    {"id": "hk-specialist-normal", "kind": "financial", "market": "HK", "mode": "specialist", "profile": "normal", "license": "synthetic-fixture", "file": "financial/hk-specialist-normal.json"},
+    {"id": "hk-single-chat-partial", "kind": "financial", "market": "HK", "mode": "single_chat", "profile": "partial", "license": "synthetic-fixture", "file": "financial/hk-single-chat-partial.json"},
+    {"id": "hk-full-partial", "kind": "financial", "market": "HK", "mode": "full", "profile": "partial", "license": "synthetic-fixture", "file": "financial/hk-full-partial.json"},
+    {"id": "us-single-run-normal", "kind": "financial", "market": "US", "mode": "single_run", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-single-run-normal.json"},
+    {"id": "us-single-chat-normal", "kind": "financial", "market": "US", "mode": "single_chat", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-single-chat-normal.json"},
+    {"id": "us-quick-normal", "kind": "financial", "market": "US", "mode": "quick", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-quick-normal.json"},
+    {"id": "us-standard-normal", "kind": "financial", "market": "US", "mode": "standard", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-standard-normal.json"},
+    {"id": "us-full-normal", "kind": "financial", "market": "US", "mode": "full", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-full-normal.json"},
+    {"id": "us-specialist-normal", "kind": "financial", "market": "US", "mode": "specialist", "profile": "normal", "license": "synthetic-fixture", "file": "financial/us-specialist-normal.json"},
+    {"id": "us-quick-partial", "kind": "financial", "market": "US", "mode": "quick", "profile": "partial", "license": "synthetic-fixture", "file": "financial/us-quick-partial.json"},
+    {"id": "us-specialist-partial", "kind": "financial", "market": "US", "mode": "specialist", "profile": "partial", "license": "synthetic-fixture", "file": "financial/us-specialist-partial.json"},
+    {"id": "contract-modelref-single-mismatch", "kind": "contract", "market": "A", "mode": "single_run", "profile": "modelref", "license": "synthetic-fixture", "file": "contract/contract-modelref-single-mismatch.json"},
+    {"id": "contract-modelref-multi-mixed-models", "kind": "contract", "market": "A", "mode": "quick", "profile": "modelref", "license": "synthetic-fixture", "file": "contract/contract-modelref-multi-mixed-models.json"},
+    {"id": "contract-fallback-provider-error", "kind": "contract", "market": "A", "mode": "single_run", "profile": "fallback", "license": "synthetic-fixture", "file": "contract/contract-fallback-provider-error.json"},
+    {"id": "contract-fallback-adapter-raise-chat", "kind": "contract", "market": "A", "mode": "single_chat", "profile": "fallback", "license": "synthetic-fixture", "file": "contract/contract-fallback-adapter-raise-chat.json"},
+    {"id": "contract-toolscope-unknown-tool", "kind": "contract", "market": "A", "mode": "single_run", "profile": "toolscope", "license": "synthetic-fixture", "file": "contract/contract-toolscope-unknown-tool.json"},
+    {"id": "contract-toolscope-stage-filtered-tool", "kind": "contract", "market": "A", "mode": "standard", "profile": "toolscope", "license": "synthetic-fixture", "file": "contract/contract-toolscope-stage-filtered-tool.json"},
+    {"id": "contract-timeout-agent-wallclock", "kind": "contract", "market": "A", "mode": "single_run", "profile": "timeout", "license": "synthetic-fixture", "file": "contract/contract-timeout-agent-wallclock.json"},
+    {"id": "contract-timeout-pipeline-budget-skip", "kind": "contract", "market": "A", "mode": "standard", "profile": "timeout", "license": "synthetic-fixture", "file": "contract/contract-timeout-pipeline-budget-skip.json"},
+    {"id": "contract-cancelrace-single-slow-tool", "kind": "contract", "market": "A", "mode": "single_run", "profile": "cancelrace", "license": "synthetic-fixture", "file": "contract/contract-cancelrace-single-slow-tool.json"},
+    {"id": "contract-cancelrace-parallel-late-tool", "kind": "contract", "market": "A", "mode": "single_run", "profile": "cancelrace", "license": "synthetic-fixture", "file": "contract/contract-cancelrace-parallel-late-tool.json"},
+    {"id": "contract-malformed-dashboard-repaired", "kind": "contract", "market": "A", "mode": "single_run", "profile": "malformed", "license": "synthetic-fixture", "file": "contract/contract-malformed-dashboard-repaired.json"},
+    {"id": "contract-malformed-decision-unparseable", "kind": "contract", "market": "A", "mode": "standard", "profile": "malformed", "license": "synthetic-fixture", "file": "contract/contract-malformed-decision-unparseable.json"}
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "id": "contract-toolscope-stage-filtered-tool",
+  "notes": "Tool scope rejection (multi-agent): the technical agent calls 'search_stock_news', which IS registered in the shared registry but is NOT part of the technical agent's stage-scoped tool subset (expect_unregistered bypasses the harness schema assertion). Characterizes stage-level tool scoping behavior when a stage requests an out-of-scope tool.",
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "standard"
+  },
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_sf1",
+          "name": "search_stock_news",
+          "arguments": {
+            "stock_code": "600519"
+          },
+          "expect_unregistered": true
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 26,
+        "total_tokens": 666
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"hold\", \"confidence\": 0.5, \"reasoning\": \"新闻工具不在技术分析范围内，仅凭价格结构给出中性判断。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 60, \"ma_alignment\": \"mixed\", \"volume_status\": \"normal\", \"pattern\": \"consolidation\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 760,
+        "completion_tokens": 92,
+        "total_tokens": 852
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": "{\"signal\": \"hold\", \"confidence\": 0.55, \"reasoning\": \"消息面平稳。\", \"risk_alerts\": [], \"positive_catalysts\": [], \"sentiment_label\": \"neutral\", \"capital_flow_signal\": \"neutral\", \"key_news\": []}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 560,
+        "completion_tokens": 66,
+        "total_tokens": 626
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "decision",
+      "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 55,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"信号中性，观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势方向确认\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"两阶段结论均为中性\",\n      \"data_limitations\": \"技术阶段的新闻工具调用被范围限制拒绝\"\n    }\n  },\n  \"analysis_summary\": \"技术面与消息面均中性，维持观望。\",\n  \"key_points\": \"中性信号；工具越界被拒\",\n  \"risk_warning\": \"方向不明朗，等待确认\"\n}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 980,
+        "completion_tokens": 240,
+        "total_tokens": 1220
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "technical",
+      "technical",
+      "intel",
+      "decision"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "search_stock_news",
+        "arguments": {
+          "stock_code": "600519"
+        },
+        "success": false,
+        "result_length": 74,
+        "cached": false
+      }
+    ],
+    "total_steps": 3,
+    "total_tokens": 3364,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "贵州茅台",
+      "sentiment_score": 55,
+      "trend_prediction": "震荡整理",
+      "operation_advice": "观望",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "信号中性，观望为主",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "暂不介入",
+            "has_position": "持有观察"
+          },
+          "time_sensitivity": "本周内"
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0,
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "控制仓位",
+            "entry_plan": "暂不介入",
+            "risk_control": "止损参考 95.0"
+          }
+        },
+        "phase_decision": {
+          "phase_context": "基于最近收盘数据",
+          "action_window": "次一交易日",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "趋势方向确认",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "两阶段结论均为中性",
+          "data_limitations": "技术阶段的新闻工具调用被范围限制拒绝"
+        },
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "mixed",
+            "trend_score": 60,
+            "is_bullish": false
+          }
+        },
+        "intelligence": {
+          "risk_alerts": []
+        }
+      },
+      "analysis_summary": "技术面与消息面均中性，维持观望。",
+      "key_points": [
+        "新闻工具不在技术分析范围内，仅凭价格结构给出中性判断。",
+        "消息面平稳。",
+        "技术面与消息面均中性，维持观望。"
+      ],
+      "risk_warning": "方向不明朗，等待确认"
+    },
+    "content": "{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 55,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"信号中性，观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"控制仓位\",\n        \"entry_plan\": \"暂不介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势方向确认\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"两阶段结论均为中性\",\n      \"data_limitations\": \"技术阶段的新闻工具调用被范围限制拒绝\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"mixed\",\n        \"trend_score\": 60,\n        \"is_bullish\": false\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"技术面与消息面均中性，维持观望。\",\n  \"key_points\": [\n    \"新闻工具不在技术分析范围内，仅凭价格结构给出中性判断。\",\n    \"消息面平稳。\",\n    \"技术面与消息面均中性，维持观望。\"\n  ],\n  \"risk_warning\": \"方向不明朗，等待确认\"\n}",
+    "error": null
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "id": "contract-fallback-adapter-raise-chat",
+  "notes": "Fallback behavior (chat): the LLM adapter raises mid-call (uses the harness raise_error hook). Characterizes the chat failure contract: success=False with the public AGENT_CHAT_FAILURE_MESSAGE, and the failure history sentinel persisted as the assistant conversation row.",
+  "input": {
+    "message": "600519 现在适合加仓吗？",
+    "session_id": "replay-contract-adapter-raise",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_chat",
+      "raise_error": "synthetic provider outage",
+      "content": null,
+      "tool_calls": [],
+      "usage": {},
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "signal": null,
+    "stage_sequence": [
+      "single_chat"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [],
+    "total_steps": 0,
+    "total_tokens": 0,
+    "provider": "",
+    "model": "",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "",
+    "error": "Agent chat failed",
+    "conversation": [
+      {
+        "role": "user",
+        "content": "600519 现在适合加仓吗？"
+      },
+      {
+        "role": "assistant",
+        "content": "Agent chat failed"
+      }
+    ],
+    "provider_turns": []
+  }
+}

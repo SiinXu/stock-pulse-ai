@@ -1,0 +1,65 @@
+{
+  "id": "contract-cancelrace-single-slow-tool",
+  "notes": "Cancel race (single-tool path): with agent_orchestrator_timeout_s=1 the remaining wall-clock budget becomes the tool wait timeout. The single slow_tool(seconds=3) call exceeds it, so the runner cancels the future, logs a synthetic '{\"error\": ..., \"timeout\": true}' tool result (timeout: true in the log entry), and the loop then fails with the volatile 'Agent timed out after ...' error (frozen as error_prefix). The tool thread keeps sleeping in the background; the runtime must not wait for it.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "config": {
+    "agent_orchestrator_timeout_s": 1
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_cr1",
+          "name": "slow_tool",
+          "arguments": {
+            "seconds": 3
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 24,
+        "total_tokens": 544
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "signal": null,
+    "stage_sequence": [
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "slow_tool",
+        "arguments": {
+          "seconds": 3
+        },
+        "success": false,
+        "result_length": 66,
+        "cached": false,
+        "timeout": true
+      }
+    ],
+    "total_steps": 1,
+    "total_tokens": 544,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "",
+    "error_prefix": "Agent timed out after"
+  }
+}
