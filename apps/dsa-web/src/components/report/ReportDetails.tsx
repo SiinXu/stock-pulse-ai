@@ -115,7 +115,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
             <button
               type="button"
               onClick={() => setShowRaw(!showRaw)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-full p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.rawResult}</span>
               <svg
@@ -141,7 +141,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
             <button
               type="button"
               onClick={() => setShowSnapshot(!showSnapshot)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-full p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.analysisSnapshot}</span>
               <svg

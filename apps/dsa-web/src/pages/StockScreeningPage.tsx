@@ -1097,7 +1097,7 @@ const StockScreeningPage: React.FC = () => {
               return (
               <button
                 key={`${item.topic}-${item.rank ?? ''}`}
-                className={`group relative min-h-28 overflow-hidden rounded-full border px-3 py-3 text-left transition-all ${
+                className={`group relative min-h-28 overflow-hidden rounded-lg border px-3 py-3 text-left transition-all ${
                   selected
                     ? 'border-warning/50 bg-gradient-to-br from-warning/10 via-card to-card shadow-soft-card ring-1 ring-warning/20'
                     : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-soft-card'
@@ -1301,7 +1301,7 @@ const StockScreeningPage: React.FC = () => {
               return (
                 <button
                   key={item.id}
-                  className={`min-h-28 rounded-full border p-4 text-left transition-all ${
+                  className={`min-h-28 rounded-lg border p-4 text-left transition-all ${
                     selected
                       ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
                       : 'border-border/80 bg-surface/70 hover:border-primary/45 hover:bg-hover/70'

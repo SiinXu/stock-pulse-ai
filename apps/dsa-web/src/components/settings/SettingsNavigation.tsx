@@ -115,7 +115,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
             <button
               type="button"
               className={cn(
-                'flex min-h-11 w-full items-center gap-2 rounded-full border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
+                'flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
                 isActive
                   ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground'
                   : 'border-transparent bg-transparent text-secondary-text hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]',

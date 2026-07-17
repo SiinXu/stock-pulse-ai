@@ -133,7 +133,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === 0}
                   aria-label={formatUiText(text.moveUp, { model: labelFor(route) })}
                   onClick={() => moveUp(index)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↑
                 </button>
@@ -142,7 +142,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled || index === routes.length - 1}
                   aria-label={formatUiText(text.moveDown, { model: labelFor(route) })}
                   onClick={() => moveDown(index)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-40"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↓
                 </button>
@@ -151,7 +151,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   disabled={disabled}
                   aria-label={formatUiText(text.removeFallback, { model: labelFor(route) })}
                   onClick={() => removeAt(index)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-danger"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-danger"
                 >
                   ✕
                 </button>

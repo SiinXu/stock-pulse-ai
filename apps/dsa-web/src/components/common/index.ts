@@ -31,4 +31,3 @@ export * from '../layout/Shell';
 export * from '../layout/SidebarNav';
 export * from '../theme/ThemeProvider';
 export * from '../theme/ThemeToggle';
-export * from './ParticleBackground';

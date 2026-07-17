@@ -88,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
             onClick={handleClose}
             disabled={closeDisabled}
             aria-label={closeLabel ?? t('common.close')}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

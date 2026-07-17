@@ -170,6 +170,15 @@ async function installMockAuth(page: Page, options: {
   await page.addInitScript(({ key, language }) => {
     localStorage.setItem(key, language);
   }, { key: uiLanguageStorageKey, language: options.language });
+  // The mock-auth world must keep every /api/v1 response authorized. After a
+  // mocked login the app has no real session, so workspace requests reaching
+  // the real backend return 401 and the global unauthorized interceptor
+  // hard-redirects back to /login, looping forever between / and /login.
+  // Playwright matches routes in reverse registration order, so the auth
+  // routes registered below take precedence over this catch-all.
+  await page.route('**/api/v1/**', async (route) => {
+    await fulfillJson(route, {});
+  });
   await page.route('**/api/v1/auth/status', async (route) => {
     await fulfillJson(route, {
       authEnabled: true,

@@ -111,7 +111,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
                 type="button"
                 onClick={onToggleCollapse}
                 aria-label={t('layout.expandSidebar')}
-                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
               >
                 <PanelRight className="size-4.5" />
               </button>
@@ -129,7 +129,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
               type="button"
               onClick={onToggleCollapse}
               aria-label={t('layout.collapseSidebar')}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
             >
               <PanelLeft className="size-4.5" />
             </button>
@@ -142,7 +142,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           type="button"
           onClick={openSearch}
           aria-label={t('layout.search')}
-          className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-full border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
+          className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
         >
           <Search className="h-4 w-4" />
         </button>
@@ -152,7 +152,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
-            className="mb-3 flex min-h-11 w-full items-center rounded-full border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
+            className="mb-3 flex min-h-11 w-full items-center rounded-lg border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
               <Search className="h-4 w-4" />

@@ -88,7 +88,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
       <button
         type="button"
         onClick={handleCopy}
-        className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-full
+        className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-lg
           border border-border bg-elevated hover:bg-hover text-secondary-text
           transition-colors z-10"
       >
