@@ -891,7 +891,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -911,7 +911,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
             aria-label={t('common.closeDrawer')}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -1042,7 +1042,7 @@ const ChatPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('chat.history')}
               >
                 <svg
@@ -1405,7 +1405,7 @@ const ChatPage: React.FC = () => {
                     disabled={!contextCompressionLoaded || contextCompressionSaving}
                     onClick={() => void updateContextCompressionEnabled(!contextCompressionEnabled)}
                     className={cn(
-                      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
+                      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors',
                       !contextCompressionLoaded || contextCompressionSaving
                         ? 'cursor-not-allowed opacity-60'
                         : 'cursor-pointer',
@@ -1441,7 +1441,7 @@ const ChatPage: React.FC = () => {
                 <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-full px-3 text-left text-sm text-foreground"
+                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm text-foreground"
                     aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"

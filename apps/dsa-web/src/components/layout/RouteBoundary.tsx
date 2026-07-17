@@ -83,7 +83,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             </button>
             <button
               type="button"
-              className="min-h-11 min-w-11 rounded-full border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
+              className="min-h-11 min-w-11 rounded-lg border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
               onClick={() => window.location.assign('/')}
             >
               {this.props.text.backHome}

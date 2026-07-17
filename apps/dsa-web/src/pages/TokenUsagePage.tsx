@@ -157,7 +157,7 @@ const TokenUsagePage: React.FC = () => {
                     type="button"
                     onClick={() => setPeriod(option)}
                     className={cn(
-                      'min-h-11 min-w-11 rounded-full px-3 py-1.5 text-sm transition-colors',
+                      'min-h-11 min-w-11 rounded-lg px-3 py-1.5 text-sm transition-colors',
                       period === option
                         ? 'bg-primary text-background shadow-soft-card'
                         : 'text-secondary-text hover:bg-hover hover:text-foreground'

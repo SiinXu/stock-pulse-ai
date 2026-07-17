@@ -12,12 +12,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BUTTON_SIZE_STYLES = {
-  xsm: 'h-6 min-h-11 min-w-11 rounded-full px-2.5 text-xs',
-  sm: 'h-8 min-h-11 min-w-11 rounded-full px-3.5 text-xs',
-  md: 'h-9 min-h-11 min-w-11 rounded-full px-4 text-sm',
-  lg: 'h-10 min-h-11 min-w-11 rounded-full px-5 text-sm',
-  xl: 'h-11 min-h-11 min-w-11 rounded-full px-6 text-sm',
-  icon: 'h-11 min-h-11 w-11 min-w-11 shrink-0 rounded-full p-0 text-sm',
+  xsm: 'h-6 min-h-11 min-w-11 rounded-lg px-2.5 text-xs',
+  sm: 'h-8 min-h-11 min-w-11 rounded-lg px-3.5 text-xs',
+  md: 'h-9 min-h-11 min-w-11 rounded-lg px-4 text-sm',
+  lg: 'h-10 min-h-11 min-w-11 rounded-lg px-5 text-sm',
+  xl: 'h-11 min-h-11 min-w-11 rounded-lg px-6 text-sm',
+  icon: 'h-11 min-h-11 w-11 min-w-11 shrink-0 rounded-lg p-0 text-sm',
 } as const;
 
 const ACTION_AI_STYLES = 'bg-[var(--home-action-ai-bg)] border border-[var(--home-action-ai-border)] text-[var(--home-action-ai-text)] hover:bg-[var(--home-action-ai-hover-bg)]';

@@ -27,7 +27,7 @@
 - **中性极简**：米白/近黑双主题，大量留白，极浅边框分层，轻投影。
 - **禁止**：cyan/purple 辉光（glow）、pulse-glow 动画、彩色渐变发光、玻璃拟态强模糊。
 - **字体**：Geist。标题 SemiBold + 负字距（letter-spacing 约 -0.02em）。
-- **形状**：按钮一律胶囊形 `rounded-full`；卡片保留大圆角（`--radius` 体系不变）。
+- **形状**：按钮一律软圆角 `rounded-lg`（`var(--radius)`），禁止胶囊形 `rounded-full`；装饰性圆点用 `--radius-dot`；卡片保留大圆角（`--radius` 体系不变）。
 
 ## 2. 颜色 Token（Figma get_variable_defs 精确值）
 
@@ -72,7 +72,7 @@
 
 ### 4.1 Button（Figma `1051:20280`）
 
-- 形状：所有尺寸 `rounded-full`。
+- 形状：所有尺寸 `rounded-lg`，禁止 `rounded-full` 胶囊按钮。
 - **primary（主 CTA）= 反色**：亮色主题黑底白字（`#151514` 底），暗色主题白底黑字，
   即 `bg-foreground text-background`，带 Figma 的 inset + drop 双投影。
 - secondary/outline：透明或卡片底 + `--border` 描边 + `--foreground` 文字。
@@ -128,7 +128,7 @@
 
 - [ ] `npm run lint && npm run build` 通过（build 输出到根 `static/`）
 - [ ] 明暗两主题背景/文字/边框符合 §2.1
-- [ ] 主按钮胶囊 + 黑白反色；焦点环为绿
+- [ ] 主按钮软圆角（`rounded-lg`）+ 黑白反色；焦点环为绿
 - [ ] 涨跌红绿未被改动
 - [ ] `grep -rn 'cyan\|purple\|glow' src/` 无非白名单残留
 - [ ] `git diff` 仅含样式面改动

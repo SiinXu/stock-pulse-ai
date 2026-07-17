@@ -88,14 +88,14 @@ export const Input = ({
     <button
       type="button"
       className={cn(
-        'inline-flex h-11 w-11 items-center justify-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2',
+        'inline-flex h-11 w-11 items-center justify-center rounded-lg border border-transparent bg-transparent transition-all duration-200 focus:outline-none focus-visible:ring-2',
         isLoginAppearance
           ? visible
-            ? 'border-[var(--login-input-toggle-active-border)] bg-[var(--login-input-toggle-active-bg)] text-[var(--login-input-toggle-active-text)] shadow-soft-card focus:ring-[var(--login-input-toggle-ring)]'
-            : 'border-[var(--login-input-toggle-border)] bg-[var(--login-input-toggle-bg)] text-[var(--login-input-toggle-text)] hover:border-[var(--login-input-toggle-border-hover)] hover:bg-[var(--login-input-toggle-bg-hover)] hover:text-[var(--login-input-toggle-text-hover)] focus:ring-[var(--login-input-toggle-ring)]'
+            ? 'text-[var(--login-text-secondary)] focus-visible:ring-[var(--login-input-toggle-ring)]'
+            : 'text-[var(--login-input-icon)] hover:text-[var(--login-text-secondary)] focus-visible:ring-[var(--login-input-toggle-ring)]'
           : visible
-            ? 'border-transparent bg-transparent text-warning'
-            : 'border-transparent bg-transparent text-muted-text hover:text-warning focus:ring-primary/30'
+            ? 'text-warning'
+            : 'text-muted-text hover:text-warning focus-visible:ring-primary/30'
       )}
       onClick={() => {
         const nextVisible = !visible;

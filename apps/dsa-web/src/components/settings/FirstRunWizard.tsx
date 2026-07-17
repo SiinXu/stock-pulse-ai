@@ -526,7 +526,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   type="button"
                   aria-pressed={mode === value}
                   onClick={() => chooseMode(value)}
-                  className={`rounded-full border px-4 py-3 text-left text-sm transition-colors ${
+                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                     mode === value
                       ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] text-foreground'
                       : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
@@ -713,7 +713,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       aria-label={formatUiText(text.removeModel, { model })}
                       disabled={modelsAreReadOnly}
                       onClick={() => removeModelToken(model)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger"
                     >
                       ×
                     </button>

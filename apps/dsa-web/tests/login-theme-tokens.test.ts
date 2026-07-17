@@ -9,16 +9,7 @@ const REQUIRED_LOGIN_TOKENS = [
   '--login-label-text',
   '--login-hint-text',
   '--login-input-icon',
-  '--login-input-toggle-bg',
-  '--login-input-toggle-border',
-  '--login-input-toggle-text',
-  '--login-input-toggle-border-hover',
-  '--login-input-toggle-bg-hover',
-  '--login-input-toggle-text-hover',
   '--login-input-toggle-ring',
-  '--login-input-toggle-active-bg',
-  '--login-input-toggle-active-border',
-  '--login-input-toggle-active-text',
 ];
 
 describe('login theme tokens', () => {

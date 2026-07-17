@@ -159,7 +159,7 @@ const RangeControls: React.FC<{
           key={option.value}
           type="button"
           onClick={() => onRangeChange(option.value)}
-          className={`min-h-11 min-w-11 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`min-h-11 min-w-11 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
             filters.range === option.value
               ? 'border-primary/50 bg-primary/10 text-primary'
               : 'border-border/70 bg-background/50 text-secondary-text hover:bg-hover hover:text-foreground'
@@ -369,7 +369,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
                         <td className="px-3 py-3">
                           <button
                             type="button"
-                            className="min-h-11 min-w-11 rounded-full border border-primary/35 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/14"
+                            className="min-h-11 min-w-11 rounded-lg border border-primary/35 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/14"
                             onClick={(event) => {
                               event.stopPropagation();
                               onSelectRecord(item.id);

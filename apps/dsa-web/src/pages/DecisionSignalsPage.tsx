@@ -1223,7 +1223,7 @@ const DecisionSignalsPage: React.FC = () => {
                   <button
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
-                    className="min-h-11 min-w-11 rounded-full border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
+                    className="min-h-11 min-w-11 rounded-lg border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);

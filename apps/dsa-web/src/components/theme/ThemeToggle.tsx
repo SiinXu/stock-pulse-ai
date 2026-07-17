@@ -87,10 +87,10 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
           triggerClassName
             ? triggerClassName
             : isRailVariant
-              ? 'flex h-[var(--nav-item-height)] w-full items-center justify-center gap-2.5 rounded-full border border-transparent px-2 text-sm leading-none text-secondary-text transition-all hover:bg-[var(--nav-hover-bg)] hover:text-foreground data-[state=open]:border-[var(--nav-active-border)] data-[state=open]:bg-[var(--nav-active-bg)] data-[state=open]:text-[hsl(var(--primary))]'
+              ? 'flex h-[var(--nav-item-height)] w-full items-center justify-center gap-2.5 rounded-lg border border-transparent px-2 text-sm leading-none text-secondary-text transition-all hover:bg-[var(--nav-hover-bg)] hover:text-foreground data-[state=open]:border-[var(--nav-active-border)] data-[state=open]:bg-[var(--nav-active-bg)] data-[state=open]:text-[hsl(var(--primary))]'
               : isNavVariant
-                ? 'group relative flex h-12 w-full select-none items-center gap-3 rounded-full border border-transparent px-4 text-sm text-secondary-text transition-all duration-300 hover:bg-hover hover:text-foreground data-[state=open]:border-subtle data-[state=open]:bg-subtle data-[state=open]:text-foreground'
-                : 'inline-flex h-11 min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
+                ? 'group relative flex h-12 w-full select-none items-center gap-3 rounded-lg border border-transparent px-4 text-sm text-secondary-text transition-all duration-300 hover:bg-hover hover:text-foreground data-[state=open]:border-subtle data-[state=open]:bg-subtle data-[state=open]:text-foreground'
+                : 'inline-flex h-11 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border/70 bg-card/80 px-3 text-sm text-secondary-text shadow-soft-card transition-colors hover:bg-hover hover:text-foreground',
           triggerClassName && open ? triggerActiveClassName : '',
           isNavVariant && collapsed ? 'justify-center px-2' : ''
         )}
@@ -132,7 +132,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
                   setOpen(false);
                 }}
                 className={cn(
-                  'flex min-h-11 w-full items-center justify-between rounded-full px-3 py-2 text-sm transition-colors',
+                  'flex min-h-11 w-full items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
                   isActive
                     ? 'bg-primary/10 text-foreground'
                     : 'text-secondary-text hover:bg-hover hover:text-foreground'

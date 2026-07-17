@@ -418,7 +418,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenRunFlow(recordId)}
-                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground"
+                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
                     aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
                   >
                     <Workflow className="h-5 w-5" aria-hidden="true" />
@@ -432,7 +432,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   type="button"
                   onClick={() => void handleCopy('markdown')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-50"
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyMarkdownSource}
                 >
                   {copiedType === 'markdown' ? (
@@ -451,7 +451,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   type="button"
                   onClick={() => void handleCopy('text')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-full text-secondary-text hover:text-foreground disabled:opacity-50"
+                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyPlainText}
                 >
                   {copiedType === 'text' ? (

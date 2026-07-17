@@ -1,7 +1,7 @@
 export const productionDesignGuardFixtures = {
-  nonPillButton: '<button className="min-h-11 rounded-lg">Run</button>',
-  nonPillCssButton: '.btn-primary { border-radius: 0.9rem; }',
-  mappedNonPillCssButton: '.session-item { border-radius: 0.75rem; }',
+  pillButton: '<button className="min-h-11 rounded-full">Run</button>',
+  pillCssButton: '.btn-primary { border-radius: 9999px; }',
+  mappedPillCssButton: '.session-item { border-radius: 50%; }',
   hardcodedHex: '<div className="bg-[#123456]" />',
   hardcodedFunctionalColor: '<div className="shadow-[0_8px_24px_rgba(0,0,0,0.2)]" />',
   hardcodedCssFunctionalColor: '.card { box-shadow: 0 8px 24px hsl(0 0% 0% / 0.2); }',
@@ -86,5 +86,5 @@ export const productionDesignGuardFixtures = {
     '  return <Button className="bg-gradient-to-r">Dialog</Button>;',
     '};',
   ].join('\n'),
-  compliant: '<button className="min-h-11 rounded-full bg-primary">Run</button>',
+  compliant: '<button className="min-h-11 rounded-lg bg-primary">Run</button>',
 } as const;

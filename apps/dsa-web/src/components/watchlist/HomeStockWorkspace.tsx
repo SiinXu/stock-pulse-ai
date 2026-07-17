@@ -258,7 +258,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             key={tab.key}
             type="button"
             aria-pressed={selected}
-            className={`h-11 rounded-full px-2 text-xs font-medium transition-colors ${
+            className={`h-11 rounded-lg px-2 text-xs font-medium transition-colors ${
               selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
             }`}
             onClick={() => onTabChange(tab.key)}

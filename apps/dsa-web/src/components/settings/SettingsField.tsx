@@ -208,7 +208,7 @@ function renderFieldControl(
           disabled={isDisabled}
           onClick={() => onChange(checked ? 'false' : 'true')}
           className={cn(
-            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
+            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors',
             isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
           )}
         >
