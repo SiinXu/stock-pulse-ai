@@ -463,13 +463,25 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
 
+    const backDetailRequestIndex = fixture.detailRequests.length;
+    const restoredReportBResponse = page.waitForResponse((response) => (
+      new URL(response.url()).pathname === '/api/v1/history/2' && response.status() === 200
+    ), { timeout: 10_000 });
     await page.goBack();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
+    await restoredReportBResponse;
+    expect(fixture.detailRequests.slice(backDetailRequestIndex)).toEqual([2]);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
 
+    const forwardDetailRequestIndex = fixture.detailRequests.length;
+    const restoredReportAResponse = page.waitForResponse((response) => (
+      new URL(response.url()).pathname === '/api/v1/history/1' && response.status() === 200
+    ), { timeout: 10_000 });
     await page.goForward();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    await restoredReportAResponse;
+    expect(fixture.detailRequests.slice(forwardDetailRequestIndex)).toEqual([1]);
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
   });
 
   test('a slow report response cannot replace the newer URL selection', async ({ page }) => {
