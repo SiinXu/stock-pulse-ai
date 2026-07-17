@@ -56,3 +56,4 @@
 | 2026-07-17 | AR-PY-03 实现完成(versioned events + late-write fence + 协作取消 + UsageRecorder/classify 收敛 + SSE 单一降级点 + 29 项新测试);状态 -> In progress(待合入) |
 | 2026-07-17 | AR-PY-04 Spike 完成并定方案 B(维护者裁决审批点 3);实测 pydantic-ai-slim 绕开 tiktoken #537 冲突;首片实验 Adapter + 可选依赖 + 9 项测试落地;状态 -> In progress(首片,待合入) |
 | 2026-07-17 | AR-PY-04 次片:BoundToolSession→PydanticAI 工具桥接(Tool.from_schema,经 execute() fail-closed 分发);测试增至 12 项;runtime 全套 93 项绿 |
+| 2026-07-17 | AR-PY-04 event/usage 片:PydanticAI 运行 usage 收敛到单一 UsageRecorder(无第二套 usage 权威);工具桥接经 RuntimeEventEmitter 发 tool_start/tool_done;测试增至 14 项;runtime 全套 102 项绿 |

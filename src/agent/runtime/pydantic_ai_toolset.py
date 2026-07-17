@@ -22,12 +22,17 @@ from typing import Any
 _EMPTY_SCHEMA = {"type": "object", "properties": {}}
 
 
-def build_bound_session_toolset(session: Any) -> Any:
+def build_bound_session_toolset(session: Any, *, event_emitter: Any = None) -> Any:
     """Build a PydanticAI ``FunctionToolset`` backed by a ``BoundToolSession``.
 
     Only the session's allowed tools are exposed, and each call is dispatched
     through the session's fail-closed gates. The structured result dict
     (success or the shared error contract) is returned to the model unchanged.
+
+    When ``event_emitter`` (an AR-PY-03 ``RuntimeEventEmitter``) is provided,
+    each call emits ``tool_start`` / ``tool_done`` through that single event
+    stream, so PydanticAI tool activity shares the same versioned event path
+    and late-write fence as the native runtime.
     """
     from src.agent.runtime.pydantic_ai_adapter import _require_pydantic_ai
 
@@ -37,7 +42,13 @@ def build_bound_session_toolset(session: Any) -> Any:
 
     def _make_caller(tool_name: str):
         def _call(**kwargs: Any) -> Any:
-            return session.execute(tool_name, kwargs)
+            if event_emitter is not None:
+                event_emitter.emit("tool_start", tool=tool_name)
+            result = session.execute(tool_name, kwargs)
+            if event_emitter is not None:
+                succeeded = not (isinstance(result, dict) and result.get("error"))
+                event_emitter.emit("tool_done", tool=tool_name, success=succeeded)
+            return result
 
         return _call
 

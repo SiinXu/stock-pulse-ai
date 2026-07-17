@@ -242,6 +242,65 @@ def test_gate_rejection_is_fail_closed_at_dispatch():
     assert handle.result.dashboard == {"signal": "hold"}
 
 
+def test_usage_is_recorded_through_single_recorder():
+    class _RecordingRecorder:
+        def __init__(self):
+            self.calls = []
+
+        def record(self, usage, model, *, call_type="agent"):
+            self.calls.append((usage, model, call_type))
+            return True
+
+    recorder = _RecordingRecorder()
+    adapter = PydanticAIRuntimeAdapter(
+        model=_fake_model('{"signal": "buy"}'), usage_recorder=recorder
+    )
+    adapter.execute(_run_context("Analyze 600519"))
+
+    assert len(recorder.calls) == 1
+    usage, model, call_type = recorder.calls[0]
+    assert call_type == "agent"
+    assert model == "fake-model"
+    assert usage == {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10}
+
+
+def test_tool_calls_emit_events_through_shared_emitter():
+    from src.agent.runtime.events import RuntimeEventEmitter
+
+    emitter = RuntimeEventEmitter(execution_id="ex-evt-1")
+    events = []
+    original = emitter.emit
+
+    def _spy(event_type, **fields):
+        result = original(event_type, **fields)
+        events.append((event_type, fields))
+        return result
+
+    emitter.emit = _spy  # type: ignore[assignment]
+
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-evt-1",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "buy"}'),
+        tool_session=session,
+        event_emitter=emitter,
+    )
+    adapter.execute(_run_context("Analyze 600519"))
+
+    kinds = [e[0] for e in events]
+    assert "tool_start" in kinds
+    assert "tool_done" in kinds
+    start = next(f for t, f in events if t == "tool_start")
+    done = next(f for t, f in events if t == "tool_done")
+    assert start["tool"] == "echo"
+    assert done["tool"] == "echo"
+    assert done["success"] is True
+
+
 def test_toolset_exposes_only_allowed_tools():
     from src.agent.runtime.pydantic_ai_toolset import build_bound_session_toolset
 

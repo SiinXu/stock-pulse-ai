@@ -39,7 +39,7 @@ from src.agent.runtime.contract import (
     ExecutionState,
     ProgressCallback,
 )
-from src.agent.runtime.lifecycle import classify_terminal_state
+from src.agent.runtime.lifecycle import classify_terminal_state, get_default_usage_recorder
 from src.agent.public_contract import sanitize_agent_diagnostic
 
 _PYDANTIC_AI_DIST = "pydantic-ai-slim"
@@ -148,7 +148,15 @@ class PydanticAIRuntimeAdapter:
     the product default.
     """
 
-    def __init__(self, *, model: Any = None, llm_adapter: Any = None, tool_session: Any = None):
+    def __init__(
+        self,
+        *,
+        model: Any = None,
+        llm_adapter: Any = None,
+        tool_session: Any = None,
+        usage_recorder: Any = None,
+        event_emitter: Any = None,
+    ):
         if model is None and llm_adapter is None:
             raise ValueError(
                 "PydanticAIRuntimeAdapter requires an explicit 'model' or an "
@@ -157,6 +165,8 @@ class PydanticAIRuntimeAdapter:
         self._model = model
         self._llm_adapter = llm_adapter
         self._tool_session = tool_session
+        self._usage_recorder = usage_recorder
+        self._event_emitter = event_emitter
 
     @property
     def name(self) -> str:
@@ -213,11 +223,16 @@ class PydanticAIRuntimeAdapter:
         if self._tool_session is not None:
             from src.agent.runtime.pydantic_ai_toolset import build_bound_session_toolset
 
-            toolsets.append(build_bound_session_toolset(self._tool_session))
+            toolsets.append(
+                build_bound_session_toolset(
+                    self._tool_session, event_emitter=self._event_emitter
+                )
+            )
         agent = Agent(model=self._resolve_model(), toolsets=toolsets)
         run_result = agent.run_sync(context.prompt)
         content = str(run_result.output or "")
         usage = run_result.usage
+        self._record_usage(usage, self._resolve_model().model_name)
         dashboard = parse_dashboard_json(content)
         return AgentResult(
             success=dashboard is not None,
@@ -227,3 +242,18 @@ class PydanticAIRuntimeAdapter:
             model=self._resolve_model().model_name,
             error=None if dashboard is not None else "Failed to parse dashboard JSON from agent response",
         )
+
+    def _record_usage(self, usage: Any, model: str) -> None:
+        """Persist PydanticAI usage through StockPulse's single recorder.
+
+        Mapping PydanticAI ``RunUsage`` onto the shared ``UsageRecorder`` keeps
+        one usage authority: this experimental runtime never opens a second
+        telemetry path (an AR-PY-05 hard gate).
+        """
+        recorder = self._usage_recorder or get_default_usage_recorder()
+        usage_dict = {
+            "input_tokens": int(getattr(usage, "input_tokens", 0) or 0),
+            "output_tokens": int(getattr(usage, "output_tokens", 0) or 0),
+            "total_tokens": int(getattr(usage, "total_tokens", 0) or 0),
+        }
+        recorder.record(usage_dict, model, call_type="agent")
