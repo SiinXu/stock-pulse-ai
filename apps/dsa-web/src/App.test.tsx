@@ -166,6 +166,36 @@ describe('App routing behavior', () => {
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
   });
 
+  it('preserves the deep link when an authenticated user lands on /login with a redirect', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/login?redirect=%2Fsettings%3Fsection%3Dai_models');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings');
+    expect(window.location.search).toBe('?section=ai_models');
+    expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
+  });
+
+  it('rejects non-relative login redirects and falls back to the home page', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/login?redirect=%2F%2Fevil.example.com');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('home-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
+  });
+
   it('keeps the shell mounted and resets the route boundary after page render errors', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     chatPageShouldThrow.value = true;

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
+import type { SystemConfigItem } from '../../../types/systemConfig';
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { getFieldDescriptionZh, getFieldTitleZh } from '../../../utils/systemConfigI18n';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
@@ -470,6 +471,16 @@ describe('SettingsField', () => {
     // free-text input.
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     const group = screen.getByTestId('multi-enum-MARKET_REVIEW_REGION');
+
+    // Collapsed by default: catalog options stay behind the dropdown trigger.
+    expect(within(group).queryAllByRole('checkbox')).toHaveLength(0);
+
+    // The field label stays associated with the dropdown trigger.
+    const trigger = screen.getByLabelText('大盘复盘市场');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(trigger).toHaveTextContent('已选 2 / 6');
+
+    fireEvent.click(trigger);
     const checkboxes = within(group).getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
@@ -479,9 +490,6 @@ describe('SettingsField', () => {
     expect(checkboxes[0]).toBeChecked(); // cn
     expect(checkboxes[3]).toBeChecked(); // jp
     expect(checkboxes[1]).not.toBeChecked(); // hk
-
-    // The field label stays associated with the first checkbox.
-    expect(screen.getByLabelText('大盘复盘市场')).toBe(checkboxes[0]);
 
     // Selecting kr serializes in catalog order, not click order.
     fireEvent.click(checkboxes[4]);
@@ -520,10 +528,17 @@ describe('SettingsField', () => {
     );
 
     const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
+
+    // The unknown stored value stays visible as a removable chip even while
+    // the dropdown is collapsed, and counts toward the selection summary.
+    const trigger = within(group).getByText(/已选/).closest('button')!;
+    expect(trigger).toHaveTextContent('已选 2 / 3');
+    expect(within(group).getByText('legacy_channel')).toBeInTheDocument();
+
+    fireEvent.click(trigger);
     const checkboxes = within(group).getAllByRole('checkbox');
     // 2 catalog options + 1 unknown stored value that must stay visible.
     expect(checkboxes).toHaveLength(3);
-    expect(within(group).getByText('legacy_channel')).toBeInTheDocument();
     expect(checkboxes[2]).toBeChecked();
 
     // Enabling feishu keeps the unknown stored value at the tail.
@@ -533,6 +548,102 @@ describe('SettingsField', () => {
     // Deselecting the unknown value drops it explicitly (never silently).
     fireEvent.click(checkboxes[2]);
     expect(onChange).toHaveBeenCalledWith('NOTIFICATION_REPORT_CHANNELS', 'email');
+  });
+
+  it('filters multi-enum options and falls back to the empty state guidance', () => {
+    const buildItem = (): SystemConfigItem => ({
+      key: 'NOTIFICATION_REPORT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_REPORT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [
+          { label: 'email', value: 'email' },
+          { label: 'feishu', value: 'feishu' },
+        ],
+        validation: { allowed_values: ['email', 'feishu'], multi_value: true, delimiter: ',' },
+        displayOrder: 62,
+      },
+    });
+
+    // Filtered-out options disappear, but an already-selected value must stay
+    // visible so the stored config never silently loses entries.
+    const { rerender } = render(
+      <SettingsField
+        item={buildItem()}
+        value="email"
+        onChange={vi.fn()}
+        enumOptionFilter={(optionValue) => optionValue === 'feishu'}
+        enumEmptyState={<p>去配置通知渠道</p>}
+      />
+    );
+    const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
+    fireEvent.click(within(group).getByText(/已选/).closest('button')!);
+    const labels = within(group).getAllByRole('option').map((option) => option.textContent);
+    expect(labels).toEqual(['email', 'feishu']);
+
+    // No selectable option and nothing selected → guidance replaces the control.
+    rerender(
+      <SettingsField
+        item={buildItem()}
+        value=""
+        onChange={vi.fn()}
+        enumOptionFilter={() => false}
+        enumEmptyState={<p>去配置通知渠道</p>}
+      />
+    );
+    expect(screen.queryByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS')).not.toBeInTheDocument();
+    const emptyState = screen.getByTestId('multi-enum-empty-NOTIFICATION_REPORT_CHANNELS');
+    expect(within(emptyState).getByText('去配置通知渠道')).toBeInTheDocument();
+  });
+
+  it('serializes ordered multi-enums in selection order instead of catalog order', () => {
+    const onChange = vi.fn();
+
+    render(
+      <SettingsField
+        item={{
+          key: 'REALTIME_SOURCE_PRIORITY',
+          value: 'efinance,tencent',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'REALTIME_SOURCE_PRIORITY',
+            category: 'data_source',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            defaultValue: 'tencent,akshare_sina,efinance,akshare_em',
+            options: [
+              { label: 'tencent', value: 'tencent' },
+              { label: 'akshare_sina', value: 'akshare_sina' },
+              { label: 'efinance', value: 'efinance' },
+            ],
+            validation: { multi_value: true, delimiter: ',', ordered: true },
+            displayOrder: 20,
+          },
+        }}
+        value="efinance,tencent"
+        onChange={onChange}
+      />
+    );
+
+    const group = screen.getByTestId('multi-enum-REALTIME_SOURCE_PRIORITY');
+    fireEvent.click(within(group).getByText(/已选/).closest('button')!);
+    const checkboxes = within(group).getAllByRole('checkbox');
+    // Picking akshare_sina appends to the priority tail; catalog order would
+    // have produced tencent,akshare_sina,efinance instead.
+    fireEvent.click(checkboxes[1]);
+    expect(onChange).toHaveBeenCalledWith('REALTIME_SOURCE_PRIORITY', 'efinance,tencent,akshare_sina');
   });
 
   it('applies min/max/step from schema validation to number inputs', () => {

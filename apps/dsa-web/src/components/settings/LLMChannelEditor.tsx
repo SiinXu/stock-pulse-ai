@@ -10,6 +10,7 @@ import type {
 import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
+import { SettingsSwitch } from './SettingsSwitch';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -1626,7 +1627,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-4" data-connection-id={draft.name}>
+        // form wrapper (not div): password inputs outside a <form> trigger
+        // browser DevTools warnings; all inner buttons are type="button".
+        <form className="space-y-4" data-connection-id={draft.name} onSubmit={(event) => event.preventDefault()}>
           {mode === 'edit' && fieldIsVisible('provider_id') ? (
             <div>
               <label htmlFor={providerSelectId} className="mb-2 block text-sm font-medium text-foreground">
@@ -2027,34 +2030,14 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <p className="text-sm text-foreground">{text.enableThis}</p>
               <p className="text-xs text-muted-text">{text.disabledDraftHint}</p>
             </div>
-            <button
+            <SettingsSwitch
               id={enabledSwitchId}
-              type="button"
-              role="switch"
-              aria-checked={draft.enabled}
-              aria-label={text.enableAria}
+              checked={draft.enabled}
               disabled={fieldIsReadOnly('enabled')}
-              onClick={() => {
-                if (!fieldIsReadOnly('enabled')) {
-                  updateDraft('enabled', !draft.enabled);
-                }
-              }}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
-            >
-              <span
-                data-testid="connection-enabled-switch-visual"
-                aria-hidden="true"
-                className={`relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors ${
-                  draft.enabled ? 'bg-foreground' : 'bg-border'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${
-                    draft.enabled ? 'translate-x-3' : 'translate-x-0.5'
-                  }`}
-                />
-              </span>
-            </button>
+              onCheckedChange={(next) => updateDraft('enabled', next)}
+              aria-label={text.enableAria}
+              visualTestId="connection-enabled-switch-visual"
+            />
           </div>
           ) : null}
 
@@ -2135,7 +2118,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               {mode === 'edit' ? text.saveChanges : text.addToConfig}
             </Button>
           </div>
-        </div>
+        </form>
       )}
     </Modal>
   );

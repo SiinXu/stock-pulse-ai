@@ -9,6 +9,7 @@ import type { ParsedApiError } from '../api/error';
 import { isParsedApiError, localizeParsedApiError } from '../api/error';
 import { useAuth } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { resolveLoginRedirect } from '../utils/loginRedirect';
 import { SettingsAlert } from '../components/settings';
 
 const LoginPage: React.FC = () => {
@@ -21,9 +22,7 @@ const LoginPage: React.FC = () => {
     document.title = t('login.pageTitle');
   }, [t]);
   const [searchParams] = useSearchParams();
-  const rawRedirect = searchParams.get('redirect') ?? '';
-  const redirect =
-    rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/';
+  const redirect = resolveLoginRedirect(searchParams);
 
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');

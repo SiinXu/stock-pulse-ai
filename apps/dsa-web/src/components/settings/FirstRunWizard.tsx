@@ -547,7 +547,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         {step === 'connection' && mode === 'cloud' ? (
-          <div className="space-y-3">
+          <form className="space-y-3" onSubmit={(event) => event.preventDefault()}>
             {showProviderField ? (
               <div>
                 <label htmlFor="wizard-provider" className="mb-1 block text-sm text-foreground">
@@ -628,7 +628,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 />
               </div>
             ) : null}
-          </div>
+          </form>
         ) : null}
 
         {step !== 'mode' && mode === 'cloud' && !connectionAuthority.usable ? (
