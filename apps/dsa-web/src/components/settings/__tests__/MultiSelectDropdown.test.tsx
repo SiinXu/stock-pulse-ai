@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { Modal } from '../../common/Modal';
 import { MultiSelectDropdown } from '../MultiSelectDropdown';
 
 const options = [
@@ -118,5 +119,59 @@ describe('MultiSelectDropdown', () => {
     fireEvent.keyDown(within(listbox).getAllByRole('checkbox')[0], { key: 'Escape' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it('portals and positions a bottom-anchored popup inside the viewport', async () => {
+    const triggerRect = new DOMRect(110, 706, 272, 44);
+    const popupRect = new DOMRect(110, 754, 348, 299);
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.getAttribute('aria-label') === '通知渠道') {
+          return triggerRect;
+        }
+        if (this.getAttribute('data-dialog-popup') === 'true') {
+          return popupRect;
+        }
+        return new DOMRect();
+      });
+    vi.stubGlobal('innerWidth', 390);
+    vi.stubGlobal('innerHeight', 844);
+
+    try {
+      render(
+        <Modal isOpen title="通知设置" onClose={() => {}}>
+          <div data-testid="clipping-parent" className="overflow-hidden">
+            <MultiSelectDropdown
+              options={options}
+              selected={[]}
+              onChange={() => {}}
+              ariaLabel="通知渠道"
+            />
+          </div>
+        </Modal>,
+      );
+      const dialog = screen.getByRole('dialog', { name: '通知设置' });
+      const clippingParent = screen.getByTestId('clipping-parent');
+      fireEvent.click(within(dialog).getByRole('button', { name: '通知渠道' }));
+      const popup = screen.getByRole('listbox', { name: '通知渠道' }).parentElement;
+      expect(popup).not.toBeNull();
+
+      await waitFor(() => {
+        expect(popup).toHaveClass('fixed');
+        expect(popup?.parentElement).toBe(dialog);
+        expect(clippingParent).not.toContainElement(popup);
+        expect(popup?.style.maxWidth).toBe('calc(100vw - 16px)');
+
+        const popupTop = Number.parseFloat(popup?.style.top ?? '');
+        const popupLeft = Number.parseFloat(popup?.style.left ?? '');
+        expect(popupTop).toBeLessThan(triggerRect.top);
+        expect(popupTop + popupRect.height).toBeLessThanOrEqual(window.innerHeight - 8);
+        expect(popupLeft).toBeGreaterThanOrEqual(8);
+        expect(popupLeft + popupRect.width).toBeLessThanOrEqual(window.innerWidth - 8);
+      });
+    } finally {
+      rectSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 });

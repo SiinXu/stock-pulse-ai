@@ -1,10 +1,35 @@
+const REDIRECT_VALIDATION_ORIGIN = 'https://login-redirect.invalid';
+
+function hasUnsafeRedirectCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 0x20 || codePoint === 0x7f || character === '\\') {
+      return true;
+    }
+  }
+  return false;
+}
+
 // Only same-origin absolute paths are allowed; anything else (external URLs,
-// protocol-relative "//host", backslash tricks) falls back to the home page.
+// protocol-relative hosts, control-character normalization, or backslash
+// tricks) falls back to the home page.
 export function resolveLoginRedirect(search: string | URLSearchParams): string {
   const params = typeof search === 'string' ? new URLSearchParams(search) : search;
   const raw = params.get('redirect') ?? '';
-  if (raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\')) {
-    return raw;
+
+  if (!raw.startsWith('/') || hasUnsafeRedirectCharacter(raw)) {
+    return '/';
   }
-  return '/';
+
+  try {
+    const validationOrigin = new URL(REDIRECT_VALIDATION_ORIGIN);
+    const destination = new URL(raw, validationOrigin);
+    if (destination.origin !== validationOrigin.origin) {
+      return '/';
+    }
+
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return '/';
+  }
 }
