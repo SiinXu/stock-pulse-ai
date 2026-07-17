@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
@@ -90,7 +90,7 @@ export function useHomeUrlState({
     replace: boolean,
     issueAction: { set?: HomeUrlIssue; clear?: boolean } = {},
   ) => {
-    pendingSearchRef.current = search;
+    pendingSearchRef.current = search === location.search ? null : search;
     const nextState = { ...navigationState };
     if (issueAction.set) {
       nextState[HOME_URL_ISSUE_STATE_KEY] = issueAction.set;
@@ -105,9 +105,10 @@ export function useHomeUrlState({
       },
       { replace, state: Object.keys(nextState).length > 0 ? nextState : null },
     );
-  }, [location.hash, location.pathname, navigate, navigationState]);
+  }, [location.hash, location.pathname, location.search, navigate, navigationState]);
 
-  useEffect(() => {
+  // Confirm the programmatic target before the new report can be painted and navigated away from.
+  useLayoutEffect(() => {
     if (pendingSearchRef.current === location.search) {
       pendingSearchRef.current = null;
     }

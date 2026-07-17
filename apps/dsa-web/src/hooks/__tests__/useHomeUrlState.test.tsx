@@ -51,6 +51,7 @@ function Harness({
   return (
     <div>
       <output data-testid="search">{location.search}</output>
+      <output data-testid="location-key">{location.key}</output>
       <output data-testid="source">{source}</output>
       <output data-testid="issue">{homeUrl.urlIssue ?? 'none'}</output>
       <button type="button" onClick={() => homeUrl.navigateToRecord(2)}>record 2</button>
@@ -113,6 +114,31 @@ describe('useHomeUrlState', () => {
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=2'));
     await waitFor(() => expect(onSelect.mock.calls.at(-1)?.[0]).toBe(2));
     expect(onSelect.mock.calls.map(([recordId]) => recordId)).toEqual([2, 1, 2]);
+  });
+
+  it('does not let a repeated current-record navigation block Back restoration', async () => {
+    const onSelect = vi.fn();
+    renderHarness('/?recordId=1', { initialSelectedRecordId: 1, onSelect });
+
+    fireEvent.click(screen.getByRole('button', { name: 'record 2' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=2'));
+    await waitFor(() => expect(onSelect.mock.calls.map(([recordId]) => recordId)).toEqual([2]));
+    const firstRecordTwoKey = screen.getByTestId('location-key').textContent;
+    expect(firstRecordTwoKey).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'record 2' }));
+    await waitFor(() => expect(screen.getByTestId('location-key').textContent).not.toBe(firstRecordTwoKey));
+    const repeatedRecordTwoKey = screen.getByTestId('location-key').textContent;
+    expect(repeatedRecordTwoKey).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+    await waitFor(() => expect(screen.getByTestId('location-key').textContent).toBe(firstRecordTwoKey));
+    expect(screen.getByTestId('location-key').textContent).not.toBe(repeatedRecordTwoKey);
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=1'));
+    await waitFor(() => expect(onSelect.mock.calls.map(([recordId]) => recordId)).toEqual([2, 1]));
   });
 
   it('restores task and history Run Flow state and preserves the report when closing', async () => {
