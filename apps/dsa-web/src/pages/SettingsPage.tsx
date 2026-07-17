@@ -22,6 +22,7 @@ import {
   DataProvidersPanel,
   NotificationTestPanel,
   isNotificationChannelKey,
+  getConfiguredRoutingValues,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
   getNotificationFieldOrder,
@@ -58,6 +59,7 @@ import {
   type ConnectionCredentialField,
 } from '../components/settings/llmConnectionContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
+import { SettingsSwitch } from '../components/settings/SettingsSwitch';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
   SETTINGS_SECTIONS,
@@ -95,6 +97,7 @@ import type {
 } from '../types/systemConfig';
 import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
+import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 
 type DesktopWindow = Window & {
   dsaDesktop?: {
@@ -115,6 +118,14 @@ interface SettingsGroupSaveState {
 }
 
 const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
+
+// Routing fields whose options must be limited to channels the user has
+// actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
+const CHANNEL_ROUTING_FIELD_KEYS = new Set([
+  'NOTIFICATION_REPORT_CHANNELS',
+  'NOTIFICATION_ALERT_CHANNELS',
+  'NOTIFICATION_SYSTEM_ERROR_CHANNELS',
+]);
 
 function connectionItemsRespectSchema(
   items: Array<{ key: string; value: string }>,
@@ -752,6 +763,15 @@ function serializeScheduleTimes(times: string[]) {
   return times.map((time) => time.trim()).filter(Boolean).join(',');
 }
 
+function normalizeScheduleTimeDraft(value: string): string | null {
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  const candidate = `${match[1].padStart(2, '0')}:${match[2].padStart(2, '0')}`;
+  return SCHEDULE_TIME_PATTERN.test(candidate) ? candidate : null;
+}
+
 function formatSchedulerTimestamp(value: string | null | undefined, language: UiLanguage) {
   if (!value) {
     return '-';
@@ -806,6 +826,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
+  const [timeDraft, setTimeDraft] = useState<{ index: number; value: string } | null>(null);
 
   const refreshSchedulerStatus = useCallback(async () => {
     setStatusError(null);
@@ -890,24 +911,22 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
-                <label className="flex min-h-11 items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-border text-foreground focus:ring-foreground/20"
-                    checked={displayedScheduleEnabled}
-                    data-testid="scheduler-enabled-checkbox"
-                    disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
-                    onChange={(event) => {
-                      const nextEnabled = Boolean(event.target.checked);
-                      setScheduleEnabledOverride(nextEnabled);
-                      onChange('SCHEDULE_ENABLED', nextEnabled ? 'true' : 'false');
-                    }}
-                  />
-              <span>
-                <span className="block text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</span>
-                <span className="block text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</span>
-              </span>
-            </label>
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
+                <p className="text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</p>
+              </div>
+              <SettingsSwitch
+                checked={displayedScheduleEnabled}
+                disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
+                onCheckedChange={(nextEnabled) => {
+                  setScheduleEnabledOverride(nextEnabled);
+                  onChange('SCHEDULE_ENABLED', nextEnabled ? 'true' : 'false');
+                }}
+                testId="scheduler-enabled-switch"
+                aria-label={t('settings.schedulerEnable')}
+              />
+            </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -920,18 +939,44 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     key={index}
                     className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border settings-border bg-card/90 px-1 shadow-inner"
                   >
+                    {/* Plain text input instead of type="time": native pickers
+                        follow the OS locale and may render 12-hour AM/PM even
+                        in a 24-hour product context. */}
                     <input
                       data-testid={`scheduler-time-input-${index}`}
-                      type="time"
-                      value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={t('settings.schedulerTimePlaceholder')}
+                      value={
+                        timeDraft?.index === index
+                          ? timeDraft.value
+                          : SCHEDULE_TIME_PATTERN.test(time) ? time : ''
+                      }
                       aria-label={t('settings.schedulerTimeInputAria', { index: index + 1 })}
                       className="h-11 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
                       disabled={disabled}
                       onChange={(event) => {
-                        const nextTimes = scheduleTimes.map((currentTime, currentIndex) => (
-                          currentIndex === index ? event.target.value : currentTime
-                        ));
-                        updateScheduleTimes(nextTimes);
+                        const nextValue = event.target.value;
+                        if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
+                          setTimeDraft(null);
+                          updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
+                            currentIndex === index ? nextValue : currentTime
+                          )));
+                          return;
+                        }
+                        setTimeDraft({ index, value: nextValue });
+                      }}
+                      onBlur={() => {
+                        if (!timeDraft || timeDraft.index !== index) {
+                          return;
+                        }
+                        const normalized = normalizeScheduleTimeDraft(timeDraft.value);
+                        setTimeDraft(null);
+                        if (normalized) {
+                          updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
+                            currentIndex === index ? normalized : currentTime
+                          )));
+                        }
                       }}
                     />
                     {scheduleTimes.length > 1 ? (
@@ -943,6 +988,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                         title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
                         onClick={() => {
+                          setTimeDraft(null);
                           updateScheduleTimes(scheduleTimes.filter((_, currentIndex) => currentIndex !== index));
                         }}
                       >
@@ -958,7 +1004,10 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                   className="h-11 shrink-0"
                   data-testid="scheduler-add-time-button"
                   disabled={disabled}
-                  onClick={() => updateScheduleTimes([...scheduleTimes, SCHEDULER_DEFAULT_TIME])}
+                  onClick={() => {
+                    setTimeDraft(null);
+                    updateScheduleTimes([...scheduleTimes, SCHEDULER_DEFAULT_TIME]);
+                  }}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   {t('settings.schedulerAddTime')}
@@ -1592,6 +1641,31 @@ const SettingsPage: React.FC = () => {
     }
     return keys;
   }, [itemsByCategory]);
+  // Channel routing fields only offer channels the user has configured;
+  // otherwise they get an empty state that links to the channel setup view.
+  const configuredRoutingValues = useMemo(
+    () => getConfiguredRoutingValues(allValuesByKey),
+    [allValuesByKey],
+  );
+  const channelRoutingOptionFilter = useCallback(
+    (optionValue: string) => configuredRoutingValues.has(optionValue),
+    [configuredRoutingValues],
+  );
+  const notificationText = SETTINGS_NOTIFICATION_TEXT[uiLanguage];
+  const channelRoutingEmptyState = (
+    <div className="space-y-2 rounded-lg border border-border bg-background/35 p-3">
+      <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
+      <Button
+        type="button"
+        variant="settings-secondary"
+        size="sm"
+        className="text-xs shadow-none"
+        onClick={() => selectSectionView('notifications', 'channels')}
+      >
+        {notificationText.goConfigureChannels}
+      </Button>
+    </div>
+  );
   const hasUnsafeModelAccessSchema = rawActiveItems.some((item) => (
     (
       getUnsafeAiPlacement(item, activeCategory) !== null
@@ -2420,7 +2494,10 @@ const SettingsPage: React.FC = () => {
             return (
               <div key={group.id} className="space-y-2">
                 <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                <form
+                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                  onSubmit={(event) => event.preventDefault()}
+                >
                   {groupItems.map((item) => (
                     <SettingsField
                       key={item.key}
@@ -2432,15 +2509,20 @@ const SettingsPage: React.FC = () => {
                       requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
                       dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                       readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
+                      enumOptionFilter={CHANNEL_ROUTING_FIELD_KEYS.has(item.key) ? channelRoutingOptionFilter : undefined}
+                      enumEmptyState={CHANNEL_ROUTING_FIELD_KEYS.has(item.key) ? channelRoutingEmptyState : undefined}
                     />
                   ))}
-                </div>
+                </form>
               </div>
             );
           })}
         </div>
       ) : subFilteredItems.length ? (
-        <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+        <form
+          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+          onSubmit={(event) => event.preventDefault()}
+        >
           {subFilteredItems.map((item) => (
             <SettingsField
               key={item.key}
@@ -2454,7 +2536,7 @@ const SettingsPage: React.FC = () => {
               readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
             />
           ))}
-        </div>
+        </form>
       ) : null}
       {activeSubPromptCacheItems.length ? (
         <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
@@ -2469,7 +2551,10 @@ const SettingsPage: React.FC = () => {
             </div>
             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
           </summary>
-          <div className="border-t border-[var(--settings-border-soft)]">
+          <form
+            className="border-t border-[var(--settings-border-soft)]"
+            onSubmit={(event) => event.preventDefault()}
+          >
             {activeSubPromptCacheItems.map((item) => (
               <SettingsField
                 key={item.key}
@@ -2483,7 +2568,7 @@ const SettingsPage: React.FC = () => {
                 readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
               />
             ))}
-          </div>
+          </form>
         </details>
       ) : null}
     </SettingsSectionCard>
@@ -3188,7 +3273,10 @@ const SettingsPage: React.FC = () => {
                   </summary>
                   <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
                     {advancedSectionItems.length > 0 ? (
-                      <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                      <form
+                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                        onSubmit={(event) => event.preventDefault()}
+                      >
                         {advancedSectionItems.map((item) => (
                           <SettingsField
                             key={item.key}
@@ -3202,7 +3290,7 @@ const SettingsPage: React.FC = () => {
                             readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
                           />
                         ))}
-                      </div>
+                      </form>
                     ) : null}
                     <LLMConfigModeBanner
                       status={llmModeStatus}
@@ -3307,7 +3395,10 @@ const SettingsPage: React.FC = () => {
                 title={settingsText.eventMonitor}
                 description={settingsText.eventMonitorDescription}
               >
-                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                <form
+                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                  onSubmit={(event) => event.preventDefault()}
+                >
                   {eventMonitorItems.map((item) => (
                     <SettingsField
                       key={item.key}
@@ -3321,7 +3412,7 @@ const SettingsPage: React.FC = () => {
                       readOnlyDiagnostic={readOnlyDiagnosticForItem(item, 'agent')}
                     />
                   ))}
-                </div>
+                </form>
               </SettingsSectionCard>
             ) : null}
           </section>

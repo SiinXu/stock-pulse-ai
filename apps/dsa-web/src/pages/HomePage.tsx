@@ -1572,7 +1572,7 @@ const HomePage: React.FC = () => {
               ) : null}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2.5 md:flex-nowrap md:flex-shrink-0">
-              <label className="flex h-11 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
+              <label className="flex h-11 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
                 <input
                   type="checkbox"
                   checked={notify}

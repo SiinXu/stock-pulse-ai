@@ -152,13 +152,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
-            className="mb-3 flex min-h-11 w-full items-center justify-between rounded-full border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
+            className="mb-3 flex min-h-11 w-full items-center rounded-full border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
               <Search className="h-4 w-4" />
               {t('layout.search')}
             </span>
-            <kbd className="flex h-5 w-5 items-center justify-center rounded bg-muted text-xs font-medium text-secondary-text">/</kbd>
           </button>
           <div className="mb-3 border-t border-dashed border-border" />
         </>

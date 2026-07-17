@@ -16,6 +16,7 @@ import {
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
 import { useAgentChatStore } from './stores/agentChatStore';
+import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -71,7 +72,9 @@ const AppLayout: React.FC = () => {
   }
 
   if (isLoginRoute) {
-    return <Navigate to="/" replace />;
+    // Preserve the deep link: every path into /login carries ?redirect=,
+    // and the post-login re-render must not race LoginPage back to "/".
+    return <Navigate to={resolveLoginRedirect(location.search)} replace />;
   }
 
   return <Outlet />;

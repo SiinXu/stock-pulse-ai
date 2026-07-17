@@ -1005,7 +1005,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "REALTIME_SOURCE_PRIORITY": {
         "title": "Realtime Source Priority",
-        "description": "Comma-separated priority for realtime quote providers.",
+        "description": "Ordered priority for realtime quote providers; earlier entries are tried first.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "text",
@@ -1013,8 +1013,17 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_required": False,
         "is_editable": True,
         "default_value": "tencent,akshare_sina,efinance,akshare_em",
-        "options": [],
-        "validation": {},
+        # No allowed_values on purpose: stored aliases (e.g. akshare_qq) and
+        # custom sources must keep validating; the UI only offers the catalog.
+        "options": [
+            {"label": "tencent", "value": "tencent"},
+            {"label": "akshare_sina", "value": "akshare_sina"},
+            {"label": "efinance", "value": "efinance"},
+            {"label": "akshare_em", "value": "akshare_em"},
+            {"label": "tushare", "value": "tushare"},
+            {"label": "tickflow", "value": "tickflow"},
+        ],
+        "validation": {"multi_value": True, "delimiter": ",", "ordered": True},
         "display_order": 20,
         "help_key": "settings.data_source.REALTIME_SOURCE_PRIORITY",
         "examples": [

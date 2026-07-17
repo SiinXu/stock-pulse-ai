@@ -228,7 +228,7 @@ const fieldDescriptionMap: Record<string, string> = {
   MINIMAX_API_KEYS: '用于新闻检索的 MiniMax 密钥，支持逗号分隔多个（最低优先级）。',
   NEWS_STRATEGY_PROFILE: '新闻窗口档位：ultra_short=1天，short=3天，medium=7天，long=30天。',
   NEWS_MAX_AGE_DAYS: '新闻最大时效上限。实际窗口 = min(策略档位天数, NEWS_MAX_AGE_DAYS)。例如 ultra_short + 7 仍为 1 天。',
-  REALTIME_SOURCE_PRIORITY: '按逗号分隔填写数据源调用优先级。',
+  REALTIME_SOURCE_PRIORITY: '实时行情数据源的调用优先级，按选择顺序依次尝试，靠前的先调用。',
   TICKFLOW_API_KEY: '用于接入 TickFlow 数据服务的 API 密钥。',
   TICKFLOW_PRIORITY: '控制 TickFlow 在 A 股日 K 数据源回退链中的尝试顺序；不控制实时行情，实时行情顺序由 REALTIME_SOURCE_PRIORITY 决定。',
   TICKFLOW_KLINE_ADJUST: '控制 TickFlow 日 K 线的复权口径，默认 none 保持未复权技术指标基线。',
@@ -421,6 +421,14 @@ const fieldOptionLabelMap: Record<string, Record<string, string>> = {
     kr: '韩股（kr）',
     both: '全部市场（both）',
   },
+  REALTIME_SOURCE_PRIORITY: {
+    tencent: '腾讯行情（tencent）',
+    akshare_sina: '新浪财经（akshare_sina）',
+    efinance: '东方财富（efinance）',
+    akshare_em: '东方财富 AkShare（akshare_em）',
+    tushare: 'Tushare（tushare）',
+    tickflow: 'TickFlow（tickflow）',
+  },
   GENERATION_BACKEND: {
     litellm: '默认模型配置',
     codex_cli: 'Codex CLI（实验）',
@@ -506,6 +514,14 @@ const fieldOptionLabelMapEn: Record<string, Record<string, string>> = {
     jp: 'Japan (jp)',
     kr: 'Korea (kr)',
     both: 'All markets (both)',
+  },
+  REALTIME_SOURCE_PRIORITY: {
+    tencent: 'Tencent quotes (tencent)',
+    akshare_sina: 'Sina Finance (akshare_sina)',
+    efinance: 'Eastmoney (efinance)',
+    akshare_em: 'Eastmoney via AkShare (akshare_em)',
+    tushare: 'Tushare (tushare)',
+    tickflow: 'TickFlow (tickflow)',
   },
   GENERATION_BACKEND: {
     litellm: 'Default model settings',

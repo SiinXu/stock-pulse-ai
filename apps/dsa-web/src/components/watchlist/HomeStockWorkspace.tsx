@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   ArrowDownWideNarrow,
   CalendarDays,
@@ -223,6 +223,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   className = '',
 }) => {
   const { t } = useUiLanguage();
+  const reactId = useId();
   const [draftCode, setDraftCode] = useState('');
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
@@ -249,15 +250,41 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     void onAddToWatchlist(code).then(() => setDraftCode(''));
   };
 
+  const tabId = (key: HomeWorkspaceTab) => `${reactId}-tab-${key}`;
+  const panelId = `${reactId}-panel`;
+
+  const handleTabListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = tabs.findIndex((tab) => tab.key === activeTab);
+    let nextIndex = -1;
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = tabs.length - 1;
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextKey = tabs[nextIndex].key;
+    onTabChange(nextKey);
+    document.getElementById(tabId(nextKey))?.focus();
+  };
+
   const renderTabs = (
-    <div className="grid grid-cols-3 gap-1 rounded-xl border border-subtle bg-base/40 p-1">
+    <div
+      role="tablist"
+      aria-label={t('watchlist.tabsAria')}
+      onKeyDown={handleTabListKeyDown}
+      className="grid grid-cols-3 gap-1 rounded-xl border border-subtle bg-base/40 p-1"
+    >
       {tabs.map((tab) => {
         const selected = activeTab === tab.key;
         return (
           <button
             key={tab.key}
+            id={tabId(tab.key)}
             type="button"
-            aria-pressed={selected}
+            role="tab"
+            aria-selected={selected}
+            aria-controls={panelId}
+            tabIndex={selected ? 0 : -1}
             className={`h-11 rounded-full px-2 text-xs font-medium transition-colors ${
               selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
             }`}
@@ -270,29 +297,40 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     </div>
   );
 
-  if (activeTab === 'history') {
-    return (
-      <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
-        {renderTabs}
-        <StockBar
-          items={historyItems}
-          isLoading={isLoadingHistory}
-          selectedStockCode={selectedStockCode}
-          selectedRecordId={selectedRecordId}
-          onItemClick={onHistoryItemClick}
-          onDeleteStock={onDeleteStock}
-          isDeleting={isDeleting}
-          className="flex-1 overflow-hidden"
-        />
+  // Both branches share one skeleton so the tab bar keeps an identical
+  // position/size when switching tabs; only the panel content changes.
+  const workspaceShell = (content: React.ReactNode) => (
+    <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
+      {renderTabs}
+      <div
+        role="tabpanel"
+        id={panelId}
+        aria-labelledby={tabId(activeTab)}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        {content}
       </div>
+    </div>
+  );
+
+  if (activeTab === 'history') {
+    return workspaceShell(
+      <StockBar
+        items={historyItems}
+        isLoading={isLoadingHistory}
+        selectedStockCode={selectedStockCode}
+        selectedRecordId={selectedRecordId}
+        onItemClick={onHistoryItemClick}
+        onDeleteStock={onDeleteStock}
+        isDeleting={isDeleting}
+        className="flex-1 overflow-hidden"
+      />,
     );
   }
 
-  return (
-    <aside className={`glass-card flex min-h-0 flex-1 flex-col overflow-hidden ${className}`}>
+  return workspaceShell(
+    <aside className="glass-card flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="space-y-3 border-b border-subtle px-4 py-4">
-        {renderTabs}
-
         {activeTab === 'watchlist' ? (
           <>
             <DashboardPanelHeader
@@ -461,7 +499,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           </Button>
         </div>
       ) : null}
-    </aside>
+    </aside>,
   );
 };
 

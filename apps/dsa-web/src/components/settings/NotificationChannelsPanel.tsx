@@ -5,7 +5,7 @@ import type { ConfigValidationIssue, SystemConfigItem } from '../../types/system
 import { Badge, Modal } from '../common';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
-import { NOTIFICATION_CHANNELS } from './notificationChannels';
+import { isConfiguredChannelValue, NOTIFICATION_CHANNELS } from './notificationChannels';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getNotificationChannelLabel, SETTINGS_NOTIFICATION_TEXT } from '../../locales/settingsNotifications';
 
@@ -17,10 +17,7 @@ interface NotificationChannelsPanelProps {
 }
 
 function isChannelConfigured(items: SystemConfigItem[]): boolean {
-  return items.some((item) => {
-    const value = String(item.value ?? '').trim().toLowerCase();
-    return value !== '' && value !== 'false';
-  });
+  return items.some((item) => isConfiguredChannelValue(item.value));
 }
 
 export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps> = ({
@@ -83,7 +80,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         title={openChannel ? getNotificationChannelLabel(openChannel.id, language) : undefined}
         className="max-w-2xl"
       >
-        <div className="divide-y divide-transparent">
+        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
           {openChannelItems.map((item) => (
             <SettingsField
               key={item.key}
@@ -94,7 +91,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               issues={issueByKey[item.key] || []}
             />
           ))}
-        </div>
+        </form>
       </Modal>
     </>
   );

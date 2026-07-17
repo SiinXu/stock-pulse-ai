@@ -825,6 +825,25 @@ class TestMarketReviewFieldsRegistered(unittest.TestCase):
         self.assertIn("MARKET_REVIEW_REGION", field_keys)
 
 
+class TestRealtimeSourcePriorityField(unittest.TestCase):
+    """REALTIME_SOURCE_PRIORITY is an ordered multi-enum for the settings UI."""
+
+    def test_field_definition_offers_source_catalog(self):
+        field = get_field_definition("REALTIME_SOURCE_PRIORITY")
+        self.assertEqual(field["category"], "data_source")
+        self.assertEqual(field["default_value"], "tencent,akshare_sina,efinance,akshare_em")
+        self.assertEqual(
+            [option["value"] for option in field["options"]],
+            ["tencent", "akshare_sina", "efinance", "akshare_em", "tushare", "tickflow"],
+        )
+        self.assertTrue(field["validation"]["multi_value"])
+        self.assertTrue(field["validation"]["ordered"])
+        self.assertEqual(field["validation"]["delimiter"], ",")
+        # No allowed_values on purpose: stored aliases (e.g. akshare_qq) and
+        # custom sources must not start failing validation.
+        self.assertNotIn("allowed_values", field["validation"])
+
+
 class TestConfigConditions(unittest.TestCase):
     def test_evaluate_config_conditions_and_operators(self) -> None:
         from src.core.config_registry import evaluate_config_conditions

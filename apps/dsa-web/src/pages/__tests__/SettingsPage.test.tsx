@@ -199,7 +199,7 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
-  isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
+  ...(await import('../../components/settings/notificationChannels')),
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
       {items.map((item) => (
@@ -355,9 +355,12 @@ vi.mock('../../components/settings', async () => ({
   ),
   SettingsField: ({
     item,
+    value,
     disabled,
     dependencyLocked,
     readOnlyDiagnostic,
+    enumOptionFilter,
+    enumEmptyState,
   }: {
     item: {
       key: string;
@@ -366,24 +369,40 @@ vi.mock('../../components/settings', async () => ({
         options?: Array<string | { label: string; value: string }>;
       };
     };
+    value?: string;
     disabled?: boolean;
     dependencyLocked?: boolean;
     readOnlyDiagnostic?: string;
-  }) => (
-    <div
-      data-testid={`settings-field-${item.key}`}
-      data-readonly={disabled || dependencyLocked || Boolean(readOnlyDiagnostic) ? 'true' : 'false'}
-    >
-      <div>{item.key}</div>
-      {readOnlyDiagnostic ? <p>{readOnlyDiagnostic}</p> : null}
-      {item.schema?.description ? <p>{item.schema.description}</p> : null}
-      {item.schema?.options?.map((option) => {
-        const label = typeof option === 'string' ? option : option.label;
-        const value = typeof option === 'string' ? option : option.value;
-        return <span key={`${item.key}-${value}`}>{label}</span>;
-      })}
-    </div>
-  ),
+    enumOptionFilter?: (optionValue: string) => boolean;
+    enumEmptyState?: React.ReactNode;
+  }) => {
+    // Mirror the real component's option filtering just enough to assert the
+    // page-level wiring: filtered options hide, already-selected values stay,
+    // and a fully-filtered field falls back to the empty state.
+    const selectedValues = (value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
+    const visibleOptions = (item.schema?.options ?? []).filter((option) => {
+      const optionValue = typeof option === 'string' ? option : option.value;
+      return !enumOptionFilter || enumOptionFilter(optionValue) || selectedValues.includes(optionValue);
+    });
+    if (enumEmptyState && enumOptionFilter && visibleOptions.length === 0 && selectedValues.length === 0) {
+      return <div data-testid={`settings-field-${item.key}`}>{enumEmptyState}</div>;
+    }
+    return (
+      <div
+        data-testid={`settings-field-${item.key}`}
+        data-readonly={disabled || dependencyLocked || Boolean(readOnlyDiagnostic) ? 'true' : 'false'}
+      >
+        <div>{item.key}</div>
+        {readOnlyDiagnostic ? <p>{readOnlyDiagnostic}</p> : null}
+        {item.schema?.description ? <p>{item.schema.description}</p> : null}
+        {visibleOptions.map((option) => {
+          const label = typeof option === 'string' ? option : option.label;
+          const optionValue = typeof option === 'string' ? option : option.value;
+          return <span key={`${item.key}-${optionValue}`}>{label}</span>;
+        })}
+      </div>
+    );
+  },
   SettingsLoading: () => <div>loading</div>,
   SettingsPanelErrorBoundary: ({
     title,
@@ -2422,6 +2441,88 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
   });
 
+  it('limits channel routing options to configured channels and guides setup when none exist', () => {
+    const routingItem = (options: string[]) => ({
+      key: 'NOTIFICATION_ALERT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_ALERT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: options.map((option) => ({ label: option, value: option })),
+        validation: { allowed_values: options, multi_value: true, delimiter: ',' },
+        displayOrder: 1,
+      },
+    });
+    const channelItem = (key: string, value: string) => ({
+      key,
+      value,
+      rawValueExists: value !== '',
+      isMasked: false,
+      schema: {
+        key,
+        category: 'notification',
+        dataType: 'string',
+        uiControl: 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem(['wechat', 'feishu', 'custom']),
+          channelItem('WECHAT_WEBHOOK_URL', 'https://wx.example/hook'),
+          channelItem('CUSTOM_WEBHOOK_URLS', ''),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+
+    // Only channels with a configured key stay selectable.
+    const { rerender, unmount } = render(<SettingsPage />);
+    const field = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(field).getByText('wechat')).toBeInTheDocument();
+    expect(within(field).queryByText('feishu')).not.toBeInTheDocument();
+    expect(within(field).queryByText('custom')).not.toBeInTheDocument();
+
+    // With no configured channel at all, the field shows guidance that jumps
+    // to the notification channels setup view.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem(['wechat', 'feishu', 'custom']),
+          channelItem('WECHAT_WEBHOOK_URL', ''),
+        ],
+      },
+    }));
+    // buildSystemConfigState resets the router params; restore the alerts view.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    const emptyField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(emptyField).getByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).toBeInTheDocument();
+    fireEvent.click(within(emptyField).getByRole('button', { name: '去配置通知渠道' }));
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('notifications');
+    expect(nextParams?.get('view')).toBe('channels');
+    unmount();
+  });
+
   it('lists validation errors and jumps to the errored field section from any section', () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3196,8 +3297,12 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-11', 'w-11');
-    expect(screen.getByTestId('scheduler-enabled-checkbox').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByTestId('scheduler-time-input-0')).toHaveClass('h-11');
+    const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toHaveAttribute('role', 'switch');
+    expect(enabledSwitch).toHaveClass('h-11', 'w-11');
+    const timeInput = screen.getByTestId('scheduler-time-input-0');
+    expect(timeInput).toHaveClass('h-11');
+    expect(timeInput).toHaveAttribute('type', 'text');
 
     fireEvent.change(screen.getByTestId('scheduler-time-input-0'), {
       target: { value: '10:30' },
@@ -3208,6 +3313,76 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByTestId('scheduler-run-now-button'));
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
+  });
+
+  it('keeps partial schedule time drafts local and normalizes them on blur', async () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        system: [
+          ...configState.itemsByCategory.system,
+          {
+            key: 'SCHEDULE_ENABLED',
+            value: 'true',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'SCHEDULE_ENABLED',
+              category: 'system',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 8,
+            },
+          },
+          {
+            key: 'SCHEDULE_TIMES',
+            value: '18:00,15:10',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'SCHEDULE_TIMES',
+              category: 'system',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 11,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    const timeInput = await screen.findByTestId('scheduler-time-input-0');
+
+    // Partial drafts must not autosave: only a full HH:MM commits.
+    fireEvent.change(timeInput, { target: { value: '9' } });
+    expect(setDraftValue).not.toHaveBeenCalled();
+    expect(timeInput).toHaveValue('9');
+
+    // Blur normalizes a shorthand draft (9:5 -> 09:05) and commits it.
+    fireEvent.change(timeInput, { target: { value: '9:5' } });
+    expect(setDraftValue).not.toHaveBeenCalled();
+    fireEvent.blur(timeInput);
+    expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_TIMES', '09:05,15:10');
+
+    // Blur discards an unparseable draft and falls back to the stored value.
+    fireEvent.change(timeInput, { target: { value: 'abc' } });
+    fireEvent.blur(timeInput);
+    expect(setDraftValue).toHaveBeenCalledTimes(1);
+    expect(timeInput).toHaveValue('18:00');
   });
 
   it('shows an error when run-now is rejected because analysis is already running', async () => {
@@ -3388,13 +3563,13 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    expect(enabledCheckbox).toBeChecked();
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toBeChecked();
 
-    fireEvent.click(enabledCheckbox);
+    fireEvent.click(enabledSwitch);
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_ENABLED', 'false');
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
   });
 
   it('keeps local scheduler toggle edits when runtime and saved states are initially consistent', async () => {
@@ -3446,17 +3621,17 @@ describe('SettingsPage', () => {
     }));
     render(<SettingsPage />);
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    expect(enabledCheckbox).toBeChecked();
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toBeChecked();
 
-    fireEvent.click(enabledCheckbox);
+    fireEvent.click(enabledSwitch);
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_ENABLED', 'false');
-    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-checkbox')).not.toBeChecked());
+    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-switch')).not.toBeChecked());
 
     const refreshButton = screen.getByTestId('scheduler-refresh-status-button');
     fireEvent.click(refreshButton);
-    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-checkbox')).not.toBeChecked());
+    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-switch')).not.toBeChecked());
   });
 
   it('can reconcile runtime scheduler state when runtime is enabled but saved value is disabled', async () => {
@@ -3524,11 +3699,11 @@ describe('SettingsPage', () => {
 
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    await waitFor(() => expect(enabledCheckbox).toBeChecked());
-    fireEvent.click(enabledCheckbox);
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
+    fireEvent.click(enabledSwitch);
 
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
     await waitFor(() => expect(save).toHaveBeenCalledWith(
       [{ key: 'SCHEDULE_ENABLED', value: 'false' }],
       { silent: true },
@@ -3600,11 +3775,11 @@ describe('SettingsPage', () => {
 
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
-    fireEvent.click(enabledCheckbox);
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
+    fireEvent.click(enabledSwitch);
 
-    await waitFor(() => expect(enabledCheckbox).toBeChecked());
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
     await waitFor(() => expect(save).toHaveBeenCalledWith(
       [{ key: 'SCHEDULE_ENABLED', value: 'true' }],
       { silent: true },

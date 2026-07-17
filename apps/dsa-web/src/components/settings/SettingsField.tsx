@@ -9,6 +9,8 @@ import { getFieldDescriptionZh, getFieldOptionLabel, getFieldTitleZh } from '../
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { SettingsHelpButton } from './SettingsHelpButton';
+import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { SettingsSwitch } from './SettingsSwitch';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -77,6 +79,10 @@ interface SettingsFieldProps {
   dependencyLocked?: boolean;
   /** Fail-safe schema diagnostic that forces a field into read-only mode. */
   readOnlyDiagnostic?: string;
+  /** Restricts multi-enum options to those passing the filter (already-selected values always stay visible). */
+  enumOptionFilter?: (value: string) => boolean;
+  /** Rendered instead of the multi-enum control when the filter leaves no option and nothing is selected. */
+  enumEmptyState?: React.ReactNode;
 }
 
 function renderFieldControl(
@@ -91,6 +97,8 @@ function renderFieldControl(
   ariaDescribedBy: string | undefined,
   language: UiLanguage,
   t: (key: UiTextKey) => string,
+  enumOptionFilter?: (optionValue: string) => boolean,
+  enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
   const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
@@ -98,64 +106,41 @@ function renderFieldControl(
   const isMultiValue = isMultiValueField(item);
 
   // Multi-value enums (finite options + multi_value validation) render as a
-  // checkbox group so users pick from the catalog instead of typing a
-  // comma-separated string. Stored values outside the catalog stay visible and
-  // deselectable so saving never silently drops them.
+  // collapsed multi-select dropdown so users pick from the catalog instead of
+  // typing a comma-separated string. Stored values outside the catalog stay
+  // visible and deselectable so saving never silently drops them.
   if (schema?.options?.length && isMultiValue) {
     const normalizedOptions = normalizeSelectOptions(item.key, schema.options, language);
     const selectedValues = value.split(',').map((entry) => entry.trim()).filter(Boolean);
-    const knownValues = new Set(normalizedOptions.map((option) => option.value));
-    const unknownValues = selectedValues.filter((entry) => !knownValues.has(entry));
-    const isDisabled = disabled || !schema.isEditable;
+    const visibleOptions = enumOptionFilter
+      ? normalizedOptions.filter(
+          (option) => enumOptionFilter(option.value) || selectedValues.includes(option.value),
+        )
+      : normalizedOptions;
+    const validation = (schema.validation ?? {}) as Record<string, unknown>;
+    const isOrdered = Boolean(validation.ordered);
 
-    const toggleValue = (target: string) => {
-      const selected = new Set(selectedValues);
-      if (selected.has(target)) {
-        selected.delete(target);
-      } else {
-        selected.add(target);
-      }
-      const orderedKnown = normalizedOptions
-        .map((option) => option.value)
-        .filter((candidate) => selected.has(candidate));
-      const keptUnknown = unknownValues.filter((entry) => selected.has(entry));
-      onChange([...orderedKnown, ...keptUnknown].join(','));
-    };
+    if (enumEmptyState && visibleOptions.length === 0 && selectedValues.length === 0) {
+      return (
+        <div data-testid={`multi-enum-empty-${item.key}`}>
+          {enumEmptyState}
+        </div>
+      );
+    }
 
     return (
-      <div
-        role="group"
-        aria-invalid={hasError || undefined}
-        aria-describedby={ariaDescribedBy}
-        className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3"
-        data-testid={`multi-enum-${item.key}`}
-      >
-        {normalizedOptions.map((option, index) => (
-          <label key={option.value} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
-            <input
-              id={index === 0 ? controlId : undefined}
-              type="checkbox"
-              checked={selectedValues.includes(option.value)}
-              disabled={isDisabled}
-              onChange={() => toggleValue(option.value)}
-              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-            />
-            <span className="min-w-0 truncate">{option.label}</span>
-          </label>
-        ))}
-        {unknownValues.map((entry) => (
-          <label key={`unknown-${entry}`} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
-            <input
-              type="checkbox"
-              checked
-              disabled={isDisabled}
-              onChange={() => toggleValue(entry)}
-              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-            />
-            <span className="min-w-0 truncate">{entry}</span>
-          </label>
-        ))}
-      </div>
+      <MultiSelectDropdown
+        id={controlId}
+        testId={`multi-enum-${item.key}`}
+        options={visibleOptions}
+        selected={selectedValues}
+        onChange={(next) => onChange(next.join(','))}
+        ordered={isOrdered}
+        disabled={disabled || !schema.isEditable}
+        hasError={hasError}
+        ariaDescribedBy={ariaDescribedBy}
+        language={language}
+      />
     );
   }
 
@@ -198,36 +183,15 @@ function renderFieldControl(
     const isDisabled = disabled || !schema?.isEditable;
     return (
       <div className="flex items-center gap-2 md:w-full md:justify-end">
-        <button
+        <SettingsSwitch
           id={controlId}
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-invalid={hasError || undefined}
-          aria-describedby={ariaDescribedBy}
+          checked={checked}
           disabled={isDisabled}
-          onClick={() => onChange(checked ? 'false' : 'true')}
-          className={cn(
-            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
-            isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-          )}
-        >
-          <span
-            className={cn(
-              'relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors',
-              checked ? 'bg-foreground' : 'bg-border',
-            )}
-            data-testid={`${controlId}-switch-visual`}
-            aria-hidden="true"
-          >
-            <span
-              className={cn(
-                'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-                checked ? 'translate-x-3' : 'translate-x-0.5',
-              )}
-            />
-          </span>
-        </button>
+          onCheckedChange={(next) => onChange(next ? 'true' : 'false')}
+          visualTestId={`${controlId}-switch-visual`}
+          aria-invalid={hasError}
+          aria-describedby={ariaDescribedBy}
+        />
       </div>
     );
   }
@@ -327,7 +291,14 @@ function renderFieldControl(
       type={inputType}
       aria-invalid={hasError || undefined}
       aria-describedby={ariaDescribedBy}
-      className={cn(commonClass, 'block h-11 md:ml-auto md:w-44', hasError && 'border-danger')}
+      className={cn(
+        commonClass,
+        'block h-11 md:ml-auto',
+        // Numbers stay compact; text/path fields fill the 240px control column
+        // so long values (e.g. directory paths) are not clipped to ~170px.
+        inputType === 'number' ? 'md:w-44' : 'md:w-full',
+        hasError && 'border-danger',
+      )}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
@@ -345,6 +316,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   requirement = null,
   dependencyLocked = false,
   readOnlyDiagnostic,
+  enumOptionFilter,
+  enumEmptyState,
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
@@ -434,6 +407,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           ariaDescribedBy,
           language,
           t,
+          enumOptionFilter,
+          enumEmptyState,
         )}
 
         {issues.length ? (

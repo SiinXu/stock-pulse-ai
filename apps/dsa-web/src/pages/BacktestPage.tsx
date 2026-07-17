@@ -525,6 +525,9 @@ const BacktestPage: React.FC = () => {
     <div className="min-h-full flex flex-col rounded-3xl bg-transparent">
       {/* Header */}
       <header className="flex-shrink-0 border-b border-white/5 px-3 py-3 sm:px-4">
+        {/* Visually hidden: the header is a dense filter toolbar, but the page
+            still needs an h1 landmark for assistive technology. */}
+        <h1 className="sr-only">{text.pageTitle}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative min-w-0 flex-[1_1_220px]">
             <input
@@ -634,8 +637,8 @@ const BacktestPage: React.FC = () => {
         </p>
       </header>
 
-      {/* Main content */}
-      <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
+      {/* Main content; div, not main: the app shell already renders the single <main> landmark. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row">
         {/* Left sidebar - Performance */}
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
           {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
@@ -806,7 +809,7 @@ const BacktestPage: React.FC = () => {
             </div>
           ) : null}
         </section>
-      </main>
+      </div>
     </div>
   );
 };

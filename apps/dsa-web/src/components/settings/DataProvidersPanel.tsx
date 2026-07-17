@@ -111,7 +111,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
         title={openProvider ? openProvider.label : undefined}
         className="max-w-2xl"
       >
-        <div className="divide-y divide-transparent">
+        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
           {openProviderItems.map((item) => (
             <SettingsField
               key={item.key}
@@ -122,7 +122,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
               issues={issueByKey[item.key] || []}
             />
           ))}
-        </div>
+        </form>
       </Modal>
     </>
   );
