@@ -37,6 +37,7 @@ import type { RunFlowSnapshotSource } from '../types/runFlow';
 import { getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
+import { getUiListSeparator } from '../utils/uiLocale';
 
 type MarketReviewNotice = {
   variant: 'success' | 'warning' | 'danger';
@@ -565,7 +566,7 @@ const HomePage: React.FC = () => {
     const requiredNeedsAction = setupStatus.checks
       .filter((check) => check.required && check.status === 'needs_action')
       .map((check) => check.title);
-    return requiredNeedsAction.slice(0, 3).join(uiLanguage === 'en' ? ', ' : '、');
+    return requiredNeedsAction.slice(0, 3).join(getUiListSeparator(uiLanguage));
   }, [setupStatus, uiLanguage]);
 
   const handleCompletedTaskDataRefreshed = useCallback((task: TaskInfo) => {

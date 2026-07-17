@@ -12,6 +12,8 @@ function collectSourceFiles(dir: string): string[] {
     const stats = statSync(fullPath);
 
     if (stats.isDirectory()) {
+      // Generated locale values can contain HTML examples; they are data, not JSX.
+      if (fullPath === join(srcRoot, 'i18n', 'translations')) return [];
       return collectSourceFiles(fullPath);
     }
 

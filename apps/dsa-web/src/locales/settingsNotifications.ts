@@ -1,3 +1,4 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -16,7 +17,7 @@ const en: Record<keyof typeof zh, string> = {
   goConfigureChannels: 'Configure channels',
 };
 
-export const SETTINGS_NOTIFICATION_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_NOTIFICATION_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsNotifications.SETTINGS_NOTIFICATION_TEXT", { zh, en });
 
 export function getNotificationChannelLabel(id: string, language: UiLanguage): string {
   const labels = SETTINGS_NOTIFICATION_TEXT[language] as Record<string, string>;

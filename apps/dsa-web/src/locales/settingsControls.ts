@@ -1,3 +1,4 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -78,9 +79,9 @@ const en: Record<keyof typeof zh, string> = {
   priorityPosition: 'Priority {position}',
 };
 
-export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsControls.SETTINGS_CONTROLS_TEXT", { zh, en });
 
-export const SETTINGS_SOURCE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_SOURCE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsControls.SETTINGS_SOURCE_LABELS", {
   zh: { auto: zh.sourceAuto, channels: zh.sourceChannels, yaml: 'YAML', legacy: zh.sourceLegacy },
   en: { auto: en.sourceAuto, channels: en.sourceChannels, yaml: 'YAML', legacy: en.sourceLegacy },
-};
+});

@@ -1,7 +1,8 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 
-const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = {
+const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
   base: '基础设置',
   data_source: '数据源',
@@ -22,9 +23,9 @@ const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>>
     backtest: 'Backtest',
     uncategorized: 'Other',
   },
-};
+});
 
-const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCategory, string>>> = {
+const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCategory, string>>> = createUiLanguageRecord("utils.systemConfigI18n.categoryDescriptionMap", {
   zh: {
   base: '管理自选股与基础运行参数。',
   data_source: '管理行情数据源与优先级策略。',
@@ -45,7 +46,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
     backtest: 'Manage backtest switches, evaluation windows, and engine parameters.',
     uncategorized: 'Other uncategorized settings.',
   },
-};
+});
 
 const fieldTitleMap: Record<string, string> = {
   STOCK_LIST: '自选股列表',
@@ -569,6 +570,11 @@ const fieldOptionLabelMapEn: Record<string, Record<string, string>> = {
   },
 };
 
+const fieldOptionLabelMaps: Record<UiLanguage, Record<string, Record<string, string>>> = createUiLanguageRecord(
+  'utils.systemConfigI18n.fieldOptionLabelMaps',
+  { zh: fieldOptionLabelMap, en: fieldOptionLabelMapEn },
+);
+
 function normalizeOptionToken(raw: string): string {
   return raw.trim().toLowerCase();
 }
@@ -607,7 +613,7 @@ export function getFieldOptionLabel(
   fallbackLabel?: string,
   locale: UiLanguage = 'zh',
 ): string {
-  const map = locale === 'en' ? fieldOptionLabelMapEn[key] : fieldOptionLabelMap[key];
+  const map = fieldOptionLabelMaps[locale][key];
   if (!map) {
     return fallbackLabel ?? value;
   }

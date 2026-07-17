@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Languages } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { UI_LANGUAGES, UI_LANGUAGE_METADATA, type UiLanguage } from '../../i18n/uiLanguages';
 import { cn } from '../../utils/cn';
 
 type UiLanguageToggleVariant = 'default' | 'nav' | 'rail';
@@ -25,17 +26,16 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
   labelClassName,
 }) => {
   const { language, setLanguage, t } = useUiLanguage();
-  const nextLanguage = language === 'zh' ? 'en' : 'zh';
   const isNavVariant = variant === 'nav';
   const isRailVariant = variant === 'rail';
-  const label = language === 'zh' ? t('language.uiLanguage') : t('language.current');
+  const metadata = UI_LANGUAGE_METADATA[language];
 
   return (
-    <div className={cn('relative', isRailVariant ? 'w-full' : '', wrapperClassName)}>
-      <button
-        type="button"
-        onClick={() => setLanguage(nextLanguage)}
+    <label className={cn('group relative block', isRailVariant ? 'w-full' : '', wrapperClassName)}>
+      <span
+        aria-hidden="true"
         className={cn(
+          'group-focus-within:ring-2 group-focus-within:ring-primary group-focus-within:ring-offset-2 group-focus-within:ring-offset-background',
           triggerClassName
             ? triggerClassName
             : isRailVariant
@@ -46,18 +46,27 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
           triggerActiveClassName,
           isNavVariant && collapsed ? 'justify-center px-2' : ''
         )}
-        aria-label={t('language.toggle')}
-        title={t('language.toggle')}
       >
         <Languages className={iconClassName ?? cn('shrink-0', isRailVariant ? 'size-4.5' : isNavVariant ? 'h-5 w-5' : 'h-4 w-4')} />
         {isRailVariant ? (
-          <span className={labelClassName}>{language === 'zh' ? t('language.short.zh') : t('language.short.en')}</span>
+          <span className={labelClassName}>{metadata.shortLabel}</span>
         ) : isNavVariant ? (
-          collapsed ? null : <span className="truncate text-[1.02rem] font-medium">{label}</span>
+          collapsed ? null : <span className="truncate text-[1.02rem] font-medium">{metadata.nativeLabel}</span>
         ) : (
-          <span className="hidden sm:inline">{label}</span>
+          <span className="hidden sm:inline">{metadata.nativeLabel}</span>
         )}
-      </button>
-    </div>
+      </span>
+      <select
+        aria-label={t('language.toggle')}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        data-testid="ui-language-selector"
+        onChange={(event) => setLanguage(event.target.value as UiLanguage)}
+        value={language}
+      >
+        {UI_LANGUAGES.map((option) => (
+          <option key={option} value={option}>{UI_LANGUAGE_METADATA[option].nativeLabel}</option>
+        ))}
+      </select>
+    </label>
   );
 };

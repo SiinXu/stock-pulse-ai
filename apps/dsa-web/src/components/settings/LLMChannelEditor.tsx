@@ -48,6 +48,7 @@ import {
 } from './modelAccessFieldKey';
 import { encodeModelRef, isModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
+import { getUiColon, getUiListSeparator } from '../../utils/uiLocale';
 
 // Provider *business* metadata comes from the backend catalog (passed as a
 // prop). These helpers resolve an entry by channel/provider id; "known" excludes
@@ -774,7 +775,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             <span className="truncate text-xs text-muted-text">{channel.displayName}</span>
             {unsaved ? <Badge variant="warning">{text.unsaved}</Badge> : null}
             {!isComplete ? (
-              <Tooltip content={issues.map((issue) => localizeModelAccessIssue(issue, language)).join(language === 'en' ? ', ' : '、')}>
+              <Tooltip content={issues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language))}>
                 <span className="inline-flex">
                   <Badge variant="warning">{text.incompleteDraft}</Badge>
                 </span>
@@ -826,7 +827,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             </button>
           )}
           {usedByTasks.length > 0 ? (
-            <p className="mt-1 truncate text-xs text-muted-text">{formatUiText(text.usedBy, { tasks: usedByTasks.join(language === 'en' ? ', ' : '、') })}</p>
+            <p className="mt-1 truncate text-xs text-muted-text">{formatUiText(text.usedBy, { tasks: usedByTasks.join(getUiListSeparator(language)) })}</p>
           ) : null}
         </div>
 
@@ -2056,7 +2057,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             />
           ) : null}
           {!draft.enabled && completenessIssues.length > 0 ? (
-            <p className="text-xs text-muted-text">{formatUiText(text.incompleteSavedDraft, { issues: completenessIssues.map((issue) => localizeModelAccessIssue(issue, language)).join(language === 'en' ? ', ' : '、') })}</p>
+            <p className="text-xs text-muted-text">{formatUiText(text.incompleteSavedDraft, { issues: completenessIssues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language)) })}</p>
           ) : null}
 
           <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
@@ -2391,13 +2392,13 @@ function buildLlmFailureText(result: {
 }, language: UiLanguage): string {
   const editorText = MODEL_ACCESS_EDITOR_TEXT[language];
   const prefix = `${getLlmStageLabel(result.stage, language)} · ${getLlmErrorCodeLabel(result.errorCode, language)}`;
-  const summary = language === 'en'
-    ? getLlmErrorCodeLabel(result.errorCode, language)
-    : result.message || MODEL_ACCESS_TEXT[language].testFailed;
+  const summary = language === 'zh'
+    ? result.message || MODEL_ACCESS_TEXT[language].testFailed
+    : getLlmErrorCodeLabel(result.errorCode, language);
   if (language === 'zh' && result.error && result.error !== result.message) {
     return `${prefix}：${summary} (${formatUiText(editorText.rawSummary, { summary: result.error })})`;
   }
-  return `${prefix}${language === 'en' ? ': ' : '：'}${summary}`;
+  return `${prefix}${getUiColon(language)}${summary}`;
 }
 
 function runtimeConfigChangedKeys(left: RuntimeConfig, right: RuntimeConfig): Set<string> {
@@ -3494,7 +3495,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   <li key={channel.id || index}>
                     {formatUiText(editorText.invalidConnection, {
                       name: channel.displayName.trim() || channel.name || formatUiText(editorText.connectionNumber, { number: index + 1 }),
-                      issues: issues.map((issue) => localizeModelAccessIssue(issue, language)).join(language === 'en' ? ', ' : '、'),
+                      issues: issues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language)),
                     })}
                   </li>
                 ))}
@@ -3522,7 +3523,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         title={pendingRemove && pendingRemove.referencedBy.length > 0 ? editorText.cannotDeleteConnection : editorText.deleteConnectionTitle}
         message={pendingRemove
           ? (pendingRemove.referencedBy.length > 0
-            ? formatUiText(editorText.referencedConnection, { name: pendingRemove.name, tasks: pendingRemove.referencedBy.join(language === 'en' ? ', ' : '、') })
+            ? formatUiText(editorText.referencedConnection, { name: pendingRemove.name, tasks: pendingRemove.referencedBy.join(getUiListSeparator(language)) })
             : formatUiText(editorText.removeDraftConnection, { name: pendingRemove.name }))
           : ''}
         confirmText={pendingRemove && pendingRemove.referencedBy.length > 0 ? editorText.replaceInRouting : MODEL_ACCESS_TEXT[language].deleteConnection}

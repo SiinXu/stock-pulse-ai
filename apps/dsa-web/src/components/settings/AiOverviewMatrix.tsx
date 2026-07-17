@@ -1,4 +1,5 @@
 import type React from 'react';
+import { getUiListSeparator } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
 import { resolveAiTaskMatrix, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
 import { SETTINGS_MISC_TEXT, SETTINGS_OVERVIEW_STATUS } from '../../locales/settingsMisc';
@@ -29,7 +30,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   formatModel = (modelRef) => modelRef,
 }) => {
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
-  const tx = (entry: { zh: string; en: string }) => entry[language];
+  const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
 
   return (
@@ -86,7 +87,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
                 <td className="px-3 py-2.5 text-secondary-text">
                   {row.fallbackModels.length > 0 ? (
                     <span className="break-all">
-                      {row.fallbackModels.map(formatModel).join(language === 'en' ? ', ' : '、')}
+                      {row.fallbackModels.map(formatModel).join(getUiListSeparator(language))}
                     </span>
                   ) : (
                     <span className="text-muted-text">—</span>

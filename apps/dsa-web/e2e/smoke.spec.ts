@@ -117,15 +117,14 @@ test.describe('web smoke', () => {
   test('language switch updates UI copy and persists after page refresh', async ({ page }) => {
     await login(page);
 
-    const languageToggle = page.getByRole('button', { name: '切换界面语言' });
-    await expect(languageToggle).toBeVisible();
+    const languageSelector = page.locator('select[data-testid="ui-language-selector"]:visible').first();
+    await expect(languageSelector).toBeVisible();
     await expect(page.getByRole('link', { name: '设置' })).toBeVisible();
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
 
-    await languageToggle.click();
+    await languageSelector.selectOption('en');
 
-    const englishLanguageToggle = page.getByRole('button', { name: 'Switch UI language' });
-    await expect(englishLanguageToggle).toBeVisible();
+    await expect(languageSelector).toHaveValue('en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
 
@@ -134,7 +133,7 @@ test.describe('web smoke', () => {
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(englishLanguageToggle).toBeVisible();
+    await expect(languageSelector).toHaveValue('en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
 

@@ -2,6 +2,7 @@ import type {
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
 import type { UiLanguage } from '../../i18n/uiText';
+import { prefersChineseContent } from '../../i18n/uiLanguages';
 import {
   evaluateConnectionFieldStates,
   evaluateConnectionSchemaAuthority,
@@ -103,12 +104,12 @@ export function getProviderDisplayLabel(
   provider: LlmProviderCatalogEntry,
   language: UiLanguage,
 ): string {
-  const localized = language === 'en' ? provider.labelEn : provider.labelZh;
+  const localized = prefersChineseContent(language) ? provider.labelZh : provider.labelEn;
   if (localized?.trim()) {
     return localized.trim();
   }
   const legacy = provider.label?.trim();
-  if (legacy && (language !== 'en' || !CHINESE_SCRIPT.test(legacy))) {
+  if (legacy && (prefersChineseContent(language) || !CHINESE_SCRIPT.test(legacy))) {
     return legacy;
   }
   return provider.id;
