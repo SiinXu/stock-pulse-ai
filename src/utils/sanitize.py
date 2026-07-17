@@ -102,6 +102,7 @@ _SAFE_EXCEPTION_CHAIN_LIMIT = 4
 _SAFE_EXCEPTION_PART_MAX_LENGTH = 240
 _SAFE_EXCEPTION_SUMMARY_MAX_LENGTH = 900
 _EXACT_REDACTION_VALUE_LIMIT = 64
+_EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT = _EXACT_REDACTION_VALUE_LIMIT + 1
 _SAFE_RENDER_FAILURE = "[UNRENDERABLE]"
 _UNSAFE_EXCEPTION_ACCESS = object()
 
@@ -375,7 +376,7 @@ def sanitize_exception_chain(
 
 
 def exception_chain_redaction_values(error: Any) -> set[str]:
-    """Return each raw exception-chain message for fail-closed exact redaction."""
+    """Return bounded exact values matching each rendered chain diagnostic source."""
 
     values: set[str] = set()
     current = error
@@ -385,14 +386,28 @@ def exception_chain_redaction_values(error: Any) -> set[str]:
         if identity in seen:
             break
         seen.add(identity)
-        try:
-            rendered = str(current)
-        except BaseException:
-            rendered = ""
-        if rendered:
-            values.add(rendered)
         if not isinstance(current, BaseException):
             break
+
+        diagnostic_source = _safe_exception_diagnostic_source(current)
+        if diagnostic_source is _UNSAFE_EXCEPTION_ACCESS:
+            break
+        try:
+            rendered = _safe_structured_string(diagnostic_source).strip()
+        except BaseException:
+            rendered = ""
+        if rendered and rendered != _SAFE_RENDER_FAILURE:
+            examined_chunks = 0
+            for offset in range(0, len(rendered), _SAFE_EXCEPTION_PART_MAX_LENGTH):
+                chunk = rendered[offset : offset + _SAFE_EXCEPTION_PART_MAX_LENGTH]
+                if chunk:
+                    values.add(chunk)
+                examined_chunks += 1
+                if len(values) >= _EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT:
+                    return values
+                if examined_chunks >= _EXCEPTION_REDACTION_FAIL_CLOSED_LIMIT:
+                    break
+
         next_exception = _safe_next_exception(current)
         if next_exception is _UNSAFE_EXCEPTION_ACCESS:
             break
@@ -445,21 +460,28 @@ def log_safe_exception(
     path: Optional[str] = None,
     context: Optional[Mapping[str, Any]] = None,
     redaction_values: Optional[Iterable[Any]] = None,
+    exception_redaction_values: Optional[Iterable[Any]] = None,
 ) -> None:
     """Log a sanitized exception summary without attaching raw exception info."""
-    exact_values = _normalize_redaction_values(redaction_values)
-    if exact_values is None:
+    structural_values = _normalize_redaction_values(redaction_values)
+    exception_values = _normalize_redaction_values(exception_redaction_values)
+    if structural_values is None or exception_values is None:
         message = _SAFE_RENDER_FAILURE
     else:
         try:
+            summary_values = _normalize_redaction_values(
+                (*structural_values, *exception_values)
+            )
+            if summary_values is None:
+                raise ValueError("unsafe exception redaction values")
             fields = [
                 sanitize_diagnostic_text(
                     event,
                     max_length=160,
-                    redaction_values=exact_values,
+                    redaction_values=structural_values,
                 ) or "Unhandled exception",
                 "error_code="
-                f"{sanitize_diagnostic_text(error_code, max_length=120, redaction_values=exact_values) or 'unknown_error'}",
+                f"{sanitize_diagnostic_text(error_code, max_length=120, redaction_values=structural_values) or 'unknown_error'}",
             ]
             for field_name, value, field_limit in (
                 ("trace_id", trace_id, 128),
@@ -471,14 +493,14 @@ def log_safe_exception(
                 safe_value = sanitize_diagnostic_text(
                     value,
                     max_length=field_limit,
-                    redaction_values=exact_values,
+                    redaction_values=structural_values,
                 )
                 if safe_value:
                     fields.append(f"{field_name}={safe_value}")
             fields.extend(
-                _safe_log_context_fields(context, redaction_values=exact_values)
+                _safe_log_context_fields(context, redaction_values=structural_values)
             )
-            summary = sanitize_exception_chain(exc, redaction_values=exact_values)
+            summary = sanitize_exception_chain(exc, redaction_values=summary_values)
             fields.extend(
                 (
                     f"exception_type={safe_exception_type_name(exc)}",
@@ -539,6 +561,13 @@ def safe_before_sleep_log(
             retry_exception = state_error
 
         if retry_exception is not None:
+            try:
+                retry_redaction_values = exception_chain_redaction_values(retry_exception)
+            except BaseException:
+                retry_redaction_values = None
+            if retry_redaction_values is None:
+                target_logger.log(level, _SAFE_RENDER_FAILURE)
+                return
             log_safe_exception(
                 target_logger,
                 event,
@@ -547,6 +576,7 @@ def safe_before_sleep_log(
                 level=level,
                 context=retry_context,
                 redaction_values=exact_values,
+                exception_redaction_values=retry_redaction_values,
             )
             return
 

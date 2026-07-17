@@ -4,11 +4,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
+from unittest.mock import patch
 
 from src.agent.stock_scope import StockScope
 from src.agent.tool_surface import ToolSurface
+from src.agent.tools.data_tools import get_portfolio_snapshot_tool
 from src.agent.tools.execution import ToolAccessContext
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy, ToolRegistry
 
@@ -292,6 +295,44 @@ def test_handler_error_is_structured_without_traceback() -> None:
     assert result["error"]["code"] == "handler_error"
     assert "Traceback" not in result["result_text"]
     assert "secret stack" not in result["result_text"]
+
+
+def test_caught_portfolio_error_is_safe_across_tool_surface_result_and_log(caplog) -> None:
+    canary = "TOOL_SURFACE_PORTFOLIO_DIAGNOSTIC_CANARY"
+    raw_path = "/Users/private-user/.config/stockpulse/tool-surface-portfolio.json"
+
+    class _FailingPortfolioService:
+        def get_portfolio_snapshot(self, **_kwargs):
+            raise OSError(5, f"portfolio provider failed: {canary}", raw_path)
+
+    registry = ToolRegistry()
+    registry.register(get_portfolio_snapshot_tool)
+    caplog.set_level(logging.WARNING, logger="src.agent.tools.data_tools")
+
+    with patch(
+        "src.services.portfolio_service.PortfolioService",
+        _FailingPortfolioService,
+    ), patch(
+        "src.services.portfolio_risk_service.PortfolioRiskService",
+    ):
+        result = ToolSurface(registry).execute_tool(
+            "get_portfolio_snapshot",
+            {"account_id": 1, "include_risk": False},
+            None,
+        )
+
+    # Domain failures remain successful ToolSurface invocations until AR-02 types them.
+    assert result["ok"] is True
+    assert result["result"] == {
+        "status": "failed",
+        "error": "Portfolio snapshot is unavailable.",
+    }
+    visible = json.dumps(result, ensure_ascii=False) + "\n" + "\n".join(
+        record.getMessage() for record in caplog.records
+    )
+    assert canary not in visible
+    assert raw_path not in visible
+    assert "portfolio provider failed" not in visible
 
 
 def test_serialization_fallback_for_non_json_native_object() -> None:

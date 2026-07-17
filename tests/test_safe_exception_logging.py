@@ -45,6 +45,11 @@ class BrokenBaseExceptionStringError(Exception):
         return "BROKEN_BASE_EXCEPTION_REPR_CANARY"
 
 
+class MultiArgumentError(Exception):
+    def __str__(self) -> str:
+        return "wrapped multi-argument failure"
+
+
 class BrokenNestedValue:
     def __str__(self) -> str:
         raise RuntimeError("nested string conversion failed")
@@ -245,6 +250,78 @@ def test_exception_chain_redaction_values_catches_base_exception_from_string() -
     )
 
     assert values == set()
+
+
+def test_exception_chain_redaction_values_match_key_error_diagnostic_source() -> None:
+    canary = "KEY_ERROR_DIAGNOSTIC_CANARY"
+    error = KeyError(canary)
+
+    rendered = sanitize_exception_chain(
+        error,
+        redaction_values=exception_chain_redaction_values(error),
+    )
+
+    assert rendered == "KeyError: [REDACTED]"
+    assert canary not in rendered
+
+
+def test_exception_chain_redaction_values_match_os_error_diagnostic_source() -> None:
+    canary = "OS_ERROR_DIAGNOSTIC_CANARY"
+    raw_path = "/Users/private-user/.config/stockpulse/provider.json"
+    error = OSError(5, canary, raw_path)
+
+    rendered = sanitize_exception_chain(
+        error,
+        redaction_values=exception_chain_redaction_values(error),
+    )
+
+    assert rendered == "OSError: [REDACTED]"
+    assert canary not in rendered
+    assert raw_path not in rendered
+
+
+def test_exception_chain_redaction_values_match_multi_argument_diagnostic_source() -> None:
+    message_canary = "MULTI_ARGUMENT_MESSAGE_CANARY"
+    path_canary = "/Users/private-user/MULTI_ARGUMENT_PATH_CANARY"
+    error = MultiArgumentError(message_canary, path_canary)
+
+    rendered = sanitize_exception_chain(
+        error,
+        redaction_values=exception_chain_redaction_values(error),
+    )
+
+    assert rendered == "MultiArgumentError: [REDACTED]"
+    assert message_canary not in rendered
+    assert path_canary not in rendered
+
+
+def test_exception_chain_redaction_values_cover_each_chain_diagnostic_source() -> None:
+    outer_canary = "OUTER_KEY_ERROR_CANARY"
+    cause_canary = "CAUSE_OS_ERROR_CANARY"
+    cause = OSError(5, cause_canary)
+    outer = KeyError(outer_canary)
+    outer.__cause__ = cause
+
+    rendered = sanitize_exception_chain(
+        outer,
+        redaction_values=exception_chain_redaction_values(outer),
+    )
+
+    assert rendered == "KeyError: [REDACTED] <- OSError: [REDACTED]"
+    assert outer_canary not in rendered
+    assert cause_canary not in rendered
+
+
+def test_exception_chain_redaction_values_are_bounded_for_long_diagnostics() -> None:
+    canary = "LONG_DIAGNOSTIC_CANARY_"
+    error = OSError(5, canary * 2000)
+
+    values = exception_chain_redaction_values(error)
+    rendered = sanitize_exception_chain(error, redaction_values=values)
+
+    assert len(values) <= 65
+    assert all(0 < len(value) <= 240 for value in values)
+    assert canary not in rendered
 
 
 def test_exception_chain_uses_fixed_placeholder_for_broken_cause() -> None:
@@ -454,7 +531,8 @@ def test_retry_log_catches_base_exception_from_state_access(caplog) -> None:
     assert len(caplog.records) == 1
     rendered = caplog.records[0].getMessage()
     assert "RETRY_STATE_READ_CANARY" not in rendered
-    assert "token=[REDACTED]" in rendered
+    assert "error_code=retry_state_inspection_failed" in rendered
+    assert "summary=RetryStateReadFailure: [REDACTED]" in rendered
     assert caplog.records[0].exc_info is None
 
 
@@ -788,3 +866,54 @@ def test_safe_exception_log_redacts_configured_standalone_values(caplog) -> None
     assert "[REDACTED]" in rendered
     assert len(rendered) < 2500
     assert record.exc_info is None
+
+
+def test_exception_redactions_do_not_corrupt_stable_log_fields(caplog) -> None:
+    caplog.set_level(logging.ERROR, logger="tests.safe_exception_fields")
+    target_logger = logging.getLogger("tests.safe_exception_fields")
+    error = RuntimeError("failed")
+
+    log_safe_exception(
+        target_logger,
+        "Search provider failed",
+        error,
+        error_code="tavily_search_failed",
+        context={"provider": "failed-provider"},
+        exception_redaction_values=exception_chain_redaction_values(error),
+    )
+
+    assert len(caplog.records) == 1
+    rendered = caplog.records[0].getMessage()
+    assert "Search provider failed" in rendered
+    assert "error_code=tavily_search_failed" in rendered
+    assert "provider=failed-provider" in rendered
+    assert "summary=RuntimeError: [REDACTED]" in rendered
+    assert "diagnostic=RuntimeError: [REDACTED]" in rendered
+    assert "tavily_search_[REDACTED]" not in rendered
+
+
+def test_retry_log_redacts_arbitrary_exception_without_corrupting_fields(caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="tests.safe_retry_arbitrary")
+    target_logger = logging.getLogger("tests.safe_retry_arbitrary")
+    callback = safe_before_sleep_log(
+        target_logger,
+        logging.WARNING,
+        event="Search request failed",
+        error_code="search_retry_failed",
+        context={"provider": "failed-provider"},
+    )
+    retry_state = SimpleNamespace(
+        attempt_number=1,
+        next_action=SimpleNamespace(sleep=0.25),
+        outcome=SimpleNamespace(exception=lambda: RuntimeError("failed")),
+    )
+
+    callback(retry_state)
+
+    assert len(caplog.records) == 1
+    rendered = caplog.records[0].getMessage()
+    assert "Search request failed" in rendered
+    assert "error_code=search_retry_failed" in rendered
+    assert "provider=failed-provider" in rendered
+    assert "summary=RuntimeError: [REDACTED]" in rendered
+    assert "search_retry_[REDACTED]" not in rendered

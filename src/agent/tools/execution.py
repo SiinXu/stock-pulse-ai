@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,15 @@ def serialize_tool_result(result: Any) -> str:
         except (TypeError, ValueError):
             return str(result)
     return str(result)
+
+
+def serialize_tool_error_result(*, message: str, code: str, retriable: bool) -> str:
+    """Serialize the stable model-visible error contract shared by agent runtimes."""
+    return serialize_tool_result({
+        "error": message,
+        "code": code,
+        "retriable": retriable,
+    })
 
 
 def _normalize_tool_stock_code(value: Any) -> Any:
@@ -289,6 +298,7 @@ def execute_runner_tool_call(
         )
         return tool_call, non_retriable_tool_results[cache_key], False, dur, True, None
 
+    registered_tool = tool_registry.resolve(tool_call.name)
     try:
         res = tool_registry.execute(tool_call.name, **tool_call.arguments)
         res_str = serialize_tool_result(res)
@@ -296,7 +306,20 @@ def execute_runner_tool_call(
         if cache_key and non_retriable_tool_results is not None and _is_non_retriable_tool_result(res):
             non_retriable_tool_results[cache_key] = res_str
     except Exception as exc:
-        res_str = json.dumps({"error": str(exc)})
+        if registered_tool is None and (":" in tool_call.name or "." in tool_call.name):
+            error_code = "invalid_tool_name"
+            error_message = "Tool name must exactly match a registered StockPulse tool."
+        elif registered_tool is None:
+            error_code = "tool_not_found"
+            error_message = "Tool not found."
+        else:
+            error_code = "handler_error"
+            error_message = "Tool handler failed."
+        res_str = serialize_tool_error_result(
+            message=error_message,
+            code=error_code,
+            retriable=False,
+        )
         ok = False
         log_safe_exception(
             logger,
@@ -305,6 +328,7 @@ def execute_runner_tool_call(
             error_code="agent_tool_execution_failed",
             level=logging.WARNING,
             context={"tool_name": tool_call.name},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
     dur = round(time.time() - t0, 2)
     return tool_call, res_str, ok, dur, False, None

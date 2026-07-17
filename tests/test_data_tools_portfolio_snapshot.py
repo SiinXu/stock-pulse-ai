@@ -11,6 +11,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.agent.tools.data_tools import _handle_get_portfolio_snapshot
 
 
+PORTFOLIO_CANARY = "PORTFOLIO_PROVIDER_DIAGNOSTIC_CANARY"
+PORTFOLIO_PATH = "/Users/private-user/.config/stockpulse/portfolio.json"
+
+
 class _FakePortfolioService:
     def get_portfolio_snapshot(self, **_kwargs):
         return {
@@ -94,6 +98,19 @@ class _FakeRiskService:
         }
 
 
+class _FailingPortfolioService:
+    def get_portfolio_snapshot(self, **_kwargs):
+        raise OSError(5, f"portfolio provider failed: {PORTFOLIO_CANARY}", PORTFOLIO_PATH)
+
+
+class _FailingRiskService:
+    def __init__(self, **_kwargs):
+        pass
+
+    def get_risk_report(self, **_kwargs):
+        raise OSError(5, f"portfolio risk failed: {PORTFOLIO_CANARY}", PORTFOLIO_PATH)
+
+
 class TestGetPortfolioSnapshotTool(unittest.TestCase):
     @patch("src.services.portfolio_service.PortfolioService", _FakePortfolioService)
     @patch("src.services.portfolio_risk_service.PortfolioRiskService", _FakeRiskService)
@@ -127,6 +144,36 @@ class TestGetPortfolioSnapshotTool(unittest.TestCase):
         invalid = _handle_get_portfolio_snapshot(as_of="2026/03/15")
         self.assertIn("error", invalid)
         self.assertIn("YYYY-MM-DD", invalid["error"])
+
+    @patch("src.services.portfolio_service.PortfolioService", _FailingPortfolioService)
+    @patch("src.services.portfolio_risk_service.PortfolioRiskService", _FakeRiskService)
+    def test_snapshot_failure_uses_stable_public_error_and_safe_log(self) -> None:
+        with self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
+            result = _handle_get_portfolio_snapshot(account_id=1)
+
+        self.assertEqual(
+            result,
+            {"status": "failed", "error": "Portfolio snapshot is unavailable."},
+        )
+        visible = str(result) + "\n" + "\n".join(logs.output)
+        self.assertNotIn(PORTFOLIO_CANARY, visible)
+        self.assertNotIn(PORTFOLIO_PATH, visible)
+        self.assertNotIn("portfolio provider failed", visible)
+
+    @patch("src.services.portfolio_service.PortfolioService", _FakePortfolioService)
+    @patch("src.services.portfolio_risk_service.PortfolioRiskService", _FailingRiskService)
+    def test_risk_failure_uses_stable_public_error_and_safe_log(self) -> None:
+        with self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
+            result = _handle_get_portfolio_snapshot(account_id=1)
+
+        self.assertEqual(
+            result["risk"],
+            {"status": "failed", "error": "Portfolio risk snapshot is unavailable."},
+        )
+        visible = str(result) + "\n" + "\n".join(logs.output)
+        self.assertNotIn(PORTFOLIO_CANARY, visible)
+        self.assertNotIn(PORTFOLIO_PATH, visible)
+        self.assertNotIn("portfolio risk failed", visible)
 
 
 if __name__ == "__main__":

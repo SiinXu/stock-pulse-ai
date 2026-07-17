@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
 - [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。
-- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息。
+- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息；Native Tool handler 与未知工具失败使用稳定错误码，内置 Agent 工具的 Portfolio、基本面、资金流与搜索下游失败使用稳定状态、诊断码或公开文案，模型、Single provider trace 与日志均不再包含原始异常详情；SearchService provider 失败日志只保留 provider、HTTP status、error count 与稳定 error code 等有界字段，不再输出 response body、私有 endpoint 或 API Key 前缀。
 - [修复] Web 异步分析仅在 409 envelope 的 `error` 为 `duplicate_task` 时构造重复任务错误，其它分析冲突与大盘复盘 409 统一走共享错误解析，并完整保留 `params`、`details` 和 `trace_id` 诊断元数据。
 - [修复] Web 用户可见文案与通知测试默认文案中的旧 DSA 品牌统一为 StockPulse；环境变量、API 字段、协议标识、内部模块名和历史载荷中的兼容标识保持不变。
 - [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。

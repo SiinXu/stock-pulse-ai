@@ -14,6 +14,7 @@ from src.agent.tools.execution import (
     _guard_tool_stock_scope,
     build_tool_audit,
     redact_diagnostic_value,
+    serialize_tool_error_result,
     serialize_tool_result,
 )
 from src.agent.tools.registry import (
@@ -241,9 +242,10 @@ class ToolSurface:
         arguments: Any = None,
     ) -> Dict[str, Any]:
         duration = time.time() - started_at
-        safe_text = result_text or json.dumps(
-            {"error": message, "code": code, "retriable": retriable},
-            ensure_ascii=False,
+        safe_text = result_text or serialize_tool_error_result(
+            message=message,
+            code=code,
+            retriable=retriable,
         )
         result_truncated = False
         if context.max_result_bytes is not None and context.max_result_bytes >= 0:
