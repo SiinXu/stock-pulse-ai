@@ -806,8 +806,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "请求字段非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -816,8 +816,8 @@
               }
             }
           },
-          "400": {
-            "description": "请求字段非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1178,8 +1178,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "查询参数非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -1188,8 +1188,8 @@
               }
             }
           },
-          "400": {
-            "description": "查询参数非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1286,8 +1286,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "请求参数非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -1296,8 +1296,8 @@
               }
             }
           },
-          "400": {
-            "description": "请求参数非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1452,8 +1452,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "状态非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -1462,8 +1462,8 @@
               }
             }
           },
-          "400": {
-            "description": "状态非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1746,8 +1746,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "请求字段非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -1756,8 +1756,8 @@
               }
             }
           },
-          "400": {
-            "description": "请求字段非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -1934,8 +1934,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "查询参数非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -1944,8 +1944,8 @@
               }
             }
           },
-          "400": {
-            "description": "查询参数非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2057,8 +2057,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "查询参数非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -2067,8 +2067,8 @@
               }
             }
           },
-          "400": {
-            "description": "查询参数非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2299,8 +2299,8 @@
               }
             }
           },
-          "401": {
-            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
+          "400": {
+            "description": "请求字段非法",
             "content": {
               "application/json": {
                 "schema": {
@@ -2309,8 +2309,8 @@
               }
             }
           },
-          "400": {
-            "description": "请求字段非法",
+          "401": {
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）",
             "content": {
               "application/json": {
                 "schema": {
@@ -2449,16 +2449,6 @@
               }
             }
           },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal Server Error"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2468,6 +2458,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         }
       }
@@ -2563,6 +2563,16 @@
             },
             "description": "Bad Request"
           },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
           "500": {
             "content": {
               "application/json": {
@@ -2572,13 +2582,35 @@
               }
             },
             "description": "Internal Server Error"
-          },
-          "422": {
-            "description": "Validation Error",
+          }
+        }
+      }
+    },
+    "/api/v1/system/config/llm/providers": {
+      "get": {
+        "tags": [
+          "SystemConfig"
+        ],
+        "summary": "Get the authoritative LLM model-service provider catalog",
+        "description": "Return provider metadata (label, protocol, default endpoint, credential and base-URL requirements, discovery support, capabilities). This is the single source of truth the Web model-access page consumes.",
+        "operationId": "get_llm_provider_catalog_api_v1_system_config_llm_providers_get",
+        "responses": {
+          "200": {
+            "description": "LLM provider catalog loaded",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/LLMProviderCatalogResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3390,7 +3422,10 @@
             "type": "boolean"
           },
           "is_required": {
-            "type": "boolean"
+            "type": "boolean",
+            "title": "Is Required",
+            "description": "Deprecated compatibility flag; contract.requirement is authoritative when present",
+            "deprecated": true
           },
           "is_editable": {
             "type": "boolean"
@@ -3412,6 +3447,17 @@
           },
           "display_order": {
             "type": "integer"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemConfigFieldContract"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Authoritative requirement, condition, and connection-test metadata"
           }
         },
         "required": [
@@ -3736,49 +3782,123 @@
         ]
       },
       "SystemConfigValidationErrorResponse": {
-        "type": "object",
-        "description": "配置更新校验失败响应",
         "properties": {
           "error": {
             "type": "string",
-            "example": "validation_failed"
+            "title": "Error"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "title": "Message"
           },
-          "issues": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigValidationIssue"
-            }
+          "params": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ConfigValidationIssue"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "details": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "detail": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Deprecated read-only alias of details; retained for patch/minor compatibility and removed only in a future major or versioned API",
+            "deprecated": true,
+            "readOnly": true
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
           }
         },
+        "type": "object",
         "required": [
           "error",
-          "message",
-          "issues"
-        ]
+          "message"
+        ],
+        "title": "SystemConfigValidationErrorResponse",
+        "description": "Stable envelope for failed update validation."
       },
       "SystemConfigConflictResponse": {
-        "type": "object",
-        "description": "配置版本冲突响应",
         "properties": {
           "error": {
             "type": "string",
-            "example": "config_version_conflict"
+            "title": "Error"
           },
           "message": {
-            "type": "string"
+            "type": "string",
+            "title": "Message"
           },
-          "current_config_version": {
-            "type": "string"
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "details": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "detail": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Deprecated read-only alias of details; retained for patch/minor compatibility and removed only in a future major or versioned API",
+            "deprecated": true,
+            "readOnly": true
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
           }
         },
+        "type": "object",
         "required": [
           "error",
-          "message",
-          "current_config_version"
-        ]
+          "message"
+        ],
+        "title": "SystemConfigConflictResponse",
+        "description": "Stable envelope for optimistic-lock conflicts."
       },
       "DecisionAction": {
         "type": "string",
@@ -3950,8 +4070,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1.0,
-                "minimum": 0.0
+                "maximum": 1,
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -3963,8 +4083,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 100.0,
-                "minimum": 0.0
+                "maximum": 100,
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -3996,7 +4116,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -4008,7 +4128,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -4020,7 +4140,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -4032,7 +4152,7 @@
             "anyOf": [
               {
                 "type": "number",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -4621,6 +4741,18 @@
             ],
             "title": "Details",
             "description": "Diagnostic details"
+          },
+          "detail": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Deprecated read-only alias of details; retained for patch/minor compatibility and removed only in a future major or versioned API",
+            "deprecated": true,
+            "readOnly": true
           },
           "trace_id": {
             "anyOf": [
@@ -5712,7 +5844,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "exclusiveMinimum": 0.0
+                "exclusiveMinimum": 0
               },
               {
                 "type": "null"
@@ -5838,8 +5970,8 @@
           },
           "limit": {
             "type": "integer",
-            "maximum": 500.0,
-            "minimum": 1.0,
+            "maximum": 500,
+            "minimum": 1,
             "title": "Limit",
             "default": 100
           }
@@ -6763,8 +6895,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 100.0,
-                "minimum": 0.0
+                "maximum": 100,
+                "minimum": 0
               },
               {
                 "type": "null"
@@ -6888,6 +7020,321 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "LLMProviderCatalogResponse": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LLMProviderCatalogEntry"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "connection_fields": {
+            "items": {
+              "$ref": "#/components/schemas/LLMConnectionFieldSchema"
+            },
+            "type": "array",
+            "title": "Connection Fields"
+          },
+          "empty_api_key_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Empty Api Key Hosts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "providers",
+          "connection_fields"
+        ],
+        "title": "LLMProviderCatalogResponse",
+        "description": "Provider metadata plus the shared dynamic Connection field contract."
+      },
+      "LLMProviderCatalogEntry": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Deprecated Chinese compatibility label; use label_zh or label_en",
+            "deprecated": true
+          },
+          "label_zh": {
+            "type": "string",
+            "title": "Label Zh"
+          },
+          "label_en": {
+            "type": "string",
+            "title": "Label En"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
+          "default_base_url": {
+            "type": "string",
+            "title": "Default Base Url"
+          },
+          "credential_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Url"
+          },
+          "console_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Url"
+          },
+          "models_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models Url"
+          },
+          "docs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docs Url"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "requires_api_key": {
+            "type": "boolean",
+            "title": "Requires Api Key"
+          },
+          "requires_base_url": {
+            "type": "boolean",
+            "title": "Requires Base Url"
+          },
+          "supports_discovery": {
+            "type": "boolean",
+            "title": "Supports Discovery"
+          },
+          "is_local": {
+            "type": "boolean",
+            "title": "Is Local"
+          },
+          "is_custom": {
+            "type": "boolean",
+            "title": "Is Custom"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "label_zh",
+          "label_en",
+          "protocol",
+          "default_base_url",
+          "requires_api_key",
+          "requires_base_url",
+          "supports_discovery",
+          "is_local",
+          "is_custom"
+        ],
+        "title": "LLMProviderCatalogEntry",
+        "description": "Authoritative model-service Provider metadata."
+      },
+      "LLMConnectionFieldSchema": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "env_suffix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env Suffix"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "boolean",
+              "array",
+              "json"
+            ],
+            "title": "Data Type"
+          },
+          "is_sensitive": {
+            "type": "boolean",
+            "title": "Is Sensitive"
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "description": "Deprecated unconditional compatibility projection; contract.requirement and required_when are authoritative",
+            "deprecated": true
+          },
+          "contract": {
+            "$ref": "#/components/schemas/SystemConfigFieldContract"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "data_type",
+          "is_sensitive",
+          "is_required",
+          "contract"
+        ],
+        "title": "LLMConnectionFieldSchema",
+        "description": "Schema for one dynamic per-Connection configuration field."
+      },
+      "SystemConfigCondition": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "equals",
+              "notEquals",
+              "in",
+              "notEmpty"
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "operator"
+        ],
+        "title": "SystemConfigCondition",
+        "description": "One condition in an AND-composed configuration field contract."
+      },
+      "SystemConfigFieldContract": {
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "enum": [
+              "required",
+              "optional",
+              "inherited"
+            ],
+            "title": "Requirement"
+          },
+          "required_when": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemConfigCondition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required When"
+          },
+          "visible_when": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemConfigCondition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible When"
+          },
+          "enabled_when": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemConfigCondition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled When"
+          },
+          "requires_connection_test": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires Connection Test"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requirement"
+        ],
+        "title": "SystemConfigFieldContract",
+        "description": "Authoritative conditional behavior for a configuration field."
       }
     },
     "securitySchemes": {

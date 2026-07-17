@@ -8,6 +8,7 @@ Covers:
 - extract_stock_codes_from_image(): magic bytes check, parsing
 """
 import io
+import logging
 import sys
 from unittest.mock import MagicMock
 
@@ -448,9 +449,10 @@ class TestExtractStockCodesFromImage:
         with pytest.raises(ValueError):
             extract_stock_codes_from_image(fake, "image/jpeg")
 
-    def test_wraps_litellm_error_message(self):
+    def test_wraps_litellm_error_message(self, caplog):
         cfg = _cfg(gemini_api_keys=[_GEMINI_KEY])
         jpeg = _make_jpeg_bytes()
+        caplog.set_level(logging.WARNING, logger="src.services.image_stock_extractor")
         with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
              patch("src.services.image_stock_extractor.litellm.completion",
                    side_effect=RuntimeError(
@@ -460,6 +462,12 @@ class TestExtractStockCodesFromImage:
                 extract_stock_codes_from_image(jpeg, "image/jpeg")
         assert "super-secret" not in str(exc_info.value)
         assert "private.example" not in str(exc_info.value)
+        rendered_logs = "\n".join(record.getMessage() for record in caplog.records)
+        assert "super-secret" not in rendered_logs
+        assert "private.example" not in rendered_logs
+        assert "error_code=vision_provider_failed" in rendered_logs
+        assert "exception_type=RuntimeError" in rendered_logs
+        assert all(record.exc_info is None for record in caplog.records)
 
     def test_image_api_hides_litellm_provider_error(self):
         cfg = _cfg(gemini_api_keys=[_GEMINI_KEY])

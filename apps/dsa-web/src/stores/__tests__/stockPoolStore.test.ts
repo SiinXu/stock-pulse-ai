@@ -126,7 +126,7 @@ describe('stockPoolStore', () => {
     vi.mocked(analysisApi.getTasks).mockResolvedValue(createTaskListResponse([]));
   });
 
-  it('loads initial history and auto-selects the first report', async () => {
+  it('loads initial history without bypassing the URL-owned selection path', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,
       page: 1,
@@ -139,7 +139,9 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
-    expect(state.selectedReport?.meta.stockCode).toBe('600519');
+    expect(state.selectedReport).toBeNull();
+    expect(state.selectedRecordId).toBeNull();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
   });
@@ -404,7 +406,7 @@ describe('stockPoolStore', () => {
     });
   });
 
-  it('deletes the selected market review history record and clears the open market report', async () => {
+  it('deletes market history data without changing the URL-owned report selection', async () => {
     const marketItem = {
       ...historyItem,
       id: 10,
@@ -433,10 +435,11 @@ describe('stockPoolStore', () => {
     expect(historyApi.deleteRecords).toHaveBeenCalledWith([10]);
     expect(state.marketReviewHistoryItems).toEqual([]);
     expect(state.selectedMarketReviewHistoryIds).toEqual([]);
-    expect(state.selectedReport).toBeNull();
+    expect(state.selectedReport).toBe(marketReviewHistoryReport);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
   });
 
-  it('deletes selected history and clears the selected report when nothing remains', async () => {
+  it('deletes history data without clearing the URL-owned report selection', async () => {
     useStockPoolStore.setState({
       historyItems: [historyItem],
       selectedHistoryIds: [1],
@@ -456,11 +459,12 @@ describe('stockPoolStore', () => {
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(0);
     expect(state.selectedHistoryIds).toHaveLength(0);
-    expect(state.selectedReport).toBeNull();
+    expect(state.selectedReport).toBe(historyReport);
     expect(historyApi.getList).toHaveBeenCalledTimes(1);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
   });
 
-  it('falls back to the next history report after deleting the currently selected item', async () => {
+  it('does not choose a fallback report after deleting history data', async () => {
     const nextHistoryItem = {
       ...historyItem,
       id: 2,
@@ -468,17 +472,6 @@ describe('stockPoolStore', () => {
       stockCode: 'AAPL',
       stockName: 'Apple',
     };
-    const nextHistoryReport = {
-      ...historyReport,
-      meta: {
-        ...historyReport.meta,
-        id: 2,
-        queryId: 'q-2',
-        stockCode: 'AAPL',
-        stockName: 'Apple',
-      },
-    };
-
     useStockPoolStore.setState({
       historyItems: [historyItem, nextHistoryItem],
       selectedHistoryIds: [1],
@@ -492,15 +485,13 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [nextHistoryItem],
     });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(nextHistoryReport);
-
     await useStockPoolStore.getState().deleteSelectedHistory();
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
     expect(state.historyItems[0].id).toBe(2);
-    expect(state.selectedReport?.meta.id).toBe(2);
-    expect(state.selectedReport?.meta.stockCode).toBe('AAPL');
+    expect(state.selectedReport).toBe(historyReport);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
   });
 
   it('surfaces duplicate task errors without replacing the dashboard error state', async () => {
@@ -595,23 +586,13 @@ describe('stockPoolStore', () => {
     expect(state.currentPage).toBe(1);
   });
 
-  it('selects the newest report for the completed task stock during silent refresh', async () => {
+  it('returns the newest completed-task item without selecting its report', async () => {
     const latestItem = {
       ...historyItem,
       id: 2,
       queryId: 'q-2',
       createdAt: '2026-03-18T09:00:00Z',
     };
-    const latestReport = {
-      ...historyReport,
-      meta: {
-        ...historyReport.meta,
-        id: 2,
-        queryId: 'q-2',
-        createdAt: '2026-03-18T09:00:00Z',
-      },
-    };
-
     useStockPoolStore.setState({
       historyItems: [historyItem],
       selectedReport: historyReport,
@@ -622,34 +603,53 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [latestItem, historyItem],
     });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(latestReport);
-
-    await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+    const candidate = await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
       status: 'completed',
       progress: 100,
     }));
 
     const state = useStockPoolStore.getState();
-    expect(historyApi.getDetail).toHaveBeenCalledWith(2);
+    expect(candidate?.id).toBe(2);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
-    expect(state.selectedReport?.meta.id).toBe(2);
+    expect(state.selectedReport).toBe(historyReport);
   });
 
-  it('selects the completed-task report after an overlapping refresh supersedes the original request', async () => {
+  it('returns null when a completed-task refresh introduces no matching report id', async () => {
+    const differentStockItem = {
+      ...historyItem,
+      id: 2,
+      queryId: 'q-2',
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      createdAt: '2026-03-18T09:00:00Z',
+    };
+    useStockPoolStore.setState({
+      historyItems: [historyItem],
+      selectedReport: historyReport,
+    });
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [differentStockItem, historyItem],
+    });
+
+    const candidate = await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+      status: 'completed',
+      progress: 100,
+    }));
+
+    expect(candidate).toBeNull();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
+  });
+
+  it('uses the latest applied refresh when it supersedes the completed-task request', async () => {
     const latestItem = {
       ...historyItem,
       id: 2,
       queryId: 'q-2',
       createdAt: '2026-03-18T09:00:00Z',
-    };
-    const latestReport = {
-      ...historyReport,
-      meta: {
-        ...historyReport.meta,
-        id: 2,
-        queryId: 'q-2',
-        createdAt: '2026-03-18T09:00:00Z',
-      },
     };
     const completedRefresh = createDeferred<HistoryListResponse>();
     const overlappingRefresh = createDeferred<HistoryListResponse>();
@@ -661,8 +661,6 @@ describe('stockPoolStore', () => {
     vi.mocked(historyApi.getList)
       .mockReturnValueOnce(completedRefresh.promise)
       .mockReturnValueOnce(overlappingRefresh.promise);
-    vi.mocked(historyApi.getDetail).mockResolvedValue(latestReport);
-
     const completedRefreshPromise = useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
       status: 'completed',
       progress: 100,
@@ -683,16 +681,146 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [latestItem, historyItem],
     });
-    await completedRefreshPromise;
+    const candidate = await completedRefreshPromise;
 
     const state = useStockPoolStore.getState();
-    expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
-    expect(historyApi.getDetail).toHaveBeenCalledWith(2);
+    expect(candidate?.id).toBe(2);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
-    expect(state.selectedReport?.meta.id).toBe(2);
+    expect(state.selectedReport).toBe(historyReport);
   });
 
-  it('selects the newest completed-task report when stock codes use equivalent aliases', async () => {
+  it('returns null when pagination supersedes a completed-task page-one refresh', async () => {
+    const completedItem = {
+      ...historyItem,
+      id: 2,
+      queryId: 'q-2',
+      createdAt: '2026-03-18T10:00:00Z',
+    };
+    const oldPaginatedItem = {
+      ...historyItem,
+      id: 3,
+      queryId: 'q-3',
+      createdAt: '2026-03-17T08:00:00Z',
+    };
+    const completedRefresh = createDeferred<HistoryListResponse>();
+    const pagination = createDeferred<HistoryListResponse>();
+    useStockPoolStore.setState({
+      historyItems: [historyItem],
+      currentPage: 1,
+      hasMore: true,
+    });
+    vi.mocked(historyApi.getList)
+      .mockReturnValueOnce(completedRefresh.promise)
+      .mockReturnValueOnce(pagination.promise);
+
+    const completedRefreshPromise = useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+      status: 'completed',
+      progress: 100,
+    }));
+    const paginationPromise = useStockPoolStore.getState().loadMoreHistory();
+
+    completedRefresh.resolve({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [completedItem, historyItem],
+    });
+    const candidate = await completedRefreshPromise;
+    expect(candidate).toBeNull();
+
+    pagination.resolve({
+      total: 3,
+      page: 2,
+      limit: 20,
+      items: [oldPaginatedItem],
+    });
+    await paginationPromise;
+
+    expect(useStockPoolStore.getState().historyItems.map((item) => item.id)).toEqual([1, 3]);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
+  });
+
+  it('waits for a pending superseding refresh instead of using stale history', async () => {
+    const staleItem = {
+      ...historyItem,
+      id: 2,
+      queryId: 'q-2',
+      createdAt: '2026-03-18T09:00:00Z',
+    };
+    const completedItem = {
+      ...historyItem,
+      id: 3,
+      queryId: 'q-3',
+      createdAt: '2026-03-18T10:00:00Z',
+    };
+    const completedRefresh = createDeferred<HistoryListResponse>();
+    const overlappingRefresh = createDeferred<HistoryListResponse>();
+
+    useStockPoolStore.setState({
+      historyItems: [staleItem, historyItem],
+      selectedReport: historyReport,
+    });
+    vi.mocked(historyApi.getList)
+      .mockReturnValueOnce(completedRefresh.promise)
+      .mockReturnValueOnce(overlappingRefresh.promise);
+
+    const completedRefreshPromise = useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+      status: 'completed',
+      progress: 100,
+    }));
+    const overlappingRefreshPromise = useStockPoolStore.getState().refreshHistory(true);
+    let completedRefreshSettled = false;
+    void completedRefreshPromise.finally(() => {
+      completedRefreshSettled = true;
+    });
+
+    completedRefresh.resolve({
+      total: 3,
+      page: 1,
+      limit: 20,
+      items: [completedItem, staleItem, historyItem],
+    });
+    await completedRefresh.promise;
+    await Promise.resolve();
+
+    expect(completedRefreshSettled).toBe(false);
+    expect(useStockPoolStore.getState().historyItems.map((item) => item.id)).toEqual([2, 1]);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
+
+    overlappingRefresh.resolve({
+      total: 3,
+      page: 1,
+      limit: 20,
+      items: [completedItem, staleItem, historyItem],
+    });
+    await overlappingRefreshPromise;
+    const candidate = await completedRefreshPromise;
+
+    expect(candidate?.id).toBe(3);
+    expect(useStockPoolStore.getState().historyItems.map((item) => item.id)).toEqual([3, 2, 1]);
+  });
+
+  it('does not reuse stale history when a completed-task refresh fails', async () => {
+    useStockPoolStore.setState({
+      historyItems: [historyItem],
+      selectedReport: historyReport,
+    });
+    vi.mocked(historyApi.getList).mockRejectedValue(new Error('refresh failed'));
+
+    const candidate = await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+      status: 'completed',
+      progress: 100,
+    }));
+
+    const state = useStockPoolStore.getState();
+    expect(candidate).toBeNull();
+    expect(state.historyItems).toEqual([historyItem]);
+    expect(state.error).not.toBeNull();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
+  });
+
+  it('returns the newest completed-task item when stock codes use equivalent aliases', async () => {
     const olderTencentItem = {
       ...historyItem,
       id: 10,
@@ -717,17 +845,6 @@ describe('stockPoolStore', () => {
       stockCode: '00700.HK',
       createdAt: '2026-03-18T09:00:00Z',
     };
-    const latestTencentReport = {
-      ...olderTencentReport,
-      meta: {
-        ...olderTencentReport.meta,
-        id: 11,
-        queryId: 'q-11',
-        stockCode: '00700.HK',
-        createdAt: '2026-03-18T09:00:00Z',
-      },
-    };
-
     useStockPoolStore.setState({
       historyItems: [olderTencentItem],
       selectedReport: olderTencentReport,
@@ -738,9 +855,7 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [latestTencentItem, olderTencentItem],
     });
-    vi.mocked(historyApi.getDetail).mockResolvedValue(latestTencentReport);
-
-    await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+    const candidate = await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
       stockCode: '00700.HK',
       stockName: '腾讯控股',
       status: 'completed',
@@ -748,12 +863,13 @@ describe('stockPoolStore', () => {
     }));
 
     const state = useStockPoolStore.getState();
-    expect(historyApi.getDetail).toHaveBeenCalledWith(11);
+    expect(candidate?.id).toBe(11);
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.historyItems.map((item) => item.id)).toEqual([11, 10]);
-    expect(state.selectedReport?.meta.id).toBe(11);
+    expect(state.selectedReport).toBe(olderTencentReport);
   });
 
-  it('does not replace the selected report when another stock task completes', async () => {
+  it('returns a completed-task candidate without replacing another stock report', async () => {
     const otherReport = {
       ...historyReport,
       meta: {
@@ -782,32 +898,24 @@ describe('stockPoolStore', () => {
       items: [latestItem, historyItem],
     });
 
-    await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
+    const candidate = await useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
       status: 'completed',
       progress: 100,
     }));
 
     const state = useStockPoolStore.getState();
+    expect(candidate?.id).toBe(2);
     expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
     expect(state.selectedReport?.meta.stockCode).toBe('AAPL');
   });
 
-  it('does not auto-switch to completed-task latest when the selected report changed before the refresh response returns', async () => {
+  it('does not change selection when it changes before a completed-task refresh returns', async () => {
     const latestItem = {
       ...historyItem,
       id: 2,
       queryId: 'q-2',
       createdAt: '2026-03-18T09:00:00Z',
-    };
-    const latestCompletedReport = {
-      ...historyReport,
-      meta: {
-        ...historyReport.meta,
-        id: 2,
-        queryId: 'q-2',
-        createdAt: '2026-03-18T09:00:00Z',
-      },
     };
     const switchedReport = {
       ...historyReport,
@@ -824,8 +932,6 @@ describe('stockPoolStore', () => {
       selectedReport: historyReport,
     });
     vi.mocked(historyApi.getList).mockReturnValue(completedRefreshResponse.promise);
-    vi.mocked(historyApi.getDetail).mockResolvedValue(latestCompletedReport);
-
     const completedRefreshPromise = useStockPoolStore.getState().refreshHistoryForCompletedTask(createTask({
       status: 'completed',
       progress: 100,
@@ -841,9 +947,10 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [latestItem, historyItem],
     });
-    await completedRefreshPromise;
+    const candidate = await completedRefreshPromise;
 
     const state = useStockPoolStore.getState();
+    expect(candidate?.id).toBe(2);
     expect(state.historyItems.map((item) => item.id)).toEqual([2, 1]);
     expect(state.selectedReport?.meta.id).toBe(3);
     expect(historyApi.getDetail).not.toHaveBeenCalled();
@@ -869,16 +976,6 @@ describe('stockPoolStore', () => {
         createdAt: '2026-03-18T07:00:00Z',
       },
     };
-    const latestCompletedReport = {
-      ...historyReport,
-      meta: {
-        ...historyReport.meta,
-        id: 2,
-        queryId: 'q-2',
-        createdAt: '2026-03-18T09:00:00Z',
-      },
-    };
-
     useStockPoolStore.setState({
       historyItems: [
         historyItem,
@@ -894,9 +991,7 @@ describe('stockPoolStore', () => {
       selectedReport: historyReport,
     });
     vi.mocked(historyApi.getList).mockReturnValueOnce(completedRefreshResponse.promise);
-    vi.mocked(historyApi.getDetail)
-      .mockReturnValueOnce(userSelectionDetail.promise)
-      .mockResolvedValue(latestCompletedReport);
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(userSelectionDetail.promise);
 
     const completedRefreshPromise = useStockPoolStore.getState().refreshHistoryForCompletedTask(
       createTask({
@@ -912,9 +1007,10 @@ describe('stockPoolStore', () => {
       limit: 20,
       items: [latestItem, historyItem],
     });
-    await completedRefreshPromise;
+    const candidate = await completedRefreshPromise;
 
     const midState = useStockPoolStore.getState();
+    expect(candidate?.id).toBe(2);
     expect(midState.selectedReport?.meta.id).toBe(historyReport.meta.id);
     expect(historyApi.getDetail).toHaveBeenCalledWith(3);
     expect(historyApi.getDetail).toHaveBeenCalledTimes(1);
@@ -1309,6 +1405,55 @@ describe('stockPoolStore', () => {
     expect(state.selectedReport?.meta.id).toBe(2);
   });
 
+  it('clears the URL-owned report selection and ignores an older in-flight response', async () => {
+    const deferred = createDeferred<AnalysisReport>();
+    vi.mocked(historyApi.getDetail).mockReturnValueOnce(deferred.promise as never);
+
+    const loadPromise = useStockPoolStore.getState().selectHistoryItem(2);
+    expect(useStockPoolStore.getState().pendingRecordId).toBe(2);
+
+    useStockPoolStore.getState().clearSelectedRecord();
+    deferred.resolve({
+      ...historyReport,
+      meta: { ...historyReport.meta, id: 2, stockCode: 'AAPL' },
+    } as AnalysisReport);
+    await loadPromise;
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedRecordId).toBeNull();
+    expect(state.pendingRecordId).toBeNull();
+    expect(state.selectedReport).toBeNull();
+    expect(state.isLoadingReport).toBe(false);
+  });
+
+  it('ignores a pre-reset detail response after a new URL request starts', async () => {
+    const preResetDetail = createDeferred<AnalysisReport>();
+    const postResetDetail = createDeferred<AnalysisReport>();
+    const postResetReport = {
+      ...historyReport,
+      meta: { ...historyReport.meta, id: 2, stockCode: 'AAPL' },
+    } as AnalysisReport;
+    vi.mocked(historyApi.getDetail)
+      .mockReturnValueOnce(preResetDetail.promise as never)
+      .mockReturnValueOnce(postResetDetail.promise as never);
+
+    const preResetPromise = useStockPoolStore.getState().selectHistoryItem(1);
+    useStockPoolStore.getState().resetDashboardState();
+    const postResetPromise = useStockPoolStore.getState().selectHistoryItem(2);
+
+    postResetDetail.resolve(postResetReport);
+    await postResetPromise;
+    expect(useStockPoolStore.getState().selectedReport?.meta.id).toBe(2);
+
+    preResetDetail.resolve(historyReport as AnalysisReport);
+    await preResetPromise;
+
+    const state = useStockPoolStore.getState();
+    expect(state.selectedRecordId).toBe(2);
+    expect(state.selectedReport?.meta.id).toBe(2);
+    expect(state.reportDetailError).toBeNull();
+  });
+
   it('drops the stale report and keeps a retryable failure when a user switch fails', async () => {
     useStockPoolStore.setState({ selectedReport: historyReport as AnalysisReport, selectedRecordId: 1 });
     vi.mocked(historyApi.getDetail).mockRejectedValue(new Error('boom'));
@@ -1320,18 +1465,21 @@ describe('stockPoolStore', () => {
     expect(state.selectedRecordId).toBe(2);
     expect(state.pendingRecordId).toBeNull();
     expect(state.isLoadingReport).toBe(false);
-    expect(state.error).not.toBeNull();
+    expect(state.reportDetailError).not.toBeNull();
+    expect(state.error).toBeNull();
   });
 
-  it('keeps the current report when a background reselect fails', async () => {
+  it('keeps the current report when a same-record background reload fails', async () => {
     useStockPoolStore.setState({ selectedReport: historyReport as AnalysisReport, selectedRecordId: 1 });
     vi.mocked(historyApi.getDetail).mockRejectedValue(new Error('boom'));
 
-    await useStockPoolStore.getState().selectHistoryItem(2, false);
+    await useStockPoolStore.getState().selectHistoryItem(1, false);
 
     const state = useStockPoolStore.getState();
     expect(state.selectedReport?.meta.id).toBe(1);
-    expect(state.error).not.toBeNull();
+    expect(state.selectedRecordId).toBe(1);
+    expect(state.reportDetailError).not.toBeNull();
+    expect(state.error).toBeNull();
   });
 
   it('retries the selected record after a failed load', async () => {
@@ -1348,6 +1496,7 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.selectedReport?.meta.id).toBe(2);
+    expect(state.reportDetailError).toBeNull();
     expect(state.error).toBeNull();
   });
 

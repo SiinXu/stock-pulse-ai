@@ -1,4 +1,4 @@
-import apiClient from './index';
+import apiClient, { locallyRecoverableResourceConfig } from './index';
 import { toCamelCase } from './utils';
 import type {
   HistoryListResponse,
@@ -51,7 +51,10 @@ export const historyApi = {
    * @param recordId 分析历史记录主键 ID（使用 ID 而非 query_id，因为 query_id 在批量分析时可能重复）
    */
   getDetail: async (recordId: number): Promise<AnalysisReport> => {
-    const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}`);
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/history/${recordId}`,
+      locallyRecoverableResourceConfig(),
+    );
     return toCamelCase<AnalysisReport>(response.data);
   },
 
@@ -96,7 +99,10 @@ export const historyApi = {
    * @param recordId 分析历史记录主键 ID
    */
   getRecordFlow: async (recordId: number): Promise<RunFlowSnapshot> => {
-    const response = await apiClient.get<Record<string, unknown>>(`/api/v1/history/${recordId}/flow`);
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/history/${recordId}/flow`,
+      locallyRecoverableResourceConfig(),
+    );
     return toCamelCase<RunFlowSnapshot>(response.data);
   },
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any, Mapping
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -16,6 +17,7 @@ from api.v1.schemas.system_config import (
     GenerationBackendStatusPreviewRequest,
     GenerationBackendStatusResponse,
     ImportSystemConfigRequest,
+    LLMProviderCatalogResponse,
     SystemConfigConflictResponse,
     SystemConfigResponse,
     SystemConfigSchemaResponse,
@@ -40,10 +42,30 @@ from src.services.system_config_service import (
     SystemConfigService,
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _log_config_exception(
+    event: str,
+    exc: BaseException,
+    *,
+    error_code: str = "internal_error",
+    level: int = logging.ERROR,
+    context: Mapping[str, Any] | None = None,
+) -> None:
+    """Route configuration endpoint failures through the shared sanitizer."""
+    log_safe_exception(
+        logger,
+        event,
+        exc,
+        error_code=error_code,
+        level=level,
+        context=context,
+    )
 
 
 @router.get(
@@ -149,7 +171,7 @@ def get_system_config(
         payload = service.get_config(include_schema=include_schema)
         return SystemConfigResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to load system configuration: %s", exc, exc_info=True)
+        _log_config_exception("System configuration load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -178,7 +200,7 @@ def get_setup_status(
         payload = service.get_setup_status()
         return SetupStatusResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to load setup status: %s", exc, exc_info=True)
+        _log_config_exception("Setup status load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -209,7 +231,7 @@ def get_generation_backend_status(
         payload = service.get_generation_backend_status()
         return GenerationBackendStatusResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to load generation backend status: %s", exc, exc_info=True)
+        _log_config_exception("Generation backend status load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -238,7 +260,7 @@ def get_llm_config_mode_status(
     try:
         return service.get_llm_config_mode_status()
     except Exception as exc:
-        logger.error("Failed to load LLM config mode status: %s", exc, exc_info=True)
+        _log_config_exception("LLM config mode status load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -268,7 +290,7 @@ def get_llm_available_models(
     try:
         return service.get_available_models()
     except Exception as exc:
-        logger.error("Failed to load available models: %s", exc, exc_info=True)
+        _log_config_exception("Available model list load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to load available models"},
@@ -277,6 +299,7 @@ def get_llm_available_models(
 
 @router.get(
     "/config/llm/providers",
+    response_model=LLMProviderCatalogResponse,
     responses={
         200: {"description": "LLM provider catalog loaded"},
         500: {"description": "Internal server error", "model": ErrorResponse},
@@ -291,14 +314,19 @@ def get_llm_available_models(
 def get_llm_provider_catalog() -> dict:
     """Return the authoritative provider catalog without reading user config."""
     try:
-        from src.llm.provider_catalog import get_empty_api_key_hosts, get_provider_catalog
+        from src.llm.provider_catalog import (
+            get_connection_field_schema,
+            get_empty_api_key_hosts,
+            get_provider_catalog,
+        )
 
         return {
             "providers": get_provider_catalog(),
+            "connection_fields": get_connection_field_schema(),
             "empty_api_key_hosts": get_empty_api_key_hosts(),
         }
     except Exception as exc:
-        logger.error("Failed to load LLM provider catalog: %s", exc, exc_info=True)
+        _log_config_exception("LLM provider catalog load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to load LLM provider catalog"},
@@ -321,7 +349,7 @@ def preview_legacy_channels_migration(
     try:
         return service.preview_legacy_channels_migration()
     except Exception as exc:
-        logger.error("Failed to preview legacy channel migration: %s", exc, exc_info=True)
+        _log_config_exception("Legacy channel migration preview failed", exc)
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to preview legacy channel migration"},
@@ -354,7 +382,7 @@ def apply_legacy_channels_migration(
             detail={"error": "config_conflict", "current_config_version": exc.current_version},
         )
     except Exception as exc:
-        logger.error("Failed to apply legacy channel migration: %s", exc, exc_info=True)
+        _log_config_exception("Legacy channel migration apply failed", exc)
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "Failed to apply legacy channel migration"},
@@ -393,7 +421,7 @@ def preview_generation_backend_status(
             },
         )
     except Exception as exc:
-        logger.error("Failed to preview generation backend status: %s", exc, exc_info=True)
+        _log_config_exception("Generation backend status preview failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -439,7 +467,7 @@ def test_generation_backend(
             },
         )
     except Exception as exc:
-        logger.error("Failed to smoke test generation backend: %s", exc, exc_info=True)
+        _log_config_exception("Generation backend smoke test failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -493,7 +521,7 @@ def update_system_config(
             },
         )
     except Exception as exc:
-        logger.error("Failed to update system configuration: %s", exc, exc_info=True)
+        _log_config_exception("System configuration update failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -523,14 +551,20 @@ def export_system_config(
     try:
         _allow_env_backup_access(request)
     except EnvBackupAccessDenied as exc:
-        logger.warning("System config export blocked: %s", exc)
+        _log_config_exception(
+            "System configuration export blocked",
+            exc,
+            error_code="env_backup_access_denied",
+            level=logging.WARNING,
+            context={"status_code": exc.status_code},
+        )
         _raise_env_backup_access_error(exc)
 
     try:
         payload = service.export_env()
         return ExportSystemConfigResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to export system configuration: %s", exc, exc_info=True)
+        _log_config_exception("System configuration export failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -575,7 +609,13 @@ def import_system_config(
     try:
         _allow_env_backup_access(request_obj)
     except EnvBackupAccessDenied as exc:
-        logger.warning("System config import blocked: %s", exc)
+        _log_config_exception(
+            "System configuration import blocked",
+            exc,
+            error_code="env_backup_access_denied",
+            level=logging.WARNING,
+            context={"status_code": exc.status_code},
+        )
         _raise_env_backup_access_error(exc)
 
     try:
@@ -612,7 +652,7 @@ def import_system_config(
             },
         )
     except Exception as exc:
-        logger.error("Failed to import system configuration: %s", exc, exc_info=True)
+        _log_config_exception("System configuration import failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -641,7 +681,7 @@ def validate_system_config(
         payload = service.validate(items=[item.model_dump() for item in request.items])
         return ValidateSystemConfigResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to validate system configuration: %s", exc, exc_info=True)
+        _log_config_exception("System configuration validation failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -681,7 +721,7 @@ def test_llm_channel(
         )
         return TestLLMChannelResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to test LLM channel: %s", exc, exc_info=True)
+        _log_config_exception("LLM channel test failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -717,7 +757,7 @@ def test_notification_channel(
         )
         return TestNotificationChannelResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to test notification channel: %s", exc, exc_info=True)
+        _log_config_exception("Notification channel test failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -755,7 +795,7 @@ def discover_llm_channel_models(
         )
         return DiscoverLLMChannelModelsResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to discover LLM channel models: %s", exc, exc_info=True)
+        _log_config_exception("LLM channel model discovery failed", exc)
         raise HTTPException(
             status_code=500,
             detail={
@@ -783,7 +823,7 @@ def get_system_config_schema(
         payload = service.get_schema()
         return SystemConfigSchemaResponse.model_validate(payload)
     except Exception as exc:
-        logger.error("Failed to load system configuration schema: %s", exc, exc_info=True)
+        _log_config_exception("System configuration schema load failed", exc)
         raise HTTPException(
             status_code=500,
             detail={

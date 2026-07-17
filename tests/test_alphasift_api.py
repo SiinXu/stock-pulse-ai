@@ -130,6 +130,31 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertNotIn("sk-alphasift-secret-marker", serialized)
         self.assertNotIn("user:password@example.invalid", serialized)
 
+    def test_hotspot_cache_failure_logs_topic_metadata_without_private_text(self) -> None:
+        private_topic = (
+            "Board discussion about Northwind acquiring Contoso before announcement"
+        )
+        cache_path = MagicMock()
+        cache_path.write_text.side_effect = RuntimeError("cache write unavailable")
+
+        with (
+            patch(
+                "src.services.alphasift_service._alphasift_hotspot_detail_cache_path",
+                return_value=cache_path,
+            ),
+            self.assertLogs("src.services.alphasift_service", level="WARNING") as captured,
+        ):
+            alphasift_service._write_alphasift_hotspot_detail_cache(
+                provider="akshare",
+                topic=private_topic,
+                payload={"topic": private_topic, "stocks": []},
+            )
+
+        rendered = "\n".join(captured.output)
+        self.assertNotIn(private_topic, rendered)
+        self.assertIn(f"topic_length={len(private_topic)}", rendered)
+        self.assertIn("provider=akshare", rendered)
+
     def test_default_install_spec_is_commit_pinned(self) -> None:
         self.assertRegex(
             DEFAULT_ALPHASIFT_TEST_SPEC,
@@ -3401,15 +3426,24 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
     def test_screen_maps_adapter_value_error_to_bad_request(self) -> None:
         config = self._config(enabled=True)
         fake_module = _make_adapter_module(
-            screen=MagicMock(side_effect=ValueError("Only market='cn' is currently supported")),
+            screen=MagicMock(side_effect=ValueError(PUBLIC_DIAGNOSTIC_SECRET)),
         )
 
-        with patch("src.services.alphasift_service._import_alphasift", return_value=fake_module):
+        with (
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            self.assertLogs("src.services.alphasift_service", level="WARNING") as captured,
+        ):
             with self.assertRaises(HTTPException) as caught:
                 self._screen(config, market="cn", strategy="dual_low", max_results=5)
 
         self.assertEqual(caught.exception.status_code, 400)
         self.assertEqual(caught.exception.detail["error"], "alphasift_screen_rejected")
+        rendered_logs = "\n".join(captured.output)
+        self.assertNotIn("sk-alphasift-secret-marker", rendered_logs)
+        self.assertNotIn("user:password", rendered_logs)
+        self.assertIn("error_code=alphasift_screen_rejected", rendered_logs)
+        self.assertIn("exception_type=ValueError", rendered_logs)
+        self.assertTrue(all(record.exc_info is None for record in captured.records))
 
     def test_screen_runtime_exception_hides_raw_diagnostic(self) -> None:
         config = self._config(enabled=True)
@@ -3417,7 +3451,10 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             screen=MagicMock(side_effect=RuntimeError(PUBLIC_DIAGNOSTIC_SECRET)),
         )
 
-        with patch("src.services.alphasift_service._import_alphasift", return_value=fake_module):
+        with (
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            self.assertLogs("src.services.alphasift_service", level="WARNING") as captured,
+        ):
             with self.assertRaises(HTTPException) as caught:
                 self._screen(config, market="cn", strategy="dual_low", max_results=5)
 
@@ -3425,6 +3462,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(caught.exception.detail["error"], "alphasift_screen_failed")
         self.assertEqual(caught.exception.detail["message"], "AlphaSift 选股运行失败，请稍后重试。")
         self.assert_public_payload_is_private(caught.exception.detail)
+        rendered_logs = "\n".join(captured.output)
+        self.assertNotIn("sk-alphasift-secret-marker", rendered_logs)
+        self.assertNotIn("user:password", rendered_logs)
+        self.assertIn("error_code=alphasift_screen_failed", rendered_logs)
+        self.assertIn("exception_type=RuntimeError", rendered_logs)
+        self.assertTrue(all(record.exc_info is None for record in captured.records))
 
 
 if __name__ == "__main__":

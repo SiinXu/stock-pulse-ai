@@ -18,6 +18,12 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from src.utils.sanitize import (
+    safe_exception_type_name,
+    sanitize_diagnostic_text,
+    sanitize_exception_chain,
+)
+
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(pathname)s:%(lineno)d | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -36,17 +42,153 @@ class RelativePathFormatter(logging.Formatter):
 
     def __init__(self, fmt=None, datefmt=None, relative_to=None):
         super().__init__(fmt, datefmt)
-        self.relative_to = Path(relative_to) if relative_to else Path.cwd()
+        try:
+            self.relative_to = (
+                Path.cwd() if relative_to is None else Path(relative_to)
+            )
+        except BaseException:
+            self.relative_to = None
+
+    @staticmethod
+    def _record_fields(record) -> dict:
+        try:
+            fields = object.__getattribute__(record, "__dict__")
+        except BaseException:
+            return {}
+        return fields if type(fields) is dict else {}
+
+    @staticmethod
+    def _render_message(fields: dict) -> str:
+        try:
+            message = str(fields.get("msg", ""))
+            args = fields.get("args", ())
+            if args is None:
+                args = ()
+            if type(args) not in {dict, tuple}:
+                return "Log message formatting failed"
+            if args:
+                message = message % args
+            return sanitize_diagnostic_text(message, max_length=4000)
+        except BaseException:
+            return "Log message formatting failed"
+
+    def _safe_pathname(self, raw_pathname) -> str:
+        try:
+            pathname = Path(raw_pathname)
+            if pathname.is_absolute():
+                if self.relative_to is None:
+                    return "[REDACTED_PATH]"
+                try:
+                    pathname = pathname.relative_to(self.relative_to)
+                except ValueError:
+                    return "[REDACTED_PATH]"
+            return (
+                sanitize_diagnostic_text(str(pathname), max_length=500)
+                or "[UNRENDERABLE]"
+            )
+        except BaseException:
+            return "[UNRENDERABLE]"
+
+    @staticmethod
+    def _safe_integer(value, *, fallback: int) -> int:
+        if type(value) is not int:
+            return fallback
+        return value
+
+    @staticmethod
+    def _scrub_shared_record(record, safe_record: logging.LogRecord) -> None:
+        safe_fields = object.__getattribute__(safe_record, "__dict__")
+        for name in (
+            "args",
+            "created",
+            "exc_info",
+            "exc_text",
+            "filename",
+            "funcName",
+            "levelname",
+            "levelno",
+            "lineno",
+            "message",
+            "module",
+            "msecs",
+            "msg",
+            "name",
+            "pathname",
+            "process",
+            "processName",
+            "relativeCreated",
+            "stack_info",
+            "thread",
+            "threadName",
+        ):
+            if name not in safe_fields:
+                continue
+            try:
+                object.__setattr__(record, name, safe_fields[name])
+            except BaseException:
+                continue
 
     def format(self, record):
-        # 将绝对路径转为相对路径
-        try:
-            record.pathname = str(Path(record.pathname).relative_to(self.relative_to))
-        except ValueError:
-            # 如果无法转换为相对路径，保持原样
-            pass
-        return super().format(record)
+        fields = self._record_fields(record)
+        safe_message = self._render_message(fields)
+        exc_info = fields.get("exc_info")
+        if (
+            type(exc_info) is tuple
+            and len(exc_info) == 3
+            and isinstance(exc_info[1], BaseException)
+        ):
+            exc = exc_info[1]
+            summary = sanitize_exception_chain(exc)
+            safe_message = " ".join(
+                part
+                for part in (
+                    safe_message,
+                    f"exception_type={safe_exception_type_name(exc)}",
+                    f"summary={summary}",
+                )
+                if part
+            )
+        elif exc_info is not None:
+            safe_message = " ".join(
+                part
+                for part in (
+                    safe_message,
+                    "exception_metadata=[UNRENDERABLE]",
+                )
+                if part
+            )
 
+        safe_name = (
+            sanitize_diagnostic_text(fields.get("name"), max_length=160)
+            or "unknown_logger"
+        )
+        safe_level = self._safe_integer(
+            fields.get("levelno"),
+            fallback=logging.ERROR,
+        )
+        safe_pathname = self._safe_pathname(fields.get("pathname", ""))
+        safe_lineno = self._safe_integer(fields.get("lineno"), fallback=0)
+        safe_func = (
+            sanitize_diagnostic_text(fields.get("funcName"), max_length=160)
+            or None
+        )
+        try:
+            safe_record = logging.LogRecord(
+                name=safe_name,
+                level=safe_level,
+                pathname=safe_pathname,
+                lineno=safe_lineno,
+                msg=safe_message,
+                args=(),
+                exc_info=None,
+                func=safe_func,
+                sinfo=None,
+            )
+            safe_record.message = safe_message
+            self._scrub_shared_record(record, safe_record)
+            return super().format(safe_record)
+        except BaseException:
+            return "Log record formatting failed"
 
 
 # 默认需要降低日志级别的第三方库
@@ -185,12 +327,12 @@ def setup_logging(
     except ValueError:
         rel_debug_log_file = debug_log_file
 
-    logging.info(f"日志系统初始化完成，日志目录: {rel_log_path}")
-    logging.info(f"常规日志: {rel_log_file}")
-    logging.info(f"调试日志: {rel_debug_log_file}")
+    logging.info("Logging initialized; directory: %s", rel_log_path)
+    logging.info("Application log: %s", rel_log_file)
+    logging.info("Debug log: %s", rel_debug_log_file)
     if invalid_litellm_level is not None:
         logging.warning(
-            "LITELLM_LOG_LEVEL=%r 无效，已回退为 %s；可选值：%s",
+            "Invalid LITELLM_LOG_LEVEL=%r; falling back to %s. Allowed values: %s",
             invalid_litellm_level,
             _DEFAULT_LITELLM_LOG_LEVEL,
             ", ".join(_ALLOWED_LOG_LEVELS),

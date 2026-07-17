@@ -260,17 +260,17 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
           message={t('decisionSignals.timelineTruncatedDescription')}
         />
       ) : null}
-      <div className="h-[320px] min-h-[320px] w-full">
+      <div className="h-80 min-h-80 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 18, right: 18, bottom: 20, left: 4 }}>
-            <CartesianGrid stroke="rgba(148, 163, 184, 0.18)" vertical={false} />
+            <CartesianGrid stroke="hsl(var(--border) / 0.72)" vertical={false} />
             <XAxis
               dataKey="x"
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString(), language)}
               tick={{ fontSize: 11, fill: 'currentColor' }}
-              stroke="rgba(148, 163, 184, 0.5)"
+              stroke="hsl(var(--muted-text) / 0.5)"
             />
             <YAxis
               dataKey="rank"
@@ -279,11 +279,11 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
               ticks={[-3, -2, -1, 0, 1, 2, 3]}
               tickFormatter={(value) => RANK_LABELS[Number(value)] ?? String(value)}
               tick={{ fontSize: 11, fill: 'currentColor' }}
-              stroke="rgba(148, 163, 184, 0.5)"
+              stroke="hsl(var(--muted-text) / 0.5)"
               width={76}
             />
             <ChartTooltip
-              cursor={{ stroke: 'rgba(148, 163, 184, 0.35)', strokeDasharray: '3 3' }}
+              cursor={{ stroke: 'hsl(var(--muted-text) / 0.35)', strokeDasharray: '3 3' }}
               content={(props: unknown) => <TimelineTooltip {...(props as TimelineTooltipProps)} />}
             />
             <Scatter
@@ -312,9 +312,9 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
         </ResponsiveContainer>
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-secondary-text">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#16a34a]" />{t('decisionSignals.timelineFamilyBullish')}</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#dc2626]" />{t('decisionSignals.timelineFamilyDefensive')}</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#878980]" />{t('decisionSignals.timelineFamilyNeutral')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-success" />{t('decisionSignals.timelineFamilyBullish')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-danger" />{t('decisionSignals.timelineFamilyDefensive')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-muted-text" />{t('decisionSignals.timelineFamilyNeutral')}</span>
         <span>{t('decisionSignals.timelineAlertShape')}</span>
         {selectedIndex !== null ? <span>{t('decisionSignals.timelineSelected', { index: selectedIndex + 1 })}</span> : null}
       </div>

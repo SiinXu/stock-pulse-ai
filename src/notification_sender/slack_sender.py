@@ -14,6 +14,7 @@ import requests
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,13 @@ class SlackSender:
         # 按字节分块，避免单条消息超限
         try:
             chunks = chunk_content_by_max_bytes(content, _TEXT_LIMIT, add_page_marker=True)
-        except Exception as e:
-            logger.error(f"分割 Slack 消息失败: {e}, 尝试整段发送。")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Slack message chunking failed; using the complete message",
+                exc,
+                error_code="slack_message_chunking_failed",
+            )
             chunks = [content]
 
         # 优先使用 Bot API（与 _send_slack_image 保持一致）
@@ -125,8 +131,13 @@ class SlackSender:
                 return True
             logger.error(f"Slack Webhook 发送失败: HTTP {response.status_code} {response.text[:200]}")
             return False
-        except Exception as e:
-            logger.error(f"Slack Webhook 发送异常: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Slack webhook delivery failed",
+                exc,
+                error_code="slack_webhook_delivery_failed",
+            )
             return False
 
     def _send_slack_bot(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
@@ -161,8 +172,13 @@ class SlackSender:
                 return True
             logger.error(f"Slack Bot 发送失败: {result.get('error', 'unknown')}")
             return False
-        except Exception as e:
-            logger.error(f"Slack Bot 发送异常: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Slack Bot delivery failed",
+                exc,
+                error_code="slack_bot_delivery_failed",
+            )
             return False
 
     def _send_slack_image(self, image_bytes: bytes, fallback_content: str = "") -> bool:
@@ -227,8 +243,13 @@ class SlackSender:
                     logger.info("Slack Bot 图片发送成功")
                     return True
                 logger.error("Slack 完成上传失败: %s", result3.get('error', 'unknown'))
-            except Exception as e:
-                logger.error("Slack Bot 图片发送异常: %s", e)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Slack Bot image delivery failed",
+                    exc,
+                    error_code="slack_bot_image_delivery_failed",
+                )
 
         # Webhook 模式或 Bot 上传失败：回退为文本
         if fallback_content:

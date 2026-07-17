@@ -9,6 +9,13 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 
+PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION = (
+    "Client-generated idempotency key scoped by operation type, account, and "
+    "account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS "
+    "(seven days by default)."
+)
+
+
 class PortfolioAccountCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
     broker: Optional[str] = Field(None, max_length=64)
@@ -43,7 +50,11 @@ class PortfolioAccountListResponse(BaseModel):
 
 
 class PortfolioTradeCreateRequest(BaseModel):
-    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
+    operation_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    )
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     trade_date: date
@@ -59,7 +70,11 @@ class PortfolioTradeCreateRequest(BaseModel):
 
 
 class PortfolioCashLedgerCreateRequest(BaseModel):
-    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
+    operation_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    )
     account_id: int
     event_date: date
     direction: Literal["in", "out"]
@@ -69,7 +84,11 @@ class PortfolioCashLedgerCreateRequest(BaseModel):
 
 
 class PortfolioCorporateActionCreateRequest(BaseModel):
-    operation_id: Optional[str] = Field(None, max_length=128, description="Client-generated idempotency key")
+    operation_id: Optional[str] = Field(
+        None,
+        max_length=128,
+        description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
+    )
     account_id: int
     symbol: str = Field(..., min_length=1, max_length=16)
     effective_date: date

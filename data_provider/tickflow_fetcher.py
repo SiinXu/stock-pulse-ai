@@ -19,6 +19,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
+from src.utils.sanitize import log_safe_exception
+
 try:
     import exchange_calendars as xcals
 except ImportError:  # pragma: no cover - optional dependency in lightweight installs.
@@ -142,7 +144,13 @@ class TickFlowFetcher(BaseFetcher):
             try:
                 client.close()
             except Exception as exc:
-                logger.debug("[TickFlowFetcher] close client failed: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow client close failed",
+                    exc,
+                    error_code="tickflow_client_close_failed",
+                    level=logging.DEBUG,
+                )
 
     def __del__(self) -> None:
         try:
@@ -355,7 +363,9 @@ class TickFlowFetcher(BaseFetcher):
         return 0.10
 
     @staticmethod
-    def _coerce_frame(value: Any) -> pd.DataFrame:
+    def _coerce_frame(
+        value: pd.DataFrame | list | dict | None,
+    ) -> pd.DataFrame:
         if value is None:
             return pd.DataFrame()
         if isinstance(value, pd.DataFrame):
@@ -447,7 +457,7 @@ class TickFlowFetcher(BaseFetcher):
     @classmethod
     def _prepare_daily_frame(
         cls,
-        value: Any,
+        value: pd.DataFrame | list | dict | None,
         *,
         symbol: str,
         start_date: str,
@@ -650,7 +660,13 @@ class TickFlowFetcher(BaseFetcher):
                         batch_count,
                     )
                     return cached_count
-                logger.warning("[TickFlowFetcher] batch daily K-line failed: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow batch daily K-line request failed",
+                    exc,
+                    error_code="tickflow_batch_daily_kline_failed",
+                    level=logging.WARNING,
+                )
                 continue
 
             for symbol, df in self._iter_batch_frames(batch_result):
@@ -741,7 +757,13 @@ class TickFlowFetcher(BaseFetcher):
             try:
                 quotes = client.quotes.get(symbols=batch_symbols)
             except Exception as exc:
-                logger.warning("[TickFlowFetcher] batch realtime quote failed: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow batch realtime quote request failed",
+                    exc,
+                    error_code="tickflow_batch_realtime_quote_failed",
+                    level=logging.WARNING,
+                )
                 continue
             cached_count += self._store_quotes(quotes)
         return cached_count
@@ -793,7 +815,14 @@ class TickFlowFetcher(BaseFetcher):
             try:
                 quotes = client.quotes.get(symbols=[symbol])
             except Exception as exc:
-                logger.warning("[TickFlowFetcher] realtime quote failed for %s: %s", symbol, exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow realtime quote request failed",
+                    exc,
+                    error_code="tickflow_realtime_quote_failed",
+                    level=logging.WARNING,
+                    context={"symbol": symbol},
+                )
                 return None
             self._store_quotes(quotes)
             quote = self._get_cached_quote(symbol, quote_ttl)
@@ -892,14 +921,28 @@ class TickFlowFetcher(BaseFetcher):
             name = self._extract_name(cached or {})
             if name:
                 return name
-        except Exception:
-            logger.debug("[TickFlowFetcher] quote name lookup failed for %s", symbol, exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "TickFlow quote name lookup failed",
+                exc,
+                error_code="tickflow_quote_name_lookup_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
 
         try:
             instrument = client.instruments.get(symbol)
             return self._extract_instrument_name(instrument)
-        except Exception:
-            logger.debug("[TickFlowFetcher] instrument lookup failed for %s", symbol, exc_info=True)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "TickFlow instrument lookup failed",
+                exc,
+                error_code="tickflow_instrument_lookup_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
         return None
 
     @staticmethod
@@ -930,7 +973,14 @@ class TickFlowFetcher(BaseFetcher):
             if self._is_universe_permission_error(exc):
                 logger.info("[TickFlowFetcher] universe list is not available for current plan")
                 return pd.DataFrame(columns=["code", "name", "industry", "area", "market"])
-            logger.warning("[TickFlowFetcher] stock universe lookup failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "TickFlow stock universe lookup failed",
+                exc,
+                error_code="tickflow_stock_universe_lookup_failed",
+                level=logging.WARNING,
+                context={"universe": _CN_UNIVERSE_ID},
+            )
             return pd.DataFrame(columns=["code", "name", "industry", "area", "market"])
 
         rows = []

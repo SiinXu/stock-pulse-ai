@@ -185,7 +185,7 @@ function renderFieldControl(
         id={controlId}
         aria-invalid={hasError || undefined}
         aria-describedby={ariaDescribedBy}
-        className={cn(commonClass, 'min-h-[92px] resize-y py-2', hasError && 'border-danger')}
+        className={cn(commonClass, 'min-h-24 resize-y py-2', hasError && 'border-danger')}
         value={value}
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}

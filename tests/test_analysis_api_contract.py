@@ -1042,7 +1042,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(task_info.status, TaskStatus.FAILED)
         self.assertEqual(task_info.error, "task_failed")
         self.assertEqual(task_info.message, "任务执行失败")
-        self.assertEqual(task_info.diagnostic_error, "runtime init failed")
+        self.assertEqual(task_info.diagnostic_error, "RuntimeError: [REDACTED]")
         release_market_review_lock.assert_called_once()
 
     def test_failed_task_polling_does_not_expose_legacy_diagnostic_text(self) -> None:
@@ -1336,6 +1336,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "message": "LLM stream interrupted",
                 "params": {},
                 "details": None,
+                "detail": None,
                 "trace_id": None,
             },
         )

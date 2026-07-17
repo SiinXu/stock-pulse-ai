@@ -37,7 +37,6 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
 
 # Timeout (seconds) for efinance library calls that go through eastmoney APIs
@@ -53,6 +52,7 @@ except (ValueError, TypeError):
 
 from src.patches.eastmoney_patch import eastmoney_patch
 from src.config import get_config
+from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 from .base import (
     BaseFetcher,
     DataFetchError,
@@ -325,7 +325,13 @@ class EfinanceFetcher(BaseFetcher):
             random_ua = random.choice(USER_AGENTS)
             logger.debug(f"设置 User-Agent: {random_ua[:50]}...")
         except Exception as e:
-            logger.debug(f"设置 User-Agent 失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance user agent selection failed",
+                e,
+                error_code="efinance_user_agent_selection_failed",
+                level=logging.DEBUG,
+            )
     
     def _enforce_rate_limit(self) -> None:
         """
@@ -358,7 +364,12 @@ class EfinanceFetcher(BaseFetcher):
             requests.exceptions.ConnectionError,
             requests.exceptions.ChunkedEncodingError
         )),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Efinance daily data retry scheduled",
+            error_code="efinance_daily_data_retry",
+        ),
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -467,10 +478,32 @@ class EfinanceFetcher(BaseFetcher):
             )
 
             if category == "rate_limit_or_anti_bot":
-                logger.warning(failure_message)
+                log_safe_exception(
+                    logger,
+                    "Efinance rate limit detected",
+                    e,
+                    error_code="efinance_rate_limit_detected",
+                    level=logging.WARNING,
+                    context={
+                        "symbol": stock_code,
+                        "endpoint": EASTMONEY_HISTORY_ENDPOINT,
+                        "category": category,
+                    },
+                )
                 raise RateLimitError(f"efinance 可能被限流: {failure_message}") from e
 
-            logger.error(failure_message)
+            log_safe_exception(
+                logger,
+                "Efinance historical data fetch failed",
+                e,
+                error_code="efinance_history_fetch_failed",
+                level=logging.ERROR,
+                context={
+                    "symbol": stock_code,
+                    "endpoint": EASTMONEY_HISTORY_ENDPOINT,
+                    "category": category,
+                },
+            )
             raise DataFetchError(f"efinance 获取数据失败: {failure_message}") from e
     
     def _fetch_etf_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
@@ -561,10 +594,32 @@ class EfinanceFetcher(BaseFetcher):
             )
 
             if category == "rate_limit_or_anti_bot":
-                logger.warning(failure_message)
+                log_safe_exception(
+                    logger,
+                    "Efinance ETF rate limit detected",
+                    e,
+                    error_code="efinance_etf_rate_limit_detected",
+                    level=logging.WARNING,
+                    context={
+                        "symbol": stock_code,
+                        "endpoint": EASTMONEY_HISTORY_ENDPOINT,
+                        "category": category,
+                    },
+                )
                 raise RateLimitError(f"efinance 可能被限流: {failure_message}") from e
 
-            logger.error(failure_message)
+            log_safe_exception(
+                logger,
+                "Efinance ETF historical data fetch failed",
+                e,
+                error_code="efinance_etf_history_fetch_failed",
+                level=logging.ERROR,
+                context={
+                    "symbol": stock_code,
+                    "endpoint": EASTMONEY_HISTORY_ENDPOINT,
+                    "category": category,
+                },
+            )
             raise DataFetchError(f"efinance 获取 ETF 数据失败: {failure_message}") from e
     
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
@@ -735,8 +790,15 @@ class EfinanceFetcher(BaseFetcher):
             circuit_breaker.record_failure(source_key, "timeout")
             return None
         except Exception as e:
-            logger.info(f"[API错误] 获取 {stock_code} 实时行情(efinance)失败: {e}")
-            circuit_breaker.record_failure(source_key, str(e))
+            log_safe_exception(
+                logger,
+                "Efinance realtime quote failed",
+                e,
+                error_code="efinance_realtime_quote_failed",
+                level=logging.INFO,
+                context={"symbol": stock_code},
+            )
+            circuit_breaker.record_failure(source_key, "efinance_realtime_quote_failed")
             return None
 
     def _get_etf_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
@@ -829,8 +891,18 @@ class EfinanceFetcher(BaseFetcher):
             )
             return quote
         except Exception as e:
-            logger.info(f"[API错误] 获取 ETF {stock_code} 实时行情(efinance)失败: {e}")
-            circuit_breaker.record_failure(source_key, str(e))
+            log_safe_exception(
+                logger,
+                "Efinance ETF realtime quote failed",
+                e,
+                error_code="efinance_etf_realtime_quote_failed",
+                level=logging.INFO,
+                context={"symbol": stock_code},
+            )
+            circuit_breaker.record_failure(
+                source_key,
+                "efinance_etf_realtime_quote_failed",
+            )
             return None
 
     def get_main_indices(self, region: str = "cn") -> Optional[List[Dict[str, Any]]]:
@@ -915,7 +987,14 @@ class EfinanceFetcher(BaseFetcher):
                 logger.info(f"[efinance] 获取到 {len(results)} 个指数行情")
             return results if results else None
         except Exception as e:
-            logger.error(f"[efinance] 获取指数行情失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance market indices fetch failed",
+                e,
+                error_code="efinance_market_indices_failed",
+                level=logging.ERROR,
+                context={"market": region},
+            )
             return None
 
     def get_market_stats(self) -> Optional[Dict[str, Any]]:
@@ -964,10 +1043,12 @@ class EfinanceFetcher(BaseFetcher):
 
             return self._calc_market_stats(df)
         except Exception as e:
-            logger.error(
-                "[MarketStats] component=market_stats provider=EfinanceFetcher "
-                "api=ef.stock.get_realtime_quotes action=failed error=%s",
+            log_safe_exception(
+                logger,
+                "Efinance market statistics fetch failed",
                 e,
+                error_code="efinance_market_stats_failed",
+                level=logging.ERROR,
             )
             return None
         
@@ -1096,7 +1177,13 @@ class EfinanceFetcher(BaseFetcher):
             ]
             return top_sectors, bottom_sectors
         except Exception as e:
-            logger.error(f"[efinance] 获取板块排行失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance sector ranking fetch failed",
+                e,
+                error_code="efinance_sector_ranking_failed",
+                level=logging.ERROR,
+            )
             return None
     
     def get_base_info(self, stock_code: str) -> Optional[Dict[str, Any]]:
@@ -1142,7 +1229,14 @@ class EfinanceFetcher(BaseFetcher):
             return None
             
         except Exception as e:
-            logger.error(f"[API错误] 获取 {stock_code} 基本信息失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance stock base information fetch failed",
+                e,
+                error_code="efinance_stock_base_info_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code},
+            )
             return None
     
     def get_belong_board(self, stock_code: str) -> Optional[pd.DataFrame]:
@@ -1183,7 +1277,14 @@ class EfinanceFetcher(BaseFetcher):
             logger.warning(f"[超时] ef.stock.get_belong_board({stock_code}) 超过 {_EF_CALL_TIMEOUT}s，跳过")
             return None
         except Exception as e:
-            logger.error(f"[API错误] 获取 {stock_code} 所属板块失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance stock board membership fetch failed",
+                e,
+                error_code="efinance_stock_board_membership_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code},
+            )
             return None
     
     def get_enhanced_data(self, stock_code: str, days: int = 60) -> Dict[str, Any]:
@@ -1210,7 +1311,14 @@ class EfinanceFetcher(BaseFetcher):
             df = self.get_daily_data(stock_code, days=days)
             result['daily_data'] = df
         except Exception as e:
-            logger.error(f"获取 {stock_code} 日线数据失败: {e}")
+            log_safe_exception(
+                logger,
+                "Efinance daily data fetch failed",
+                e,
+                error_code="efinance_daily_data_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code},
+            )
         
         # 获取实时行情
         result['realtime_quote'] = self.get_realtime_quote(stock_code)

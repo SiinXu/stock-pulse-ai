@@ -33,6 +33,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from data_provider.realtime_types import CircuitBreaker
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -148,8 +149,13 @@ class TwInstitutionalFetcher:
         try:
             table = self._whole_market(market, date)
         except Exception as exc:  # noqa: BLE001 - fail-open by contract
-            logger.info(
-                "[tw-inst] fetch failed market=%s code=%s: %s", market, stock_code, exc
+            log_safe_exception(
+                logger,
+                "Taiwan institutional data fetch failed",
+                exc,
+                error_code="tw_institutional_fetch_failed",
+                level=logging.INFO,
+                context={"market": market, "symbol": stock_code},
             )
             return None
         if not table:
@@ -223,8 +229,11 @@ class TwInstitutionalFetcher:
                 return {}
             try:
                 table = self._fetch_twse(ad_date) if market == "twse" else self._fetch_tpex()
-            except Exception as exc:  # network / HTTP error -> trip the breaker, then re-raise
-                self._breaker.record_failure(market, str(exc))
+            except Exception:  # network / HTTP error -> trip the breaker, then re-raise
+                self._breaker.record_failure(
+                    market,
+                    "tw_institutional_endpoint_failed",
+                )
                 raise
             # The breaker tracks REACHABILITY (open only on hard network/HTTP errors).
             # An empty / stat!=OK body still means the endpoint RESPONDED, so it counts

@@ -311,7 +311,12 @@ function toErrorEnvelope(value: unknown): ErrorEnvelope | null {
   }
 
   const nested = isRecord(value.detail) ? value.detail : null;
-  const source = nested && typeof nested.error === 'string' ? nested : value;
+  const hasTopLevelError = typeof value.error === 'string' && Boolean(value.error.trim());
+  const source = hasTopLevelError
+    ? value
+    : nested && typeof nested.error === 'string'
+      ? nested
+      : value;
   if (typeof source.error !== 'string' || !source.error.trim()) {
     return null;
   }
@@ -329,7 +334,7 @@ function toErrorEnvelope(value: unknown): ErrorEnvelope | null {
     error: source.error.trim(),
     message: pickString(source.message) ?? undefined,
     params,
-    details: source.details ?? (isRecord(source.detail) ? source.detail : undefined),
+    details: source.details !== undefined ? source.details : source.detail,
     traceId,
   };
 }

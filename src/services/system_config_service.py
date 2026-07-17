@@ -70,6 +70,12 @@ from src.llm.backend_registry import (
 )
 from src.llm.generation_params import apply_litellm_generation_params
 from src.llm.local_cli_backend import resolve_local_cli_preset
+from src.llm.provider_catalog import (
+    build_connection_contract_values,
+    get_connection_field_schema,
+    get_unknown_connection_contract_fields,
+    validate_connection_contract_values,
+)
 from src.notification_contracts import (
     FEISHU_APP_BOT_ENV_GROUP,
     FEISHU_WEBHOOK_ENV_GROUP,
@@ -81,7 +87,11 @@ from src.notification_sender.gotify_sender import resolve_gotify_message_endpoin
 from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.services.stock_list_parser import split_stock_list
 from src.services.generation_backend_status_service import GenerationBackendStatusService
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_diagnostic_text,
+    sanitize_exception_chain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -565,11 +575,28 @@ class SystemConfigService:
                 timeout_seconds=float(timeout_seconds),
             )
         except Exception as exc:
-            logger.warning("Notification channel test failed for %s: %s", normalized_channel, exc)
+            redaction_values = [
+                value
+                for key, value in effective_map.items()
+                if get_field_definition(key, value_hint=str(value)).get("is_sensitive")
+            ]
+            safe_error = sanitize_exception_chain(
+                exc,
+                redaction_values=redaction_values,
+            )
+            log_safe_exception(
+                logger,
+                "Notification channel test failed",
+                exc,
+                error_code="notification_channel_test_failed",
+                level=logging.WARNING,
+                context={"channel": normalized_channel},
+                redaction_values=redaction_values,
+            )
             error_code, retryable = self._classify_notification_exception(exc)
             return self._build_notification_test_result(
                 success=False,
-                message=f"通知测试异常: {exc}",
+                message=safe_error,
                 error_code=error_code,
                 stage="notification_send",
                 retryable=retryable,
@@ -578,7 +605,7 @@ class SystemConfigService:
                     {
                         "channel": normalized_channel,
                         "success": False,
-                        "message": str(exc),
+                        "message": safe_error,
                         "target": self._resolve_notification_test_target(normalized_channel, effective_map),
                         "error_code": error_code,
                         "stage": "notification_send",
@@ -1289,16 +1316,13 @@ class SystemConfigService:
         existing_models = [str(m).strip() for m in models if str(m).strip()]
         validation_issues, resolved_protocol = self._validate_llm_channel_connection(
             channel_name=channel_name,
+            provider=provider,
+            provider_id=str(provider_id or ""),
             protocol_value=protocol,
             base_url_value=base_url,
             api_key_value=api_key,
             model_values=existing_models,
             field_prefix="discover_channel",
-            require_base_url=(
-                bool(provider["requires_base_url"])
-                if provider is not None
-                else True
-            ),
         )
         if not resolved_protocol and existing_models:
             resolved_protocol = resolve_llm_channel_protocol(
@@ -1404,16 +1428,20 @@ class SystemConfigService:
                 )
             latency_ms = int((time.perf_counter() - started_at) * 1000)
         except requests.RequestException as exc:
-            logger.warning(
-                "LLM channel model discovery failed for %s: %s",
-                channel_name,
-                self._sanitize_llm_error_text(exc, redaction_values=redaction_values),
+            log_safe_exception(
+                logger,
+                "LLM channel model discovery failed",
+                exc,
+                error_code="llm_channel_model_discovery_failed",
+                level=logging.WARNING,
+                context={"channel": channel_name},
+                redaction_values=redaction_values,
             )
             diagnostic = self._classify_llm_exception(exc)
             return self._build_llm_channel_result(
                 success=False,
                 message=diagnostic.message,
-                error=str(exc),
+                error=sanitize_exception_chain(exc, redaction_values=redaction_values),
                 stage="model_discovery",
                 error_code=diagnostic.error_code,
                 retryable=diagnostic.retryable,
@@ -1612,6 +1640,9 @@ class SystemConfigService:
                 )
         validation_issues = self._validate_llm_channel_definition(
             channel_name=channel_name,
+            display_name=channel_name,
+            provider=provider,
+            provider_id=str(provider_id or ""),
             protocol_value=protocol,
             base_url_value=base_url,
             api_key_value=api_key,
@@ -1619,11 +1650,6 @@ class SystemConfigService:
             enabled=enabled,
             field_prefix="test_channel",
             require_complete=True,
-            require_base_url=(
-                bool(provider["requires_base_url"])
-                if provider is not None
-                else False
-            ),
         )
         errors = [issue for issue in validation_issues if issue["severity"] == "error"]
         if errors:
@@ -1794,16 +1820,20 @@ class SystemConfigService:
                 redaction_values=redaction_values,
             )
         except Exception as exc:
-            logger.warning(
-                "LLM channel test failed for %s: %s",
-                channel_name,
-                self._sanitize_llm_error_text(exc, redaction_values=redaction_values),
+            log_safe_exception(
+                logger,
+                "LLM channel test failed",
+                exc,
+                error_code="llm_channel_test_failed",
+                level=logging.WARNING,
+                context={"channel": channel_name},
+                redaction_values=redaction_values,
             )
             diagnostic = self._classify_llm_exception(exc)
             return self._build_llm_channel_result(
                 success=False,
                 message=diagnostic.message,
-                error=str(exc),
+                error=sanitize_exception_chain(exc, redaction_values=redaction_values),
                 stage="chat_completion",
                 error_code=diagnostic.error_code,
                 retryable=diagnostic.retryable,
@@ -2169,19 +2199,25 @@ class SystemConfigService:
             )
         except Exception as exc:
             diagnostic = cls._classify_llm_capability_exception(exc, "stream")
-            return cls._build_llm_capability_result_from_diagnostic("stream", diagnostic, str(exc))
+            return cls._build_llm_capability_result_from_diagnostic(
+                "stream",
+                diagnostic,
+                sanitize_exception_chain(exc, redaction_values=redaction_values),
+                redaction_values=redaction_values,
+            )
         finally:
             close_stream = getattr(stream, "close", None)
             if callable(close_stream):
                 try:
                     close_stream()
                 except Exception as exc:
-                    logger.debug(
-                        "Failed to close LLM stream capability probe: %s",
-                        cls._sanitize_llm_error_text(
-                            exc,
-                            redaction_values=redaction_values,
-                        ),
+                    log_safe_exception(
+                        logger,
+                        "LLM stream capability probe close failed",
+                        exc,
+                        error_code="llm_stream_capability_probe_close_failed",
+                        level=logging.DEBUG,
+                        redaction_values=redaction_values,
                     )
 
     @classmethod
@@ -2440,7 +2476,13 @@ class SystemConfigService:
                 warnings.extend(config.validate())
                 reload_triggered = True
             except Exception as exc:  # pragma: no cover - defensive branch
-                logger.error("Configuration reload failed: %s", exc, exc_info=True)
+                log_safe_exception(
+                    logger,
+                    "Configuration reload failed",
+                    exc,
+                    error_code="configuration_reload_failed",
+                    redaction_values=(updates[key] for key in sensitive_keys),
+                )
                 warnings.append("Configuration updated but reload failed")
 
         warnings.extend(
@@ -2472,7 +2514,13 @@ class SystemConfigService:
                     clear_enabled_override="SCHEDULE_ENABLED" in submitted_keys,
                 )
             except Exception as exc:  # pragma: no cover - defensive branch
-                logger.error("Runtime scheduler reconcile failed: %s", exc, exc_info=True)
+                log_safe_exception(
+                    logger,
+                    "Runtime scheduler reconciliation failed",
+                    exc,
+                    error_code="runtime_scheduler_reconcile_failed",
+                    redaction_values=(updates[key] for key in sensitive_keys),
+                )
                 warnings.append("Configuration updated but runtime scheduler reconcile failed")
 
         return {
@@ -5208,7 +5256,7 @@ class SystemConfigService:
             touched = llm_channels_touched or any(
                 updated_key.startswith(f"{prefix}_") for updated_key in updated_keys
             )
-            provider, _provider_id, provider_is_explicit = (
+            provider, provider_id, provider_is_explicit = (
                 SystemConfigService._resolve_connection_provider(effective_map, name)
             )
             if provider_is_explicit and provider is None and touched:
@@ -5257,6 +5305,7 @@ class SystemConfigService:
                 (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
                 or (effective_map.get(f"{prefix}_API_KEY") or "").strip()
             )
+            api_keys_value = (effective_map.get(f"{prefix}_API_KEYS") or "").strip()
             if name.lower() == "anspire" and not api_key_value:
                 api_key_value = (effective_map.get("ANSPIRE_API_KEYS") or "").strip()
             models_value = [
@@ -5298,34 +5347,51 @@ class SystemConfigService:
                             }
                         )
                 continue
-            # Custom endpoints (names outside the known provider templates) must
-            # supply a Base URL, except when the endpoint has a runtime default
-            # (ollama / localhost), which also allows an empty API key.
-            resolved_gate_protocol = resolve_llm_channel_protocol(
-                protocol_value,
-                base_url=base_url_value,
-                models=models_value or None,
-                channel_name=name,
-            )
-            if provider_is_explicit and provider is not None:
-                require_base_url = bool(provider["requires_base_url"])
-            else:
-                is_custom_endpoint = name.lower() not in known_llm_provider_channel_names()
-                require_base_url = is_custom_endpoint and not channel_allows_empty_api_key(
-                    resolved_gate_protocol,
-                    base_url_value,
+            validation_provider = provider
+            if (
+                not provider_is_explicit
+                and provider is not None
+                and provider.get("is_custom")
+            ):
+                # Legacy Connections had no Provider identity. Preserve the
+                # established model-route inference only when it resolves to a
+                # local runtime contract (for example ollama/model); explicit
+                # Custom selections still require their own Base URL.
+                inferred_protocol = resolve_llm_channel_protocol(
+                    protocol_value,
+                    base_url=base_url_value,
+                    models=models_value or None,
+                    channel_name=name,
                 )
+                from src.llm.provider_catalog import get_provider
+
+                inferred_provider = get_provider(inferred_protocol)
+                if inferred_provider is not None and inferred_provider.get("is_local"):
+                    validation_provider = inferred_provider
+            display_name_key = f"{prefix}_DISPLAY_NAME"
+            # Legacy Connection payloads predate DISPLAY_NAME. Preserve their
+            # identity label only when the key is absent; an explicit empty
+            # value must still reach the authoritative required-field contract.
+            display_name = (
+                name
+                if display_name_key not in effective_map
+                else (effective_map.get(display_name_key) or "").strip()
+            )
             issues.extend(
                 SystemConfigService._validate_llm_channel_definition(
                     channel_name=name,
+                    display_name=display_name,
+                    provider=validation_provider,
+                    provider_id=provider_id,
                     protocol_value=protocol_value,
                     base_url_value=base_url_value,
                     api_key_value=api_key_value,
+                    api_keys_value=api_keys_value,
                     model_values=models_value,
+                    extra_headers_value=(effective_map.get(f"{prefix}_EXTRA_HEADERS") or "").strip(),
                     enabled=enabled,
                     field_prefix=prefix,
                     require_complete=enabled and touched,
-                    require_base_url=require_base_url,
                 )
             )
 
@@ -6226,34 +6292,149 @@ class SystemConfigService:
         return issues
 
     @staticmethod
+    def _unknown_connection_contract_issues(
+        *,
+        schema: Sequence[Dict[str, Any]],
+        values: Dict[str, str],
+        field_prefix: str,
+        field_keys: Optional[Sequence[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Build stable validation issues for unsupported field conditions."""
+        fields_by_key = {
+            str(field.get("key") or ""): field
+            for field in schema
+        }
+        issues: List[Dict[str, Any]] = []
+        for field_key in get_unknown_connection_contract_fields(
+            schema,
+            values,
+            field_keys=field_keys,
+        ):
+            field = fields_by_key.get(field_key, {})
+            env_suffix = str(field.get("env_suffix") or "").strip()
+            issue_key = (
+                field_key
+                if field_prefix == "test_channel"
+                else f"{field_prefix}_{env_suffix}" if env_suffix else field_prefix
+            )
+            issues.append(
+                {
+                    "key": issue_key,
+                    "code": "unknown_contract_condition",
+                    "message": (
+                        f"LLM channel field '{field_key}' uses an unsupported "
+                        "contract condition"
+                    ),
+                    "severity": "error",
+                    "expected": "supported condition operator",
+                    "actual": "unknown",
+                }
+            )
+        return issues
+
+    @staticmethod
     def _validate_llm_channel_definition(
         *,
         channel_name: str,
+        display_name: str = "",
+        provider: Optional[Dict[str, Any]] = None,
+        provider_id: str = "",
         protocol_value: str,
         base_url_value: str,
         api_key_value: str,
+        api_keys_value: str = "",
         model_values: Sequence[str],
+        extra_headers_value: str = "",
         enabled: bool,
         field_prefix: str,
         require_complete: bool,
-        require_base_url: bool = False,
     ) -> List[Dict[str, Any]]:
         """Validate one normalized LLM channel definition."""
-        if not require_complete:
-            return []
-
-        issues, resolved_protocol = SystemConfigService._validate_llm_channel_connection(
-            channel_name=channel_name,
-            protocol_value=protocol_value,
-            base_url_value=base_url_value,
-            api_key_value=api_key_value,
-            model_values=model_values,
-            field_prefix=field_prefix,
-            require_base_url=require_base_url,
-        )
+        if require_complete:
+            issues, resolved_protocol = SystemConfigService._validate_llm_channel_connection(
+                channel_name=channel_name,
+                provider=provider,
+                provider_id=provider_id,
+                protocol_value=protocol_value,
+                base_url_value=base_url_value,
+                api_key_value=api_key_value,
+                api_keys_value=api_keys_value,
+                model_values=model_values,
+                extra_headers_value=extra_headers_value,
+                enabled=enabled,
+                field_prefix=field_prefix,
+            )
+        else:
+            issues = []
+            resolved_protocol = resolve_llm_channel_protocol(
+                protocol_value,
+                base_url=base_url_value,
+                models=list(model_values) if model_values else None,
+                channel_name=channel_name,
+            )
         models_key = f"{field_prefix}_MODELS" if field_prefix != "test_channel" else "models"
+        contract_values = build_connection_contract_values(
+            connection_name=channel_name,
+            display_name=display_name,
+            provider_id=provider_id,
+            provider=provider,
+            protocol=resolved_protocol,
+            base_url=base_url_value,
+            api_key=api_key_value,
+            api_keys=api_keys_value,
+            models=model_values,
+            extra_headers=extra_headers_value,
+            enabled=enabled,
+        )
+        connection_schema = get_connection_field_schema()
+        missing_fields = validate_connection_contract_values(
+            connection_schema,
+            contract_values,
+        )
+        issues.extend(
+            SystemConfigService._unknown_connection_contract_issues(
+                schema=connection_schema,
+                values=contract_values,
+                field_prefix=field_prefix,
+                field_keys=(
+                    (
+                        "connection_name",
+                        "display_name",
+                        "provider_id",
+                        "api_keys",
+                        "models",
+                        "extra_headers",
+                        "enabled",
+                    )
+                    if require_complete
+                    else None
+                ),
+            )
+        )
 
-        if not model_values:
+        if "display_name" in missing_fields:
+            display_name_key = (
+                f"{field_prefix}_DISPLAY_NAME"
+                if field_prefix != "test_channel"
+                else "display_name"
+            )
+            issues.append(
+                {
+                    "key": display_name_key,
+                    "code": "field_required",
+                    "message": f"LLM channel '{channel_name}' requires a display name",
+                    "severity": "error",
+                    "expected": "non-empty value",
+                    "actual": "",
+                }
+            )
+
+        # Disabled drafts may omit fields required only while enabled, but
+        # unconditional identity requirements and schema diagnostics still apply.
+        if not require_complete:
+            return issues
+
+        if "models" in missing_fields:
             issues.append(
                 {
                     "key": models_key,
@@ -6287,12 +6468,16 @@ class SystemConfigService:
     def _validate_llm_channel_connection(
         *,
         channel_name: str,
+        provider: Optional[Dict[str, Any]] = None,
+        provider_id: str = "",
         protocol_value: str,
         base_url_value: str,
         api_key_value: str,
+        api_keys_value: str = "",
         model_values: Sequence[str] = (),
+        extra_headers_value: str = "",
+        enabled: bool = True,
         field_prefix: str,
-        require_base_url: bool,
     ) -> Tuple[List[Dict[str, Any]], str]:
         """Validate connection-level fields shared by test and discovery flows."""
         issues: List[Dict[str, Any]] = []
@@ -6316,18 +6501,7 @@ class SystemConfigService:
                 }
             )
 
-        if require_base_url and not base_url_value.strip():
-            issues.append(
-                {
-                    "key": base_url_key,
-                    "code": "missing_base_url",
-                    "message": f"LLM channel '{channel_name}' requires a base URL to discover models",
-                    "severity": "error",
-                    "expected": "http(s)://host/v1",
-                    "actual": "",
-                }
-            )
-        elif base_url_value and not SystemConfigService._is_valid_llm_base_url(base_url_value):
+        if base_url_value and not SystemConfigService._is_valid_llm_base_url(base_url_value):
             issues.append(
                 {
                     "key": base_url_key,
@@ -6356,10 +6530,61 @@ class SystemConfigService:
             models=list(model_values) if model_values else None,
             channel_name=channel_name,
         )
-        # Validate parsed key segments so that inputs like "," or " , " are
-        # treated as empty (they produce zero usable keys after split+strip).
-        _parsed_api_keys = [seg.strip() for seg in api_key_value.split(",") if seg.strip()]
-        if not _parsed_api_keys and not channel_allows_empty_api_key(resolved_protocol, base_url_value):
+        # Parsed segments make comma-only credentials empty before contract
+        # evaluation. Requirement decisions themselves stay in the shared schema.
+        parsed_api_key = ",".join(
+            segment.strip() for segment in api_key_value.split(",") if segment.strip()
+        )
+        contract_values = build_connection_contract_values(
+            connection_name=channel_name,
+            display_name=channel_name,
+            provider_id=provider_id,
+            provider=provider,
+            protocol=resolved_protocol,
+            base_url=base_url_value,
+            api_key=parsed_api_key,
+            api_keys=api_keys_value,
+            models=model_values,
+            extra_headers=extra_headers_value,
+            enabled=enabled,
+        )
+        connection_schema = get_connection_field_schema()
+        missing_fields = validate_connection_contract_values(
+            connection_schema,
+            contract_values,
+            field_keys=("protocol", "base_url", "api_key"),
+        )
+        issues.extend(
+            SystemConfigService._unknown_connection_contract_issues(
+                schema=connection_schema,
+                values=contract_values,
+                field_prefix=field_prefix,
+                field_keys=("protocol", "base_url", "api_key"),
+            )
+        )
+        if "protocol" in missing_fields:
+            issues.append(
+                {
+                    "key": protocol_key,
+                    "code": "missing_protocol",
+                    "message": f"LLM channel '{channel_name}' requires a protocol",
+                    "severity": "error",
+                    "expected": "supported protocol",
+                    "actual": "",
+                }
+            )
+        if "base_url" in missing_fields:
+            issues.append(
+                {
+                    "key": base_url_key,
+                    "code": "missing_base_url",
+                    "message": f"LLM channel '{channel_name}' requires a base URL",
+                    "severity": "error",
+                    "expected": "http(s)://host/v1",
+                    "actual": "",
+                }
+            )
+        if "api_key" in missing_fields:
             issues.append(
                 {
                     "key": api_key_key,

@@ -15,6 +15,8 @@ import subprocess
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 _FALSEY_ENV_VALUES = {"0", "false", "no", "off"}
@@ -112,11 +114,20 @@ def _run_frontend_commands(commands: Sequence[Sequence[str]], frontend_dir: Path
         logger.info("前端静态资源构建完成")
         return True
     except subprocess.CalledProcessError as exc:
-        cmd_display = " ".join(exc.cmd) if isinstance(exc.cmd, (list, tuple)) else str(exc.cmd)
-        logger.error(
-            "前端命令执行失败（exit_code=%s）: %s",
-            getattr(exc, "returncode", "N/A"),
-            cmd_display,
+        command_name = (
+            str(exc.cmd[0])
+            if isinstance(exc.cmd, (list, tuple)) and exc.cmd
+            else "frontend_command"
+        )
+        log_safe_exception(
+            logger,
+            "Frontend build command failed",
+            exc,
+            error_code="frontend_build_command_failed",
+            context={
+                "command": command_name,
+                "exit_code": getattr(exc, "returncode", "unknown"),
+            },
         )
         return False
 

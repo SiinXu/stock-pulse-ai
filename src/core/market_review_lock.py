@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 
 try:
     import fcntl
@@ -84,7 +85,13 @@ def _is_windows_process_alive(pid: int) -> bool:
         finally:
             kernel32.CloseHandle(handle)
     except Exception as exc:
-        logger.warning("Windows 进程存活探测失败，保守视为仍在运行: %s", exc)
+        log_safe_exception(
+            logger,
+            "Windows process liveness check failed; assuming process is alive",
+            exc,
+            error_code="windows_process_liveness_check_failed",
+            level=logging.WARNING,
+        )
         return True
 
 
@@ -187,7 +194,13 @@ def try_acquire_market_review_lock(
                     try:
                         lock_path.unlink()
                     except OSError as exc:
-                        logger.warning("清理过期 market_review.lock 失败: %s", exc)
+                        log_safe_exception(
+                            logger,
+                            "Stale market review lock cleanup failed",
+                            exc,
+                            error_code="stale_market_review_lock_cleanup_failed",
+                            level=logging.WARNING,
+                        )
                         return None
 
             if fd is None:

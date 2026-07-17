@@ -12,6 +12,7 @@ from src.repositories.portfolio_repo import PortfolioRepository
 from src.services.decision_signal_service import DecisionSignalService
 from src.services.decision_signal_summary import summarize_decision_signal
 from src.services.portfolio_service import PortfolioService
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +169,13 @@ class PortfolioRiskService:
                 "actions": action_counts,
                 "items": risk_items,
             }
-        except Exception:
-            logger.exception("[PortfolioRiskService] Decision signal risk unavailable")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Portfolio decision signal risk unavailable",
+                exc,
+                error_code="portfolio_decision_signal_risk_unavailable",
+            )
             return self._empty_decision_signal_risk(available=False)
 
     @staticmethod

@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 _CURRENT_CONTEXT: ContextVar[Optional["RunDiagnosticContext"]] = ContextVar(
@@ -470,7 +472,14 @@ class RunDiagnosticContext:
             event_payload["id"] = event_payload.get("id") or f"flow_{self.flow_event_index:04d}"
             self.event_sink(event_payload)
         except Exception as exc:  # pragma: no cover - defensive fail-open guard
-            logger.warning("run-flow event sink failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Run Flow event sink failed",
+                exc,
+                error_code="run_flow_event_sink_failed",
+                level=logging.WARNING,
+                trace_id=self.trace_id,
+            )
 
     def snapshot(self) -> Dict[str, Any]:
         return {
@@ -520,7 +529,13 @@ def reset_run_diagnostic_context(token: Optional[Token]) -> None:
     try:
         _CURRENT_CONTEXT.reset(token)
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("run diagnostic context reset failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Run diagnostic context reset failed",
+            exc,
+            error_code="run_diagnostic_context_reset_failed",
+            level=logging.WARNING,
+        )
 
 
 def current_diagnostic_snapshot() -> Optional[Dict[str, Any]]:
@@ -530,7 +545,14 @@ def current_diagnostic_snapshot() -> Optional[Dict[str, Any]]:
     try:
         return context.snapshot()
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("run diagnostic snapshot failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Run diagnostic snapshot failed",
+            exc,
+            error_code="run_diagnostic_snapshot_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
         return None
 
 
@@ -904,7 +926,14 @@ def record_provider_run(
             )
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("provider diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Provider diagnostic record failed",
+            exc,
+            error_code="provider_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 def record_provider_run_started(
@@ -925,7 +954,14 @@ def record_provider_run_started(
             operation=operation,
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("provider started diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Provider start diagnostic record failed",
+            exc,
+            error_code="provider_start_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 def record_llm_run(
@@ -961,7 +997,14 @@ def record_llm_run(
             )
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("llm diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "LLM diagnostic record failed",
+            exc,
+            error_code="llm_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 def record_llm_run_started(
@@ -982,7 +1025,14 @@ def record_llm_run_started(
             call_type=call_type,
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("llm started diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "LLM start diagnostic record failed",
+            exc,
+            error_code="llm_start_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 def record_notification_run(
@@ -1010,7 +1060,14 @@ def record_notification_run(
             )
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("notification diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Notification diagnostic record failed",
+            exc,
+            error_code="notification_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 def record_history_run(
@@ -1036,7 +1093,14 @@ def record_history_run(
             )
         )
     except Exception as exc:  # pragma: no cover - defensive fail-open guard
-        logger.warning("history diagnostic record failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "History diagnostic record failed",
+            exc,
+            error_code="history_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
 
 
 _SUMMARY_STATUS_LABELS = {

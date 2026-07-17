@@ -24,6 +24,7 @@ from src.enums import ReportType
 from src.storage import get_db
 from bot.models import BotMessage
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -232,8 +233,15 @@ class TaskService:
                 return {"success": False, "task_id": task_id, "error": fail_message}
 
         except Exception as e:
-            error_msg = str(e)
-            logger.error(f"[TaskService] 股票 {code} 分析异常: {error_msg}")
+            error_msg = "Analysis task failed"
+            log_safe_exception(
+                logger,
+                "TaskService analysis failed",
+                e,
+                error_code="task_service_analysis_failed",
+                context={"stock_code": code, "task_id": task_id},
+                exception_redaction_values=exception_chain_redaction_values(e),
+            )
 
             with self._tasks_lock:
                 self._tasks[task_id].update({

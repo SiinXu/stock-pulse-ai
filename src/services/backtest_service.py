@@ -17,9 +17,10 @@ from src.market_phase_summary import extract_market_phase_summary, normalize_ana
 from src.repositories.backtest_repo import BacktestRepository
 from src.repositories.stock_repo import StockRepository
 from src.schemas.decision_action import build_action_fields
-from src.storage import BacktestResult, BacktestSummary, DatabaseManager
+from src.storage import AnalysisHistory, BacktestResult, BacktestSummary, DatabaseManager
 from src.utils.data_processing import parse_json_field
 from src.services.stock_code_utils import normalize_code as normalize_backtest_code
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,16 @@ class BacktestService:
 
             except Exception as exc:
                 errors += 1
-                logger.error(f"回测失败: {analysis.code}#{analysis.id}: {exc}")
+                log_safe_exception(
+                    logger,
+                    "Backtest evaluation failed",
+                    exc,
+                    error_code="backtest_evaluation_failed",
+                    context={
+                        "stock_code": analysis.code,
+                        "analysis_id": analysis.id,
+                    },
+                )
                 results_to_save.append(
                     BacktestResult(
                         analysis_history_id=analysis.id,
@@ -939,7 +949,7 @@ class BacktestService:
             phase_breakdown[bucket] = phase_breakdown.get(bucket, 0) + 1
         return {"phase_breakdown": phase_breakdown, "raw_phase_counts": raw_phase_counts}
 
-    def _resolve_analysis_date(self, analysis) -> Optional[date]:
+    def _resolve_analysis_date(self, analysis: AnalysisHistory) -> Optional[date]:
         parsed = self.repo.parse_analysis_date_from_snapshot(analysis.context_snapshot)
         if parsed:
             return parsed
@@ -969,7 +979,14 @@ class BacktestService:
                 return
             self.db.save_daily_data(df, code=refill_code, data_source=source)
         except Exception as exc:
-            logger.warning(f"补全日线数据失败({refill_code}): {exc}")
+            log_safe_exception(
+                logger,
+                "Backtest daily data refill failed",
+                exc,
+                error_code="backtest_daily_data_refill_failed",
+                level=logging.WARNING,
+                context={"stock_code": refill_code},
+            )
 
     def _recompute_summaries(self, *, touched_codes: List[str], eval_window_days: int, engine_version: str) -> None:
         with self.db.get_session() as session:

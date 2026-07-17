@@ -18,6 +18,14 @@ function chooseOption(trigger: HTMLElement, value: string) {
   fireEvent.click(option);
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 const {
   mockGetResults,
   mockGetOverallPerformance,
@@ -122,9 +130,9 @@ describe('BacktestPage', () => {
     const windowInput = screen.getByPlaceholderText('10');
 
     expect(filterInput).toHaveClass('h-11');
-    expect(filterInput).toHaveClass('rounded-[10px]');
+    expect(filterInput).toHaveClass('rounded-sm');
     expect(windowInput).toHaveClass('h-11');
-    expect(windowInput).toHaveClass('rounded-[10px]');
+    expect(windowInput).toHaveClass('rounded-sm');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -224,13 +232,30 @@ describe('BacktestPage', () => {
   });
 
   it('renders backtest controls and result headings in English UI mode', async () => {
+    type ResultsResponse = {
+      total: number;
+      page: number;
+      limit: number;
+      items: Array<typeof baseResultItem>;
+    };
+    let resolveResults!: (response: ResultsResponse) => void;
+    const delayedResults = new Promise<ResultsResponse>((resolve) => {
+      resolveResults = resolve;
+    });
+    mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('h-11');
     expect(screen.getByText('Evaluation window')).toBeInTheDocument();
-    expect(screen.getAllByText('Phase').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
-    expect(screen.getByText('Window return')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveResults({ total: 1, page: 1, limit: 20, items: [baseResultItem] });
+      await delayedResults;
+    });
+
+    expect(await screen.findByText('Window return')).toBeInTheDocument();
     expect(screen.getByText('Direction match')).toBeInTheDocument();
     expect(screen.getByText('Direction accuracy')).toBeInTheDocument();
     expect(screen.queryByText('运行回测')).not.toBeInTheDocument();
@@ -426,12 +451,22 @@ describe('BacktestPage', () => {
   it('switches to next-day validation with the 1D shortcut', async () => {
     render(<BacktestPage />);
 
-    await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
+    await screen.findByText('600519');
     const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
     expect(oneDayButton).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('min-h-11', 'min-w-11');
+    const nextDayResults = createDeferred<{
+      total: number;
+      page: number;
+      limit: number;
+      items: typeof baseResultItem[];
+    }>();
+    const nextDayPerformance = createDeferred<typeof basePerformance>();
+    mockGetResults.mockReturnValueOnce(nextDayResults.promise);
+    mockGetOverallPerformance.mockReturnValueOnce(nextDayPerformance.promise);
     fireEvent.click(oneDayButton);
 
+    expect(await screen.findByText('正在加载结果...')).toBeInTheDocument();
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenLastCalledWith({
         code: undefined,
@@ -450,7 +485,19 @@ describe('BacktestPage', () => {
       });
     });
 
-    expect(screen.getByText('实际表现')).toBeInTheDocument();
+    await act(async () => {
+      nextDayResults.resolve({
+        total: 1,
+        page: 1,
+        limit: 20,
+        items: [{ ...baseResultItem, evalWindowDays: 1 }],
+      });
+      nextDayPerformance.resolve({ ...basePerformance, evalWindowDays: 1 });
+      await Promise.all([nextDayResults.promise, nextDayPerformance.promise]);
+    });
+
+    expect(await screen.findByText('实际表现')).toBeInTheDocument();
+    expect(screen.queryByText('正在加载结果...')).not.toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
   });

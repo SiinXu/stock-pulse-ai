@@ -12,6 +12,7 @@ from datetime import datetime
 import requests
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import chunk_content_by_max_bytes
 
 
@@ -88,8 +89,13 @@ class PushplusSender:
                 )
 
             return self._send_pushplus_message(api_url, content, title, timeout_seconds=timeout_seconds)
-        except Exception as e:
-            logger.error(f"发送 PushPlus 消息失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "PushPlus message delivery failed",
+                exc,
+                error_code="pushplus_delivery_failed",
+            )
             return False
 
     def _send_pushplus_message(

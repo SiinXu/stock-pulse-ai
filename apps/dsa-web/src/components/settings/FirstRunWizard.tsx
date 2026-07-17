@@ -2,13 +2,20 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { Button, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
+import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
 import type { UiLang } from './settingsInformationArchitecture';
 import {
+  buildConnectionContractValues,
   canonicalModelRoute,
+  type ConnectionCredentialField,
+  evaluateConnectionSchemaAuthority,
+  getProviderDisplayLabel,
+  isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
   resolveConnectionRequirements,
   suggestConnectionName,
+  validateConnectionContractValues,
 } from './llmConnectionContract';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
@@ -42,10 +49,11 @@ interface FirstRunWizardProps {
   existingChannelNames?: string[];
   /**
    * Authoritative provider catalog from the backend. The wizard reads provider
-   * metadata and credential/base-URL requirements from here — it does not keep a
-   * second hardcoded business list.
+   * identity, labels, defaults, and capabilities from here. Field requirements
+   * come from connectionFields when the backend supplies that schema.
    */
   providers: LlmProviderCatalogEntry[];
+  connectionFields?: LlmConnectionFieldSchema[];
   emptyApiKeyHosts?: string[];
 }
 
@@ -83,6 +91,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   language,
   existingChannelNames = [],
   providers,
+  connectionFields,
   emptyApiKeyHosts = [],
 }) => {
   const text = SETTINGS_WIZARD_TEXT[language];
@@ -91,6 +100,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [providerId, setProviderId] = useState<string>(providers[0]?.id ?? '');
   const [protocol, setProtocol] = useState(providers[0]?.protocol ?? 'openai');
   const [apiKey, setApiKey] = useState('');
+  const [credentialField, setCredentialField] = useState<ConnectionCredentialField>('api_key');
   const [baseUrl, setBaseUrl] = useState('');
   const [models, setModels] = useState('');
   const [modelDraft, setModelDraft] = useState('');
@@ -112,12 +122,100 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     [providers, providerId],
   );
   const modelOptions = useMemo(() => parseModels(models), [models]);
-  const requirements = useMemo(() => provider ? resolveConnectionRequirements({
+  const suggestedConnectionName = useMemo(
+    () => provider ? suggestConnectionName(existingChannelNames, provider.id) : '',
+    [existingChannelNames, provider],
+  );
+  const hasConnectionSchema = connectionFields !== undefined;
+  const connectionSchemaFields = connectionFields ?? [];
+  const requirements = useMemo(() => !hasConnectionSchema && provider ? resolveConnectionRequirements({
     provider,
     protocol,
     baseUrl,
     emptyApiKeyHosts,
-  }) : null, [provider, protocol, baseUrl, emptyApiKeyHosts]);
+  }) : null, [hasConnectionSchema, provider, protocol, baseUrl, emptyApiKeyHosts]);
+  const connectionContractValues = useMemo(() => provider ? buildConnectionContractValues({
+    connectionName: suggestedConnectionName,
+    displayName: getProviderDisplayLabel(provider, language),
+    providerId: provider.id,
+    provider,
+    protocol,
+    baseUrl,
+    apiKey,
+    credentialField,
+    models,
+    enabled: true,
+    emptyApiKeyHosts,
+    baseUrlVisible: hasConnectionSchema ? undefined : Boolean(requirements?.showBaseUrl),
+  }) : null, [
+    apiKey,
+    baseUrl,
+    credentialField,
+    emptyApiKeyHosts,
+    hasConnectionSchema,
+    language,
+    models,
+    protocol,
+    provider,
+    requirements?.showBaseUrl,
+    suggestedConnectionName,
+  ]);
+  const connectionAuthority = evaluateConnectionSchemaAuthority(
+    connectionContractValues ?? {},
+    connectionFields,
+  );
+  const connectionFieldStates = connectionAuthority.states;
+  const missingConnectionFields = connectionContractValues && hasConnectionSchema
+    ? validateConnectionContractValues(connectionContractValues, connectionSchemaFields)
+    : [];
+  const fieldIsVisible = (key: string) => !hasConnectionSchema
+    || connectionFieldStates[key]?.visible === true;
+  const fieldCanWrite = (key: string) => isConnectionSchemaFieldWritable(connectionAuthority, key);
+  const fieldIsReadOnly = (key: string) => !fieldCanWrite(key);
+  const visibleApiKeyStates = hasConnectionSchema
+    ? (['api_key', 'api_keys'] as ConnectionCredentialField[])
+      .map((key) => ({ key, state: connectionFieldStates[key] }))
+      .filter(({ state }) => state?.visible)
+    : [];
+  const writableCredentialFields = visibleApiKeyStates
+    .filter(({ key }) => fieldCanWrite(key))
+    .map(({ key }) => key);
+  const showProviderField = fieldIsVisible('provider_id');
+  const showProtocolField = hasConnectionSchema
+    ? fieldIsVisible('protocol')
+    : Boolean(requirements?.showProtocol);
+  const showApiKeyField = hasConnectionSchema
+    ? visibleApiKeyStates.length > 0
+    : Boolean(requirements?.showApiKey);
+  const apiKeyRequired = hasConnectionSchema
+    ? visibleApiKeyStates.some(({ state }) => state?.required)
+    : Boolean(requirements?.apiKeyRequired);
+  const apiKeyIsReadOnly = hasConnectionSchema
+    && writableCredentialFields.length === 0;
+  const showBaseUrlField = hasConnectionSchema
+    ? fieldIsVisible('base_url')
+    : Boolean(requirements?.showBaseUrl);
+  const showModelsField = fieldIsVisible('models');
+  const modelsAreReadOnly = fieldIsReadOnly('models');
+  const supportsDiscovery = provider?.supportsDiscovery === true;
+  const canPersistConnectionIdentity = connectionAuthority.usable
+    && fieldCanWrite('connection_name')
+    && fieldCanWrite('provider_id');
+  const discoveryEnabledByContract = hasConnectionSchema
+    ? Boolean(
+      canPersistConnectionIdentity
+      && connectionContractValues
+      && isConnectionModelDiscoveryEnabled(
+        connectionContractValues,
+        connectionSchemaFields,
+      )
+    )
+    : !apiKeyRequired || Boolean(apiKey.trim());
+  const cloudContractReady = Boolean(
+    provider
+    && canPersistConnectionIdentity
+    && missingConnectionFields.length === 0,
+  );
   const protocolOptions = useMemo(() => Array.from(
     new Map(providers.map((entry) => [entry.protocol, entry.protocol])).entries(),
   ).map(([value, label]) => ({ value, label })), [providers]);
@@ -125,12 +223,14 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   // One model per Enter/click, but pasted comma/whitespace-separated lists are
   // split, trimmed and deduped in one pass.
   const addModelToken = (raw: string) => {
+    if (modelsAreReadOnly) return;
     const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
     if (tokens.length === 0) return;
     setModels(Array.from(new Set([...modelOptions, ...tokens])).join(','));
     setModelDraft('');
   };
   const removeModelToken = (model: string) => {
+    if (modelsAreReadOnly) return;
     setModels(modelOptions.filter((entry) => entry !== model).join(','));
   };
 
@@ -138,28 +238,94 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const stepIndex = order.indexOf(step);
 
   const applyProvider = (nextProviderId: string) => {
-    setProviderId(nextProviderId);
     const nextProvider = providers.find((entry) => entry.id === nextProviderId);
-    setProtocol(nextProvider?.protocol ?? 'openai');
-    setBaseUrl(nextProvider?.defaultBaseUrl ?? '');
-    setApiKey('');
+    if (!nextProvider) {
+      return;
+    }
+    const nextProtocol = nextProvider.protocol ?? 'openai';
+    const nextBaseUrl = nextProvider.defaultBaseUrl ?? '';
+    const proposedAuthority = evaluateConnectionSchemaAuthority(buildConnectionContractValues({
+      connectionName: suggestConnectionName(existingChannelNames, nextProvider.id),
+      displayName: getProviderDisplayLabel(nextProvider, language),
+      providerId: nextProvider.id,
+      provider: nextProvider,
+      protocol: nextProtocol,
+      baseUrl: nextBaseUrl,
+      apiKey,
+      credentialField,
+      models,
+      enabled: true,
+      emptyApiKeyHosts,
+    }), connectionFields);
+    const proposedStates = proposedAuthority.states;
+    const proposedFieldCanWrite = (key: string) => (
+      isConnectionSchemaFieldWritable(proposedAuthority, key)
+    );
+    if (!proposedFieldCanWrite('provider_id')) {
+      return;
+    }
+    const canAdoptProviderDefault = (key: string) => !hasConnectionSchema
+      || proposedStates[key] === undefined
+      || proposedStates[key].visible === false
+      || proposedFieldCanWrite(key);
+    const proposedWritableCredentials = (['api_key', 'api_keys'] as ConnectionCredentialField[])
+      .filter(proposedFieldCanWrite);
+
+    setProviderId(nextProviderId);
+    if (canAdoptProviderDefault('protocol')) {
+      setProtocol(nextProtocol);
+    }
+    if (canAdoptProviderDefault('base_url')) {
+      setBaseUrl(nextBaseUrl);
+    }
+    if (!hasConnectionSchema || proposedWritableCredentials.length > 0) {
+      setApiKey('');
+      setCredentialField(proposedWritableCredentials[0] ?? 'api_key');
+    }
     // Do not seed example model IDs: models come from discovery or manual entry.
-    setModels('');
-    setReportModel('');
+    if (canAdoptProviderDefault('models')) {
+      setModels('');
+      setReportModel('');
+    }
     setDiscoveredModels([]);
     setDiscoverNote(null);
     setTestResult(null);
   };
 
+  const handleApiKeyChange = (nextValue: string) => {
+    if (!hasConnectionSchema) {
+      setApiKey(nextValue);
+      return;
+    }
+    const preferred: ConnectionCredentialField = parseModels(nextValue).length > 1
+      ? 'api_keys'
+      : 'api_key';
+    const nextCredentialField = [preferred, credentialField, ...writableCredentialFields]
+      .find((key, index, candidates) => (
+        candidates.indexOf(key) === index
+        && writableCredentialFields.includes(key)
+      ));
+    if (!nextCredentialField) {
+      return;
+    }
+    setCredentialField(nextCredentialField);
+    setApiKey(nextValue);
+  };
+
   const handleDiscover = async () => {
-    if (!provider || requirements?.supportsDiscovery === false) {
+    if (
+      !provider
+      || !canPersistConnectionIdentity
+      || !supportsDiscovery
+      || !discoveryEnabledByContract
+    ) {
       return;
     }
     setIsDiscovering(true);
     setDiscoverNote(null);
     try {
       const result = await systemConfigApi.discoverLLMChannelModels({
-        name: provider.id,
+        name: suggestedConnectionName,
         providerId: provider.id,
         protocol,
         baseUrl: baseUrl.trim(),
@@ -181,14 +347,14 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleTestConnection = async () => {
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return;
     }
     setIsTesting(true);
     setTestResult(null);
     try {
       const result = await systemConfigApi.testLLMChannel({
-        name: provider.id,
+        name: suggestedConnectionName,
         providerId: provider.id,
         protocol,
         baseUrl: baseUrl.trim(),
@@ -218,6 +384,23 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         if (mode === 'cli') {
           return Boolean(cliBackend);
         }
+        if (hasConnectionSchema) {
+          const stepFields = new Set([
+            'connection_name',
+            'display_name',
+            'provider_id',
+            'protocol',
+            'base_url',
+            'api_key',
+            'api_keys',
+            'enabled',
+          ]);
+          return Boolean(
+            provider
+            && canPersistConnectionIdentity
+            && !missingConnectionFields.some((field) => stepFields.has(field)),
+          );
+        }
         // Official providers use their SDK default / prefilled endpoint, so Base
         // URL is never a blocker here; the API key is required unless the
         // provider is key-exempt (e.g. Ollama).
@@ -226,15 +409,21 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         return Boolean(provider && keyOk && baseUrlOk);
       }
       case 'models':
-        return modelOptions.length > 0;
+        return hasConnectionSchema
+          ? canPersistConnectionIdentity
+            && !missingConnectionFields.includes('models')
+          : modelOptions.length > 0;
       case 'model':
-        return true; // defaults to the first model
+        return !hasConnectionSchema || cloudContractReady;
       default:
         return true;
     }
   })();
 
   const goNext = () => {
+    if (!canAdvance) {
+      return;
+    }
     if (step === 'model' && !reportModel && modelOptions.length > 0) {
       setReportModel(modelOptions[0]);
     }
@@ -251,6 +440,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleSave = async () => {
+    if (mode === 'cloud' && hasConnectionSchema && !cloudContractReady) {
+      return;
+    }
     setSaveError(null);
     const result = await onComplete(buildItems());
     if (!result.success) {
@@ -263,15 +455,15 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (mode === 'cli') {
       return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
     }
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return [];
     }
-    const name = suggestConnectionName(existingChannelNames, provider.id);
+    const name = suggestedConnectionName;
     const up = name.toUpperCase();
     const primaryModel = reportModel || modelOptions[0] || '';
     // Persist Connection-aware identity; execution resolves it to this route.
     const primaryRoute = canonicalModelRoute(protocol, primaryModel);
-    const primaryModelRef = encodeModelRef(name, primaryRoute);
+    const primaryModelRef = primaryRoute ? encodeModelRef(name, primaryRoute) : '';
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
     const items: WizardDraftItem[] = [
@@ -280,20 +472,37 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       { key: 'LLM_CONFIG_MODE', value: 'channels' },
       { key: 'GENERATION_BACKEND', value: 'litellm' },
       { key: 'LLM_CHANNELS', value: mergedChannels },
-      { key: `LLM_${up}_PROVIDER`, value: provider.id },
-      { key: `LLM_${up}_PROTOCOL`, value: protocol },
-      { key: `LLM_${up}_MODELS`, value: modelOptions.join(',') },
-      { key: `LLM_${up}_ENABLED`, value: 'true' },
-      { key: 'LITELLM_MODEL', value: primaryModelRef },
     ];
+    const pushConnectionField = (field: string, suffix: string, value: string) => {
+      if (!hasConnectionSchema || fieldCanWrite(field)) {
+        items.push({ key: `LLM_${up}_${suffix}`, value });
+      }
+    };
+    if (hasConnectionSchema) {
+      pushConnectionField('display_name', 'DISPLAY_NAME', getProviderDisplayLabel(provider, language));
+    }
+    pushConnectionField('provider_id', 'PROVIDER', provider.id);
+    pushConnectionField('protocol', 'PROTOCOL', protocol);
+    pushConnectionField('models', 'MODELS', modelOptions.join(','));
+    pushConnectionField('enabled', 'ENABLED', 'true');
+    if (primaryModelRef) {
+      items.push({ key: 'LITELLM_MODEL', value: primaryModelRef });
+    }
     // Base URL: official providers with a blank template endpoint use the SDK
     // default; only emit an explicit endpoint when one is provided.
-    if (baseUrl.trim()) {
+    if (baseUrl.trim() && (!hasConnectionSchema || fieldCanWrite('base_url'))) {
       items.push({ key: `LLM_${up}_BASE_URL`, value: baseUrl.trim() });
     }
     // API key: omit for key-exempt local runtimes (e.g. Ollama).
     if (apiKey.trim()) {
-      items.push({ key: `LLM_${up}_API_KEY`, value: apiKey.trim() });
+      if (!hasConnectionSchema) {
+        items.push({ key: `LLM_${up}_API_KEY`, value: apiKey.trim() });
+      } else if (fieldCanWrite(credentialField)) {
+        items.push({
+          key: `LLM_${up}_${credentialField === 'api_keys' ? 'API_KEYS' : 'API_KEY'}`,
+          value: apiKey.trim(),
+        });
+      }
     }
     return items;
   };
@@ -317,7 +526,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   type="button"
                   aria-pressed={mode === value}
                   onClick={() => chooseMode(value)}
-                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
+                  className={`rounded-full border px-4 py-3 text-left text-sm transition-colors ${
                     mode === value
                       ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] text-foreground'
                       : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
@@ -339,18 +548,24 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
 
         {step === 'connection' && mode === 'cloud' ? (
           <div className="space-y-3">
-            <div>
-              <label htmlFor="wizard-provider" className="mb-1 block text-sm text-foreground">
-                {text.provider}
-              </label>
-              <Select
-                id="wizard-provider"
-                value={providerId}
-                onChange={applyProvider}
-                options={providers.map((entry) => ({ value: entry.id, label: entry.label }))}
-              />
-            </div>
-            {requirements?.showProtocol ? (
+            {showProviderField ? (
+              <div>
+                <label htmlFor="wizard-provider" className="mb-1 block text-sm text-foreground">
+                  {text.provider}
+                </label>
+                <Select
+                  id="wizard-provider"
+                  value={providerId}
+                  onChange={applyProvider}
+                  options={providers.map((entry) => ({
+                    value: entry.id,
+                    label: getProviderDisplayLabel(entry, language),
+                  }))}
+                  disabled={fieldIsReadOnly('provider_id')}
+                />
+              </div>
+            ) : null}
+            {showProtocolField ? (
               <div>
                 <label htmlFor="wizard-protocol" className="mb-1 block text-sm text-foreground">
                   {text.protocol}
@@ -358,15 +573,20 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Select
                   id="wizard-protocol"
                   value={protocol}
-                  onChange={setProtocol}
+                  onChange={(nextProtocol) => {
+                    if (!fieldIsReadOnly('protocol')) {
+                      setProtocol(nextProtocol);
+                    }
+                  }}
                   options={protocolOptions}
+                  disabled={fieldIsReadOnly('protocol')}
                 />
               </div>
             ) : null}
-            {requirements?.showApiKey ? (
+            {showApiKeyField ? (
               <div>
                 <label htmlFor="wizard-api-key" className="mb-1 block text-sm text-foreground">
-                  {requirements.apiKeyRequired
+                  {apiKeyRequired
                     ? text.apiKey
                     : text.apiKeyOptional}
                 </label>
@@ -374,23 +594,24 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   id="wizard-api-key"
                   type="password"
                   value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  placeholder={requirements.apiKeyRequired
+                  onChange={(event) => handleApiKeyChange(event.target.value)}
+                  placeholder={apiKeyRequired
                     ? text.apiKeyPlaceholder
                     : text.localKeyPlaceholder}
+                  disabled={apiKeyIsReadOnly}
                 />
                 <div className="mt-1">
                   <ProviderQuickLinks
                     provider={provider}
                     context="credentials"
                     language={language}
-                    primaryLabel={requirements.apiKeyRequired ? text.apiKey : text.apiKeyOptional}
-                    secondaryLabel={provider?.label ?? text.provider}
+                    primaryLabel={apiKeyRequired ? text.apiKey : text.apiKeyOptional}
+                    secondaryLabel={provider ? getProviderDisplayLabel(provider, language) : text.provider}
                   />
                 </div>
               </div>
             ) : null}
-            {requirements?.showBaseUrl ? (
+            {showBaseUrlField ? (
               <div>
                 <label htmlFor="wizard-base-url" className="mb-1 block text-sm text-foreground">
                   {text.baseUrl}
@@ -398,11 +619,26 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Input
                   id="wizard-base-url"
                   value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
+                  onChange={(event) => {
+                    if (!fieldIsReadOnly('base_url')) {
+                      setBaseUrl(event.target.value);
+                    }
+                  }}
+                  disabled={fieldIsReadOnly('base_url')}
                 />
               </div>
             ) : null}
           </div>
+        ) : null}
+
+        {step !== 'mode' && mode === 'cloud' && !connectionAuthority.usable ? (
+          <InlineAlert
+            variant="warning"
+            title={text.contractUnsupportedTitle}
+            message={connectionAuthority.reason === 'unknown_condition'
+              ? text.contractUnknownMessage
+              : text.contractUnsupportedMessage}
+          />
         ) : null}
 
         {step === 'connection' && mode === 'cli' ? (
@@ -420,19 +656,23 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           </div>
         ) : null}
 
-        {step === 'models' ? (
+        {step === 'models' && showModelsField ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="block text-sm text-foreground">
                 {text.availableModels}
               </span>
-              {requirements?.supportsDiscovery !== false ? (
+              {supportsDiscovery ? (
                 <Button
                   type="button"
                   variant="settings-secondary"
                   size="xsm"
                   onClick={() => void handleDiscover()}
-                  disabled={isDiscovering || (Boolean(requirements?.apiKeyRequired) && !apiKey.trim())}
+                  disabled={
+                    isDiscovering
+                    || !canPersistConnectionIdentity
+                    || !discoveryEnabledByContract
+                  }
                   isLoading={isDiscovering}
                 >
                   {text.discoverModels}
@@ -444,9 +684,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               context="models"
               language={language}
               primaryLabel={text.availableModels}
-              secondaryLabel={provider?.label ?? text.provider}
+              secondaryLabel={provider ? getProviderDisplayLabel(provider, language) : text.provider}
             />
-            {requirements?.supportsDiscovery === false ? (
+            {!supportsDiscovery ? (
               <p className="text-xs text-muted-text">
                 {text.discoveryUnsupported}
               </p>
@@ -456,6 +696,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 options={discoveredModels}
                 isSelected={(model) => modelOptions.includes(model)}
                 onToggle={(model) => (modelOptions.includes(model) ? removeModelToken(model) : addModelToken(model))}
+                disabled={modelsAreReadOnly}
                 language={language}
               />
             ) : null}
@@ -470,6 +711,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     <button
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
+                      disabled={modelsAreReadOnly}
                       onClick={() => removeModelToken(model)}
                       className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
                     >
@@ -489,6 +731,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 value={modelDraft}
                 aria-label={text.addModel}
                 placeholder={text.addModelPlaceholder}
+                disabled={modelsAreReadOnly}
                 onChange={(event) => setModelDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -511,7 +754,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 variant="settings-secondary"
                 size="xsm"
                 className="shrink-0"
-                disabled={!modelDraft.trim()}
+                disabled={modelsAreReadOnly || !modelDraft.trim()}
                 onClick={() => addModelToken(modelDraft)}
               >
                 {text.add}
@@ -563,7 +806,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-text">{text.modelService}</dt>
-                    <dd className="min-w-0 truncate font-medium text-foreground">{provider?.label ?? '—'}</dd>
+                    <dd className="min-w-0 truncate font-medium text-foreground">
+                      {provider ? getProviderDisplayLabel(provider, language) : '—'}
+                    </dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-muted-text">{text.availableModels}</dt>
@@ -586,7 +831,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   variant="settings-secondary"
                   size="xsm"
                   onClick={() => void handleTestConnection()}
-                  disabled={isTesting}
+                  disabled={isTesting || (hasConnectionSchema && !cloudContractReady)}
                   isLoading={isTesting}
                 >
                   {text.testOptional}
@@ -618,7 +863,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 variant="settings-primary"
                 size="sm"
                 onClick={() => void handleSave()}
-                disabled={isSaving}
+                disabled={isSaving || (mode === 'cloud' && hasConnectionSchema && !cloudContractReady)}
                 isLoading={isSaving}
               >
                 {text.saveApply}

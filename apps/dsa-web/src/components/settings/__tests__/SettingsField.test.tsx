@@ -875,13 +875,18 @@ describe('SettingsField', () => {
     expect(docLink).toHaveAttribute('href', 'https://example.com/full-guide');
     expect(docLink).toHaveClass('min-h-11', 'min-w-11');
 
-    const closeButtons = screen.getAllByRole('button', { name: '关闭配置说明' });
-    expect(closeButtons[0].tabIndex).toBe(-1);
-    const closeButton = closeButtons.find((button) => button.tabIndex !== -1);
-    expect(closeButton).toBeDefined();
+    const closeButton = within(helpDialog).getByRole('button', { name: '关闭配置说明' });
     expect(closeButton).toHaveClass('h-11', 'w-11');
 
-    closeButton?.focus();
+    // jsdom has no layout, so expose the visibly rendered link to the shared
+    // focus trap's offsetParent visibility check.
+    Object.defineProperties(docLink, {
+      offsetParent: { configurable: true, value: helpDialog },
+    });
+    Object.defineProperties(closeButton, {
+      offsetParent: { configurable: true, value: helpDialog },
+    });
+    closeButton.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(docLink).toHaveFocus();
 

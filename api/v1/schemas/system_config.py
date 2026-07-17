@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.v1.schemas.common import ErrorDetailsCompatibilityModel
+
 LLMCapabilityCheck = Literal["json", "tools", "vision", "stream"]
 GenerationBackendSmokeMode = Literal["text", "json"]
 GenerationBackendHealthStatus = Literal["not_tested", "passed", "failed", "skipped"]
@@ -57,6 +59,57 @@ class SystemConfigFieldContract(BaseModel):
     visible_when: Optional[List[SystemConfigCondition]] = None
     enabled_when: Optional[List[SystemConfigCondition]] = None
     requires_connection_test: Optional[bool] = None
+
+
+class LLMConnectionFieldSchema(BaseModel):
+    """Schema for one dynamic per-Connection configuration field."""
+
+    key: str
+    env_suffix: Optional[str] = None
+    data_type: Literal["string", "boolean", "array", "json"]
+    is_sensitive: bool
+    is_required: bool = Field(
+        ...,
+        deprecated=True,
+        description=(
+            "Deprecated unconditional compatibility projection; "
+            "contract.requirement and required_when are authoritative"
+        ),
+    )
+    contract: SystemConfigFieldContract
+
+
+class LLMProviderCatalogEntry(BaseModel):
+    """Authoritative model-service Provider metadata."""
+
+    id: str
+    label: str = Field(
+        ...,
+        deprecated=True,
+        description="Deprecated Chinese compatibility label; use label_zh or label_en",
+    )
+    label_zh: str
+    label_en: str
+    protocol: str
+    default_base_url: str
+    credential_url: Optional[str] = None
+    console_url: Optional[str] = None
+    models_url: Optional[str] = None
+    docs_url: Optional[str] = None
+    capabilities: List[str] = Field(default_factory=list)
+    requires_api_key: bool
+    requires_base_url: bool
+    supports_discovery: bool
+    is_local: bool
+    is_custom: bool
+
+
+class LLMProviderCatalogResponse(BaseModel):
+    """Provider metadata plus the shared dynamic Connection field contract."""
+
+    providers: List[LLMProviderCatalogEntry]
+    connection_fields: List[LLMConnectionFieldSchema]
+    empty_api_key_hosts: List[str] = Field(default_factory=list)
 
 
 class SystemConfigFieldSchema(BaseModel):
@@ -397,21 +450,19 @@ class DiscoverLLMChannelModelsResponse(BaseModel):
     latency_ms: Optional[int] = None
 
 
-class SystemConfigValidationErrorResponse(BaseModel):
+class SystemConfigValidationErrorResponse(ErrorDetailsCompatibilityModel):
     """Stable envelope for failed update validation."""
 
     error: str
     message: str
     params: Dict[str, List[ConfigValidationIssue]] = Field(default_factory=dict)
-    details: Optional[Any] = None
     trace_id: Optional[str] = None
 
 
-class SystemConfigConflictResponse(BaseModel):
+class SystemConfigConflictResponse(ErrorDetailsCompatibilityModel):
     """Stable envelope for optimistic-lock conflicts."""
 
     error: str
     message: str
     params: Dict[str, str] = Field(default_factory=dict)
-    details: Optional[Any] = None
     trace_id: Optional[str] = None

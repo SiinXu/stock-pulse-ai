@@ -38,6 +38,7 @@ from src.utils.data_processing import (
     signal_attribution_has_content,
     signal_attribution_weight_items,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +242,13 @@ def render(
         )
         template = env.get_template(template_name)
         return template.render(**context)
-    except Exception as e:
-        logger.warning("Report render failed for %s: %s", template_name, e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Report rendering failed",
+            exc,
+            error_code="report_rendering_failed",
+            level=logging.WARNING,
+            context={"template": template_name},
+        )
         return None

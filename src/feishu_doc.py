@@ -6,6 +6,7 @@ import lark_oapi as lark
 from lark_oapi.api.docx.v1 import *
 from typing import List, Dict, Any, Optional
 from src.config import get_config
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -92,10 +93,13 @@ class FeishuDocManager:
             logger.info(f"文档内容写入完成")
             return doc_url
 
-        except Exception as e:
-            logger.error(f"飞书文档操作异常: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu document operation failed",
+                exc,
+                error_code="feishu_document_operation_failed",
+            )
             return None
 
     def _markdown_to_sdk_blocks(self, md_text: str) -> List[Block]:

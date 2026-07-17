@@ -16,6 +16,7 @@ from src.report_language import normalize_report_language
 from src.schemas.decision_action import display_action_fields
 from src.schemas.decision_scale import extract_decision_guardrail_reason
 from src.utils.data_processing import parse_json_field
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +59,15 @@ def _record_to_signal(
             "action_label": action_fields["action_label"],
             "trend_prediction": record.trend_prediction,
         }
-    except Exception as e:
-        logger.debug("Skip record for history comparison: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "History comparison record skipped",
+            exc,
+            error_code="history_comparison_record_invalid",
+            level=logging.DEBUG,
+            context={"query_id": getattr(record, "query_id", None) or "unknown"},
+        )
         return None
 
 

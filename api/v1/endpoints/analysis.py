@@ -95,6 +95,7 @@ from src.utils.data_processing import (
     extract_market_structure_detail_field,
     extract_realtime_detail_fields,
 )
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +532,13 @@ def _handle_sync_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"分析失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Stock analysis failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": stock_code},
+        )
         raise api_error(500, "internal_error", f"分析过程发生错误: {str(e)}")
 
 
@@ -785,10 +792,13 @@ def _load_history_run_flow_by_query_id(
         )
     except Exception as e:
         if fail_open:
-            logger.debug(
-                "load history run-flow failed, falling back to task skeleton: query_id=%s err=%s",
-                query_id,
+            log_safe_exception(
+                logger,
+                "History run-flow load failed; falling back to task skeleton",
                 e,
+                error_code="history_run_flow_load_failed",
+                level=logging.DEBUG,
+                context={"query_id": query_id},
             )
             return None
         raise
@@ -838,7 +848,13 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
         if history_snapshot is not None:
             return history_snapshot
     except Exception as e:
-        logger.error(f"查询任务运行流失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Task run-flow query failed",
+            e,
+            error_code="internal_error",
+            context={"task_id": task_id},
+        )
         raise api_error(500, "internal_error", f"查询任务运行流失败: {str(e)}")
 
     raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
@@ -1021,10 +1037,13 @@ def _build_task_analysis_result(task: Any) -> AnalysisResultResponse:
                 payload["report"] = report.model_dump()
                 report_enriched = True
             except Exception as e:
-                logger.debug(
-                    "enrich in-memory task report failed (fail-open): task_id=%s err=%s",
-                    getattr(task, "task_id", None),
+                log_safe_exception(
+                    logger,
+                    "In-memory task report enrichment failed (fail-open)",
                     e,
+                    error_code="task_report_enrichment_failed",
+                    level=logging.DEBUG,
+                    context={"task_id": getattr(task, "task_id", None)},
                 )
 
     if not report_enriched and isinstance(report_data, dict):
@@ -1090,10 +1109,14 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             else:
                 try:
                     result = _build_task_analysis_result(task)
-                except Exception:
-                    logger.warning(
-                        "解析任务结果失败，回退为空返回: task_id=%s",
-                        task.task_id,
+                except Exception as exc:
+                    log_safe_exception(
+                        logger,
+                        "Task result parsing failed; returning an empty result",
+                        exc,
+                        error_code="task_result_parse_failed",
+                        level=logging.WARNING,
+                        context={"task_id": task.task_id},
                     )
 
         return TaskStatus(
@@ -1282,7 +1305,13 @@ def get_analysis_status(task_id: str) -> TaskStatus:
             )
 
     except Exception as e:
-        logger.error(f"查询任务状态失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Task status query failed",
+            e,
+            error_code="internal_error",
+            context={"task_id": task_id},
+        )
         raise api_error(500, "internal_error", f"查询任务状态失败: {str(e)}")
 
     # 3. 任务不存在
@@ -1318,11 +1347,13 @@ def _load_sync_fundamental_sources(
         )
         return context_snapshot, fallback_fundamental, raw_result_snapshot
     except Exception as e:
-        logger.debug(
-            "load sync fundamental sources failed (fail-open): query_id=%s stock_code=%s err=%s",
-            query_id,
-            stock_code,
+        log_safe_exception(
+            logger,
+            "Synchronous fundamental source load failed (fail-open)",
             e,
+            error_code="fundamental_source_load_failed",
+            level=logging.DEBUG,
+            context={"query_id": query_id, "stock_code": stock_code},
         )
         return None, None, None
 

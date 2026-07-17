@@ -21,10 +21,10 @@ import re
 import time
 import contextvars
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional
 
-from src.agent.llm_adapter import LLMToolAdapter
+from src.agent.llm_adapter import LLMToolAdapter, ToolCall
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -474,10 +474,16 @@ def run_agent_loop(
 
         if response.tool_calls:
             # ---- tool execution branch ----
+            tool_calls = [
+                tool_call
+                if type(tool_call.name) is str
+                else replace(tool_call, name="")
+                for tool_call in response.tool_calls
+            ]
             logger.info(
                 "Agent requesting %d tool call(s): %s",
-                len(response.tool_calls),
-                [tc.name for tc in response.tool_calls],
+                len(tool_calls),
+                [tc.name for tc in tool_calls],
             )
 
             # Append assistant message (with tool_calls) to history
@@ -494,7 +500,7 @@ def run_agent_loop(
                         **({"provider_specific_fields": tc.provider_specific_fields} if tc.provider_specific_fields else {}),
                         **({"thought_signature": tc.thought_signature} if tc.thought_signature is not None else {}),
                     }
-                    for tc in response.tool_calls
+                    for tc in tool_calls
                 ],
             }
             if response.reasoning_content is not None:
@@ -511,7 +517,7 @@ def run_agent_loop(
                     tool_call_timeout_seconds if tool_call_timeout_seconds and tool_call_timeout_seconds > 0 else remaining_timeout,
                 )
             tool_results = _execute_tools(
-                response.tool_calls,
+                tool_calls,
                 tool_registry,
                 step + 1,
                 progress_callback,
@@ -522,7 +528,7 @@ def run_agent_loop(
             )
 
             # Append tool results preserving original call order
-            tc_order = {tc.id: i for i, tc in enumerate(response.tool_calls)}
+            tc_order = {tc.id: i for i, tc in enumerate(tool_calls)}
             tool_results.sort(key=lambda x: tc_order.get(x["tc"].id, 0))
             for tr in tool_results:
                 messages.append(
@@ -594,7 +600,7 @@ def run_agent_loop(
 # ============================================================
 
 def _execute_tools(
-    tool_calls,
+    tool_calls: List[ToolCall],
     tool_registry: ToolRegistry,
     step: int,
     progress_callback: Optional[Callable],

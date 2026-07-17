@@ -29,10 +29,16 @@ from src.llm.backend_registry import (
     resolve_generation_backend_id,
     resolve_generation_fallback_backend_id,
 )
-from src.llm.generation_backend import GenerationError
+from src.llm.generation_backend import GenerationError, GenerationErrorCode
 from src.schemas.market_light import MARKET_LIGHT_REGIONS, MarketLightSnapshot
 from src.services.run_diagnostics import record_llm_run, record_llm_run_started
 from src.services.intelligence_service import IntelligenceService
+from src.utils.sanitize import (
+    exception_chain_redaction_values,
+    has_matching_exception_snapshot,
+    log_safe_exception,
+    sanitize_diagnostic_text,
+)
 from data_provider.base import DataFetcherManager
 
 logger = logging.getLogger(__name__)
@@ -153,6 +159,82 @@ class MarketAnalyzer:
 
     def _log_context(self) -> str:
         return f"component=market_review region={self.region}"
+
+    def _generation_log_redaction_values(self, error: Any = None) -> set[str]:
+        """Return exact generation secrets without depending on analyzer internals."""
+        analyzer = getattr(self, "analyzer", None)
+        if analyzer is None:
+            return exception_chain_redaction_values(error)
+        static_method = getattr_static(
+            analyzer,
+            "get_generation_log_redaction_values",
+            None,
+        )
+        if static_method is None:
+            return exception_chain_redaction_values(error)
+        method = getattr(analyzer, "get_generation_log_redaction_values", None)
+        if not callable(method):
+            return exception_chain_redaction_values(error)
+        try:
+            model = str(getattr(self.config, "litellm_model", "") or "")
+            values = method(model, fallback_error=error)
+            static_values = values if isinstance(values, set) else set(values or ())
+        except Exception:
+            return exception_chain_redaction_values(error)
+        if has_matching_exception_snapshot(error, static_values):
+            return static_values
+        exception_values = exception_chain_redaction_values(error)
+        exception_values.update(static_values)
+        return exception_values
+
+    def _sanitize_generation_diagnostic(
+        self,
+        error: Any,
+        *,
+        redaction_values: Optional[set[str]] = None,
+    ) -> str:
+        """Sanitize an analyzer failure before persistence or user diagnostics."""
+        if redaction_values is None:
+            redaction_values = self._generation_log_redaction_values(error)
+        if isinstance(error, GenerationError):
+            error_code = (
+                error.error_code.value
+                if isinstance(error.error_code, GenerationErrorCode)
+                else GenerationErrorCode.UNKNOWN_BACKEND_ERROR.value
+            )
+            return f"GenerationError: {error_code}"
+        if has_matching_exception_snapshot(error, redaction_values):
+            return sanitize_diagnostic_text(
+                error,
+                max_length=500,
+                redaction_values=redaction_values,
+            )
+        analyzer = getattr(self, "analyzer", None)
+        static_method = (
+            getattr_static(analyzer, "sanitize_generation_diagnostic", None)
+            if analyzer is not None
+            else None
+        )
+        method = (
+            getattr(analyzer, "sanitize_generation_diagnostic", None)
+            if static_method is not None
+            else None
+        )
+        if callable(method):
+            try:
+                model = str(getattr(self.config, "litellm_model", "") or "")
+                return sanitize_diagnostic_text(
+                    method(error, model=model),
+                    max_length=500,
+                    redaction_values=redaction_values,
+                )
+            except Exception:
+                pass
+        return sanitize_diagnostic_text(
+            error,
+            max_length=500,
+            redaction_values=redaction_values,
+        )
 
     def _get_output_language(self) -> str:
         """Return the truthful report language (zh/en/ko) for payload and directives."""
@@ -487,7 +569,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 )
 
         except Exception as e:
-            logger.error("[大盘] %s action=get_main_indices status=failed error=%s", self._log_context(), e)
+            log_safe_exception(
+                logger,
+                "Market review index fetch failed",
+                e,
+                error_code="market_review_index_fetch_failed",
+                level=logging.ERROR,
+                context={"region": self.region},
+            )
 
         return indices
 
@@ -521,7 +610,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 logger.warning("[大盘] %s action=get_market_stats status=empty", self._log_context())
 
         except Exception as e:
-            logger.error("[大盘] %s action=get_market_stats status=failed error=%s", self._log_context(), e)
+            log_safe_exception(
+                logger,
+                "Market review statistics fetch failed",
+                e,
+                error_code="market_review_statistics_fetch_failed",
+                level=logging.ERROR,
+                context={"region": self.region},
+            )
 
     def _get_sector_rankings(self, overview: MarketOverview):
         """获取板块涨跌榜"""
@@ -544,7 +640,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 logger.warning("[大盘] %s action=get_sector_rankings status=empty", self._log_context())
 
         except Exception as e:
-            logger.error("[大盘] %s action=get_sector_rankings status=failed error=%s", self._log_context(), e)
+            log_safe_exception(
+                logger,
+                "Market review sector ranking fetch failed",
+                e,
+                error_code="market_review_sector_ranking_fetch_failed",
+                level=logging.ERROR,
+                context={"region": self.region},
+            )
 
     def _get_concept_rankings(self, overview: MarketOverview):
         """获取概念/题材涨跌榜（fail-open）。"""
@@ -567,7 +670,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 logger.warning("[大盘] %s action=get_concept_rankings status=empty", self._log_context())
 
         except Exception as e:
-            logger.warning("[大盘] %s action=get_concept_rankings status=failed error=%s", self._log_context(), e)
+            log_safe_exception(
+                logger,
+                "Market review concept ranking fetch failed",
+                e,
+                error_code="market_review_concept_ranking_fetch_failed",
+                level=logging.WARNING,
+                context={"region": self.region},
+            )
     
     # def _get_north_flow(self, overview: MarketOverview):
     #     """获取北向资金流入"""
@@ -644,7 +754,14 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
             
         except Exception as e:
-            logger.error("[大盘] %s action=search_market_news status=failed error=%s", self._log_context(), e)
+            log_safe_exception(
+                logger,
+                "Market review news search failed",
+                e,
+                error_code="market_review_news_search_failed",
+                level=logging.ERROR,
+                context={"region": self.region},
+            )
         
         return all_news
     
@@ -661,11 +778,19 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         """
         backend_error = self._get_analyzer_generation_backend_config_error()
         if backend_error is not None:
-            logger.error(
-                "[大盘] %s action=generate_review status=failed error_type=%s error=%s",
-                self._log_context(),
-                type(backend_error).__name__,
+            redaction_values = self._generation_log_redaction_values(backend_error)
+            log_safe_exception(
+                logger,
+                "Market review generation backend unavailable",
                 backend_error,
+                error_code="market_review_generation_backend_unavailable",
+                level=logging.ERROR,
+                context={"region": self.region},
+                redaction_values=redaction_values,
+            )
+            safe_backend_error = self._sanitize_generation_diagnostic(
+                backend_error,
+                redaction_values=redaction_values,
             )
             record_llm_run(
                 success=False,
@@ -673,7 +798,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 model=getattr(self.config, "litellm_model", None),
                 call_type="market_review",
                 error_type=type(backend_error).__name__,
-                error_message=backend_error,
+                error_message=safe_backend_error,
             )
             raise backend_error
 
@@ -698,6 +823,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             )
             review = self.analyzer.generate_text(prompt, max_tokens=8192, temperature=0.7)
         except Exception as exc:
+            safe_error = self._sanitize_generation_diagnostic(exc)
             record_llm_run(
                 success=False,
                 provider="litellm",
@@ -705,7 +831,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 call_type="market_review",
                 duration_ms=int((time.perf_counter() - llm_started_at) * 1000),
                 error_type=type(exc).__name__,
-                error_message=exc,
+                error_message=safe_error,
             )
             raise
 
@@ -1841,7 +1967,14 @@ Market conditions can change quickly. The data above is for reference only and d
                     "url": "" if url.startswith("no-url:intel:") else url,
                 })
         except Exception as exc:
-            logger.debug("[大盘] %s action=load_local_intelligence status=failed error=%s", self._log_context(), exc)
+            log_safe_exception(
+                logger,
+                "Market review local intelligence load failed",
+                exc,
+                error_code="market_review_local_intelligence_load_failed",
+                level=logging.DEBUG,
+                context={"region": self.region},
+            )
         merged_news = []
         merged_local_index = 0
         merged_search_index = 0

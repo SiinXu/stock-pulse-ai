@@ -27,7 +27,7 @@ from src.storage import (
     DecisionSignalOutcomeRecord,
     DecisionSignalRecord,
 )
-from src.utils.sanitize import sanitize_decision_signal_text
+from src.utils.sanitize import log_safe_exception, sanitize_decision_signal_text
 
 
 logger = logging.getLogger(__name__)
@@ -535,7 +535,13 @@ class DecisionSignalOutcomeService:
         try:
             return json.loads(value)
         except json.JSONDecodeError as exc:
-            logger.warning("Invalid decision signal sidecar source JSON: %s", exc)
+            log_safe_exception(
+                logger,
+                "Decision signal sidecar source JSON is invalid",
+                exc,
+                error_code="decision_signal_sidecar_json_invalid",
+                level=logging.WARNING,
+            )
             return None
 
     @staticmethod

@@ -121,9 +121,11 @@ def test_sina_realtime_remote_disconnect_logs_category(caplog, monkeypatch, aksh
     assert breaker.failures
     source_key, message = breaker.failures[0]
     assert source_key == "akshare_sina"
-    assert "category=remote_disconnect" in message
+    assert message == "akshare_sina_realtime_quote_failed"
     assert f"endpoint={SINA_REALTIME_ENDPOINT}" in caplog.text
-    assert "新浪 实时行情接口失败:" in caplog.text
+    assert "Akshare Sina realtime quote failed" in caplog.text
+    assert "error_code=akshare_sina_realtime_quote_failed" in caplog.text
+    assert "category=remote_disconnect" in caplog.text
 
 
 def test_tencent_realtime_http_status_logs_endpoint(caplog, monkeypatch, akshare_fetcher):

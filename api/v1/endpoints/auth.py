@@ -34,6 +34,7 @@ from src.auth import (
 )
 from src.config import Config, setup_env
 from src.core.config_manager import ConfigManager
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -113,10 +114,13 @@ def _apply_auth_enabled(enabled: bool, request: Request | None = None) -> bool:
             )
             manager_applied = True
         except Exception as exc:
-            logger.warning(
-                "Failed to apply auth toggle via shared SystemConfigService, falling back: %s",
+            log_safe_exception(
+                logger,
+                "Auth toggle via shared SystemConfigService failed; falling back",
                 exc,
-                exc_info=True,
+                error_code="auth_toggle_service_failed",
+                level=logging.WARNING,
+                context={"enabled": enabled},
             )
             manager_applied = False
 
@@ -130,7 +134,13 @@ def _apply_auth_enabled(enabled: bool, request: Request | None = None) -> bool:
             )
             manager_applied = True
         except Exception as exc:
-            logger.error("Failed to apply auth toggle via ConfigManager: %s", exc, exc_info=True)
+            log_safe_exception(
+                logger,
+                "Auth toggle via ConfigManager failed",
+                exc,
+                error_code="auth_toggle_config_manager_failed",
+                context={"enabled": enabled},
+            )
             manager_applied = False
 
     if not manager_applied:

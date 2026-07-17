@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
-import type { AvailableModelEntry, LlmProviderCatalogEntry } from '../../types/systemConfig';
+import type {
+  AvailableModelEntry,
+  LlmConnectionFieldSchema,
+  LlmProviderCatalogEntry,
+} from '../../types/systemConfig';
 import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
@@ -19,13 +23,24 @@ import {
 } from '../../locales/settingsModelAccess';
 import {
   canonicalModelRoute,
+  buildConnectionContractValues,
+  type ConnectionCredentialField,
+  type ConnectionSchemaAuthority,
   connectionAllowsEmptyApiKey,
+  evaluateConnectionSchemaAuthority,
+  getProviderDisplayLabel,
+  inspectConnectionSchemaDefinition,
+  isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
   resolveConnectionRequirements,
   suggestConnectionName,
+  validateConnectionContractValues,
 } from './llmConnectionContract';
 import {
   CHANNEL_FIELD_KEY_PATTERN,
   CHANNEL_FIELD_SUFFIXES,
+  CONNECTION_SCHEMA_KEY_BY_SUFFIX,
+  SUPPORTED_CONNECTION_SCHEMA_KEYS,
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
   type ModelAccessFieldFocusRequest,
@@ -68,6 +83,8 @@ import { ModelMultiSelect } from './ModelMultiSelect';
 const FALSEY_VALUES = new Set(['0', 'false', 'no', 'off']);
 const HERMES_CHANNEL_NAME = 'hermes';
 const HERMES_DEFAULT_MODEL = 'hermes-agent';
+const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = '连接 Schema 不完整或不可用';
+const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE = '连接字段契约包含不支持的条件';
 
 const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
   channel.name.trim().toLowerCase() === HERMES_CHANNEL_NAME
@@ -100,13 +117,23 @@ interface ChannelConfig {
   name: string;
   /** User-facing label; changing it never changes the Connection identity. */
   displayName: string;
+  /** The card may show a fallback label without making it a Schema value. */
+  displayNameValuePresent: boolean;
   providerId: string;
+  /** False when the persisted Provider identity is absent. */
+  providerIdExplicit: boolean;
   protocol: ChannelProtocol;
+  /** Distinguishes a persisted protocol from the legacy UI fallback. */
+  protocolValuePresent: boolean;
   baseUrl: string;
   apiKey: string;
+  /** Schema field that owns apiKey, independent of how many keys it contains. */
+  credentialField: ConnectionCredentialField;
   models: string;
   extraHeaders: string;
   enabled: boolean;
+  /** A persisted false is a value; an absent boolean is not. */
+  enabledValuePresent: boolean;
 }
 
 interface ChannelTestState {
@@ -146,6 +173,8 @@ interface LLMChannelEditorProps {
   items: Array<{ key: string; value: string; rawValueExists?: boolean }>;
   /** Authoritative provider catalog (business metadata) from the backend. */
   providers: LlmProviderCatalogEntry[];
+  /** Dynamic field behavior from the same backend Catalog response. */
+  connectionFields?: LlmConnectionFieldSchema[];
   /** Hosts the backend exempts from API-key requirements (local endpoints). */
   emptyApiKeyHosts?: string[];
   /** Authoritative routes, used for backend-equivalent historical Agent normalization. */
@@ -165,6 +194,8 @@ interface LLMChannelEditorProps {
   /** Opens the owning connection dialog and focuses a dynamic backend field. */
   focusFieldRequest?: ModelAccessFieldFocusRequest | null;
   disabled?: boolean;
+  /** True until the Catalog response establishes schema-present vs legacy. */
+  catalogLoading?: boolean;
   /**
    * The provider catalog failed to load. Existing connections stay editable/
    * read-only, but adding a NEW connection is blocked so we never create a
@@ -209,6 +240,16 @@ function isChannelSecretFieldKey(key: string): boolean {
   const match = CHANNEL_FIELD_KEY_PATTERN.exec(key.toUpperCase());
   return match?.[2] === 'API_KEY' || match?.[2] === 'API_KEYS';
 }
+
+const CONNECTION_FIELD_BY_DRAFT_KEY: Partial<Record<keyof ChannelConfig, string>> = {
+  name: 'connection_name',
+  displayName: 'display_name',
+  protocol: 'protocol',
+  baseUrl: 'base_url',
+  models: 'models',
+  extraHeaders: 'extra_headers',
+  enabled: 'enabled',
+};
 
 function resolveInitialChannelApiKeySource(
   channelName: string,
@@ -269,6 +310,26 @@ function resolveInitialChannelApiKeyValue(
     return apiKeyValue;
   }
   return itemValueByKey.get(apiKeysKey) || itemValueByKey.get(apiKeyKey) || '';
+}
+
+function resolveInitialChannelCredentialField(
+  channelName: string,
+  itemValueByKey: Map<string, string>,
+): ConnectionCredentialField {
+  const upperName = channelName.trim().toUpperCase();
+  const apiKeysValue = (itemValueByKey.get(`LLM_${upperName}_API_KEYS`) || '').trim();
+  const apiKeyValue = (itemValueByKey.get(`LLM_${upperName}_API_KEY`) || '').trim();
+  if (channelName.trim().toLowerCase() === HERMES_CHANNEL_NAME) {
+    return 'api_key';
+  }
+  if (apiKeysValue || (!apiKeyValue && itemValueByKey.has(`LLM_${upperName}_API_KEYS`))) {
+    return 'api_keys';
+  }
+  // Preserve the legacy editor's comma-to-API_KEYS behavior when an old
+  // single-key field happens to contain a list.
+  return apiKeyValue.split(',').filter((segment) => segment.trim()).length > 1
+    ? 'api_keys'
+    : 'api_key';
 }
 
 function buildChangedItemKeys(
@@ -336,22 +397,37 @@ function buildChangedItemKeys(
     }
 
     const prefix = `LLM_${currentName}`;
-    if (current.displayName !== previous.displayName) {
+    if (
+      current.displayName !== previous.displayName
+      || current.displayNameValuePresent !== previous.displayNameValuePresent
+    ) {
       changedKeys.add(`${prefix}_DISPLAY_NAME`);
     }
-    if (current.protocol !== previous.protocol) {
+    if (
+      current.protocol !== previous.protocol
+      || current.protocolValuePresent !== previous.protocolValuePresent
+    ) {
       changedKeys.add(`${prefix}_PROTOCOL`);
     }
-    if (current.providerId !== previous.providerId) {
+    if (
+      current.providerId !== previous.providerId
+      || current.providerIdExplicit !== previous.providerIdExplicit
+    ) {
       changedKeys.add(`${prefix}_PROVIDER`);
     }
     if (current.baseUrl !== previous.baseUrl) {
       changedKeys.add(`${prefix}_BASE_URL`);
     }
-    if (current.enabled !== previous.enabled) {
+    if (
+      current.enabled !== previous.enabled
+      || current.enabledValuePresent !== previous.enabledValuePresent
+    ) {
       changedKeys.add(`${prefix}_ENABLED`);
     }
-    if (current.apiKey !== previous.apiKey) {
+    if (
+      current.apiKey !== previous.apiKey
+      || current.credentialField !== previous.credentialField
+    ) {
       changedKeys.add(`${prefix}_API_KEY`);
       changedKeys.add(`${prefix}_API_KEYS`);
     }
@@ -376,6 +452,132 @@ function inferLegacyProviderId(
   const lower = name.trim().toLowerCase();
   return providers.find((provider) => provider.id !== 'custom' && provider.id.toLowerCase() === lower)?.id
     ?? 'custom';
+}
+
+function resolveConnectionContractProvider(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+): LlmProviderCatalogEntry | undefined {
+  const provider = findCatalogProvider(providers, channel.providerId);
+  if (channel.providerIdExplicit || !provider?.isCustom) {
+    return provider;
+  }
+  return providers.find((entry) => (
+    entry.isLocal
+    && normalizeProtocol(entry.protocol) === normalizeProtocol(channel.protocol)
+  )) ?? provider;
+}
+
+function buildChannelContractValues(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  options: { baseUrlVisible?: boolean; extraHeadersVisible?: boolean } = {},
+): Record<string, string> {
+  const values = buildConnectionContractValues({
+    connectionName: channel.name,
+    displayName: channel.displayName,
+    providerId: channel.providerId,
+    provider: resolveConnectionContractProvider(channel, providers),
+    protocol: channel.protocol,
+    baseUrl: channel.baseUrl,
+    apiKey: channel.apiKey,
+    credentialField: channel.credentialField,
+    models: channel.models,
+    extraHeaders: channel.extraHeaders,
+    enabled: channel.enabled,
+    emptyApiKeyHosts,
+    ...options,
+  });
+  if (!channel.displayNameValuePresent) {
+    values.display_name = '';
+  }
+  if (!channel.providerIdExplicit) {
+    values.provider_id = '';
+  }
+  if (!channel.protocolValuePresent) {
+    values.protocol = '';
+  }
+  if (!channel.enabledValuePresent) {
+    values.enabled = '';
+  }
+  return values;
+}
+
+function evaluateChannelSchemaAuthority(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
+  options: { baseUrlVisible?: boolean; extraHeadersVisible?: boolean } = {},
+): ConnectionSchemaAuthority {
+  return evaluateConnectionSchemaAuthority(
+    buildChannelContractValues(channel, providers, emptyApiKeyHosts, options),
+    connectionFields,
+  );
+}
+
+function channelSchemaAllowsKnownOperations(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
+): boolean {
+  return evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  ).usable;
+}
+
+function channelIdentityCanWrite(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
+): boolean {
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return authority.usable
+    && isConnectionSchemaFieldWritable(authority, 'connection_name')
+    && isConnectionSchemaFieldWritable(authority, 'provider_id');
+}
+
+function channelConnectionNameCanWrite(
+  channel: ChannelConfig,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
+): boolean {
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return authority.usable
+    && isConnectionSchemaFieldWritable(authority, 'connection_name');
+}
+
+function channelFieldCanWrite(
+  channel: ChannelConfig,
+  key: string,
+  providers: LlmProviderCatalogEntry[],
+  emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
+): boolean {
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return isConnectionSchemaFieldWritable(authority, key);
 }
 
 function countChannelsForProvider(
@@ -486,10 +688,13 @@ interface ConnectionCardProps {
   testState?: ChannelTestState;
   issues: string[];
   onTest: () => void;
+  canTest: boolean;
   onEdit: () => void;
   onManageModels: () => void;
   onToggleEnabled: () => void;
+  canToggleEnabled: boolean;
   onRemove: () => void;
+  canRemove: boolean;
 }
 
 // Compact connection card: provider, connection name, status, model chips and
@@ -505,16 +710,20 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
   testState,
   issues,
   onTest,
+  canTest,
   onEdit,
   onManageModels,
   onToggleEnabled,
+  canToggleEnabled,
   onRemove,
+  canRemove,
 }) => {
   const { language } = useUiLanguage();
   const text = MODEL_ACCESS_TEXT[language];
   const provider = findCatalogProvider(providers, channel.providerId);
-  const displayLabel = provider?.label
-    ?? (channel.providerId && channel.providerId !== 'custom' ? channel.providerId : text.customProvider);
+  const displayLabel = provider
+    ? getProviderDisplayLabel(provider, language)
+    : (channel.providerId && channel.providerId !== 'custom' ? channel.providerId : text.customProvider);
   const selectedModels = splitModels(channel.models);
   const channelRouteModels = resolveChannelRouteModels(channel);
   const channelModelRefs = new Set(channelRouteModels.map((route) => (
@@ -528,6 +737,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     ),
   );
   const isComplete = issues.length === 0;
+  const actionName = channel.displayName.trim() || channel.name;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -585,7 +795,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           {selectedModels.length > 0 ? (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
+              aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 flex min-h-11 min-w-11 max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -606,7 +816,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           ) : (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
+              aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -625,7 +835,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             variant="settings-secondary"
             size="sm"
             className="px-3 text-xs shadow-none"
-            disabled={busy || testState?.status === 'loading'}
+            disabled={busy || !canTest || testState?.status === 'loading'}
             onClick={onTest}
           >
             {testState?.status === 'loading' ? text.testing : text.test}
@@ -647,7 +857,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               size="sm"
               className="h-8 px-2 text-xs text-muted-text"
               disabled={busy}
-              aria-label={formatUiText(text.moreActions, { name: channel.displayName })}
+              aria-label={formatUiText(text.moreActions, { name: actionName })}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((previous) => !previous)}
@@ -662,8 +872,12 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={!canToggleEnabled}
                   className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
                   onClick={() => {
+                    if (!canToggleEnabled) {
+                      return;
+                    }
                     setMenuOpen(false);
                     onToggleEnabled();
                   }}
@@ -673,8 +887,12 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={!canRemove}
                   className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
                   onClick={() => {
+                    if (!canRemove) {
+                      return;
+                    }
                     setMenuOpen(false);
                     onRemove();
                   }}
@@ -717,10 +935,12 @@ interface ConnectionModalProps {
   availableModelRoutes: string[];
   availableModels: AvailableModelEntry[];
   providers: LlmProviderCatalogEntry[];
+  connectionFields?: LlmConnectionFieldSchema[];
   emptyApiKeyHosts: string[];
   maskToken: string;
   hermesSecretPersisted: boolean;
   catalogUnavailable: boolean;
+  disabled: boolean;
   taskModelRefs: TaskModelReference[];
   onReloadCatalog?: () => void;
   onManageModels?: () => void;
@@ -741,10 +961,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   availableModelRoutes,
   availableModels,
   providers,
+  connectionFields,
   emptyApiKeyHosts,
   maskToken,
   hermesSecretPersisted,
   catalogUnavailable,
+  disabled,
   taskModelRefs,
   onReloadCatalog,
   onManageModels,
@@ -754,6 +976,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 }) => {
   const { language } = useUiLanguage();
   const text = MODEL_ACCESS_TEXT[language];
+  const hasConnectionSchema = connectionFields !== undefined;
+  const connectionSchemaFields = connectionFields ?? [];
   const [draft, setDraft] = useState<ChannelConfig | null>(initialChannel);
   const [providerId, setProviderId] = useState<string | undefined>(() => (
     initialChannel?.providerId
@@ -785,7 +1009,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     if (matchedProvider.defaultBaseUrl) {
       return initialChannel.baseUrl.trim() !== '' && initialChannel.baseUrl !== matchedProvider.defaultBaseUrl;
     }
-    return matchedProvider.requiresBaseUrl ? true : initialChannel.baseUrl.trim() !== '';
+    return !hasConnectionSchema && matchedProvider.requiresBaseUrl
+      ? true
+      : initialChannel.baseUrl.trim() !== '';
   });
   const [showManualModelInput, setShowManualModelInput] = useState(false);
   const [modelDraft, setModelDraft] = useState('');
@@ -810,28 +1036,81 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       .filter((name) => name && name !== excluded);
   }, [channels, initialChannel]);
 
-  const providerOptions = useMemo<SearchableSelectOption[]>(() => {
-    return providers.map((entry) => {
+  const buildProviderDraft = (entry: LlmProviderCatalogEntry): ChannelConfig => {
+    const candidate: ChannelConfig = {
+      id: `modal:${entry.id}`,
+      name: suggestConnectionName(existingNames, entry.id),
+      displayName: getProviderDisplayLabel(entry, language),
+      displayNameValuePresent: true,
+      providerId: entry.id,
+      providerIdExplicit: true,
+      protocol: normalizeProtocol(entry.protocol),
+      protocolValuePresent: true,
+      baseUrl: entry.defaultBaseUrl ?? '',
+      apiKey: '',
+      credentialField: 'api_key',
+      models: '',
+      extraHeaders: '',
+      enabled: true,
+      enabledValuePresent: true,
+    };
+    if (hasConnectionSchema) {
+      const authority = evaluateChannelSchemaAuthority(
+        candidate,
+        providers,
+        emptyApiKeyHosts,
+        connectionSchemaFields,
+      );
+      candidate.credentialField = (['api_key', 'api_keys'] as ConnectionCredentialField[])
+        .find((key) => isConnectionSchemaFieldWritable(authority, key)) ?? 'api_key';
+    }
+    return candidate;
+  };
+  const providerCanBeSelected = (entry: LlmProviderCatalogEntry) => {
+    if (disabled) {
+      return false;
+    }
+    if (!hasConnectionSchema) {
+      return true;
+    }
+    const candidate = buildProviderDraft(entry);
+    if (mode === 'add') {
+      return channelIdentityCanWrite(
+        candidate,
+        providers,
+        emptyApiKeyHosts,
+        connectionSchemaFields,
+      );
+    }
+    const authority = evaluateChannelSchemaAuthority(
+      candidate,
+      providers,
+      emptyApiKeyHosts,
+      connectionSchemaFields,
+    );
+    return isConnectionSchemaFieldWritable(authority, 'provider_id');
+  };
+  const selectableProviders = providers.filter(providerCanBeSelected);
+  const providerOptions: SearchableSelectOption[] = selectableProviders.map((entry) => {
       const count = countChannelsForProvider(channels, entry.id);
       return {
         value: entry.id,
-        label: entry.label,
+        label: getProviderDisplayLabel(entry, language),
         sublabel: describeProviderOption(entry, count, language),
         keywords: [entry.protocol, ...entry.capabilities],
       };
     });
-  }, [providers, channels, language]);
   const protocolOptions = useMemo(
     () => buildProtocolOptions(providers, draft?.protocol),
     [draft?.protocol, providers],
   );
-  const officialProtocolOptions = useMemo(
-    () => buildProtocolOptions(provider ? [provider] : [], draft?.protocol),
-    [draft?.protocol, provider],
+  const officialProtocolOptions = buildProtocolOptions(
+    provider ? [provider] : [],
+    draft?.protocol,
   );
 
   const chooseProvider = (id: string) => {
-    if (!id) {
+    if (!id || !selectableProviders.some((entry) => entry.id === id)) {
       return;
     }
     setProviderId(id);
@@ -842,7 +1121,15 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const changeDraftProvider = (id: string) => {
-    if (!draft) {
+    if (
+      disabled
+      ||
+      !draft
+      || (
+        hasConnectionSchema
+        && !isConnectionSchemaFieldWritable(connectionAuthority, 'provider_id')
+      )
+    ) {
       return;
     }
     const chosen = findCatalogProvider(providers, id);
@@ -853,17 +1140,59 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const shouldUseChosenDefault = !draft.baseUrl.trim()
       || Boolean(previousProvider?.defaultBaseUrl && draft.baseUrl === previousProvider.defaultBaseUrl);
     const nextBaseUrl = shouldUseChosenDefault ? (chosen.defaultBaseUrl ?? '') : draft.baseUrl;
-    setProviderId(id);
-    setDraft({
+    const proposedDraft: ChannelConfig = {
       ...draft,
       providerId: id,
+      providerIdExplicit: true,
       protocol: normalizeProtocol(chosen.protocol),
+      protocolValuePresent: true,
       baseUrl: nextBaseUrl,
-    });
-    setCustomBaseUrl(Boolean(
-      chosen.isCustom
-      || (nextBaseUrl && (!chosen.defaultBaseUrl || nextBaseUrl !== chosen.defaultBaseUrl)),
-    ));
+    };
+    const proposedAuthority = hasConnectionSchema
+      ? evaluateChannelSchemaAuthority(
+        proposedDraft,
+        providers,
+        emptyApiKeyHosts,
+        connectionSchemaFields,
+        {
+          baseUrlVisible: Boolean(
+            chosen.isCustom
+            || (nextBaseUrl && (!chosen.defaultBaseUrl || nextBaseUrl !== chosen.defaultBaseUrl)),
+          ),
+        },
+      )
+      : evaluateConnectionSchemaAuthority({}, undefined);
+    const proposedStates = proposedAuthority.states;
+    if (
+      hasConnectionSchema
+      && !isConnectionSchemaFieldWritable(proposedAuthority, 'provider_id')
+    ) {
+      return;
+    }
+    const nextDraft: ChannelConfig = {
+      ...draft,
+      providerId: id,
+      providerIdExplicit: true,
+    };
+    const canAdoptProviderDefault = (key: string) => !hasConnectionSchema
+      || proposedStates[key] === undefined
+      || proposedStates[key].visible === false
+      || isConnectionSchemaFieldWritable(proposedAuthority, key);
+    if (canAdoptProviderDefault('protocol')) {
+      nextDraft.protocol = proposedDraft.protocol;
+      nextDraft.protocolValuePresent = true;
+    }
+    if (canAdoptProviderDefault('base_url')) {
+      nextDraft.baseUrl = proposedDraft.baseUrl;
+    }
+    setProviderId(id);
+    setDraft(nextDraft);
+    if (canAdoptProviderDefault('base_url')) {
+      setCustomBaseUrl(Boolean(
+        chosen.isCustom
+        || (nextBaseUrl && (!chosen.defaultBaseUrl || nextBaseUrl !== chosen.defaultBaseUrl)),
+      ));
+    }
     testNonceRef.current += 1;
     discoveryNonceRef.current += 1;
     setTest(null);
@@ -871,25 +1200,14 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const advanceProvider = () => {
-    if (!providerId) {
+    if (disabled || !providerId) {
       return;
     }
     const chosen = findCatalogProvider(providers, providerId);
-    if (!chosen) {
+    if (!chosen || !providerCanBeSelected(chosen)) {
       return;
     }
-    setDraft({
-      id: `modal:${providerId}`,
-      name: suggestConnectionName(existingNames, providerId),
-      displayName: chosen.label,
-      providerId,
-      protocol: normalizeProtocol(chosen.protocol),
-      baseUrl: chosen.defaultBaseUrl ?? '',
-      apiKey: '',
-      models: '',
-      extraHeaders: '',
-      enabled: true,
-    });
+    setDraft(buildProviderDraft(chosen));
     setCustomBaseUrl(chosen.isCustom === true);
     testNonceRef.current += 1;
     discoveryNonceRef.current += 1;
@@ -898,7 +1216,17 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const updateDraft = (field: keyof ChannelConfig, value: string | boolean) => {
-    setDraft((previous) => (previous ? { ...previous, [field]: value } : previous));
+    const schemaField = CONNECTION_FIELD_BY_DRAFT_KEY[field];
+    if (schemaField && fieldIsReadOnly(schemaField)) {
+      return;
+    }
+    setDraft((previous) => previous ? {
+      ...previous,
+      [field]: value,
+      ...(field === 'displayName' ? { displayNameValuePresent: true } : {}),
+      ...(field === 'protocol' ? { protocolValuePresent: true } : {}),
+      ...(field === 'enabled' ? { enabledValuePresent: true } : {}),
+    } : previous);
     if (field === 'protocol' || field === 'baseUrl' || field === 'apiKey' || field === 'name') {
       // Bump nonces so in-flight test/discovery responses for the
       // previous connection parameters are discarded instead of re-filling state.
@@ -969,7 +1297,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     return options;
   }, [availableModels, candidateChannels, draft, pendingModelRemoval]);
   const removeModel = (model: string) => {
-    if (!draft) {
+    if (!draft || fieldIsReadOnly('models')) {
       return;
     }
     updateDraft('models', selectedModels.filter((existing) => existing !== model).join(','));
@@ -977,7 +1305,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setReplacementRoute('');
   };
   const requestRemoveModel = (model: string) => {
-    if (!draft) {
+    if (!draft || fieldIsReadOnly('models')) {
       return;
     }
     const route = isHermesChannel(draft)
@@ -996,7 +1324,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setReplacementRoute('');
   };
   const addModelToken = (raw: string) => {
-    if (!draft) {
+    if (!draft || fieldIsReadOnly('models')) {
       return;
     }
     const tokens = raw.split(/[,\s]+/).map((token) => token.trim()).filter(Boolean);
@@ -1016,7 +1344,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const handleTest = async () => {
-    if (!draft) {
+    if (!draft || disabled || !connectionContractKnown) {
       return;
     }
     if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
@@ -1037,7 +1365,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const handleDiscover = async () => {
-    if (!draft) {
+    if (!draft || !discoveryEnabledByContract || modelsAreReadOnly) {
       return;
     }
     if (hasRuntimeOnlyMaskedHermesSecret(draft, maskToken, hermesSecretPersisted)) {
@@ -1060,29 +1388,158 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const nameIssues = draft ? getChannelNameIssues(draft) : [];
-  const displayNameIssues = draft && !draft.displayName.trim() ? ['连接名称必填'] : [];
+  const legacyDisplayNameIssues = draft
+    ? getChannelDisplayNameIssues(draft, connectionFields)
+    : [];
   const nameConflict = draft && existingNames.includes(draft.name.trim().toLowerCase())
     ? ['连接名称已存在，请更换']
     : [];
   const completenessIssues = draft
-    ? getChannelCompletenessIssues(draft, providers, emptyApiKeyHosts, catalogUnavailable)
+    ? getChannelCompletenessIssues(
+      draft,
+      providers,
+      emptyApiKeyHosts,
+      connectionFields,
+      catalogUnavailable,
+    )
     : [];
-  const blockingIssues = [...nameIssues, ...displayNameIssues, ...nameConflict, ...(draft?.enabled ? completenessIssues : [])];
-  const nameError = [...displayNameIssues, ...nameIssues, ...nameConflict][0];
+  const contractDiagnostics = completenessIssues.filter(
+    (issue) => issue === CONNECTION_SCHEMA_UNAVAILABLE_ISSUE
+      || issue === CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE,
+  );
+  const contractBlockingIssues = hasConnectionSchema
+    ? completenessIssues
+    : draft?.enabled
+      ? completenessIssues
+      : contractDiagnostics;
+  const blockingIssues = [
+    ...nameIssues,
+    ...legacyDisplayNameIssues,
+    ...nameConflict,
+    ...contractBlockingIssues,
+  ];
+  const nameError = [
+    ...legacyDisplayNameIssues,
+    ...completenessIssues.filter((issue) => issue === '连接名称必填'),
+    ...nameIssues,
+    ...nameConflict,
+  ][0];
   const apiKeyError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少 API 密钥') : undefined;
   const baseUrlError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少服务地址') : undefined;
   const modelsError = draft?.enabled ? completenessIssues.find((issue) => issue === '至少配置一个模型') : undefined;
 
-  const providerRequirements = draft && provider ? resolveConnectionRequirements({
+  const providerRequirements = !hasConnectionSchema && draft && provider ? resolveConnectionRequirements({
     provider,
     protocol: draft.protocol,
     baseUrl: draft.baseUrl,
     emptyApiKeyHosts,
   }) : null;
+  const connectionContractValues = draft ? buildChannelContractValues(
+    draft,
+    providers,
+    emptyApiKeyHosts,
+    {
+      baseUrlVisible: isCustomService || customBaseUrl || focusField === 'BASE_URL',
+      extraHeadersVisible: Boolean(draft.extraHeaders.trim() || focusField === 'EXTRA_HEADERS'),
+    },
+  ) : null;
+  const connectionAuthority = evaluateConnectionSchemaAuthority(
+    connectionContractValues ?? {},
+    connectionFields,
+  );
+  const connectionFieldStates = connectionAuthority.states;
+  const connectionContractKnown = connectionAuthority.usable;
+  const fieldIsVisible = (key: string) => !hasConnectionSchema
+    || connectionFieldStates[key]?.visible === true;
+  const fieldIsReadOnly = (key: string) => disabled || !connectionAuthority.usable || (hasConnectionSchema
+    && !isConnectionSchemaFieldWritable(connectionAuthority, key));
   const allowsEmptyKey = draft ? channelAllowsEmptyApiKey(draft, emptyApiKeyHosts) : false;
-  const showApiKeyField = Boolean(draft) && (providerRequirements?.showApiKey ?? true);
+  const visibleApiKeyStates = hasConnectionSchema
+    ? (['api_key', 'api_keys'] as ConnectionCredentialField[])
+      .map((key) => ({ key, state: connectionFieldStates[key] }))
+      .filter(({ state }) => state?.visible)
+    : [];
+  const writableCredentialFields = visibleApiKeyStates
+    .filter(({ key }) => isConnectionSchemaFieldWritable(connectionAuthority, key))
+    .map(({ key }) => key);
+  const showApiKeyField = Boolean(draft) && (hasConnectionSchema
+    ? visibleApiKeyStates.length > 0
+    : providerRequirements?.showApiKey ?? true);
+  const apiKeyRequired = hasConnectionSchema
+    ? visibleApiKeyStates.some(({ state }) => state?.required)
+    : !allowsEmptyKey;
+  const apiKeyLabel = hasConnectionSchema && !apiKeyRequired
+    ? text.apiKeyOptional
+    : text.apiKey;
+  const apiKeyIsReadOnly = hasConnectionSchema
+    && (!connectionAuthority.usable || writableCredentialFields.length === 0);
+  const showProtocolField = hasConnectionSchema
+    ? connectionFieldStates.protocol?.visible === true
+    : isCustomService || focusField === 'PROTOCOL';
+  const showBaseUrlField = hasConnectionSchema
+    ? connectionFieldStates.base_url?.visible === true
+    : isCustomService || customBaseUrl || focusField === 'BASE_URL';
+  const showExtraHeadersField = hasConnectionSchema
+    ? fieldIsVisible('extra_headers')
+    : focusField === 'EXTRA_HEADERS' || Boolean(draft?.extraHeaders.trim());
+  const showModelsField = fieldIsVisible('models');
+  const modelsAreReadOnly = fieldIsReadOnly('models');
+  const baseUrlIsReadOnly = fieldIsReadOnly('base_url');
+  const showEnabledField = fieldIsVisible('enabled');
   const supportsDiscovery = provider?.supportsDiscovery === true;
-  const showBaseUrlSummary = !isCustomService && !customBaseUrl;
+  const discoveryEnabledByContract = hasConnectionSchema
+    ? Boolean(connectionContractValues && isConnectionModelDiscoveryEnabled(
+      connectionContractValues,
+      connectionSchemaFields,
+    ))
+    : true;
+  const handleApiKeyChange = (nextValue: string) => {
+    if (!draft) {
+      return;
+    }
+    const preferred: ConnectionCredentialField = nextValue
+      .split(',')
+      .filter((segment) => segment.trim()).length > 1
+      ? 'api_keys'
+      : 'api_key';
+    const nextCredentialField = hasConnectionSchema
+      ? [preferred, draft.credentialField, ...writableCredentialFields]
+        .find((key, index, candidates) => (
+          candidates.indexOf(key) === index
+          && writableCredentialFields.includes(key)
+        ))
+      : preferred;
+    if (!nextCredentialField) {
+      return;
+    }
+    setDraft({
+      ...draft,
+      apiKey: nextValue,
+      credentialField: nextCredentialField,
+    });
+    testNonceRef.current += 1;
+    discoveryNonceRef.current += 1;
+    setTest(null);
+    setDiscovery(null);
+  };
+  const revealedBaseUrlAuthority = draft && hasConnectionSchema
+    ? evaluateChannelSchemaAuthority(
+      draft,
+      providers,
+      emptyApiKeyHosts,
+      connectionSchemaFields,
+      {
+        baseUrlVisible: true,
+        extraHeadersVisible: Boolean(draft.extraHeaders.trim() || focusField === 'EXTRA_HEADERS'),
+      },
+    )
+    : evaluateConnectionSchemaAuthority({}, connectionFields);
+  const canRevealBaseUrl = !disabled && (!hasConnectionSchema
+    || isConnectionSchemaFieldWritable(revealedBaseUrlAuthority, 'base_url'));
+  const showBaseUrlSummary = !isCustomService
+    && !customBaseUrl
+    && !showBaseUrlField
+    && canRevealBaseUrl;
   const discoveredModels = discovery?.models || [];
   const providerSelectId = 'connection-modal-provider';
   const nameInputId = 'connection-modal-name';
@@ -1139,7 +1596,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 </button>
               ) : null}
             </div>
-          ) : (
+          ) : providerOptions.length > 0 ? (
             <SearchableSelect
               id={providerSelectId}
               ariaLabel={text.chooseProvider}
@@ -1148,15 +1605,20 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               options={providerOptions}
               placeholder={text.providerPlaceholder}
               searchPlaceholder={text.providerSearch}
+              disabled={disabled}
             />
-          )}
+          ) : null}
           <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"
               variant="settings-primary"
               size="sm"
-              disabled={!providerId || !findCatalogProvider(providers, providerId)}
+              disabled={
+                !providerId
+                || disabled
+                || !selectableProviders.some((entry) => entry.id === providerId)
+              }
               onClick={advanceProvider}
             >
               {text.next}
@@ -1165,7 +1627,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
         </div>
       ) : (
         <div className="space-y-4" data-connection-id={draft.name}>
-          {mode === 'edit' ? (
+          {mode === 'edit' && fieldIsVisible('provider_id') ? (
             <div>
               <label htmlFor={providerSelectId} className="mb-2 block text-sm font-medium text-foreground">
                 {text.provider}
@@ -1178,25 +1640,32 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 options={providerOptions}
                 placeholder={text.providerPlaceholder}
                 searchPlaceholder={text.providerSearch}
-                disabled={catalogUnavailable || providers.length === 0}
+                disabled={
+                  catalogUnavailable
+                  || providers.length === 0
+                  || fieldIsReadOnly('provider_id')
+                }
               />
               {catalogUnavailable ? <p className="mt-1 text-xs text-danger">{text.catalogFailed}</p> : null}
             </div>
           ) : null}
-          <div>
-            <label htmlFor={nameInputId} className="mb-2 block text-sm font-medium text-foreground">
-              {text.connectionName}
-            </label>
-            <Input
-              id={nameInputId}
-              value={draft.displayName}
-              onChange={(e) => updateDraft('displayName', e.target.value)}
-              placeholder={text.connectionName}
-              error={nameError}
-            />
-          </div>
+          {fieldIsVisible('display_name') ? (
+            <div>
+              <label htmlFor={nameInputId} className="mb-2 block text-sm font-medium text-foreground">
+                {text.connectionName}
+              </label>
+              <Input
+                id={nameInputId}
+                value={draft.displayName}
+                onChange={(e) => updateDraft('displayName', e.target.value)}
+                placeholder={text.connectionName}
+                error={nameError}
+                disabled={fieldIsReadOnly('display_name')}
+              />
+            </div>
+          ) : null}
 
-          {isCustomService || focusField === 'PROTOCOL' ? (
+          {showProtocolField ? (
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor={protocolInputId} className="mb-2 block text-sm font-medium text-foreground">
@@ -1208,6 +1677,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   onChange={(v) => updateDraft('protocol', normalizeProtocol(v))}
                   options={isCustomService ? protocolOptions : officialProtocolOptions}
                   placeholder={text.chooseProtocol}
+                  disabled={fieldIsReadOnly('protocol')}
                 />
                 {!isCustomService && provider ? (
                   <p className="mt-1 text-xs text-muted-text">
@@ -1215,18 +1685,51 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   </p>
                 ) : null}
               </div>
-              <div>
-                <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
-                  {text.baseUrl}
-                </label>
-                <Input
-                  id={baseUrlInputId}
-                  value={draft.baseUrl}
-                  onChange={(e) => updateDraft('baseUrl', e.target.value)}
-                  placeholder="https://api.example.com/v1"
-                  error={baseUrlError}
-                />
-              </div>
+              {showBaseUrlField ? (
+                <div>
+                  <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
+                    {text.baseUrl}
+                  </label>
+                  <Input
+                    id={baseUrlInputId}
+                    value={draft.baseUrl}
+                    onChange={(e) => updateDraft('baseUrl', e.target.value)}
+                    placeholder="https://api.example.com/v1"
+                    error={baseUrlError}
+                    disabled={fieldIsReadOnly('base_url')}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : showBaseUrlField ? (
+            <div>
+              <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
+                {text.baseUrl}
+              </label>
+              <Input
+                id={baseUrlInputId}
+                value={draft.baseUrl}
+                onChange={(e) => updateDraft('baseUrl', e.target.value)}
+                placeholder={provider?.defaultBaseUrl || 'https://api.example.com/v1'}
+                error={baseUrlError}
+                disabled={fieldIsReadOnly('base_url')}
+              />
+              {provider?.defaultBaseUrl ? (
+                <button
+                  type="button"
+                  className="settings-accent-text mt-1 inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
+                  disabled={baseUrlIsReadOnly}
+                  onClick={() => {
+                    if (baseUrlIsReadOnly) {
+                      return;
+                    }
+                    updateDraft('baseUrl', provider.defaultBaseUrl);
+                    setCustomBaseUrl(false);
+                  }}
+                >
+                  {text.restoreOfficialUrl}
+                </button>
+              ) : null}
             </div>
           ) : showBaseUrlSummary ? (
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-secondary-text">
@@ -1238,42 +1741,22 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <button
                 type="button"
                 className="settings-accent-text inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center underline-offset-2 hover:underline"
-                onClick={() => setCustomBaseUrl(true)}
+                disabled={!canRevealBaseUrl}
+                onClick={() => {
+                  if (canRevealBaseUrl) {
+                    setCustomBaseUrl(true);
+                  }
+                }}
               >
                 {text.customUrl}
               </button>
             </div>
-          ) : (
-            <div>
-              <label htmlFor={baseUrlInputId} className="mb-2 block text-sm font-medium text-foreground">
-                {text.baseUrl}
-              </label>
-              <Input
-                id={baseUrlInputId}
-                value={draft.baseUrl}
-                onChange={(e) => updateDraft('baseUrl', e.target.value)}
-                placeholder={provider?.defaultBaseUrl || 'https://api.example.com/v1'}
-                error={baseUrlError}
-              />
-              {provider?.defaultBaseUrl ? (
-                <button
-                  type="button"
-                  className="settings-accent-text mt-1 inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-                  onClick={() => {
-                    updateDraft('baseUrl', provider.defaultBaseUrl);
-                    setCustomBaseUrl(false);
-                  }}
-                >
-                  {text.restoreOfficialUrl}
-                </button>
-              ) : null}
-            </div>
-          )}
+          ) : null}
 
           {showApiKeyField ? (
             <div>
               <label htmlFor={apiKeyInputId} className="mb-2 block text-sm font-medium text-foreground">
-                {text.apiKey}
+                {apiKeyLabel}
               </label>
               <Input
                 id={apiKeyInputId}
@@ -1283,9 +1766,10 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 passwordVisible={keyVisible}
                 onPasswordVisibleChange={setKeyVisible}
                 value={draft.apiKey}
-                onChange={(e) => updateDraft('apiKey', e.target.value)}
-                placeholder={allowsEmptyKey ? text.localKeyOptional : text.multipleKeys}
+                onChange={(e) => handleApiKeyChange(e.target.value)}
+                placeholder={apiKeyRequired ? text.multipleKeys : text.localKeyOptional}
                 error={apiKeyError}
+                disabled={apiKeyIsReadOnly}
               />
               <div className="mt-1">
                 <ProviderQuickLinks
@@ -1293,13 +1777,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   context="credentials"
                   language={language}
                   primaryLabel={text.getKey.replace(/[:：]\s*$/, '')}
-                  secondaryLabel={provider?.label ?? text.provider}
+                  secondaryLabel={provider ? getProviderDisplayLabel(provider, language) : text.provider}
                 />
               </div>
             </div>
           ) : null}
 
-          {focusField === 'EXTRA_HEADERS' || draft.extraHeaders.trim() ? (
+          {showExtraHeadersField ? (
             <div>
               <label htmlFor={extraHeadersInputId} className="mb-2 block text-sm font-medium text-foreground">
                 {text.extraHeaders}
@@ -1309,10 +1793,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 value={draft.extraHeaders}
                 onChange={(event) => updateDraft('extraHeaders', event.target.value)}
                 placeholder={text.extraHeadersPlaceholder}
+                disabled={fieldIsReadOnly('extra_headers')}
               />
             </div>
           ) : null}
 
+          {showModelsField ? (
           <div className="space-y-2">
             <label htmlFor={modelsInputId} className="block text-sm font-medium text-foreground">
               {text.availableModels}
@@ -1322,7 +1808,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               context="models"
               language={language}
               primaryLabel={text.availableModels}
-              secondaryLabel={provider?.label ?? text.viewDetails}
+              secondaryLabel={provider ? getProviderDisplayLabel(provider, language) : text.viewDetails}
             />
             {selectedModels.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
@@ -1335,6 +1821,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     <button
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
+                      disabled={modelsAreReadOnly}
                       onClick={() => requestRemoveModel(model)}
                       className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
                     >
@@ -1365,13 +1852,17 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                           ariaLabel={text.replacementModel}
                           placeholder={text.chooseReplacement}
                           searchPlaceholder={text.searchReplacement}
+                          disabled={modelsAreReadOnly}
                         />
                         <Button
                           type="button"
                           variant="settings-primary"
                           size="sm"
-                          disabled={!replacementRoute}
+                          disabled={modelsAreReadOnly || !replacementRoute}
                           onClick={() => {
+                            if (modelsAreReadOnly) {
+                              return;
+                            }
                             const replacements = Array.from(new Set(
                               pendingModelRemoval.references.map((reference) => reference.route),
                             )).map((fromRoute) => ({
@@ -1414,7 +1905,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     variant="settings-secondary"
                     size="sm"
                     className="px-3 text-xs shadow-none"
-                    disabled={discovery?.status === 'loading'}
+                    disabled={
+                      discovery?.status === 'loading'
+                      || !discoveryEnabledByContract
+                      || fieldIsReadOnly('models')
+                    }
                     onClick={() => void handleDiscover()}
                   >
                     {discovery?.status === 'loading' ? text.gettingModels : text.getModels}
@@ -1441,7 +1936,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 isSelected={(model) => selectedModels.some((selectedModel) => (
                   areModelsEquivalent(selectedModel, model, draft.protocol)
                 ))}
-                onToggle={(model) => updateDraft('models', toggleModelSelection(draft.models, model, draft.protocol))}
+                onToggle={(model) => {
+                  if (modelsAreReadOnly) {
+                    return;
+                  }
+                  updateDraft('models', toggleModelSelection(draft.models, model, draft.protocol));
+                }}
+                disabled={modelsAreReadOnly}
               />
             ) : null}
             {showManualModelInput || !supportsDiscovery ? (
@@ -1466,13 +1967,14 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   aria-label={text.addModelAria}
                   placeholder={text.addModelPlaceholder}
                   error={modelsError}
+                  disabled={modelsAreReadOnly}
                 />
                 <Button
                   type="button"
                   variant="settings-secondary"
                   size="sm"
                   className="shrink-0 px-3 text-xs shadow-none"
-                  disabled={!modelDraft.trim()}
+                  disabled={!modelDraft.trim() || modelsAreReadOnly}
                   onClick={() => addModelToken(modelDraft)}
                 >
                   {text.add}
@@ -1482,12 +1984,18 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <button
                 type="button"
                 className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
-                onClick={() => setShowManualModelInput(true)}
+                disabled={modelsAreReadOnly}
+                onClick={() => {
+                  if (!modelsAreReadOnly) {
+                    setShowManualModelInput(true);
+                  }
+                }}
               >
                 {text.manualModel}
               </button>
             )}
           </div>
+          ) : null}
 
           <div className="flex items-start gap-2">
             <Button
@@ -1495,7 +2003,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               variant="settings-secondary"
               size="sm"
               className="shrink-0 px-3 text-xs shadow-none"
-              disabled={test?.status === 'loading'}
+                disabled={disabled || !connectionContractKnown || test?.status === 'loading'}
               onClick={() => void handleTest()}
             >
               {test?.status === 'loading' ? text.testing : text.testConnection}
@@ -1513,6 +2021,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             ) : null}
           </div>
 
+          {showEnabledField ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-2.5">
             <div>
               <p className="text-sm text-foreground">{text.enableThis}</p>
@@ -1524,7 +2033,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               role="switch"
               aria-checked={draft.enabled}
               aria-label={text.enableAria}
-              onClick={() => updateDraft('enabled', !draft.enabled)}
+              disabled={fieldIsReadOnly('enabled')}
+              onClick={() => {
+                if (!fieldIsReadOnly('enabled')) {
+                  updateDraft('enabled', !draft.enabled);
+                }
+              }}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
             >
               <span
@@ -1542,6 +2056,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               </span>
             </button>
           </div>
+          ) : null}
 
           {blockingIssues.length > 0 ? (
             <InlineAlert
@@ -1582,8 +2097,31 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               type="button"
               variant="settings-primary"
               size="sm"
-              disabled={blockingIssues.length > 0}
+              disabled={disabled || !connectionContractKnown || (
+                mode === 'add'
+                && !channelIdentityCanWrite(
+                  draft,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              ) || blockingIssues.length > 0}
               onClick={() => {
+                if (
+                  disabled
+                  || !connectionContractKnown
+                  || (
+                    mode === 'add'
+                    && !channelIdentityCanWrite(
+                      draft,
+                      providers,
+                      emptyApiKeyHosts,
+                      connectionFields,
+                    )
+                  )
+                ) {
+                  return;
+                }
                 const finalChannels = candidateChannels.map((channel) => (
                   channel.id === draft.id ? draft : channel
                 ));
@@ -1952,6 +2490,7 @@ function parseChannelsFromItems(
   items: Array<{ key: string; value: string }>,
   itemSourceByKey: Map<string, boolean> = new Map(),
   providers: LlmProviderCatalogEntry[] = [],
+  connectionFields?: LlmConnectionFieldSchema[],
 ): ChannelConfig[] {
   const itemMap = new Map(items.map((item) => [item.key.toUpperCase(), item.value]));
   const channelNames = (itemMap.get('LLM_CHANNELS') || '')
@@ -1961,22 +2500,41 @@ function parseChannelsFromItems(
 
   return channelNames.map((name, index) => {
     const upperName = name.toUpperCase();
+    const legacyMode = connectionFields === undefined;
+    const displayNameKey = `LLM_${upperName}_DISPLAY_NAME`;
+    const providerKey = `LLM_${upperName}_PROVIDER`;
+    const protocolKey = `LLM_${upperName}_PROTOCOL`;
+    const enabledKey = `LLM_${upperName}_ENABLED`;
+    const fieldHasSource = (key: string) => (
+      itemMap.has(key) && itemSourceByKey.get(key) !== false
+    );
     const baseUrl = itemMap.get(`LLM_${upperName}_BASE_URL`) || '';
     const rawModels = itemMap.get(`LLM_${upperName}_MODELS`) || '';
     const models = splitModels(rawModels);
-    const explicitProviderId = (itemMap.get(`LLM_${upperName}_PROVIDER`) || '').trim().toLowerCase();
+    const explicitProviderId = fieldHasSource(providerKey)
+      ? (itemMap.get(providerKey) || '').trim().toLowerCase()
+      : '';
+    const rawProtocol = fieldHasSource(protocolKey) ? (itemMap.get(protocolKey) || '') : '';
+    const rawEnabled = fieldHasSource(enabledKey) ? itemMap.get(enabledKey) : undefined;
 
     return {
       id: `parsed:${index}:${upperName}`,
       name: name.toLowerCase(),
-      displayName: itemMap.get(`LLM_${upperName}_DISPLAY_NAME`) || name,
+      displayName: fieldHasSource(displayNameKey)
+        ? (itemMap.get(displayNameKey) ?? '')
+        : name,
+      displayNameValuePresent: fieldHasSource(displayNameKey) || legacyMode,
       providerId: explicitProviderId || inferLegacyProviderId(providers, name),
-      protocol: inferProtocol(itemMap.get(`LLM_${upperName}_PROTOCOL`) || '', baseUrl, models),
+      providerIdExplicit: Boolean(explicitProviderId),
+      protocol: inferProtocol(rawProtocol, baseUrl, models),
+      protocolValuePresent: Boolean(rawProtocol.trim()) || legacyMode,
       baseUrl,
       apiKey: resolveInitialChannelApiKeyValue(name, itemMap, itemSourceByKey),
+      credentialField: resolveInitialChannelCredentialField(name, itemMap),
       models: rawModels,
       extraHeaders: itemMap.get(`LLM_${upperName}_EXTRA_HEADERS`) || '',
-      enabled: parseEnabled(itemMap.get(`LLM_${upperName}_ENABLED`)),
+      enabled: parseEnabled(rawEnabled),
+      enabledValuePresent: Boolean(rawEnabled?.trim()) || legacyMode,
     };
   });
 }
@@ -2001,8 +2559,7 @@ function channelsToUpdateItems(
 
   for (const channel of channels) {
     const prefix = `LLM_${channel.name.toUpperCase()}`;
-    const isMultiKey = channel.apiKey.includes(',');
-    updates.push({ key: `${prefix}_DISPLAY_NAME`, value: channel.displayName.trim() || channel.name });
+    updates.push({ key: `${prefix}_DISPLAY_NAME`, value: channel.displayName.trim() });
     updates.push({ key: `${prefix}_PROVIDER`, value: channel.providerId });
     updates.push({ key: `${prefix}_PROTOCOL`, value: channel.protocol });
     updates.push({ key: `${prefix}_BASE_URL`, value: channel.baseUrl });
@@ -2011,8 +2568,10 @@ function channelsToUpdateItems(
       updates.push({ key: `${prefix}_API_KEY`, value: channel.apiKey });
       updates.push({ key: `${prefix}_API_KEYS`, value: '' });
     } else {
-      updates.push({ key: `${prefix}_API_KEY${isMultiKey ? 'S' : ''}`, value: channel.apiKey });
-      updates.push({ key: `${prefix}_API_KEY${isMultiKey ? '' : 'S'}`, value: '' });
+      const credentialSuffix = channel.credentialField === 'api_keys' ? 'API_KEYS' : 'API_KEY';
+      const siblingSuffix = channel.credentialField === 'api_keys' ? 'API_KEY' : 'API_KEYS';
+      updates.push({ key: `${prefix}_${credentialSuffix}`, value: channel.apiKey });
+      updates.push({ key: `${prefix}_${siblingSuffix}`, value: '' });
     }
     updates.push({ key: `${prefix}_MODELS`, value: channel.models });
     updates.push({ key: `${prefix}_EXTRA_HEADERS`, value: channel.extraHeaders });
@@ -2057,8 +2616,15 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
   return [];
 }
 
-function getChannelDisplayNameIssues(channel: ChannelConfig): string[] {
-  return channel.displayName.trim() ? [] : ['连接名称必填'];
+function getChannelDisplayNameIssues(
+  channel: ChannelConfig,
+  connectionFields?: LlmConnectionFieldSchema[],
+): string[] {
+  // Older Catalog payloads have no dynamic schema, so preserve their display
+  // name requirement. Once a schema is present, its contract is authoritative.
+  return connectionFields !== undefined || channel.displayName.trim()
+    ? []
+    : ['连接名称必填'];
 }
 
 // Mirrors the backend `channel_allows_empty_api_key` contract: ollama never
@@ -2076,8 +2642,42 @@ function getChannelCompletenessIssues(
   channel: ChannelConfig,
   providers: LlmProviderCatalogEntry[],
   emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
 ): string[] {
+  if (connectionFields !== undefined) {
+    const connectionSchemaFields = connectionFields ?? [];
+    const values = buildChannelContractValues(channel, providers, emptyApiKeyHosts);
+    const authority = evaluateConnectionSchemaAuthority(values, connectionSchemaFields);
+    if (!authority.usable) {
+      return [authority.reason === 'unknown_condition'
+        ? CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE
+        : CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
+    }
+    const issueByField: Record<string, string> = {
+      connection_name: '连接名称必填',
+      display_name: '连接名称必填',
+      provider_id: '缺少模型服务商',
+      protocol: '缺少连接协议',
+      base_url: '缺少服务地址',
+      api_key: '缺少 API 密钥',
+      api_keys: '缺少 API 密钥',
+      models: '至少配置一个模型',
+      extra_headers: '附加请求头必填',
+      enabled: '缺少启用状态',
+    };
+    const missingFields = validateConnectionContractValues(values, connectionSchemaFields);
+    if (missingFields.some((field) => !SUPPORTED_CONNECTION_SCHEMA_KEYS.has(field))) {
+      return [CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
+    }
+    const issues = missingFields.map(
+      (field) => issueByField[field] ?? CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
+    );
+    return Array.from(new Set(issues));
+  }
+
+  // Rolling-upgrade compatibility for an older Catalog payload. Requirement
+  // flags still come from that payload; no Provider ID table is reconstructed.
   const issues: string[] = [];
   if (!channelAllowsEmptyApiKey(channel, emptyApiKeyHosts) && !channel.apiKey.trim()) {
     issues.push('缺少 API 密钥');
@@ -2105,15 +2705,31 @@ function getChannelSaveIssues(
   channel: ChannelConfig,
   providers: LlmProviderCatalogEntry[],
   emptyApiKeyHosts: string[],
+  connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
 ): string[] {
   const nameIssues = getChannelNameIssues(channel);
-  const displayNameIssues = getChannelDisplayNameIssues(channel);
+  const displayNameIssues = getChannelDisplayNameIssues(channel, connectionFields);
   if (nameIssues.length > 0 || displayNameIssues.length > 0) {
     return [...nameIssues, ...displayNameIssues];
   }
+  if (connectionFields !== undefined) {
+    return getChannelCompletenessIssues(
+      channel,
+      providers,
+      emptyApiKeyHosts,
+      connectionFields,
+      catalogUnavailable,
+    );
+  }
   return channel.enabled
-    ? getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable)
+    ? getChannelCompletenessIssues(
+      channel,
+      providers,
+      emptyApiKeyHosts,
+      connectionFields,
+      catalogUnavailable,
+    )
     : [];
 }
 
@@ -2126,6 +2742,9 @@ function buildFilteredChannelUpdateItems({
   runtimeConfig,
   initialRuntimeConfig,
   managesRuntimeConfig,
+  providers,
+  emptyApiKeyHosts,
+  connectionFields,
 }: {
   channels: ChannelConfig[];
   initialChannels: ChannelConfig[];
@@ -2135,16 +2754,67 @@ function buildFilteredChannelUpdateItems({
   runtimeConfig: RuntimeConfig;
   initialRuntimeConfig: RuntimeConfig;
   managesRuntimeConfig: boolean;
+  providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts: string[];
+  connectionFields?: LlmConnectionFieldSchema[];
 }): Array<{ key: string; value: string }> {
   const changedKeys = new Set<string>([
     ...buildChangedItemKeys(channels, initialChannels, initialItemSourceByKey, savedItemMap),
     ...runtimeConfigChangedKeys(runtimeConfig, initialRuntimeConfig),
   ]);
+  const currentChannelsByName = new Map(
+    channels.map((channel) => [channel.name.trim().toLowerCase(), channel]),
+  );
+  const initialChannelsByName = new Map(
+    initialChannels.map((channel) => [channel.name.trim().toLowerCase(), channel]),
+  );
+  const schemaAllowsChannelField = (channel: ChannelConfig, fieldKey: string) => {
+    const authority = evaluateChannelSchemaAuthority(
+      channel,
+      providers,
+      emptyApiKeyHosts,
+      connectionFields,
+    );
+    return isConnectionSchemaFieldWritable(authority, fieldKey);
+  };
+  const schemaAllowsItem = (itemKey: string) => {
+    if (connectionFields === undefined) {
+      return true;
+    }
+    if (itemKey === 'LLM_CHANNELS') {
+      if (!changedKeys.has(itemKey)) {
+        return false;
+      }
+      return [...currentChannelsByName.values(), ...initialChannelsByName.values()]
+        .every((channel) => schemaAllowsChannelField(channel, 'connection_name'));
+    }
+    const parsed = parseModelAccessFieldKey(itemKey);
+    if (!parsed) {
+      return true;
+    }
+    const channel = currentChannelsByName.get(parsed.connectionName)
+      ?? initialChannelsByName.get(parsed.connectionName);
+    return Boolean(
+      channel
+      && schemaAllowsChannelField(channel, CONNECTION_SCHEMA_KEY_BY_SUFFIX[parsed.suffix]),
+    );
+  };
+
   return channelsToUpdateItems(channels, initialNames, runtimeConfig, managesRuntimeConfig).filter((item) => {
     const itemKey = item.key.toUpperCase();
+    if (!schemaAllowsItem(itemKey)) {
+      return false;
+    }
     const initialItemSource = initialItemSourceByKey.get(itemKey);
     if (isChannelSecretFieldKey(itemKey)) {
       return changedKeys.has(itemKey);
+    }
+    if (
+      connectionFields !== undefined
+      && initialItemSource === undefined
+      && !changedKeys.has(itemKey)
+    ) {
+      return false;
     }
     if (initialItemSource === false) {
       return changedKeys.has(itemKey);
@@ -2163,6 +2833,9 @@ function buildChannelDraftItems({
   runtimeConfig,
   initialRuntimeConfig,
   managesRuntimeConfig,
+  providers,
+  emptyApiKeyHosts,
+  connectionFields,
 }: {
   hasChanges: boolean;
   channels: ChannelConfig[];
@@ -2173,6 +2846,9 @@ function buildChannelDraftItems({
   runtimeConfig: RuntimeConfig;
   initialRuntimeConfig: RuntimeConfig;
   managesRuntimeConfig: boolean;
+  providers: LlmProviderCatalogEntry[];
+  emptyApiKeyHosts: string[];
+  connectionFields?: LlmConnectionFieldSchema[];
 }): Array<{ key: string; value: string }> {
   if (!hasChanges || !channelNamesAreSafe(channels)) {
     return [];
@@ -2186,6 +2862,9 @@ function buildChannelDraftItems({
     runtimeConfig,
     initialRuntimeConfig,
     managesRuntimeConfig,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
   });
 }
 
@@ -2193,13 +2872,18 @@ function channelsAreEqual(left: ChannelConfig, right: ChannelConfig): boolean {
   return (
     left.name === right.name
     && left.displayName === right.displayName
+    && left.displayNameValuePresent === right.displayNameValuePresent
     && left.providerId === right.providerId
+    && left.providerIdExplicit === right.providerIdExplicit
     && left.protocol === right.protocol
+    && left.protocolValuePresent === right.protocolValuePresent
     && left.baseUrl === right.baseUrl
     && left.apiKey === right.apiKey
+    && left.credentialField === right.credentialField
     && left.models === right.models
     && left.extraHeaders === right.extraHeaders
     && left.enabled === right.enabled
+    && left.enabledValuePresent === right.enabledValuePresent
   );
 }
 
@@ -2257,6 +2941,7 @@ function applyChannelDraftItems(
 export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   items,
   providers,
+  connectionFields,
   emptyApiKeyHosts = [],
   availableModelRoutes = [],
   availableModels = [],
@@ -2268,6 +2953,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   addSignal = 0,
   focusFieldRequest = null,
   disabled = false,
+  catalogLoading = false,
   catalogUnavailable = false,
   onReloadCatalog,
   overriddenByMode = null,
@@ -2280,8 +2966,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const editorText = MODEL_ACCESS_EDITOR_TEXT[language];
   const initialItemSourceByKey = useMemo(() => buildItemSourceByKey(items), [items]);
   const initialChannels = useMemo(
-    () => parseChannelsFromItems(items, initialItemSourceByKey, providers),
-    [items, initialItemSourceByKey, providers],
+    () => parseChannelsFromItems(items, initialItemSourceByKey, providers, connectionFields),
+    [items, initialItemSourceByKey, providers, connectionFields],
   );
   const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
   const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
@@ -2299,8 +2985,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     [items, persistedDraftItems],
   );
   const hydratedChannels = useMemo(
-    () => parseChannelsFromItems(hydratedItems, buildItemSourceByKey(hydratedItems), providers),
-    [hydratedItems, providers],
+    () => parseChannelsFromItems(
+      hydratedItems,
+      buildItemSourceByKey(hydratedItems),
+      providers,
+      connectionFields,
+    ),
+    [hydratedItems, providers, connectionFields],
   );
 
   const [channels, setChannels] = useState<ChannelConfig[]>(hydratedChannels);
@@ -2313,7 +3004,19 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
 
-  const busy = disabled || Boolean(overriddenByMode);
+  const connectionSchemaDefinition = useMemo(
+    () => inspectConnectionSchemaDefinition(connectionFields),
+    [connectionFields],
+  );
+  const schemaUnavailable = connectionSchemaDefinition.mode === 'schema'
+    && !connectionSchemaDefinition.usable;
+  const baseBusy = disabled
+    || catalogLoading
+    || catalogUnavailable
+    || Boolean(overriddenByMode);
+  const schemaAllowsInspection = connectionSchemaDefinition.reason === 'unknown_condition';
+  const busy = baseBusy || (schemaUnavailable && !schemaAllowsInspection);
+  const mutationBusy = baseBusy || schemaUnavailable;
   const knownEditorRouteSet = useMemo(() => new Set([
     ...availableModelRoutes,
     ...collectChannelRouteSet(channels, false),
@@ -2347,7 +3050,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
   if (prevAddSignal !== addSignal) {
     setPrevAddSignal(addSignal);
-    if (!busy && !catalogUnavailable) {
+    if (!mutationBusy) {
       setModal({ mode: 'add' });
     }
   }
@@ -2358,7 +3061,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const index = parsed
       ? channels.findIndex((channel) => channel.name === parsed.connectionName)
       : -1;
-    if (parsed && index >= 0) {
+    if (
+      parsed
+      && index >= 0
+      && (schemaAllowsInspection || channelSchemaAllowsKnownOperations(
+        channels[index],
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      ))
+    ) {
       setHandledFocusRequestId(focusFieldRequest.requestId);
       setPendingRemove(null);
       setModal({ mode: 'edit', index, focusField: parsed.suffix });
@@ -2375,16 +3087,25 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   // Structural gate: names must be valid for every channel and every enabled
   // channel must be complete before the draft can be saved.
   const blockingChannels = useMemo(
-    () => channels
+    () => catalogLoading ? [] : channels
       .map((channel, index) => ({
         channel,
         index,
-        issues: getChannelSaveIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable),
+        issues: getChannelSaveIssues(
+          channel,
+          providers,
+          emptyApiKeyHosts,
+          connectionFields,
+          catalogUnavailable,
+        ),
       }))
       .filter((entry) => entry.issues.length > 0),
-    [channels, providers, emptyApiKeyHosts, catalogUnavailable],
+    [catalogLoading, channels, providers, emptyApiKeyHosts, connectionFields, catalogUnavailable],
   );
-  const draftValid = blockingChannels.length === 0;
+  const draftValid = !catalogLoading
+    && !catalogUnavailable
+    && connectionSchemaDefinition.usable
+    && blockingChannels.length === 0;
 
   // Task Routing / Reliability own the runtime routing keys in this IA, so the
   // channel draft never emits them (managesRuntimeConfig: false).
@@ -2398,6 +3119,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     runtimeConfig: initialRuntimeConfig,
     initialRuntimeConfig,
     managesRuntimeConfig: false,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
   }), [
     channels,
     hasChanges,
@@ -2405,6 +3129,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     initialItemSourceByKey,
     initialNames,
     initialRuntimeConfig,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
     savedItemMap,
   ]);
   const draftFingerprint = useMemo(() => JSON.stringify(draftItems), [draftItems]);
@@ -2446,7 +3173,38 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     return !saved || !channelsAreEqual(channel, saved);
   };
 
+  const openChannelEditor = (
+    index: number,
+    options: { focusModels?: boolean; focusField?: ChannelFieldSuffix } = {},
+  ) => {
+    const channel = channels[index];
+    if (
+      !channel
+      || busy
+      || (!schemaAllowsInspection && !channelSchemaAllowsKnownOperations(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      ))
+    ) {
+      return;
+    }
+    setModal({ mode: 'edit', index, ...options });
+  };
+
   const handleTest = async (channel: ChannelConfig) => {
+    if (
+      mutationBusy
+      || !channelSchemaAllowsKnownOperations(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      )
+    ) {
+      return;
+    }
     if (hasRuntimeOnlyMaskedHermesSecret(channel, maskToken, hermesSecretPersisted)) {
       setTestStates((previous) => ({
         ...previous,
@@ -2485,7 +3243,20 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   };
 
   const removeChannel = (index: number) => {
-    const removedChannelId = channels[index]?.id || '';
+    const channel = channels[index];
+    if (
+      !channel
+      || mutationBusy
+      || !channelConnectionNameCanWrite(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      )
+    ) {
+      return;
+    }
+    const removedChannelId = channel.id;
     setChannels((previous) => previous.filter((_, rowIndex) => rowIndex !== index));
     if (removedChannelId) {
       clearTestState(removedChannelId);
@@ -2497,7 +3268,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   // the confirm action becomes "go to Task Routing to replace" instead.
   const requestRemoveChannel = (index: number) => {
     const channel = channels[index];
-    if (!channel) {
+    if (
+      !channel
+      || mutationBusy
+      || !channelConnectionNameCanWrite(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      )
+    ) {
       return;
     }
     const routes = channel.enabled
@@ -2518,13 +3298,30 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   // an unusable connection go live.
   const toggleEnabled = (index: number) => {
     const channel = channels[index];
-    if (!channel) {
+    if (
+      !channel
+      || mutationBusy
+      || !channelFieldCanWrite(
+        channel,
+        'enabled',
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      )
+    ) {
       return;
     }
     if (!channel.enabled) {
+      const enabledChannel = { ...channel, enabled: true };
       const issues = [
-        ...getChannelNameIssues(channel),
-        ...getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable),
+        ...getChannelNameIssues(enabledChannel),
+        ...getChannelCompletenessIssues(
+          enabledChannel,
+          providers,
+          emptyApiKeyHosts,
+          connectionFields,
+          catalogUnavailable,
+        ),
       ];
       if (issues.length > 0) {
         setModal({ mode: 'edit', index });
@@ -2532,7 +3329,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       }
     }
     setChannels((previous) => previous.map((item, rowIndex) => (
-      rowIndex === index ? { ...item, enabled: !item.enabled } : item
+      rowIndex === index
+        ? { ...item, enabled: !item.enabled, enabledValuePresent: true }
+        : item
     )));
   };
 
@@ -2540,7 +3339,25 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     channel: ChannelConfig,
     replacements: ModelReferenceReplacement[],
   ) => {
-    if (!modal) {
+    if (
+      !modal
+      || mutationBusy
+      || !channelSchemaAllowsKnownOperations(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      )
+      || (
+        modal.mode === 'add'
+        && !channelIdentityCanWrite(
+          channel,
+          providers,
+          emptyApiKeyHosts,
+          connectionFields,
+        )
+      )
+    ) {
       return;
     }
     if (modal.mode === 'add') {
@@ -2557,6 +3374,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           || previousChannel.protocol !== channel.protocol
           || previousChannel.baseUrl !== channel.baseUrl
           || previousChannel.apiKey !== channel.apiKey
+          || previousChannel.credentialField !== channel.credentialField
           || previousChannel.models !== channel.models
           || previousChannel.extraHeaders !== channel.extraHeaders;
         if (connectionChanged) {
@@ -2598,6 +3416,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         </div>
       ) : null}
 
+      {schemaUnavailable ? (
+        <InlineAlert
+          variant="warning"
+          title={editorText.schemaUnavailableTitle}
+          message={editorText.schemaUnavailableMessage}
+          className="rounded-lg px-3 py-2 text-xs shadow-none"
+        />
+      ) : null}
+
       {channels.length === 0 ? (
         <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
           <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
@@ -2613,18 +3440,60 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               availableModels={availableModels}
               taskModelRefs={resolvedTaskModelRefs}
               unsaved={isChannelUnsaved(channel)}
-              busy={busy}
+              busy={busy || (
+                !schemaAllowsInspection
+                && !channelSchemaAllowsKnownOperations(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              )}
               testState={testStates[channel.id]}
-              issues={[
+              issues={catalogLoading ? [] : [
                 ...getChannelNameIssues(channel),
-                ...getChannelDisplayNameIssues(channel),
-                ...getChannelCompletenessIssues(channel, providers, emptyApiKeyHosts, catalogUnavailable),
+                ...getChannelDisplayNameIssues(channel, connectionFields),
+                ...getChannelCompletenessIssues(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                  catalogUnavailable,
+                ),
               ]}
               onTest={() => void handleTest(channel)}
-              onEdit={() => setModal({ mode: 'edit', index })}
-              onManageModels={() => setModal({ mode: 'edit', index, focusModels: true })}
+              canTest={
+                !mutationBusy
+                && channelSchemaAllowsKnownOperations(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              }
+              onEdit={() => openChannelEditor(index)}
+              onManageModels={() => openChannelEditor(index, { focusModels: true })}
               onToggleEnabled={() => toggleEnabled(index)}
+              canToggleEnabled={
+                !mutationBusy
+                && channelFieldCanWrite(
+                  channel,
+                  'enabled',
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              }
               onRemove={() => requestRemoveChannel(index)}
+              canRemove={
+                !mutationBusy
+                && channelConnectionNameCanWrite(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              }
             />
           ))}
         </div>
@@ -2698,10 +3567,12 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           availableModelRoutes={availableModelRoutes}
           availableModels={availableModels}
           providers={providers}
+          connectionFields={connectionFields}
           emptyApiKeyHosts={emptyApiKeyHosts}
           maskToken={maskToken}
           hermesSecretPersisted={hermesSecretPersisted}
           catalogUnavailable={catalogUnavailable}
+          disabled={busy}
           taskModelRefs={resolvedTaskModelRefs}
           onReloadCatalog={onReloadCatalog}
           onManageModels={onManageModels}

@@ -28,9 +28,10 @@ from src.data.stock_index_loader import get_index_stock_name
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.services.market_symbol_utils import is_suffix_market_symbol
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
+from src.utils.sanitize import log_safe_exception
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
-from .realtime_types import CircuitBreaker
+from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -516,11 +517,14 @@ class BaseFetcher(ABC):
             return df
             
         except Exception as e:
-            elapsed = time.time() - request_start
             error_type, error_reason = summarize_exception(e)
-            logger.error(
-                f"[{self.name}] {stock_code} 获取失败: 范围={start_date} ~ {end_date}, "
-                f"error_type={error_type}, elapsed={elapsed:.2f}s, reason={error_reason}"
+            log_safe_exception(
+                logger,
+                "Data provider daily data fetch failed",
+                e,
+                error_code="data_provider_daily_data_failed",
+                level=logging.ERROR,
+                context={"symbol": stock_code, "provider": self.name},
             )
             raise DataFetchError(f"[{self.name}] {stock_code}: {error_reason}") from e
     
@@ -711,12 +715,17 @@ class DataFetcherManager:
         except TypeError:
             return bool(probe())
         except Exception as exc:
-            logger.debug(
-                "[数据源可用性] %s.%s 检查失败(capability=%s): %s",
-                fetcher.name,
-                probe_name,
-                capability or "default",
+            log_safe_exception(
+                logger,
+                "Data provider availability probe failed",
                 exc,
+                error_code="data_provider_availability_probe_failed",
+                level=logging.DEBUG,
+                context={
+                    "provider": fetcher.name,
+                    "probe": probe_name,
+                    "capability": capability or "default",
+                },
             )
             return False
 
@@ -863,7 +872,13 @@ class DataFetcherManager:
                     try:
                         current_fetcher.close()
                     except Exception as exc:
-                        logger.debug("[TickFlowFetcher] 关闭旧实例失败: %s", exc)
+                        log_safe_exception(
+                            logger,
+                            "TickFlow stale fetcher close failed",
+                            exc,
+                            error_code="tickflow_stale_fetcher_close_failed",
+                            level=logging.DEBUG,
+                        )
                 self._tickflow_fetcher = None
                 self._tickflow_api_key = None
                 return None
@@ -879,7 +894,13 @@ class DataFetcherManager:
                 try:
                     current_fetcher.close()
                 except Exception as exc:
-                    logger.debug("[TickFlowFetcher] 切换实例时关闭失败: %s", exc)
+                    log_safe_exception(
+                        logger,
+                        "TickFlow fetcher close during replacement failed",
+                        exc,
+                        error_code="tickflow_replaced_fetcher_close_failed",
+                        level=logging.DEBUG,
+                    )
 
             try:
                 from .tickflow_fetcher import TickFlowFetcher
@@ -895,7 +916,13 @@ class DataFetcherManager:
                 self._tickflow_api_key = api_key
                 return fetcher
             except Exception as exc:
-                logger.warning("[TickFlowFetcher] 初始化失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow fetcher initialization failed",
+                    exc,
+                    error_code="tickflow_fetcher_initialization_failed",
+                    level=logging.WARNING,
+                )
                 self._tickflow_fetcher = None
                 self._tickflow_api_key = None
                 return None
@@ -914,7 +941,13 @@ class DataFetcherManager:
             try:
                 current_fetcher.close()
             except Exception as exc:
-                logger.debug("[TickFlowFetcher] 关闭管理器资源失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow manager resource close failed",
+                    exc,
+                    error_code="tickflow_manager_resource_close_failed",
+                    level=logging.DEBUG,
+                )
 
     def __del__(self) -> None:
         try:
@@ -1390,17 +1423,33 @@ class DataFetcherManager:
                             error_message=error_reason,
                             fallback_to=fallback_to,
                         )
-                        logger.warning(
-                            f"[数据源失败 {attempt}/{total_fetchers}] [{fetcher.name}] {stock_code}: "
-                            f"error_type={error_type}, reason={error_reason}"
+                        log_safe_exception(
+                            logger,
+                            "Data provider daily data attempt failed",
+                            e,
+                            error_code="data_provider_daily_data_attempt_failed",
+                            level=logging.WARNING,
+                            context={
+                                "symbol": stock_code,
+                                "provider": fetcher.name,
+                                "market": market,
+                                "attempt": attempt,
+                            },
                         )
-                        self._record_daily_source_failure(fetcher, market, error_reason)
+                        self._record_daily_source_failure(
+                            fetcher,
+                            market,
+                            "data_provider_daily_data_attempt_failed",
+                        )
                         errors.append(error_msg)
                     break
 
             error_summary = f"{market_label} {stock_code} 获取失败:\n" + "\n".join(errors)
-            elapsed = time.time() - request_start
-            logger.error(f"[数据源终止] {stock_code} 获取失败: elapsed={elapsed:.2f}s\n{error_summary}")
+            logger.error(
+                "All eligible data providers failed daily data request symbol=%s market=%s",
+                stock_code,
+                market,
+            )
             raise DataFetchError(error_summary)
 
         for attempt, fetcher in enumerate(fetchers, start=1):
@@ -1471,11 +1520,24 @@ class DataFetcherManager:
                     error_message=error_reason,
                     fallback_to=fallback_to,
                 )
-                logger.warning(
-                    f"[数据源失败 {attempt}/{total_fetchers}] [{fetcher.name}] {stock_code}: "
-                    f"error_type={error_type}, reason={error_reason}"
+                log_safe_exception(
+                    logger,
+                    "Data provider daily data attempt failed",
+                    e,
+                    error_code="data_provider_daily_data_attempt_failed",
+                    level=logging.WARNING,
+                    context={
+                        "symbol": stock_code,
+                        "provider": fetcher.name,
+                        "market": market,
+                        "attempt": attempt,
+                    },
                 )
-                self._record_daily_source_failure(fetcher, market, error_reason)
+                self._record_daily_source_failure(
+                    fetcher,
+                    market,
+                    "data_provider_daily_data_attempt_failed",
+                )
                 errors.append(error_msg)
                 if attempt < total_fetchers:
                     next_fetcher = fetchers[attempt]
@@ -1485,8 +1547,11 @@ class DataFetcherManager:
         
         # 所有数据源都失败
         error_summary = f"所有数据源获取 {stock_code} 失败:\n" + "\n".join(errors)
-        elapsed = time.time() - request_start
-        logger.error(f"[数据源终止] {stock_code} 获取失败: elapsed={elapsed:.2f}s\n{error_summary}")
+        logger.error(
+            "All data providers failed daily data request symbol=%s market=%s",
+            stock_code,
+            market,
+        )
         raise DataFetchError(error_summary)
     
     @property
@@ -1591,7 +1656,13 @@ class DataFetcherManager:
                     or 0
                 )
             except Exception as exc:
-                logger.warning("[TickFlowFetcher] realtime prefetch failed: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "TickFlow realtime quote prefetch failed",
+                    exc,
+                    error_code="tickflow_realtime_prefetch_failed",
+                    level=logging.WARNING,
+                )
                 return 0
 
         try:
@@ -1617,12 +1688,13 @@ class DataFetcherManager:
                 return 0
                 
         except Exception as e:
-            logger.error(
-                "[预取] component=realtime_prefetch action=complete status=error "
-                "stock_count=%d prefetch_source=%s error=%s",
-                len(stock_codes),
-                prefetch_source,
+            log_safe_exception(
+                logger,
+                "Realtime quote prefetch failed",
                 e,
+                error_code="realtime_quote_prefetch_failed",
+                level=logging.ERROR,
+                context={"provider": prefetch_source},
             )
             return 0
 
@@ -1643,7 +1715,13 @@ class DataFetcherManager:
                 or 0
             )
         except Exception as exc:
-            logger.warning("[TickFlowFetcher] daily K-line prefetch failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "TickFlow daily K-line prefetch failed",
+                exc,
+                error_code="tickflow_daily_kline_prefetch_failed",
+                level=logging.WARNING,
+            )
             return 0
 
     @staticmethod
@@ -1966,7 +2044,17 @@ class DataFetcherManager:
                     error_message=error_reason,
                     fallback_to=fallback_to,
                 )
-                logger.info(f"[实时行情] {stock_code} {error_msg}，继续尝试下一个数据源")
+                log_safe_exception(
+                    logger,
+                    "Data provider realtime quote failed; trying next provider",
+                    e,
+                    error_code="data_provider_realtime_quote_failed",
+                    level=logging.INFO,
+                    context={
+                        "symbol": stock_code,
+                        "provider": getattr(fetcher, "name", source),
+                    },
+                )
                 errors.append(error_msg)
                 if primary_quote is None:
                     failed_sources.append(source)
@@ -1983,7 +2071,11 @@ class DataFetcherManager:
         # 所有数据源都失败，返回 None（降级兜底）
         if log_final_failure:
             if errors:
-                logger.info(f"[实时行情] {stock_code} 所有数据源均失败: {'; '.join(errors)}")
+                logger.info(
+                    "All realtime quote providers failed symbol=%s failure_count=%d",
+                    stock_code,
+                    len(errors),
+                )
             else:
                 logger.info(f"[实时行情] {stock_code} 无可用数据源")
 
@@ -2083,10 +2175,23 @@ class DataFetcherManager:
                 error_type=error_type,
                 error_message=error_reason,
             )
-            logger.debug(f"[实时行情] {stock_code} {fetcher_name} 获取失败: {e}")
+            log_safe_exception(
+                logger,
+                "Data provider realtime quote failed",
+                e,
+                error_code="data_provider_realtime_quote_failed",
+                level=logging.DEBUG,
+                context={"symbol": stock_code, "provider": fetcher_name},
+            )
         return None
 
-    def _supplement_quote(self, stock_code: str, primary_quote, fetcher_name: str, **kw):
+    def _supplement_quote(
+        self,
+        stock_code: str,
+        primary_quote: Optional[UnifiedRealtimeQuote],
+        fetcher_name: str,
+        **kw: str,
+    ) -> Optional[UnifiedRealtimeQuote]:
         """Supplement *primary_quote* with data from *fetcher_name*.
 
         If *primary_quote* is None, try *fetcher_name* as the sole source.
@@ -2102,7 +2207,14 @@ class DataFetcherManager:
                     if filled:
                         logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")
             except Exception as e:
-                logger.debug(f"[实时行情] {stock_code} {fetcher_name} 补充失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Realtime quote supplement failed",
+                    e,
+                    error_code="realtime_quote_supplement_failed",
+                    level=logging.DEBUG,
+                    context={"symbol": stock_code, "provider": fetcher_name},
+                )
             return primary_quote
 
         q = self._try_fetcher_quote(stock_code, fetcher_name, **kw)
@@ -2110,7 +2222,11 @@ class DataFetcherManager:
             logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 获取成功 (独立数据源)")
         return q
 
-    def _supplement_from_longbridge(self, stock_code: str, primary_quote):
+    def _supplement_from_longbridge(
+        self,
+        stock_code: str,
+        primary_quote: Optional[UnifiedRealtimeQuote],
+    ) -> Optional[UnifiedRealtimeQuote]:
         """Shortcut kept for backward-compat with A-share general loop."""
         return self._supplement_quote(stock_code, primary_quote, "LongbridgeFetcher")
 
@@ -2221,8 +2337,18 @@ class DataFetcherManager:
                     error_message=error_reason,
                     fallback_to=fallback_to,
                 )
-                logger.warning(f"[筹码分布] {fetcher_name} 获取 {stock_code} 失败: {e}")
-                circuit_breaker.record_failure(source_key, str(e))
+                log_safe_exception(
+                    logger,
+                    "Data provider chip distribution fetch failed",
+                    e,
+                    error_code="data_provider_chip_distribution_failed",
+                    level=logging.WARNING,
+                    context={"symbol": stock_code, "provider": fetcher_name},
+                )
+                circuit_breaker.record_failure(
+                    source_key,
+                    "data_provider_chip_distribution_failed",
+                )
                 continue
 
         logger.warning(f"[筹码分布] {stock_code} 所有数据源均失败")
@@ -2291,7 +2417,14 @@ class DataFetcherManager:
                     logger.info(f"[股票名称] 从 {fetcher.name} 获取: {stock_code} -> {name}")
                     return name
             except Exception as e:
-                logger.debug(f"[股票名称] {fetcher.name} 获取失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Data provider stock name lookup failed",
+                    e,
+                    error_code="data_provider_stock_name_lookup_failed",
+                    level=logging.DEBUG,
+                    context={"symbol": stock_code, "provider": fetcher.name},
+                )
                 continue
 
         # 4. 所有数据源都失败
@@ -2361,7 +2494,14 @@ class DataFetcherManager:
                     error_message=error_reason,
                     fallback_to=fallback_to,
                 )
-                logger.debug(f"[{fetcher.name}] 获取所属板块失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Data provider stock board membership fetch failed",
+                    e,
+                    error_code="data_provider_stock_board_membership_failed",
+                    level=logging.DEBUG,
+                    context={"symbol": stock_code, "provider": fetcher.name},
+                )
                 continue
         return []
 
@@ -2443,7 +2583,14 @@ class DataFetcherManager:
                     
                     logger.info(f"[股票名称] 从 {fetcher.name} 批量获取完成，剩余 {len(missing_codes)} 个待查")
             except Exception as e:
-                logger.debug(f"[股票名称] {fetcher.name} 批量获取失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Data provider bulk stock name lookup failed",
+                    e,
+                    error_code="data_provider_bulk_stock_name_lookup_failed",
+                    level=logging.DEBUG,
+                    context={"provider": fetcher.name},
+                )
                 continue
         
         # 3. 逐个获取剩余的
@@ -2467,7 +2614,14 @@ class DataFetcherManager:
                         logger.info("[TickFlowFetcher] 获取指数行情成功")
                         return data
                 except Exception as e:
-                    logger.warning(f"[TickFlowFetcher] 获取指数行情失败: {e}")
+                    log_safe_exception(
+                        logger,
+                        "TickFlow market indices fetch failed",
+                        e,
+                        error_code="tickflow_market_indices_failed",
+                        level=logging.WARNING,
+                        context={"market": region},
+                    )
 
         for fetcher in self._fetchers:
             if region == "cn" and fetcher.name == "TickFlowFetcher":
@@ -2478,7 +2632,14 @@ class DataFetcherManager:
                     logger.info(f"[{fetcher.name}] 获取指数行情成功")
                     return data
             except Exception as e:
-                logger.warning(f"[{fetcher.name}] 获取指数行情失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Data provider market indices fetch failed",
+                    e,
+                    error_code="data_provider_market_indices_failed",
+                    level=logging.WARNING,
+                    context={"market": region, "provider": fetcher.name},
+                )
                 continue
         return []
 
@@ -2506,13 +2667,13 @@ class DataFetcherManager:
                     elapsed,
                 )
             except Exception as e:
-                elapsed = time.monotonic() - started_at
-                logger.warning(
-                    "[MarketStats] component=market_stats action=provider_failed "
-                    "purpose=%s provider=TickFlowFetcher elapsed=%.2fs error=%s",
-                    purpose,
-                    elapsed,
+                log_safe_exception(
+                    logger,
+                    "TickFlow market statistics fetch failed",
                     e,
+                    error_code="tickflow_market_stats_failed",
+                    level=logging.WARNING,
+                    context={"purpose": purpose},
                 )
 
         for fetcher in self._fetchers:
@@ -2539,14 +2700,13 @@ class DataFetcherManager:
                     elapsed,
                 )
             except Exception as e:
-                elapsed = time.monotonic() - started_at
-                logger.warning(
-                    "[MarketStats] component=market_stats action=provider_failed "
-                    "purpose=%s provider=%s elapsed=%.2fs error=%s",
-                    purpose,
-                    fetcher.name,
-                    elapsed,
+                log_safe_exception(
+                    logger,
+                    "Data provider market statistics fetch failed",
                     e,
+                    error_code="data_provider_market_stats_failed",
+                    level=logging.WARNING,
+                    context={"purpose": purpose, "provider": fetcher.name},
                 )
                 continue
         logger.warning("[MarketStats] component=market_stats action=complete status=empty purpose=%s", purpose)
@@ -2980,7 +3140,14 @@ class DataFetcherManager:
                     fetcher = TwInstitutionalFetcher()
                     self._tw_institutional_fetcher = fetcher
                 except Exception as exc:  # noqa: BLE001 - wiring failure: loud but fail-open
-                    logger.error("[tw-inst] fetcher init failed (wiring bug?) code=%s: %s", stock_code, exc)
+                    log_safe_exception(
+                        logger,
+                        "Taiwan institutional data fetcher initialization failed",
+                        exc,
+                        error_code="tw_institutional_fetcher_initialization_failed",
+                        level=logging.ERROR,
+                        context={"symbol": stock_code},
+                    )
                     fetcher = None
             # fetch_timeout == 0 disables per-fetch fundamental fetches (same as valuation /
             # bundle above, which gate on fetch_timeout); honour that for institution too so
@@ -3000,7 +3167,10 @@ class DataFetcherManager:
                         "fundamental_tw_institution",
                     )
                     if inst_err:
-                        logger.warning("[tw-inst] fetch failed/timeout code=%s: %s", stock_code, inst_err)
+                        logger.warning(
+                            "Taiwan institutional data fetch failed or timed out symbol=%s",
+                            stock_code,
+                        )
                 else:
                     tw_record = None
         # status 'ok' only when the record carries all core net figures (a genuine 0 is
@@ -3633,7 +3803,14 @@ class DataFetcherManager:
                             "error": error_reason,
                         }
                     )
-                    logger.warning(f"[{fetcher.name}] 获取板块排行失败: {error_reason}")
+                    log_safe_exception(
+                        logger,
+                        "Data provider sector ranking fetch failed",
+                        e,
+                        error_code="data_provider_sector_ranking_failed",
+                        level=logging.WARNING,
+                        context={"provider": fetcher.name},
+                    )
 
             return [], [], source_chain, last_error
 
@@ -3643,7 +3820,7 @@ class DataFetcherManager:
         top, bottom, _, last_error = self._get_sector_rankings_with_meta(n)
         if top or bottom:
             return top, bottom
-        logger.warning(f"[板块排行] 所有数据源均失败，最终错误: {last_error}")
+        logger.warning("All data providers returned no sector rankings")
         return [], []
 
     @staticmethod
@@ -3687,10 +3864,17 @@ class DataFetcherManager:
                 except Exception as e:
                     error_type, error_reason = summarize_exception(e)
                     last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                    logger.warning(f"[{fetcher.name}] 获取概念排行失败: {error_reason}")
+                    log_safe_exception(
+                        logger,
+                        "Data provider concept ranking fetch failed",
+                        e,
+                        error_code="data_provider_concept_ranking_failed",
+                        level=logging.WARNING,
+                        context={"provider": fetcher.name},
+                    )
 
             if not top and not bottom and last_error:
-                logger.warning(f"[概念排行] 所有数据源均失败，最终错误: {last_error}")
+                logger.warning("All data providers returned no concept rankings")
 
             ttl = (
                 self.__class__._CONCEPT_RANKINGS_CACHE_TTL_SECONDS
@@ -3719,9 +3903,16 @@ class DataFetcherManager:
             except Exception as e:
                 error_type, error_reason = summarize_exception(e)
                 last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                logger.warning(f"[{fetcher.name}] 获取人气股失败: {error_reason}")
+                log_safe_exception(
+                    logger,
+                    "Data provider hot stock fetch failed",
+                    e,
+                    error_code="data_provider_hot_stock_fetch_failed",
+                    level=logging.WARNING,
+                    context={"provider": fetcher.name},
+                )
         if last_error:
-            logger.warning(f"[人气股] 所有数据源均失败，最终错误: {last_error}")
+            logger.warning("All data providers returned no hot stocks")
         return []
 
     def get_limit_up_pool(
@@ -3741,7 +3932,14 @@ class DataFetcherManager:
             except Exception as e:
                 error_type, error_reason = summarize_exception(e)
                 last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                logger.warning(f"[{fetcher.name}] 获取涨停池失败: {error_reason}")
+                log_safe_exception(
+                    logger,
+                    "Data provider limit-up pool fetch failed",
+                    e,
+                    error_code="data_provider_limit_up_pool_failed",
+                    level=logging.WARNING,
+                    context={"provider": fetcher.name},
+                )
         if last_error:
-            logger.warning(f"[涨停池] 所有数据源均失败，最终错误: {last_error}")
+            logger.warning("All data providers returned no limit-up pool data")
         return []

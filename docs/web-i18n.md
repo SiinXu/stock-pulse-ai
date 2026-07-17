@@ -28,7 +28,7 @@ locales/reportContent.ts
 
 ## 错误与格式化
 
-面向 Web 的后端错误使用统一 envelope：`error` 是稳定业务码，`params` 是本地化插值参数，`message`、`details` 和可选 `trace_id` 只提供诊断信息。前端按 UI language 将 `error + params` 映射为主错误；未知 code 显示通用本地化错误，legacy 裸字符串通过兼容适配器保留到 Details，不能直接成为主提示。
+面向 Web 的后端错误使用统一 envelope：`error` 是稳定业务码，`params` 是本地化插值参数，`message`、`details` 和可选 `trace_id` 只提供诊断信息。过渡期内响应还会输出 deprecated、read-only 的 `detail`，它始终是 `details` 的同值别名而不是第二份来源；字段只能在未来 major 或 versioned API 中移除。新客户端优先读取 `details`，旧客户端继续读取 `detail`，5xx 的两个字段都不会承载原始异常。前端按 UI language 将 `error + params` 映射为主错误；未知 code 显示通用本地化错误，legacy 裸字符串通过兼容适配器保留到 Details，不能直接成为主提示。
 
 Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
 

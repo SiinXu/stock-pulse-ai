@@ -36,12 +36,11 @@ export function SuggestionsList({
   return (
     <ul
       id="suggestions-list"
-      className="z-[100] border-x border-b rounded-b-lg rounded-t-none max-h-60 overflow-auto"
+      className="z-[100] max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
       style={{
         ...style,
         backgroundColor: 'hsl(var(--card))',
         borderColor: 'hsl(var(--border))',
-        boxShadow: '0 12px 28px -12px rgba(0, 0, 0, 0.18)',
       }}
       role="listbox"
     >
@@ -81,10 +80,10 @@ export function SuggestionsList({
 const MARKET_BADGE_CONFIG = {
   CN: { labelKey: 'marketCN', className: 'border-danger/25 bg-danger/10 text-danger' },
   HK: { labelKey: 'marketHK', className: 'border-success/25 bg-success/10 text-success' },
-  US: { labelKey: 'marketUS', className: 'border-cyan/25 bg-cyan/10 text-cyan' },
+  US: { labelKey: 'marketUS', className: 'border-primary/25 bg-primary/10 text-primary' },
   JP: { labelKey: 'marketJP', className: 'border-indigo-500/25 bg-indigo-500/10 text-indigo-500' },
   KR: { labelKey: 'marketKR', className: 'border-rose-500/25 bg-rose-500/10 text-rose-500' },
-  INDEX: { labelKey: 'marketIndex', className: 'border-purple/25 bg-purple/10 text-purple' },
+  INDEX: { labelKey: 'marketIndex', className: 'border-secondary-text/25 bg-secondary-text/10 text-secondary-text' },
   ETF: { labelKey: null, className: 'border-warning/25 bg-warning/10 text-warning' },
   BSE: { labelKey: 'marketBSE', className: 'border-orange-500/25 bg-orange-500/10 text-orange-500' },
 } as const;
@@ -108,8 +107,8 @@ function MatchTypeBadge({ matchType }: { matchType: string }) {
   const { language } = useUiLanguage();
   const text = STOCK_SEARCH_TEXT[language];
   const configMap = {
-    exact: { label: text.matchExact, className: 'border-cyan/25 bg-cyan/10 text-cyan' },
-    prefix: { label: text.matchPrefix, className: 'border-purple/25 bg-purple/10 text-purple' },
+    exact: { label: text.matchExact, className: 'border-primary/25 bg-primary/10 text-primary' },
+    prefix: { label: text.matchPrefix, className: 'border-secondary-text/25 bg-secondary-text/10 text-secondary-text' },
     contains: { label: text.matchContains, className: 'border-warning/25 bg-warning/10 text-warning' },
     fuzzy: { label: text.matchFuzzy, className: 'border-border/55 bg-elevated/75 text-muted-text' },
   };

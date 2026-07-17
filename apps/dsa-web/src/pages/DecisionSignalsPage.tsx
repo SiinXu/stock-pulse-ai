@@ -1255,7 +1255,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
               <input
-                className="h-11 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.stockCode}
                 onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
                 placeholder={t('decisionSignals.stockCode')}
@@ -1292,7 +1292,7 @@ const DecisionSignalsPage: React.FC = () => {
             <label className="grid gap-1">
               <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
               <input
-                className="h-11 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
+                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
                 value={filters.sourceReportId}
                 onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
                 placeholder={t('decisionSignals.sourceReportId')}

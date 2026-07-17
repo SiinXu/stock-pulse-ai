@@ -16,7 +16,14 @@ from sqlalchemy.sql import func
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.config import Config
-from src.storage import Base, CURRENT_SCHEMA_VERSION, DatabaseManager, DatabaseSchemaMigration, StockDaily
+from src.storage import (
+    AgentProviderTurn,
+    Base,
+    CURRENT_SCHEMA_VERSION,
+    DatabaseManager,
+    DatabaseSchemaMigration,
+    StockDaily,
+)
 
 class TestStorage(unittest.TestCase):
 
@@ -162,6 +169,25 @@ class TestStorage(unittest.TestCase):
         self.assertIn("metadata.create_all", row.description)
 
         DatabaseManager.reset_instance()
+
+    def test_database_initialization_log_does_not_expose_database_url(self):
+        DatabaseManager.reset_instance()
+        temp_dir = tempfile.TemporaryDirectory()
+        canary = "STORAGE_DATABASE_URL_CANARY"
+        db_path = os.path.join(temp_dir.name, f"{canary}.sqlite")
+
+        try:
+            with self.assertLogs("src.storage", level="INFO") as logs:
+                DatabaseManager(db_url=f"sqlite:///{db_path}")
+
+            log_text = "\n".join(logs.output)
+            self.assertIn("Database initialized: backend=sqlite", log_text)
+            self.assertNotIn(canary, log_text)
+            self.assertNotIn(db_path, log_text)
+        finally:
+            DatabaseManager.reset_instance()
+            Config.reset_instance()
+            temp_dir.cleanup()
 
     def test_schema_migration_record_is_idempotent(self):
         DatabaseManager.reset_instance()
@@ -415,12 +441,17 @@ class TestStorage(unittest.TestCase):
             temp_dir.cleanup()
 
     def test_decision_signal_profile_migration_fails_when_column_inspection_fails(self):
+        canary = "STORAGE_SCHEMA_INSPECTION_CANARY"
+        private_url = "https://admin:password@db.internal.example/data?token=private"
+
         class BrokenInspector:
             def has_table(self, _table_name: str) -> bool:
                 return True
 
             def get_columns(self, _table_name: str):
-                raise RuntimeError("inspection failed")
+                raise RuntimeError(
+                    f"inspection failed api_key={canary} endpoint={private_url}"
+                )
 
         DatabaseManager.reset_instance()
         try:
@@ -429,10 +460,15 @@ class TestStorage(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         DatabaseManager(db_url="sqlite:///:memory:")
 
+            log_text = "\n".join(logs.output)
+            self.assertIn("profile migration cannot continue safely", log_text)
             self.assertIn(
-                "profile migration cannot continue safely",
-                "\n".join(logs.output),
+                "error_code=storage_decision_signal_profile_schema_inspection_failed",
+                log_text,
             )
+            self.assertIn("exception_type=RuntimeError", log_text)
+            self.assertNotIn(canary, log_text)
+            self.assertNotIn(private_url, log_text)
         finally:
             DatabaseManager.reset_instance()
             Config.reset_instance()
@@ -648,6 +684,48 @@ class TestStorage(unittest.TestCase):
         self.assertEqual(rows[0]["estimated_tokens"], 42)
 
         DatabaseManager.reset_instance()
+
+    def test_invalid_provider_turn_json_is_not_logged_or_returned_raw(self):
+        DatabaseManager.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+        canary = "STORAGE_PROVIDER_TRACE_CANARY"
+        turn_id = db.save_agent_provider_turn(
+            session_id="trace-invalid-json",
+            run_id="run-invalid-json",
+            provider="deepseek",
+            model="deepseek/deepseek-chat",
+            anchor_user_message_id=1,
+            anchor_assistant_message_id=2,
+            messages=[{"role": "assistant", "content": "valid"}],
+            contains_reasoning=False,
+            contains_tool_calls=False,
+            contains_thinking_blocks=False,
+            must_roundtrip=True,
+            estimated_tokens=1,
+        )
+        invalid_json = f'{{"api_key": "{canary}"'
+
+        try:
+            with db.session_scope() as session:
+                row = session.get(AgentProviderTurn, turn_id)
+                row.messages_json = invalid_json
+
+            with self.assertLogs("src.storage", level="WARNING") as logs:
+                rows = db.get_agent_provider_turns("trace-invalid-json")
+
+            self.assertEqual(rows[0]["messages"], [])
+            self.assertEqual(rows[0]["messages_json"], "[]")
+            log_text = "\n".join(logs.output)
+            self.assertIn(
+                "error_code=storage_provider_trace_decode_failed",
+                log_text,
+            )
+            self.assertIn("exception_type=JSONDecodeError", log_text)
+            self.assertNotIn(canary, log_text)
+            self.assertNotIn(invalid_json, log_text)
+        finally:
+            DatabaseManager.reset_instance()
+            Config.reset_instance()
 
     def test_provider_turns_do_not_appear_in_visible_or_web_messages_and_delete_with_session(self):
         DatabaseManager.reset_instance()
@@ -992,7 +1070,10 @@ class TestStorage(unittest.TestCase):
     def test_init_cleanup_preserves_original_initialization_error(self):
         DatabaseManager.reset_instance()
         original_error = RuntimeError("create all failed")
-        cleanup_error = RuntimeError("dispose failed")
+        canary = "STORAGE_INIT_CLEANUP_CANARY"
+        cleanup_error = RuntimeError(
+            f"dispose failed Authorization: Bearer {canary}"
+        )
 
         def create_engine_with_failing_dispose(*args, **kwargs):
             engine = sqlalchemy_create_engine(*args, **kwargs)
@@ -1006,11 +1087,19 @@ class TestStorage(unittest.TestCase):
         try:
             with patch("src.storage.create_engine", side_effect=create_engine_with_failing_dispose):
                 with patch.object(Base.metadata, "create_all", side_effect=original_error):
-                    with self.assertRaisesRegex(RuntimeError, "create all failed") as ctx:
-                        DatabaseManager.get_instance()
+                    with self.assertLogs("src.storage", level="WARNING") as logs:
+                        with self.assertRaisesRegex(RuntimeError, "create all failed") as ctx:
+                            DatabaseManager.get_instance()
 
             self.assertIs(ctx.exception, original_error)
             self.assertIsNone(DatabaseManager._instance)
+            log_text = "\n".join(logs.output)
+            self.assertIn(
+                "error_code=storage_database_init_cleanup_failed",
+                log_text,
+            )
+            self.assertIn("exception_type=RuntimeError", log_text)
+            self.assertNotIn(canary, log_text)
         finally:
             DatabaseManager.reset_instance()
 

@@ -120,7 +120,7 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
     return (
       <aside className="home-subpanel p-4 text-sm text-secondary-text" data-testid="run-flow-node-details-empty">
         <div className="flex items-center gap-2">
-          <Info className="h-4 w-4 text-cyan" aria-hidden="true" />
+          <Info className="h-4 w-4 text-primary" aria-hidden="true" />
           {t('runFlow.nodeDetails.empty')}
         </div>
       </aside>

@@ -23,7 +23,7 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
     sanitize_agent_diagnostic,
 )
-from src.config import get_config
+from src.config import Config, get_config
 from src.storage import get_db
 
 logger = logging.getLogger(__name__)
@@ -247,7 +247,7 @@ class AskCommand(BotCommand):
 
     def _analyze_single(
         self,
-        config,
+        config: Config,
         message: BotMessage,
         code: str,
         skill_id: str,
@@ -288,7 +288,7 @@ class AskCommand(BotCommand):
 
     def _analyze_multi(
         self,
-        config,
+        config: Config,
         message: BotMessage,
         codes: List[str],
         skill_id: str,

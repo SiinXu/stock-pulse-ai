@@ -201,6 +201,7 @@ class PortfolioImportService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="csv_import.commit",
+                scope_account_id=account_id,
                 payload=operation_payload,
             )
             if replay is not None:
@@ -299,6 +300,7 @@ class PortfolioImportService:
                 session=session,
                 operation_id=operation_id,
                 operation_type="csv_import.commit",
+                scope_account_id=account_id,
                 payload=operation_payload,
                 response=result,
             )

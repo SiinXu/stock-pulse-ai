@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple
 
 from src.config import Config, get_config
 from src.llm.hermes import route_has_hermes
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,9 @@ def _parse_items_from_text(text: str) -> List[Tuple[str, Optional[str], str]]:
     # Fallback: legacy format (codes only)
     codes = _parse_codes_from_text(text)
     if not codes:
-        logger.info("[ImageExtractor] 无法解析为结构化 items，且 legacy code 提取为空")
+        logger.info(
+            "[ImageExtractor] Structured item parsing and legacy code extraction returned no results"
+        )
     return [(c, None, "medium") for c in codes]
 
 
@@ -353,15 +356,26 @@ def extract_stock_codes_from_image(
             logger.debug("[ImageExtractor] raw LLM response:\n%s", raw)
             items = _parse_items_from_text(raw)
             logger.info(
-                f"[ImageExtractor] {model} 提取 {len(items)} 个: "
+                f"[ImageExtractor] {model} extracted {len(items)} item(s): "
                 f"{[(i[0], i[1]) for i in items[:5]]}{'...' if len(items) > 5 else ''}"
             )
             return items, raw
-        except Exception as e:
-            last_error = e
+        except Exception as exc:
+            last_error = exc
             if attempt < 2:
                 delay = 2 ** attempt
-                logger.warning(f"[ImageExtractor] 尝试 {attempt + 1}/3 失败，{delay}s 后重试: {e}")
+                log_safe_exception(
+                    logger,
+                    "Vision provider call failed; retrying",
+                    exc,
+                    error_code="vision_provider_failed",
+                    level=logging.WARNING,
+                    context={
+                        "model": model,
+                        "attempt": f"{attempt + 1}/3",
+                        "retry_delay_seconds": delay,
+                    },
+                )
                 time.sleep(delay)
 
     raise ValueError("Vision API 调用失败") from last_error

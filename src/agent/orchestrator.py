@@ -54,6 +54,7 @@ from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.config import AGENT_MAX_STEPS_DEFAULT, get_config
 from src.report_language import normalize_report_language
+from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from src.agent.executor import AgentResult
@@ -377,11 +378,12 @@ class AgentOrchestrator:
                 progress_callback=progress_callback,
             )
         except Exception as exc:
-            logger.error(
-                "Agent orchestrator chat raised: session_id=%s exception_type=%s diagnostic=%s",
-                session_id,
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "Agent orchestrator chat raised",
+                exc,
+                error_code="agent_chat_failed",
+                context={"session_id": session_id},
             )
             conversation_manager.add_message(
                 session_id,
@@ -730,11 +732,12 @@ class AgentOrchestrator:
                 agents.append(agent)
             return agents
         except Exception as exc:
-            logger.warning(
-                "[Orchestrator] failed to build skill agents: "
-                "exception_type=%s diagnostic=%s",
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "[Orchestrator] failed to build skill agents",
+                exc,
+                error_code="agent_skill_build_failed",
+                level=logging.WARNING,
             )
             return []
 
@@ -774,11 +777,12 @@ class AgentOrchestrator:
             else:
                 logger.info("[Orchestrator] no skill opinions to aggregate")
         except Exception as exc:
-            logger.warning(
-                "[Orchestrator] skill aggregation failed: "
-                "exception_type=%s diagnostic=%s",
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "[Orchestrator] skill aggregation failed",
+                exc,
+                error_code="agent_skill_aggregation_failed",
+                level=logging.WARNING,
             )
 
     def _aggregate_strategy_opinions(self, ctx: AgentContext) -> None:

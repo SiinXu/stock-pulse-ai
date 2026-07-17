@@ -15,6 +15,8 @@ from typing import Any, Optional
 
 import requests
 
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -144,7 +146,13 @@ def is_valid_remote_stock_index_file(cache_path: Path = DEFAULT_STOCK_INDEX_CACH
     except FileNotFoundError:
         return False
     except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
-        logger.warning("[stock-index] cached remote index is invalid: %s", exc)
+        log_safe_exception(
+            logger,
+            "Cached remote stock index is invalid",
+            exc,
+            error_code="cached_remote_stock_index_invalid",
+            level=logging.WARNING,
+        )
         return False
 
 
@@ -177,7 +185,13 @@ def _clear_backend_stock_index_cache() -> None:
 
         clear_stock_index_cache()
     except Exception as exc:  # noqa: BLE001 - cache clearing must not break refresh.
-        logger.warning("[stock-index] remote index refreshed but backend cache clear failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "Remote stock index refreshed but backend cache clear failed",
+            exc,
+            error_code="stock_index_backend_cache_clear_failed",
+            level=logging.WARNING,
+        )
 
 
 def _reset_remote_failure_state() -> None:
@@ -246,13 +260,19 @@ def refresh_remote_stock_index_cache(settings: RemoteStockIndexSettings) -> Remo
         logger.info("[stock-index] remote index refreshed: %s", cache_path)
         return RemoteStockIndexResult(cache_path=cache_path, refreshed=True)
     except Exception as exc:  # noqa: BLE001 - remote refresh is best-effort by design.
-        message = str(exc)
+        message = "remote stock index update failed"
         failures = _record_remote_failure(current_time, settings.ttl_hours)
-        logger.warning(
-            "[stock-index] remote update failed (%d/%d), using local fallback: %s",
-            failures,
-            DEFAULT_STOCK_INDEX_REMOTE_MAX_FAILURES,
-            message,
+        log_safe_exception(
+            logger,
+            "Remote stock index update failed; using local fallback",
+            exc,
+            error_code="stock_index_remote_update_failed",
+            level=logging.WARNING,
+            context={
+                "failure_count": failures,
+                "max_failures": DEFAULT_STOCK_INDEX_REMOTE_MAX_FAILURES,
+            },
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         if is_valid_remote_stock_index_file(cache_path):
             return RemoteStockIndexResult(cache_path=cache_path, error=message)

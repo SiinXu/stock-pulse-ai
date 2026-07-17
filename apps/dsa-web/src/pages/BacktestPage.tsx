@@ -26,9 +26,9 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/de
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_INPUT_CLASS =
-  'h-11 w-full rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const BACKTEST_COMPACT_INPUT_CLASS =
-  'h-11 rounded-[10px] border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
 type BacktestFilterSnapshot = {
@@ -522,7 +522,7 @@ const BacktestPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-full flex flex-col rounded-[1.5rem] bg-transparent">
+    <div className="min-h-full flex flex-col rounded-3xl bg-transparent">
       {/* Header */}
       <header className="flex-shrink-0 border-b border-white/5 px-3 py-3 sm:px-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -706,7 +706,7 @@ const BacktestPage: React.FC = () => {
                 <span className="backtest-table-scroll-hint">{text.scrollHint}</span>
               </div>
               <div className="backtest-table-wrapper">
-                <table className="backtest-table min-w-[900px] w-full text-sm">
+                <table className="backtest-table min-w-224 w-full text-sm">
                   <thead className="backtest-table-head">
                     <tr className="text-left">
                       <th className="backtest-table-head-cell">{text.stock}</th>
@@ -742,7 +742,7 @@ const BacktestPage: React.FC = () => {
                           </td>
                           <td className="backtest-table-cell text-secondary-text">{row.analysisDate || '--'}</td>
                           <td className="backtest-table-cell text-secondary-text">{phaseLabel(row, language)}</td>
-                          <td className="backtest-table-cell max-w-[220px] text-foreground">
+                          <td className="backtest-table-cell max-w-56 text-foreground">
                             {predictionParts.length ? (
                               <Tooltip
                                 content={predictionParts.join(' / ')}

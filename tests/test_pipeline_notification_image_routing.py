@@ -187,7 +187,10 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
         pipeline.notifier._send_wechat_image.assert_not_called()
         pipeline.notifier.send_to_wechat.assert_called_once_with("dashboard-report")
         self.assertTrue(
-            any("企业微信 Markdown 转图片失败" in str(call.args[0]) for call in mock_warning.call_args_list)
+            any(
+                "WeCom Markdown-to-image conversion failed" in str(call.args[0])
+                for call in mock_warning.call_args_list
+            )
         )
 
 
@@ -366,17 +369,60 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
     def test_channel_exception_does_not_skip_later_channel_and_records_noise(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.TELEGRAM, NotificationChannel.EMAIL])
-        pipeline.notifier.send_to_telegram.side_effect = RuntimeError("telegram failed")
+        canary = "notification-channel-canary"
+        pipeline.notifier.send_to_telegram.side_effect = RuntimeError(
+            f"telegram failed api_key={canary} at "
+            f"https://private.example.invalid/notify?token={canary}"
+        )
         pipeline.notifier.send_to_email.return_value = True
         pipeline.config = SimpleNamespace(stock_email_groups=[])
         results = [SimpleNamespace(code="000001")]
 
-        pipeline._send_notifications(results, ReportType.SIMPLE)
+        with self.assertLogs("src.core.pipeline", level="ERROR") as logs:
+            pipeline._send_notifications(results, ReportType.SIMPLE)
 
         pipeline.notifier.send_to_telegram.assert_called_once_with("report:000001")
         pipeline.notifier.send_to_email.assert_called_once_with("report:000001")
         pipeline.notifier.record_noise_control.assert_called_once()
         pipeline.notifier.release_noise_control.assert_not_called()
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("error_code=pipeline_notification_channel_failed", rendered_logs)
+        self.assertIn("channel=telegram", rendered_logs)
+        self.assertIn("exception_type=RuntimeError", rendered_logs)
+        self.assertIn("[REDACTED]", rendered_logs)
+        self.assertIn("[REDACTED_URL]", rendered_logs)
+        self.assertNotIn(canary, rendered_logs)
+        self.assertNotIn("private.example.invalid", rendered_logs)
+        self.assertNotIn("Traceback (most recent call last)", rendered_logs)
+
+    def test_notification_pipeline_failure_logs_only_safe_diagnostic(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier([NotificationChannel.TELEGRAM])
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        pipeline.save_context_snapshot = False
+        canary = "notification-pipeline-canary"
+        pipeline._generate_aggregate_report = MagicMock(
+            side_effect=RuntimeError(
+                f"report failed Authorization: Bearer {canary} at "
+                f"https://private.example.invalid/report?token={canary}"
+            )
+        )
+
+        with self.assertLogs("src.core.pipeline", level="ERROR") as logs:
+            pipeline._send_notifications(
+                [SimpleNamespace(code="000001")],
+                ReportType.SIMPLE,
+            )
+
+        rendered_logs = "\n".join(logs.output)
+        self.assertIn("Notification delivery failed", rendered_logs)
+        self.assertIn("error_code=pipeline_notification_delivery_failed", rendered_logs)
+        self.assertIn("exception_type=RuntimeError", rendered_logs)
+        self.assertIn("[REDACTED]", rendered_logs)
+        self.assertIn("[REDACTED_URL]", rendered_logs)
+        self.assertNotIn(canary, rendered_logs)
+        self.assertNotIn("private.example.invalid", rendered_logs)
+        self.assertNotIn("Traceback (most recent call last)", rendered_logs)
 
     def test_all_static_channel_failures_release_noise_reservation(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -422,7 +468,7 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
         self.assertFalse(notification_runs[1]["success"])
         self.assertTrue(
             any(
-                call.args and call.args[0] == "决策仪表盘推送成功"
+                call.args and call.args[0] == "Decision dashboard delivered"
                 for call in mock_info.call_args_list
             )
         )

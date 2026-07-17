@@ -16,6 +16,7 @@ from typing import Dict, Optional, TYPE_CHECKING
 from bot.models import WebhookResponse
 from bot.dispatcher import get_dispatcher
 from bot.platforms import ALL_PLATFORMS
+from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from bot.platforms.base import BotPlatform  # noqa: F401
@@ -43,7 +44,7 @@ def get_platform(platform_name: str) -> Optional['BotPlatform']:
         if platform_class:
             _platform_instances[platform_name] = platform_class()
         else:
-            logger.warning(f"[BotHandler] 未知平台: {platform_name}")
+            logger.warning("[BotHandler] Unknown platform: %s", platform_name)
             return None
 
     return _platform_instances[platform_name]
@@ -69,14 +70,14 @@ def handle_webhook(
     Returns:
         WebhookResponse 响应对象
     """
-    logger.info(f"[BotHandler] 收到 {platform_name} Webhook 请求")
+    logger.info("[BotHandler] Received webhook request: platform=%s", platform_name)
 
     # 检查机器人功能是否启用
     from src.config import get_config
     config = get_config()
 
     if not getattr(config, 'bot_enabled', True):
-        logger.info("[BotHandler] 机器人功能未启用")
+        logger.info("[BotHandler] Bot integration is disabled")
         return WebhookResponse.success()
 
     # 获取平台适配器
@@ -87,23 +88,32 @@ def handle_webhook(
     # 解析 JSON 数据
     try:
         data = json.loads(body.decode('utf-8')) if body else {}
-    except json.JSONDecodeError as e:
-        logger.error(f"[BotHandler] JSON 解析失败: {e}")
+    except json.JSONDecodeError as exc:
+        log_safe_exception(
+            logger,
+            "[BotHandler] Webhook JSON parsing failed",
+            exc,
+            error_code="bot_webhook_invalid_json",
+            level=logging.WARNING,
+            context={"platform": platform_name},
+        )
         return WebhookResponse.error("Invalid JSON", 400)
 
-    logger.debug(f"[BotHandler] 请求数据: {json.dumps(data, ensure_ascii=False)[:500]}")
+    logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
 
     # 处理 Webhook
     message, immediate_response = platform.handle_webhook(headers, body, data)
 
     # 如果是验证/错误响应且没有消息需要处理，直接返回
     if immediate_response and not message:
-        logger.info("[BotHandler] 返回验证响应")
+        logger.info("[BotHandler] Returning immediate verification response")
         return immediate_response
 
     # 延迟响应（如 Discord type 5）：立即返回 ACK，后台处理命令
     if immediate_response and message:
-        logger.info("[BotHandler] 返回延迟 ACK，后台处理命令")
+        logger.info(
+            "[BotHandler] Returning deferred acknowledgement and dispatching in background"
+        )
 
         def _deferred_dispatch() -> None:
             try:
@@ -112,17 +122,27 @@ def handle_webhook(
                 if response.text:
                     platform.send_followup(response, message)
             except Exception as exc:
-                logger.error("[BotHandler] 延迟命令处理失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "[BotHandler] Deferred command dispatch failed",
+                    exc,
+                    error_code="bot_deferred_dispatch_failed",
+                    context={"platform": platform_name},
+                )
 
         threading.Thread(target=_deferred_dispatch, daemon=True).start()
         return immediate_response
 
     # 如果没有消息需要处理，返回空响应
     if not message:
-        logger.debug("[BotHandler] 无需处理的消息")
+        logger.debug("[BotHandler] Webhook did not contain a processable message")
         return WebhookResponse.success()
 
-    logger.info(f"[BotHandler] 解析到消息: user={message.user_name}, content={message.content[:50]}")
+    logger.info(
+        "[BotHandler] Parsed message: chat_type=%s content_length=%d",
+        message.chat_type.value,
+        len(message.content),
+    )
 
     # 分发到命令处理器
     dispatcher = get_dispatcher()
@@ -147,13 +167,16 @@ async def handle_webhook_async(
     Preferred when called from an async context (e.g. FastAPI endpoint)
     to avoid blocking the event loop.
     """
-    logger.info(f"[BotHandler] 收到 {platform_name} Webhook 请求 (async)")
+    logger.info(
+        "[BotHandler] Received asynchronous webhook request: platform=%s",
+        platform_name,
+    )
 
     from src.config import get_config
     config = get_config()
 
     if not getattr(config, 'bot_enabled', True):
-        logger.info("[BotHandler] 机器人功能未启用")
+        logger.info("[BotHandler] Bot integration is disabled")
         return WebhookResponse.success()
 
     platform = get_platform(platform_name)
@@ -162,20 +185,29 @@ async def handle_webhook_async(
 
     try:
         data = json.loads(body.decode('utf-8')) if body else {}
-    except json.JSONDecodeError as e:
-        logger.error(f"[BotHandler] JSON 解析失败: {e}")
+    except json.JSONDecodeError as exc:
+        log_safe_exception(
+            logger,
+            "[BotHandler] Webhook JSON parsing failed",
+            exc,
+            error_code="bot_webhook_invalid_json",
+            level=logging.WARNING,
+            context={"platform": platform_name},
+        )
         return WebhookResponse.error("Invalid JSON", 400)
 
-    logger.debug(f"[BotHandler] 请求数据: {json.dumps(data, ensure_ascii=False)[:500]}")
+    logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
 
     message, immediate_response = platform.handle_webhook(headers, body, data)
 
     if immediate_response and not message:
-        logger.info("[BotHandler] 返回验证响应")
+        logger.info("[BotHandler] Returning immediate verification response")
         return immediate_response
 
     if immediate_response and message:
-        logger.info("[BotHandler] 返回延迟 ACK，后台处理命令 (async)")
+        logger.info(
+            "[BotHandler] Returning deferred acknowledgement and dispatching asynchronously"
+        )
 
         async def _deferred_dispatch() -> None:
             try:
@@ -184,16 +216,26 @@ async def handle_webhook_async(
                 if response.text:
                     await asyncio.to_thread(platform.send_followup, response, message)
             except Exception as exc:
-                logger.error("[BotHandler] 延迟命令处理失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "[BotHandler] Deferred command dispatch failed",
+                    exc,
+                    error_code="bot_deferred_dispatch_failed",
+                    context={"platform": platform_name},
+                )
 
         asyncio.ensure_future(_deferred_dispatch())
         return immediate_response
 
     if not message:
-        logger.debug("[BotHandler] 无需处理的消息")
+        logger.debug("[BotHandler] Webhook did not contain a processable message")
         return WebhookResponse.success()
 
-    logger.info(f"[BotHandler] 解析到消息: user={message.user_name}, content={message.content[:50]}")
+    logger.info(
+        "[BotHandler] Parsed message: chat_type=%s content_length=%d",
+        message.chat_type.value,
+        len(message.content),
+    )
 
     dispatcher = get_dispatcher()
     response = await dispatcher.dispatch_async(message)

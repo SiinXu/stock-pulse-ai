@@ -341,6 +341,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `FUNDAMENTAL_RETRY_MAX` | Retry count for fundamental capabilities (including the first attempt) | `1` | Optional |
 | `FUNDAMENTAL_CACHE_TTL_SECONDS` | Fundamental aggregation cache TTL (seconds), short cache to reduce repeated API pulling. | `120` | Optional |
 | `FUNDAMENTAL_CACHE_MAX_ENTRIES` | Maximum entries for fundamental cache (evicted by time within TTL) | `256` | Optional |
+| `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` | Replay window, in days, for idempotent Portfolio writes (`1-3650`). Older records are lazily removed by a later successful keyed write. | `7` | Optional |
 
 > **Behavior Notes:**
 > - **A-shares**: Returns aggregated capabilities by `valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards`.
@@ -1346,6 +1347,7 @@ FastAPI provides RESTful API service for configuration management and triggering
 
 - **Configuration Management** - View/modify watchlist
 - **Home workspace tri-view** - Home now has History / Watchlist / Today tabs, with History as the default view; Watchlist supports batch submission for all stocks or only those not analyzed today
+- **Restorable Home links** - Historical reports use `?recordId=<positive integer>`; task Run Flow uses `?runFlow=task&runFlowTaskId=<task_id>`; history Run Flow uses `?runFlow=history&runFlowRecordId=<positive integer>`. User selections push browser history, while closing Run Flow removes only its parameters and preserves the report plus unrelated query state. Refresh, sharing, Back, and Forward restore from the URL. Invalid, unauthorized, or deleted identities show a localized error and are removed with replace navigation.
 - **UI Language Switch** - Toggle UI language (`zh`/`en`) on login page, shell/navigation, settings page, and shared controls; this switch is independent of `REPORT_LANGUAGE`.
 - **Quick Analysis** - Trigger stock analysis via API; the Home page also provides a Market Review button that starts a background market recap in Docker/server mode
 - **Strategy selection** - The Home page supports explicitly selecting analysis strategy skills; when `skills` is omitted, analysis uses the server default strategy so legacy clients keep existing behavior
@@ -1533,8 +1535,11 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 
 ### Idempotent portfolio mutations
 
-- Trade, cash-ledger, corporate-action, and CSV commit requests accept a client `operation_id`; clients may also send the same value in the `Idempotency-Key` header.
-- Retrying the same operation ID with the same payload replays the first committed response. This prevents duplicate ledger entries when the original response times out after commit. Reusing an ID with a different payload returns `409 idempotency_conflict`.
+- Trade, cash-ledger, corporate-action, and CSV commit requests accept a client `operation_id`; clients may also send the same value in the `Idempotency-Key` header. Identity is scoped by operation type, account, account owner, and client key, so another type, account, or owner may safely reuse the same key.
+- Within the default seven-day replay window, retrying the same scoped operation ID with the same payload replays the first committed response. This prevents duplicate ledger entries when the original response times out after commit. Reusing the same scoped ID with a different payload returns `409 idempotency_conflict`. `PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS` changes the window.
+- Expired idempotency records are lazily removed by a later keyed Portfolio write and an expired key starts a new operation. Cleanup, lookup, and ledger mutation share the same atomic transaction. Cleanup deletes only `portfolio_idempotency_records`; it does not delete trades, cash entries, corporate actions, snapshots, or any other ledger data.
+- Existing SQLite tables receive nullable scope columns, a unique index, and a legacy-write guard trigger through an additive migration. Raw-key legacy rows cannot prove their historical owner at write time, so they are retained unscoped and are not replayed by the current runtime; the same client key starts a new scoped operation.
+- Rollback uses a normal code revert while retaining the nullable columns, index, guard trigger, and all ledger data. The old runtime cannot read a v2 scoped response. If it tries to insert a raw row for an existing v2 client key, the trigger aborts the same transaction and rolls back the ledger mutation, preventing duplication but returning a failure instead of a replay. Other raw-key rows created during rollback remain unscoped on re-upgrade, so they cannot collide with the v2 unique index or block startup.
 - CSV records are committed in one portfolio-ledger transaction with per-row savepoints. The batch summary and operation result are persisted together; a `409 portfolio_busy` retry must reuse the original operation ID.
 - The Web client keeps the operation ID after a failed request, locks fields and close behavior while submission is pending, and changes compact forms to one column at 320px.
 

@@ -103,7 +103,7 @@ describe('App routing behavior', () => {
 
     const { container } = render(<App />);
 
-    expect(container.querySelector('.border-t-cyan')).toBeInTheDocument();
+    expect(container.querySelector('.border-t-primary')).toBeInTheDocument();
   });
 
   it('redirects protected routes to login when auth is enabled but user is not logged in', async () => {

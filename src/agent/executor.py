@@ -38,6 +38,7 @@ from src.market_context import get_market_role, get_market_guidelines
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
 from src.services.daily_market_context import format_daily_market_context_prompt_section
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -675,11 +676,12 @@ class AgentExecutor:
                 stock_scope=scope_resolution.stock_scope,
             )
         except Exception as exc:
-            logger.error(
-                "Agent chat execution raised: session_id=%s exception_type=%s diagnostic=%s",
-                session_id,
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "Agent chat execution raised",
+                exc,
+                error_code="agent_chat_failed",
+                context={"session_id": session_id},
             )
             conversation_manager.add_message(
                 session_id,
@@ -736,13 +738,13 @@ class AgentExecutor:
                 anchor_assistant_message_id=assistant_message_id,
             )
         except Exception as exc:
-            logger.warning(
-                "Provider trace extraction failed for session %s run %s "
-                "exception_type=%s diagnostic=%s",
-                session_id,
-                run_id,
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "Provider trace extraction failed",
+                exc,
+                error_code="agent_provider_trace_extraction_failed",
+                level=logging.WARNING,
+                context={"session_id": session_id, "run_id": run_id},
             )
             return
 
@@ -759,13 +761,13 @@ class AgentExecutor:
         try:
             db = get_db()
         except Exception as exc:
-            logger.warning(
-                "Provider trace storage unavailable for session %s run %s "
-                "exception_type=%s diagnostic=%s",
-                session_id,
-                run_id,
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "Provider trace storage unavailable",
+                exc,
+                error_code="agent_provider_trace_storage_unavailable",
+                level=logging.WARNING,
+                context={"session_id": session_id, "run_id": run_id},
             )
             return
 
@@ -786,15 +788,18 @@ class AgentExecutor:
                     estimated_tokens=turn.estimated_tokens,
                 )
             except Exception as exc:
-                logger.warning(
-                    "Provider trace persistence failed for session %s run %s "
-                    "provider=%s model=%s exception_type=%s diagnostic=%s",
-                    session_id,
-                    run_id,
-                    turn.provider,
-                    turn.model,
-                    type(exc).__name__,
-                    sanitize_agent_diagnostic(exc),
+                log_safe_exception(
+                    logger,
+                    "Provider trace persistence failed",
+                    exc,
+                    error_code="agent_provider_trace_persistence_failed",
+                    level=logging.WARNING,
+                    context={
+                        "session_id": session_id,
+                        "run_id": run_id,
+                        "provider": turn.provider,
+                        "model": turn.model,
+                    },
                 )
 
     def _run_loop(

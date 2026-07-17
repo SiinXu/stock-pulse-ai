@@ -17,6 +17,7 @@ from src.agent.agents.base_agent import BaseAgent
 from src.agent.protocols import AgentContext, AgentOpinion
 from src.agent.runner import try_parse_json
 from src.agent.skills.defaults import build_skill_agent_name
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,14 @@ class SkillAgent(BaseAgent):
             sm = get_skill_manager()
             return sm.get(skill_id)
         except Exception as exc:
-            logger.warning("[SkillAgent] failed to load skill '%s': %s", skill_id, exc)
+            log_safe_exception(
+                logger,
+                "Skill agent definition loading failed",
+                exc,
+                error_code="agent_skill_definition_load_failed",
+                level=logging.WARNING,
+                context={"skill_id": skill_id},
+            )
         return None
 
     def system_prompt(self, ctx: AgentContext) -> str:

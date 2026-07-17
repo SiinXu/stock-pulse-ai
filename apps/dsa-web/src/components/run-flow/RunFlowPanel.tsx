@@ -1,7 +1,8 @@
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw, Workflow } from 'lucide-react';
 import { Button, EmptyState, InlineAlert } from '../common';
+import type { ParsedApiError } from '../../api/error';
 import { useRunFlowSnapshot } from '../../hooks/useRunFlowSnapshot';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowSnapshotSource } from '../../types/runFlow';
@@ -14,9 +15,22 @@ import { buildRunFlowTopologyModel } from './topologyViewModel';
 interface RunFlowPanelProps {
   source: RunFlowSnapshotSource | null;
   title?: string;
+  onUnavailable?: (error: ParsedApiError) => void;
 }
 
-export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title }) => {
+const isPermanentlyUnavailable = (error: ParsedApiError | null): error is ParsedApiError => Boolean(
+  error
+  && (
+    error.status === 401
+    || error.status === 403
+    || error.status === 404
+    || error.code === 'unauthorized'
+    || error.code === 'forbidden'
+    || error.code === 'not_found'
+  ),
+);
+
+export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUnavailable }) => {
   const { t } = useUiLanguage();
   const { snapshot, isLoading, error, refetch } = useRunFlowSnapshot({
     source,
@@ -25,6 +39,27 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title }) => 
   const [explicitSelectedNodeId, setExplicitSelectedNodeId] = useState<string | null>(null);
   const [isDetailsClosed, setIsDetailsClosed] = useState(false);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
+  const unavailableReportKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isPermanentlyUnavailable(error) || !onUnavailable) {
+      if (!error) {
+        unavailableReportKeyRef.current = null;
+      }
+      return;
+    }
+    const sourceKey = source?.type === 'task'
+      ? `task:${source.taskId}`
+      : source?.type === 'history'
+        ? `history:${source.recordId}`
+        : 'none';
+    const reportKey = `${sourceKey}:${error.status ?? error.code ?? 'unavailable'}`;
+    if (unavailableReportKeyRef.current === reportKey) {
+      return;
+    }
+    unavailableReportKeyRef.current = reportKey;
+    onUnavailable(error);
+  }, [error, onUnavailable, source]);
   const topology = useMemo(
     () => (snapshot ? buildRunFlowTopologyModel(snapshot, { expandedGroupIds }) : null),
     [expandedGroupIds, snapshot],

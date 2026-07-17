@@ -22,6 +22,8 @@ from typing import Optional, Tuple
 
 from dotenv import dotenv_values
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 COOKIE_NAME = "dsa_session"
@@ -93,8 +95,13 @@ def rotate_session_secret() -> bool:
         _session_secret = new_secret
         logger.info("Session secret rotated successfully")
         return True
-    except OSError as e:
-        logger.error("Failed to rotate .session_secret: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Session secret rotation failed",
+            exc,
+            error_code="session_secret_rotation_failed",
+        )
         return False
 
 
@@ -129,8 +136,13 @@ def _load_session_secret() -> Optional[bytes]:
         else:
             _session_secret = new_secret
         return _session_secret
-    except OSError as e:
-        logger.error("Failed to create or read .session_secret: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Session secret load or creation failed",
+            exc,
+            error_code="session_secret_load_failed",
+        )
         return None
 
 
@@ -181,8 +193,13 @@ def _load_credential_from_file() -> bool:
             return False
         _password_hash_salt, _password_hash_stored = parsed
         return True
-    except OSError as e:
-        logger.error("Failed to read credential file: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Admin credential file read failed",
+            exc,
+            error_code="admin_credential_file_read_failed",
+        )
         return False
 
 
@@ -274,8 +291,13 @@ def set_initial_password(password: str) -> Optional[str]:
         tmp_path.replace(cred_path)
         _load_credential_from_file()
         return None
-    except OSError as e:
-        logger.error("Failed to write credential file: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Admin credential file write failed",
+            exc,
+            error_code="admin_credential_file_write_failed",
+        )
         return "密码保存失败"
 
 
@@ -324,8 +346,13 @@ def change_password(current: str, new: str) -> Optional[str]:
         # Reload into memory so subsequent verify_password uses new hash
         _load_credential_from_file()
         return None
-    except OSError as e:
-        logger.error("Failed to write credential file: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Admin credential file write failed",
+            exc,
+            error_code="admin_credential_file_write_failed",
+        )
         return "密码保存失败"
 
 
@@ -454,8 +481,13 @@ def overwrite_password(new_password: str) -> Optional[str]:
         tmp_path.replace(cred_path)
         _load_credential_from_file()
         return None
-    except OSError as e:
-        logger.error("Failed to write credential file: %s", e)
+    except OSError as exc:
+        log_safe_exception(
+            logger,
+            "Admin credential file write failed",
+            exc,
+            error_code="admin_credential_file_write_failed",
+        )
         return "密码保存失败"
 
 

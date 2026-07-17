@@ -12,6 +12,7 @@ def test_error_body_uses_stable_envelope() -> None:
         "message": "bad input",
         "params": {},
         "details": None,
+        "detail": None,
         "trace_id": None,
     }
 
@@ -26,6 +27,7 @@ def test_api_error_uses_standard_detail_shape() -> None:
         "message": "missing",
         "params": {},
         "details": {"id": 1},
+        "detail": {"id": 1},
         "trace_id": None,
     }
 
@@ -36,5 +38,18 @@ def test_error_json_response_uses_standard_content() -> None:
     assert response.status_code == 409
     assert response.body == (
         b'{"error":"conflict","message":"already exists","params":{},'
-        b'"details":null,"trace_id":null}'
+        b'"details":null,"detail":null,"trace_id":null}'
     )
+
+
+def test_legacy_detail_is_a_read_only_output_alias_of_details() -> None:
+    body = error_body(
+        "validation_error",
+        "bad input",
+        details={"issues": [{"field": "name"}]},
+        detail={"ignored": "legacy input cannot override canonical details"},
+    )
+
+    assert body["detail"] == body["details"]
+    assert body["detail"] is body["details"]
+    assert body["details"] == {"issues": [{"field": "name"}]}

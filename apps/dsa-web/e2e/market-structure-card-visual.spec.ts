@@ -4,7 +4,6 @@ import {
   test,
   type Browser,
   type Page,
-  type TestInfo,
 } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,8 +22,8 @@ import { createServer as createViteServer, type ViteDevServer } from 'vite';
  * store/report pipeline: history list auto-select -> history detail with
  * `details.market_structure` -> camelCase conversion -> card render.
  *
- * Coverage: light/dark themes x desktop(1280x900)/mobile(390x844) viewports,
- * with per-scenario screenshots attached as Playwright artifacts.
+ * Coverage: light/dark themes x desktop(1280x900)/mobile(390x844) viewports.
+ * Assertions remain DOM-based because the secret-bearing CI run is text-only.
  */
 
 test.use({ locale: 'zh-CN' });
@@ -252,26 +251,6 @@ const SCENARIOS: Scenario[] = [
   { id: 'dark-mobile-390', theme: 'dark', viewport: { width: 390, height: 844 } },
 ];
 
-async function attachScreenshots(page: Page, scenario: Scenario, testInfo: TestInfo): Promise<void> {
-  const card = page.getByRole('region', { name: CARD_REGION_NAME });
-  await card.scrollIntoViewIfNeeded();
-
-  const cardShotPath = testInfo.outputPath(`market-structure-card-${scenario.id}.png`);
-  const cardShot = await card.screenshot({ path: cardShotPath });
-  expect(cardShot.length).toBeGreaterThan(1024);
-  await testInfo.attach(`market-structure-card-${scenario.id}`, {
-    path: cardShotPath,
-    contentType: 'image/png',
-  });
-
-  const pageShotPath = testInfo.outputPath(`home-market-review-${scenario.id}.png`);
-  await page.screenshot({ path: pageShotPath, fullPage: false });
-  await testInfo.attach(`home-market-review-${scenario.id}`, {
-    path: pageShotPath,
-    contentType: 'image/png',
-  });
-}
-
 test.describe('MarketStructureCard on the real market review page', () => {
   let browser: Browser | null = null;
   let viteServer: ViteDevServer | null = null;
@@ -312,7 +291,7 @@ test.describe('MarketStructureCard on the real market review page', () => {
   });
 
   for (const scenario of SCENARIOS) {
-    test(`renders inside MarketReviewReportView (${scenario.id})`, async ({ browser: _unused }, testInfo) => {
+    test(`renders inside MarketReviewReportView (${scenario.id})`, async ({ browser: _unused }) => {
       void _unused;
       test.setTimeout(180_000);
 
@@ -344,16 +323,14 @@ test.describe('MarketStructureCard on the real market review page', () => {
         const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
         expect(isDark).toBe(scenario.theme === 'dark');
 
-        await attachScreenshots(page, scenario, testInfo);
       } finally {
         await context.close();
       }
     });
   }
 
-  test('legacy market review reports without marketStructure render without the card', async ({ browser: _unused }, testInfo) => {
+  test('legacy market review reports without marketStructure render without the card', async ({ browser: _unused }) => {
     void _unused;
-    void testInfo;
     test.setTimeout(180_000);
 
     const context = await browser!.newContext({

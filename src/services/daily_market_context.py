@@ -23,6 +23,7 @@ from src.services.run_diagnostics import (
     reset_run_diagnostic_context,
 )
 from src.storage import DatabaseManager
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,14 @@ class DailyMarketContextService:
                 limit=20,
             )
         except Exception as exc:
-            logger.warning("读取大盘复盘历史失败，跳过市场上下文缓存: %s", exc)
+            log_safe_exception(
+                logger,
+                "Market review history lookup failed; skipping context cache",
+                exc,
+                error_code="market_review_history_lookup_failed",
+                level=logging.WARNING,
+                context={"region": region, "target_date": target_date.isoformat()},
+            )
             return None
 
         for record in records or []:
@@ -482,10 +490,13 @@ class DailyMarketContextService:
                 query_id=caller_query_id,
             )
         except Exception as exc:
-            logger.warning(
-                "大盘复盘上下文生成失败，个股分析继续: %s",
+            log_safe_exception(
+                logger,
+                "Market review context generation failed; stock analysis continues",
                 exc,
-                exc_info=True,
+                error_code="market_review_context_generation_failed",
+                level=logging.WARNING,
+                context={"region": region, "target_date": target_date.isoformat()},
             )
             return None
         finally:

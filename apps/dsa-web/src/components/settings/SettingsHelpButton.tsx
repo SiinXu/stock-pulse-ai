@@ -1,15 +1,12 @@
-import { CircleHelp, ExternalLink, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { CircleHelp, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
 import type React from 'react';
-import { createPortal } from 'react-dom';
 import type { SystemConfigFieldSchema } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
-import { cn } from '../../utils/cn';
-import { Tooltip } from '../common';
-import { OVERLAY_Z } from '../common/overlayZ';
+import { Modal, Tooltip } from '../common';
 
 interface SettingsHelpButtonProps {
   fieldKey: string;
@@ -21,19 +18,6 @@ interface SettingsHelpButtonProps {
   description?: string;
   /** Whether the saved config sets this key explicitly (vs. using the default). */
   rawValueExists?: boolean;
-}
-
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function getFocusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
 }
 
 function hasItems<T>(items: T[] | undefined): items is T[] {
@@ -128,76 +112,10 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
           ? t('settings.sourceUnset')
           : '';
   const [open, setOpen] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const titleId = useId();
   const examples = providedExamples ?? help?.examples ?? schema?.examples ?? [];
   const docs = providedDocs?.length ? providedDocs : schema?.docs?.length ? schema.docs : help?.docs ?? [];
   const showFieldKey = help?.showFieldKey ?? true;
   const helpButtonLabel = formatUiText(SETTINGS_MISC_TEXT[language].helpLabel, { title });
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const focusDialogStart = () => {
-      closeButtonRef.current?.focus();
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        return;
-      }
-
-      if (event.key !== 'Tab') {
-        return;
-      }
-
-      const dialog = dialogRef.current;
-      if (!dialog) {
-        return;
-      }
-
-      const focusableElements = getFocusableElements(dialog);
-      if (!focusableElements.length) {
-        event.preventDefault();
-        dialog.focus();
-        return;
-      }
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      const activeElement = document.activeElement;
-
-      if (event.shiftKey) {
-        if (!activeElement || !dialog.contains(activeElement) || activeElement === firstElement) {
-          event.preventDefault();
-          lastElement.focus();
-        }
-        return;
-      }
-
-      if (!activeElement || !dialog.contains(activeElement) || activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    const triggerButton = buttonRef.current;
-    document.body.style.overflow = 'hidden';
-    focusDialogStart();
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
-      triggerButton?.focus();
-    };
-  }, [open]);
 
   if (!help) {
     return null;
@@ -208,12 +126,11 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
       <Tooltip content={t('settings.helpTooltip')}>
         <span className="inline-flex">
           <button
-            ref={buttonRef}
             type="button"
             className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent text-muted-text transition-colors hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)] hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
             aria-label={helpButtonLabel}
             aria-expanded={open}
-            aria-controls={open ? titleId : undefined}
+            aria-haspopup="dialog"
             onClick={() => setOpen(true)}
           >
             <CircleHelp aria-hidden="true" className="h-4 w-4" />
@@ -221,118 +138,77 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
         </span>
       </Tooltip>
 
-      {open && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-              className="fixed inset-0 flex items-end bg-background/25 backdrop-blur-sm sm:items-center sm:justify-center"
-              style={{ zIndex: OVERLAY_Z.settingsModal }}
-            >
-              <button
-                type="button"
-                className="absolute inset-0 cursor-default"
-                aria-label={t('settings.helpClose')}
-                tabIndex={-1}
-                onClick={() => setOpen(false)}
-              />
-              <div
-                ref={dialogRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                tabIndex={-1}
-                className={cn(
-                  'relative flex max-h-[88vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border/80 bg-card shadow-soft-card-strong',
-                  'sm:max-w-2xl sm:rounded-2xl',
-                )}
-              >
-                <div className="h-1 w-full bg-gradient-to-r from-primary/70 via-primary/40 to-transparent" />
-                <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
-                  <div className="min-w-0">
-                    {showFieldKey ? (
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
-                        {fieldKey}
-                      </p>
-                    ) : null}
-                    <h2 id={titleId} className="mt-1 text-lg font-semibold text-foreground">
-                      {help.title || title}
-                    </h2>
-                    {help.summary ? (
-                      <p className="mt-2 text-sm leading-6 text-secondary-text">{help.summary}</p>
-                    ) : null}
-                  </div>
-                  <button
-                    ref={closeButtonRef}
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
-                    aria-label={t('settings.helpClose')}
+      <Modal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title={help.title || title}
+        description={help.summary}
+        closeLabel={t('settings.helpClose')}
+        className="max-w-2xl"
+      >
+        <div className="space-y-5">
+          {showFieldKey ? (
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
+              {fieldKey}
+            </p>
+          ) : null}
+          <HelpSection title={t('settings.helpPurpose')}>
+            {help.usage ? <p className="text-sm leading-6 text-secondary-text">{help.usage}</p> : null}
+          </HelpSection>
+
+          {valueSource ? (
+            <HelpSection title={t('settings.helpCurrentSource')}>
+              <p className="text-sm leading-6 text-secondary-text">
+                {sourceLabel}
+                {valueSource === 'default' && !schema?.isSensitive ? (
+                  <>
+                    {' '}
+                    <span className="text-muted-text">{t('settings.sourceDefaultValueLabel')}: </span>
+                    <code className="rounded bg-background/70 px-1.5 py-0.5 font-mono text-xs text-foreground">{defaultValue}</code>
+                  </>
+                ) : null}
+              </p>
+            </HelpSection>
+          ) : null}
+
+          <HelpSection title={t('settings.helpValueNotes')}>
+            <HelpList items={help.valueNotes} />
+          </HelpSection>
+
+          {hasItems(examples) ? (
+            <HelpSection title={t('settings.helpExamples')}>
+              <CodeExamples examples={examples} />
+            </HelpSection>
+          ) : null}
+
+          <HelpSection title={t('settings.helpImpact')}>
+            <HelpList items={help.impact} />
+          </HelpSection>
+
+          <HelpSection title={t('settings.helpNotes')}>
+            <HelpList items={help.notes} />
+          </HelpSection>
+
+          {hasItems(docs) ? (
+            <HelpSection title={t('settings.helpRelatedDocs')}>
+              <div className="flex flex-wrap gap-2">
+                {docs.map((doc) => (
+                  <a
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                    href={doc.href}
+                    key={`${doc.label}-${doc.href}`}
+                    rel="noreferrer"
+                    target="_blank"
                   >
-                    <X aria-hidden="true" className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-5 overflow-y-auto px-5 py-5">
-                  <HelpSection title={t('settings.helpPurpose')}>
-                    {help.usage ? <p className="text-sm leading-6 text-secondary-text">{help.usage}</p> : null}
-                  </HelpSection>
-
-                  {valueSource ? (
-                    <HelpSection title={t('settings.helpCurrentSource')}>
-                      <p className="text-sm leading-6 text-secondary-text">
-                        {sourceLabel}
-                        {valueSource === 'default' && !schema?.isSensitive ? (
-                          <>
-                            {' '}
-                            <span className="text-muted-text">{t('settings.sourceDefaultValueLabel')}: </span>
-                            <code className="rounded bg-background/70 px-1.5 py-0.5 font-mono text-xs text-foreground">{defaultValue}</code>
-                          </>
-                        ) : null}
-                      </p>
-                    </HelpSection>
-                  ) : null}
-
-                  <HelpSection title={t('settings.helpValueNotes')}>
-                    <HelpList items={help.valueNotes} />
-                  </HelpSection>
-
-                  {hasItems(examples) ? (
-                    <HelpSection title={t('settings.helpExamples')}>
-                      <CodeExamples examples={examples} />
-                    </HelpSection>
-                  ) : null}
-
-                  <HelpSection title={t('settings.helpImpact')}>
-                    <HelpList items={help.impact} />
-                  </HelpSection>
-
-                  <HelpSection title={t('settings.helpNotes')}>
-                    <HelpList items={help.notes} />
-                  </HelpSection>
-
-                  {hasItems(docs) ? (
-                    <HelpSection title={t('settings.helpRelatedDocs')}>
-                      <div className="flex flex-wrap gap-2">
-                        {docs.map((doc) => (
-                          <a
-                            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-                            href={doc.href}
-                            key={`${doc.label}-${doc.href}`}
-                            rel="noreferrer"
-                            target="_blank"
-                          >
-                            <span>{doc.label}</span>
-                            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-                          </a>
-                        ))}
-                      </div>
-                    </HelpSection>
-                  ) : null}
-                </div>
+                    <span>{doc.label}</span>
+                    <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
+                  </a>
+                ))}
               </div>
-            </div>,
-            document.body,
-          )
-        : null}
+            </HelpSection>
+          ) : null}
+        </div>
+      </Modal>
     </>
   );
 };

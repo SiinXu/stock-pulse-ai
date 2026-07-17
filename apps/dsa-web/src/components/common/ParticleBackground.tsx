@@ -10,7 +10,19 @@ type Particle = {
   baseAlpha: number;
 };
 
-const PARTICLE_COLORS = ['135, 137, 128', '65, 184, 61', '155, 157, 149', '135, 137, 128'];
+const PARTICLE_COLORS = [
+  '--muted-text',
+  '--primary',
+  '--secondary-text',
+  '--muted-text',
+];
+
+function colorWithAlpha(
+  color: string,
+  alpha: number,
+): string {
+  return `hsl(${color} / ${alpha})`;
+}
 
 function createParticle(canvas: HTMLCanvasElement): Particle {
   return {
@@ -36,10 +48,14 @@ function updateParticle(particle: Particle, canvas: HTMLCanvasElement) {
   }
 }
 
-function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle) {
+function drawParticle(
+  ctx: CanvasRenderingContext2D,
+  particle: Particle,
+  color: string,
+) {
   ctx.beginPath();
   ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(${particle.color}, ${particle.baseAlpha})`;
+  ctx.fillStyle = colorWithAlpha(color, particle.baseAlpha);
   ctx.fill();
 }
 
@@ -51,6 +67,7 @@ export const ParticleBackground = () => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const styles = getComputedStyle(canvas);
 
     let animationFrameId: number;
     let particles: Particle[] = [];
@@ -72,7 +89,11 @@ export const ParticleBackground = () => {
       }
     };
 
-    const drawLines = (c: CanvasRenderingContext2D) => {
+    const drawLines = (
+      c: CanvasRenderingContext2D,
+      primaryColor: string,
+      mutedColor: string,
+    ) => {
       for (let i = 0; i < particles.length; i++) {
         const dxMouse = particles[i].x - mouse.x;
         const dyMouse = particles[i].y - mouse.y;
@@ -81,12 +102,12 @@ export const ParticleBackground = () => {
         if (distMouse > 0 && distMouse < 250) {
           c.beginPath();
           const opacity = 0.8 * (1 - distMouse / 250);
-          c.strokeStyle = `rgba(65, 184, 61, ${opacity})`;
+          c.strokeStyle = colorWithAlpha(primaryColor, opacity);
           c.lineWidth = 2.0;
           c.moveTo(particles[i].x, particles[i].y);
           c.lineTo(mouse.x, mouse.y);
           c.stroke();
-          
+
           const force = (250 - distMouse) / 250;
           particles[i].x += (dxMouse / distMouse) * force * 2.0;
           particles[i].y += (dyMouse / distMouse) * force * 2.0;
@@ -100,7 +121,7 @@ export const ParticleBackground = () => {
           if (dist < 150) {
             c.beginPath();
             const opacity = 0.3 * (1 - dist / 150);
-            c.strokeStyle = `rgba(135, 137, 128, ${opacity})`;
+            c.strokeStyle = colorWithAlpha(mutedColor, opacity);
             c.lineWidth = 0.8;
             c.moveTo(particles[i].x, particles[i].y);
             c.lineTo(particles[j].x, particles[j].y);
@@ -113,12 +134,20 @@ export const ParticleBackground = () => {
     const animate = () => {
       if (!canvas || !ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const mutedColor = styles.getPropertyValue('--muted-text').trim();
+      const primaryColor = styles.getPropertyValue('--primary').trim();
+      const secondaryColor = styles.getPropertyValue('--secondary-text').trim();
 
       particles.forEach((particle) => {
         updateParticle(particle, canvas);
-        drawParticle(ctx, particle);
+        const color = particle.color === '--primary'
+          ? primaryColor
+          : particle.color === '--secondary-text'
+            ? secondaryColor
+            : mutedColor;
+        drawParticle(ctx, particle, color);
       });
-      drawLines(ctx);
+      drawLines(ctx, primaryColor, mutedColor);
 
       animationFrameId = requestAnimationFrame(animate);
     };

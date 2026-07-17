@@ -14,6 +14,7 @@ from typing import List, Optional
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,11 @@ class AnalyzeCommand(BotCommand):
         report_type = "simple"
         if len(args) > 1 and args[1].lower() in ["full", "完整", "详细"]:
             report_type = "full"
-        logger.info(f"[AnalyzeCommand] 分析股票: {code}, 报告类型: {report_type}")
+        logger.info(
+            "[AnalyzeCommand] Analyzing stock: code=%s report_type=%s",
+            code,
+            report_type,
+        )
         
         try:
             # 调用分析服务
@@ -99,9 +104,14 @@ class AnalyzeCommand(BotCommand):
                     f"分析完成后将自动推送结果。"
                 )
             else:
-                error = result.get("error", "未知错误")
-                return BotResponse.error_response(f"提交分析任务失败: {error}")
+                return BotResponse.error_response("提交分析任务失败，请稍后重试")
                 
-        except Exception as e:
-            logger.error(f"[AnalyzeCommand] 执行失败: {e}")
-            return BotResponse.error_response(f"分析失败: {str(e)[:100]}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[AnalyzeCommand] Analysis execution failed",
+                exc,
+                error_code="bot_analyze_failed",
+                context={"stock_code": code, "report_type": report_type},
+            )
+            return BotResponse.error_response("分析失败，请稍后重试")

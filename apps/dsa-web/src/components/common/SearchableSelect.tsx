@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
@@ -42,6 +50,15 @@ interface SearchableSelectProps {
   clearable?: boolean;
 }
 
+interface PopupPosition {
+  top: number;
+  left: number;
+  maxHeight: number;
+}
+
+const POPUP_GAP = 4;
+const VIEWPORT_MARGIN = 8;
+
 /**
  * A strict searchable select: the user can only pick from the provided
  * options (no free-text values). A persisted value missing from the list is
@@ -77,6 +94,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [activeIndex, setActiveIndex] = useState(0);
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -111,6 +129,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     if (disabled) {
       return;
     }
+    setPopupPosition(null);
     setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
     setPortalHost(
       (triggerRef.current?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body,
@@ -123,10 +142,36 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const close = useCallback((refocus: boolean) => {
     setIsOpen(false);
     setQuery('');
+    setPopupPosition(null);
     if (refocus) {
       triggerRef.current?.focus();
     }
   }, []);
+
+  useLayoutEffect(() => {
+    const popup = popoverRef.current;
+    if (!isOpen || !triggerRect || !popup) {
+      return;
+    }
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const popupRect = popup.getBoundingClientRect();
+    const maxHeight = Math.max(viewportHeight - (VIEWPORT_MARGIN * 2), 0);
+    const popupHeight = Math.min(popupRect.height, maxHeight);
+    const availableBelow = viewportHeight - triggerRect.bottom - POPUP_GAP - VIEWPORT_MARGIN;
+    const availableAbove = triggerRect.top - POPUP_GAP - VIEWPORT_MARGIN;
+    const openAbove = popupHeight > availableBelow && availableAbove > availableBelow;
+    const preferredTop = openAbove
+      ? triggerRect.top - POPUP_GAP - popupHeight
+      : triggerRect.bottom + POPUP_GAP;
+    const maxTop = Math.max(viewportHeight - VIEWPORT_MARGIN - popupHeight, VIEWPORT_MARGIN);
+    const top = Math.min(Math.max(preferredTop, VIEWPORT_MARGIN), maxTop);
+    const maxLeft = Math.max(viewportWidth - VIEWPORT_MARGIN - popupRect.width, VIEWPORT_MARGIN);
+    const left = Math.min(Math.max(triggerRect.left, VIEWPORT_MARGIN), maxLeft);
+
+    setPopupPosition({ top, left, maxHeight });
+  }, [isOpen, navItems.length, portalHost, query, triggerRect]);
 
   const commit = useCallback(
     (next: string) => {
@@ -246,7 +291,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground',
+            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-full border bg-transparent px-3 text-left text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : '',
@@ -290,7 +335,13 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <div
             ref={popoverRef}
             data-dialog-popup="true"
-            style={{ top: triggerRect.bottom + 4, left: triggerRect.left, minWidth: triggerRect.width }}
+            style={{
+              top: popupPosition?.top ?? triggerRect.bottom + POPUP_GAP,
+              left: popupPosition?.left ?? triggerRect.left,
+              minWidth: triggerRect.width,
+              maxHeight: popupPosition?.maxHeight,
+              visibility: popupPosition ? 'visible' : 'hidden',
+            }}
             className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">
@@ -314,7 +365,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                 className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
               />
             </div>
-            <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="max-h-60 overflow-auto p-1">
+            <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="min-h-0 max-h-60 overflow-auto p-1">
               {navItems.length === 0 ? (
                 <li role="presentation" className="px-3 py-1.5 text-xs text-muted-text">
                   {emptyText ?? t('common.noMatches')}

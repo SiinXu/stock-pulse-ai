@@ -120,7 +120,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
       <details data-testid="analysis-context-summary" className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan/10 text-cyan">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Database className="h-4 w-4" aria-hidden="true" />
             </span>
             <span className="min-w-0">
@@ -166,7 +166,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
             eyebrow={text.eyebrow}
             title={text.title}
             leading={(
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan/10 text-cyan">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Database className="h-4 w-4" aria-hidden="true" />
               </span>
             )}

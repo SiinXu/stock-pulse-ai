@@ -10,6 +10,7 @@ import logging
 from typing import Optional
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,16 @@ def _handle_analyze_trend(stock_code: str) -> dict:
     analyzer = StockTrendAnalyzer()
     try:
         result = analyzer.analyze(df, stock_code)
-    except Exception:
-        logger.warning("analyze_trend(%s): Trend analysis failed", stock_code, exc_info=True)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Agent trend analysis failed",
+            exc,
+            error_code="agent_trend_analysis_failed",
+            level=logging.WARNING,
+            context={"stock_code": stock_code},
+            exception_redaction_values=exception_chain_redaction_values(exc),
+        )
         return {"error": f"Trend analysis failed for {stock_code}"}
 
     return {

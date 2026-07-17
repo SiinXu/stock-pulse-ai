@@ -30,6 +30,7 @@ from src.services.run_diagnostics import (
     record_notification_run,
 )
 from src.schemas.market_light import MARKET_LIGHT_REGIONS
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,14 @@ def _refresh_market_review_history_diagnostics(*, query_id: str) -> None:
                 diagnostics=diagnostic_snapshot,
             )
     except Exception as exc:
-        logger.warning("回写大盘复盘运行诊断失败（fail-open）: %s", exc)
+        log_safe_exception(
+            logger,
+            "Market review run diagnostic update failed open",
+            exc,
+            error_code="market_review_diagnostic_update_failed_open",
+            level=logging.WARNING,
+            context={"query_id": query_id},
+        )
 
 
 def _record_market_review_notification_run(
@@ -428,22 +436,30 @@ def run_market_review(
                 return merge_markdown_report
             return review_report
         
-    except GenerationError:
-        logger.exception(
-            "[MarketReview] component=market_review action=failed "
-            "reason=generation_backend_config trigger_source=%s query_id=%s region=%s",
-            trigger_source,
-            history_query_id,
-            persist_region,
+    except GenerationError as exc:
+        log_safe_exception(
+            logger,
+            "Market review generation backend failed",
+            exc,
+            error_code="market_review_generation_backend_failed",
+            context={
+                "trigger_source": trigger_source,
+                "query_id": history_query_id,
+                "region": persist_region,
+            },
         )
         raise
-    except Exception:
-        logger.exception(
-            "[MarketReview] component=market_review action=failed "
-            "trigger_source=%s query_id=%s region=%s",
-            trigger_source,
-            history_query_id,
-            persist_region,
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Market review execution failed",
+            exc,
+            error_code="market_review_execution_failed",
+            context={
+                "trigger_source": trigger_source,
+                "query_id": history_query_id,
+                "region": persist_region,
+            },
         )
     
     return None
@@ -861,7 +877,14 @@ def _persist_market_review_history(
             metadata_saved=False,
             error_message=exc,
         )
-        logger.warning("大盘复盘历史记录保存异常，报告文件与推送流程继续: %s", exc, exc_info=True)
+        log_safe_exception(
+            logger,
+            "Market review history persistence failed; report and notifications continue",
+            exc,
+            error_code="market_review_history_persistence_failed",
+            level=logging.WARNING,
+            context={"query_id": history_query_id},
+        )
         return 0
 
 

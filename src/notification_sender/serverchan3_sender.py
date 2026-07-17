@@ -12,6 +12,7 @@ from datetime import datetime
 import re
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -104,8 +105,11 @@ class Serverchan3Sender:
                 logger.error(f"响应内容: {response.text}")
                 return False
 
-        except Exception as e:
-            logger.error(f"发送 Server酱3 消息失败: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "ServerChan3 message delivery failed",
+                exc,
+                error_code="serverchan3_delivery_failed",
+            )
             return False

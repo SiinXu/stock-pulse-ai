@@ -5036,26 +5036,42 @@ def evaluate_config_conditions(
     Returns 'met', 'not_met', or 'unknown'. An unknown operator yields 'unknown'
     so callers can fail-safe (keep the field visible and still validated).
     """
+    if conditions is None:
+        return "met"
+    if not isinstance(conditions, list):
+        return "unknown"
     if not conditions:
         return "met"
+    all_met = True
     for condition in conditions:
-        key = str(condition.get("key", "")).upper()
+        if not isinstance(condition, dict):
+            return "unknown"
+        key = str(condition.get("key", "")).strip().upper()
+        if not key:
+            return "unknown"
         operator = condition.get("operator")
         expected = condition.get("value")
         actual = str(config_map.get(key, "") or "")
         if operator == "equals":
-            met = actual == str(expected)
+            if isinstance(expected, list):
+                return "unknown"
+            expected_scalar = "" if expected is None else str(expected)
+            met = actual == expected_scalar
         elif operator == "notEquals":
-            met = actual != str(expected)
+            if isinstance(expected, list):
+                return "unknown"
+            expected_scalar = "" if expected is None else str(expected)
+            met = actual != expected_scalar
         elif operator == "in":
-            met = actual in [str(value) for value in (expected or [])]
+            if not isinstance(expected, list):
+                return "unknown"
+            met = actual in [str(value) for value in expected]
         elif operator == "notEmpty":
             met = bool(actual.strip())
         else:
             return "unknown"
-        if not met:
-            return "not_met"
-    return "met"
+        all_met = all_met and met
+    return "met" if all_met else "not_met"
 
 
 def build_schema_response() -> Dict[str, Any]:

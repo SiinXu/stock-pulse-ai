@@ -21,6 +21,7 @@ import tempfile
 from typing import Optional
 
 from src.formatters import markdown_to_html_document
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,27 @@ def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
     except subprocess.TimeoutExpired:
         logger.warning("m2f conversion timed out (60s)")
         return None
-    except Exception as e:
-        logger.warning("markdown_to_image (m2f) failed: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Markdown-to-file image conversion failed",
+            exc,
+            error_code="markdown_to_file_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
     finally:
         if temp_dir and os.path.isdir(temp_dir):
             try:
                 shutil.rmtree(temp_dir)
-            except OSError as e:
-                logger.debug("Failed to remove temp dir %s: %s", temp_dir, e)
+            except OSError as exc:
+                log_safe_exception(
+                    logger,
+                    "Markdown image temporary directory cleanup failed",
+                    exc,
+                    error_code="markdown_image_temp_cleanup_failed",
+                    level=logging.DEBUG,
+                )
 
 
 def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
@@ -92,14 +105,32 @@ def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
             return out
         logger.warning("imgkit.from_string returned empty or invalid result")
         return None
-    except OSError as e:
-        if "wkhtmltoimage" in str(e).lower() or "wkhtmltopdf" in str(e).lower():
-            logger.debug("wkhtmltopdf/wkhtmltoimage not found: %s", e)
+    except OSError as exc:
+        if "wkhtmltoimage" in str(exc).lower() or "wkhtmltopdf" in str(exc).lower():
+            log_safe_exception(
+                logger,
+                "wkhtmltoimage executable is unavailable",
+                exc,
+                error_code="wkhtmltoimage_unavailable",
+                level=logging.DEBUG,
+            )
         else:
-            logger.warning("imgkit/wkhtmltoimage error: %s", e)
+            log_safe_exception(
+                logger,
+                "wkhtmltoimage conversion failed",
+                exc,
+                error_code="wkhtmltoimage_conversion_failed",
+                level=logging.WARNING,
+            )
         return None
-    except Exception as e:
-        logger.warning("markdown_to_image conversion failed: %s", e)
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Markdown image conversion failed",
+            exc,
+            error_code="markdown_image_conversion_failed",
+            level=logging.WARNING,
+        )
         return None
 
 

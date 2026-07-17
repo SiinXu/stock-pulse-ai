@@ -153,19 +153,22 @@ LITELLM_MODEL=ollama/qwen3:8b
 
 **网页端可以直接配：** 你可以启动程序后，在 **Web UI 的“系统设置 -> AI 与模型 -> 模型接入”** 中非常直观地进行可视化配置！
 
-> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型 / 任务模型”组织。Provider Catalog 决定字段要求和是否显示“获取模型”；OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`，不支持发现或发现失败时可逐个手动添加。发现结果不会自动全选。每个模型是独立 token，底层仍保存为 `LLM_{CONNECTION}_MODELS=model1,model2`；Provider 身份另存为 `LLM_{CONNECTION}_PROVIDER=<provider_id>`，不会再从可重命名的 Connection 名称猜测。任务路由中的报告 / Agent / Vision / 备用模型只能从可用模型目录选择，不支持任意输入；历史失效值会保留并标记“当前配置不可用”，保存不会静默清理。
+> **新版编辑体验补充**：模型接入按“模型服务商 / 模型连接 / 可用模型 / 任务模型”组织。动态 `connection_fields` Schema 决定字段的必填、显隐与启用状态；Provider Catalog 的权威职责仅限于 Provider 身份、双语标签、默认 Base URL、协议、发现能力、本地/自定义属性和相关链接，其中 `supports_discovery` 决定是否显示“获取模型”。OpenAI-compatible 使用模型列表接口，Ollama 使用 `/api/tags`，不支持发现或发现失败时可逐个手动添加。发现结果不会自动全选。每个模型是独立 token，底层仍保存为 `LLM_{CONNECTION}_MODELS=model1,model2`；Provider 身份另存为 `LLM_{CONNECTION}_PROVIDER=<provider_id>`，不会再从可重命名的 Connection 名称猜测。任务路由中的报告 / Agent / Vision / 备用模型只能从可用模型目录选择，不支持任意输入；历史失效值会保留并标记“当前配置不可用”，保存不会静默清理。
 
 可用模型目录使用 connection-aware `ModelRef` 作为任务模型身份，唯一性由 `connection_id + runtime_route` 决定。两条 OpenAI Connection 都提供同名模型时会显示为两个独立选项，任务路由保存具体 Connection 的 `ModelRef`，执行前再解析到该 Connection 的凭据、端点和 runtime route。旧配置中的裸 route 只有唯一 Connection 匹配时才兼容；多连接同 route 会返回 `ambiguous_model_route` 并要求用户明确选择，不会静默选第一条。YAML alias 没有 Connection 身份时继续按 legacy route 兼容。
 
 ### 首次启动配置状态
 
-后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用 Provider Catalog 的凭据、Base URL 和发现能力契约；Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
+后端提供只读状态接口 `GET /api/v1/system/config/setup/status`，用于判断首次启动闭环中最基础的几类配置是否已经就绪：LLM 主连接、Agent 模型、自选股、通知渠道和本地存储。首次向导与日常模型接入共用同一份 `connection_fields` 字段契约；Provider Catalog 权威提供 Provider 身份、标签、初始化默认值、发现能力与相关链接，但不权威决定字段 requirement。按当前内置 Schema，Ollama 免 Key，官方默认地址无需手填，Custom 才要求 Base URL。向导会写入显式 `_PROVIDER`，不会覆盖已有 Connection，也不会保存裸模型名或自动全选发现结果。状态接口本身只读取已保存的 `.env` 与当前进程环境变量，不会重载运行时配置、写入 `.env`、测试真实模型或创建数据库文件。
 
 ### Web 模型连接编辑器的兼容性 / 迁移 / 回退规则
 
 - Provider / Base URL 只用于**初始化表单**；真正落盘时包含 `LLM_{CONNECTION}_PROVIDER`、`LLM_{CONNECTION}_PROTOCOL`、`LLM_{CONNECTION}_BASE_URL`、`LLM_{CONNECTION}_MODELS` 和 `LLM_{CONNECTION}_API_KEY(S)`。Provider ID 与 Connection 名称分离；旧配置只在名称精确等于 Catalog ID 时兼容推断，不按 `openai2` 等前缀猜测，也不静默迁移。
 - “获取模型”是否可用由 Provider Catalog 的 `supports_discovery` 决定；OpenAI-compatible / DeepSeek 使用模型列表接口，Ollama 使用 `{base_url}/api/tags` 并允许空 Key。“测试连接”默认只对模型列表首项发起一次最小聊天请求，并在结果中展示后端规范化后的 `resolved_model`。若返回 `details.reason=model_access_denied`，请优先确认该模型是否已在当前账号/key 下开通；未覆盖或语义不同的 provider 文案会继续走兜底诊断。可选的“运行时能力检测”必须由用户显式选择后触发，会额外发起 JSON / tools / stream / vision smoke 请求；诊断不会写回 `.env`，也不会阻止保存。
 - Provider Catalog 同时提供可选的获取凭据、控制台、模型列表和官方文档地址。模型接入弹窗与首次向导只消费这些后端元数据：缺少地址时不显示空入口，外链在新标签页安全打开；Web 不再按 Provider ID 维护第二份业务外链表。Catalog 暂时失败时，已保存 Connection 仍按持久化 Provider ID/兼容摘要显示，不能被误标为 Custom；失败只限制新增或依赖 Catalog 的编辑动作。
+- `GET /api/v1/system/config/llm/providers` 同时返回动态 Connection 的 `connection_fields` 字段 Schema。只要响应中存在该属性（Web 转换后为 `connectionFields`），即使值是显式空数组 `[]`，Schema 也是 required/visible/enabled 与可写字段集合的唯一权威来源，Web 不得读取 Provider 条目中的 legacy requirement flags。只有旧后端完全省略该属性时，才启用隔离的 rolling-upgrade Catalog fallback。后端保存校验和 Web 完整度提示按同一 `contract` 及 AND 条件语义处理 `connection_name/display_name/provider_id/protocol/base_url/api_key/api_keys/models/extra_headers/enabled`；AND 列表中任一未知 operator 都优先于更早出现的未满足条件，字段保持可见、只读并显示诊断，且阻止保存。旧 `is_required` 仍作为 deprecated 兼容投影，`contract.requirement/required_when` 才是权威来源；`requires_connection_test` 只描述状态，不把连接测试变成保存门禁。仅对完全省略 `LLM_<CONNECTION>_DISPLAY_NAME` 的旧配置兼容使用 Connection ID 作为显示名；显式提交空值仍按必填契约拒绝。
+- Catalog 内置 Provider 同时提供 `label_zh` 与 `label_en`，Web 按当前界面语言即时选择显示文本；legacy `label` 仅为兼容字段。Provider ID、protocol、capability 和用户自定义 display name 不参与翻译，英文目标 label 缺失时回退到稳定 Provider ID，不会把内置中文 label 放进英文界面。
+- System Config 的 409/422 错误 envelope 以 `details` 为权威诊断字段，并在兼容窗口内输出同值的 deprecated `detail` 只读别名；旧客户端可继续读取 `detail`，新客户端应优先读取 `details`。该别名只会在未来 major 或 versioned API 中移除。
 - 配置 Schema 的 `contract` 会通过 API 完整返回 `requirement`、`required_when`、`visible_when`、`enabled_when` 与 `requires_connection_test`。Web 仅解释这些条件，后端仍负责权威校验；滚动部署或旧缓存导致 AI 字段缺失/出现未知 `ui_placement` 时，该字段只会进入“高级”只读诊断，不会重新成为普通编辑入口。未知条件同样保持可见但只读，并展示 Schema 诊断码。
 - 日常设置路径没有全局 Save。配置变更按后端 category 分组，所有 Connection、任务路由和 fallback 键归入同一个 `ai_model` 原子组，并在停止编辑 700ms 后串行自动保存。每组独立显示“等待保存 / 保存中 / 已保存 / 失败 / 冲突”；失败保留草稿并支持重试或恢复服务器值，409 使用 `base/server/local` 冲突视图，当前分组 Reset 不影响其它组。保存中、失败或冲突草稿会触发离开保护；masked secret 只有实际修改时才提交。连接测试和模型发现仍是显式诊断动作，不会被自动保存触发，也不作为保存硬门禁。
 - 配置 GET 对 Schema 标记为 `is_sensitive` 的所有字段统一返回 mask token，不把 Provider Key、通知 token/password/webhook 或 Connection 附加认证头发送到浏览器；`raw_value_exists` 只表示服务端是否已有持久化值。动态 `LLM_{CONNECTION}_EXTRA_HEADERS` 是敏感 JSON 对象，无效 JSON 或数组会被后端拒绝，不会在运行时静默忽略。

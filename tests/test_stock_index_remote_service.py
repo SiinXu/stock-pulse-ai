@@ -120,7 +120,7 @@ def test_refresh_remote_stock_index_cache_keeps_old_cache_on_download_failure(tm
         result = service.refresh_remote_stock_index_cache(settings)
 
     assert result.cache_path == cache_path
-    assert result.error == "timeout"
+    assert result.error == "remote stock index update failed"
     assert json.loads(cache_path.read_text(encoding="utf-8"))[0][2] == "旧缓存"
 
 

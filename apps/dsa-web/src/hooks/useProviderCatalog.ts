@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
-import type { LlmProviderCatalogEntry } from '../types/systemConfig';
+import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../types/systemConfig';
+import {
+  inspectConnectionSchemaDefinition,
+  type ConnectionSchemaDefinition,
+} from '../utils/connectionSchemaAuthority';
 
 interface ProviderCatalogState {
   providers: LlmProviderCatalogEntry[];
+  connectionFields?: LlmConnectionFieldSchema[];
+  connectionSchemaDefinition: ConnectionSchemaDefinition;
   emptyApiKeyHosts: string[];
   isLoading: boolean;
   error: string | null;
@@ -12,12 +18,12 @@ interface ProviderCatalogState {
 
 /**
  * Fetches the authoritative LLM provider catalog from the backend. This is the
- * single business source of truth for provider metadata (labels, protocol,
- * default endpoint, credential/base-URL requirements, capabilities) — the Web
- * must not maintain a second hardcoded list.
+ * single source of Provider identity/default/capability metadata. Dynamic
+ * field requirements come from connectionFields when that property is present.
  */
 export function useProviderCatalog(): ProviderCatalogState {
   const [providers, setProviders] = useState<LlmProviderCatalogEntry[]>([]);
+  const [connectionFields, setConnectionFields] = useState<LlmConnectionFieldSchema[] | undefined>();
   const [emptyApiKeyHosts, setEmptyApiKeyHosts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +47,7 @@ export function useProviderCatalog(): ProviderCatalogState {
           return;
         }
         setProviders(response.providers ?? []);
+        setConnectionFields(response.connectionFields);
         setEmptyApiKeyHosts(response.emptyApiKeyHosts ?? []);
         setIsLoading(false);
       })
@@ -58,5 +65,18 @@ export function useProviderCatalog(): ProviderCatalogState {
     };
   }, [reloadToken]);
 
-  return { providers, emptyApiKeyHosts, isLoading, error, reload };
+  const connectionSchemaDefinition = useMemo(
+    () => inspectConnectionSchemaDefinition(connectionFields),
+    [connectionFields],
+  );
+
+  return {
+    providers,
+    connectionFields,
+    connectionSchemaDefinition,
+    emptyApiKeyHosts,
+    isLoading,
+    error,
+    reload,
+  };
 }

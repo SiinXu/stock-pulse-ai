@@ -17,6 +17,7 @@ import smtplib
 
 from data_provider.base import normalize_stock_code
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import markdown_to_html_document
 
 
@@ -214,11 +215,21 @@ class EmailSender:
         except smtplib.SMTPAuthenticationError:
             logger.error("邮件发送失败：认证错误，请检查邮箱和授权码是否正确")
             return False
-        except smtplib.SMTPConnectError as e:
-            logger.error(f"邮件发送失败：无法连接 SMTP 服务器 - {e}")
+        except smtplib.SMTPConnectError as exc:
+            log_safe_exception(
+                logger,
+                "Email SMTP connection failed",
+                exc,
+                error_code="email_smtp_connection_failed",
+            )
             return False
-        except Exception as e:
-            logger.error(f"发送邮件失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Email delivery failed",
+                exc,
+                error_code="email_delivery_failed",
+            )
             return False
         finally:
             self._close_server(server)
@@ -273,8 +284,13 @@ class EmailSender:
             server.send_message(msg)
             logger.info("邮件（内联图片）发送成功，收件人: %s", receivers)
             return True
-        except Exception as e:
-            logger.error("邮件（内联图片）发送失败: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Email inline image delivery failed",
+                exc,
+                error_code="email_inline_image_delivery_failed",
+            )
             return False
         finally:
             self._close_server(server)

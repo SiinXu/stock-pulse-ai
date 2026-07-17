@@ -33,7 +33,7 @@ function renderPhaseQuality(trigger: AlertTriggerItem, language: 'zh' | 'en'): R
       {phase ? <Badge variant="default">{phase.replace(/^.*?:\s*/, '')}</Badge> : null}
       {quality ? <div className="text-xs text-secondary-text">{formatUiText(text.quality, { quality })}</div> : null}
       {limitations.length ? (
-        <div className="max-w-[180px] text-xs text-muted-text">{limitations.join(language === 'en' ? '; ' : '；')}</div>
+        <div className="max-w-44 text-xs text-muted-text">{limitations.join(language === 'en' ? '; ' : '；')}</div>
       ) : null}
     </div>
   );
@@ -59,7 +59,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({ trigge
       ) : null}
       {!isLoading && triggers.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left text-sm">
+          <table className="w-full min-w-216 text-left text-sm">
             <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
               <tr>
                 <th className="px-3 py-2 font-medium">{text.status}</th>

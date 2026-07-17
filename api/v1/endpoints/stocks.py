@@ -42,6 +42,7 @@ from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
 from src.services.system_config_service import SystemConfigService
 from data_provider.base import normalize_stock_code
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,14 @@ def extract_from_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.warning(f"读取上传文件失败: {e}")
+        log_safe_exception(
+            logger,
+            "Stock image upload read failed",
+            e,
+            error_code="stock_image_read_failed",
+            level=logging.WARNING,
+            context={"content_type": content_type},
+        )
         raise HTTPException(
             status_code=400,
             detail={"error": "read_failed", "message": "读取上传文件失败"},
@@ -188,7 +196,13 @@ def extract_from_image(
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": "extract_failed", "message": str(e)})
     except Exception as e:
-        logger.error(f"图片提取失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Stock image extraction failed",
+            e,
+            error_code="internal_error",
+            context={"content_type": content_type},
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "图片提取失败"},
@@ -220,7 +234,13 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
         try:
             body = await request.json()
         except Exception as e:
-            logger.warning("[parse_import] JSON parse failed: %s", e)
+            log_safe_exception(
+                logger,
+                "Stock import JSON parsing failed",
+                e,
+                error_code="invalid_json",
+                level=logging.WARNING,
+            )
             raise HTTPException(
                 status_code=400,
                 detail={"error": "invalid_json", "message": f"JSON 解析失败: {e}"},
@@ -235,10 +255,13 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
             items = parse_import_from_text(text)
         except ValueError as e:
             text_bytes = len(text.encode("utf-8"))
-            logger.warning(
-                "[parse_import] parse_import_from_text failed: text_bytes=%d, error=%s",
-                text_bytes,
+            log_safe_exception(
+                logger,
+                "Stock import text parsing failed",
                 e,
+                error_code="parse_failed",
+                level=logging.WARNING,
+                context={"text_bytes": text_bytes},
             )
             raise HTTPException(status_code=400, detail={"error": "parse_failed", "message": str(e)})
     elif "multipart" in content_type:
@@ -273,11 +296,13 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
         except Exception as e:
             filename = getattr(file, "filename", None) or ""
             size = getattr(file, "size", None)
-            logger.warning(
-                "[parse_import] file read failed: filename=%r, size=%s, error=%s",
-                filename,
-                size,
+            log_safe_exception(
+                logger,
+                "Stock import file read failed",
                 e,
+                error_code="read_failed",
+                level=logging.WARNING,
+                context={"filename": filename, "size": size},
             )
             raise HTTPException(
                 status_code=400,
@@ -288,12 +313,13 @@ async def parse_import(request: Request) -> ExtractFromImageResponse:
             items = parse_import_from_bytes(data, filename=filename)
         except ValueError as e:
             ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-            logger.warning(
-                "[parse_import] parse_import_from_bytes failed: filename=%r, ext=%r, bytes=%d, error=%s",
-                filename,
-                ext,
-                len(data),
+            log_safe_exception(
+                logger,
+                "Stock import file parsing failed",
                 e,
+                error_code="parse_failed",
+                level=logging.WARNING,
+                context={"filename": filename, "extension": ext, "bytes": len(data)},
             )
             raise HTTPException(status_code=400, detail={"error": "parse_failed", "message": str(e)})
     else:
@@ -330,7 +356,12 @@ def get_watchlist(
         codes = _read_watchlist_codes(service)
         return WatchlistResponse(stock_codes=codes, message=f"当前自选 {len(codes)} 只股票")
     except Exception as e:
-        logger.error(f"获取自选队列失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Watchlist query failed",
+            e,
+            error_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"获取自选队列失败: {str(e)}"},
@@ -363,7 +394,13 @@ def add_to_watchlist(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"加入自选失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Watchlist add failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": request.stock_code},
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"加入自选失败: {str(e)}"},
@@ -398,7 +435,13 @@ def remove_from_watchlist(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"从自选删除失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Watchlist removal failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": request.stock_code},
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"从自选删除失败: {str(e)}"},
@@ -464,7 +507,13 @@ def get_stock_quote(stock_code: str) -> StockQuote:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"获取实时行情失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Realtime quote query failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": stock_code},
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -545,7 +594,13 @@ def get_stock_history(
             }
         )
     except Exception as e:
-        logger.error(f"获取历史行情失败: {e}", exc_info=True)
+        log_safe_exception(
+            logger,
+            "Historical quote query failed",
+            e,
+            error_code="internal_error",
+            context={"stock_code": stock_code, "period": period},
+        )
         raise HTTPException(
             status_code=500,
             detail={

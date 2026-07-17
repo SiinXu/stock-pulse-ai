@@ -37,7 +37,11 @@ from src.storage import (
     utc_naive_now,
 )
 from src.utils.data_processing import parse_json_field
-from src.utils.sanitize import sanitize_decision_signal_payload, sanitize_decision_signal_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_decision_signal_payload,
+    sanitize_decision_signal_text,
+)
 
 
 SOURCE_TYPES = frozenset({"analysis", "agent", "alert", "market_review", "manual"})
@@ -435,11 +439,13 @@ class DecisionSignalService:
             if isinstance(signal_id, int):
                 self._invalidate_history_backfill_if_superseded(signal_id)
         except Exception as exc:
-            logger.warning(
-                "Decision signal lazy backfill failed: source_report_id=%s error=%s",
-                source_report_id,
+            log_safe_exception(
+                logger,
+                "Decision signal lazy backfill failed",
                 exc,
-                exc_info=True,
+                error_code="decision_signal_lazy_backfill_failed",
+                level=logging.WARNING,
+                context={"source_report_id": source_report_id},
             )
 
     @staticmethod
@@ -1194,11 +1200,13 @@ class DecisionSignalService:
         try:
             return json.loads(value)
         except json.JSONDecodeError as exc:
-            logger.warning(
-                "Invalid decision signal JSON: id=%s field=%s error=%s",
-                signal_id,
-                field_name,
+            log_safe_exception(
+                logger,
+                "Persisted decision signal JSON is invalid",
                 exc,
+                error_code="persisted_decision_signal_json_invalid",
+                level=logging.WARNING,
+                context={"signal_id": signal_id, "field": field_name},
             )
             raise DecisionSignalStorageError(
                 f"invalid persisted JSON for decision signal {signal_id} field {field_name}"

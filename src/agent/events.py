@@ -31,7 +31,13 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.config import Config
+    from src.notification import NotificationService
+
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -242,9 +248,29 @@ class EventMonitor:
                             else:
                                 await asyncio.to_thread(cb, result)
                         except Exception as exc:
-                            logger.warning("[EventMonitor] Callback error: %s", exc)
+                            log_safe_exception(
+                                logger,
+                                "Event monitor callback failed",
+                                exc,
+                                error_code="event_monitor_callback_failed",
+                                level=logging.WARNING,
+                                context={
+                                    "stock_code": rule.stock_code,
+                                    "alert_type": rule.alert_type.value,
+                                },
+                            )
             except Exception as exc:
-                logger.debug("[EventMonitor] Check failed for %s: %s", rule.description, exc)
+                log_safe_exception(
+                    logger,
+                    "Event monitor rule check failed",
+                    exc,
+                    error_code="event_monitor_rule_check_failed",
+                    level=logging.DEBUG,
+                    context={
+                        "stock_code": rule.stock_code,
+                        "alert_type": rule.alert_type.value,
+                    },
+                )
 
         return triggered
 
@@ -293,7 +319,14 @@ class EventMonitor:
                             f"current = {current_price}",
                 )
         except Exception as exc:
-            logger.debug("[EventMonitor] _check_price error: %s", exc)
+            log_safe_exception(
+                logger,
+                "Event monitor price check failed",
+                exc,
+                error_code="event_monitor_price_check_failed",
+                level=logging.DEBUG,
+                context={"stock_code": rule.stock_code},
+            )
         return None
 
     async def _check_price_change(self, rule: PriceChangeAlert) -> Optional[TriggeredAlert]:
@@ -329,7 +362,14 @@ class EventMonitor:
                             f"current = {current_change_pct:+.2f}%",
                 )
         except Exception as exc:
-            logger.debug("[EventMonitor] _check_price_change error: %s", exc)
+            log_safe_exception(
+                logger,
+                "Event monitor price change check failed",
+                exc,
+                error_code="event_monitor_price_change_check_failed",
+                level=logging.DEBUG,
+                context={"stock_code": rule.stock_code},
+            )
         return None
 
     async def _check_volume(self, rule: VolumeAlert) -> Optional[TriggeredAlert]:
@@ -360,7 +400,14 @@ class EventMonitor:
                             f"{latest_vol:,.0f} ({latest_vol / avg_vol:.1f}× avg)",
                 )
         except Exception as exc:
-            logger.debug("[EventMonitor] _check_volume error: %s", exc)
+            log_safe_exception(
+                logger,
+                "Event monitor volume check failed",
+                exc,
+                error_code="event_monitor_volume_check_failed",
+                level=logging.DEBUG,
+                context={"stock_code": rule.stock_code},
+            )
         return None
 
     # -----------------------------------------------------------------
@@ -428,7 +475,14 @@ class EventMonitor:
                 rule.ttl_hours = float(entry.get("ttl_hours", 24.0))
                 monitor.add_alert(rule)
             except Exception as exc:
-                logger.warning("[EventMonitor] Skip invalid rule #%d: %s", index, exc)
+                log_safe_exception(
+                    logger,
+                    "Event monitor skipped an invalid rule",
+                    exc,
+                    error_code="event_monitor_invalid_rule",
+                    level=logging.WARNING,
+                    context={"rule_index": index},
+                )
         return monitor
 
 
@@ -520,7 +574,10 @@ def validate_event_alert_rule(rule: Dict[str, Any]) -> None:
             raise ValueError("multiplier must be > 0")
 
 
-def build_event_monitor_from_config(config=None, notifier=None) -> Optional[EventMonitor]:
+def build_event_monitor_from_config(
+    config: Optional[Config] = None,
+    notifier: Optional[NotificationService] = None,
+) -> Optional[EventMonitor]:
     """Build an EventMonitor from runtime config and attach notification callbacks."""
     if config is None:
         from src.config import get_config
@@ -533,7 +590,13 @@ def build_event_monitor_from_config(config=None, notifier=None) -> Optional[Even
     try:
         rules = parse_event_alert_rules(raw_rules)
     except Exception as exc:
-        logger.warning("[EventMonitor] Failed to parse configured alert rules: %s", exc)
+        log_safe_exception(
+            logger,
+            "Event monitor configuration parsing failed",
+            exc,
+            error_code="event_monitor_config_parse_failed",
+            level=logging.WARNING,
+        )
         return None
 
     if not rules:

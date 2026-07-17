@@ -20,7 +20,6 @@ from src.agent.memory import AgentMemory
 from src.agent.protocols import AgentContext, AgentOpinion, StageResult, StageStatus
 from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
-    sanitize_agent_diagnostic,
 )
 from src.agent.runner import RunLoopResult, run_agent_loop
 from src.agent.skills.defaults import extract_skill_id
@@ -29,6 +28,7 @@ from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
 from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -151,11 +151,12 @@ class BaseAgent(ABC):
             result.status = StageStatus.COMPLETED
 
         except Exception as exc:
-            logger.error(
-                "[%s] execution failed: exception_type=%s diagnostic=%s",
-                self.agent_name,
-                type(exc).__name__,
-                sanitize_agent_diagnostic(exc),
+            log_safe_exception(
+                logger,
+                "Agent execution failed",
+                exc,
+                error_code="agent_execution_failed",
+                context={"agent": self.agent_name},
             )
             result.status = StageStatus.FAILED
             result.error = AGENT_EXECUTION_FAILURE_MESSAGE

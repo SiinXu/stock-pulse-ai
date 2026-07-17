@@ -16,6 +16,7 @@ from typing import Dict, Optional, Set, Tuple
 
 from src.data.stock_mapping import STOCK_NAME_MAP
 from src.services.stock_code_utils import is_code_like, normalize_code
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +118,14 @@ def _get_akshare_name_to_code() -> Optional[Dict[str, str]]:
         _akshare_cache = (now, result)
         logger.info(f"[NameResolver] AkShare cache loaded: {len(result)} name->code mappings")
         return result
-    except Exception as e:
-        logger.warning(f"[NameResolver] AkShare fallback failed: {e}")
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Name resolver AkShare fallback failed",
+            exc,
+            error_code="name_resolver_akshare_fallback_failed",
+            level=logging.WARNING,
+        )
         return None
 
 
@@ -182,8 +189,14 @@ def resolve_name_to_code(name: str) -> Optional[str]:
                 return code
     except ImportError:
         pass
-    except Exception as e:
-        logger.debug(f"[NameResolver] Pinyin match failed: {e}")
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Name resolver pinyin match failed",
+            exc,
+            error_code="name_resolver_pinyin_match_failed",
+            level=logging.DEBUG,
+        )
 
     # Skip AkShare/fuzzy fallback for non-CJK free text such as random Latin noise.
     # These paths are expensive and only meaningfully help Chinese stock names.

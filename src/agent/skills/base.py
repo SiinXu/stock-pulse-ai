@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 # Built-in skill YAML directory (project_root/strategies/ kept for compatibility)
@@ -298,16 +300,30 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
             skill = load_skill_from_yaml(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill from YAML: {skill.name} ({filepath.name})")
-        except Exception as e:
-            logger.warning(f"Failed to load skill from {filepath.name}: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Skill YAML loading failed",
+                exc,
+                error_code="agent_skill_yaml_load_failed",
+                level=logging.WARNING,
+                context={"skill_file": filepath.name},
+            )
 
     for filepath in markdown_files:
         try:
             skill = load_skill_from_markdown(filepath)
             skills.append(skill)
             logger.debug(f"Loaded skill bundle: {skill.name} ({filepath})")
-        except Exception as e:
-            logger.warning(f"Failed to load skill bundle from {filepath}: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Skill bundle loading failed",
+                exc,
+                error_code="agent_skill_bundle_load_failed",
+                level=logging.WARNING,
+                context={"skill_file": filepath.name},
+            )
 
     return skills
 

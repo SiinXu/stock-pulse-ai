@@ -61,18 +61,24 @@ from src.agent.public_contract import (
     sanitize_agent_history_content,
 )
 from src.config import get_config
+from src.portfolio_idempotency import build_portfolio_idempotency_storage_id
 from src.schemas.decision_profile import extract_legacy_decision_profile
+from src.utils.sanitize import log_safe_exception
 from src.utils.sniper_points import extract_sniper_points, parse_sniper_value
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 CURRENT_SCHEMA_VERSION = "2026-06-05-create-all-baseline"
 INTELLIGENCE_ITEM_NULL_SCOPE_VALUE = "__dsa_null_scope__"
+PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER = (
+    "trg_portfolio_idempotency_legacy_key_guard"
+)
 
 # SQLAlchemy ORM 基类
 Base = declarative_base()
 
 if TYPE_CHECKING:
+    from src.analyzer import AnalysisResult
     from src.search_service import SearchResponse
 
 
@@ -511,16 +517,31 @@ class PortfolioAccount(Base):
 
 
 class PortfolioIdempotencyRecord(Base):
-    """Persisted result for one client-generated portfolio mutation."""
+    """Persisted result for one scoped client-generated portfolio mutation."""
 
     __tablename__ = 'portfolio_idempotency_records'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    # Kept as the physical unique key for compatibility with the original table.
     operation_id = Column(String(128), nullable=False, unique=True, index=True)
+    client_operation_id = Column(String(128), index=True)
     operation_type = Column(String(32), nullable=False, index=True)
+    scope_key = Column(String(64), index=True)
+    scope_account_id = Column(Integer, index=True)
+    scope_owner_id = Column(String(64), index=True)
     request_hash = Column(String(64), nullable=False)
     response_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index(
+            'uix_portfolio_idempotency_scope_operation',
+            'operation_type',
+            'scope_key',
+            'client_operation_id',
+            unique=True,
+        ),
+    )
 
 
 class PortfolioTrade(Base):
@@ -1230,12 +1251,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             Base.metadata.create_all(self._engine)
             self._ensure_llm_usage_telemetry_columns()
             self._ensure_decision_signal_profile_schema()
+            self._ensure_portfolio_idempotency_scope_schema()
             self._ensure_intelligence_item_scope_values()
             self._ensure_schema_migration_record()
             self._ensure_intelligence_items_unique_index()
 
             self._initialized = True
-            logger.info(f"数据库初始化完成: {db_url}")
+            logger.info(
+                "Database initialized: backend=%s",
+                self._engine.url.get_backend_name(),
+            )
 
             # 注册退出钩子，确保程序退出时关闭数据库连接
             atexit.register(DatabaseManager._cleanup_engine, self._engine)
@@ -1245,7 +1270,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 if created_engine is not None:
                     created_engine.dispose()
             except Exception as cleanup_exc:
-                logger.warning("数据库初始化失败后的引擎清理也失败: %s", cleanup_exc)
+                log_safe_exception(
+                    logger,
+                    "Database engine cleanup failed after initialization error",
+                    cleanup_exc,
+                    error_code="storage_database_init_cleanup_failed",
+                    level=logging.WARNING,
+                )
             self._engine = None
             self._SessionLocal = None
             self.__class__._instance = None
@@ -1277,6 +1308,151 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         finally:
             session.close()
 
+    def _ensure_portfolio_idempotency_scope_schema(self) -> None:
+        """Add scoped idempotency columns to existing SQLite databases."""
+
+        if not self._is_sqlite_engine:
+            return
+        table_name = PortfolioIdempotencyRecord.__tablename__
+        inspector = inspect(self._engine)
+        if not inspector.has_table(table_name):
+            return
+
+        existing_columns = {
+            column["name"]
+            for column in inspector.get_columns(table_name)
+        }
+        additions = {
+            "client_operation_id": "VARCHAR(128)",
+            "scope_key": "VARCHAR(64)",
+            "scope_account_id": "INTEGER",
+            "scope_owner_id": "VARCHAR(64)",
+        }
+        for column_name, column_type in additions.items():
+            if column_name in existing_columns:
+                continue
+            try:
+                with self._engine.begin() as connection:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                    )
+            except OperationalError as exc:
+                if not self._is_sqlite_duplicate_column_error(exc, column_name):
+                    raise
+
+        self._backfill_portfolio_idempotency_scopes()
+        index_name = "uix_portfolio_idempotency_scope_operation"
+        expected_columns = ["operation_type", "scope_key", "client_operation_id"]
+        with self._engine.begin() as connection:
+            connection.exec_driver_sql(
+                f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
+                f"ON {table_name} ({', '.join(expected_columns)})"
+            )
+
+        refreshed_inspector = inspect(self._engine)
+        actual_columns = {
+            column["name"]
+            for column in refreshed_inspector.get_columns(table_name)
+        }
+        missing_columns = set(additions) - actual_columns
+        if missing_columns:
+            raise RuntimeError(
+                "Portfolio idempotency scope migration did not create columns: "
+                f"{sorted(missing_columns)}"
+            )
+        indexes = {
+            index["name"]: index
+            for index in refreshed_inspector.get_indexes(table_name)
+        }
+        actual_index = indexes.get(index_name) or {}
+        if (
+            actual_index.get("column_names") != expected_columns
+            or not actual_index.get("unique")
+        ):
+            raise RuntimeError(
+                "Portfolio idempotency scope index verification failed: "
+                f"actual={actual_index}"
+            )
+        self._ensure_portfolio_legacy_idempotency_guard_trigger()
+
+    def _backfill_portfolio_idempotency_scopes(self) -> None:
+        """Preserve raw-key legacy rows without inventing historical owner scope."""
+
+        table_name = PortfolioIdempotencyRecord.__tablename__
+        with self._engine.begin() as connection:
+            rows = connection.execute(
+                text(
+                    f"SELECT id, operation_id, operation_type, "
+                    f"client_operation_id, scope_key FROM {table_name} ORDER BY id"
+                )
+            ).mappings().all()
+            for row in rows:
+                operation_id = str(row["operation_id"])
+                client_operation_id = row["client_operation_id"]
+                scope_key = row["scope_key"]
+                if client_operation_id and scope_key and operation_id == (
+                    build_portfolio_idempotency_storage_id(
+                        operation_type=str(row["operation_type"]),
+                        scope_key=str(scope_key),
+                        client_operation_id=str(client_operation_id),
+                    )
+                ):
+                    continue
+
+                # A raw operation_id cannot prove the owner at write time because
+                # portfolio ownership is mutable and has no historical audit row.
+                # Keep the record for rollback compatibility, but leave it outside
+                # the scoped lookup contract so it can never cross owner boundaries.
+                legacy_client_operation_id = str(client_operation_id or operation_id)
+                connection.execute(
+                    text(
+                        f"UPDATE {table_name} SET "
+                        "client_operation_id = :client_operation_id, "
+                        "scope_key = NULL, "
+                        "scope_account_id = NULL, "
+                        "scope_owner_id = NULL "
+                        "WHERE id = :record_id"
+                    ),
+                    {
+                        "client_operation_id": legacy_client_operation_id,
+                        "record_id": row["id"],
+                    },
+                )
+
+    def _ensure_portfolio_legacy_idempotency_guard_trigger(self) -> None:
+        """Keep reverted runtimes from duplicating a scoped v2 mutation."""
+
+        table_name = PortfolioIdempotencyRecord.__tablename__
+        trigger_name = PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
+        with self._engine.begin() as connection:
+            connection.exec_driver_sql(
+                f"""CREATE TRIGGER IF NOT EXISTS {trigger_name}
+                BEFORE INSERT ON {table_name}
+                FOR EACH ROW
+                WHEN NEW.client_operation_id IS NULL
+                  AND NEW.scope_key IS NULL
+                  AND EXISTS (
+                    SELECT 1 FROM {table_name}
+                    WHERE client_operation_id = NEW.operation_id
+                      AND scope_key IS NOT NULL
+                  )
+                BEGIN
+                  SELECT RAISE(ABORT, 'legacy idempotency key conflicts with scoped record');
+                END"""
+            )
+            actual_trigger = connection.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type = 'trigger' AND name = :trigger_name"
+                ),
+                {"trigger_name": trigger_name},
+            ).scalar_one_or_none()
+        if actual_trigger != trigger_name:
+            raise RuntimeError(
+                "Portfolio legacy idempotency guard trigger verification failed: "
+                f"actual={actual_trigger!r}"
+            )
+
     def _ensure_decision_signal_profile_schema(self) -> None:
         """Add and backfill nullable decision_profile for existing SQLite DBs."""
 
@@ -1292,10 +1468,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 for column in inspector.get_columns(DecisionSignalRecord.__tablename__)
             }
         except Exception as exc:
-            logger.error(
-                "[DecisionSignal] failed to inspect decision_profile column; "
-                "profile migration cannot continue safely: %s",
+            log_safe_exception(
+                logger,
+                "Decision signal profile migration cannot continue safely after schema inspection failed",
                 exc,
+                error_code="storage_decision_signal_profile_schema_inspection_failed",
+                level=logging.ERROR,
             )
             raise
 
@@ -1468,10 +1646,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         try:
             unique_indexes = self._list_sqlite_unique_indexes("intelligence_items")
         except Exception as exc:
-            logger.warning(
-                "[Intelligence items] failed to inspect unique indexes; "
-                "skip migration/repair: %s",
+            log_safe_exception(
+                logger,
+                "Intelligence item unique index inspection failed; migration skipped",
                 exc,
+                error_code="storage_intelligence_index_inspection_failed",
+                level=logging.WARNING,
             )
             return
 
@@ -1573,10 +1753,12 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 for column in inspect(self._engine).get_columns(LLMUsage.__tablename__)
             }
         except Exception as exc:
-            logger.warning(
-                "[LLM usage] failed to inspect telemetry columns; "
-                "skipping best-effort SQLite telemetry column backfill: %s",
+            log_safe_exception(
+                logger,
+                "LLM usage telemetry schema inspection failed; backfill skipped",
                 exc,
+                error_code="storage_llm_usage_schema_inspection_failed",
+                level=logging.WARNING,
             )
             return
 
@@ -1622,7 +1804,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 for column in inspect(self._engine).get_columns(IntelligenceItem.__tablename__)
             }
         except Exception as exc:
-            logger.warning("资讯池 scope_value 回填检查失败，已跳过: %s", exc)
+            log_safe_exception(
+                logger,
+                "Intelligence item scope schema inspection failed; backfill skipped",
+                exc,
+                error_code="storage_intelligence_scope_schema_inspection_failed",
+                level=logging.WARNING,
+            )
             return
         if "scope_value" not in existing:
             return
@@ -1635,7 +1823,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     (INTELLIGENCE_ITEM_NULL_SCOPE_VALUE,),
                 )
         except Exception as exc:
-            logger.warning("资讯池 scope_value 回填失败，已跳过: %s", exc)
+            log_safe_exception(
+                logger,
+                "Intelligence item scope value backfill failed; migration skipped",
+                exc,
+                error_code="storage_intelligence_scope_backfill_failed",
+                level=logging.WARNING,
+            )
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':
@@ -1668,9 +1862,15 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         try:
             if engine is not None:
                 engine.dispose()
-                logger.debug("数据库引擎已清理")
-        except Exception as e:
-            logger.warning(f"清理数据库引擎时出错: {e}")
+                logger.debug("Database engine disposed")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Database engine disposal failed",
+                exc,
+                error_code="storage_database_engine_disposal_failed",
+                level=logging.WARNING,
+            )
 
     def _install_sqlite_pragma_handler(self) -> None:
         """为 SQLite 连接安装竞争保护参数。"""
@@ -1685,7 +1885,13 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 if self._sqlite_file_db and self._sqlite_wal_enabled:
                     cursor.execute("PRAGMA journal_mode=WAL")
             except Exception as exc:
-                logger.warning("初始化 SQLite PRAGMA 失败: %s", exc)
+                log_safe_exception(
+                    logger,
+                    "SQLite PRAGMA initialization failed",
+                    exc,
+                    error_code="storage_sqlite_pragma_initialization_failed",
+                    level=logging.WARNING,
+                )
             finally:
                 cursor.close()
 
@@ -1720,7 +1926,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 ):
                     delay = self._sqlite_write_retry_base_delay * (2 ** attempt)
                     logger.warning(
-                        "SQLite 写入锁冲突，准备重试: %s (%s/%s, %.2fs)",
+                        "SQLite write lock conflict; retrying: %s (%s/%s, %.2fs)",
                         operation_name,
                         attempt + 1,
                         max_retries,
@@ -1972,7 +2178,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                         session.flush()
                     local_saved_count += 1
                 except IntegrityError:
-                    logger.debug("新闻情报重复（已跳过）: %s %s", code, url_key)
+                    logger.debug("Duplicate news intelligence skipped: %s %s", code, url_key)
 
             return local_saved_count
 
@@ -1981,9 +2187,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_news_intel[{code}]",
                 _write,
             )
-            logger.info(f"保存新闻情报成功: {code}, 新增 {saved_count} 条")
-        except Exception as e:
-            logger.error(f"保存新闻情报失败: {e}")
+            logger.info(f"Saved news intelligence for {code}: {saved_count} new item(s)")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "News intelligence save failed",
+                exc,
+                error_code="storage_news_intelligence_save_failed",
+                level=logging.ERROR,
+                context={"stock_code": code},
+            )
             raise
 
         return saved_count
@@ -2018,12 +2231,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_fundamental_snapshot[{query_id}:{code}]",
                 _write,
             )
-        except Exception as e:
-            logger.debug(
-                "基本面快照写入失败（fail-open）: query_id=%s code=%s err=%s",
-                query_id,
-                code,
-                e,
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Fundamental snapshot write failed; continuing without snapshot",
+                exc,
+                error_code="storage_fundamental_snapshot_save_failed",
+                level=logging.DEBUG,
+                context={"query_id": query_id, "stock_code": code},
             )
             return 0
 
@@ -2053,12 +2268,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     .order_by(desc(FundamentalSnapshot.created_at))
                     .limit(1)
                 ).scalar_one_or_none()
-            except Exception as e:
-                logger.debug(
-                    "基本面快照读取失败（fail-open）: query_id=%s code=%s err=%s",
-                    query_id,
-                    code,
-                    e,
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Fundamental snapshot read failed; continuing without snapshot",
+                    exc,
+                    error_code="storage_fundamental_snapshot_read_failed",
+                    level=logging.DEBUG,
+                    context={"query_id": query_id, "stock_code": code},
                 )
                 return None
 
@@ -2119,7 +2336,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def save_analysis_history(
         self,
-        result: Any,
+        result: "AnalysisResult",
         query_id: str,
         report_type: str,
         news_content: Optional[str],
@@ -2168,8 +2385,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_analysis_history[{result.code}]",
                 _write,
             )
-        except Exception as e:
-            logger.error(f"保存分析历史失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis history save failed",
+                exc,
+                error_code="storage_analysis_history_save_failed",
+                level=logging.ERROR,
+            )
             return 0
 
     def update_analysis_history_diagnostics(
@@ -2242,12 +2465,14 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"update_analysis_history_diagnostics[{query_id}:{code or '*'}]",
                 _write,
             )
-        except Exception as e:
-            logger.warning(
-                "更新分析历史诊断快照失败（fail-open）: query_id=%s code=%s err=%s",
-                query_id,
-                code,
-                e,
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Analysis history diagnostic snapshot update failed; continuing without update",
+                exc,
+                error_code="storage_analysis_diagnostics_update_failed",
+                level=logging.WARNING,
+                context={"query_id": query_id, "stock_code": code or "all"},
             )
             return 0
 
@@ -2615,7 +2840,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             本次实际新增的记录数（不含更新）
         """
         if df is None or df.empty:
-            logger.warning(f"保存数据为空，跳过 {code}")
+            logger.warning(f"No data to save; skipping {code}")
             return 0
 
         now = datetime.now()
@@ -2738,10 +2963,17 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 f"save_daily_data[{code}]",
                 _write,
             )
-            logger.info(f"保存 {code} 数据成功，新增 {saved_count} 条")
+            logger.info(f"Saved {code} data: {saved_count} new row(s)")
             return saved_count
-        except Exception as e:
-            logger.error(f"保存 {code} 数据失败: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Daily stock data save failed",
+                exc,
+                error_code="storage_daily_data_save_failed",
+                level=logging.ERROR,
+                context={"stock_code": code},
+            )
             raise
     
     def get_analysis_context(
@@ -2772,7 +3004,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
         recent_data = self.get_latest_data(code, days=2)
         
         if not recent_data:
-            logger.warning(f"未找到 {code} 的数据")
+            logger.warning(f"No data found for {code}")
             return None
         
         today_data = recent_data[0]
@@ -3069,16 +3301,20 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
             rows = session.execute(stmt).scalars().all()
             result = []
             for row in rows:
+                messages_json = row.messages_json
                 try:
-                    messages = json.loads(row.messages_json or "[]")
+                    messages = json.loads(messages_json or "[]")
                 except json.JSONDecodeError as exc:
-                    logger.warning(
-                        "Invalid provider trace messages_json skipped for session %s turn %s: %s",
-                        row.session_id,
-                        row.id,
+                    log_safe_exception(
+                        logger,
+                        "Invalid provider trace messages JSON skipped",
                         exc,
+                        error_code="storage_provider_trace_decode_failed",
+                        level=logging.WARNING,
+                        context={"session_id": row.session_id, "turn_id": row.id},
                     )
                     messages = []
+                    messages_json = "[]"
                 result.append({
                     "id": row.id,
                     "session_id": row.session_id,
@@ -3088,7 +3324,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     "anchor_user_message_id": row.anchor_user_message_id,
                     "anchor_assistant_message_id": row.anchor_assistant_message_id,
                     "messages": messages if isinstance(messages, list) else [],
-                    "messages_json": row.messages_json,
+                    "messages_json": messages_json,
                     "contains_reasoning": row.contains_reasoning,
                     "contains_tool_calls": row.contains_tool_calls,
                     "contains_thinking_blocks": row.contains_thinking_blocks,
@@ -3530,7 +3766,13 @@ def persist_llm_usage(
             **telemetry,
         )
     except Exception as exc:
-        logging.getLogger(__name__).warning("[LLM usage] failed to persist usage record: %s", exc)
+        log_safe_exception(
+            logger,
+            "LLM usage record persistence failed",
+            exc,
+            error_code="storage_llm_usage_persistence_failed",
+            level=logging.WARNING,
+        )
 
 
 def _coerce_llm_usage_non_negative_int(value: Any) -> Optional[int]:

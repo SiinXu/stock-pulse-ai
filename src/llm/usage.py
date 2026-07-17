@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 PROVIDER_USAGE_SCHEMA_NAME = "provider_usage_v1"
@@ -792,7 +794,13 @@ def _load_usage_hmac_secret() -> Optional[bytes]:
         _HMAC_SECRET_CACHE = new_secret
         return new_secret
     except OSError as exc:
-        logger.warning("[LLM usage] failed to load HMAC secret: %s", exc)
+        log_safe_exception(
+            logger,
+            "LLM usage HMAC secret load failed",
+            exc,
+            error_code="llm_usage_hmac_secret_load_failed",
+            level=logging.WARNING,
+        )
         return None
 
 

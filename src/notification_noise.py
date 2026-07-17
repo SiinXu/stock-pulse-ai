@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
+from src.utils.sanitize import log_safe_exception
+
 try:  # pragma: no cover - Python <3.9 fallback is not expected in CI.
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 except Exception:  # pragma: no cover
@@ -233,7 +235,13 @@ def evaluate_notification_noise(
             now=now,
         )
     except Exception as exc:  # pragma: no cover - defensive behavior is tested via monkeypatch.
-        logger.warning("通知降噪判断失败，将继续发送静态通知渠道: %s", exc)
+        log_safe_exception(
+            logger,
+            "Notification noise-control evaluation failed open",
+            exc,
+            error_code="notification_noise_evaluation_failed_open",
+            level=logging.WARNING,
+        )
         return NotificationNoiseDecision(
             should_send=True,
             reason_code="noise_check_failed_open",
@@ -382,7 +390,13 @@ def release_notification_noise(decision: NotificationNoiseDecision) -> None:
         with _state_lock:
             _release_reserved_locked(decision)
     except Exception as exc:  # pragma: no cover - defensive branch.
-        logger.warning("通知降噪发送中状态释放失败，忽略该错误: %s", exc)
+        log_safe_exception(
+            logger,
+            "Notification noise-control reservation release failed",
+            exc,
+            error_code="notification_noise_reservation_release_failed",
+            level=logging.WARNING,
+        )
 
 
 def record_notification_noise(decision: NotificationNoiseDecision, now: Optional[datetime] = None) -> None:
@@ -403,4 +417,10 @@ def record_notification_noise(decision: NotificationNoiseDecision, now: Optional
             if decision.cooldown_seconds > 0 and decision.cooldown_key:
                 _cooldown_expires_at[decision.cooldown_key] = now_ts + decision.cooldown_seconds
     except Exception as exc:  # pragma: no cover - defensive branch.
-        logger.warning("通知降噪状态记录失败，忽略该错误: %s", exc)
+        log_safe_exception(
+            logger,
+            "Notification noise-control state persistence failed",
+            exc,
+            error_code="notification_noise_state_persistence_failed",
+            level=logging.WARNING,
+        )

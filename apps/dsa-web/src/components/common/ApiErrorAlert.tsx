@@ -36,7 +36,7 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
         {onDismiss ? (
           <button
             type="button"
-            className="min-h-11 min-w-11 shrink-0 rounded-md border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-2 py-1 text-xs text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
+            className="min-h-11 min-w-11 shrink-0 rounded-full border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-2 py-1 text-xs text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
             onClick={onDismiss}
           >
             {dismissLabel ?? t('common.close')}
@@ -54,7 +54,7 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
       {actionLabel && onAction ? (
         <button
           type="button"
-          className="mt-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-3 py-1.5 text-xs font-medium text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
+          className="mt-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-3 py-1.5 text-xs font-medium text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
           onClick={onAction}
         >
           {actionLabel}

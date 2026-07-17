@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { loginAsE2eAdmin } from './auth-fixture';
 
@@ -59,12 +59,6 @@ const MODEL_KEYS_TO_RESET = [
   'VISION_MODEL',
   'LITELLM_FALLBACK_MODELS',
 ];
-
-async function capture(page: Page, testInfo: TestInfo, name: string) {
-  const path = testInfo.outputPath(`${name}.png`);
-  await page.screenshot({ path, fullPage: true });
-  await testInfo.attach(name, { path, contentType: 'image/png' });
-}
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
   await page.getByRole('button', { name: '切换主题' }).first().click();
@@ -276,12 +270,11 @@ test.describe('model access product convergence', () => {
     expect(page.url()).not.toContain('sub=providers');
   });
 
-  test('03 Model Access has the concise title, description, and one primary action', async ({ page }, testInfo) => {
+  test('03 Model Access has the concise title, description, and one primary action', async ({ page }) => {
     await openConnections(page);
     await selectTheme(page, '浅色');
     await expect(page.getByText('连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。')).toBeVisible();
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toHaveCount(1);
-    await capture(page, testInfo, 'connections-empty-light');
   });
 
   test('04 Model Access removes generation-backend diagnostics from the first screen', async ({ page }) => {
@@ -341,7 +334,7 @@ test.describe('model access product convergence', () => {
     await expect(dialog.getByLabel('连接名称')).toBeVisible();
   });
 
-  test('09 official providers hide protocol and default Base URL', async ({ page }, testInfo) => {
+  test('09 official providers hide protocol and default Base URL', async ({ page }) => {
     await openConnections(page);
     const dialog = await openAddDialog(page);
     await chooseProvider(page, 'openai');
@@ -349,7 +342,6 @@ test.describe('model access product convergence', () => {
     await expect(dialog.getByLabel('服务地址')).toHaveCount(0);
     await expect(dialog.getByText('使用服务商官方地址')).toBeVisible();
     await expect(dialog.getByLabel('API 密钥')).toBeVisible();
-    await capture(page, testInfo, 'add-openai-modal');
   });
 
   test('09b a second OpenAI Connection persists the same explicit Provider identity', async ({ page }) => {
@@ -873,7 +865,7 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
   });
 
-  test('28 developer diagnostics is top-level and collapsed by default', async ({ page }, testInfo) => {
+  test('28 developer diagnostics is top-level and collapsed by default', async ({ page }) => {
     await openSettings(page);
     await page.goto('/settings?section=advanced&view=raw_config');
     const details = page.locator('details').filter({ hasText: '开发者诊断' });
@@ -881,7 +873,6 @@ test.describe('model access product convergence', () => {
     await details.locator('summary').click();
     await expect(details).toHaveAttribute('open', '');
     await expect(details).toContainText(/模型配置生效来源|执行后端/);
-    await capture(page, testInfo, 'developer-diagnostics-expanded');
   });
 
   test('29 a real 409 keeps the local draft and surfaces conflict UI', async ({ page }) => {
@@ -912,7 +903,7 @@ test.describe('model access product convergence', () => {
     await expect(page.getByTestId('connection-card-custom')).toContainText('local-only-model');
   });
 
-  test('30 mobile modal is a bottom sheet and both themes remain usable', async ({ page }, testInfo) => {
+  test('30 mobile modal is a bottom sheet and both themes remain usable', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openConnections(page);
     await selectTheme(page, '浅色');
@@ -921,8 +912,7 @@ test.describe('model access product convergence', () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThanOrEqual(389);
     expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
-    await capture(page, testInfo, 'connections-mobile-light-sheet');
-    await page.getByRole('button', { name: '关闭抽屉' }).click();
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
 
     await selectTheme(page, '深色');
     dialog = await openAddDialog(page);
@@ -930,6 +920,5 @@ test.describe('model access product convergence', () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThanOrEqual(389);
     expect(Math.abs(box!.y + box!.height - 844)).toBeLessThanOrEqual(2);
-    await capture(page, testInfo, 'connections-mobile-dark-sheet');
   });
 });

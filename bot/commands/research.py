@@ -16,6 +16,7 @@ from typing import List, Optional
 from bot.commands.base import BotCommand
 from bot.models import BotMessage, BotResponse
 from src.config import get_config
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,11 @@ class ResearchCommand(BotCommand):
             )
 
             research_timeout = getattr(config, "agent_deep_research_timeout", 180)
-            logger.info("[ResearchCommand] Starting deep research (timeout=%ds): %s", research_timeout, question[:100])
+            logger.info(
+                "[ResearchCommand] Starting deep research: timeout_seconds=%d stock_scoped=%s",
+                research_timeout,
+                stock_code is not None,
+            )
             t0 = time.time()
             result = agent.research(
                 question,
@@ -143,5 +148,11 @@ class ResearchCommand(BotCommand):
                 )
 
         except Exception as exc:
-            logger.error("[ResearchCommand] Error: %s", exc, exc_info=True)
-            return BotResponse.text_response(f"❌ Research failed: {exc}")
+            log_safe_exception(
+                logger,
+                "[ResearchCommand] Deep research failed",
+                exc,
+                error_code="bot_research_failed",
+                context={"stock_code": stock_code or "topic"},
+            )
+            return BotResponse.text_response("❌ Research failed. Please try again later.")

@@ -26,6 +26,7 @@ from typing import Any, Callable, Dict, List, Optional
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.runner import RunLoopResult, run_agent_loop
 from src.agent.tools.registry import ToolRegistry
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +333,13 @@ Return a JSON object:
             parsed = json.loads(raw)
             return {"questions": parsed.get("questions", [query]), "tokens": tokens}
         except Exception as exc:
-            logger.warning("[ResearchAgent] decompose failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Research query decomposition failed",
+                exc,
+                error_code="agent_research_decomposition_failed",
+                level=logging.WARNING,
+            )
             if timeout_seconds is not None and self._looks_like_timeout_error(exc):
                 return {"questions": [query], "tokens": 0, "timed_out": True, "error": str(exc)}
             return {"questions": [query], "tokens": 0}
@@ -397,7 +404,13 @@ Token budget remaining: ~{remaining_budget}
                 "success": result.success,
             }
         except Exception as exc:
-            logger.warning("[ResearchAgent] sub-question failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Research sub-question execution failed",
+                exc,
+                error_code="agent_research_sub_question_failed",
+                level=logging.WARNING,
+            )
             if timeout_seconds is not None and self._looks_like_timeout_error(exc):
                 return {
                     "question": question,
@@ -454,7 +467,13 @@ Use Markdown formatting.  Be concise but thorough.
             tokens = completion["tokens"]
             return {"content": content, "tokens": tokens}
         except Exception as exc:
-            logger.warning("[ResearchAgent] synthesis failed: %s", exc)
+            log_safe_exception(
+                logger,
+                "Research report synthesis failed",
+                exc,
+                error_code="agent_research_synthesis_failed",
+                level=logging.WARNING,
+            )
             if timeout_seconds is not None and self._looks_like_timeout_error(exc):
                 return {"content": "", "tokens": 0, "timed_out": True, "error": str(exc)}
             return {"content": findings_text, "tokens": 0, "error": str(exc)}

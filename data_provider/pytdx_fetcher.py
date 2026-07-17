@@ -26,8 +26,9 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
-    before_sleep_log,
 )
+
+from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 
 from .base import (
     BaseFetcher,
@@ -220,7 +221,14 @@ class PytdxFetcher(BaseFetcher):
                         logger.debug(f"Pytdx 连接成功: {host}:{port}")
                         break
                 except Exception as e:
-                    logger.debug(f"Pytdx 连接 {host}:{port} 失败: {e}")
+                    log_safe_exception(
+                        logger,
+                        "Pytdx server connection failed",
+                        e,
+                        error_code="pytdx_server_connection_failed",
+                        level=logging.DEBUG,
+                        context={"host": host, "port": port},
+                    )
                     continue
             
             if not connected:
@@ -235,7 +243,13 @@ class PytdxFetcher(BaseFetcher):
                 api.disconnect()
                 logger.debug("Pytdx 连接已断开")
             except Exception as e:
-                logger.warning(f"Pytdx 断开连接时出错: {e}")
+                log_safe_exception(
+                    logger,
+                    "Pytdx disconnect failed",
+                    e,
+                    error_code="pytdx_disconnect_failed",
+                    level=logging.WARNING,
+                )
     
     def _get_market_code(self, stock_code: str) -> Tuple[int, str]:
         """
@@ -305,7 +319,12 @@ class PytdxFetcher(BaseFetcher):
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=30),
         retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Pytdx daily data retry scheduled",
+            error_code="pytdx_daily_data_retry",
+        ),
     )
     def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -448,7 +467,14 @@ class PytdxFetcher(BaseFetcher):
                     return name
                 
         except Exception as e:
-            logger.debug(f"Pytdx 获取股票名称失败 {stock_code}: {e}")
+            log_safe_exception(
+                logger,
+                "Pytdx stock name lookup failed",
+                e,
+                error_code="pytdx_stock_name_lookup_failed",
+                level=logging.DEBUG,
+                context={"symbol": stock_code},
+            )
         
         return None
     
@@ -488,7 +514,14 @@ class PytdxFetcher(BaseFetcher):
                         'ask_prices': [quote.get(f'ask{i}', 0) for i in range(1, 6)],
                     }
         except Exception as e:
-            logger.warning(f"Pytdx 获取实时行情失败 {stock_code}: {e}")
+            log_safe_exception(
+                logger,
+                "Pytdx realtime quote failed",
+                e,
+                error_code="pytdx_realtime_quote_failed",
+                level=logging.WARNING,
+                context={"symbol": stock_code},
+            )
         
         return None
 

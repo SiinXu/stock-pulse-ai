@@ -53,7 +53,11 @@ from src.schemas.decision_action import (
     display_operation_advice_for_result,
 )
 from bot.models import BotMessage
-from src.utils.sanitize import sanitize_diagnostic_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    sanitize_diagnostic_text,
+    sanitize_exception_chain,
+)
 from src.utils.data_processing import (
     signal_attribution_has_content,
     signal_attribution_weight_items,
@@ -326,8 +330,14 @@ class NotificationService(
                 exclude_query_ids=exclude_ids,
                 report_language=report_language,
             )
-        except Exception as e:
-            logger.debug("History comparison skipped: %s", e)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Notification history comparison skipped",
+                exc,
+                error_code="notification_history_comparison_skipped",
+                level=logging.DEBUG,
+            )
             history_by_code = {}
 
         self._history_compare_cache[cache_key] = history_by_code
@@ -650,8 +660,13 @@ class NotificationService(
                     success = True
                 else:
                     logger.error("钉钉会话（Stream）推送失败")
-            except Exception as e:
-                logger.error(f"钉钉会话（Stream）推送异常: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "DingTalk Stream session delivery failed",
+                    exc,
+                    error_code="dingtalk_stream_session_delivery_failed",
+                )
 
         # 尝试飞书会话
         feishu_info = self._extract_feishu_reply_info()
@@ -662,8 +677,13 @@ class NotificationService(
                     success = True
                 else:
                     logger.error("飞书会话（Stream）推送失败")
-            except Exception as e:
-                logger.error(f"飞书会话（Stream）推送异常: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Feishu Stream session delivery failed",
+                    exc,
+                    error_code="feishu_stream_session_delivery_failed",
+                )
 
         # 尝试 Telegram 会话上下文（按来源 chat_id 回执）
         telegram_chat_id = self._extract_telegram_context_chat_id()
@@ -674,8 +694,13 @@ class NotificationService(
                     success = True
                 else:
                     logger.error("Telegram 上下文会话推送失败")
-            except Exception as e:
-                logger.error(f"Telegram 上下文会话推送异常: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Telegram context session delivery failed",
+                    exc,
+                    error_code="telegram_context_session_delivery_failed",
+                )
 
         return success
 
@@ -718,11 +743,21 @@ class NotificationService(
 
             return reply_client.send_to_chat(chat_id, content)
 
-        except ImportError as e:
-            logger.error(f"导入飞书 Stream 模块失败: {e}")
+        except ImportError as exc:
+            log_safe_exception(
+                logger,
+                "Feishu Stream module import failed",
+                exc,
+                error_code="feishu_stream_module_import_failed",
+            )
             return False
-        except Exception as e:
-            logger.error(f"飞书 Stream 回复异常: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Feishu Stream reply failed",
+                exc,
+                error_code="feishu_stream_reply_failed",
+            )
             return False
 
     def _send_feishu_stream_chunked(
@@ -2645,8 +2680,14 @@ class NotificationService(
                     )
                 )
 
-            except Exception as e:
-                logger.error(f"{channel_name} 发送失败: {e}")
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Notification channel delivery failed",
+                    exc,
+                    error_code="notification_channel_delivery_failed",
+                    context={"channel": channel.value},
+                )
                 fail_count += 1
                 channel_results.append(
                     ChannelAttemptResult(
@@ -2655,7 +2696,7 @@ class NotificationService(
                         error_code="exception",
                         retryable=True,
                         latency_ms=int((time.monotonic() - started_at) * 1000),
-                        diagnostics=self._sanitize_notification_diagnostics(str(e)),
+                        diagnostics=sanitize_exception_chain(exc),
                     )
                 )
 

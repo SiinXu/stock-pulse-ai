@@ -765,7 +765,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                   aria-label={t('runFlow.graph.nodeAria', { label: node.label, status: statusLabel })}
                   data-layout-lane={node.laneIndex}
                   data-layout-row={node.row}
-                  className={`box-border flex max-w-full min-w-0 flex-col items-start overflow-hidden rounded-lg border-2 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15 ${nodeDensityClass} ${nodeStateClass} ${
+                  className={`box-border flex max-w-full min-w-0 flex-col items-start overflow-hidden rounded-full border-2 text-left backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/60 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15 ${nodeDensityClass} ${nodeStateClass} ${
                     expandable ? 'pb-8' : ''
                   }`}
                   style={{ width: node.width, height: node.height }}
@@ -803,7 +803,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       event.stopPropagation();
                       onToggleExpanded?.(node.id);
                     }}
-                    className="absolute bottom-0 right-0 z-40 inline-flex h-11 min-w-11 items-end justify-end p-2 text-xs font-medium leading-none text-secondary-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan/15"
+                    className="absolute bottom-0 right-0 z-40 inline-flex h-11 min-w-11 items-end justify-end p-2 text-xs font-medium leading-none text-secondary-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
                   >
                     <span
                       data-testid={`run-flow-node-${node.id}-toggle-visual`}

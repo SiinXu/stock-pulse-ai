@@ -12,6 +12,7 @@ from typing import Optional
 import requests
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import MIN_MAX_WORDS, chunk_content_by_max_words
 
 
@@ -102,8 +103,13 @@ class DiscordSender:
                     add_page_marker=True,
                 )
             return chunks
-        except ValueError as e:
-            logger.error("分割 Discord 消息失败: %s", e)
+        except ValueError as exc:
+            log_safe_exception(
+                logger,
+                "Discord message chunking failed",
+                exc,
+                error_code="discord_message_chunking_failed",
+            )
             return chunk_content_by_max_words(
                 content,
                 DISCORD_MAX_CONTENT_LENGTH,
@@ -216,20 +222,31 @@ class DiscordSender:
         for attempt in range(1, DISCORD_MAX_RETRIES + 1):
             try:
                 response = requests.post(url, **request_kwargs)
-            except requests.exceptions.RequestException as e:
+            except requests.exceptions.RequestException as exc:
                 if attempt < DISCORD_MAX_RETRIES:
                     delay = 2 ** attempt
-                    logger.warning(
-                        "Discord %s 请求异常（%d/%d）：%s，%s 秒后重试",
-                        channel_name,
-                        attempt,
-                        DISCORD_MAX_RETRIES,
-                        e,
-                        delay,
+                    log_safe_exception(
+                        logger,
+                        "Discord request failed; retry scheduled",
+                        exc,
+                        error_code="discord_request_retry",
+                        level=logging.WARNING,
+                        context={
+                            "channel": channel_name,
+                            "attempt": attempt,
+                            "max_attempts": DISCORD_MAX_RETRIES,
+                            "retry_in_seconds": delay,
+                        },
                     )
                     time.sleep(delay)
                     continue
-                logger.error("Discord %s 请求重试后仍失败: %s", channel_name, e)
+                log_safe_exception(
+                    logger,
+                    "Discord request failed after retries",
+                    exc,
+                    error_code="discord_request_retries_exhausted",
+                    context={"channel": channel_name, "attempt": attempt},
+                )
                 return False
 
             if response.status_code in success_statuses:

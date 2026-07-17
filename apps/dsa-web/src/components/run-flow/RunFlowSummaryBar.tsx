@@ -48,7 +48,7 @@ export const RunFlowSummaryBar: React.FC<RunFlowSummaryBarProps> = ({ snapshot }
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <Workflow className="h-4 w-4 shrink-0 text-cyan" aria-hidden="true" />
+            <Workflow className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <h3 className="truncate text-base font-semibold text-foreground">{title}</h3>
             <Badge variant={style.badge} className="gap-1.5 shadow-none">
               <StatusDot tone={style.tone} pulse={style.pulse} className="h-1.5 w-1.5" />

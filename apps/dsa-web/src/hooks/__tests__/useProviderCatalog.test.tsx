@@ -16,13 +16,64 @@ describe('useProviderCatalog', () => {
   it('loads the provider catalog from the backend', async () => {
     getLlmProviderCatalog.mockResolvedValue({
       providers: [{ id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' }],
+      connectionFields: [{
+        key: 'provider_id',
+        dataType: 'string',
+        isSensitive: false,
+        isRequired: true,
+        contract: { requirement: 'required' },
+      }],
     });
     const { result } = renderHook(() => useProviderCatalog());
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.providers).toHaveLength(1);
     expect(result.current.providers[0].id).toBe('deepseek');
+    expect(result.current.connectionFields?.[0].key).toBe('provider_id');
     expect(result.current.error).toBeNull();
+  });
+
+  it('preserves an absent schema for rolling-upgrade compatibility', async () => {
+    getLlmProviderCatalog.mockResolvedValue({ providers: [] });
+    const { result } = renderHook(() => useProviderCatalog());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.connectionFields).toBeUndefined();
+    expect(result.current.connectionSchemaDefinition).toMatchObject({ mode: 'legacy', usable: true });
+  });
+
+  it('preserves an explicitly empty authoritative schema', async () => {
+    getLlmProviderCatalog.mockResolvedValue({ providers: [], connectionFields: [] });
+    const { result } = renderHook(() => useProviderCatalog());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.connectionFields).toEqual([]);
+    expect(result.current.connectionSchemaDefinition).toMatchObject({
+      mode: 'schema',
+      usable: false,
+      reason: 'empty',
+    });
+  });
+
+  it('surfaces a present partial schema as unavailable instead of legacy compatibility', async () => {
+    getLlmProviderCatalog.mockResolvedValue({
+      providers: [],
+      connectionFields: [{
+        key: 'models',
+        dataType: 'array',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }],
+    });
+    const { result } = renderHook(() => useProviderCatalog());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.connectionSchemaDefinition).toMatchObject({
+      mode: 'schema',
+      usable: false,
+      reason: 'missing_identity',
+    });
   });
 
   it('surfaces an error without throwing when the catalog request fails', async () => {

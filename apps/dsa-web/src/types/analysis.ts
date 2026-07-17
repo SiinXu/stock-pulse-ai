@@ -615,7 +615,10 @@ export interface StockBarResponse {
 export interface ApiError {
   error: string;
   message: string;
-  detail?: Record<string, unknown>;
+  details?: unknown;
+  /** @deprecated Read-only server alias of details during the compatibility window. */
+  detail?: unknown;
+  traceId?: string | null;
 }
 
 // ============ Helper Functions ============

@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC, get_configured_llm_models
-from src.utils.sanitize import sanitize_sensitive_text
+from src.utils.sanitize import log_safe_exception, sanitize_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,15 @@ _ALPHASIFT_PUBLIC_DIAGNOSTIC_CODES = frozenset({
     "stock_news_unavailable",
     "stock_news_failed",
 })
+
+
+def _topic_log_context(topic: Any, **identifiers: Any) -> Dict[str, Any]:
+    """Return non-content metadata for a user-provided AlphaSift topic."""
+    context = dict(identifiers)
+    context["topic_length"] = len(topic.strip()) if isinstance(topic, str) else 0
+    return context
+
+
 DSA_ALPHASIFT_HOTSPOT_CONNECTIVITY_ERROR_MARKERS = (
     "remote disconnected",
     "remote end closed connection",
@@ -249,7 +258,14 @@ def _load_alphasift_hotspot_detail_cache(
     except FileNotFoundError:
         return None
     except Exception as exc:
-        logger.warning("Failed to read AlphaSift hotspot detail cache from %s: %s", cache_path, exc)
+        log_safe_exception(
+            logger,
+            "Failed to read AlphaSift hotspot detail cache",
+            exc,
+            error_code="alphasift_hotspot_detail_cache_read_failed",
+            level=logging.WARNING,
+            context={"cache_path": cache_path},
+        )
         return None
 
     payload = raw.get("payload") if isinstance(raw, dict) else None
@@ -305,7 +321,14 @@ def _write_alphasift_hotspot_detail_cache(*, provider: str, topic: str, payload:
             encoding="utf-8",
         )
     except Exception as exc:
-        logger.warning("Failed to write AlphaSift hotspot detail cache for %s: %s", topic, exc)
+        log_safe_exception(
+            logger,
+            "Failed to write AlphaSift hotspot detail cache",
+            exc,
+            error_code="alphasift_hotspot_detail_cache_write_failed",
+            level=logging.WARNING,
+            context=_topic_log_context(topic, provider=provider or "unknown"),
+        )
 
 
 def _ensure_hotspot_detail_compat_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -345,7 +368,14 @@ def _load_alphasift_hotspot_cache(*, provider: str, top: int) -> Optional[Dict[s
     except FileNotFoundError:
         return None
     except Exception as exc:
-        logger.warning("Failed to read AlphaSift hotspot cache from %s: %s", cache_path, exc)
+        log_safe_exception(
+            logger,
+            "Failed to read AlphaSift hotspot cache",
+            exc,
+            error_code="alphasift_hotspot_cache_read_failed",
+            level=logging.WARNING,
+            context={"cache_path": cache_path},
+        )
         return None
 
     payload = _normalize_alphasift_hotspot_cache_payload(raw)
@@ -461,7 +491,14 @@ def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> List[
             focus_keywords=[topic_text, "A股", "题材", "催化", "涨价"],
         )
     except Exception as exc:
-        logger.info("AlphaSift hotspot event search skipped for %s: %s", topic_text, exc)
+        log_safe_exception(
+            logger,
+            "AlphaSift hotspot event search skipped",
+            exc,
+            error_code="alphasift_hotspot_event_search_failed",
+            level=logging.INFO,
+            context=_topic_log_context(topic_text, source="configured_search"),
+        )
         return []
 
     if not bool(getattr(response, "success", False)):
@@ -649,7 +686,14 @@ def _summarize_hotspot_news_event_with_llm(*, topic: str, text: str, config: Con
             )
         return _clean_hotspot_llm_summary(_extract_litellm_message_content(response))
     except Exception as exc:
-        logger.info("AlphaSift hotspot LLM event summary skipped for %s: %s", topic, exc)
+        log_safe_exception(
+            logger,
+            "AlphaSift hotspot LLM event summary skipped",
+            exc,
+            error_code="alphasift_hotspot_summary_failed",
+            level=logging.INFO,
+            context=_topic_log_context(topic, stage="llm_summary"),
+        )
         return ""
 
 
@@ -710,7 +754,13 @@ def _enrich_hotspot_rows_from_provider(rows: List[Any], provider: Any, *, top: i
     try:
         provider_rows = provider.hotspot_rows(top=max(top, len(rows), 30))
     except Exception as exc:
-        logger.warning("AlphaSift hotspot metric enrichment failed: %s", exc)
+        log_safe_exception(
+            logger,
+            "AlphaSift hotspot metric enrichment failed",
+            exc,
+            error_code="alphasift_hotspot_metric_enrichment_failed",
+            level=logging.WARNING,
+        )
         return [dict(item) if isinstance(item, dict) else item for item in rows]
     by_topic: Dict[str, Dict[str, Any]] = {}
     for item in provider_rows or []:
@@ -787,7 +837,14 @@ def _write_alphasift_hotspot_cache(payload: Dict[str, Any]) -> None:
             encoding="utf-8",
         )
     except Exception as exc:
-        logger.warning("Failed to write AlphaSift hotspot cache to %s: %s", cache_path, exc)
+        log_safe_exception(
+            logger,
+            "Failed to write AlphaSift hotspot cache",
+            exc,
+            error_code="alphasift_hotspot_cache_write_failed",
+            level=logging.WARNING,
+            context={"cache_path": cache_path},
+        )
 
 
 def _hotspot_topic_from_row(row: Any) -> str:
@@ -1011,7 +1068,13 @@ class AlphaSiftService:
                 cached["source_errors"] = errors
                 cached["fallback_used"] = True
                 cached["cache_used"] = True
-                logger.warning("AlphaSift hotspot live refresh failed; serving cache", exc_info=True)
+                log_safe_exception(
+                    logger,
+                    "AlphaSift hotspot live refresh failed; serving cache",
+                    exc,
+                    error_code=DSA_ALPHASIFT_HOTSPOT_REFRESH_FAILED_CODE,
+                    level=logging.WARNING,
+                )
                 fallback_payload = (
                     _attach_cached_hotspot_details(cached, provider=provider_name, top=top_count)
                     if include_details
@@ -1028,7 +1091,13 @@ class AlphaSiftService:
                         "diagnostics": diagnostics,
                     },
                 ) from exc
-            logger.warning("AlphaSift hotspot live refresh failed without cache", exc_info=True)
+            log_safe_exception(
+                logger,
+                "AlphaSift hotspot live refresh failed without cache",
+                exc,
+                error_code=DSA_ALPHASIFT_HOTSPOT_UNAVAILABLE_CODE,
+                level=logging.WARNING,
+            )
             return _empty_alphasift_hotspot_payload(
                 provider=provider_name,
                 provider_used=type(provider_arg).__name__,
@@ -1045,8 +1114,14 @@ class AlphaSiftService:
         if isinstance(provider_arg, DsaEastMoneyHotspotProvider) and _hotspot_rows_are_thin(selected, top=top_count):
             try:
                 direct_hotspots = provider_arg.hotspot_rows(top=top_count)
-            except Exception:
-                logger.warning("AlphaSift DSA direct hotspot fallback failed", exc_info=True)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "AlphaSift direct hotspot fallback failed",
+                    exc,
+                    error_code=DSA_ALPHASIFT_HOTSPOT_DIRECT_FALLBACK_FAILED_CODE,
+                    level=logging.WARNING,
+                )
                 direct_hotspots = []
                 raw_source_errors.append(DSA_ALPHASIFT_HOTSPOT_DIRECT_FALLBACK_FAILED_CODE)
             if len(direct_hotspots) > len(selected):
@@ -1117,17 +1192,23 @@ class AlphaSiftService:
                 details[topic] = self.hotspot_detail(topic=topic, provider=provider, refresh=refresh)
             except HTTPException as exc:
                 source_errors.append(DSA_ALPHASIFT_HOTSPOT_DETAIL_PREFETCH_FAILED_CODE)
-                logger.warning(
-                    "AlphaSift hotspot detail prefetch failed with an HTTP error for topic=%s",
-                    topic,
-                    exc_info=(type(exc), exc, exc.__traceback__),
+                log_safe_exception(
+                    logger,
+                    "AlphaSift hotspot detail prefetch failed with an HTTP error",
+                    exc,
+                    error_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_PREFETCH_FAILED_CODE,
+                    level=logging.WARNING,
+                    context=_topic_log_context(topic, provider=provider),
                 )
-            except Exception:
+            except Exception as exc:
                 source_errors.append(DSA_ALPHASIFT_HOTSPOT_DETAIL_PREFETCH_FAILED_CODE)
-                logger.warning(
-                    "AlphaSift hotspot detail prefetch failed for topic=%s",
-                    topic,
-                    exc_info=True,
+                log_safe_exception(
+                    logger,
+                    "AlphaSift hotspot detail prefetch failed",
+                    exc,
+                    error_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_PREFETCH_FAILED_CODE,
+                    level=logging.WARNING,
+                    context=_topic_log_context(topic, provider=provider),
                 )
         attached = dict(payload)
         if details:
@@ -1179,22 +1260,31 @@ class AlphaSiftService:
                             provider=provider_arg,
                             topic=topic_text,
                         )
-                    except Exception:
+                    except Exception as exc:
                         hotspot_helper_failed = True
-                        logger.warning(
-                            "AlphaSift contract hotspot detail fallback to provider for topic=%s",
-                            topic_text,
-                            exc_info=True,
+                        log_safe_exception(
+                            logger,
+                            "AlphaSift contract hotspot detail fallback to provider",
+                            exc,
+                            error_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_FALLBACK_CODE,
+                            level=logging.WARNING,
+                            context=_topic_log_context(
+                                topic_text,
+                                provider=provider_name,
+                            ),
                         )
                 else:
                     normalized = provider_arg.hotspot_detail(topic_text)
                 if not normalized:
                     normalized = provider_arg.hotspot_detail(topic_text)
         except Exception as exc:
-            logger.warning(
-                "AlphaSift hotspot detail fetch failed for topic=%s",
-                topic_text,
-                exc_info=True,
+            log_safe_exception(
+                logger,
+                "AlphaSift hotspot detail fetch failed",
+                exc,
+                error_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_SOURCE_ERROR_CODE,
+                level=logging.WARNING,
+                context=_topic_log_context(topic_text, provider=provider_name),
             )
             stale_cached = _load_alphasift_hotspot_detail_cache(
                 provider=provider_name,
@@ -1247,13 +1337,25 @@ class AlphaSiftService:
         try:
             raw = _call_alphasift_screen(screen, strategy, market, max_results, self.config)
         except ValueError as exc:
-            logger.warning("AlphaSift screen request was rejected by the adapter", exc_info=True)
+            log_safe_exception(
+                logger,
+                "AlphaSift screen request was rejected by the adapter",
+                exc,
+                error_code="alphasift_screen_rejected",
+                level=logging.WARNING,
+            )
             raise HTTPException(
                 status_code=400,
                 detail={"error": "alphasift_screen_rejected", "message": "AlphaSift 拒绝了当前选股参数。"},
             ) from exc
         except (TypeError, KeyError) as exc:
-            logger.warning("AlphaSift screen received invalid adapter input", exc_info=True)
+            log_safe_exception(
+                logger,
+                "AlphaSift screen received invalid adapter input",
+                exc,
+                error_code="alphasift_invalid_input",
+                level=logging.WARNING,
+            )
             raise HTTPException(
                 status_code=422,
                 detail={"error": "alphasift_invalid_input", "message": "AlphaSift 选股参数无效。"},
@@ -1261,7 +1363,13 @@ class AlphaSiftService:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.warning("AlphaSift screen execution failed", exc_info=True)
+            log_safe_exception(
+                logger,
+                "AlphaSift screen execution failed",
+                exc,
+                error_code="alphasift_screen_failed",
+                level=logging.WARNING,
+            )
             raise HTTPException(
                 status_code=424,
                 detail={"error": "alphasift_screen_failed", "message": "AlphaSift 选股运行失败，请稍后重试。"},
@@ -1479,10 +1587,16 @@ def _merge_provider_hotspot_route_fallback(
     try:
         provider_detail = provider.hotspot_detail(topic)
     except Exception as exc:
-        logger.warning(
-            "AlphaSift provider route fallback failed for %s; keeping contract detail route: %s",
-            topic,
+        log_safe_exception(
+            logger,
+            "AlphaSift provider route fallback failed; keeping contract detail route",
             exc,
+            error_code=DSA_ALPHASIFT_HOTSPOT_DETAIL_FALLBACK_CODE,
+            level=logging.WARNING,
+            context=_topic_log_context(
+                topic,
+                provider_type=type(provider).__name__,
+            ),
         )
         return normalized
 
@@ -1563,7 +1677,13 @@ def _install_alphasift(config: Config) -> Dict[str, Any]:
                 timeout=300,
             )
         except Exception as exc:
-            logger.warning("AlphaSift repair install could not start", exc_info=True)
+            log_safe_exception(
+                logger,
+                "AlphaSift repair install could not start",
+                exc,
+                error_code="alphasift_install_failed",
+                level=logging.WARNING,
+            )
             raise HTTPException(
                 status_code=424,
                 detail={"error": "alphasift_install_failed", "message": "修复安装 AlphaSift 失败，请检查后端日志。"},
@@ -1698,7 +1818,14 @@ def _get_alphasift_source_health_snapshot() -> Dict[str, Any]:
                 if snapshot:
                     health[key] = snapshot
         except Exception as exc:
-            logger.debug("AlphaSift %s source health snapshot unavailable: %s", key, exc)
+            log_safe_exception(
+                logger,
+                "AlphaSift source health snapshot unavailable",
+                exc,
+                error_code="alphasift_source_health_unavailable",
+                level=logging.DEBUG,
+                context={"source": key},
+            )
     return health
 
 
@@ -1832,9 +1959,12 @@ def _call_alphasift_status() -> Dict[str, Any]:
         adapter = _import_alphasift()
     except ModuleNotFoundError as exc:
         if _is_expected_alphasift_missing(exc):
-            logger.warning(
+            log_safe_exception(
+                logger,
                 "AlphaSift import missing expected module during status probe",
-                exc_info=(type(exc), exc, exc.__traceback__),
+                exc,
+                error_code="alphasift_unavailable",
+                level=logging.WARNING,
             )
             diagnostics = {
                 "reason": "missing_module",
@@ -1900,10 +2030,13 @@ def _alphasift_unavailable_exception(
 
 
 def _log_unexpected_alphasift_exception(stage: str, exc: BaseException) -> Dict[str, str]:
-    logger.warning(
-        "Unexpected AlphaSift %s failure",
-        stage,
-        exc_info=(type(exc), exc, exc.__traceback__),
+    log_safe_exception(
+        logger,
+        f"Unexpected AlphaSift {stage} failure",
+        exc,
+        error_code=DSA_ALPHASIFT_INTERNAL_ERROR_CODE,
+        level=logging.WARNING,
+        context={"stage": stage},
     )
     return {
         "reason": "unexpected_exception",
@@ -2098,11 +2231,13 @@ def _alphasift_dsa_daily_history_provider() -> Iterator[None]:
                 normalized.attrs["source"] = f"dsa:{dsa_source}"
                 return normalized
         except Exception as exc:
-            logger.warning(
-                "AlphaSift DSA daily history fetch failed for %s; falling back to AlphaSift source %s: %s",
-                code,
-                source,
+            log_safe_exception(
+                logger,
+                "AlphaSift StockPulse daily history fetch failed; falling back to AlphaSift source",
                 exc,
+                error_code="alphasift_daily_history_fallback",
+                level=logging.WARNING,
+                context={"code": code, "source": source},
             )
         return original_fetch(code, lookback_days=lookback_days, source=source, retries=retries)
 
@@ -2356,10 +2491,13 @@ class DsaEastMoneyHotspotProvider:
                 last_error = exc
                 if attempt >= len(delays):
                     break
-                logger.warning(
-                    "AlphaSift EastMoney hotspot request failed; retrying attempt=%s: %s",
-                    attempt + 1,
+                log_safe_exception(
+                    logger,
+                    "AlphaSift EastMoney hotspot request failed; retrying",
                     exc,
+                    error_code="alphasift_eastmoney_request_failed",
+                    level=logging.WARNING,
+                    context={"attempt": attempt + 1},
                 )
                 time.sleep(delays[attempt])
         assert last_error is not None
@@ -2442,10 +2580,13 @@ class DsaEastMoneyHotspotProvider:
         try:
             frames.append(self._fetch_ths_constituents(symbol))
         except Exception as exc:
-            logger.warning(
-                "AlphaSift THS constituent fetch failed for %s; falling back to alternative sources: %s",
-                symbol,
+            log_safe_exception(
+                logger,
+                "AlphaSift THS constituent fetch failed; falling back to alternative sources",
                 exc,
+                error_code="alphasift_ths_constituent_fetch_failed",
+                level=logging.WARNING,
+                context={"symbol": symbol},
             )
         frames.append(self._fallback_constituents(symbol))
         frames.append(self._related_hotspot_constituents(symbol))
@@ -2468,10 +2609,13 @@ class DsaEastMoneyHotspotProvider:
         try:
             summary = self._find_board_change(topic)
         except Exception as exc:
-            logger.warning(
-                "AlphaSift board-change summary fetch failed for %s; continuing without summary: %s",
-                topic,
+            log_safe_exception(
+                logger,
+                "AlphaSift board-change summary fetch failed; continuing without summary",
                 exc,
+                error_code="alphasift_board_change_summary_failed",
+                level=logging.WARNING,
+                context=_topic_log_context(topic, provider="eastmoney"),
             )
             summary = {}
         if self._is_industry_hotspot(topic):
@@ -2567,7 +2711,13 @@ class DsaEastMoneyHotspotProvider:
         try:
             return self._fetch_board_changes()
         except Exception as exc:
-            logger.warning("AlphaSift hotspot board-change fetch failed; falling back to ranking/board names: %s", exc)
+            log_safe_exception(
+                logger,
+                "AlphaSift hotspot board-change fetch failed; falling back to ranking/board names",
+                exc,
+                error_code="alphasift_board_change_fetch_failed",
+                level=logging.WARNING,
+            )
             return pd.DataFrame()
 
     def _is_broad_board(self, name: str) -> bool:
@@ -2597,7 +2747,14 @@ class DsaEastMoneyHotspotProvider:
         try:
             return self._fetch_rankings(source)
         except Exception as exc:
-            logger.warning("AlphaSift hotspot %s ranking fetch failed; falling back to board names: %s", source, exc)
+            log_safe_exception(
+                logger,
+                "AlphaSift hotspot ranking fetch failed; falling back to board names",
+                exc,
+                error_code="alphasift_ranking_fetch_failed",
+                level=logging.WARNING,
+                context={"source": source},
+            )
             return pd.DataFrame()
 
     def _fetch_board_names(self, *, source_fs: str) -> Any:
@@ -2655,10 +2812,13 @@ class DsaEastMoneyHotspotProvider:
         try:
             frame = self.stock_board_industry_name_em()
         except Exception as exc:
-            logger.warning(
-                "AlphaSift industry hotspot source check failed for %s; using concept constituents: %s",
-                topic,
+            log_safe_exception(
+                logger,
+                "AlphaSift industry hotspot source check failed; using concept constituents",
                 exc,
+                error_code="alphasift_industry_source_check_failed",
+                level=logging.WARNING,
+                context=_topic_log_context(topic, provider="eastmoney"),
             )
             return False
         return self._board_frame_contains_topic(frame, topic)
@@ -2822,7 +2982,7 @@ class DsaEastMoneyHotspotProvider:
             return ""
         if "概念名称" not in df.columns:
             logger.warning(
-                "AlphaSift THS summary missing required column '概念名称'; skip enrichment.",
+                "AlphaSift THS summary is missing the required concept-name column; skipping enrichment.",
             )
             return ""
         rows = df[df["概念名称"].astype(str) == topic]
@@ -2913,10 +3073,13 @@ class DsaEastMoneyHotspotProvider:
         try:
             summary = self._find_board_change(topic)
         except Exception as exc:
-            logger.warning(
-                "AlphaSift board-change constituent fallback failed for %s; trying other sources: %s",
-                topic,
+            log_safe_exception(
+                logger,
+                "AlphaSift board-change constituent fallback failed; trying other sources",
                 exc,
+                error_code="alphasift_constituent_fallback_failed",
+                level=logging.WARNING,
+                context=_topic_log_context(topic, provider="eastmoney"),
             )
             return pd.DataFrame()
         code = _env_text(summary.get("板块异动最频繁个股及所属类型-股票代码"))
@@ -3019,7 +3182,13 @@ class DsaEastMoneyHotspotProvider:
             manager = _get_dsa_fetcher_manager()
             manager.prefetch_realtime_quotes(codes)
         except Exception as exc:
-            logger.debug("AlphaSift hotspot quote prefetch skipped: %s", exc)
+            log_safe_exception(
+                logger,
+                "AlphaSift hotspot quote prefetch skipped",
+                exc,
+                error_code="alphasift_quote_prefetch_failed",
+                level=logging.DEBUG,
+            )
             return stocks
         quote_by_code: Dict[str, Any] = {}
         for code in codes:
@@ -3561,10 +3730,17 @@ def _enrich_candidates_with_dsa(candidates: List[Dict[str, Any]]) -> Tuple[List[
             if enriched.get("dsa_context", {}).get("enriched"):
                 enriched_count += 1
             warnings.extend(enriched.get("dsa_context", {}).get("warnings") or [])
-        except Exception:  # noqa: BLE001 - DSA enrichment must not block screening.
+        except Exception as exc:  # noqa: BLE001 - enrichment must not block screening.
             code = candidate.get("code") or f"rank-{candidate.get('rank', index + 1)}"
             warnings.append("dsa_candidate_enrichment_failed")
-            logger.warning("DSA enrichment failed for AlphaSift candidate %s", code, exc_info=True)
+            log_safe_exception(
+                logger,
+                "StockPulse enrichment failed for AlphaSift candidate",
+                exc,
+                error_code="dsa_candidate_enrichment_failed",
+                level=logging.WARNING,
+                context={"code": code},
+            )
             candidate["dsa_context"] = {
                 "enriched": False,
                 "warnings": ["dsa_candidate_enrichment_failed"],
@@ -3640,18 +3816,30 @@ def _build_dsa_candidate_context(
         if resolved_name and (not name or name == code):
             name = resolved_name
             candidate["name"] = resolved_name
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         warnings.append("dsa_stock_name_failed")
-        logger.warning("DSA stock name lookup failed during AlphaSift enrichment", exc_info=True)
+        log_safe_exception(
+            logger,
+            "StockPulse stock name lookup failed during AlphaSift enrichment",
+            exc,
+            error_code="dsa_stock_name_failed",
+            level=logging.WARNING,
+        )
 
     if not quote:
         try:
             quote = get_dsa_realtime_quote(code)
             if not quote:
                 warnings.append("dsa_realtime_quote_missing")
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             warnings.append("dsa_realtime_quote_failed")
-            logger.warning("DSA realtime quote failed during AlphaSift enrichment", exc_info=True)
+            log_safe_exception(
+                logger,
+                "StockPulse realtime quote failed during AlphaSift enrichment",
+                exc,
+                error_code="dsa_realtime_quote_failed",
+                level=logging.WARNING,
+            )
             quote = {}
 
     if quote:
@@ -3664,9 +3852,15 @@ def _build_dsa_candidate_context(
     if include_fundamentals and not fundamentals:
         try:
             fundamentals = get_dsa_fundamental_context(code)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             warnings.append("dsa_fundamental_context_failed")
-            logger.warning("DSA fundamental context failed during AlphaSift enrichment", exc_info=True)
+            log_safe_exception(
+                logger,
+                "StockPulse fundamental context failed during AlphaSift enrichment",
+                exc,
+                error_code="dsa_fundamental_context_failed",
+                level=logging.WARNING,
+            )
             fundamentals = {}
 
     if include_news:
@@ -3675,9 +3869,15 @@ def _build_dsa_candidate_context(
                 news = search_dsa_stock_news(code, _env_text(candidate.get("name")) or name or code, max_results=3)
                 if not news.get("success"):
                     warnings.append(news.get("error") or "stock_news_unavailable")
-            except Exception:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001
                 warnings.append("stock_news_failed")
-                logger.warning("DSA stock news failed during AlphaSift enrichment", exc_info=True)
+                log_safe_exception(
+                    logger,
+                    "StockPulse stock news failed during AlphaSift enrichment",
+                    exc,
+                    error_code="stock_news_failed",
+                    level=logging.WARNING,
+                )
                 news = {"success": False, "error": "stock_news_failed", "results": []}
     elif not _news_has_results(news):
         news = {

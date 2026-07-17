@@ -35,6 +35,11 @@ from src.services.run_diagnostics import (
     reset_run_diagnostic_context,
 )
 from src.utils.analysis_metadata import SELECTION_SOURCES
+from src.utils.sanitize import (
+    exception_chain_redaction_values,
+    log_safe_exception,
+    sanitize_exception_chain,
+)
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 
 logger = logging.getLogger(__name__)
@@ -886,8 +891,19 @@ class AnalysisTaskQueue:
         except Exception as e:
             if "diag_token" in locals():
                 reset_run_diagnostic_context(diag_token)
-            error_msg = str(e)
-            logger.error(f"[TaskQueue] 任务失败: {task_id} ({stock_code}), 错误: {error_msg}")
+            redaction_values = exception_chain_redaction_values(e)
+            error_msg = sanitize_exception_chain(
+                e,
+                redaction_values=redaction_values,
+            )
+            log_safe_exception(
+                logger,
+                "Analysis task failed",
+                e,
+                error_code="analysis_task_failed",
+                context={"task_id": task_id, "stock_code": stock_code},
+                exception_redaction_values=redaction_values,
+            )
             
             with self._data_lock:
                 task = self._tasks.get(task_id)
@@ -977,9 +993,18 @@ class AnalysisTaskQueue:
             return result
 
         except Exception as e:  # pragma: no cover - behavior verified in downstream tests
-            error_msg = str(e)
-            logger.error(
-                f"[TaskQueue] 自定义任务失败: {task_id}, 错误: {error_msg}"
+            redaction_values = exception_chain_redaction_values(e)
+            error_msg = sanitize_exception_chain(
+                e,
+                redaction_values=redaction_values,
+            )
+            log_safe_exception(
+                logger,
+                "Background task failed",
+                e,
+                error_code="background_task_failed",
+                context={"task_id": task_id, "stock_code": task.stock_code},
+                exception_redaction_values=redaction_values,
             )
 
             with self._data_lock:
@@ -1095,11 +1120,25 @@ class AnalysisTaskQueue:
                 # 使用 call_soon_threadsafe 将事件放入 asyncio 队列
                 # 这是从工作线程向主事件循环发送消息的安全方式
                 loop.call_soon_threadsafe(queue.put_nowait, event)
-            except RuntimeError as e:
+            except RuntimeError as exc:
                 # 事件循环已关闭
-                logger.debug(f"[TaskQueue] 广播事件跳过（循环已关闭）: {e}")
-            except Exception as e:
-                logger.warning(f"[TaskQueue] 广播事件失败: {e}")
+                log_safe_exception(
+                    logger,
+                    "Task event broadcast skipped because the loop is closed",
+                    exc,
+                    error_code="task_event_loop_closed",
+                    level=logging.DEBUG,
+                    context={"event_type": event_type},
+                )
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "Task event broadcast failed",
+                    exc,
+                    error_code="task_event_broadcast_failed",
+                    level=logging.WARNING,
+                    context={"event_type": event_type},
+                )
     
     # ========== 清理方法 ==========
     
@@ -1128,6 +1167,12 @@ def get_task_queue() -> AnalysisTaskQueue:
         target_workers = max(1, int(getattr(config, "max_workers", queue.max_workers)))
         queue.sync_max_workers(target_workers, log=False)
     except Exception as exc:
-        logger.debug("[TaskQueue] 读取 MAX_WORKERS 失败，使用当前并发设置: %s", exc)
+        log_safe_exception(
+            logger,
+            "Task queue worker configuration lookup failed; keeping current concurrency",
+            exc,
+            error_code="task_queue_worker_config_lookup_failed",
+            level=logging.DEBUG,
+        )
 
     return queue

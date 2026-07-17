@@ -14,10 +14,19 @@ import requests
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from api.v1.endpoints.intelligence import _internal_error
 from src.config import Config
 from src.storage import DatabaseManager
 
 RSS_FIXTURE = b'<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><item><title>Market event</title><link>https://news.example.com/market-event</link><description>Evidence summary</description></item></channel></rss>'
+
+
+class BrokenIntelligenceError(Exception):
+    def __str__(self) -> str:
+        raise RuntimeError("intelligence error rendering failed")
+
+    def __repr__(self) -> str:
+        return "BROKEN_INTELLIGENCE_API_REPR_CANARY"
 
 
 class IntelligenceApiTestCase(unittest.TestCase):
@@ -227,6 +236,19 @@ class IntelligenceApiTestCase(unittest.TestCase):
                     self.assertNotIn(secret_url, body["message"])
                     self.assertNotIn("token=", body["message"])
                     self.assertNotIn("super-secret", body["message"])
+
+    def test_internal_error_logging_does_not_pre_render_exception(self) -> None:
+        with self.assertLogs("api.v1.endpoints.intelligence", level="ERROR") as logs:
+            response = _internal_error(
+                "Intelligence operation failed",
+                BrokenIntelligenceError("RAW_INTELLIGENCE_API_CANARY"),
+            )
+
+        rendered = "\n".join(logs.output)
+        self.assertEqual(response.status_code, 500)
+        self.assertIn("[UNRENDERABLE]", rendered)
+        self.assertNotIn("RAW_INTELLIGENCE_API_CANARY", rendered)
+        self.assertNotIn("BROKEN_INTELLIGENCE_API_REPR_CANARY", rendered)
 
 
 if __name__ == "__main__":

@@ -20,7 +20,13 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => navigateMock,
+    useNavigate: () => {
+      const navigate = actual.useNavigate();
+      return (...args: Parameters<typeof navigate>) => {
+        navigateMock(...args);
+        return navigate(...args);
+      };
+    },
   };
 });
 
@@ -1512,17 +1518,38 @@ describe('HomePage', () => {
       expect(analysisApi.triggerMarketReview).toHaveBeenCalledWith({ sendNotification: true });
     });
     expect(await screen.findByText('大盘复盘已完成')).toBeInTheDocument();
-    expect(await screen.findByText('市场复盘报告示例文本')).toBeInTheDocument();
+    expect(screen.getByText('大盘复盘任务已完成，结果已生成并按配置推送。')).toBeInTheDocument();
+    expect(screen.queryByText('市场复盘报告示例文本')).not.toBeInTheDocument();
+    expect(historyApi.getDetail).not.toHaveBeenCalled();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
   it('re-enables Market Review after acceptance and ignores the superseded poll result', async () => {
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      total: 0,
+    const newMarketItem = {
+      ...marketReviewHistoryItem,
+      id: 3,
+      queryId: 'new-task',
+    };
+    const newMarketReport = {
+      ...marketReviewHistoryReport,
+      meta: {
+        ...marketReviewHistoryReport.meta,
+        id: 3,
+        queryId: 'new-task',
+      },
+      summary: {
+        ...marketReviewHistoryReport.summary,
+        analysisSummary: '新任务持久化复盘',
+      },
+    };
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
+      total: params.reportType === 'market_review' ? 1 : 0,
       page: 1,
-      limit: 20,
-      items: [],
-    });
+      limit: params.reportType === 'market_review' ? 10 : 20,
+      items: params.reportType === 'market_review' ? [newMarketItem] : [],
+    }));
+    vi.mocked(historyApi.getDetail).mockResolvedValue(newMarketReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# 新任务持久化复盘正文');
     vi.mocked(analysisApi.triggerMarketReview)
       .mockResolvedValueOnce({
         status: 'accepted',
@@ -1565,8 +1592,10 @@ describe('HomePage', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
-    expect(await screen.findByText('NEW_GENERATION_RENDERED')).toBeInTheDocument();
+    expect(await screen.findByText('新任务持久化复盘')).toBeInTheDocument();
     expect(analysisApi.getStatus).toHaveBeenCalledWith('new-task');
+    expect(screen.getByText('大盘复盘任务已完成，结果如下：')).toBeInTheDocument();
+    expect(screen.queryByText('NEW_GENERATION_RENDERED')).not.toBeInTheDocument();
 
     await act(async () => {
       resolveOldStatus({
@@ -1576,7 +1605,8 @@ describe('HomePage', () => {
       });
     });
 
-    expect(screen.getByText('NEW_GENERATION_RENDERED')).toBeInTheDocument();
+    expect(screen.getByText('新任务持久化复盘')).toBeInTheDocument();
+    expect(screen.getByText('大盘复盘任务已完成，结果如下：')).toBeInTheDocument();
     expect(screen.queryByText('OLD_GENERATION_SHOULD_NOT_RENDER')).not.toBeInTheDocument();
   });
 
@@ -1631,13 +1661,27 @@ describe('HomePage', () => {
     expect(vi.mocked(analysisApi.analyzeAsync).mock.calls[0]?.[0]).not.toHaveProperty('reportLanguage');
   });
 
-  it('keeps live market review controls in the UI language', async () => {
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      total: 0,
+  it('keeps persisted market review controls in the UI language', async () => {
+    const persistedMarketItem = {
+      ...marketReviewHistoryItem,
+      queryId: 'task-1',
+    };
+    const persistedMarketReport = {
+      ...marketReviewHistoryReport,
+      meta: {
+        ...marketReviewHistoryReport.meta,
+        queryId: 'task-1',
+        reportLanguage: 'en' as const,
+      },
+    };
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
+      total: params.reportType === 'market_review' ? 1 : 0,
       page: 1,
-      limit: 20,
-      items: [],
-    });
+      limit: params.reportType === 'market_review' ? 10 : 20,
+      items: params.reportType === 'market_review' ? [persistedMarketItem] : [],
+    }));
+    vi.mocked(historyApi.getDetail).mockResolvedValue(persistedMarketReport);
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue('# US Market Recap\n\n## Summary\n\nPersisted market review body');
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
@@ -1647,7 +1691,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: '# US Market Recap\n\n## Summary\n\nUS market review body',
+      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
       marketReviewPayload: {
         kind: 'market_review',
         region: 'us',
@@ -1674,6 +1718,7 @@ describe('HomePage', () => {
     expect(await screen.findByRole('button', { name: '复制 Markdown 源码' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复制纯文本' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Copy Markdown Source' })).not.toBeInTheDocument();
+    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
   });
 
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
@@ -1725,12 +1770,63 @@ describe('HomePage', () => {
   });
 
   it('keeps market review results in the main dashboard scroll area', async () => {
-    vi.mocked(historyApi.getList).mockResolvedValue({
-      total: 0,
+    const persistedMarketItem = {
+      ...marketReviewHistoryItem,
+      queryId: 'task-1',
+    };
+    const persistedMarketReport = {
+      ...marketReviewHistoryReport,
+      meta: {
+        ...marketReviewHistoryReport.meta,
+        queryId: 'task-1',
+      },
+      details: {
+        contextSnapshot: {
+          marketReviewPayload: {
+            kind: 'market_review',
+            region: 'cn',
+            title: 'A股市场复盘',
+            breadth: {
+              upCount: 3200,
+              downCount: 1700,
+              limitUpCount: 60,
+              limitDownCount: 8,
+              totalAmount: 9800,
+              turnoverUnit: '亿',
+            },
+            indices: [
+              {
+                code: '000001',
+                name: '上证指数',
+                current: 3150.2,
+                changePct: 0.62,
+                high: 3168.4,
+                low: 3120.8,
+              },
+            ],
+            sections: [
+              {
+                key: 'index_overview',
+                title: '指数概览',
+                markdown: '| 指数 | 表现 |\n| --- | --- |\n| 上证指数 | 震荡走强 |',
+              },
+              {
+                key: 'risk',
+                title: '风险提示',
+                markdown: '- 资金回流核心资产',
+              },
+            ],
+          },
+        },
+      },
+    };
+    vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => Promise.resolve({
+      total: params.reportType === 'market_review' ? 1 : 0,
       page: 1,
-      limit: 20,
-      items: [],
-    });
+      limit: params.reportType === 'market_review' ? 10 : 20,
+      items: params.reportType === 'market_review' ? [persistedMarketItem] : [],
+    }));
+    vi.mocked(historyApi.getDetail).mockResolvedValue(persistedMarketReport);
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',
       sendNotification: true,
@@ -1740,56 +1836,7 @@ describe('HomePage', () => {
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
       taskId: 'task-1',
       status: 'completed',
-      marketReviewReport: [
-        '# A股市场复盘',
-        '',
-        '> 市场情绪修复',
-        '',
-        '## 指数概览',
-        '',
-        '| 指数 | 表现 |',
-        '| --- | --- |',
-        '| 上证指数 | 震荡走强 |',
-        '',
-        '## 风险提示',
-        '',
-        '- 资金回流核心资产',
-      ].join('\n'),
-      marketReviewPayload: {
-        kind: 'market_review',
-        region: 'cn',
-        title: 'A股市场复盘',
-        breadth: {
-          upCount: 3200,
-          downCount: 1700,
-          limitUpCount: 60,
-          limitDownCount: 8,
-          totalAmount: 9800,
-          turnoverUnit: '亿',
-        },
-        indices: [
-          {
-            code: '000001',
-            name: '上证指数',
-            current: 3150.2,
-            changePct: 0.62,
-            high: 3168.4,
-            low: 3120.8,
-          },
-        ],
-        sections: [
-          {
-            key: 'index_overview',
-            title: '指数概览',
-            markdown: '| 指数 | 表现 |\n| --- | --- |\n| 上证指数 | 震荡走强 |',
-          },
-          {
-            key: 'risk',
-            title: '风险提示',
-            markdown: '- 资金回流核心资产',
-          },
-        ],
-      },
+      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
     });
 
     render(
@@ -2196,10 +2243,18 @@ describe('HomePage', () => {
     expect(historyApi.getMarkdown).toHaveBeenCalledWith(marketReviewHistoryReport.meta.id);
 
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
-    expect(navigateMock).not.toHaveBeenCalled();
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledWith(
+      {
+        pathname: '/',
+        search: `?recordId=${marketReviewHistoryReport.meta.id}`,
+        hash: '',
+      },
+      { replace: true, state: null },
+    );
   });
 
-  it('clears live market review output when switching to a history report', async () => {
+  it('clears market review completion feedback when switching to a stock report', async () => {
     vi.mocked(historyApi.getList).mockImplementation((params: { reportType?: string } = {}) => {
       if (params.reportType === 'market_review') {
         return Promise.resolve({
@@ -2254,12 +2309,12 @@ describe('HomePage', () => {
       status: 'accepted',
       sendNotification: true,
       message: '大盘复盘任务已提交',
-      taskId: 'task-1',
+      taskId: 'market-review-q-1',
     });
     vi.mocked(analysisApi.getStatus).mockResolvedValue({
-      taskId: 'task-1',
+      taskId: 'market-review-q-1',
       status: 'completed',
-      marketReviewReport: '市场复盘报告示例文本',
+      marketReviewReport: 'RAW_TASK_OUTPUT_MUST_NOT_RENDER',
     });
 
     render(
@@ -2272,20 +2327,16 @@ describe('HomePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('大盘复盘已完成')).toBeInTheDocument();
-      expect(screen.getByText('市场复盘报告示例文本')).toBeInTheDocument();
-    });
+    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+    expect(screen.getByText('大盘复盘已完成')).toBeInTheDocument();
+    expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
 
-    const marketHistoryButton = await screen.findByRole('button', { name: /MARKET/ });
-    fireEvent.click(marketHistoryButton);
+    fireEvent.click(screen.getByRole('button', { name: '贵州茅台 600519 历史记录' }));
 
     await waitFor(() => {
-      expect(screen.queryByText('市场复盘报告示例文本')).not.toBeInTheDocument();
       expect(screen.queryByText('大盘复盘已完成')).not.toBeInTheDocument();
     });
-    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
-    expect(vi.mocked(historyApi.getDetail)).toHaveBeenCalledWith(2);
+    expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
+    expect(vi.mocked(historyApi.getDetail)).toHaveBeenCalledWith(1);
   });
 });

@@ -291,16 +291,23 @@ function deferredPromise<T>() {
   return { promise, resolve, reject };
 }
 
+async function waitForPortfolioLoad() {
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: /^(刷新数据|Refresh data)$/ })).toBeEnabled();
+  });
+}
+
 async function waitForInitialLoad() {
   await waitFor(() => expect(getAccounts).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(getRisk).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(1));
+  await waitForPortfolioLoad();
 }
 
 describe('PortfolioPage FX refresh', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     window.localStorage.clear();
 
     getAccounts.mockResolvedValue(makeAccounts());
@@ -489,10 +496,14 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('refreshes FX for a single selected account and only reloads snapshot/risk', async () => {
+    const selectedAccountRisk = deferredPromise<ReturnType<typeof makeRisk>>();
     getSnapshot
       .mockResolvedValueOnce(makeSnapshot({ fxStale: true }))
       .mockResolvedValueOnce(makeSnapshot({ accountId: 1, fxStale: true }))
       .mockResolvedValueOnce(makeSnapshot({ accountId: 1, fxStale: false }));
+    getRisk
+      .mockResolvedValueOnce(makeRisk())
+      .mockReturnValueOnce(selectedAccountRisk.promise);
 
     render(<PortfolioPage />);
 
@@ -504,6 +515,13 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => {
       expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false });
     });
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toBeDisabled();
+
+    await act(async () => {
+      selectedAccountRisk.resolve(makeRisk());
+      await selectedAccountRisk.promise;
+    });
+    await waitForPortfolioLoad();
 
     const snapshotCallsBeforeRefresh = getSnapshot.mock.calls.length;
     const riskCallsBeforeRefresh = getRisk.mock.calls.length;
@@ -1028,6 +1046,7 @@ describe('PortfolioPage FX refresh', () => {
     const accountSelect = screen.getAllByRole('combobox')[0];
     chooseOption(accountSelect, '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    await waitForPortfolioLoad();
 
     fireEvent.click(screen.getByRole('button', { name: '刷新汇率' }));
     expect(await screen.findByRole('button', { name: '刷新中...' })).toBeDisabled();
@@ -1101,9 +1120,13 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('deactivates the selected account from the account toolbar and reloads accounts', async () => {
+    const selectedAccountRisk = deferredPromise<ReturnType<typeof makeRisk>>();
     getAccounts
       .mockResolvedValueOnce(makeAccounts([{ id: 1, name: 'Main' }, { id: 2, name: 'Alt' }]))
       .mockResolvedValueOnce(makeAccounts([{ id: 2, name: 'Alt' }]));
+    getRisk
+      .mockResolvedValueOnce(makeRisk())
+      .mockReturnValueOnce(selectedAccountRisk.promise);
 
     render(<PortfolioPage />);
 
@@ -1113,6 +1136,13 @@ describe('PortfolioPage FX refresh', () => {
     chooseOption(accountSelect, '1');
 
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    expect(screen.getByRole('button', { name: '删除账户' })).toBeDisabled();
+
+    await act(async () => {
+      selectedAccountRisk.resolve(makeRisk());
+      await selectedAccountRisk.promise;
+    });
+    await waitForPortfolioLoad();
     fireEvent.click(screen.getByRole('button', { name: '删除账户' }));
 
     const dialog = await screen.findByText('删除持仓账户');
@@ -1178,8 +1208,8 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByLabelText('数量')).toBeDisabled();
     expect(screen.getByRole('button', { name: '提交中' })).toBeDisabled();
     expect(screen.getByLabelText('交易日期').closest('.grid')).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
-    expect(within(dialog).getByRole('button', { name: '关闭抽屉' })).toBeDisabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
+    expect(within(dialog).getByRole('button', { name: '关闭' })).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     expect(screen.getByRole('dialog', { name: '手工录入：交易' })).toBeInTheDocument();
 
     await act(async () => {

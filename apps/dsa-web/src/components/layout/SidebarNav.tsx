@@ -83,7 +83,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const navItems = showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening');
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-lg border border-transparent text-sm leading-none text-secondary-text transition-all',
+    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-full border border-transparent text-sm leading-none text-secondary-text transition-all',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
@@ -103,25 +103,25 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
       {collapsed ? (
         <div className="mb-4 flex justify-center">
           <div className="group relative h-11 w-11">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[0.625rem] bg-[linear-gradient(140deg,#c8f050_0%,#8ecb4e_100%)] text-[#151514] transition-opacity group-hover:opacity-0">
-              <BarChart3 className="h-[18px] w-[18px]" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity group-hover:opacity-0">
+              <BarChart3 className="size-4.5" />
             </div>
             {onToggleCollapse ? (
               <button
                 type="button"
                 onClick={onToggleCollapse}
                 aria-label={t('layout.expandSidebar')}
-                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-[0.625rem] border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
               >
-                <PanelRight className="h-[18px] w-[18px]" />
+                <PanelRight className="size-4.5" />
               </button>
             ) : null}
           </div>
         </div>
       ) : (
         <div className="mb-4 flex items-center gap-2 px-1">
-          <div className="flex h-8 w-8 items-center justify-center rounded-[0.625rem] bg-[linear-gradient(140deg,#c8f050_0%,#8ecb4e_100%)] text-[#151514]">
-            <BarChart3 className="h-[18px] w-[18px]" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
+            <BarChart3 className="size-4.5" />
           </div>
           <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
           {onToggleCollapse ? (
@@ -129,9 +129,9 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
               type="button"
               onClick={onToggleCollapse}
               aria-label={t('layout.collapseSidebar')}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
             >
-              <PanelLeft className="h-[18px] w-[18px]" />
+              <PanelLeft className="size-4.5" />
             </button>
           ) : null}
         </div>
@@ -142,7 +142,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           type="button"
           onClick={openSearch}
           aria-label={t('layout.search')}
-          className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-[0.625rem] border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
+          className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-full border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
         >
           <Search className="h-4 w-4" />
         </button>
@@ -152,7 +152,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
-            className="mb-3 flex min-h-11 w-full items-center justify-between rounded-[0.625rem] border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
+            className="mb-3 flex min-h-11 w-full items-center justify-between rounded-full border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
               <Search className="h-4 w-4" />
@@ -190,7 +190,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
                     tone="info"
                     data-testid="chat-completion-badge"
                     className={cn(
-                      'absolute right-3 border-2 border-background shadow-[0_0_10px_var(--nav-indicator-shadow)]',
+                      'absolute right-3 border-2 border-background shadow-soft-card',
                       collapsed ? 'right-2 top-2' : ''
                     )}
                     aria-label={t('layout.newChatMessage')}
@@ -209,17 +209,17 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           variant="nav"
           collapsed
           wrapperClassName={collapsed ? '' : 'flex-1'}
-          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
+          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
           triggerActiveClassName={itemActiveClass}
-          iconClassName="h-[18px] w-[18px] shrink-0"
+          iconClassName="size-4.5 shrink-0"
         />
         <UiLanguageToggle
           variant="nav"
           collapsed
           wrapperClassName={collapsed ? '' : 'flex-1'}
-          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
+          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
           triggerActiveClassName={itemActiveClass}
-          iconClassName="h-[18px] w-[18px] shrink-0"
+          iconClassName="size-4.5 shrink-0"
         />
       </div>
 

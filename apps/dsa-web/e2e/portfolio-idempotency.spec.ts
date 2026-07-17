@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 test.describe('portfolio idempotent mobile mutations', () => {
-  test('320px trade form locks while pending and reuses its operation ID on retry', async ({ page }, testInfo) => {
+  test('320px trade form locks while pending and reuses its operation ID on retry', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await loginAsE2eAdmin(page);
 
@@ -70,7 +70,7 @@ test.describe('portfolio idempotent mobile mutations', () => {
     await expect(dialog.getByLabel('股票代码')).toBeDisabled();
     await expect(dialog.getByLabel('数量')).toBeDisabled();
     await expect(dialog.getByRole('button', { name: '提交中' })).toBeDisabled();
-    await expect(dialog.getByRole('button', { name: '关闭抽屉' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeDisabled();
     await expect(dialog).toBeVisible();
 
     const dateBox = await dialog.getByLabel('交易日期').boundingBox();
@@ -82,13 +82,6 @@ test.describe('portfolio idempotent mobile mutations', () => {
       expect(control.x).toBeGreaterThanOrEqual(0);
       expect(control.x + control.width).toBeLessThanOrEqual(320);
     }
-
-    const screenshotPath = testInfo.outputPath('portfolio-trade-pending-320.png');
-    await page.screenshot({ path: screenshotPath, fullPage: true });
-    await testInfo.attach('portfolio trade pending at 320px', {
-      path: screenshotPath,
-      contentType: 'image/png',
-    });
 
     releaseFirstRequest();
     await expect(dialog.getByText('请求失败', { exact: true })).toBeVisible();

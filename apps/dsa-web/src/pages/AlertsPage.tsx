@@ -398,7 +398,7 @@ const AlertsPage: React.FC = () => {
         ) : null}
         {!notificationsLoading && notifications.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
+            <table className="w-full min-w-170 text-left text-sm">
               <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
                 <tr>
                   <th className="px-3 py-2 font-medium">{text.channel}</th>

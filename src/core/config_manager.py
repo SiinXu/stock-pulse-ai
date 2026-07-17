@@ -15,6 +15,8 @@ from typing import Dict, Iterable, List, Literal, Optional, Set, Tuple
 
 from dotenv import dotenv_values
 
+from src.utils.sanitize import log_safe_exception
+
 _ASSIGNMENT_PATTERN = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$")
 _FALLBACK_REWRITE_ERRNOS = {errno.EBUSY, errno.EXDEV}
 _COMPOSE_ESCAPED_ENV_VALUE_KEYS = frozenset({"CUSTOM_WEBHOOK_BODY_TEMPLATE"})
@@ -272,9 +274,13 @@ class ConfigManager:
             if exc.errno not in _FALLBACK_REWRITE_ERRNOS:
                 raise
 
-            logger.warning(
-                "Atomic replace for .env failed with errno=%s, falling back to in-place rewrite",
-                exc.errno,
+            log_safe_exception(
+                logger,
+                "Atomic environment file replace failed; using in-place rewrite",
+                exc,
+                error_code="environment_file_atomic_replace_failed",
+                level=logging.WARNING,
+                context={"errno": exc.errno},
             )
             self._rewrite_in_place(content)
         finally:

@@ -11,10 +11,10 @@ const JSON_TOKEN_PATTERN = /"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b
 
 function getTokenClassName(token: string, remainingLine: string): string {
   if (token.startsWith('"')) {
-    return /^\s*:/.test(remainingLine) ? 'text-cyan-400' : 'text-emerald-400';
+    return /^\s*:/.test(remainingLine) ? 'text-primary' : 'text-emerald-400';
   }
   if (token === 'true' || token === 'false' || token === 'null') {
-    return 'text-purple-400';
+    return 'text-secondary-text';
   }
   return 'text-amber-400';
 }

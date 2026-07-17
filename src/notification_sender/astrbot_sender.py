@@ -14,6 +14,7 @@ from typing import Optional
 import requests
 
 from src.config import Config
+from src.utils.sanitize import log_safe_exception
 from src.formatters import markdown_to_html_document
 
 
@@ -105,6 +106,11 @@ class AstrbotSender:
             else:
                 logger.error(f"AstrBot 发送失败: {response.status_code} {response.text}")
                 return False
-        except Exception as e:
-            logger.error(f"AstrBot 发送异常: {e}")
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "AstrBot message delivery failed",
+                exc,
+                error_code="astrbot_delivery_failed",
+            )
             return False

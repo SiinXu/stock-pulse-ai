@@ -7,6 +7,13 @@ import { SCREENING_TEXT } from '../src/locales/screening';
 import { loginAsE2eAdmin, getE2eAuthStatus } from './auth-fixture';
 
 const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
+const BUILT_IN_PROVIDER_LABELS = {
+  openai: { zh: 'OpenAI 官方', en: 'OpenAI Official' },
+  gemini: { zh: 'Gemini 官方', en: 'Gemini Official' },
+  ollama: { zh: 'Ollama（本地）', en: 'Ollama (Local)' },
+  custom: { zh: '自定义兼容服务', en: 'Custom compatible service' },
+} as const;
+const CHINESE_SCRIPT = /[\u3400-\u9fff]/;
 
 async function switchToEnglish(page: Page) {
   const toggle = page.getByRole('button', { name: '切换界面语言' });
@@ -105,6 +112,91 @@ test.describe('complete UI i18n acceptance', () => {
     await dialog.getByRole('button', { name: 'Get models' }).click();
     await expect(dialog.getByText(/Model discovery|failed|Request/i).last()).toBeVisible({ timeout: 20_000 }); // 29
     await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible(); // 30
+  });
+
+  test('English Connection Modal renders all built-in Provider labels without Chinese script', async ({ page }) => {
+    await loginInEnglish(page);
+    await page.goto('/settings?section=ai_models&view=connections');
+    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    await dialog.getByLabel('Choose model provider').click();
+
+    for (const [providerId, labels] of Object.entries(BUILT_IN_PROVIDER_LABELS)) {
+      const option = dialog.locator(`[role="option"][data-value="${providerId}"]`);
+      await expect(option).toContainText(labels.en);
+      expect(await option.innerText()).not.toMatch(CHINESE_SCRIPT);
+    }
+  });
+
+  test('Chinese Connection Modal renders the localized built-in Provider labels', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await page.goto('/settings?section=ai_models&view=connections');
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+    await dialog.getByLabel('选择模型服务商').click();
+
+    for (const [providerId, labels] of Object.entries(BUILT_IN_PROVIDER_LABELS)) {
+      await expect(dialog.locator(`[role="option"][data-value="${providerId}"]`)).toContainText(labels.zh);
+    }
+  });
+
+  test('an open Connection Modal updates immediately after switching UI language', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await page.goto('/settings?section=ai_models&view=connections');
+    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+    const providerSelect = dialog.getByLabel('选择模型服务商');
+    await providerSelect.click();
+    await dialog.locator('[role="option"][data-value="openai"]').click();
+    await expect(providerSelect).toHaveAttribute('data-value', 'openai');
+    await dialog.evaluate((element) => element.setAttribute('data-language-switch-modal', 'same'));
+
+    await page.locator('button[aria-label="切换界面语言"]').first().evaluate(
+      (button: HTMLButtonElement) => button.click(),
+    );
+
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    const sameDialog = page.locator('[data-language-switch-modal="same"]');
+    await expect(sameDialog).toContainText('Add model service');
+    const localizedSelect = sameDialog.getByLabel('Choose model provider');
+    await expect(localizedSelect).toHaveAttribute('data-value', 'openai');
+    await expect(localizedSelect).toContainText('OpenAI Official');
+    await localizedSelect.click();
+    const openAiOption = sameDialog.locator('[role="option"][data-value="openai"]');
+    await expect(openAiOption).toContainText('OpenAI Official');
+    expect(await openAiOption.innerText()).not.toMatch(CHINESE_SCRIPT);
+  });
+
+  test('English First-run Wizard uses catalog-localized Provider labels', async ({ page }) => {
+    await page.route('**/api/v1/system/config/setup/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          is_complete: false,
+          ready_for_smoke: false,
+          required_missing_keys: ['LLM_CHANNELS'],
+          next_step_key: 'LLM_CHANNELS',
+          checks: [],
+        }),
+      });
+    });
+    await loginInEnglish(page);
+    await page.goto('/settings?section=base&view=base');
+    await page.getByRole('button', { name: 'Start wizard' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Quick setup wizard' });
+    await dialog.getByRole('button', { name: /Cloud API/ }).click();
+    await dialog.getByRole('button', { name: 'Next' }).click();
+    await dialog.getByRole('combobox', { name: 'Provider' }).click();
+
+    for (const [providerId, labels] of Object.entries(BUILT_IN_PROVIDER_LABELS)) {
+      const option = page.locator(`[role="option"][data-value="${providerId}"]`);
+      await expect(option).toContainText(labels.en);
+      expect(await option.innerText()).not.toMatch(CHINESE_SCRIPT);
+    }
   });
 
   test('a Chinese server diagnostic is not the primary English error', async ({ page }) => {

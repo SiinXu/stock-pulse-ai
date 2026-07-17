@@ -180,7 +180,7 @@ const TodayItem: React.FC<{ item: StockBarItem; onClick: (recordId: number) => v
   return (
     <button
       type="button"
-      className="home-subpanel grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 text-left"
+      className="home-subpanel-button grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 text-left"
       onClick={() => onClick(item.id)}
     >
       <div className="min-w-0">

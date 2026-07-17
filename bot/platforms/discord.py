@@ -20,7 +20,8 @@ from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
 from bot.platforms.base import BotPlatform
-from bot.models import BotMessage, WebhookResponse, ChatType
+from bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
+from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,9 @@ class DiscordPlatform(BotPlatform):
             签名是否有效
         """
         if not self._interactions_public_key:
-            logger.warning("[Discord] 未配置 interactions public key，拒绝请求")
+            logger.warning(
+                "[Discord] Interactions public key is not configured; rejecting request"
+            )
             return False
 
         normalized_headers = {str(k).lower(): v for k, v in headers.items()}
@@ -65,26 +68,34 @@ class DiscordPlatform(BotPlatform):
         timestamp = normalized_headers.get("x-signature-timestamp", "")
 
         if not signature or not timestamp:
-            logger.warning("[Discord] 缺少签名头，拒绝请求")
+            logger.warning("[Discord] Signature headers are missing; rejecting request")
             return False
 
         # 校验 timestamp 格式与时效性，防止重放攻击
         try:
             ts_int = int(timestamp)
         except (TypeError, ValueError):
-            logger.warning("[Discord] 非法的 timestamp：必须为 Unix 秒整数，拒绝请求")
+            logger.warning(
+                "[Discord] Timestamp must be an integer Unix timestamp; rejecting request"
+            )
             return False
 
         try:
             now_ts = int(time.time())
         except Exception as exc:
-            logger.warning("[Discord] 获取当前时间失败: %s，拒绝请求", exc)
+            log_safe_exception(
+                logger,
+                "[Discord] Current time lookup failed; rejecting request",
+                exc,
+                error_code="bot_discord_time_lookup_failed",
+                level=logging.WARNING,
+            )
             return False
 
         # 允许的时间窗口：±5 分钟
         if abs(now_ts - ts_int) > 300:
             logger.warning(
-                "[Discord] 请求 timestamp 超出允许窗口，可能为重放攻击：timestamp=%s, now=%s",
+                "[Discord] Request timestamp is outside the allowed window: timestamp=%s now=%s",
                 ts_int,
                 now_ts,
             )
@@ -94,19 +105,33 @@ class DiscordPlatform(BotPlatform):
             verify_key = VerifyKey(bytes.fromhex(self._interactions_public_key))
             signature_bytes = bytes.fromhex(signature)
         except ValueError:
-            logger.warning("[Discord] 公钥或签名不是合法十六进制，拒绝请求")
+            logger.warning(
+                "[Discord] Public key or signature is not valid hexadecimal; rejecting request"
+            )
             return False
         except Exception as exc:
-            logger.warning("[Discord] 无法加载签名公钥: %s", exc)
+            log_safe_exception(
+                logger,
+                "[Discord] Signature public key loading failed",
+                exc,
+                error_code="bot_discord_public_key_load_failed",
+                level=logging.WARNING,
+            )
             return False
 
         try:
             verify_key.verify(timestamp.encode("utf-8") + body, signature_bytes)
         except BadSignatureError:
-            logger.warning("[Discord] 签名验证失败")
+            logger.warning("[Discord] Signature verification failed")
             return False
         except Exception as exc:
-            logger.warning("[Discord] 签名校验异常: %s", exc)
+            log_safe_exception(
+                logger,
+                "[Discord] Signature verification failed unexpectedly",
+                exc,
+                error_code="bot_discord_signature_verification_failed",
+                level=logging.WARNING,
+            )
             return False
 
         return True
@@ -226,7 +251,7 @@ class DiscordPlatform(BotPlatform):
     # Discord message content hard limit
     DISCORD_MAX_CONTENT_LENGTH = 2000
 
-    def send_followup(self, response: Any, message: BotMessage) -> bool:
+    def send_followup(self, response: BotResponse, message: BotMessage) -> bool:
         """Edit the deferred interaction placeholder with the real result.
 
         Uses ``PATCH /webhooks/{application_id}/{token}/messages/@original``
@@ -239,7 +264,7 @@ class DiscordPlatform(BotPlatform):
         interaction_token = raw.get("token", "")
         if not application_id or not interaction_token:
             logger.warning(
-                "[Discord] 缺少 application_id 或 interaction token，无法发送 follow-up"
+                "[Discord] application_id or interaction token is missing; cannot send follow-up"
             )
             return False
 
@@ -252,7 +277,13 @@ class DiscordPlatform(BotPlatform):
                 content, self.DISCORD_MAX_CONTENT_LENGTH
             )
         except (ValueError, Exception) as exc:
-            logger.warning("[Discord] 消息分块失败: %s，尝试整段发送", exc)
+            log_safe_exception(
+                logger,
+                "[Discord] Message chunking failed; attempting a single message",
+                exc,
+                error_code="bot_discord_message_chunking_failed",
+                level=logging.WARNING,
+            )
             chunks = [content]
 
         base_url = (
@@ -279,24 +310,27 @@ class DiscordPlatform(BotPlatform):
                     )
                 if resp.status_code >= 300:
                     logger.error(
-                        "[Discord] follow-up chunk %d/%d 发送失败: %s %s",
+                        "[Discord] Follow-up chunk delivery failed: chunk=%d total=%d status=%s",
                         idx + 1,
                         len(chunks),
                         resp.status_code,
-                        resp.text[:200],
                     )
                     success = False
             except Exception as exc:
-                logger.error(
-                    "[Discord] follow-up chunk %d/%d 请求异常: %s",
-                    idx + 1,
-                    len(chunks),
+                log_safe_exception(
+                    logger,
+                    "[Discord] Follow-up chunk request failed",
                     exc,
+                    error_code="bot_discord_followup_request_failed",
+                    context={"chunk": idx + 1, "total": len(chunks)},
                 )
                 success = False
 
         if success:
-            logger.info("[Discord] follow-up 消息发送成功 (%d 块)", len(chunks))
+            logger.info(
+                "[Discord] Follow-up message delivery succeeded: chunk_count=%d",
+                len(chunks),
+            )
         return success
 
     def handle_challenge(self, data: Dict[str, Any]) -> Optional[WebhookResponse]:

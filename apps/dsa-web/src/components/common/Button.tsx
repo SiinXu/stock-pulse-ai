@@ -22,15 +22,16 @@ const BUTTON_SIZE_STYLES = {
 
 const ACTION_AI_STYLES = 'bg-[var(--home-action-ai-bg)] border border-[var(--home-action-ai-border)] text-[var(--home-action-ai-text)] hover:bg-[var(--home-action-ai-hover-bg)]';
 const ACTION_REPORT_STYLES = 'bg-[var(--home-action-report-bg)] border border-[var(--home-action-report-border)] text-[var(--home-action-report-text)] hover:bg-[var(--home-action-report-hover-bg)]';
+const PRIMARY_BUTTON_STYLES = 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110';
 
 const BUTTON_VARIANT_STYLES = {
-  primary: 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110',
+  primary: PRIMARY_BUTTON_STYLES,
   secondary: 'border border-border bg-card text-foreground shadow-soft-card hover:bg-hover',
-  'settings-primary': 'border settings-button-primary hover:brightness-110 hover:shadow-xl',
+  'settings-primary': PRIMARY_BUTTON_STYLES,
   'settings-secondary': 'border settings-button-secondary hover:translate-y-[-1px]',
   outline: 'border border-border bg-transparent text-foreground hover:bg-hover',
   ghost: 'border border-transparent bg-transparent text-secondary-text hover:bg-hover hover:text-foreground',
-  gradient: 'border border-transparent bg-foreground text-background shadow-soft-card hover:brightness-110',
+  gradient: PRIMARY_BUTTON_STYLES,
   danger: 'border border-transparent bg-danger text-destructive-foreground shadow-soft-card hover:brightness-105',
   'danger-subtle': 'border border-danger/50 bg-danger/10 text-danger hover:bg-danger/15',
   'action-primary': ACTION_AI_STYLES,
@@ -55,7 +56,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const { t } = useUiLanguage();
-  const glowStyles = glow ? 'shadow-glow-cyan settings-glow-cyan-hover' : '';
+  const emphasisStyles = glow ? 'shadow-soft-card hover:shadow-soft-card-strong' : '';
 
   return (
     <button
@@ -68,7 +69,7 @@ export const Button: React.FC<ButtonProps> = ({
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none',
         BUTTON_SIZE_STYLES[size],
         BUTTON_VARIANT_STYLES[variant],
-        glowStyles,
+        emphasisStyles,
         className,
       )}
       disabled={disabled || isLoading}

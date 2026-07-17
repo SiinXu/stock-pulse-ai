@@ -3341,6 +3341,62 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         )
         self.assertTrue(validation["valid"], validation["issues"])
 
+    def test_unknown_contract_operator_blocks_disabled_draft_without_writing(self) -> None:
+        from src.llm.provider_catalog import get_connection_field_schema
+
+        self._rewrite_env("STOCK_LIST=600519")
+        schema = get_connection_field_schema()
+        base_url = next(field for field in schema if field["key"] == "base_url")
+        base_url["contract"]["visible_when"] = [
+            {"key": "provider_id", "operator": "futureOperator", "value": "custom"}
+        ]
+        items = [
+            {"key": "LLM_CHANNELS", "value": "draft1"},
+            {"key": "LLM_DRAFT1_PROTOCOL", "value": "openai"},
+            {"key": "LLM_DRAFT1_ENABLED", "value": "false"},
+        ]
+
+        with patch(
+            "src.services.system_config_service.get_connection_field_schema",
+            return_value=schema,
+        ):
+            validation = self.service.validate(items=items)
+            self.assertFalse(validation["valid"])
+            self.assertTrue(
+                any(issue["code"] == "unknown_contract_condition" for issue in validation["issues"]),
+                validation["issues"],
+            )
+            with self.assertRaises(ConfigValidationError):
+                self.service.update(
+                    config_version=self.manager.get_config_version(),
+                    items=items,
+                )
+
+        self.assertEqual(self.manager.read_config_map(), {"STOCK_LIST": "600519"})
+
+    def test_dynamic_connection_validator_consumes_catalog_field_contract(self) -> None:
+        from src.llm.provider_catalog import get_connection_field_schema
+
+        schema = get_connection_field_schema()
+        models = next(field for field in schema if field["key"] == "models")
+        models["contract"].pop("required_when")
+        with patch(
+            "src.services.system_config_service.get_connection_field_schema",
+            return_value=schema,
+        ):
+            validation = self.service.validate(
+                items=[
+                    {"key": "LLM_CHANNELS", "value": "custom_draft"},
+                    {"key": "LLM_CUSTOM_DRAFT_PROVIDER", "value": "custom"},
+                    {"key": "LLM_CUSTOM_DRAFT_PROTOCOL", "value": "openai"},
+                    {"key": "LLM_CUSTOM_DRAFT_BASE_URL", "value": "https://api.example.com/v1"},
+                    {"key": "LLM_CUSTOM_DRAFT_API_KEY", "value": "sk-test"},
+                    {"key": "LLM_CUSTOM_DRAFT_ENABLED", "value": "true"},
+                ]
+            )
+
+        self.assertTrue(validation["valid"], validation["issues"])
+
     def test_validate_allows_enabled_ollama_channel_without_api_key(self) -> None:
         validation = self.service.validate(
             items=[

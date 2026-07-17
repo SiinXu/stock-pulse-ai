@@ -59,7 +59,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-md transition-colors hover:bg-hover hover:text-foreground"
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-sm transition-colors hover:bg-hover hover:text-foreground"
           aria-label={t('layout.openNav')}
         >
           <Menu className="h-5 w-5" />
@@ -74,7 +74,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <aside
           className={cn(
             'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
-            collapsed ? 'w-[76px]' : 'w-[228px]'
+            collapsed ? 'w-19' : 'w-57'
           )}
           aria-label={t('layout.desktopSidebar')}
         >
@@ -85,7 +85,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           />
         </aside>
 
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-[1.5rem] border border-border bg-card shadow-soft-card mt-14 mx-3 mb-3 lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4 touch-pan-y">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-3xl border border-border bg-card shadow-soft-card mt-14 mx-3 mb-3 lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4 touch-pan-y">
           {children ?? <Outlet />}
         </main>
       </div>
