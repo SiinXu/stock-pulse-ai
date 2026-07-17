@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web 设置多选下拉改用视口定位并在空间不足时向上展开，避免被设置分组或弹窗的 `overflow` 边界裁切；弹层在窄屏中保留 8px 安全边距。
+- [修复] Web 通知路由严格按运行时完整凭据组判断可用渠道，辅助字段或半套 Telegram、邮件、飞书、Discord、Slack、Pushover、ntfy、Gotify 等配置不再误显示为可路由。
+- [修复] Web 登录 `redirect` 在解析前拒绝 ASCII 控制字符、空格、DEL 与任意反斜杠，并在固定同源基准上二次校验，防止 URL 规范化绕过或登录后跳转失败。
 - [修复] Web 侧栏搜索框移除误导性的 `/` 快捷键提示（此前并无全局 `/` 监听），避免暗示不存在的键盘快捷键。
 - [修复] Web 登录深链不再丢失：已登录用户访问带 `?redirect=` 的 `/login`、或登录成功后，都会按 `?redirect=` 返回原页面而非首页；redirect 仅接受同源绝对路径，外部 URL、协议相对与反斜杠变体一律回退首页。
 - [改进] Web 剩余按钮观感控件统一为胶囊形（设置帮助弹窗文档链接、持仓 CSV 文件选择、首页通知勾选 chip），与全站按钮形状规范一致。

@@ -481,7 +481,7 @@ describe('SettingsField', () => {
     expect(trigger).toHaveTextContent('已选 2 / 6');
 
     fireEvent.click(trigger);
-    const checkboxes = within(group).getAllByRole('checkbox');
+    const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
       expect(checkbox.closest('label')).toHaveClass('min-h-11');
@@ -536,7 +536,7 @@ describe('SettingsField', () => {
     expect(within(group).getByText('legacy_channel')).toBeInTheDocument();
 
     fireEvent.click(trigger);
-    const checkboxes = within(group).getAllByRole('checkbox');
+    const checkboxes = screen.getAllByRole('checkbox');
     // 2 catalog options + 1 unknown stored value that must stay visible.
     expect(checkboxes).toHaveLength(3);
     expect(checkboxes[2]).toBeChecked();
@@ -586,7 +586,7 @@ describe('SettingsField', () => {
     );
     const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
     fireEvent.click(within(group).getByText(/已选/).closest('button')!);
-    const labels = within(group).getAllByRole('option').map((option) => option.textContent);
+    const labels = screen.getAllByRole('option').map((option) => option.textContent);
     expect(labels).toEqual(['email', 'feishu']);
 
     // No selectable option and nothing selected → guidance replaces the control.
@@ -639,7 +639,7 @@ describe('SettingsField', () => {
 
     const group = screen.getByTestId('multi-enum-REALTIME_SOURCE_PRIORITY');
     fireEvent.click(within(group).getByText(/已选/).closest('button')!);
-    const checkboxes = within(group).getAllByRole('checkbox');
+    const checkboxes = screen.getAllByRole('checkbox');
     // Picking akshare_sina appends to the priority tail; catalog order would
     // have produced tencent,akshare_sina,efinance instead.
     fireEvent.click(checkboxes[1]);
