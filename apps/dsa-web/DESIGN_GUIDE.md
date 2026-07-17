@@ -18,11 +18,17 @@
    lint/build 报错涉及任务范围外逻辑、拿不准是否需要扩展公共组件——一律停下提问。
    提问时给出：页面/文件、现状、StockPulse 依据、外部参考（如有）和倾向方案。
 4. **禁止硬编码**：
-   - 生产 `TS/TSX/JS/CSS` 中不得新增 hardcoded hex；运行时颜色必须来自
-     `src/index.css` 的 semantic token，禁止在组件里写 `bg-[#151514]`、
-     `text-[#41B83D]` 这类任意值类名或内联 hex。
+   - 组件和普通生产 `TS/TSX/JS/CSS` 不得出现 raw hex；新增运行时颜色必须引用
+     `src/index.css` 的 semantic token。唯一允许声明 raw color source value 的生产入口，是
+     `src/index.css` 的 `:root` / `.dark` 内 semantic-token custom-property declaration。这不是
+     `index.css` 整文件豁免；非 token CSS declaration、组件、types、utils 和 renderer 均不得
+     使用 raw hex，组件内也禁止 `bg-[#151514]`、`text-[#41B83D]` 等任意值类名或内联 hex。
    - 设计文档中的 HSL-to-hex 换算值只用于人工审阅，不是可复制到生产组件或样式的实现值。
-     合法测试 fixture 如确需固定 hex，必须进入明确白名单，并说明它验证的颜色语义。
+     测试与 fixture 如确需固定 hex，必须进入具名显式白名单，并逐项记录文件、值及颜色语义或
+     guard sentinel 用途；目录级排除不等同于白名单。
+   - 当前 `productionDesignGuard.test.ts` 的可执行生产扫描覆盖 `TSX`，以及由 CSS 路径完整性
+     断言约束的 `App.css` / `index.css`；尚未加载 `.ts` / `.js`，当前 types/utils 中的 `.ts` 与
+     其它 `.ts/.js` 生产路径缺口继续登记在 `UI01-P2-06`。因此本规则尚未对所有生产源类型自动执行。
    - 字号/圆角/间距优先用现有 tailwind 阶梯与 `--radius` 体系，不写魔法数字。
    - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑（仓库硬规则）。
 
@@ -131,8 +137,8 @@
 | 保留 CSS 变量名，只改取值 | 重命名/删除现有 token 变量 |
 | 保留 tailwind 的 cyan/purple key（值改为新色） | 删除 key 导致未清扫处编译爆炸 |
 | 用边框补层次（去辉光后） | 用新的发光/渐变替代旧辉光 |
-| 生产颜色走 `index.css` semantic token；文档 hex 只作审阅换算 | 在生产 TS/TSX/JS/CSS 写 hardcoded hex，或把文档换算值复制进组件 |
-| 测试 fixture 的固定 hex 有白名单和颜色语义说明 | 用无说明的 fixture hex 绕过生产 token 规则 |
+| 生产颜色引用 `index.css` semantic token；只在 `:root/.dark` 的 semantic-token declaration 声明 raw source value；文档 hex 只作审阅换算 | 在普通 CSS declaration、组件、types、utils 或 renderer 写 raw hex，或把 `index.css` 当作整文件豁免 |
+| 测试 fixture 的固定 hex 有具名白名单，并记录值和颜色/guard-sentinel 语义 | 把目录级 fixture 排除当成白名单，或用无说明的 fixture hex 绕过生产 token 规则 |
 | 尺寸用 tailwind 阶梯 / `--radius` 体系 | 魔法数字（`h-[37px]` 之类） |
 | token 缺口 → 停下提问 | 自己发明颜色值 |
 
@@ -158,6 +164,9 @@
 - [ ] 主按钮胶囊 + 黑白反色；焦点环为绿
 - [ ] 涨跌红绿未被改动
 - [ ] `grep -rn 'cyan\|purple\|glow' src/` 无非白名单残留
+- [ ] `productionDesignGuard.test.ts` 的生产 `TSX` / CSS guard 通过；在 `UI01-P2-06` 扩展
+      `.ts` / `.js` 覆盖前，另行人工审计 types、utils 与其它 `.ts/.js` 生产路径，且不声称规则已
+      全量自动执行
 - [ ] `git diff` 仅含样式面改动
 - [ ] Playwright 逐页明/暗截图符合本指南和批准的产品语义；外部参考只记录采用/拒绝理由
 - [ ] 抽查交互无回归：登录、主题切换、导航、Analyze 触发、历史列表、设置保存
