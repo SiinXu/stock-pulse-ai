@@ -1,0 +1,95 @@
+{
+  "id": "contract-malformed-dashboard-repaired",
+  "notes": "Malformed output (repairable): the final single-agent answer contains a dashboard JSON block that is truncated (missing closing braces, trailing comma). Characterizes that parse_dashboard_json rescues it via json_repair and the run still succeeds with the repaired dashboard. The frozen dashboard shows exactly what the repair layer produces today.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_mr1",
+          "name": "get_realtime_quote",
+          "arguments": {
+            "stock_code": "600519"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 30,
+        "total_tokens": 550
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_run",
+      "content": "输出决策仪表盘（响应被截断）：\n```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"短期震荡\",\n  \"operation_advice\": \"持有\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"结构未破坏，等待方向选择\",\n      \"signal_type\": \"🟡持有观望\",\n```",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 660,
+        "completion_tokens": 120,
+        "total_tokens": 780
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "single_run",
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "get_realtime_quote",
+        "arguments": {
+          "stock_code": "600519"
+        },
+        "success": true,
+        "result_length": 126,
+        "cached": false
+      }
+    ],
+    "total_steps": 2,
+    "total_tokens": 1330,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "operation_advice",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "贵州茅台",
+      "sentiment_score": 58,
+      "trend_prediction": "短期震荡",
+      "operation_advice": "持有",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "结构未破坏，等待方向选择",
+          "signal_type": "🟡持有观望"
+        }
+      }
+    },
+    "content": "输出决策仪表盘（响应被截断）：\n```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"短期震荡\",\n  \"operation_advice\": \"持有\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"结构未破坏，等待方向选择\",\n      \"signal_type\": \"🟡持有观望\",\n```",
+    "error": null
+  }
+}

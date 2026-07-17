@@ -1,0 +1,54 @@
+{
+  "id": "contract-timeout-agent-wallclock",
+  "notes": "Timeout behavior (single-agent): agent_orchestrator_timeout_s=1 while the only LLM call takes 1.3s (delay_s). Characterizes that run_agent_loop detects budget exhaustion right after the LLM call returns, discards the pending tool calls without executing them, and fails with the volatile 'Agent timed out after ...' error (frozen as error_prefix).",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "config": {
+    "agent_orchestrator_timeout_s": 1
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "delay_s": 1.3,
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_tw1",
+          "name": "echo",
+          "arguments": {
+            "message": "never executed: budget already exhausted"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 30,
+        "total_tokens": 550
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "signal": null,
+    "stage_sequence": [
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [],
+    "total_steps": 1,
+    "total_tokens": 550,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "",
+    "error_prefix": "Agent timed out after"
+  }
+}

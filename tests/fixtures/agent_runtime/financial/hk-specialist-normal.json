@@ -1,0 +1,238 @@
+{
+  "id": "hk-specialist-normal",
+  "notes": "HK specialist pipeline with an explicitly requested bull_trend skill (technical -> intel -> risk -> skill_bull_trend -> decision).",
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "specialist"
+  },
+  "input": {
+    "task": "分析腾讯控股的投资价值",
+    "context": {
+      "stock_code": "hk00700",
+      "stock_name": "腾讯控股",
+      "skills": [
+        "bull_trend"
+      ]
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_ht1",
+          "name": "analyze_trend",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 26,
+        "total_tokens": 666
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"buy\", \"confidence\": 0.68, \"reasoning\": \"港股均线多头排列，趋势延续。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 78, \"ma_alignment\": \"bullish\", \"volume_status\": \"normal\", \"pattern\": \"ascending_channel\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 712,
+        "completion_tokens": 90,
+        "total_tokens": 802
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": "{\"signal\": \"hold\", \"confidence\": 0.55, \"reasoning\": \"消息面平稳，无重大催化。\", \"risk_alerts\": [], \"positive_catalysts\": [], \"sentiment_label\": \"neutral\", \"capital_flow_signal\": \"neutral\", \"key_news\": []}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 560,
+        "completion_tokens": 70,
+        "total_tokens": 630
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "risk",
+      "content": "{\"risk_level\": \"low\", \"risk_score\": 24, \"flags\": [], \"veto_buy\": false, \"reasoning\": \"无重大风险信号。\", \"signal_adjustment\": \"none\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 540,
+        "completion_tokens": 52,
+        "total_tokens": 592
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "skill_bull_trend",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_hs1",
+          "name": "get_daily_history",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 610,
+        "completion_tokens": 24,
+        "total_tokens": 634
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "skill_bull_trend",
+      "content": "{\"skill_id\": \"bull_trend\", \"signal\": \"buy\", \"confidence\": 0.66, \"conditions_met\": [\"MA多头排列\"], \"conditions_missed\": [\"量能放大不足\"], \"score_adjustment\": 4, \"reasoning\": \"主升趋势结构成立，量能一般。\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 700,
+        "completion_tokens": 82,
+        "total_tokens": 782
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "decision",
+      "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 70,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势与策略共振，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面与bull_trend策略结论一致\",\n      \"data_limitations\": \"无\"\n    }\n  },\n  \"analysis_summary\": \"港股技术面多头排列，bull_trend策略确认主升结构，采取回踩低吸策略。\",\n  \"key_points\": \"MA5>MA10>MA20；策略确认；风险评分24\",\n  \"risk_warning\": \"港股波动较大，跌破MA20需止损\"\n}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 1240,
+        "completion_tokens": 250,
+        "total_tokens": 1490
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "buy",
+    "stage_sequence": [
+      "technical",
+      "technical",
+      "intel",
+      "risk",
+      "skill_bull_trend",
+      "skill_bull_trend",
+      "decision"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "analyze_trend",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 180,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "get_daily_history",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 79,
+        "cached": false
+      }
+    ],
+    "total_steps": 5,
+    "total_tokens": 5596,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "腾讯控股",
+      "sentiment_score": 70,
+      "trend_prediction": "震荡上行",
+      "operation_advice": "回踩MA5轻仓买入",
+      "decision_type": "buy",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "趋势与策略共振，回踩低吸",
+          "signal_type": "🟢买入信号",
+          "position_advice": {
+            "no_position": "回踩98附近轻仓介入",
+            "has_position": "持有，跌破95止损"
+          },
+          "time_sensitivity": "本周内"
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0,
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "轻仓试仓",
+            "entry_plan": "回踩98附近轻仓介入",
+            "risk_control": "止损参考 95.0"
+          }
+        },
+        "phase_decision": {
+          "phase_context": "基于最近收盘数据",
+          "action_window": "次一交易日",
+          "immediate_action": "回踩支撑再介入",
+          "watch_conditions": "是否缩量回踩MA5",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "技术面与bull_trend策略结论一致",
+          "data_limitations": "无"
+        },
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "bullish",
+            "trend_score": 78,
+            "is_bullish": true
+          }
+        },
+        "intelligence": {
+          "risk_alerts": []
+        }
+      },
+      "analysis_summary": "港股技术面多头排列，bull_trend策略确认主升结构，采取回踩低吸策略。",
+      "key_points": [
+        "港股均线多头排列，趋势延续。",
+        "消息面平稳，无重大催化。",
+        "无重大风险信号。",
+        "主升趋势结构成立，量能一般。",
+        "Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0\n  - bull_trend: buy (66%) weight=0.66"
+      ],
+      "risk_warning": "港股波动较大，跌破MA20需止损"
+    },
+    "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 70,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势与策略共振，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术面与bull_trend策略结论一致\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": []\n    }\n  },\n  \"analysis_summary\": \"港股技术面多头排列，bull_trend策略确认主升结构，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"港股均线多头排列，趋势延续。\",\n    \"消息面平稳，无重大催化。\",\n    \"无重大风险信号。\",\n    \"主升趋势结构成立，量能一般。\",\n    \"Skill consensus from 1 skills (bull_trend): weighted score 4.00/5.0\\n  - bull_trend: buy (66%) weight=0.66\"\n  ],\n  \"risk_warning\": \"港股波动较大，跌破MA20需止损\"\n}",
+    "error": null
+  }
+}
