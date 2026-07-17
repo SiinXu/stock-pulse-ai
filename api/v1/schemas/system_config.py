@@ -188,6 +188,10 @@ class SystemConfigResponse(BaseModel):
     config_version: str
     mask_token: str
     items: List[SystemConfigItem]
+    configured_notification_channels: List[str] = Field(
+        default_factory=list,
+        description="Routable static channels detected from the current live runtime Config snapshot",
+    )
     updated_at: Optional[str] = None
 
 

@@ -551,6 +551,7 @@ type ConfigState = {
   refreshAfterExternalSave: typeof refreshAfterExternalSave;
   configVersion: string;
   maskToken: string;
+  configuredNotificationChannels: string[] | null;
 };
 
 type ConfigOverride = Partial<ConfigState>;
@@ -697,6 +698,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
     refreshAfterExternalSave,
     configVersion: 'v1',
     maskToken: '******',
+    configuredNotificationChannels: [],
     ...overrides,
   };
 }
@@ -2481,6 +2483,7 @@ describe('SettingsPage', () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'notification',
+      configuredNotificationChannels: ['wechat'],
       itemsByCategory: {
         ...configState.itemsByCategory,
         notification: [
@@ -2503,6 +2506,7 @@ describe('SettingsPage', () => {
     // to the notification channels setup view.
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'notification',
+      configuredNotificationChannels: [],
       itemsByCategory: {
         ...configState.itemsByCategory,
         notification: [
@@ -2520,7 +2524,94 @@ describe('SettingsPage', () => {
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
+
+    // During a rolling upgrade an old backend omits the authoritative channel
+    // status. Keep the catalog and stored selection usable instead of treating
+    // unknown as a confirmed empty set.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: null,
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          { ...routingItem(['wechat', 'feishu', 'custom']), value: 'feishu' },
+          channelItem('WECHAT_WEBHOOK_URL', '******'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    const unknownField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(unknownField).getByText('feishu')).toBeInTheDocument();
+    expect(within(unknownField).queryByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).not.toBeInTheDocument();
+    expect(within(unknownField).getByText('wechat')).toBeInTheDocument();
+    expect(within(unknownField).getByText('custom')).toBeInTheDocument();
     unmount();
+  });
+
+  it('keeps masked ntfy and Gotify channels available from the backend routing status', () => {
+    const routingItem = {
+      key: 'NOTIFICATION_ALERT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_ALERT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: ['ntfy', 'gotify', 'wechat'].map((option) => ({ label: option, value: option })),
+        validation: {
+          allowed_values: ['ntfy', 'gotify', 'wechat'],
+          multi_value: true,
+          delimiter: ',',
+        },
+        displayOrder: 1,
+      },
+    };
+    const maskedChannelItem = (key: string) => ({
+      key,
+      value: '******',
+      rawValueExists: true,
+      isMasked: true,
+      schema: {
+        key,
+        category: 'notification',
+        dataType: 'string',
+        uiControl: 'password',
+        isSensitive: true,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: ['ntfy', 'gotify'],
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem,
+          maskedChannelItem('NTFY_URL'),
+          maskedChannelItem('GOTIFY_URL'),
+          maskedChannelItem('GOTIFY_TOKEN'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+
+    render(<SettingsPage />);
+
+    const field = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(field).getByText('ntfy')).toBeInTheDocument();
+    expect(within(field).getByText('gotify')).toBeInTheDocument();
+    expect(within(field).queryByText('wechat')).not.toBeInTheDocument();
   });
 
   it('lists validation errors and jumps to the errored field section from any section', () => {

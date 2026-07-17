@@ -2,7 +2,6 @@ import React, {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -10,6 +9,7 @@ import React, {
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { useFixedPopup } from './useFixedPopup';
 
 export interface SearchableSelectOption {
   /** Stable value stored on selection (e.g. a canonical model route). */
@@ -50,15 +50,6 @@ interface SearchableSelectProps {
   clearable?: boolean;
 }
 
-interface PopupPosition {
-  top: number;
-  left: number;
-  maxHeight: number;
-}
-
-const POPUP_GAP = 4;
-const VIEWPORT_MARGIN = 8;
-
 /**
  * A strict searchable select: the user can only pick from the provided
  * options (no free-text values). A persisted value missing from the list is
@@ -92,9 +83,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
-  const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -124,54 +112,41 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       }),
     [filtered],
   );
+  const popupContentVersion = useMemo(
+    () => [navItems.length, query] as const,
+    [navItems.length, query],
+  );
+  const {
+    portalHost,
+    popupStyle,
+    prepareForOpen,
+    resetPosition,
+  } = useFixedPopup({
+    isOpen,
+    triggerRef,
+    popupRef: popoverRef,
+    contentVersion: popupContentVersion,
+    constrainWidthToViewport: true,
+  });
 
   const open = useCallback(() => {
     if (disabled) {
       return;
     }
-    setPopupPosition(null);
-    setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
-    setPortalHost(
-      (triggerRef.current?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body,
-    );
+    prepareForOpen();
     setQuery('');
     setActiveIndex(0);
     setIsOpen(true);
-  }, [disabled]);
+  }, [disabled, prepareForOpen]);
 
   const close = useCallback((refocus: boolean) => {
     setIsOpen(false);
     setQuery('');
-    setPopupPosition(null);
+    resetPosition();
     if (refocus) {
       triggerRef.current?.focus();
     }
-  }, []);
-
-  useLayoutEffect(() => {
-    const popup = popoverRef.current;
-    if (!isOpen || !triggerRect || !popup) {
-      return;
-    }
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const popupRect = popup.getBoundingClientRect();
-    const maxHeight = Math.max(viewportHeight - (VIEWPORT_MARGIN * 2), 0);
-    const popupHeight = Math.min(popupRect.height, maxHeight);
-    const availableBelow = viewportHeight - triggerRect.bottom - POPUP_GAP - VIEWPORT_MARGIN;
-    const availableAbove = triggerRect.top - POPUP_GAP - VIEWPORT_MARGIN;
-    const openAbove = popupHeight > availableBelow && availableAbove > availableBelow;
-    const preferredTop = openAbove
-      ? triggerRect.top - POPUP_GAP - popupHeight
-      : triggerRect.bottom + POPUP_GAP;
-    const maxTop = Math.max(viewportHeight - VIEWPORT_MARGIN - popupHeight, VIEWPORT_MARGIN);
-    const top = Math.min(Math.max(preferredTop, VIEWPORT_MARGIN), maxTop);
-    const maxLeft = Math.max(viewportWidth - VIEWPORT_MARGIN - popupRect.width, VIEWPORT_MARGIN);
-    const left = Math.min(Math.max(triggerRect.left, VIEWPORT_MARGIN), maxLeft);
-
-    setPopupPosition({ top, left, maxHeight });
-  }, [isOpen, navItems.length, portalHost, query, triggerRect]);
+  }, [resetPosition]);
 
   const commit = useCallback(
     (next: string) => {
@@ -202,19 +177,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isOpen, close]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    const updateRect = () => setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
-    window.addEventListener('scroll', updateRect, true);
-    window.addEventListener('resize', updateRect);
-    return () => {
-      window.removeEventListener('scroll', updateRect, true);
-      window.removeEventListener('resize', updateRect);
-    };
-  }, [isOpen]);
 
   const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) {
@@ -330,18 +292,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <span id={staleValueId} className="mt-1 text-xs text-warning">{staleValueLabel ?? t('common.staleValue')}</span>
       ) : null}
 
-      {isOpen && triggerRect && portalHost
+      {isOpen && popupStyle && portalHost
         ? createPortal(
           <div
             ref={popoverRef}
             data-dialog-popup="true"
-            style={{
-              top: popupPosition?.top ?? triggerRect.bottom + POPUP_GAP,
-              left: popupPosition?.left ?? triggerRect.left,
-              minWidth: triggerRect.width,
-              maxHeight: popupPosition?.maxHeight,
-              visibility: popupPosition ? 'visible' : 'hidden',
-            }}
+            style={popupStyle}
             className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">

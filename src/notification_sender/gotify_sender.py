@@ -21,9 +21,24 @@ def resolve_gotify_message_endpoint(gotify_url: Optional[str]) -> Optional[str]:
     raw_url = (gotify_url or "").strip().rstrip("/")
     if not raw_url:
         return None
+    if any(char == "\\" or char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_url):
+        return None
 
-    parsed = urlparse(raw_url)
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+    try:
+        parsed = urlparse(raw_url)
+        hostname = parsed.hostname
+        _ = parsed.port
+        username = parsed.username
+        password = parsed.password
+    except (TypeError, ValueError, UnicodeError):
+        return None
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.netloc
+        or not hostname
+        or username is not None
+        or password is not None
+    ):
         return None
     if parsed.query or parsed.fragment:
         return None

@@ -183,7 +183,7 @@ describe('useSystemConfig', () => {
     ],
   };
 
-  it('keeps load callback stable after a successful load', async () => {
+  it('keeps load callback stable and marks legacy notification status as unknown', async () => {
     const { result } = renderHook(() => useSystemConfig());
     const firstLoad = result.current.load;
 
@@ -197,6 +197,42 @@ describe('useSystemConfig', () => {
 
     expect(getConfig).toHaveBeenCalledTimes(1);
     expect(result.current.load).toBe(firstLoad);
+    expect(result.current.configuredNotificationChannels).toBeNull();
+  });
+
+  it('keeps server-configured notification channels when their values are masked', async () => {
+    getConfig.mockResolvedValue({
+      ...sampleConfig,
+      configuredNotificationChannels: ['ntfy', 'gotify'],
+      items: [
+        ...sampleConfig.items,
+        {
+          key: 'NTFY_URL',
+          value: '******',
+          rawValueExists: true,
+          isMasked: true,
+        },
+        {
+          key: 'GOTIFY_URL',
+          value: '******',
+          rawValueExists: true,
+          isMasked: true,
+        },
+        {
+          key: 'GOTIFY_TOKEN',
+          value: '******',
+          rawValueExists: true,
+          isMasked: true,
+        },
+      ],
+    });
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+
+    expect(result.current.configuredNotificationChannels).toEqual(['ntfy', 'gotify']);
   });
 
   it('keeps the latest config load when responses resolve out of order', async () => {
@@ -230,9 +266,191 @@ describe('useSystemConfig', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  it('does not let an older external refresh overwrite a newer saved snapshot', async () => {
+    const staleExternalRefresh = createDeferred<typeof sampleConfig & {
+      configuredNotificationChannels: string[];
+    }>();
+    const savedConfig = {
+      ...sampleConfig,
+      configVersion: 'v2',
+      configuredNotificationChannels: ['ntfy'],
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600519' })),
+    };
+    const staleConfig = {
+      ...sampleConfig,
+      configuredNotificationChannels: ['wechat'],
+    };
+    getConfig
+      .mockResolvedValueOnce(sampleConfig)
+      .mockReturnValueOnce(staleExternalRefresh.promise)
+      .mockResolvedValueOnce(savedConfig);
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+
+    let externalRefresh!: Promise<void>;
+    act(() => {
+      externalRefresh = result.current.refreshAfterExternalSave([]);
+      result.current.setDraftValue('STOCK_LIST', 'SH600519');
+    });
+    await act(async () => {
+      await result.current.save();
+    });
+
+    expect(result.current.configVersion).toBe('v2');
+    expect(result.current.serverItems[0]?.value).toBe('SH600519');
+    expect(result.current.configuredNotificationChannels).toEqual(['ntfy']);
+
+    await act(async () => {
+      staleExternalRefresh.resolve(staleConfig);
+      await externalRefresh;
+    });
+
+    expect(result.current.configVersion).toBe('v2');
+    expect(result.current.serverItems[0]?.value).toBe('SH600519');
+    expect(result.current.configuredNotificationChannels).toEqual(['ntfy']);
+  });
+
+  it('does not report a completed external save as failed when its superseded refresh rejects', async () => {
+    const supersededExternalRefresh = createDeferred<typeof sampleConfig>();
+    const latestConfig = {
+      ...sampleConfig,
+      configVersion: 'v4',
+      configuredNotificationChannels: ['ntfy'],
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600519' })),
+    };
+    getConfig
+      .mockResolvedValueOnce(sampleConfig)
+      .mockReturnValueOnce(supersededExternalRefresh.promise)
+      .mockResolvedValueOnce(latestConfig);
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+    let externalRefresh!: Promise<void>;
+    act(() => {
+      externalRefresh = result.current.refreshAfterExternalSave([]);
+    });
+    await act(async () => {
+      await result.current.load();
+    });
+
+    await act(async () => {
+      supersededExternalRefresh.reject(new Error('superseded external refresh failed'));
+      await externalRefresh;
+    });
+
+    expect(result.current.configVersion).toBe('v4');
+    expect(result.current.configuredNotificationChannels).toEqual(['ntfy']);
+    expect(result.current.loadError).toBeNull();
+  });
+
+  it('does not report a committed save as failed when its superseded refresh rejects', async () => {
+    const supersededSaveRefresh = createDeferred<typeof sampleConfig>();
+    const latestConfig = {
+      ...sampleConfig,
+      configVersion: 'v3',
+      configuredNotificationChannels: ['gotify'],
+      items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600519' })),
+    };
+    getConfig
+      .mockResolvedValueOnce(sampleConfig)
+      .mockReturnValueOnce(supersededSaveRefresh.promise)
+      .mockResolvedValueOnce(latestConfig);
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+
+    act(() => {
+      result.current.setDraftValue('STOCK_LIST', 'SH600519');
+    });
+    expect(result.current.hasDirty).toBe(true);
+
+    let savePromise!: ReturnType<typeof result.current.save>;
+    act(() => {
+      savePromise = result.current.save();
+    });
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledTimes(1);
+      expect(getConfig).toHaveBeenCalledTimes(2);
+    });
+
+    await act(async () => {
+      await result.current.load();
+    });
+    expect(result.current.configVersion).toBe('v3');
+    expect(result.current.configuredNotificationChannels).toEqual(['gotify']);
+
+    let saveResult: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => {
+      supersededSaveRefresh.reject(new Error('superseded refresh failed'));
+      saveResult = await savePromise;
+    });
+
+    expect(saveResult).toEqual({ success: true });
+    expect(result.current.configVersion).toBe('v3');
+    expect(result.current.serverItems[0]?.value).toBe('SH600519');
+    expect(result.current.configuredNotificationChannels).toEqual(['gotify']);
+    expect(result.current.saveError).toBeNull();
+    expect(result.current.retryAction).toBeNull();
+    expect(result.current.toast).toEqual({ type: 'success', message: '配置已更新' });
+  });
+
+  it('still reports a committed save as failed when its current refresh rejects', async () => {
+    getConfig
+      .mockResolvedValueOnce(sampleConfig)
+      .mockRejectedValueOnce(new Error('current refresh failed'));
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+    act(() => {
+      result.current.setDraftValue('STOCK_LIST', 'SH600519');
+    });
+
+    let saveResult: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => {
+      saveResult = await result.current.save();
+    });
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(saveResult).toEqual({ success: false, message: '保存失败' });
+    expect(result.current.saveError).not.toBeNull();
+    expect(result.current.retryAction).toBe('save');
+  });
+
+  it('reports an update POST failure without attempting a snapshot refresh', async () => {
+    update.mockRejectedValueOnce(new Error('update failed'));
+    const { result } = renderHook(() => useSystemConfig());
+
+    await act(async () => {
+      await result.current.load();
+    });
+    act(() => {
+      result.current.setDraftValue('STOCK_LIST', 'SH600519');
+    });
+
+    let saveResult: Awaited<ReturnType<typeof result.current.save>> | undefined;
+    await act(async () => {
+      saveResult = await result.current.save();
+    });
+
+    expect(getConfig).toHaveBeenCalledTimes(1);
+    expect(saveResult).toEqual({ success: false, message: '保存失败' });
+    expect(result.current.saveError).not.toBeNull();
+    expect(result.current.retryAction).toBe('save');
+  });
+
   it('normalizes STOCK_LIST separators before saving', async () => {
     const savedConfig = {
       ...sampleConfig,
+      configuredNotificationChannels: ['ntfy'],
       items: sampleConfig.items.map((item) => (
         item.key === 'STOCK_LIST'
           ? { ...item, value: 'SH600000,SH600519,AAPL' }
@@ -270,6 +488,7 @@ describe('useSystemConfig', () => {
       reloadNow: true,
       items: [{ key: 'STOCK_LIST', value: 'SH600000,SH600519,AAPL' }],
     });
+    expect(result.current.configuredNotificationChannels).toEqual(['ntfy']);
   });
 
   it('keeps legacy LLM provider fields in save payload without hidden-field migration', async () => {

@@ -21,9 +21,24 @@ def resolve_ntfy_endpoint(ntfy_url: Optional[str]) -> Tuple[Optional[str], Optio
     raw_url = (ntfy_url or "").strip().rstrip("/")
     if not raw_url:
         return None, None
+    if any(char == "\\" or char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw_url):
+        return None, None
 
-    parsed = urlparse(raw_url)
-    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+    try:
+        parsed = urlparse(raw_url)
+        hostname = parsed.hostname
+        _ = parsed.port
+        username = parsed.username
+        password = parsed.password
+    except (TypeError, ValueError, UnicodeError):
+        return None, None
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.netloc
+        or not hostname
+        or username is not None
+        or password is not None
+    ):
         return None, None
 
     path_segments = [segment for segment in parsed.path.split("/") if segment]

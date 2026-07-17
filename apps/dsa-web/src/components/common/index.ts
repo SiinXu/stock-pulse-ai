@@ -21,6 +21,7 @@ export * from './ScoreGauge';
 export * from './JsonViewer';
 export * from './Select';
 export * from './SearchableSelect';
+export * from './useFixedPopup';
 export * from './Badge';
 export * from './StatusDot';
 export * from './Tooltip';
