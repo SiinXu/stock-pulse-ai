@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 import {
@@ -15,17 +15,21 @@ type UseHomeUrlStateOptions = {
   defaultRecordId: number | null;
   isHistoryLoading: boolean;
   selectedRecordId: number | null;
+  selectedReportId: number | null;
   isReportLoading: boolean;
   reportError: ParsedApiError | null;
+  reportSelectionEpoch?: number;
   selectHistoryItem: (recordId: number, isUserInitiated?: boolean) => Promise<void>;
   clearSelectedRecord: (preserveError?: boolean) => void;
 };
 
 type UseHomeUrlStateResult = {
+  recordId: number | null;
   runFlowSource: RunFlowSnapshotSource | null;
   urlIssue: 'invalid_record' | 'invalid_run_flow' | null;
   dismissUrlIssue: () => void;
   navigateToRecord: (recordId: number) => void;
+  replaceRecord: (recordId: number | null, preserveError?: boolean) => void;
   openTaskRunFlow: (taskId: string) => void;
   openHistoryRunFlow: (recordId: number) => void;
   closeRunFlow: () => void;
@@ -33,6 +37,15 @@ type UseHomeUrlStateResult = {
 };
 
 type HomeUrlIssue = 'invalid_record' | 'invalid_run_flow';
+type PendingSearchNavigation = {
+  originKey: string;
+  targetSearch: string;
+};
+type RejectedRecordLocation = {
+  recordId: number;
+  locationKey: string;
+  search: string;
+};
 const HOME_URL_ISSUE_STATE_KEY = '__stockPulseHomeUrlIssue';
 
 const isPermanentRecordError = (error: ParsedApiError | null): boolean => Boolean(
@@ -51,19 +64,26 @@ export function useHomeUrlState({
   defaultRecordId,
   isHistoryLoading,
   selectedRecordId,
+  selectedReportId,
   isReportLoading,
   reportError,
+  reportSelectionEpoch = 0,
   selectHistoryItem,
   clearSelectedRecord,
 }: UseHomeUrlStateOptions): UseHomeUrlStateResult {
   const location = useLocation();
   const navigate = useNavigate();
+  const navigationType = useNavigationType();
   const urlState = useMemo(() => parseHomeUrlState(location.search), [location.search]);
   const suppressDefaultForSearchRef = useRef<string | null>(null);
-  const rejectedRecordIdRef = useRef<number | null>(null);
+  const rejectedRecordLocationRef = useRef<RejectedRecordLocation | null>(null);
+  // Deduplicate the URL intent itself so StrictMode effect replay cannot issue
+  // the same detail request while React still exposes the prior store snapshot.
   const intendedRecordIdRef = useRef<number | null>(selectedRecordId);
-  const observedSelectedRecordIdRef = useRef<number | null>(selectedRecordId);
-  const pendingSearchRef = useRef<string | null>(null);
+  const defaultRecordIntentRef = useRef<number | null>(null);
+  const pendingSearchRef = useRef<PendingSearchNavigation | null>(null);
+  const preserveErrorOnClearRef = useRef(false);
+  const observedReportSelectionEpochRef = useRef(reportSelectionEpoch);
   const navigationState = useMemo<Record<string, unknown>>(() => (
     location.state && typeof location.state === 'object'
       ? { ...(location.state as Record<string, unknown>) }
@@ -79,18 +99,25 @@ export function useHomeUrlState({
         : null;
 
   useEffect(() => {
-    if (observedSelectedRecordIdRef.current !== selectedRecordId) {
-      observedSelectedRecordIdRef.current = selectedRecordId;
-      intendedRecordIdRef.current = selectedRecordId;
+    if (observedReportSelectionEpochRef.current === reportSelectionEpoch) {
+      return;
     }
-  }, [selectedRecordId]);
+    observedReportSelectionEpochRef.current = reportSelectionEpoch;
+    intendedRecordIdRef.current = null;
+    defaultRecordIntentRef.current = null;
+    rejectedRecordLocationRef.current = null;
+    suppressDefaultForSearchRef.current = null;
+    preserveErrorOnClearRef.current = false;
+  }, [reportSelectionEpoch]);
 
   const navigateSearch = useCallback((
     search: string,
     replace: boolean,
     issueAction: { set?: HomeUrlIssue; clear?: boolean } = {},
   ) => {
-    pendingSearchRef.current = search === location.search ? null : search;
+    pendingSearchRef.current = search === location.search
+      ? null
+      : { originKey: location.key, targetSearch: search };
     const nextState = { ...navigationState };
     if (issueAction.set) {
       nextState[HOME_URL_ISSUE_STATE_KEY] = issueAction.set;
@@ -105,14 +132,22 @@ export function useHomeUrlState({
       },
       { replace, state: Object.keys(nextState).length > 0 ? nextState : null },
     );
-  }, [location.hash, location.pathname, location.search, navigate, navigationState]);
+  }, [location.hash, location.key, location.pathname, location.search, navigate, navigationState]);
 
   // Confirm the programmatic target before the new report can be painted and navigated away from.
   useLayoutEffect(() => {
-    if (pendingSearchRef.current === location.search) {
+    const pendingNavigation = pendingSearchRef.current;
+    if (
+      pendingNavigation
+      && (
+        pendingNavigation.targetSearch === location.search
+        || pendingNavigation.originKey !== location.key
+        || navigationType === 'POP'
+      )
+    ) {
       pendingSearchRef.current = null;
     }
-  }, [location.search]);
+  }, [location.key, location.search, navigationType]);
 
   useEffect(() => {
     if (urlState.needsNormalization) {
@@ -135,33 +170,50 @@ export function useHomeUrlState({
     if (urlState.needsNormalization) {
       return;
     }
-    if (pendingSearchRef.current !== null && pendingSearchRef.current !== location.search) {
+    if (
+      pendingSearchRef.current !== null
+      && pendingSearchRef.current.targetSearch !== location.search
+    ) {
       return;
     }
 
     if (urlState.recordId !== null) {
-      if (rejectedRecordIdRef.current === urlState.recordId) {
+      const rejectedRecordLocation = rejectedRecordLocationRef.current;
+      if (
+        rejectedRecordLocation?.recordId === urlState.recordId
+        && rejectedRecordLocation.locationKey === location.key
+        && rejectedRecordLocation.search === location.search
+      ) {
         return;
       }
-      rejectedRecordIdRef.current = null;
+      rejectedRecordLocationRef.current = null;
       suppressDefaultForSearchRef.current = null;
+      const isDefaultSelection = defaultRecordIntentRef.current === urlState.recordId;
+      defaultRecordIntentRef.current = null;
       if (intendedRecordIdRef.current !== urlState.recordId) {
         intendedRecordIdRef.current = urlState.recordId;
-        void selectHistoryItem(urlState.recordId, true);
+        void selectHistoryItem(urlState.recordId, !isDefaultSelection);
       }
       return;
     }
 
     if (suppressDefaultForSearchRef.current === location.search) {
+      const preserveError = preserveErrorOnClearRef.current;
+      preserveErrorOnClearRef.current = false;
+      if (selectedRecordId !== null) {
+        intendedRecordIdRef.current = null;
+        clearSelectedRecord(preserveError);
+      }
       return;
     }
 
     if (!isHistoryLoading && defaultRecordId !== null) {
       if (intendedRecordIdRef.current !== defaultRecordId) {
+        defaultRecordIntentRef.current = defaultRecordId;
         intendedRecordIdRef.current = defaultRecordId;
+        navigateSearch(setHomeRecord(location.search, defaultRecordId), true);
         void selectHistoryItem(defaultRecordId, false);
       }
-      navigateSearch(setHomeRecord(location.search, defaultRecordId), true);
       return;
     }
 
@@ -173,8 +225,10 @@ export function useHomeUrlState({
     clearSelectedRecord,
     defaultRecordId,
     isHistoryLoading,
+    location.key,
     location.search,
     navigateSearch,
+    reportSelectionEpoch,
     selectHistoryItem,
     selectedRecordId,
     urlState.needsNormalization,
@@ -193,14 +247,19 @@ export function useHomeUrlState({
     }
 
     const nextSearch = clearHomeRecord(location.search);
-    rejectedRecordIdRef.current = urlState.recordId;
+    rejectedRecordLocationRef.current = {
+      recordId: urlState.recordId,
+      locationKey: location.key,
+      search: location.search,
+    };
     suppressDefaultForSearchRef.current = nextSearch;
     intendedRecordIdRef.current = null;
-    clearSelectedRecord(true);
+    preserveErrorOnClearRef.current = true;
     navigateSearch(nextSearch, true);
   }, [
     clearSelectedRecord,
     isReportLoading,
+    location.key,
     location.search,
     navigateSearch,
     reportError,
@@ -210,14 +269,51 @@ export function useHomeUrlState({
   ]);
 
   const navigateToRecord = useCallback((recordId: number) => {
-    rejectedRecordIdRef.current = null;
-    suppressDefaultForSearchRef.current = null;
-    navigateSearch(setHomeRecord(location.search, recordId), false, { clear: true });
-    if (intendedRecordIdRef.current !== recordId) {
-      intendedRecordIdRef.current = recordId;
-      void selectHistoryItem(recordId, true);
+    if (recordId === urlState.recordId) {
+      if (selectedReportId !== recordId && !isReportLoading) {
+        defaultRecordIntentRef.current = null;
+        rejectedRecordLocationRef.current = null;
+        suppressDefaultForSearchRef.current = null;
+        preserveErrorOnClearRef.current = false;
+        intendedRecordIdRef.current = recordId;
+        void selectHistoryItem(recordId, true);
+      }
+      return;
     }
-  }, [location.search, navigateSearch, selectHistoryItem]);
+    defaultRecordIntentRef.current = null;
+    rejectedRecordLocationRef.current = null;
+    suppressDefaultForSearchRef.current = null;
+    preserveErrorOnClearRef.current = false;
+    navigateSearch(setHomeRecord(location.search, recordId), false, { clear: true });
+  }, [
+    isReportLoading,
+    location.search,
+    navigateSearch,
+    selectHistoryItem,
+    selectedReportId,
+    urlState.recordId,
+  ]);
+
+  const replaceRecord = useCallback((recordId: number | null, preserveError = false) => {
+    defaultRecordIntentRef.current = null;
+    rejectedRecordLocationRef.current = null;
+    if (recordId === null) {
+      const nextSearch = clearHomeRecord(location.search);
+      suppressDefaultForSearchRef.current = nextSearch;
+      intendedRecordIdRef.current = null;
+      preserveErrorOnClearRef.current = preserveError;
+      navigateSearch(nextSearch, true, { clear: true });
+      if (nextSearch === location.search && selectedRecordId !== null) {
+        preserveErrorOnClearRef.current = false;
+        clearSelectedRecord(preserveError);
+      }
+      return;
+    }
+
+    suppressDefaultForSearchRef.current = null;
+    preserveErrorOnClearRef.current = false;
+    navigateSearch(setHomeRecord(location.search, recordId), true, { clear: true });
+  }, [clearSelectedRecord, location.search, navigateSearch, selectedRecordId]);
 
   const openTaskRunFlow = useCallback((taskId: string) => {
     navigateSearch(setHomeTaskRunFlow(location.search, taskId), false, { clear: true });
@@ -240,10 +336,12 @@ export function useHomeUrlState({
   }, [location.search, navigateSearch]);
 
   return {
+    recordId: urlState.recordId,
     runFlowSource: urlState.runFlow,
     urlIssue,
     dismissUrlIssue,
     navigateToRecord,
+    replaceRecord,
     openTaskRunFlow,
     openHistoryRunFlow,
     closeRunFlow,

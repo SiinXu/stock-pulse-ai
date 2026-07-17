@@ -25,12 +25,13 @@ import {
   canonicalModelRoute,
   buildConnectionContractValues,
   type ConnectionCredentialField,
-  type ConnectionFieldState,
+  type ConnectionSchemaAuthority,
   connectionAllowsEmptyApiKey,
-  evaluateConnectionFieldStates,
+  evaluateConnectionSchemaAuthority,
   getProviderDisplayLabel,
-  hasUnknownConnectionFieldCondition,
+  inspectConnectionSchemaDefinition,
   isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
   resolveConnectionRequirements,
   suggestConnectionName,
   validateConnectionContractValues,
@@ -38,6 +39,8 @@ import {
 import {
   CHANNEL_FIELD_KEY_PATTERN,
   CHANNEL_FIELD_SUFFIXES,
+  CONNECTION_SCHEMA_KEY_BY_SUFFIX,
+  SUPPORTED_CONNECTION_SCHEMA_KEYS,
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
   type ModelAccessFieldFocusRequest,
@@ -80,6 +83,8 @@ import { ModelMultiSelect } from './ModelMultiSelect';
 const FALSEY_VALUES = new Set(['0', 'false', 'no', 'off']);
 const HERMES_CHANNEL_NAME = 'hermes';
 const HERMES_DEFAULT_MODEL = 'hermes-agent';
+const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = '连接 Schema 不完整或不可用';
+const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE = '连接字段契约包含不支持的条件';
 
 const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
   channel.name.trim().toLowerCase() === HERMES_CHANNEL_NAME
@@ -112,10 +117,14 @@ interface ChannelConfig {
   name: string;
   /** User-facing label; changing it never changes the Connection identity. */
   displayName: string;
+  /** The card may show a fallback label without making it a Schema value. */
+  displayNameValuePresent: boolean;
   providerId: string;
-  /** False only for legacy payloads that predate explicit Provider identity. */
+  /** False when the persisted Provider identity is absent. */
   providerIdExplicit: boolean;
   protocol: ChannelProtocol;
+  /** Distinguishes a persisted protocol from the legacy UI fallback. */
+  protocolValuePresent: boolean;
   baseUrl: string;
   apiKey: string;
   /** Schema field that owns apiKey, independent of how many keys it contains. */
@@ -123,6 +132,8 @@ interface ChannelConfig {
   models: string;
   extraHeaders: string;
   enabled: boolean;
+  /** A persisted false is a value; an absent boolean is not. */
+  enabledValuePresent: boolean;
 }
 
 interface ChannelTestState {
@@ -230,16 +241,14 @@ function isChannelSecretFieldKey(key: string): boolean {
   return match?.[2] === 'API_KEY' || match?.[2] === 'API_KEYS';
 }
 
-const CONNECTION_FIELD_BY_SUFFIX: Record<ChannelFieldSuffix, string> = {
-  DISPLAY_NAME: 'display_name',
-  PROVIDER: 'provider_id',
-  PROTOCOL: 'protocol',
-  BASE_URL: 'base_url',
-  API_KEY: 'api_key',
-  API_KEYS: 'api_keys',
-  MODELS: 'models',
-  EXTRA_HEADERS: 'extra_headers',
-  ENABLED: 'enabled',
+const CONNECTION_FIELD_BY_DRAFT_KEY: Partial<Record<keyof ChannelConfig, string>> = {
+  name: 'connection_name',
+  displayName: 'display_name',
+  protocol: 'protocol',
+  baseUrl: 'base_url',
+  models: 'models',
+  extraHeaders: 'extra_headers',
+  enabled: 'enabled',
 };
 
 function resolveInitialChannelApiKeySource(
@@ -388,19 +397,31 @@ function buildChangedItemKeys(
     }
 
     const prefix = `LLM_${currentName}`;
-    if (current.displayName !== previous.displayName) {
+    if (
+      current.displayName !== previous.displayName
+      || current.displayNameValuePresent !== previous.displayNameValuePresent
+    ) {
       changedKeys.add(`${prefix}_DISPLAY_NAME`);
     }
-    if (current.protocol !== previous.protocol) {
+    if (
+      current.protocol !== previous.protocol
+      || current.protocolValuePresent !== previous.protocolValuePresent
+    ) {
       changedKeys.add(`${prefix}_PROTOCOL`);
     }
-    if (current.providerId !== previous.providerId) {
+    if (
+      current.providerId !== previous.providerId
+      || current.providerIdExplicit !== previous.providerIdExplicit
+    ) {
       changedKeys.add(`${prefix}_PROVIDER`);
     }
     if (current.baseUrl !== previous.baseUrl) {
       changedKeys.add(`${prefix}_BASE_URL`);
     }
-    if (current.enabled !== previous.enabled) {
+    if (
+      current.enabled !== previous.enabled
+      || current.enabledValuePresent !== previous.enabledValuePresent
+    ) {
       changedKeys.add(`${prefix}_ENABLED`);
     }
     if (
@@ -453,7 +474,7 @@ function buildChannelContractValues(
   emptyApiKeyHosts: string[],
   options: { baseUrlVisible?: boolean; extraHeadersVisible?: boolean } = {},
 ): Record<string, string> {
-  return buildConnectionContractValues({
+  const values = buildConnectionContractValues({
     connectionName: channel.name,
     displayName: channel.displayName,
     providerId: channel.providerId,
@@ -468,44 +489,32 @@ function buildChannelContractValues(
     emptyApiKeyHosts,
     ...options,
   });
+  if (!channel.displayNameValuePresent) {
+    values.display_name = '';
+  }
+  if (!channel.providerIdExplicit) {
+    values.provider_id = '';
+  }
+  if (!channel.protocolValuePresent) {
+    values.protocol = '';
+  }
+  if (!channel.enabledValuePresent) {
+    values.enabled = '';
+  }
+  return values;
 }
 
-function evaluateChannelSchemaFields(
+function evaluateChannelSchemaAuthority(
   channel: ChannelConfig,
   providers: LlmProviderCatalogEntry[],
   emptyApiKeyHosts: string[],
-  connectionFields: LlmConnectionFieldSchema[],
+  connectionFields?: LlmConnectionFieldSchema[],
   options: { baseUrlVisible?: boolean; extraHeadersVisible?: boolean } = {},
-): Record<string, ConnectionFieldState> {
-  return evaluateConnectionFieldStates(
+): ConnectionSchemaAuthority {
+  return evaluateConnectionSchemaAuthority(
     buildChannelContractValues(channel, providers, emptyApiKeyHosts, options),
     connectionFields,
   );
-}
-
-function connectionFieldCanWrite(
-  states: Record<string, ConnectionFieldState>,
-  key: string,
-): boolean {
-  const state = states[key];
-  return Boolean(state?.visible && state.enabled && !state.unknownCondition);
-}
-
-function connectionSchemaStatesAreKnown(
-  connectionFields: LlmConnectionFieldSchema[],
-  states: Record<string, ConnectionFieldState>,
-): boolean {
-  return connectionFields.length > 0
-    && !Object.values(states).some((state) => state.unknownCondition);
-}
-
-function channelSchemaStates(
-  channel: ChannelConfig,
-  providers: LlmProviderCatalogEntry[],
-  emptyApiKeyHosts: string[],
-  connectionFields: LlmConnectionFieldSchema[],
-): Record<string, ConnectionFieldState> {
-  return evaluateChannelSchemaFields(channel, providers, emptyApiKeyHosts, connectionFields);
 }
 
 function channelSchemaAllowsKnownOperations(
@@ -514,13 +523,12 @@ function channelSchemaAllowsKnownOperations(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
 ): boolean {
-  if (connectionFields === undefined) {
-    return true;
-  }
-  return connectionSchemaStatesAreKnown(
+  return evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
     connectionFields,
-    channelSchemaStates(channel, providers, emptyApiKeyHosts, connectionFields),
-  );
+  ).usable;
 }
 
 function channelIdentityCanWrite(
@@ -529,13 +537,15 @@ function channelIdentityCanWrite(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
 ): boolean {
-  if (connectionFields === undefined) {
-    return true;
-  }
-  const states = channelSchemaStates(channel, providers, emptyApiKeyHosts, connectionFields);
-  return connectionSchemaStatesAreKnown(connectionFields, states)
-    && connectionFieldCanWrite(states, 'connection_name')
-    && connectionFieldCanWrite(states, 'provider_id');
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return authority.usable
+    && isConnectionSchemaFieldWritable(authority, 'connection_name')
+    && isConnectionSchemaFieldWritable(authority, 'provider_id');
 }
 
 function channelConnectionNameCanWrite(
@@ -544,12 +554,14 @@ function channelConnectionNameCanWrite(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
 ): boolean {
-  if (connectionFields === undefined) {
-    return true;
-  }
-  const states = channelSchemaStates(channel, providers, emptyApiKeyHosts, connectionFields);
-  return connectionSchemaStatesAreKnown(connectionFields, states)
-    && connectionFieldCanWrite(states, 'connection_name');
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return authority.usable
+    && isConnectionSchemaFieldWritable(authority, 'connection_name');
 }
 
 function channelFieldCanWrite(
@@ -559,12 +571,13 @@ function channelFieldCanWrite(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
 ): boolean {
-  if (connectionFields === undefined) {
-    return true;
-  }
-  const states = channelSchemaStates(channel, providers, emptyApiKeyHosts, connectionFields);
-  return connectionSchemaStatesAreKnown(connectionFields, states)
-    && connectionFieldCanWrite(states, key);
+  const authority = evaluateChannelSchemaAuthority(
+    channel,
+    providers,
+    emptyApiKeyHosts,
+    connectionFields,
+  );
+  return isConnectionSchemaFieldWritable(authority, key);
 }
 
 function countChannelsForProvider(
@@ -724,6 +737,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     ),
   );
   const isComplete = issues.length === 0;
+  const actionName = channel.displayName.trim() || channel.name;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -781,7 +795,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           {selectedModels.length > 0 ? (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
+              aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 flex min-h-11 min-w-11 max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -802,7 +816,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           ) : (
             <button
               type="button"
-              aria-label={formatUiText(text.manageModels, { name: channel.displayName })}
+              aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
               className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
@@ -843,7 +857,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               size="sm"
               className="h-8 px-2 text-xs text-muted-text"
               disabled={busy}
-              aria-label={formatUiText(text.moreActions, { name: channel.displayName })}
+              aria-label={formatUiText(text.moreActions, { name: actionName })}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((previous) => !previous)}
@@ -1027,25 +1041,28 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       id: `modal:${entry.id}`,
       name: suggestConnectionName(existingNames, entry.id),
       displayName: getProviderDisplayLabel(entry, language),
+      displayNameValuePresent: true,
       providerId: entry.id,
       providerIdExplicit: true,
       protocol: normalizeProtocol(entry.protocol),
+      protocolValuePresent: true,
       baseUrl: entry.defaultBaseUrl ?? '',
       apiKey: '',
       credentialField: 'api_key',
       models: '',
       extraHeaders: '',
       enabled: true,
+      enabledValuePresent: true,
     };
     if (hasConnectionSchema) {
-      const states = evaluateChannelSchemaFields(
+      const authority = evaluateChannelSchemaAuthority(
         candidate,
         providers,
         emptyApiKeyHosts,
         connectionSchemaFields,
       );
       candidate.credentialField = (['api_key', 'api_keys'] as ConnectionCredentialField[])
-        .find((key) => connectionFieldCanWrite(states, key)) ?? 'api_key';
+        .find((key) => isConnectionSchemaFieldWritable(authority, key)) ?? 'api_key';
     }
     return candidate;
   };
@@ -1065,14 +1082,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
         connectionSchemaFields,
       );
     }
-    const states = channelSchemaStates(
+    const authority = evaluateChannelSchemaAuthority(
       candidate,
       providers,
       emptyApiKeyHosts,
       connectionSchemaFields,
     );
-    return connectionSchemaStatesAreKnown(connectionSchemaFields, states)
-      && connectionFieldCanWrite(states, 'provider_id');
+    return isConnectionSchemaFieldWritable(authority, 'provider_id');
   };
   const selectableProviders = providers.filter(providerCanBeSelected);
   const providerOptions: SearchableSelectOption[] = selectableProviders.map((entry) => {
@@ -1111,10 +1127,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       !draft
       || (
         hasConnectionSchema
-        && (
-          !connectionSchemaStatesAreKnown(connectionSchemaFields, connectionFieldStates)
-          || !connectionFieldCanWrite(connectionFieldStates, 'provider_id')
-        )
+        && !isConnectionSchemaFieldWritable(connectionAuthority, 'provider_id')
       )
     ) {
       return;
@@ -1132,10 +1145,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       providerId: id,
       providerIdExplicit: true,
       protocol: normalizeProtocol(chosen.protocol),
+      protocolValuePresent: true,
       baseUrl: nextBaseUrl,
     };
-    const proposedStates = hasConnectionSchema
-      ? evaluateChannelSchemaFields(
+    const proposedAuthority = hasConnectionSchema
+      ? evaluateChannelSchemaAuthority(
         proposedDraft,
         providers,
         emptyApiKeyHosts,
@@ -1147,13 +1161,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           ),
         },
       )
-      : {};
+      : evaluateConnectionSchemaAuthority({}, undefined);
+    const proposedStates = proposedAuthority.states;
     if (
       hasConnectionSchema
-      && (
-        !connectionSchemaStatesAreKnown(connectionSchemaFields, proposedStates)
-        || !connectionFieldCanWrite(proposedStates, 'provider_id')
-      )
+      && !isConnectionSchemaFieldWritable(proposedAuthority, 'provider_id')
     ) {
       return;
     }
@@ -1165,9 +1177,10 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const canAdoptProviderDefault = (key: string) => !hasConnectionSchema
       || proposedStates[key] === undefined
       || proposedStates[key].visible === false
-      || connectionFieldCanWrite(proposedStates, key);
+      || isConnectionSchemaFieldWritable(proposedAuthority, key);
     if (canAdoptProviderDefault('protocol')) {
       nextDraft.protocol = proposedDraft.protocol;
+      nextDraft.protocolValuePresent = true;
     }
     if (canAdoptProviderDefault('base_url')) {
       nextDraft.baseUrl = proposedDraft.baseUrl;
@@ -1203,7 +1216,17 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   };
 
   const updateDraft = (field: keyof ChannelConfig, value: string | boolean) => {
-    setDraft((previous) => (previous ? { ...previous, [field]: value } : previous));
+    const schemaField = CONNECTION_FIELD_BY_DRAFT_KEY[field];
+    if (schemaField && fieldIsReadOnly(schemaField)) {
+      return;
+    }
+    setDraft((previous) => previous ? {
+      ...previous,
+      [field]: value,
+      ...(field === 'displayName' ? { displayNameValuePresent: true } : {}),
+      ...(field === 'protocol' ? { protocolValuePresent: true } : {}),
+      ...(field === 'enabled' ? { enabledValuePresent: true } : {}),
+    } : previous);
     if (field === 'protocol' || field === 'baseUrl' || field === 'apiKey' || field === 'name') {
       // Bump nonces so in-flight test/discovery responses for the
       // previous connection parameters are discarded instead of re-filling state.
@@ -1381,7 +1404,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     )
     : [];
   const contractDiagnostics = completenessIssues.filter(
-    (issue) => issue === '连接字段契约包含不支持的条件',
+    (issue) => issue === CONNECTION_SCHEMA_UNAVAILABLE_ISSUE
+      || issue === CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE,
   );
   const contractBlockingIssues = hasConnectionSchema
     ? completenessIssues
@@ -1419,15 +1443,16 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       extraHeadersVisible: Boolean(draft.extraHeaders.trim() || focusField === 'EXTRA_HEADERS'),
     },
   ) : null;
-  const connectionFieldStates = connectionContractValues && hasConnectionSchema
-    ? evaluateConnectionFieldStates(connectionContractValues, connectionSchemaFields)
-    : {};
-  const connectionContractKnown = !hasConnectionSchema
-    || connectionSchemaStatesAreKnown(connectionSchemaFields, connectionFieldStates);
+  const connectionAuthority = evaluateConnectionSchemaAuthority(
+    connectionContractValues ?? {},
+    connectionFields,
+  );
+  const connectionFieldStates = connectionAuthority.states;
+  const connectionContractKnown = connectionAuthority.usable;
   const fieldIsVisible = (key: string) => !hasConnectionSchema
     || connectionFieldStates[key]?.visible === true;
-  const fieldIsReadOnly = (key: string) => disabled || (hasConnectionSchema
-    && connectionFieldStates[key]?.enabled !== true);
+  const fieldIsReadOnly = (key: string) => disabled || !connectionAuthority.usable || (hasConnectionSchema
+    && !isConnectionSchemaFieldWritable(connectionAuthority, key));
   const allowsEmptyKey = draft ? channelAllowsEmptyApiKey(draft, emptyApiKeyHosts) : false;
   const visibleApiKeyStates = hasConnectionSchema
     ? (['api_key', 'api_keys'] as ConnectionCredentialField[])
@@ -1435,7 +1460,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       .filter(({ state }) => state?.visible)
     : [];
   const writableCredentialFields = visibleApiKeyStates
-    .filter(({ state }) => state?.enabled && !state.unknownCondition)
+    .filter(({ key }) => isConnectionSchemaFieldWritable(connectionAuthority, key))
     .map(({ key }) => key);
   const showApiKeyField = Boolean(draft) && (hasConnectionSchema
     ? visibleApiKeyStates.length > 0
@@ -1447,7 +1472,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     ? text.apiKeyOptional
     : text.apiKey;
   const apiKeyIsReadOnly = hasConnectionSchema
-    && writableCredentialFields.length === 0;
+    && (!connectionAuthority.usable || writableCredentialFields.length === 0);
   const showProtocolField = hasConnectionSchema
     ? connectionFieldStates.protocol?.visible === true
     : isCustomService || focusField === 'PROTOCOL';
@@ -1497,8 +1522,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     setTest(null);
     setDiscovery(null);
   };
-  const revealedBaseUrlFieldStates = draft && hasConnectionSchema
-    ? evaluateChannelSchemaFields(
+  const revealedBaseUrlAuthority = draft && hasConnectionSchema
+    ? evaluateChannelSchemaAuthority(
       draft,
       providers,
       emptyApiKeyHosts,
@@ -1508,12 +1533,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
         extraHeadersVisible: Boolean(draft.extraHeaders.trim() || focusField === 'EXTRA_HEADERS'),
       },
     )
-    : {};
+    : evaluateConnectionSchemaAuthority({}, connectionFields);
   const canRevealBaseUrl = !disabled && (!hasConnectionSchema
-    || (
-      connectionSchemaStatesAreKnown(connectionSchemaFields, revealedBaseUrlFieldStates)
-      && connectionFieldCanWrite(revealedBaseUrlFieldStates, 'base_url')
-    ));
+    || isConnectionSchemaFieldWritable(revealedBaseUrlAuthority, 'base_url'));
   const showBaseUrlSummary = !isCustomService
     && !customBaseUrl
     && !showBaseUrlField
@@ -2468,6 +2490,7 @@ function parseChannelsFromItems(
   items: Array<{ key: string; value: string }>,
   itemSourceByKey: Map<string, boolean> = new Map(),
   providers: LlmProviderCatalogEntry[] = [],
+  connectionFields?: LlmConnectionFieldSchema[],
 ): ChannelConfig[] {
   const itemMap = new Map(items.map((item) => [item.key.toUpperCase(), item.value]));
   const channelNames = (itemMap.get('LLM_CHANNELS') || '')
@@ -2477,27 +2500,41 @@ function parseChannelsFromItems(
 
   return channelNames.map((name, index) => {
     const upperName = name.toUpperCase();
+    const legacyMode = connectionFields === undefined;
     const displayNameKey = `LLM_${upperName}_DISPLAY_NAME`;
+    const providerKey = `LLM_${upperName}_PROVIDER`;
+    const protocolKey = `LLM_${upperName}_PROTOCOL`;
+    const enabledKey = `LLM_${upperName}_ENABLED`;
+    const fieldHasSource = (key: string) => (
+      itemMap.has(key) && itemSourceByKey.get(key) !== false
+    );
     const baseUrl = itemMap.get(`LLM_${upperName}_BASE_URL`) || '';
     const rawModels = itemMap.get(`LLM_${upperName}_MODELS`) || '';
     const models = splitModels(rawModels);
-    const explicitProviderId = (itemMap.get(`LLM_${upperName}_PROVIDER`) || '').trim().toLowerCase();
+    const explicitProviderId = fieldHasSource(providerKey)
+      ? (itemMap.get(providerKey) || '').trim().toLowerCase()
+      : '';
+    const rawProtocol = fieldHasSource(protocolKey) ? (itemMap.get(protocolKey) || '') : '';
+    const rawEnabled = fieldHasSource(enabledKey) ? itemMap.get(enabledKey) : undefined;
 
     return {
       id: `parsed:${index}:${upperName}`,
       name: name.toLowerCase(),
-      // Legacy payloads may omit DISPLAY_NAME. Explicit empty values remain
-      // empty so the backend-provided required-field contract can reject them.
-      displayName: itemMap.has(displayNameKey) ? (itemMap.get(displayNameKey) ?? '') : name,
+      displayName: fieldHasSource(displayNameKey)
+        ? (itemMap.get(displayNameKey) ?? '')
+        : name,
+      displayNameValuePresent: fieldHasSource(displayNameKey) || legacyMode,
       providerId: explicitProviderId || inferLegacyProviderId(providers, name),
       providerIdExplicit: Boolean(explicitProviderId),
-      protocol: inferProtocol(itemMap.get(`LLM_${upperName}_PROTOCOL`) || '', baseUrl, models),
+      protocol: inferProtocol(rawProtocol, baseUrl, models),
+      protocolValuePresent: Boolean(rawProtocol.trim()) || legacyMode,
       baseUrl,
       apiKey: resolveInitialChannelApiKeyValue(name, itemMap, itemSourceByKey),
       credentialField: resolveInitialChannelCredentialField(name, itemMap),
       models: rawModels,
       extraHeaders: itemMap.get(`LLM_${upperName}_EXTRA_HEADERS`) || '',
-      enabled: parseEnabled(itemMap.get(`LLM_${upperName}_ENABLED`)),
+      enabled: parseEnabled(rawEnabled),
+      enabledValuePresent: Boolean(rawEnabled?.trim()) || legacyMode,
     };
   });
 }
@@ -2611,6 +2648,12 @@ function getChannelCompletenessIssues(
   if (connectionFields !== undefined) {
     const connectionSchemaFields = connectionFields ?? [];
     const values = buildChannelContractValues(channel, providers, emptyApiKeyHosts);
+    const authority = evaluateConnectionSchemaAuthority(values, connectionSchemaFields);
+    if (!authority.usable) {
+      return [authority.reason === 'unknown_condition'
+        ? CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE
+        : CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
+    }
     const issueByField: Record<string, string> = {
       connection_name: '连接名称必填',
       display_name: '连接名称必填',
@@ -2620,14 +2663,16 @@ function getChannelCompletenessIssues(
       api_key: '缺少 API 密钥',
       api_keys: '缺少 API 密钥',
       models: '至少配置一个模型',
+      extra_headers: '附加请求头必填',
       enabled: '缺少启用状态',
     };
-    const issues = validateConnectionContractValues(values, connectionSchemaFields)
-      .map((field) => issueByField[field])
-      .filter((issue): issue is string => Boolean(issue));
-    if (hasUnknownConnectionFieldCondition(values, connectionSchemaFields)) {
-      issues.push('连接字段契约包含不支持的条件');
+    const missingFields = validateConnectionContractValues(values, connectionSchemaFields);
+    if (missingFields.some((field) => !SUPPORTED_CONNECTION_SCHEMA_KEYS.has(field))) {
+      return [CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
     }
+    const issues = missingFields.map(
+      (field) => issueByField[field] ?? CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
+    );
     return Array.from(new Set(issues));
   }
 
@@ -2724,12 +2769,13 @@ function buildFilteredChannelUpdateItems({
     initialChannels.map((channel) => [channel.name.trim().toLowerCase(), channel]),
   );
   const schemaAllowsChannelField = (channel: ChannelConfig, fieldKey: string) => {
-    if (connectionFields === undefined) {
-      return true;
-    }
-    const states = channelSchemaStates(channel, providers, emptyApiKeyHosts, connectionFields);
-    return connectionSchemaStatesAreKnown(connectionFields, states)
-      && connectionFieldCanWrite(states, fieldKey);
+    const authority = evaluateChannelSchemaAuthority(
+      channel,
+      providers,
+      emptyApiKeyHosts,
+      connectionFields,
+    );
+    return isConnectionSchemaFieldWritable(authority, fieldKey);
   };
   const schemaAllowsItem = (itemKey: string) => {
     if (connectionFields === undefined) {
@@ -2750,7 +2796,7 @@ function buildFilteredChannelUpdateItems({
       ?? initialChannelsByName.get(parsed.connectionName);
     return Boolean(
       channel
-      && schemaAllowsChannelField(channel, CONNECTION_FIELD_BY_SUFFIX[parsed.suffix]),
+      && schemaAllowsChannelField(channel, CONNECTION_SCHEMA_KEY_BY_SUFFIX[parsed.suffix]),
     );
   };
 
@@ -2762,6 +2808,13 @@ function buildFilteredChannelUpdateItems({
     const initialItemSource = initialItemSourceByKey.get(itemKey);
     if (isChannelSecretFieldKey(itemKey)) {
       return changedKeys.has(itemKey);
+    }
+    if (
+      connectionFields !== undefined
+      && initialItemSource === undefined
+      && !changedKeys.has(itemKey)
+    ) {
+      return false;
     }
     if (initialItemSource === false) {
       return changedKeys.has(itemKey);
@@ -2819,14 +2872,18 @@ function channelsAreEqual(left: ChannelConfig, right: ChannelConfig): boolean {
   return (
     left.name === right.name
     && left.displayName === right.displayName
+    && left.displayNameValuePresent === right.displayNameValuePresent
     && left.providerId === right.providerId
+    && left.providerIdExplicit === right.providerIdExplicit
     && left.protocol === right.protocol
-      && left.baseUrl === right.baseUrl
-      && left.apiKey === right.apiKey
-      && left.credentialField === right.credentialField
+    && left.protocolValuePresent === right.protocolValuePresent
+    && left.baseUrl === right.baseUrl
+    && left.apiKey === right.apiKey
+    && left.credentialField === right.credentialField
     && left.models === right.models
     && left.extraHeaders === right.extraHeaders
     && left.enabled === right.enabled
+    && left.enabledValuePresent === right.enabledValuePresent
   );
 }
 
@@ -2909,8 +2966,8 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const editorText = MODEL_ACCESS_EDITOR_TEXT[language];
   const initialItemSourceByKey = useMemo(() => buildItemSourceByKey(items), [items]);
   const initialChannels = useMemo(
-    () => parseChannelsFromItems(items, initialItemSourceByKey, providers),
-    [items, initialItemSourceByKey, providers],
+    () => parseChannelsFromItems(items, initialItemSourceByKey, providers, connectionFields),
+    [items, initialItemSourceByKey, providers, connectionFields],
   );
   const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
   const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
@@ -2928,8 +2985,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     [items, persistedDraftItems],
   );
   const hydratedChannels = useMemo(
-    () => parseChannelsFromItems(hydratedItems, buildItemSourceByKey(hydratedItems), providers),
-    [hydratedItems, providers],
+    () => parseChannelsFromItems(
+      hydratedItems,
+      buildItemSourceByKey(hydratedItems),
+      providers,
+      connectionFields,
+    ),
+    [hydratedItems, providers, connectionFields],
   );
 
   const [channels, setChannels] = useState<ChannelConfig[]>(hydratedChannels);
@@ -2942,7 +3004,19 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const lastDraftFingerprintRef = useRef<string | null>(null);
   const onValidityChangeRef = useRef(onValidityChange);
 
-  const busy = disabled || catalogLoading || catalogUnavailable || Boolean(overriddenByMode);
+  const connectionSchemaDefinition = useMemo(
+    () => inspectConnectionSchemaDefinition(connectionFields),
+    [connectionFields],
+  );
+  const schemaUnavailable = connectionSchemaDefinition.mode === 'schema'
+    && !connectionSchemaDefinition.usable;
+  const baseBusy = disabled
+    || catalogLoading
+    || catalogUnavailable
+    || Boolean(overriddenByMode);
+  const schemaAllowsInspection = connectionSchemaDefinition.reason === 'unknown_condition';
+  const busy = baseBusy || (schemaUnavailable && !schemaAllowsInspection);
+  const mutationBusy = baseBusy || schemaUnavailable;
   const knownEditorRouteSet = useMemo(() => new Set([
     ...availableModelRoutes,
     ...collectChannelRouteSet(channels, false),
@@ -2976,7 +3050,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   const [prevAddSignal, setPrevAddSignal] = useState(addSignal);
   if (prevAddSignal !== addSignal) {
     setPrevAddSignal(addSignal);
-    if (!busy && !catalogUnavailable) {
+    if (!mutationBusy) {
       setModal({ mode: 'add' });
     }
   }
@@ -2987,7 +3061,16 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const index = parsed
       ? channels.findIndex((channel) => channel.name === parsed.connectionName)
       : -1;
-    if (parsed && index >= 0) {
+    if (
+      parsed
+      && index >= 0
+      && (schemaAllowsInspection || channelSchemaAllowsKnownOperations(
+        channels[index],
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      ))
+    ) {
       setHandledFocusRequestId(focusFieldRequest.requestId);
       setPendingRemove(null);
       setModal({ mode: 'edit', index, focusField: parsed.suffix });
@@ -3019,7 +3102,10 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       .filter((entry) => entry.issues.length > 0),
     [catalogLoading, channels, providers, emptyApiKeyHosts, connectionFields, catalogUnavailable],
   );
-  const draftValid = !catalogLoading && !catalogUnavailable && blockingChannels.length === 0;
+  const draftValid = !catalogLoading
+    && !catalogUnavailable
+    && connectionSchemaDefinition.usable
+    && blockingChannels.length === 0;
 
   // Task Routing / Reliability own the runtime routing keys in this IA, so the
   // channel draft never emits them (managesRuntimeConfig: false).
@@ -3087,9 +3173,29 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     return !saved || !channelsAreEqual(channel, saved);
   };
 
+  const openChannelEditor = (
+    index: number,
+    options: { focusModels?: boolean; focusField?: ChannelFieldSuffix } = {},
+  ) => {
+    const channel = channels[index];
+    if (
+      !channel
+      || busy
+      || (!schemaAllowsInspection && !channelSchemaAllowsKnownOperations(
+        channel,
+        providers,
+        emptyApiKeyHosts,
+        connectionFields,
+      ))
+    ) {
+      return;
+    }
+    setModal({ mode: 'edit', index, ...options });
+  };
+
   const handleTest = async (channel: ChannelConfig) => {
     if (
-      busy
+      mutationBusy
       || !channelSchemaAllowsKnownOperations(
         channel,
         providers,
@@ -3140,7 +3246,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const channel = channels[index];
     if (
       !channel
-      || busy
+      || mutationBusy
       || !channelConnectionNameCanWrite(
         channel,
         providers,
@@ -3164,7 +3270,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const channel = channels[index];
     if (
       !channel
-      || busy
+      || mutationBusy
       || !channelConnectionNameCanWrite(
         channel,
         providers,
@@ -3194,7 +3300,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     const channel = channels[index];
     if (
       !channel
-      || busy
+      || mutationBusy
       || !channelFieldCanWrite(
         channel,
         'enabled',
@@ -3223,7 +3329,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       }
     }
     setChannels((previous) => previous.map((item, rowIndex) => (
-      rowIndex === index ? { ...item, enabled: !item.enabled } : item
+      rowIndex === index
+        ? { ...item, enabled: !item.enabled, enabledValuePresent: true }
+        : item
     )));
   };
 
@@ -3233,7 +3341,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   ) => {
     if (
       !modal
-      || busy
+      || mutationBusy
       || !channelSchemaAllowsKnownOperations(
         channel,
         providers,
@@ -3308,6 +3416,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         </div>
       ) : null}
 
+      {schemaUnavailable ? (
+        <InlineAlert
+          variant="warning"
+          title={editorText.schemaUnavailableTitle}
+          message={editorText.schemaUnavailableMessage}
+          className="rounded-lg px-3 py-2 text-xs shadow-none"
+        />
+      ) : null}
+
       {channels.length === 0 ? (
         <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
           <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
@@ -3323,7 +3440,15 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               availableModels={availableModels}
               taskModelRefs={resolvedTaskModelRefs}
               unsaved={isChannelUnsaved(channel)}
-              busy={busy}
+              busy={busy || (
+                !schemaAllowsInspection
+                && !channelSchemaAllowsKnownOperations(
+                  channel,
+                  providers,
+                  emptyApiKeyHosts,
+                  connectionFields,
+                )
+              )}
               testState={testStates[channel.id]}
               issues={catalogLoading ? [] : [
                 ...getChannelNameIssues(channel),
@@ -3338,7 +3463,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               ]}
               onTest={() => void handleTest(channel)}
               canTest={
-                !busy
+                !mutationBusy
                 && channelSchemaAllowsKnownOperations(
                   channel,
                   providers,
@@ -3346,11 +3471,11 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                   connectionFields,
                 )
               }
-              onEdit={() => setModal({ mode: 'edit', index })}
-              onManageModels={() => setModal({ mode: 'edit', index, focusModels: true })}
+              onEdit={() => openChannelEditor(index)}
+              onManageModels={() => openChannelEditor(index, { focusModels: true })}
               onToggleEnabled={() => toggleEnabled(index)}
               canToggleEnabled={
-                !busy
+                !mutationBusy
                 && channelFieldCanWrite(
                   channel,
                   'enabled',
@@ -3361,7 +3486,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               }
               onRemove={() => requestRemoveChannel(index)}
               canRemove={
-                !busy
+                !mutationBusy
                 && channelConnectionNameCanWrite(
                   channel,
                   providers,

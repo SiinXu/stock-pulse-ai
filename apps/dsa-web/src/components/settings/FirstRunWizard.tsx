@@ -9,10 +9,10 @@ import {
   buildConnectionContractValues,
   canonicalModelRoute,
   type ConnectionCredentialField,
-  evaluateConnectionFieldStates,
+  evaluateConnectionSchemaAuthority,
   getProviderDisplayLabel,
-  hasUnknownConnectionFieldCondition,
   isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
   resolveConnectionRequirements,
   suggestConnectionName,
   validateConnectionContractValues,
@@ -160,31 +160,25 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     requirements?.showBaseUrl,
     suggestedConnectionName,
   ]);
-  const connectionFieldStates = connectionContractValues && hasConnectionSchema
-    ? evaluateConnectionFieldStates(connectionContractValues, connectionSchemaFields)
-    : {};
+  const connectionAuthority = evaluateConnectionSchemaAuthority(
+    connectionContractValues ?? {},
+    connectionFields,
+  );
+  const connectionFieldStates = connectionAuthority.states;
   const missingConnectionFields = connectionContractValues && hasConnectionSchema
     ? validateConnectionContractValues(connectionContractValues, connectionSchemaFields)
     : [];
-  const hasUnknownConnectionContract = connectionContractValues && hasConnectionSchema
-    ? hasUnknownConnectionFieldCondition(connectionContractValues, connectionSchemaFields)
-    : false;
   const fieldIsVisible = (key: string) => !hasConnectionSchema
     || connectionFieldStates[key]?.visible === true;
-  const fieldIsReadOnly = (key: string) => hasConnectionSchema
-    && connectionFieldStates[key]?.enabled !== true;
-  const fieldCanWrite = (key: string) => !hasConnectionSchema || Boolean(
-    connectionFieldStates[key]?.visible
-    && connectionFieldStates[key]?.enabled
-    && !connectionFieldStates[key]?.unknownCondition,
-  );
+  const fieldCanWrite = (key: string) => isConnectionSchemaFieldWritable(connectionAuthority, key);
+  const fieldIsReadOnly = (key: string) => !fieldCanWrite(key);
   const visibleApiKeyStates = hasConnectionSchema
     ? (['api_key', 'api_keys'] as ConnectionCredentialField[])
       .map((key) => ({ key, state: connectionFieldStates[key] }))
       .filter(({ state }) => state?.visible)
     : [];
   const writableCredentialFields = visibleApiKeyStates
-    .filter(({ state }) => state?.enabled && !state.unknownCondition)
+    .filter(({ key }) => fieldCanWrite(key))
     .map(({ key }) => key);
   const showProviderField = fieldIsVisible('provider_id');
   const showProtocolField = hasConnectionSchema
@@ -204,11 +198,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const showModelsField = fieldIsVisible('models');
   const modelsAreReadOnly = fieldIsReadOnly('models');
   const supportsDiscovery = provider?.supportsDiscovery === true;
-  const canPersistConnectionIdentity = !hasConnectionSchema || Boolean(
-    connectionSchemaFields.length > 0
+  const canPersistConnectionIdentity = connectionAuthority.usable
     && fieldCanWrite('connection_name')
-    && fieldCanWrite('provider_id'),
-  );
+    && fieldCanWrite('provider_id');
   const discoveryEnabledByContract = hasConnectionSchema
     ? Boolean(
       canPersistConnectionIdentity
@@ -222,7 +214,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const cloudContractReady = Boolean(
     provider
     && canPersistConnectionIdentity
-    && !hasUnknownConnectionContract
     && missingConnectionFields.length === 0,
   );
   const protocolOptions = useMemo(() => Array.from(
@@ -253,28 +244,22 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     const nextProtocol = nextProvider.protocol ?? 'openai';
     const nextBaseUrl = nextProvider.defaultBaseUrl ?? '';
-    const proposedStates = hasConnectionSchema
-      ? evaluateConnectionFieldStates(buildConnectionContractValues({
-        connectionName: suggestConnectionName(existingChannelNames, nextProvider.id),
-        displayName: getProviderDisplayLabel(nextProvider, language),
-        providerId: nextProvider.id,
-        provider: nextProvider,
-        protocol: nextProtocol,
-        baseUrl: nextBaseUrl,
-        apiKey,
-        credentialField,
-        models,
-        enabled: true,
-        emptyApiKeyHosts,
-      }), connectionSchemaFields)
-      : {};
-    const proposedContractKnown = !hasConnectionSchema
-      || !Object.values(proposedStates).some((state) => state.unknownCondition);
-    const proposedFieldCanWrite = (key: string) => !hasConnectionSchema || Boolean(
-      proposedContractKnown
-      && proposedStates[key]?.visible
-      && proposedStates[key]?.enabled
-      && !proposedStates[key]?.unknownCondition,
+    const proposedAuthority = evaluateConnectionSchemaAuthority(buildConnectionContractValues({
+      connectionName: suggestConnectionName(existingChannelNames, nextProvider.id),
+      displayName: getProviderDisplayLabel(nextProvider, language),
+      providerId: nextProvider.id,
+      provider: nextProvider,
+      protocol: nextProtocol,
+      baseUrl: nextBaseUrl,
+      apiKey,
+      credentialField,
+      models,
+      enabled: true,
+      emptyApiKeyHosts,
+    }), connectionFields);
+    const proposedStates = proposedAuthority.states;
+    const proposedFieldCanWrite = (key: string) => (
+      isConnectionSchemaFieldWritable(proposedAuthority, key)
     );
     if (!proposedFieldCanWrite('provider_id')) {
       return;
@@ -413,7 +398,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           return Boolean(
             provider
             && canPersistConnectionIdentity
-            && !hasUnknownConnectionContract
             && !missingConnectionFields.some((field) => stepFields.has(field)),
           );
         }
@@ -428,7 +412,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         return hasConnectionSchema
           ? canPersistConnectionIdentity
             && !missingConnectionFields.includes('models')
-            && !hasUnknownConnectionContract
           : modelOptions.length > 0;
       case 'model':
         return !hasConnectionSchema || cloudContractReady;
@@ -590,7 +573,11 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Select
                   id="wizard-protocol"
                   value={protocol}
-                  onChange={setProtocol}
+                  onChange={(nextProtocol) => {
+                    if (!fieldIsReadOnly('protocol')) {
+                      setProtocol(nextProtocol);
+                    }
+                  }}
                   options={protocolOptions}
                   disabled={fieldIsReadOnly('protocol')}
                 />
@@ -632,7 +619,11 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Input
                   id="wizard-base-url"
                   value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
+                  onChange={(event) => {
+                    if (!fieldIsReadOnly('base_url')) {
+                      setBaseUrl(event.target.value);
+                    }
+                  }}
                   disabled={fieldIsReadOnly('base_url')}
                 />
               </div>
@@ -640,11 +631,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           </div>
         ) : null}
 
-        {step === 'connection' && mode === 'cloud' && hasUnknownConnectionContract ? (
+        {step !== 'mode' && mode === 'cloud' && !connectionAuthority.usable ? (
           <InlineAlert
             variant="warning"
             title={text.contractUnsupportedTitle}
-            message={text.contractUnsupportedMessage}
+            message={connectionAuthority.reason === 'unknown_condition'
+              ? text.contractUnknownMessage
+              : text.contractUnsupportedMessage}
           />
         ) : null}
 

@@ -225,11 +225,6 @@
   --settings-border-overlay: hsl(80 6% 76% / 0.92);
   --settings-accent-shadow: hsl(var(--primary) / 0.08);
   --settings-primary-border: hsl(var(--foreground) / 0.9);
-  --settings-primary-gradient:
-    linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.9));
-  --settings-primary-text: hsl(var(--background));
-  --settings-primary-shadow: hsl(var(--foreground) / 0.16);
-  --settings-primary-shadow-hover: hsl(var(--foreground) / 0.2);
   --settings-secondary-border: hsl(80 7% 82% / 0.96);
   --settings-secondary-bg: hsl(80 7% 96% / 0.98);
   --settings-secondary-border-hover: hsl(var(--primary) / 0.42);
@@ -488,11 +483,6 @@
   --settings-border-overlay: hsl(var(--neutral-white) / 0.45);
   --settings-accent-shadow: hsl(var(--primary) / 0.1);
   --settings-primary-border: hsl(var(--foreground) / 0.9);
-  --settings-primary-gradient:
-    linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.9));
-  --settings-primary-text: hsl(var(--background));
-  --settings-primary-shadow: hsl(var(--neutral-black) / 0.3);
-  --settings-primary-shadow-hover: hsl(var(--neutral-black) / 0.36);
   --settings-secondary-border: hsl(var(--neutral-white) / 0.08);
   --settings-secondary-bg: hsl(var(--neutral-white) / 0.03);
   --settings-secondary-border-hover: hsl(var(--primary) / 0.34);
@@ -1962,17 +1952,6 @@ a {
   border-color: hsl(var(--primary) / 0.34);
   background: hsl(var(--primary) / 0.12);
   box-shadow: inset 3px 0 0 hsl(var(--primary) / 0.68);
-}
-
-.settings-button-primary {
-  border-color: var(--settings-primary-border);
-  background: var(--settings-primary-gradient);
-  color: var(--settings-primary-text);
-  box-shadow: 0 12px 28px var(--settings-primary-shadow);
-}
-
-.settings-button-primary:hover {
-  box-shadow: 0 18px 34px var(--settings-primary-shadow-hover);
 }
 
 .settings-button-secondary {

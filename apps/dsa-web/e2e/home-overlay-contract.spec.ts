@@ -4,6 +4,7 @@ import { loginAsE2eAdmin } from './auth-fixture';
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
 const REPORT_A_SUMMARY = 'Contract report A';
 const REPORT_B_SUMMARY = 'Contract report B';
+const REPORT_C_SUMMARY = 'Contract report C';
 
 const HISTORY_ITEMS = [
   {
@@ -27,6 +28,13 @@ const HISTORY_ITEMS = [
     created_at: '2026-07-15T08:00:00Z',
   },
 ];
+
+const COMPLETED_TASK_ITEM = {
+  ...HISTORY_ITEMS[0],
+  id: 3,
+  query_id: 'contract-query-3',
+  created_at: '2026-07-16T08:00:00Z',
+};
 
 const REPORTS: Record<number, Record<string, unknown>> = {
   1: {
@@ -61,6 +69,23 @@ const REPORTS: Record<number, Record<string, unknown>> = {
       operation_advice: 'Hold',
       trend_prediction: 'Upward',
       sentiment_score: 72,
+    },
+  },
+  3: {
+    meta: {
+      id: 3,
+      query_id: 'contract-query-3',
+      stock_code: '600519',
+      stock_name: 'Moutai',
+      report_type: 'detailed',
+      report_language: 'en',
+      created_at: '2026-07-16T08:00:00Z',
+    },
+    summary: {
+      analysis_summary: REPORT_C_SUMMARY,
+      operation_advice: 'Watch',
+      trend_prediction: 'Upward',
+      sentiment_score: 81,
     },
   },
 };
@@ -105,6 +130,7 @@ function deferred() {
 
 type HomeApiOptions = {
   delayFirstRecord?: boolean;
+  deferCompletedTask?: boolean;
   recordFailure?: {
     recordId: number;
     status: 401 | 403;
@@ -115,8 +141,12 @@ type HomeApiOptions = {
 
 async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
   const delayedRecord = deferred();
+  const completedTask = deferred();
   let shouldDelayFirstRecord = Boolean(options.delayFirstRecord);
+  let taskEventDelivered = false;
+  let fixtureHistoryItems = [...HISTORY_ITEMS];
   const detailRequests: number[] = [];
+  const historyRequests: string[] = [];
   const taskFlowRequests: string[] = [];
   const historyFlowRequests: number[] = [];
 
@@ -134,6 +164,35 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
   }));
   await page.route('**/api/v1/analysis/tasks**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    if (pathname === '/api/v1/analysis/tasks/stream' && options.deferCompletedTask) {
+      if (!taskEventDelivered) {
+        await completedTask.promise;
+        taskEventDelivered = true;
+        fixtureHistoryItems = [COMPLETED_TASK_ITEM, ...fixtureHistoryItems];
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: [
+            'event: task_completed',
+            `data: ${JSON.stringify({
+              task_id: 'task-completed-3',
+              stock_code: '600519',
+              stock_name: 'Moutai',
+              status: 'completed',
+              progress: 100,
+              report_type: 'detailed',
+              created_at: '2026-07-16T08:00:00Z',
+              completed_at: '2026-07-16T08:01:00Z',
+            })}`,
+            '',
+            '',
+          ].join('\n'),
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'event: connected\ndata: {}\n\n' });
+      return;
+    }
     const flowMatch = pathname.match(/^\/api\/v1\/analysis\/tasks\/([^/]+)\/flow$/);
     if (flowMatch) {
       const taskId = decodeURIComponent(flowMatch[1]);
@@ -152,11 +211,12 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     const { pathname } = url;
 
     if (pathname === '/api/v1/history') {
+      historyRequests.push(url.search);
       const reportType = url.searchParams.get('report_type');
       const stockCode = url.searchParams.get('stock_code');
       const items = reportType === 'market_review'
         ? []
-        : HISTORY_ITEMS.filter((item) => !stockCode || item.stock_code === stockCode);
+        : fixtureHistoryItems.filter((item) => !stockCode || item.stock_code === stockCode);
       await fulfillJson(route, {
         total: items.length,
         page: Number(url.searchParams.get('page') || 1),
@@ -168,8 +228,8 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
 
     if (pathname === '/api/v1/history/stocks') {
       await fulfillJson(route, {
-        total: HISTORY_ITEMS.length,
-        items: HISTORY_ITEMS.map((item) => ({
+        total: fixtureHistoryItems.length,
+        items: fixtureHistoryItems.map((item) => ({
           ...item,
           analysis_count: 1,
           last_analysis_time: item.created_at,
@@ -178,11 +238,20 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
       return;
     }
 
+    const deleteByCodeMatch = pathname.match(/^\/api\/v1\/history\/by-code\/([^/]+)$/);
+    if (route.request().method() === 'DELETE' && deleteByCodeMatch) {
+      const stockCode = decodeURIComponent(deleteByCodeMatch[1]);
+      const previousLength = fixtureHistoryItems.length;
+      fixtureHistoryItems = fixtureHistoryItems.filter((item) => item.stock_code !== stockCode);
+      await fulfillJson(route, { deleted: previousLength - fixtureHistoryItems.length });
+      return;
+    }
+
     const flowMatch = pathname.match(/^\/api\/v1\/history\/(\d+)\/flow$/);
     if (flowMatch) {
       const recordId = Number(flowMatch[1]);
       historyFlowRequests.push(recordId);
-      const item = HISTORY_ITEMS.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
+      const item = fixtureHistoryItems.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
       await fulfillJson(
         route,
         runFlowSnapshot(`history-${recordId}`, item.stock_code, item.stock_name),
@@ -193,7 +262,7 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     const diagnosticsMatch = pathname.match(/^\/api\/v1\/history\/(\d+)\/diagnostics$/);
     if (diagnosticsMatch) {
       const recordId = Number(diagnosticsMatch[1]);
-      const item = HISTORY_ITEMS.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
+      const item = fixtureHistoryItems.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
       await fulfillJson(route, {
         trace_id: `trace-record-${recordId}`,
         task_id: `task-record-${recordId}`,
@@ -251,9 +320,11 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
 
   return {
     detailRequests,
+    historyRequests,
     taskFlowRequests,
     historyFlowRequests,
     releaseFirstRecord: delayedRecord.resolve,
+    releaseCompletedTask: completedTask.resolve,
   };
 }
 
@@ -464,23 +535,15 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
 
     const backDetailRequestIndex = fixture.detailRequests.length;
-    const restoredReportBResponse = page.waitForResponse((response) => (
-      new URL(response.url()).pathname === '/api/v1/history/2' && response.status() === 200
-    ), { timeout: 10_000 });
     await page.goBack();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
-    await restoredReportBResponse;
-    expect(fixture.detailRequests.slice(backDetailRequestIndex)).toEqual([2]);
+    await expect.poll(() => fixture.detailRequests.slice(backDetailRequestIndex)).toEqual([2]);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
 
     const forwardDetailRequestIndex = fixture.detailRequests.length;
-    const restoredReportAResponse = page.waitForResponse((response) => (
-      new URL(response.url()).pathname === '/api/v1/history/1' && response.status() === 200
-    ), { timeout: 10_000 });
     await page.goForward();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
-    await restoredReportAResponse;
-    expect(fixture.detailRequests.slice(forwardDetailRequestIndex)).toEqual([1]);
+    await expect.poll(() => fixture.detailRequests.slice(forwardDetailRequestIndex)).toEqual([1]);
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
   });
 
@@ -500,6 +563,57 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toHaveCount(0);
     await expectSearchParams(page, { recordId: '2' });
+  });
+
+  test('task completion replaces the Home URL and opens the completed report', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', { deferCompletedTask: true });
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    const historyLength = await page.evaluate(() => window.history.length);
+    const completionRequestIndex = fixture.detailRequests.length;
+
+    fixture.releaseCompletedTask();
+
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '3' });
+    expect(fixture.detailRequests.slice(completionRequestIndex)).toEqual([3]);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+  });
+
+  test('task completion preserves an explicit report deep link while it is still loading', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', {
+      delayFirstRecord: true,
+      deferCompletedTask: true,
+    });
+    await expect.poll(() => fixture.detailRequests).toEqual([1]);
+    const historyRequestCount = fixture.historyRequests.length;
+
+    fixture.releaseCompletedTask();
+
+    await expect.poll(() => fixture.historyRequests.length).toBeGreaterThan(historyRequestCount);
+    await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    expect(fixture.detailRequests).toEqual([1]);
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
+
+    fixture.releaseFirstRecord();
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
+  });
+
+  test('deleting the current report replaces it once without refetching the deleted id', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1');
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    const historyLength = await page.evaluate(() => window.history.length);
+    const deleteRequestIndex = fixture.detailRequests.length;
+
+    await page.getByRole('button', { name: 'Delete Moutai history record' }).click();
+    const confirmDialog = page.getByRole('dialog', { name: 'Delete History' });
+    await confirmDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+
+    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '2' });
+    expect(fixture.detailRequests.slice(deleteRequestIndex)).toEqual([2]);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
   });
 
   test('a 401 report deep link keeps its localized error and removes only recordId', async ({ page }) => {

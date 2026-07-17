@@ -77,6 +77,31 @@ const PROVIDER_ID_FIELD: LlmConnectionFieldSchema = {
 
 const CONNECTION_IDENTITY_FIELDS = [CONNECTION_NAME_FIELD, PROVIDER_ID_FIELD];
 
+const HIDDEN_INHERITED_CONTRACT: LlmConnectionFieldSchema['contract'] = {
+  requirement: 'inherited',
+  visibleWhen: [{ key: '__test_hidden', operator: 'equals', value: 'true' }],
+};
+
+const CONNECTION_CORE_FIELDS: LlmConnectionFieldSchema[] = [
+  CONNECTION_NAME_FIELD,
+  { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  PROVIDER_ID_FIELD,
+  { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_keys', dataType: 'array', isSensitive: true, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'models', dataType: 'array', isSensitive: false, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'extra_headers', dataType: 'json', isSensitive: true, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+  { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: false, contract: HIDDEN_INHERITED_CONTRACT },
+];
+
+function withCoreFields(fields: LlmConnectionFieldSchema[]): LlmConnectionFieldSchema[] {
+  const byKey = new Map(
+    [...CONNECTION_CORE_FIELDS, ...fields].map((field) => [field.key, field]),
+  );
+  return Array.from(byKey.values());
+}
+
 // The wizard no longer prefills example models; add them via the token editor
 // (mirrors the real discover / manual-add flow) on the models step.
 function addWizardModels(models: string[]): void {
@@ -86,6 +111,32 @@ function addWizardModels(models: string[]): void {
     fireEvent.change(input, { target: { value: model } });
     fireEvent.click(addButton);
   }
+}
+
+function expectCloudSetupReadOnlyForSchema(connectionFields: LlmConnectionFieldSchema[]): void {
+  const onComplete = okComplete();
+  render(
+    <FirstRunWizard
+      onComplete={onComplete}
+      onClose={() => {}}
+      isSaving={false}
+      language="zh"
+      providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      connectionFields={connectionFields}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+  fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+  const next = screen.getByRole('button', { name: '下一步' });
+  expect(screen.getByText('连接 Schema 不完整或不可用')).toBeInTheDocument();
+  expect(next).toBeDisabled();
+  next.removeAttribute('disabled');
+  fireEvent.click(next);
+  expect(screen.getByText('第 2 / 5 步')).toBeInTheDocument();
+  expect(discoverLLMChannelModels).not.toHaveBeenCalled();
+  expect(testLLMChannel).not.toHaveBeenCalled();
+  expect(onComplete).not.toHaveBeenCalled();
 }
 
 describe('FirstRunWizard', () => {
@@ -124,7 +175,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'api_key',
@@ -133,7 +184,7 @@ describe('FirstRunWizard', () => {
             isRequired: false,
             contract: { requirement: 'optional' },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -159,7 +210,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[catalogProvider]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'api_key',
@@ -168,7 +219,7 @@ describe('FirstRunWizard', () => {
             isRequired: false,
             contract: { requirement: 'optional' },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -217,7 +268,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[catalogProvider]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'api_key',
@@ -226,7 +277,7 @@ describe('FirstRunWizard', () => {
             isRequired: true,
             contract: { requirement: 'required' },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -247,7 +298,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'base_url',
@@ -259,7 +310,7 @@ describe('FirstRunWizard', () => {
               visibleWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'openai' }],
             },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -284,7 +335,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           CONNECTION_NAME_FIELD,
           {
             key: 'provider_id',
@@ -300,14 +351,15 @@ describe('FirstRunWizard', () => {
             isRequired: false,
             contract: { requirement: 'optional' },
           },
-        ]}
+        ])}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
-    expect(screen.getByLabelText('服务商')).toBeDisabled();
+    expect(screen.queryByLabelText('服务商')).not.toBeInTheDocument();
+    expect(screen.getByText('连接 Schema 不完整或不可用')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
     expect(discoverLLMChannelModels).not.toHaveBeenCalled();
     expect(testLLMChannel).not.toHaveBeenCalled();
@@ -326,7 +378,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'api_key',
@@ -342,7 +394,7 @@ describe('FirstRunWizard', () => {
             isRequired: false,
             contract: { requirement: 'optional', enabledWhen: disabledForThisProvider },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -363,7 +415,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           {
             key: 'api_key',
@@ -382,7 +434,7 @@ describe('FirstRunWizard', () => {
               visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'other' }],
             },
           },
-        ]}
+        ])}
       />,
     );
 
@@ -416,6 +468,71 @@ describe('FirstRunWizard', () => {
     fireEvent.click(nextButton);
     expect(screen.getByText('第 2 / 5 步')).toBeInTheDocument();
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('keeps cloud setup read-only for a present empty schema', () => {
+    expectCloudSetupReadOnlyForSchema([]);
+  });
+
+  it('keeps cloud setup read-only for a present models-only schema', () => {
+    expectCloudSetupReadOnlyForSchema([{
+      key: 'models',
+      dataType: 'array',
+      isSensitive: false,
+      isRequired: false,
+      contract: { requirement: 'optional' },
+    }]);
+  });
+
+  it('keeps cloud setup read-only when connection_name is missing', () => {
+    expectCloudSetupReadOnlyForSchema([PROVIDER_ID_FIELD]);
+  });
+
+  it('keeps cloud setup read-only when provider_id is missing', () => {
+    expectCloudSetupReadOnlyForSchema([CONNECTION_NAME_FIELD]);
+  });
+
+  it('keeps cloud setup read-only for a read-only identity schema', () => {
+    expectCloudSetupReadOnlyForSchema(withCoreFields([
+      CONNECTION_NAME_FIELD,
+      {
+        ...PROVIDER_ID_FIELD,
+        isRequired: false,
+        contract: { requirement: 'inherited' },
+      },
+    ]));
+  });
+
+  it('keeps cloud setup read-only for an unknown condition operator', () => {
+    expectCloudSetupReadOnlyForSchema(withCoreFields([
+      ...CONNECTION_IDENTITY_FIELDS,
+      {
+        key: 'models',
+        dataType: 'array',
+        isSensitive: false,
+        isRequired: false,
+        contract: {
+          requirement: 'optional',
+          enabledWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'openai' }],
+        },
+      },
+    ]));
+  });
+
+  it('keeps cloud setup read-only when an unknown required field becomes visible', () => {
+    expectCloudSetupReadOnlyForSchema(withCoreFields([
+      ...CONNECTION_IDENTITY_FIELDS,
+      {
+        key: 'future_token',
+        dataType: 'string',
+        isSensitive: true,
+        isRequired: true,
+        contract: {
+          requirement: 'required',
+          visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'openai' }],
+        },
+      },
+    ]));
   });
 
   it('does not authorize a new Connection when the schema omits connection_name', () => {
@@ -480,11 +597,9 @@ describe('FirstRunWizard', () => {
       />,
     );
 
-    const discoverButton = screen.getByRole('button', { name: '自动发现模型' });
-    expect(discoverButton).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '自动发现模型' })).not.toBeInTheDocument();
+    expect(screen.getByText('连接 Schema 不完整或不可用')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '下一步' })).toBeDisabled();
-    discoverButton.removeAttribute('disabled');
-    fireEvent.click(discoverButton);
     expect(discoverLLMChannelModels).not.toHaveBeenCalled();
     expect(onComplete).not.toHaveBeenCalled();
   });
@@ -542,7 +657,7 @@ describe('FirstRunWizard', () => {
         language="zh"
         providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
         existingChannelNames={['openai']}
-        connectionFields={[
+        connectionFields={withCoreFields([
           ...CONNECTION_IDENTITY_FIELDS,
           { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
           { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional' } },
@@ -550,7 +665,7 @@ describe('FirstRunWizard', () => {
           { key: 'api_keys', dataType: 'array', isSensitive: true, isRequired: true, contract: { requirement: 'required', requiresConnectionTest: true } },
           { key: 'models', dataType: 'array', isSensitive: false, isRequired: true, contract: { requirement: 'required', requiresConnectionTest: true } },
           { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
-        ]}
+        ])}
       />,
     );
 
@@ -565,6 +680,8 @@ describe('FirstRunWizard', () => {
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     const items: Array<{ key: string; value: string }> = onComplete.mock.calls[0][0];
+    expect(items).toHaveLength(11);
+    expect(new Set(items.map((item) => item.key)).size).toBe(items.length);
     const byKey = new Map(items.map((item) => [item.key, item.value]));
     expect(byKey.get('LLM_CONFIG_MODE')).toBe('channels');
     expect(byKey.get('GENERATION_BACKEND')).toBe('litellm');
@@ -589,12 +706,12 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={CATALOG}
-        connectionFields={[
+        connectionFields={withCoreFields([
           { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
           { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
           { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
           { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: readOnly } },
-        ]}
+        ])}
       />,
     );
 
@@ -617,12 +734,12 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="zh"
         providers={CATALOG}
-        connectionFields={[
+        connectionFields={withCoreFields([
           { key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
           { key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
           { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: writableForDeepSeek } },
           { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: { requirement: 'optional', enabledWhen: writableForDeepSeek } },
-        ]}
+        ])}
       />,
     );
 

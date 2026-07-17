@@ -1379,6 +1379,59 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const oldPoll = deferred();
     const oldPollStarted = deferred();
     let submissions = 0;
+    let newReviewCompleted = false;
+    const persistedReviewId = 33;
+    await page.route('**/api/v1/history**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/history' && url.searchParams.get('report_type') === 'market_review') {
+        const items = newReviewCompleted
+          ? [{
+              ...historyItem(persistedReviewId, 'MARKET', 'Persisted New Market Review'),
+              query_id: 'new-review-task',
+              report_type: 'market_review',
+              analysis_summary: 'NEW_GENERATION_PERSISTED',
+            }]
+          : [];
+        await fulfillJson(route, { total: items.length, page: 1, limit: 10, items });
+        return;
+      }
+      if (url.pathname === `/api/v1/history/${persistedReviewId}`) {
+        await fulfillJson(route, {
+          meta: {
+            id: persistedReviewId,
+            query_id: 'new-review-task',
+            stock_code: 'MARKET',
+            stock_name: 'Persisted New Market Review',
+            report_type: 'market_review',
+            report_language: 'zh',
+            created_at: '2026-07-15T12:33:00Z',
+            model_used: 'e2e/model',
+          },
+          summary: {
+            analysis_summary: 'NEW_GENERATION_PERSISTED',
+            operation_advice: '新一代持久化复盘',
+            trend_prediction: '新一代结果',
+            sentiment_score: 66,
+          },
+          details: {
+            context_snapshot: {
+              market_review_payload: {
+                kind: 'market_review',
+                region: 'cn',
+                title: 'Persisted New Market Review',
+                sections: [{
+                  key: 'generation',
+                  title: 'Generation',
+                  markdown: 'NEW_GENERATION_PERSISTED',
+                }],
+              },
+            },
+          },
+        });
+        return;
+      }
+      await route.continue();
+    });
     await page.route('**/api/v1/analysis/market-review', async (route) => {
       submissions += 1;
       await fulfillJson(route, {
@@ -1396,10 +1449,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         market_review_report: 'OLD_GENERATION_SHOULD_NOT_RENDER',
       });
     });
-    await page.route('**/api/v1/analysis/status/new-review-task', (route) => fulfillJson(route, {
-      task_id: 'new-review-task', status: 'completed', progress: 100,
-      market_review_report: 'NEW_GENERATION_RENDERED',
-    }));
+    await page.route('**/api/v1/analysis/status/new-review-task', async (route) => {
+      newReviewCompleted = true;
+      await fulfillJson(route, {
+        task_id: 'new-review-task', status: 'completed', progress: 100,
+        market_review_report: 'NEW_RAW_STATUS_SHOULD_NOT_RENDER',
+      });
+    });
     await login(page);
     const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true });
     await marketReviewButton.click();
@@ -1412,10 +1468,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(marketReviewButton).toBeEnabled();
     await marketReviewButton.click();
     await expect.poll(() => submissions).toBe(2);
-    await expect(page.getByText('NEW_GENERATION_RENDERED', { exact: true })).toBeVisible();
+    const persistedReport = page.getByTestId('market-review-report');
+    await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(`/?recordId=${persistedReviewId}`);
+    await expect(page.getByText('NEW_RAW_STATUS_SHOULD_NOT_RENDER', { exact: true })).toHaveCount(0);
     oldPoll.resolve();
     await page.waitForTimeout(200);
-    await expect(page.getByText('NEW_GENERATION_RENDERED', { exact: true })).toBeVisible();
+    await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
     await expect(page.getByText('OLD_GENERATION_SHOULD_NOT_RENDER', { exact: true })).toHaveCount(0);
   });
 

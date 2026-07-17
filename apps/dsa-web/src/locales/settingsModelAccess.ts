@@ -14,6 +14,8 @@ export const MODEL_ACCESS_TEXT: Record<UiLanguage, Record<keyof typeof zh, strin
 
 const editorZh = {
   testing: '测试中…',
+  schemaUnavailableTitle: '连接 Schema 不完整或不可用',
+  schemaUnavailableMessage: '模型服务连接已进入只读保护；请更新后端或恢复完整的连接 Schema 后重试。',
   readonly: '当前模型配置由外部配置管理，网页暂时只读。',
   viewDetails: '查看详情',
   catalogFailed: '模型服务列表加载失败',
@@ -42,6 +44,8 @@ const editorZh = {
 
 const editorEn: Record<keyof typeof editorZh, string> = {
   testing: 'Testing…',
+  schemaUnavailableTitle: 'Connection Schema is incomplete or unavailable',
+  schemaUnavailableMessage: 'Model-service connections are read-only until the backend provides a complete Connection Schema.',
   readonly: 'Model configuration is managed externally. This page is read-only.',
   viewDetails: 'View details',
   catalogFailed: 'Could not load model providers',
@@ -94,13 +98,13 @@ export const MODEL_ACCESS_REASON_HINTS: Record<UiLanguage, Record<string, string
 };
 
 export const MODEL_ACCESS_ISSUES: Record<UiLanguage, Record<string, string>> = {
-  zh: { name_required: '连接名称必填', name_invalid: '连接名称仅限小写字母、数字或下划线', missing_provider: '缺少模型服务商', missing_protocol: '缺少连接协议', missing_api_key: '缺少 API 密钥', missing_base_url: '缺少服务地址', missing_models: '至少配置一个模型', contract_unknown: '连接字段契约包含不支持的条件' },
-  en: { name_required: 'Connection name is required', name_invalid: 'Use lowercase letters, numbers, or underscores', missing_provider: 'Model provider is required', missing_protocol: 'Connection protocol is required', missing_api_key: 'API key is required', missing_base_url: 'Base URL is required', missing_models: 'Add at least one model', contract_unknown: 'The Connection field contract contains an unsupported condition' },
+  zh: { name_required: '连接名称必填', name_invalid: '连接名称仅限小写字母、数字或下划线', missing_provider: '缺少模型服务商', missing_protocol: '缺少连接协议', missing_api_key: '缺少 API 密钥', missing_base_url: '缺少服务地址', missing_models: '至少配置一个模型', missing_extra_headers: '附加请求头必填', contract_unknown: '连接字段契约包含不支持的条件', schema_unavailable: '连接 Schema 不完整或不可用' },
+  en: { name_required: 'Connection name is required', name_invalid: 'Use lowercase letters, numbers, or underscores', missing_provider: 'Model provider is required', missing_protocol: 'Connection protocol is required', missing_api_key: 'API key is required', missing_base_url: 'Base URL is required', missing_models: 'Add at least one model', missing_extra_headers: 'Extra headers are required', contract_unknown: 'The Connection field contract contains an unsupported condition', schema_unavailable: 'Connection Schema is incomplete or unavailable' },
 };
 
 export function localizeModelAccessIssue(issue: string, language: UiLanguage): string {
   const codeByZh: Record<string, keyof typeof MODEL_ACCESS_ISSUES.zh> = {
-    '连接名称必填': 'name_required', '连接名称仅限小写字母、数字或下划线': 'name_invalid', '缺少模型服务商': 'missing_provider', '缺少连接协议': 'missing_protocol', '缺少 API 密钥': 'missing_api_key', '缺少服务地址': 'missing_base_url', '至少配置一个模型': 'missing_models', '连接字段契约包含不支持的条件': 'contract_unknown',
+    '连接名称必填': 'name_required', '连接名称仅限小写字母、数字或下划线': 'name_invalid', '缺少模型服务商': 'missing_provider', '缺少连接协议': 'missing_protocol', '缺少 API 密钥': 'missing_api_key', '缺少服务地址': 'missing_base_url', '至少配置一个模型': 'missing_models', '附加请求头必填': 'missing_extra_headers', '连接字段契约包含不支持的条件': 'contract_unknown', '连接 Schema 不完整或不可用': 'schema_unavailable',
   };
   const code = codeByZh[issue];
   return code ? MODEL_ACCESS_ISSUES[language][code] : issue;

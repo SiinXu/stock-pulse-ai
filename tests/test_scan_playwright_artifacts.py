@@ -23,6 +23,13 @@ from scripts import scan_playwright_artifacts as artifact_scanner
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCANNER = REPO_ROOT / "scripts" / "scan_playwright_artifacts.py"
 CANARY = "stockpulse-playwright-canary-7f91c2a6b43d"
+FORBIDDEN_CREDENTIAL_E2E_MEDIA_PATTERNS = (
+    re.compile(r"\.\s*screenshot\s*\("),
+    re.compile(r"contentType\s*:\s*['\"]image/"),
+    re.compile(r"\brecordVideo\b"),
+    re.compile(r"\.\s*video\s*\("),
+    re.compile(r"\bscreenshots\s*:\s*true\b"),
+)
 
 
 def _run_scanner(artifact_root: Path) -> subprocess.CompletedProcess[str]:
@@ -1474,6 +1481,20 @@ def test_safe_failed_playwright_diagnostics_and_masked_values_pass(
         '"errors":[{"message":"assertion failed"}],"suites":[]}\n',
         encoding="utf-8",
     )
+    result = _run_scanner(artifact_root)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    assert "Playwright artifact scan passed" in result.stdout
+    assert {path.name for path in artifact_root.iterdir()} == {
+        "playwright-results.json",
+        "service.log",
+    }
+
+
+def test_safe_masked_trace_zip_and_opaque_resource_pass(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "test-results"
+    artifact_root.mkdir()
     with ZipFile(artifact_root / "trace.zip", "w") as archive:
         archive.writestr(
             "trace.network",
@@ -1639,18 +1660,14 @@ def test_secret_bearing_playwright_run_is_text_only_and_emits_json_report() -> N
     assert "['list']" in config
     assert "['json', { outputFile: path.join(resultDir, 'playwright-results.json') }]" in config
     assert "captureGitInfo: { commit: false, diff: false }" in config
+    assert "globalSetup: './e2e/playwright-trace-global-setup.ts'" in config
+    assert "resolvePlaywrightTracePolicy(process.env, process.argv.slice(2))" in config
+    assert "trace: requestedTraceMode === 'off'" in config
     assert "screenshot: 'off'" in config
     assert "video: 'off'" in config
     assert "screenshots: false" in config
     assert "attachments: false" in config
 
-    forbidden_media_generation = (
-        re.compile(r"\.\s*screenshot\s*\("),
-        re.compile(r"contentType\s*:\s*['\"]image/"),
-        re.compile(r"\brecordVideo\b"),
-        re.compile(r"\.\s*video\s*\("),
-        re.compile(r"\bscreenshots\s*:\s*true\b"),
-    )
     e2e_root = REPO_ROOT / "apps" / "dsa-web" / "e2e"
     source_paths = sorted(
         path
@@ -1660,7 +1677,7 @@ def test_secret_bearing_playwright_run_is_text_only_and_emits_json_report() -> N
     assert source_paths
     for source_path in source_paths:
         source = source_path.read_text(encoding="utf-8")
-        for forbidden in forbidden_media_generation:
+        for forbidden in FORBIDDEN_CREDENTIAL_E2E_MEDIA_PATTERNS:
             assert forbidden.search(source) is None, (
                 f"{source_path.relative_to(e2e_root)} generates uninspectable media"
             )
@@ -1674,21 +1691,76 @@ def test_ci_upload_is_gated_on_the_corresponding_scan_success() -> None:
     by_name = {step["name"]: step for step in steps}
 
     e2e = by_name["🎭 Playwright e2e (including i18n acceptance)"]
+    preflight = by_name["🔒 Playwright credential safety preflight"]
     scan = by_name["🔐 Scan Playwright artifacts for secrets"]
+    stage = by_name["📦 Stage allowlisted Playwright diagnostics"]
+    staged_scan = by_name["🔐 Scan staged Playwright diagnostics"]
     upload = by_name["📤 Upload scanned Playwright diagnostics"]
-    assert steps.index(e2e) < steps.index(scan) < steps.index(upload)
+    assert steps.index(preflight) < steps.index(e2e)
+    assert steps.index(e2e) < steps.index(scan) < steps.index(stage)
+    assert steps.index(stage) < steps.index(staged_scan) < steps.index(upload)
+    assert preflight["run"] == "npm run test:e2e-security-preflight"
     assert scan["id"] == "artifact_scan"
     assert scan["if"] == "always()"
     assert scan["run"] == (
         'python scripts/scan_playwright_artifacts.py '
         '"apps/dsa-web/test-results/${DSA_WEB_E2E_RUN_ID}/"'
     )
-    assert upload["if"] == "${{ always() && steps.artifact_scan.outcome == 'success' }}"
-    assert upload["with"]["path"] == (
-        "apps/dsa-web/test-results/${{ env.DSA_WEB_E2E_RUN_ID }}/"
+    assert stage["id"] == "artifact_stage"
+    assert stage["if"] == "${{ always() && steps.artifact_scan.outcome == 'success' }}"
+    assert stage["env"] == {
+        "SOURCE_DIR": "apps/dsa-web/test-results/${{ env.DSA_WEB_E2E_RUN_ID }}",
+        "STAGING_DIR": "${{ runner.temp }}/playwright-upload",
+    }
+    assert stage["run"] == (
+        'python scripts/stage_playwright_diagnostics.py '
+        '"${SOURCE_DIR}" "${STAGING_DIR}"'
     )
+    assert staged_scan["id"] == "staged_artifact_scan"
+    assert staged_scan["if"] == (
+        "${{ always() && steps.artifact_scan.outcome == 'success' "
+        "&& steps.artifact_stage.outcome == 'success' }}"
+    )
+    assert staged_scan["run"] == (
+        'python scripts/scan_playwright_artifacts.py '
+        '"${{ runner.temp }}/playwright-upload/"'
+    )
+    assert upload["if"] == (
+        "${{ always() && steps.artifact_scan.outcome == 'success' "
+        "&& steps.artifact_stage.outcome == 'success' "
+        "&& steps.staged_artifact_scan.outcome == 'success' }}"
+    )
+    assert upload["with"]["path"] == "${{ runner.temp }}/playwright-upload/"
+    assert upload["with"]["if-no-files-found"] == "error"
     assert job["env"]["DSA_WEB_E2E_RUN_ID"] == "ci-secret-bearing"
+    assert job["env"]["DSA_WEB_E2E_CREDENTIAL_BEARING"] == "true"
+    assert job["env"]["DSA_WEB_E2E_TRACE"] == "off"
     assert "DSA_PLAYWRIGHT_ARTIFACT_CANARY" in job["env"]
     assert e2e["env"]["DSA_WEB_E2E_ALPHA_API_KEY"] == (
         "${{ env.DSA_PLAYWRIGHT_ARTIFACT_CANARY }}"
+    )
+
+
+def test_repository_playwright_entrypoint_rejects_alternate_config() -> None:
+    web_root = REPO_ROOT / "apps" / "dsa-web"
+    package = json.loads((web_root / "package.json").read_text(encoding="utf-8"))
+
+    assert package["scripts"]["test:smoke"] == "node e2e/run-playwright-tests.mjs"
+    result = subprocess.run(
+        [
+            "node",
+            "e2e/run-playwright-tests.mjs",
+            "--config",
+            "alternate.config.ts",
+        ],
+        cwd=web_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr == (
+        "The repository Playwright entry point does not allow alternate config files.\n"
     )

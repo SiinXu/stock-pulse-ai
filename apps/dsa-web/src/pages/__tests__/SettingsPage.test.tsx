@@ -1,8 +1,8 @@
-import type React from 'react';
+import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
-import type { SetupStatusResponse } from '../../types/systemConfig';
+import type { LlmConnectionFieldSchema, SetupStatusResponse } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
 import SettingsPage from '../SettingsPage';
@@ -86,6 +86,43 @@ const {
 }));
 
 const mockedAnchorClick = vi.fn();
+
+const TEST_CONNECTION_NAME_FIELD: LlmConnectionFieldSchema = {
+  key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' },
+};
+const TEST_PROVIDER_ID_FIELD: LlmConnectionFieldSchema = {
+  key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' },
+};
+const TEST_MODELS_FIELD: LlmConnectionFieldSchema = {
+  key: 'models', dataType: 'array', isSensitive: false, isRequired: false, contract: { requirement: 'optional' },
+};
+
+const TEST_HIDDEN_INHERITED_CONTRACT: LlmConnectionFieldSchema['contract'] = {
+  requirement: 'inherited',
+  visibleWhen: [{ key: '__test_hidden', operator: 'equals', value: 'true' }],
+};
+
+const TEST_CONNECTION_CORE_FIELDS: LlmConnectionFieldSchema[] = [
+  TEST_CONNECTION_NAME_FIELD,
+  { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  TEST_PROVIDER_ID_FIELD,
+  { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_keys', dataType: 'array', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  TEST_MODELS_FIELD,
+  { key: 'extra_headers', dataType: 'json', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+];
+
+function withTestConnectionCoreFields(
+  fields: LlmConnectionFieldSchema[],
+): LlmConnectionFieldSchema[] {
+  const byKey = new Map(
+    [...TEST_CONNECTION_CORE_FIELDS, ...fields].map((field) => [field.key, field]),
+  );
+  return Array.from(byKey.values());
+}
 
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
@@ -206,8 +243,11 @@ vi.mock('../../components/settings', async () => ({
     focusFieldRequest?: { requestId: number; key: string } | null;
     disabled?: boolean;
     catalogUnavailable?: boolean;
-  }) => (
-    <div>
+  }) => {
+    const [inspectionOpen, setInspectionOpen] = React.useState(false);
+    React.useEffect(() => () => onValidityChange?.(true), [onValidityChange]);
+    return (
+      <div>
       <div
         data-testid="llm-channel-editor-items"
         data-disabled={disabled ? 'true' : 'false'}
@@ -216,6 +256,14 @@ vi.mock('../../components/settings', async () => ({
         {items.map((item) => item.key).join(',')}
       </div>
       <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setInspectionOpen(true)}
+      >
+        inspect existing connection
+      </button>
+      {inspectionOpen ? <div role="dialog" aria-label="existing connection inspection" /> : null}
       <button
         type="button"
         onClick={() => onDraftItemsChange?.([
@@ -234,6 +282,15 @@ vi.mock('../../components/settings', async () => ({
         ])}
       >
         emit connection draft
+      </button>
+      <button
+        type="button"
+        onClick={() => onDraftItemsChange?.([
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+        ])}
+      >
+        emit schema-valid connection draft
       </button>
       <button type="button" onClick={() => onValidityChange?.(false)}>
         mark llm draft invalid
@@ -258,8 +315,9 @@ vi.mock('../../components/settings', async () => ({
       >
         replace bare Agent reference
       </button>
-    </div>
-  ),
+      </div>
+    );
+  },
   GenerationBackendStatusPanel: ({ items }: { items: Array<{ key: string; value: string }> }) => (
     <div data-testid="generation-backend-status-items">
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
@@ -375,6 +433,28 @@ vi.mock('../../components/settings', async () => ({
         ])}
       >
         wizard apply
+      </button>
+      <button
+        type="button"
+        onClick={() => onComplete([
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://injected.example/v1' },
+        ])}
+      >
+        wizard inject read-only field
+      </button>
+      <button
+        type="button"
+        onClick={() => onComplete([
+          { key: 'LLM_CHANNELS', value: 'unknown' },
+          { key: 'LLM_UNKNOWN_DISPLAY_NAME', value: 'Unknown Provider' },
+          { key: 'LLM_UNKNOWN_PROVIDER', value: 'unknown-provider' },
+          { key: 'LLM_UNKNOWN_PROTOCOL', value: 'openai' },
+          { key: 'LLM_UNKNOWN_ENABLED', value: 'true' },
+        ])}
+      >
+        wizard apply unknown provider
       </button>
       <button type="button" onClick={onClose}>wizard close</button>
     </div>
@@ -619,6 +699,29 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+async function expectConnectionDraftAutosaveBlockedBySchema(
+  connectionFields: LlmConnectionFieldSchema[],
+): Promise<void> {
+  getLlmProviderCatalog.mockResolvedValueOnce({
+    providers: [
+      { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+    ],
+    connectionFields,
+  });
+  save.mockResolvedValue({ success: true });
+  useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
+    .toHaveAttribute('data-disabled', 'true'));
+  fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+  await act(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 850));
+  });
+  expect(save).not.toHaveBeenCalled();
+}
+
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -685,6 +788,10 @@ describe('SettingsPage', () => {
         },
       ],
     });
+    // clearAllMocks keeps queued mockResolvedValueOnce implementations. A test
+    // that unmounts before fetching the Catalog must not leak that response into
+    // the next Schema-authority scenario.
+    getLlmProviderCatalog.mockReset();
     getLlmProviderCatalog.mockResolvedValue({
       providers: [
         { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
@@ -1416,6 +1523,226 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2500 });
   });
 
+  it('does not autosave a Connection draft under a present empty schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([]);
+  });
+
+  it('does not autosave a Connection draft under a models-only schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([TEST_MODELS_FIELD]);
+  });
+
+  it('does not autosave a Connection draft when connection_name is missing', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([
+      TEST_PROVIDER_ID_FIELD,
+      TEST_MODELS_FIELD,
+    ]);
+  });
+
+  it('does not autosave a Connection draft when provider_id is missing', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([
+      TEST_CONNECTION_NAME_FIELD,
+      TEST_MODELS_FIELD,
+    ]);
+  });
+
+  it('does not autosave a Connection draft under a read-only identity schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema(withTestConnectionCoreFields([
+      TEST_CONNECTION_NAME_FIELD,
+      {
+        ...TEST_PROVIDER_ID_FIELD,
+        isRequired: false,
+        contract: { requirement: 'inherited' },
+      },
+      TEST_MODELS_FIELD,
+    ]));
+  });
+
+  it('does not autosave a Connection draft with an unknown visible required field', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema(withTestConnectionCoreFields([{
+      key: 'future_token',
+      dataType: 'string',
+      isSensitive: false,
+      isRequired: true,
+      contract: { requirement: 'required' },
+    }]));
+  });
+
+  it('does not autosave when an unknown required field becomes visible for the draft provider', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_token',
+        dataType: 'string',
+        isSensitive: true,
+        isRequired: true,
+        contract: {
+          requirement: 'required',
+          visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'deepseek' }],
+        },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('autosaves when an unknown required field stays hidden for the draft provider', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_token',
+        dataType: 'string',
+        isSensitive: true,
+        isRequired: true,
+        contract: {
+          requirement: 'required',
+          visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'openai' }],
+        },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  });
+
+  it('autosaves when an unknown visible field is optional', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_hint',
+        dataType: 'string',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  });
+
+  it('revalidates the retained Connection payload when an unmounted editor resets child validity', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+      ]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    const { rerender } = render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'mark llm draft invalid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+    expect(await screen.findByText(/自动保存失败/, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('autosaves a payload that satisfies the present Schema and authoritative Catalog', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+      ]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith([
+      { key: 'LLM_CHANNELS', value: 'deepseek' },
+      { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+    ], { silent: true }), { timeout: 2000 });
+  });
+
+  it('keeps existing Connections inspectable but blocks mutations for an unknown schema condition', async () => {
+    const connectionFields = withTestConnectionCoreFields([
+      TEST_CONNECTION_NAME_FIELD,
+      TEST_PROVIDER_ID_FIELD,
+      {
+        ...TEST_MODELS_FIELD,
+        contract: {
+          requirement: 'optional' as const,
+          enabledWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'deepseek' }],
+        },
+      },
+    ]);
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields,
+    });
+    save.mockResolvedValue({ success: true });
+    const configState = buildSystemConfigState({ activeCategory: 'ai_model' });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: configState.itemsByCategory.ai_model.map((item) => ({
+          ...item,
+          schema: {
+            ...(item.schema as Record<string, unknown>),
+            uiPlacement: 'model_access',
+          },
+        })),
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    const inspect = await screen.findByRole('button', { name: 'inspect existing connection' });
+    await waitFor(() => expect(inspect).toBeEnabled());
+    expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+    fireEvent.click(inspect);
+    expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('keeps AI autosave and the editor blocked after a Catalog failure', async () => {
     getLlmProviderCatalog.mockRejectedValueOnce(new Error('catalog failed'));
     save.mockResolvedValue({ success: true });
@@ -1487,31 +1814,37 @@ describe('SettingsPage', () => {
   });
 
   it('debounces a group autosave and reports saving then saved', async () => {
-    const pendingSave = createDeferred<{ success: boolean }>();
-    save.mockReturnValueOnce(pendingSave.promise);
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
-      activeCategory: 'system',
-      hasDirty: true,
-      dirtyCount: 1,
-      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
-    }));
+    vi.useFakeTimers();
+    try {
+      const pendingSave = createDeferred<{ success: boolean }>();
+      save.mockReturnValueOnce(pendingSave.promise);
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'system',
+        hasDirty: true,
+        dirtyCount: 1,
+        getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+      }));
 
-    render(<SettingsPage />);
+      render(<SettingsPage />);
 
-    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
-    expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
-    expect(save).not.toHaveBeenCalled();
-    await waitFor(
-      () => expect(screen.getByText(/自动保存中/)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
-    expect(save).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+      expect(screen.getByText(/等待自动保存/)).toBeInTheDocument();
+      expect(save).not.toHaveBeenCalled();
 
-    await act(async () => {
-      pendingSave.resolve({ success: true });
-      await pendingSave.promise;
-    });
-    expect(await screen.findByText(/已自动保存/)).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700);
+      });
+      expect(screen.getByText(/自动保存中/)).toBeInTheDocument();
+      expect(save).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        pendingSave.resolve({ success: true });
+        await pendingSave.promise;
+      });
+      expect(screen.getByText(/已自动保存/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps a failed autosave draft and retries the same group', async () => {
@@ -2276,6 +2609,99 @@ describe('SettingsPage', () => {
     // The wizard closes once the save succeeds.
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument());
+  });
+
+  it('rejects a Wizard Connection payload at the page adapter under a partial schema', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: [{
+        key: 'models',
+        dataType: 'array',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }],
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard apply' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+  });
+
+  it('rejects a Wizard field that a complete schema marks read-only', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+        {
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'inherited' },
+        },
+      ]),
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard inject read-only field' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+  });
+
+  it('rejects a Wizard provider identity that is absent from the authoritative Catalog', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        TEST_PROVIDER_ID_FIELD,
+        { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+      ]),
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard apply unknown provider' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
   });
 
   it('hides the first-run wizard entry once setup is complete', async () => {

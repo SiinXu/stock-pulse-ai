@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 // @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import fs from 'node:fs';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { productionDesignGuardFixtures } from './fixtures/productionDesignGuardFixtures';
 
@@ -15,6 +16,12 @@ const productionStyles: Record<string, string> = {
   '../../index.css': fs.readFileSync('src/index.css', 'utf8'),
 };
 const productionSources = { ...productionStyles, ...productionComponents };
+const PRIMARY_CTA_VARIANTS = new Set([
+  'primary',
+  'settings-primary',
+  'action-primary',
+  'gradient',
+]);
 
 type DesignRule =
   | 'button-shape'
@@ -22,6 +29,9 @@ type DesignRule =
   | 'hardcoded-color'
   | 'legacy-chromatic-token'
   | 'magic-pixel-size'
+  | 'primary-cta-gradient'
+  | 'primary-cta-shimmer'
+  | 'primary-cta-unresolved-class'
   | 'raw-viewport-height'
   | 'glow-effect'
   | 'strong-blur';
@@ -34,6 +44,10 @@ type DesignViolation = {
 };
 
 const BUTTON_OPENING_TAG_PATTERN = /<(?:button|Button)\b(?:=>|[^>])*?>/g;
+const PRIMARY_CTA_GRADIENT_PATTERN = /(?<![a-zA-Z0-9_-])(?:-?bg-(?:(?:(?:[a-zA-Z0-9_]+-)*gradient|linear|radial|conic)(?:-[^\s"'`}>]+)?|\[[^\]\r\n]*gradient[^\]\r\n]*\]|\(image:[^)\r\n]*gradient[^)\r\n]*\))|\[(?:background|background-image):[^\]\r\n]*gradient[^\]\r\n]*\])/i;
+const PRIMARY_CTA_SHIMMER_PATTERN = /(?<![a-zA-Z0-9_-])(?:animate-\[[^\]\r\n]*shimmer[^\]\r\n]*\]|\[(?:animation|animation-name):[^\]\r\n]*shimmer[^\]\r\n]*\]|(?:[a-zA-Z0-9_-]*-)?shimmer(?:-[a-zA-Z0-9_-]*)?)(?![a-zA-Z0-9_-])/i;
+const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(|var\(--[\w-]*gradient[\w-]*\))/i;
+const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
 const NON_PILL_RADIUS_PATTERN = /\brounded-(?!full\b)(?:[trblse]{1,2}-)?(?:none|sm|md|lg|xl|2xl|3xl|\[[^\]]+\])/g;
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
@@ -124,6 +138,7 @@ function extractButtonClassNames(source: string): Set<string> {
       classNames.add(tokenMatch[1]);
     }
   }
+
   return classNames;
 }
 
@@ -148,12 +163,1247 @@ function hasGlobalPillButtonRule(source: string): boolean {
   return false;
 }
 
+type StaticClassFragment = {
+  index: number;
+  text: string;
+};
+
+type StaticClassScan = {
+  fragments: StaticClassFragment[];
+  unresolved: StaticClassFragment[];
+};
+
+type StaticInitializerMap = Map<string, ts.Expression | null>;
+
+type SharedButtonBindings = {
+  checker: ts.TypeChecker;
+};
+
+type PrimaryCtaScan = {
+  matchedButtons: number;
+  matchedSharedStyles: number;
+  violations: DesignViolation[];
+};
+
+type PrimaryCtaEffectScan = {
+  classNames: StaticClassScan;
+  styles: StaticClassScan;
+};
+
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isTypeAssertionExpression(current)
+    || ts.isSatisfiesExpression(current)
+    || ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function expressionMayResolveToPrimaryCta(expression: ts.Expression): boolean {
+  const current = unwrapExpression(expression);
+  if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+    return PRIMARY_CTA_VARIANTS.has(current.text);
+  }
+  if (ts.isConditionalExpression(current)) {
+    return expressionMayResolveToPrimaryCta(current.whenTrue)
+      || expressionMayResolveToPrimaryCta(current.whenFalse);
+  }
+  if (ts.isBinaryExpression(current) && [
+    ts.SyntaxKind.AmpersandAmpersandToken,
+    ts.SyntaxKind.BarBarToken,
+    ts.SyntaxKind.QuestionQuestionToken,
+    ts.SyntaxKind.CommaToken,
+  ].includes(current.operatorToken.kind)) {
+    return expressionMayResolveToPrimaryCta(current.left)
+      || expressionMayResolveToPrimaryCta(current.right);
+  }
+  // A dynamic value can still resolve to the default/primary variant.
+  return true;
+}
+
+function isSharedButtonModuleSpecifier(specifier: string): boolean {
+  return /(?:^|\/)(?:components\/)?common(?:\/Button)?$/.test(specifier);
+}
+
+function importDeclarationFor(node: ts.Node): ts.ImportDeclaration | undefined {
+  let current: ts.Node | undefined = node;
+  while (current) {
+    if (ts.isImportDeclaration(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return undefined;
+}
+
+function isConstVariableDeclaration(declaration: ts.VariableDeclaration): boolean {
+  return ts.isVariableDeclarationList(declaration.parent)
+    && (declaration.parent.flags & ts.NodeFlags.Const) !== 0;
+}
+
+function symbolDeclaration(symbol: ts.Symbol): ts.Declaration | undefined {
+  const declarations = symbol.declarations ?? [];
+  return declarations.length === 1 ? declarations[0] : undefined;
+}
+
+function isSharedButtonNamespaceExpression(
+  expression: ts.Expression,
+  bindings: SharedButtonBindings,
+  resolving: Set<ts.Symbol>,
+): boolean {
+  const current = unwrapExpression(expression);
+  if (!ts.isIdentifier(current)) {
+    return false;
+  }
+  const symbol = bindings.checker.getSymbolAtLocation(current);
+  if (!symbol || resolving.has(symbol)) {
+    return false;
+  }
+  const declaration = symbolDeclaration(symbol);
+  if (!declaration) {
+    return false;
+  }
+  if (ts.isNamespaceImport(declaration)) {
+    const importDeclaration = importDeclarationFor(declaration);
+    return Boolean(
+      importDeclaration
+      && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+      && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+    );
+  }
+  if (
+    ts.isVariableDeclaration(declaration)
+    && isConstVariableDeclaration(declaration)
+    && declaration.initializer
+  ) {
+    const nextResolving = new Set(resolving);
+    nextResolving.add(symbol);
+    return isSharedButtonNamespaceExpression(declaration.initializer, bindings, nextResolving);
+  }
+  return false;
+}
+
+function staticStringCandidates(
+  expression: ts.Expression,
+  bindings: SharedButtonBindings,
+  resolving: Set<ts.Symbol>,
+): string[] {
+  const current = unwrapExpression(expression);
+  if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+    return [current.text];
+  }
+  if (ts.isIdentifier(current)) {
+    const symbol = bindings.checker.getSymbolAtLocation(current);
+    if (!symbol || resolving.has(symbol)) {
+      return [];
+    }
+    const declaration = symbolDeclaration(symbol);
+    if (
+      !declaration
+      || !ts.isVariableDeclaration(declaration)
+      || !isConstVariableDeclaration(declaration)
+      || !declaration.initializer
+    ) {
+      return [];
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(symbol);
+    return staticStringCandidates(declaration.initializer, bindings, nextResolving);
+  }
+  if (ts.isTemplateExpression(current)) {
+    let candidates = [current.head.text];
+    for (const span of current.templateSpans) {
+      const substitutions = staticStringCandidates(span.expression, bindings, resolving);
+      if (substitutions.length === 0 || candidates.length * substitutions.length > 64) {
+        return [];
+      }
+      candidates = candidates.flatMap((prefix) => (
+        substitutions.map((substitution) => prefix + substitution + span.literal.text)
+      ));
+    }
+    return candidates;
+  }
+  if (ts.isConditionalExpression(current)) {
+    return [
+      ...staticStringCandidates(current.whenTrue, bindings, resolving),
+      ...staticStringCandidates(current.whenFalse, bindings, resolving),
+    ];
+  }
+  if (
+    ts.isBinaryExpression(current)
+    && current.operatorToken.kind === ts.SyntaxKind.PlusToken
+  ) {
+    const left = staticStringCandidates(current.left, bindings, resolving);
+    const right = staticStringCandidates(current.right, bindings, resolving);
+    if (left.length === 0 || right.length === 0 || left.length * right.length > 64) {
+      return [];
+    }
+    return left.flatMap((prefix) => right.map((suffix) => prefix + suffix));
+  }
+  return [];
+}
+
+function staticPropertyNameCandidates(
+  name: ts.PropertyName,
+  bindings: SharedButtonBindings,
+  resolving: Set<ts.Symbol>,
+): string[] {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return [name.text];
+  }
+  return ts.isComputedPropertyName(name)
+    ? staticStringCandidates(name.expression, bindings, resolving)
+    : [];
+}
+
+function staticBindingPropertyNameCandidates(
+  binding: ts.BindingElement,
+  bindings: SharedButtonBindings,
+  resolving: Set<ts.Symbol>,
+): string[] {
+  const name = binding.propertyName
+    ?? (ts.isIdentifier(binding.name) ? binding.name : undefined);
+  return name ? staticPropertyNameCandidates(name, bindings, resolving) : [];
+}
+
+function isSharedButtonExpression(
+  expression: ts.Expression,
+  bindings: SharedButtonBindings,
+  resolving: Set<ts.Symbol>,
+): boolean {
+  const current = unwrapExpression(expression);
+  if (ts.isIdentifier(current)) {
+    const symbol = bindings.checker.getSymbolAtLocation(current);
+    if (!symbol) {
+      // Self-test snippets intentionally omit imports for the shared Button shorthand.
+      return current.text === 'Button';
+    }
+    if (resolving.has(symbol)) {
+      return false;
+    }
+    const declaration = symbolDeclaration(symbol);
+    if (!declaration) {
+      return false;
+    }
+    if (ts.isImportSpecifier(declaration)) {
+      const importDeclaration = importDeclarationFor(declaration);
+      return (declaration.propertyName ?? declaration.name).text === 'Button'
+        && Boolean(
+          importDeclaration
+          && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+          && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+        );
+    }
+    if (ts.isImportClause(declaration)) {
+      const importDeclaration = importDeclarationFor(declaration);
+      return Boolean(
+        importDeclaration
+        && ts.isStringLiteral(importDeclaration.moduleSpecifier)
+        && /(?:^|\/)Button$/.test(importDeclaration.moduleSpecifier.text)
+        && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+      );
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(symbol);
+    if (
+      ts.isVariableDeclaration(declaration)
+      && isConstVariableDeclaration(declaration)
+      && declaration.initializer
+    ) {
+      return isSharedButtonExpression(declaration.initializer, bindings, nextResolving);
+    }
+    if (
+      ts.isBindingElement(declaration)
+      && !declaration.dotDotDotToken
+      && staticBindingPropertyNameCandidates(
+        declaration,
+        bindings,
+        nextResolving,
+      ).includes('Button')
+      && ts.isObjectBindingPattern(declaration.parent)
+      && ts.isVariableDeclaration(declaration.parent.parent)
+      && declaration.parent.parent.initializer
+    ) {
+      return isSharedButtonNamespaceExpression(
+        declaration.parent.parent.initializer,
+        bindings,
+        nextResolving,
+      );
+    }
+    return false;
+  }
+  if (
+    ts.isPropertyAccessExpression(current)
+    && current.name.text === 'Button'
+  ) {
+    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+  }
+  if (
+    ts.isElementAccessExpression(current)
+    && current.argumentExpression
+    && staticStringCandidates(current.argumentExpression, bindings, resolving).includes('Button')
+  ) {
+    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+  }
+  return false;
+}
+
+function isSharedButtonOpening(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  bindings: SharedButtonBindings,
+): boolean {
+  const { tagName } = opening;
+  if (ts.isIdentifier(tagName)) {
+    return isSharedButtonExpression(tagName, bindings, new Set());
+  }
+  return ts.isPropertyAccessExpression(tagName)
+    && tagName.name.text === 'Button'
+    && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set());
+}
+
+function isPrimaryButtonOpening(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  bindings: SharedButtonBindings,
+): boolean {
+  if (!isSharedButtonOpening(opening, bindings)) {
+    return false;
+  }
+  let mayResolveToPrimary = true;
+  for (const property of opening.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(property)) {
+      mayResolveToPrimary = true;
+      continue;
+    }
+    if (property.name.getText() !== 'variant') {
+      continue;
+    }
+    if (!property.initializer) {
+      mayResolveToPrimary = true;
+    } else if (ts.isStringLiteral(property.initializer)) {
+      mayResolveToPrimary = PRIMARY_CTA_VARIANTS.has(property.initializer.text);
+    } else {
+      mayResolveToPrimary = !ts.isJsxExpression(property.initializer)
+        || !property.initializer.expression
+        || expressionMayResolveToPrimaryCta(property.initializer.expression);
+    }
+  }
+  return mayResolveToPrimary;
+}
+
+function bindingIdentifiers(name: ts.BindingName): ts.Identifier[] {
+  if (ts.isIdentifier(name)) {
+    return [name];
+  }
+  return name.elements.flatMap((element) => (
+    ts.isOmittedExpression(element) ? [] : bindingIdentifiers(element.name)
+  ));
+}
+
+function collectStaticInitializers(sourceFile: ts.SourceFile): StaticInitializerMap {
+  const initializers: StaticInitializerMap = new Map();
+  const register = (name: string, initializer: ts.Expression | null): void => {
+    if (initializers.has(name)) {
+      initializers.set(name, null);
+      return;
+    }
+    initializers.set(name, initializer);
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) {
+      const isUniqueConstInitializer = ts.isIdentifier(node.name)
+        && Boolean(node.initializer)
+        && ts.isVariableDeclarationList(node.parent)
+        && (node.parent.flags & ts.NodeFlags.Const) !== 0;
+      for (const identifier of bindingIdentifiers(node.name)) {
+        register(
+          identifier.text,
+          isUniqueConstInitializer ? (node.initializer ?? null) : null,
+        );
+      }
+    } else if (ts.isParameter(node)) {
+      for (const identifier of bindingIdentifiers(node.name)) {
+        register(identifier.text, null);
+      }
+    } else if (
+      (ts.isFunctionDeclaration(node)
+        || ts.isFunctionExpression(node)
+        || ts.isClassDeclaration(node)
+        || ts.isClassExpression(node)
+        || ts.isEnumDeclaration(node))
+      && node.name
+    ) {
+      register(node.name.text, null);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return initializers;
+}
+
+function mergeStaticClassScans(...scans: StaticClassScan[]): StaticClassScan {
+  return scans.reduce<StaticClassScan>((result, scan) => ({
+    fragments: [...result.fragments, ...scan.fragments],
+    unresolved: [...result.unresolved, ...scan.unresolved],
+  }), { fragments: [], unresolved: [] });
+}
+
+function staticClassFragment(
+  node: ts.Identifier | ts.StringLiteralLike | ts.NumericLiteral | ts.TemplateLiteralLikeNode,
+  sourceFile: ts.SourceFile,
+): StaticClassScan {
+  return {
+    fragments: [{ index: node.getStart(sourceFile) + 1, text: node.text }],
+    unresolved: [],
+  };
+}
+
+function unresolvedClassExpression(
+  expression: ts.Node,
+  sourceFile: ts.SourceFile,
+  label?: string,
+): StaticClassScan {
+  return {
+    fragments: [],
+    unresolved: [{
+      index: expression.getStart(sourceFile),
+      text: label ?? expression.getText(sourceFile),
+    }],
+  };
+}
+
+function isFunctionScope(node: ts.Node): boolean {
+  return ts.isFunctionDeclaration(node)
+    || ts.isFunctionExpression(node)
+    || ts.isArrowFunction(node)
+    || ts.isMethodDeclaration(node)
+    || ts.isGetAccessorDeclaration(node)
+    || ts.isSetAccessorDeclaration(node)
+    || ts.isConstructorDeclaration(node);
+}
+
+function nearestBindingScope(
+  node: ts.Node,
+  predicate: (candidate: ts.Node) => boolean,
+): ts.Node | undefined {
+  let current = node.parent;
+  while (current) {
+    if (predicate(current)) {
+      return current;
+    }
+    current = current.parent;
+  }
+  return undefined;
+}
+
+function isBlockBindingScope(node: ts.Node): boolean {
+  return ts.isSourceFile(node)
+    || ts.isBlock(node)
+    || ts.isModuleBlock(node)
+    || ts.isCaseBlock(node)
+    || ts.isClassStaticBlockDeclaration(node);
+}
+
+function bindingScope(node: ts.Node): ts.Node | undefined {
+  if (ts.isParameter(node)) {
+    return node.parent;
+  }
+  if (ts.isFunctionExpression(node) || ts.isClassExpression(node)) {
+    return node;
+  }
+  if (
+    ts.isFunctionDeclaration(node)
+    || ts.isClassDeclaration(node)
+    || ts.isEnumDeclaration(node)
+  ) {
+    return nearestBindingScope(node, isBlockBindingScope);
+  }
+  if (!ts.isVariableDeclaration(node)) {
+    return undefined;
+  }
+  if (ts.isCatchClause(node.parent)) {
+    return node.parent;
+  }
+  const declarationList = node.parent;
+  if (!ts.isVariableDeclarationList(declarationList)) {
+    return undefined;
+  }
+  if ((declarationList.flags & ts.NodeFlags.BlockScoped) === 0) {
+    return nearestBindingScope(declarationList, (candidate) => (
+      ts.isSourceFile(candidate) || isFunctionScope(candidate)
+    ));
+  }
+  const declarationOwner = declarationList.parent;
+  if (
+    ts.isForStatement(declarationOwner)
+    || ts.isForInStatement(declarationOwner)
+    || ts.isForOfStatement(declarationOwner)
+  ) {
+    return declarationOwner;
+  }
+  return nearestBindingScope(declarationList, isBlockBindingScope);
+}
+
+function declarationBindsIdentifier(node: ts.Node, identifier: string): boolean {
+  if (ts.isVariableDeclaration(node) || ts.isParameter(node)) {
+    return bindingIdentifiers(node.name).some(({ text }) => text === identifier);
+  }
+  return (
+    ts.isFunctionDeclaration(node)
+    || ts.isFunctionExpression(node)
+    || ts.isClassDeclaration(node)
+    || ts.isClassExpression(node)
+    || ts.isEnumDeclaration(node)
+  ) && node.name?.text === identifier;
+}
+
+function isLexicallyShadowedComposer(
+  callee: ts.Identifier,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const callsite = callee.getStart(sourceFile);
+  let isShadowed = false;
+  const visit = (node: ts.Node): void => {
+    if (isShadowed) return;
+    if (declarationBindsIdentifier(node, callee.text)) {
+      const scope = bindingScope(node);
+      if (scope && scope.getStart(sourceFile) <= callsite && callsite < scope.end) {
+        isShadowed = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return isShadowed;
+}
+
+function isClassComposerCall(
+  expression: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): boolean {
+  const callee = unwrapExpression(expression.expression);
+  if (!ts.isIdentifier(callee) || isLexicallyShadowedComposer(callee, sourceFile)) {
+    return false;
+  }
+  return ['cn', 'clsx', 'classNames', 'classnames', 'twMerge'].includes(callee.text);
+}
+
+function combineStaticClassStrings(
+  left: string[],
+  right: string[],
+): string[] | undefined {
+  if (left.length * right.length > 64) {
+    return undefined;
+  }
+  return left.flatMap((prefix) => right.map((suffix) => prefix + suffix));
+}
+
+function resolveStaticClassStrings(
+  expression: ts.Expression,
+  initializers: StaticInitializerMap,
+  resolving: Set<string>,
+): string[] | undefined {
+  const current = unwrapExpression(expression);
+  if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+    return [current.text];
+  }
+  if (ts.isIdentifier(current)) {
+    const initializer = initializers.get(current.text);
+    if (!initializer || resolving.has(current.text)) {
+      return undefined;
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return resolveStaticClassStrings(initializer, initializers, nextResolving);
+  }
+  if (ts.isTemplateExpression(current)) {
+    let results = [current.head.text];
+    for (const span of current.templateSpans) {
+      const values = resolveStaticClassStrings(span.expression, initializers, resolving);
+      if (values === undefined) {
+        return undefined;
+      }
+      const combined = combineStaticClassStrings(
+        results,
+        values.map((value) => value + span.literal.text),
+      );
+      if (combined === undefined) {
+        return undefined;
+      }
+      results = combined;
+    }
+    return results;
+  }
+  if (ts.isConditionalExpression(current)) {
+    const whenTrue = resolveStaticClassStrings(current.whenTrue, initializers, resolving);
+    const whenFalse = resolveStaticClassStrings(current.whenFalse, initializers, resolving);
+    return whenTrue === undefined || whenFalse === undefined
+      ? undefined
+      : [...whenTrue, ...whenFalse];
+  }
+  if (
+    ts.isBinaryExpression(current)
+    && current.operatorToken.kind === ts.SyntaxKind.PlusToken
+  ) {
+    const left = resolveStaticClassStrings(current.left, initializers, resolving);
+    const right = resolveStaticClassStrings(current.right, initializers, resolving);
+    return left === undefined || right === undefined
+      ? undefined
+      : combineStaticClassStrings(left, right);
+  }
+  return undefined;
+}
+
+function scanObjectClassNames(
+  expression: ts.ObjectLiteralExpression,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  resolving: Set<string>,
+): StaticClassScan {
+  return mergeStaticClassScans(...expression.properties.map((property) => {
+    if (ts.isSpreadAssignment(property)) {
+      return unresolvedClassExpression(property.expression, sourceFile);
+    }
+    if (ts.isShorthandPropertyAssignment(property)) {
+      return staticClassFragment(property.name, sourceFile);
+    }
+    if (ts.isPropertyAssignment(property)) {
+      if (ts.isComputedPropertyName(property.name)) {
+        return scanStaticClassExpression(
+          property.name.expression,
+          sourceFile,
+          initializers,
+          resolving,
+        );
+      }
+      if (
+        ts.isIdentifier(property.name)
+        || ts.isStringLiteral(property.name)
+        || ts.isNumericLiteral(property.name)
+      ) {
+        return staticClassFragment(property.name, sourceFile);
+      }
+    }
+    return unresolvedClassExpression(property, sourceFile);
+  }));
+}
+
+function scanStaticClassExpression(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  resolving: Set<string> = new Set(),
+  unresolvedLabel?: string,
+): StaticClassScan {
+  const current = unwrapExpression(expression);
+  const staticStrings = resolveStaticClassStrings(current, initializers, resolving);
+  if (staticStrings !== undefined) {
+    return {
+      fragments: staticStrings.map((text) => ({ index: current.getStart(sourceFile), text })),
+      unresolved: [],
+    };
+  }
+
+  if (ts.isIdentifier(current)) {
+    if (current.text === 'undefined') {
+      return { fragments: [], unresolved: [] };
+    }
+    const initializer = initializers.get(current.text);
+    if (!initializer || resolving.has(current.text)) {
+      return unresolvedClassExpression(current, sourceFile, unresolvedLabel);
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return scanStaticClassExpression(
+      initializer,
+      sourceFile,
+      initializers,
+      nextResolving,
+      unresolvedLabel,
+    );
+  }
+
+  if (ts.isTemplateExpression(current)) {
+    return mergeStaticClassScans(
+      staticClassFragment(current.head, sourceFile),
+      ...current.templateSpans.flatMap((span) => [
+        scanStaticClassExpression(span.expression, sourceFile, initializers, resolving),
+        staticClassFragment(span.literal, sourceFile),
+      ]),
+    );
+  }
+
+  if (ts.isConditionalExpression(current)) {
+    return mergeStaticClassScans(
+      scanStaticClassExpression(current.whenTrue, sourceFile, initializers, resolving),
+      scanStaticClassExpression(current.whenFalse, sourceFile, initializers, resolving),
+    );
+  }
+
+  if (ts.isBinaryExpression(current)) {
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      || current.operatorToken.kind === ts.SyntaxKind.CommaToken
+    ) {
+      return scanStaticClassExpression(current.right, sourceFile, initializers, resolving);
+    }
+    if ([
+      ts.SyntaxKind.BarBarToken,
+      ts.SyntaxKind.QuestionQuestionToken,
+      ts.SyntaxKind.PlusToken,
+    ].includes(current.operatorToken.kind)) {
+      return mergeStaticClassScans(
+        scanStaticClassExpression(current.left, sourceFile, initializers, resolving),
+        scanStaticClassExpression(current.right, sourceFile, initializers, resolving),
+      );
+    }
+    return unresolvedClassExpression(current, sourceFile, unresolvedLabel);
+  }
+
+  if (ts.isCallExpression(current)) {
+    if (!isClassComposerCall(current, sourceFile)) {
+      return unresolvedClassExpression(current, sourceFile, unresolvedLabel);
+    }
+    return mergeStaticClassScans(...current.arguments.map((argument) => (
+      ts.isSpreadElement(argument)
+        ? unresolvedClassExpression(argument.expression, sourceFile)
+        : scanStaticClassExpression(argument, sourceFile, initializers, resolving)
+    )));
+  }
+
+  if (ts.isArrayLiteralExpression(current)) {
+    return mergeStaticClassScans(...current.elements.map((element) => (
+      ts.isOmittedExpression(element)
+        ? { fragments: [], unresolved: [] }
+        : ts.isSpreadElement(element)
+          ? unresolvedClassExpression(element.expression, sourceFile)
+          : scanStaticClassExpression(element, sourceFile, initializers, resolving)
+    )));
+  }
+
+  if (ts.isObjectLiteralExpression(current)) {
+    return scanObjectClassNames(current, sourceFile, initializers, resolving);
+  }
+
+  if (
+    ts.isNumericLiteral(current)
+    || ts.isBigIntLiteral(current)
+    || current.kind === ts.SyntaxKind.TrueKeyword
+    || current.kind === ts.SyntaxKind.FalseKeyword
+    || current.kind === ts.SyntaxKind.NullKeyword
+    || ts.isPrefixUnaryExpression(current)
+    || ts.isVoidExpression(current)
+    || ts.isTypeOfExpression(current)
+  ) {
+    return { fragments: [], unresolved: [] };
+  }
+
+  return unresolvedClassExpression(current, sourceFile, unresolvedLabel);
+}
+
+function classNameFragments(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+): StaticClassScan {
+  const properties = opening.attributes.properties;
+  let classNameIndex = -1;
+  for (let index = properties.length - 1; index >= 0; index -= 1) {
+    const property = properties[index];
+    if (ts.isJsxAttribute(property) && property.name.getText() === 'className') {
+      classNameIndex = index;
+      break;
+    }
+  }
+  let className: ts.JsxAttribute | undefined;
+  if (classNameIndex >= 0) {
+    const candidate = properties[classNameIndex];
+    if (ts.isJsxAttribute(candidate)) {
+      className = candidate;
+    }
+  }
+  const trailingSpreads = properties
+    .slice(classNameIndex + 1)
+    .filter((property): property is ts.JsxSpreadAttribute => ts.isJsxSpreadAttribute(property))
+    .map((property) => unresolvedClassExpression(property.expression, sourceFile, 'className spread'));
+  if (!className) {
+    return mergeStaticClassScans(...trailingSpreads);
+  }
+  let explicitClassName: StaticClassScan;
+  if (!className.initializer) {
+    explicitClassName = {
+      fragments: [],
+      unresolved: [{ index: className.getStart(sourceFile), text: 'className' }],
+    };
+  } else if (ts.isStringLiteral(className.initializer)) {
+    explicitClassName = {
+      fragments: [{
+        index: className.initializer.getStart(sourceFile) + 1,
+        text: className.initializer.text,
+      }],
+      unresolved: [],
+    };
+  } else if (!ts.isJsxExpression(className.initializer) || !className.initializer.expression) {
+    explicitClassName = {
+      fragments: [],
+      unresolved: [{ index: className.initializer.getStart(sourceFile), text: 'className' }],
+    };
+  } else {
+    explicitClassName = scanStaticClassExpression(
+      className.initializer.expression,
+      sourceFile,
+      initializers,
+      new Set(),
+      'className',
+    );
+  }
+  return mergeStaticClassScans(explicitClassName, ...trailingSpreads);
+}
+
+function scanStaticStyleExpression(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  resolving: Set<string> = new Set(),
+): StaticClassScan {
+  const current = unwrapExpression(expression);
+  if (ts.isIdentifier(current)) {
+    if (current.text === 'undefined') {
+      return { fragments: [], unresolved: [] };
+    }
+    const initializer = initializers.get(current.text);
+    if (!initializer || resolving.has(current.text)) {
+      return unresolvedClassExpression(current, sourceFile, 'style');
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return scanStaticStyleExpression(initializer, sourceFile, initializers, nextResolving);
+  }
+  if (ts.isConditionalExpression(current)) {
+    return mergeStaticClassScans(
+      scanStaticStyleExpression(current.whenTrue, sourceFile, initializers, resolving),
+      scanStaticStyleExpression(current.whenFalse, sourceFile, initializers, resolving),
+    );
+  }
+  if (ts.isObjectLiteralExpression(current)) {
+    return mergeStaticClassScans(...current.properties.map((property) => {
+      if (ts.isSpreadAssignment(property)) {
+        return unresolvedClassExpression(property.expression, sourceFile, 'style spread');
+      }
+      if (ts.isShorthandPropertyAssignment(property)) {
+        return scanStaticStyleExpression(property.name, sourceFile, initializers, resolving);
+      }
+      if (ts.isPropertyAssignment(property)) {
+        return scanStaticStyleExpression(property.initializer, sourceFile, initializers, resolving);
+      }
+      return unresolvedClassExpression(property, sourceFile, 'style');
+    }));
+  }
+  return scanStaticClassExpression(
+    current,
+    sourceFile,
+    initializers,
+    resolving,
+    'style',
+  );
+}
+
+function styleFragments(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+): StaticClassScan {
+  const properties = opening.attributes.properties;
+  let styleIndex = -1;
+  for (let index = properties.length - 1; index >= 0; index -= 1) {
+    const property = properties[index];
+    if (ts.isJsxAttribute(property) && property.name.getText() === 'style') {
+      styleIndex = index;
+      break;
+    }
+  }
+  const trailingSpreads = properties
+    .slice(styleIndex + 1)
+    .filter((property): property is ts.JsxSpreadAttribute => ts.isJsxSpreadAttribute(property))
+    .map((property) => unresolvedClassExpression(property.expression, sourceFile, 'style spread'));
+  if (styleIndex < 0) {
+    return mergeStaticClassScans(...trailingSpreads);
+  }
+  const style = properties[styleIndex];
+  if (!ts.isJsxAttribute(style) || !style.initializer) {
+    return mergeStaticClassScans(
+      unresolvedClassExpression(style, sourceFile, 'style'),
+      ...trailingSpreads,
+    );
+  }
+  if (ts.isStringLiteral(style.initializer)) {
+    return mergeStaticClassScans(
+      staticClassFragment(style.initializer, sourceFile),
+      ...trailingSpreads,
+    );
+  }
+  if (!ts.isJsxExpression(style.initializer) || !style.initializer.expression) {
+    return mergeStaticClassScans(
+      unresolvedClassExpression(style.initializer, sourceFile, 'style'),
+      ...trailingSpreads,
+    );
+  }
+  return mergeStaticClassScans(
+    scanStaticStyleExpression(style.initializer.expression, sourceFile, initializers),
+    ...trailingSpreads,
+  );
+}
+
+function primaryButtonEffectFragments(
+  root: ts.JsxElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+): PrimaryCtaEffectScan {
+  const result: PrimaryCtaEffectScan = {
+    classNames: { fragments: [], unresolved: [] },
+    styles: { fragments: [], unresolved: [] },
+  };
+  const append = (opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement): void => {
+    const classScan = classNameFragments(opening, sourceFile, initializers);
+    const styleScan = styleFragments(opening, sourceFile, initializers);
+    result.classNames.fragments.push(...classScan.fragments);
+    result.classNames.unresolved.push(...classScan.unresolved);
+    result.styles.fragments.push(...styleScan.fragments);
+    result.styles.unresolved.push(...styleScan.unresolved);
+  };
+  const visit = (node: ts.Node, isRoot = false): void => {
+    if (ts.isJsxElement(node)) {
+      if (!isRoot && isSharedButtonOpening(node.openingElement, bindings)) {
+        return;
+      }
+      append(node.openingElement);
+      node.children.forEach((child) => visit(child));
+      return;
+    }
+    if (ts.isJsxSelfClosingElement(node)) {
+      if (isRoot || !isSharedButtonOpening(node, bindings)) {
+        append(node);
+      }
+      return;
+    }
+    ts.forEachChild(node, (child) => visit(child));
+  };
+  visit(root, true);
+  return result;
+}
+
+function appendPrimaryClassViolations(
+  filename: string,
+  source: string,
+  fragments: StaticClassFragment[],
+  violations: DesignViolation[],
+): void {
+  for (const fragment of fragments) {
+    for (const [rule, pattern] of [
+      ['primary-cta-gradient', PRIMARY_CTA_GRADIENT_PATTERN],
+      ['primary-cta-shimmer', PRIMARY_CTA_SHIMMER_PATTERN],
+    ] as const) {
+      const match = fragment.text.match(pattern);
+      if (!match) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + (match.index ?? 0)),
+        rule,
+        token: match[0],
+      });
+    }
+  }
+}
+
+function appendPrimaryStyleViolations(
+  filename: string,
+  source: string,
+  fragments: StaticClassFragment[],
+  violations: DesignViolation[],
+): void {
+  for (const fragment of fragments) {
+    for (const [rule, pattern] of [
+      ['primary-cta-gradient', PRIMARY_INLINE_GRADIENT_PATTERN],
+      ['primary-cta-shimmer', PRIMARY_INLINE_SHIMMER_PATTERN],
+    ] as const) {
+      const match = fragment.text.match(pattern);
+      if (!match) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + (match.index ?? 0)),
+        rule,
+        token: match[0],
+      });
+    }
+  }
+}
+
+function appendUnresolvedPrimaryClassViolations(
+  filename: string,
+  source: string,
+  unresolved: StaticClassFragment[],
+  violations: DesignViolation[],
+): void {
+  for (const expression of unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, expression.index),
+      rule: 'primary-cta-unresolved-class',
+      token: expression.text,
+    });
+  }
+}
+
+function propertyNameValues(
+  name: ts.PropertyName,
+  initializers: StaticInitializerMap,
+): string[] | undefined {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return [name.text];
+  }
+  if (ts.isComputedPropertyName(name)) {
+    return resolveStaticClassStrings(name.expression, initializers, new Set());
+  }
+  return undefined;
+}
+
+function scanFinalObjectClassValue(
+  expression: ts.ObjectLiteralExpression,
+  propertyName: string,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+): { matched: boolean; scan: StaticClassScan } {
+  const label = `BUTTON_VARIANT_STYLES.${propertyName}`;
+  for (let index = expression.properties.length - 1; index >= 0; index -= 1) {
+    const property = expression.properties[index];
+    if (ts.isSpreadAssignment(property)) {
+      return {
+        matched: false,
+        scan: unresolvedClassExpression(property.expression, sourceFile, label),
+      };
+    }
+    const names = propertyNameValues(property.name, initializers);
+    if (names === undefined) {
+      return {
+        matched: false,
+        scan: unresolvedClassExpression(property, sourceFile, label),
+      };
+    }
+    if (!names.includes(propertyName)) {
+      continue;
+    }
+    if (ts.isPropertyAssignment(property)) {
+      return {
+        matched: true,
+        scan: scanStaticClassExpression(
+          property.initializer,
+          sourceFile,
+          initializers,
+          new Set(),
+          label,
+        ),
+      };
+    }
+    if (ts.isShorthandPropertyAssignment(property)) {
+      return {
+        matched: true,
+        scan: scanStaticClassExpression(
+          property.name,
+          sourceFile,
+          initializers,
+          new Set(),
+          label,
+        ),
+      };
+    }
+    return {
+      matched: true,
+      scan: unresolvedClassExpression(property, sourceFile, label),
+    };
+  }
+  return {
+    matched: false,
+    scan: unresolvedClassExpression(expression, sourceFile, label),
+  };
+}
+
+type BoundSourceFile = {
+  sourceFile: ts.SourceFile;
+  checker: ts.TypeChecker;
+};
+
+type SourceEntry = readonly [filename: string, source: string];
+
+function createBoundSourceFiles(sources: readonly SourceEntry[]): Map<string, BoundSourceFile> {
+  const compilerOptions = {
+    jsx: ts.JsxEmit.Preserve,
+    module: ts.ModuleKind.ESNext,
+    noLib: true,
+    noResolve: true,
+    target: ts.ScriptTarget.Latest,
+  } satisfies ts.CompilerOptions;
+  const virtualSources = new Map(sources.map(([filename, source], index) => {
+    const virtualFilename = `/production-design-guard/${index}.tsx`;
+    return [virtualFilename, {
+      filename,
+      source,
+      sourceFile: ts.createSourceFile(
+        virtualFilename,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      ),
+    }] as const;
+  }));
+  const host = ts.createCompilerHost(compilerOptions, true);
+  host.fileExists = (filename) => virtualSources.has(filename);
+  host.readFile = (filename) => virtualSources.get(filename)?.source;
+  host.getSourceFile = (filename) => virtualSources.get(filename)?.sourceFile;
+  const program = ts.createProgram(Array.from(virtualSources.keys()), compilerOptions, host);
+  const checker = program.getTypeChecker();
+  const boundSources = new Map<string, BoundSourceFile>();
+  for (const [virtualFilename, entry] of virtualSources) {
+    const sourceFile = program.getSourceFile(virtualFilename);
+    if (!sourceFile) {
+      throw new Error(`Production design guard could not bind ${entry.filename}.`);
+    }
+    if (boundSources.has(entry.filename)) {
+      throw new Error(`Production design guard received duplicate source ${entry.filename}.`);
+    }
+    boundSources.set(entry.filename, { sourceFile, checker });
+  }
+  return boundSources;
+}
+
+function createBoundSourceFile(source: string): BoundSourceFile {
+  const filename = 'fixture.tsx';
+  const boundSource = createBoundSourceFiles([[filename, source]]).get(filename);
+  if (!boundSource) {
+    throw new Error('Production design guard could not bind the source file.');
+  }
+  return boundSource;
+}
+
+function scanPrimaryCtasInBoundSource(
+  filename: string,
+  source: string,
+  { sourceFile, checker }: BoundSourceFile,
+): PrimaryCtaScan {
+  const initializers = collectStaticInitializers(sourceFile);
+  const buttonBindings: SharedButtonBindings = { checker };
+  const result: PrimaryCtaScan = { matchedButtons: 0, matchedSharedStyles: 0, violations: [] };
+  const appendEffects = (effects: PrimaryCtaEffectScan): void => {
+    appendPrimaryClassViolations(
+      filename,
+      source,
+      effects.classNames.fragments,
+      result.violations,
+    );
+    appendPrimaryStyleViolations(
+      filename,
+      source,
+      effects.styles.fragments,
+      result.violations,
+    );
+    appendUnresolvedPrimaryClassViolations(
+      filename,
+      source,
+      [...effects.classNames.unresolved, ...effects.styles.unresolved],
+      result.violations,
+    );
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isJsxElement(node) && isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
+      result.matchedButtons += 1;
+      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+    } else if (ts.isJsxSelfClosingElement(node) && isPrimaryButtonOpening(node, buttonBindings)) {
+      result.matchedButtons += 1;
+      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+    }
+
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'BUTTON_VARIANT_STYLES'
+      && node.initializer
+    ) {
+      const initializer = unwrapExpression(node.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) {
+        for (const variant of PRIMARY_CTA_VARIANTS) {
+          const finalValue = scanFinalObjectClassValue(
+            initializer,
+            variant,
+            sourceFile,
+            initializers,
+          );
+          if (finalValue.matched) {
+            result.matchedSharedStyles += 1;
+          }
+          appendPrimaryClassViolations(
+            filename,
+            source,
+            finalValue.scan.fragments,
+            result.violations,
+          );
+          appendUnresolvedPrimaryClassViolations(
+            filename,
+            source,
+            finalValue.scan.unresolved,
+            result.violations,
+          );
+        }
+      } else {
+        appendUnresolvedPrimaryClassViolations(
+          filename,
+          source,
+          [unresolvedClassExpression(
+            initializer,
+            sourceFile,
+            'BUTTON_VARIANT_STYLES',
+          ).unresolved[0]],
+          result.violations,
+        );
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return result;
+}
+
+function scanPrimaryCtas(filename: string, source: string): PrimaryCtaScan {
+  return scanPrimaryCtasInBoundSource(filename, source, createBoundSourceFile(source));
+}
+
+function scanPrimaryCtaSources(sources: readonly SourceEntry[]): Map<string, PrimaryCtaScan> {
+  const boundSources = createBoundSourceFiles(sources);
+  return new Map(sources.map(([filename, source]) => {
+    const boundSource = boundSources.get(filename);
+    if (!boundSource) {
+      throw new Error(`Production design guard could not scan ${filename}.`);
+    }
+    return [filename, scanPrimaryCtasInBoundSource(filename, source, boundSource)] as const;
+  }));
+}
+
 function findProductionDesignViolations(
   filename: string,
   source: string,
   buttonClassNames: Set<string> = new Set(),
+  primaryCtaScan?: PrimaryCtaScan,
 ): DesignViolation[] {
   const violations: DesignViolation[] = [];
+
+  if (filename.endsWith('.tsx')) {
+    violations.push(...(primaryCtaScan ?? scanPrimaryCtas(filename, source)).violations);
+  }
 
   for (const buttonMatch of source.matchAll(BUTTON_OPENING_TAG_PATTERN)) {
     const button = buttonMatch[0];
@@ -407,6 +1657,458 @@ describe('production design guard', () => {
       .toEqual([expect.objectContaining({ rule: 'glow-effect' })]);
   });
 
+  it('self-test rejects gradients and shimmer inside a primary CTA', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryGradientButton,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryNamedGradientButton,
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-gradient',
+      token: 'bg-primary-gradient',
+    })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.implicitPrimaryGradientButton,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryGradientChild,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryShimmerChild,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-shimmer' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant={active ? \'primary\' : \'secondary\'} className={active ? \'bg-gradient-to-r\' : \'bg-card\'}>Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant={\'primary\'} className={`bg-[linear-gradient(to_right,var(--primary),transparent)]`}>Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+  });
+
+  it('rejects Tailwind v4 linear, radial, and conic primary CTA gradients', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className="bg-linear-to-r">Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient', token: 'bg-linear-to-r' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary"><span className="bg-radial">Run</span></Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient', token: 'bg-radial' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className="hover:bg-conic-180">Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient', token: 'bg-conic-180' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className="hover:[background-image:linear-gradient(to_right,red,blue)]">Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className="bg-(image:--gradient-primary)">Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+  });
+
+  it('tracks aliases and namespaces imported from the shared Button module', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import { Button as PrimaryButton } from '../common'; <PrimaryButton className=\"bg-linear-to-r\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../components/common'; <Common.Button className=\"bg-conic\">Run</Common.Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Dialog from './dialog'; <Dialog.Button className=\"bg-gradient-to-r\">Run</Dialog.Button>",
+    )).toEqual([]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import { Button } from '../common'; const PrimaryButton = Button; <PrimaryButton className=\"bg-gradient-to-r\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../common'; const UI = Common; const PrimaryButton = UI.Button; <PrimaryButton className=\"bg-conic\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../common'; const UI = Common; const { Button: PrimaryButton } = UI; <PrimaryButton className=\"bg-radial\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryLocalAliasGradient,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.unrelatedLocalAliasGradient,
+    )).toEqual([]);
+  });
+
+  it('resolves shared Button aliases by lexical binding', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryAliasWithUnrelatedShadow,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.unrelatedShadowOfSharedAliasGradient,
+    )).toEqual([]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.unrelatedShadowOfSharedButtonGradient,
+    )).toEqual([]);
+  });
+
+  it('tracks a shared Button selected through a static namespace bracket alias', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../common'; const PrimaryButton = Common['Button']; <PrimaryButton className=\"bg-gradient-to-r\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Dialog from './dialog'; const DialogButton = Dialog['Button']; <DialogButton className=\"bg-gradient-to-r\">Run</DialogButton>",
+    )).toEqual([]);
+  });
+
+  it('tracks a shared Button selected through a const-aliased static namespace key', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../common'; const key = 'Button'; const PrimaryButton = Common[key]; <PrimaryButton className=\"bg-gradient-to-r\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+  });
+
+  it('tracks a shared Button destructured through a const-aliased static namespace key', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Common from '../common'; const key = 'Button'; const { [key]: PrimaryButton } = Common; <PrimaryButton className=\"bg-gradient-to-r\">Run</PrimaryButton>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+  });
+
+  it('keeps a const-key bracket alias from an unrelated namespace out of the shared Button scan', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import * as Dialog from './dialog'; const key = 'Button'; const DialogButton = Dialog[key]; <DialogButton className=\"bg-gradient-to-r\">Run</DialogButton>",
+    )).toEqual([]);
+  });
+
+  it('does not treat a named Button import from an unrelated module as shared', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import { Button } from './dialog'; <Button className=\"bg-gradient-to-r\">Dialog</Button>",
+    )).toEqual([]);
+  });
+
+  it('does not treat a default Button import from an unrelated Button module as shared', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "import Button from './dialog/Button'; <Button className=\"bg-gradient-to-r\">Dialog</Button>",
+    )).toEqual([]);
+  });
+
+  it('covers every semantic primary CTA variant and fails closed for dynamic variants', () => {
+    for (const variant of PRIMARY_CTA_VARIANTS) {
+      expect(findProductionDesignViolations(
+        'fixture.tsx',
+        `<Button variant="${variant}" className="bg-primary-gradient">Run</Button>`,
+      )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    }
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primarySecondaryGradient,
+    )).toEqual([]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryDynamicVariantClass,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryEnumerableNonPrimaryVariant,
+    )).toEqual([]);
+  });
+
+  it('joins fully static class expressions before checking primary effects', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "<Button className={'bg-' + 'gradient-to-r'}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "const suffix = 'gradient-to-r'; <Button className={'bg-' + suffix}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "const suffix = 'gradient-to-r'; <Button className={`bg-${suffix}`}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "<Button className={'bg-' + (active ? 'gradient-to-r' : 'card')}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "<Button className={`bg-${active ? 'gradient-to-r' : 'card'}`}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    for (const fixture of [
+      productionDesignGuardFixtures.primaryStaticConcatenatedClass,
+      productionDesignGuardFixtures.primaryStaticTemplateClass,
+      productionDesignGuardFixtures.primaryComputedObjectClass,
+    ]) {
+      expect(findProductionDesignViolations('fixture.tsx', fixture))
+        .toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    }
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primarySeparatedComposerClasses,
+    )).toEqual([]);
+  });
+
+  it('does not trust a locally shadowed class composer', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "const cn = (...values: string[]) => values.join(' '); <Button className={cn('bg-card')}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "function cn(value: string) { return value; } <Button className={cn('bg-card')}>Run</Button>",
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+  });
+
+  it('keeps class composer shadowing inside its lexical scope', () => {
+    const fixture = [
+      "import { cn } from '../../utils/cn';",
+      "const Safe = () => <Button className={cn('bg-card')}>Run</Button>;",
+      'const Other = () => {',
+      "  const cn = (value: string) => value;",
+      "  return <div className={cn('bg-card')} />;",
+      '};',
+    ].join('\n');
+    const scan = scanPrimaryCtas('fixture.tsx', fixture);
+
+    expect(scan.matchedButtons).toBe(1);
+    expect(scan.violations).toEqual([]);
+  });
+
+  it('does not resolve a shadowed class binding through an unrelated const', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryShadowedDynamicClass,
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'className',
+    })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryUniqueSafeConstClass,
+    )).toEqual([]);
+  });
+
+  it('uses final JSX prop order when a spread can override the Button variant', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="secondary" {...{ variant: \'primary\' }} className="bg-gradient-to-r">Run</Button>',
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-gradient' }),
+    ]));
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button {...{ variant: \'primary\' }} variant="secondary" className="bg-gradient-to-r">Run</Button>',
+    )).toEqual([]);
+  });
+
+  it('fails closed only when a spread can override the final explicit className', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className="bg-card" {...props}>Run</Button>',
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        rule: 'primary-cta-unresolved-class',
+        token: 'className spread',
+      }),
+      expect.objectContaining({
+        rule: 'primary-cta-unresolved-class',
+        token: 'style spread',
+      }),
+    ]));
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" {...props} className="bg-card" style={{ background: \'var(--background)\' }}>Run</Button>',
+    )).toEqual([]);
+  });
+
+  it('resolves direct const class expressions for primary callsites and shared styles', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'const CTA_CLASSES = \'bg-linear-to-r\'; <Button variant="primary" className={CTA_CLASSES}>Run</Button>',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient', token: 'bg-linear-to-r' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'const PRIMARY_STYLES = \'bg-conic\'; const BUTTON_VARIANT_STYLES = { primary: PRIMARY_STYLES, \'settings-primary\': \'bg-foreground\', \'action-primary\': \'bg-foreground\', gradient: \'bg-foreground\' };',
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient', token: 'bg-conic' })]);
+  });
+
+  it('uses final object property order for shared primary variant styles', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.sharedPrimaryTrailingOverride,
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'BUTTON_VARIANT_STYLES.primary',
+    })]));
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.sharedPrimaryExplicitFinalOverride,
+    )).toEqual([]);
+  });
+
+  it('fails closed when primary class expressions have no static fragments', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      '<Button variant="primary" className={ctaClasses}>Run</Button>',
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'className',
+    })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'const BUTTON_VARIANT_STYLES = { primary: getPrimaryStyles(), \'settings-primary\': \'bg-foreground\', \'action-primary\': \'bg-foreground\', gradient: \'bg-foreground\' };',
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'BUTTON_VARIANT_STYLES.primary',
+    })]);
+  });
+
+  it('detects arbitrary shimmer animations without rejecting other animations', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryArbitraryShimmer,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-shimmer' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryArbitrarySpin,
+    )).toEqual([]);
+  });
+
+  it('detects inline primary effects and accepts static non-decorative styles', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryInlineGradient,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-gradient' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryInlineShimmer,
+    )).toEqual([expect.objectContaining({ rule: 'primary-cta-shimmer' })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryInlineSafe,
+    )).toEqual([]);
+  });
+
+  it('rejects a primary CTA inline backgroundImage linear gradient', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "<Button variant=\"primary\" style={{ backgroundImage: 'linear-gradient(to_right,var(--primary),transparent)' }}>Run</Button>",
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-gradient',
+      token: 'linear-gradient(',
+    })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      "<Button variant=\"primary\" style={{ backgroundImage: 'none' }}>Run</Button>",
+    )).toEqual([]);
+  });
+
+  it('propagates unresolved operands alongside static primary class fragments', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryDynamicCnClass,
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'dynamicClasses',
+    })]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.primaryDynamicTemplateClass,
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-unresolved-class',
+      token: 'dynamicClasses',
+    })]);
+  });
+
+  it('accepts fully enumerable primary class expressions', () => {
+    for (const fixture of [
+      productionDesignGuardFixtures.primaryEnumerableCnClass,
+      productionDesignGuardFixtures.primaryEnumerableConditionalClass,
+    ]) {
+      const scan = scanPrimaryCtas('fixture.tsx', fixture);
+      expect(scan.matchedButtons).toBe(1);
+      expect(scan.violations).toEqual([]);
+    }
+  });
+
+  it('retains primary CTA violations when reusing a precomputed production scan', () => {
+    const source = '<Button variant="primary" className="bg-gradient-to-r">Run</Button>';
+    const primaryCtaScan = scanPrimaryCtas('fixture.tsx', source);
+
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      source,
+      new Set(),
+      primaryCtaScan,
+    )).toEqual([expect.objectContaining({
+      rule: 'primary-cta-gradient',
+      token: 'bg-gradient-to-r',
+    })]);
+  });
+
+  it('keeps shared Button bindings isolated across a batched production scan', () => {
+    const scans = scanPrimaryCtaSources([
+      [
+        'shared.tsx',
+        "import { Button as Action } from '../common'; <Action className=\"bg-gradient-to-r\">Run</Action>",
+      ],
+      [
+        'unrelated.tsx',
+        "import { Button as Action } from './dialog'; <Action className=\"bg-gradient-to-r\">Dialog</Action>",
+      ],
+    ]);
+
+    expect(scans.get('shared.tsx')?.violations).toEqual([
+      expect.objectContaining({ rule: 'primary-cta-gradient' }),
+    ]);
+    expect(scans.get('unrelated.tsx')?.violations).toEqual([]);
+  });
+
+  it('scopes primary CTA effects to className and balanced JSX boundaries', () => {
+    const primaryViolations = (source: string) => findProductionDesignViolations('fixture.tsx', source)
+      .filter(({ rule }) => rule.startsWith('primary-cta'));
+
+    expect(primaryViolations(
+      '<Button variant="secondary" className="bg-gradient-to-r"><span className="animate-[shimmer_1s]" /></Button>',
+    )).toEqual([]);
+    expect(primaryViolations(
+      '<Button variant="primary" aria-label="bg-gradient-to-r">Shimmer report</Button>',
+    )).toEqual([]);
+    expect(primaryViolations(
+      '<Button variant="primary" /> <span className="animate-[shimmer_1s]">Sibling</span>',
+    )).toEqual([]);
+    expect(primaryViolations(
+      '<Button variant="primary"><Button variant="secondary" className="bg-gradient-to-r" /></Button>',
+    )).toEqual([]);
+    expect(primaryViolations(
+      '<Dialog.Button className="bg-gradient-to-r">Dialog action</Dialog.Button>',
+    )).toEqual([]);
+    expect(primaryViolations(
+      '{/* <Button variant="primary" className="bg-gradient-to-r">Old</Button> */}',
+    )).toEqual([]);
+    expect(primaryViolations('<Button variant="primary" className="bg-foreground">Run</Button>'))
+      .toEqual([]);
+    expect(primaryViolations('<Button className="bg-foreground">Run</Button>')).toEqual([]);
+  });
+
   it('self-test detects strong class and CSS blur without rejecting restrained blur', () => {
     expect(findProductionDesignViolations('fixture.tsx', productionDesignGuardFixtures.strongBlurClass))
       .toEqual([expect.objectContaining({ rule: 'strong-blur', token: 'backdrop-blur-xl' })]);
@@ -432,14 +2134,30 @@ describe('production design guard', () => {
       (total, [, source]) => total + Array.from(source.matchAll(BUTTON_OPENING_TAG_PATTERN)).length,
       0,
     );
+    const primaryScans = scanPrimaryCtaSources(productionTsxSources);
+    const totalMatchedPrimaryButtons = Array.from(primaryScans.values()).reduce(
+      (total, scan) => total + scan.matchedButtons,
+      0,
+    );
+    const totalMatchedSharedPrimaryStyles = Array.from(primaryScans.values()).reduce(
+      (total, scan) => total + scan.matchedSharedStyles,
+      0,
+    );
     const buttonClassNames = new Set(productionTsxSources
       .flatMap(([, source]) => Array.from(extractButtonClassNames(source))));
     const violations = scannedSources.flatMap(([filename, source]) => (
-      findProductionDesignViolations(filename, source, buttonClassNames)
+      findProductionDesignViolations(
+        filename,
+        source,
+        buttonClassNames,
+        primaryScans.get(filename),
+      )
     ));
 
     expect(scannedSources.length).toBeGreaterThan(0);
     expect(totalMatchedButtonTags).toBeGreaterThan(0);
+    expect(totalMatchedPrimaryButtons).toBeGreaterThan(0);
+    expect(totalMatchedSharedPrimaryStyles).toBe(PRIMARY_CTA_VARIANTS.size);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);
   });

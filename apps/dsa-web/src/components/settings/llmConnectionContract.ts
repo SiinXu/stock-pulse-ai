@@ -1,14 +1,30 @@
 import type {
-  LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
 import type { UiLanguage } from '../../i18n/uiText';
 import {
-  hasUnknownConfigContractCondition,
-  isFieldEnabledByContract,
-  isFieldVisibleByContract,
-  resolveFieldRequirement,
-} from '../../utils/configConditions';
+  evaluateConnectionFieldStates,
+  evaluateConnectionSchemaAuthority,
+  hasUnknownConnectionFieldCondition,
+  inspectConnectionSchemaDefinition,
+  isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
+  validateConnectionContractValues,
+  type ConnectionFieldState,
+  type ConnectionSchemaAuthority,
+  type ConnectionSchemaDefinition,
+} from '../../utils/connectionSchemaAuthority';
+
+export {
+  evaluateConnectionFieldStates,
+  evaluateConnectionSchemaAuthority,
+  hasUnknownConnectionFieldCondition,
+  inspectConnectionSchemaDefinition,
+  isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
+  validateConnectionContractValues,
+};
+export type { ConnectionFieldState, ConnectionSchemaAuthority, ConnectionSchemaDefinition };
 
 const MODEL_ROUTE_PROTOCOL_ALIASES: Record<string, string> = {
   vertexai: 'vertex_ai',
@@ -80,14 +96,6 @@ export interface ConnectionContractValuesInput {
 
 export type ConnectionCredentialField = 'api_key' | 'api_keys';
 
-export interface ConnectionFieldState {
-  visible: boolean;
-  enabled: boolean;
-  required: boolean;
-  unknownCondition: boolean;
-  requiresConnectionTest: boolean;
-}
-
 const CHINESE_SCRIPT = /[\u3400-\u9fff]/u;
 
 /** Select a Catalog display label without translating Provider identity. */
@@ -155,74 +163,6 @@ export function buildConnectionContractValues({
       ? 'true'
       : 'false',
   };
-}
-
-function normalizeContractValues(values: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(values).map(([key, value]) => [key.toUpperCase(), value]),
-  );
-}
-
-/** Evaluate the backend field schema with the shared fail-safe AND semantics. */
-export function evaluateConnectionFieldStates(
-  values: Record<string, string>,
-  fields: LlmConnectionFieldSchema[],
-): Record<string, ConnectionFieldState> {
-  const normalizedValues = normalizeContractValues(values);
-  return Object.fromEntries(fields.map((field) => {
-    const unknownCondition = hasUnknownConfigContractCondition(field.contract, normalizedValues);
-    const visible = isFieldVisibleByContract(field.contract, normalizedValues);
-    const requirement = resolveFieldRequirement(field.contract, normalizedValues);
-    return [field.key, {
-      visible,
-      enabled: isFieldEnabledByContract(field.contract, normalizedValues),
-      required: visible && requirement === 'required',
-      unknownCondition,
-      requiresConnectionTest: Boolean(field.contract.requiresConnectionTest),
-    }];
-  }));
-}
-
-/** Return missing visible fields in backend schema order. */
-export function validateConnectionContractValues(
-  values: Record<string, string>,
-  fields: LlmConnectionFieldSchema[],
-): string[] {
-  const states = evaluateConnectionFieldStates(values, fields);
-  return fields
-    .filter((field) => states[field.key]?.required && !values[field.key]?.trim())
-    .map((field) => field.key);
-}
-
-/** Expose unknown operators as a diagnostic instead of silently hiding fields. */
-export function hasUnknownConnectionFieldCondition(
-  values: Record<string, string>,
-  fields: LlmConnectionFieldSchema[],
-): boolean {
-  return Object.values(evaluateConnectionFieldStates(values, fields))
-    .some((state) => state.unknownCondition);
-}
-
-/** Return whether the evaluated schema permits model discovery right now. */
-export function isConnectionModelDiscoveryEnabled(
-  values: Record<string, string>,
-  fields: LlmConnectionFieldSchema[],
-): boolean {
-  const states = evaluateConnectionFieldStates(values, fields);
-  const modelsState = states.models;
-  if (!modelsState?.visible || !modelsState.enabled || modelsState.unknownCondition) {
-    return false;
-  }
-  if (Object.values(states).some((state) => state.unknownCondition)) {
-    return false;
-  }
-  return fields.every((field) => {
-    const state = states[field.key];
-    if (field.key === 'models' || !state?.visible || !state.requiresConnectionTest) {
-      return true;
-    }
-    return !state.required || Boolean(values[field.key]?.trim());
-  });
 }
 
 export function connectionAllowsEmptyApiKey(

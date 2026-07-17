@@ -45,10 +45,18 @@ import {
   type ModelReferenceReplacement,
 } from '../components/settings';
 import {
+  CONNECTION_SCHEMA_KEY_BY_SUFFIX,
   parseModelAccessFieldKey,
   type ModelAccessFieldFocusRequest,
 } from '../components/settings/modelAccessFieldKey';
-import { getProviderDisplayLabel } from '../components/settings/llmConnectionContract';
+import {
+  buildConnectionContractValues,
+  evaluateConnectionSchemaAuthority,
+  getProviderDisplayLabel,
+  isConnectionSchemaFieldWritable,
+  validateConnectionContractValues,
+  type ConnectionCredentialField,
+} from '../components/settings/llmConnectionContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
@@ -76,6 +84,8 @@ import {
 import type {
   ConfigValidationIssue,
   LLMConfigModeStatus,
+  LlmConnectionFieldSchema,
+  LlmProviderCatalogEntry,
   SchedulerStatusResponse,
   SetupStatusCheck,
   SetupStatusResponse,
@@ -105,6 +115,148 @@ interface SettingsGroupSaveState {
 }
 
 const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
+
+function connectionItemsRespectSchema(
+  items: Array<{ key: string; value: string }>,
+  currentValues: Record<string, string>,
+  currentRawValueKeys: Set<string>,
+  providers: LlmProviderCatalogEntry[],
+  connectionFields: LlmConnectionFieldSchema[] | undefined,
+  emptyApiKeyHosts: string[],
+): boolean {
+  if (connectionFields === undefined) {
+    return true;
+  }
+  const parsedItems = items.flatMap((item) => {
+    const parsed = parseModelAccessFieldKey(item.key);
+    return parsed ? [{ item, parsed }] : [];
+  });
+  const channelsItem = items.find(
+    (item) => item.key.trim().toUpperCase() === 'LLM_CHANNELS',
+  );
+  if (parsedItems.length === 0 && !channelsItem) {
+    return true;
+  }
+
+  const valuesBefore = new Map(
+    Object.entries(currentValues).map(([key, value]) => [key.toUpperCase(), value]),
+  );
+  const presentBefore = new Set(
+    Array.from(currentRawValueKeys, (key) => key.toUpperCase()),
+  );
+  const valuesAfter = new Map(valuesBefore);
+  const presentAfter = new Set(presentBefore);
+  for (const item of items) {
+    const key = item.key.toUpperCase();
+    valuesAfter.set(key, item.value);
+    presentAfter.add(key);
+  }
+
+  const connectionNames = (values: Map<string, string>) => (values.get('LLM_CHANNELS') ?? '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean);
+  const beforeNames = new Set(connectionNames(valuesBefore));
+  const afterNames = new Set(connectionNames(valuesAfter));
+
+  const buildAuthority = (
+    connectionName: string,
+    values: Map<string, string>,
+    presentKeys: Set<string>,
+    requireCatalogIdentity: boolean,
+  ) => {
+    const prefix = `LLM_${connectionName.toUpperCase()}_`;
+    const value = (suffix: string) => {
+      const key = `${prefix}${suffix}`;
+      return presentKeys.has(key) ? (values.get(key) ?? '') : '';
+    };
+    const providerId = value('PROVIDER').trim();
+    const provider = providers.find((candidate) => candidate.id === providerId);
+    if (requireCatalogIdentity && !provider) {
+      return null;
+    }
+    const apiKeys = value('API_KEYS');
+    const credentialField: ConnectionCredentialField = apiKeys.trim()
+      ? 'api_keys'
+      : 'api_key';
+    const rawEnabled = value('ENABLED').trim();
+    const enabled = !['0', 'false', 'no', 'off'].includes(rawEnabled.toLowerCase());
+    const authorityValues = buildConnectionContractValues({
+      connectionName,
+      displayName: value('DISPLAY_NAME'),
+      providerId,
+      provider,
+      protocol: value('PROTOCOL'),
+      baseUrl: value('BASE_URL'),
+      apiKey: credentialField === 'api_keys' ? apiKeys : value('API_KEY'),
+      credentialField,
+      models: value('MODELS'),
+      extraHeaders: value('EXTRA_HEADERS'),
+      enabled,
+      emptyApiKeyHosts,
+    });
+    // The shared builder accepts a boolean, so restore absence after building.
+    authorityValues.enabled = rawEnabled ? authorityValues.enabled : '';
+    return {
+      authority: evaluateConnectionSchemaAuthority(authorityValues, connectionFields),
+      values: authorityValues,
+    };
+  };
+
+  const finalAuthorities = new Map<string, ReturnType<typeof buildAuthority>>();
+  for (const connectionName of afterNames) {
+    const result = buildAuthority(
+      connectionName,
+      valuesAfter,
+      presentAfter,
+      true,
+    );
+    if (
+      !result
+      || !result.authority.usable
+      || validateConnectionContractValues(result.values, connectionFields).length > 0
+    ) {
+      return false;
+    }
+    finalAuthorities.set(connectionName, result);
+  }
+
+  for (const { parsed } of parsedItems) {
+    const isActive = afterNames.has(parsed.connectionName);
+    if (!isActive && !beforeNames.has(parsed.connectionName)) {
+      return false;
+    }
+    const result = isActive
+      ? finalAuthorities.get(parsed.connectionName)
+      : buildAuthority(parsed.connectionName, valuesBefore, presentBefore, false);
+    if (
+      !result?.authority.usable
+      || !isConnectionSchemaFieldWritable(
+        result.authority,
+        CONNECTION_SCHEMA_KEY_BY_SUFFIX[parsed.suffix],
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (channelsItem) {
+    const affectedNames = new Set([...beforeNames, ...afterNames]);
+    for (const connectionName of affectedNames) {
+      const result = afterNames.has(connectionName)
+        ? finalAuthorities.get(connectionName)
+        : buildAuthority(connectionName, valuesBefore, presentBefore, false);
+      if (
+        !result?.authority.usable
+        || !isConnectionSchemaFieldWritable(result.authority, 'connection_name')
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 
 type DesktopUpdateState = {
   status?: string;
@@ -998,11 +1150,16 @@ const SettingsPage: React.FC = () => {
   const {
     providers: providerCatalog,
     connectionFields: providerConnectionFields,
+    connectionSchemaDefinition: providerConnectionSchemaDefinition,
     emptyApiKeyHosts: providerEmptyApiKeyHosts,
     isLoading: isProviderCatalogLoading,
     error: providerCatalogError,
     reload: reloadProviderCatalog,
   } = useProviderCatalog();
+  const providerConnectionSchemaUnavailable = providerConnectionSchemaDefinition.mode === 'schema'
+    && !providerConnectionSchemaDefinition.usable;
+  const providerConnectionSchemaAllowsInspection = providerConnectionSchemaDefinition.reason
+    === 'unknown_condition';
   // Available model routes (authoritative) refetched when the saved config changes.
   const {
     models: availableModels,
@@ -1423,6 +1580,17 @@ const SettingsPage: React.FC = () => {
       }
     }
     return map;
+  }, [itemsByCategory]);
+  const rawValueKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const categoryItems of Object.values(itemsByCategory)) {
+      for (const item of categoryItems) {
+        if (item.rawValueExists !== false) {
+          keys.add(item.key.toUpperCase());
+        }
+      }
+    }
+    return keys;
   }, [itemsByCategory]);
   const hasUnsafeModelAccessSchema = rawActiveItems.some((item) => (
     (
@@ -1914,7 +2082,29 @@ const SettingsPage: React.FC = () => {
       setGroupSaveState(group, { status: 'scheduled', fingerprint });
       return;
     }
+    if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
+      setGroupSaveState(group, { status: 'failed', fingerprint });
+      return;
+    }
     if (group === 'ai_model' && !llmChannelDraftValid) {
+      setGroupSaveState(group, { status: 'failed', fingerprint });
+      return;
+    }
+    const changesConnection = group === 'ai_model' && items.some((item) => (
+      item.key.toUpperCase() === 'LLM_CHANNELS'
+      || parseModelAccessFieldKey(item.key) !== null
+    ));
+    if (
+      changesConnection
+      && !connectionItemsRespectSchema(
+        items,
+        allValuesByKey,
+        rawValueKeys,
+        providerCatalog,
+        providerConnectionFields,
+        providerEmptyApiKeyHosts,
+      )
+    ) {
       setGroupSaveState(group, { status: 'failed', fingerprint });
       return;
     }
@@ -1935,7 +2125,19 @@ const SettingsPage: React.FC = () => {
     } finally {
       autosaveInFlightRef.current = null;
     }
-  }, [isProviderCatalogLoading, llmChannelDraftValid, persistConfigGroup, providerCatalogError, setGroupSaveState]);
+  }, [
+    allValuesByKey,
+    isProviderCatalogLoading,
+    llmChannelDraftValid,
+    persistConfigGroup,
+    providerCatalog,
+    providerCatalogError,
+    providerConnectionFields,
+    providerConnectionSchemaUnavailable,
+    providerEmptyApiKeyHosts,
+    rawValueKeys,
+    setGroupSaveState,
+  ]);
 
   useEffect(() => {
     if (autosaveTimerRef.current !== null) {
@@ -1952,6 +2154,10 @@ const SettingsPage: React.FC = () => {
       const fingerprint = JSON.stringify(items);
       if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
         setGroupSaveState(group, { status: 'scheduled', fingerprint });
+        continue;
+      }
+      if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
+        setGroupSaveState(group, { status: 'failed', fingerprint });
         continue;
       }
       const previous = groupSaveStatesRef.current[group];
@@ -1990,6 +2196,7 @@ const SettingsPage: React.FC = () => {
     pendingGroupsFingerprint,
     runGroupAutosave,
     providerCatalogError,
+    providerConnectionSchemaUnavailable,
     setGroupSaveState,
   ]);
 
@@ -2018,6 +2225,26 @@ const SettingsPage: React.FC = () => {
   // persisted atomically and the normal post-save effects run. The result is
   // returned so the wizard can surface backend validation errors in place.
   const handleWizardComplete = async (items: WizardDraftItem[]): Promise<WizardCompleteResult> => {
+    const changesConnection = items.some((item) => (
+      item.key.toUpperCase() === 'LLM_CHANNELS'
+      || parseModelAccessFieldKey(item.key) !== null
+    ));
+    if (
+      changesConnection
+      && (
+        providerConnectionSchemaUnavailable
+        || !connectionItemsRespectSchema(
+          items,
+          allValuesByKey,
+          rawValueKeys,
+          providerCatalog,
+          providerConnectionFields,
+          providerEmptyApiKeyHosts,
+        )
+      )
+    ) {
+      return { success: false, error: settingsText.connectionSchemaUnavailable };
+    }
     const result = await save(items);
     if (!result.success) {
       const error = result.issues && result.issues.length > 0
@@ -3016,7 +3243,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-primary"
-                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
+                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || providerConnectionSchemaUnavailable || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
                       onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
                     >
                       {settingsText.addModelService}
@@ -3039,7 +3266,7 @@ const SettingsPage: React.FC = () => {
                   resetSignal={llmChannelResetSignal}
                   addSignal={llmChannelAddSignal}
                   focusFieldRequest={llmFocusFieldRequest}
-                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || hasUnsafeModelAccessSchema}
+                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
                   catalogUnavailable={Boolean(providerCatalogError)}
                   onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}

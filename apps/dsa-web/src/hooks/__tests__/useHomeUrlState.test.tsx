@@ -1,6 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useCallback, useState } from 'react';
-import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  MemoryRouter,
+  Router,
+  type Navigator,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { ParsedApiError } from '../../api/error';
 import { useHomeUrlState } from '../useHomeUrlState';
@@ -23,21 +29,32 @@ function Harness({
   const location = useLocation();
   const navigate = useNavigate();
   const [selectedRecordId, setSelectedRecordId] = useState(initialSelectedRecordId);
+  const [selectedReportId, setSelectedReportId] = useState(
+    reportError ? null : initialSelectedRecordId,
+  );
+  const [currentReportError, setCurrentReportError] = useState(reportError);
+  useEffect(() => {
+    setCurrentReportError(reportError);
+  }, [reportError]);
   const selectHistoryItem = useCallback((recordId: number, isUserInitiated?: boolean) => {
     setSelectedRecordId(recordId);
+    setSelectedReportId(recordId);
+    setCurrentReportError(null);
     onSelect?.(recordId, isUserInitiated);
     return Promise.resolve();
   }, [onSelect]);
   const clearSelectedRecord = useCallback((preserveError?: boolean) => {
     setSelectedRecordId(null);
+    setSelectedReportId(null);
     onClear?.(preserveError);
   }, [onClear]);
   const homeUrl = useHomeUrlState({
     defaultRecordId,
     isHistoryLoading: false,
     selectedRecordId,
+    selectedReportId,
     isReportLoading: false,
-    reportError,
+    reportError: currentReportError,
     selectHistoryItem,
     clearSelectedRecord,
   });
@@ -97,6 +114,28 @@ describe('useHomeUrlState', () => {
     expect(onSelect).toHaveBeenCalledWith(1, false);
   });
 
+  it('selects an applied default history record before its canonical URL replacement commits', async () => {
+    const onSelect = vi.fn();
+    const replace = vi.fn();
+    const navigator = {
+      createHref: vi.fn(() => '/?keep=yes'),
+      go: vi.fn(),
+      push: vi.fn(),
+      replace,
+    } satisfies Navigator;
+
+    render(
+      <Router location="/?keep=yes" navigator={navigator}>
+        <Harness defaultRecordId={1} onSelect={onSelect} />
+      </Router>,
+    );
+
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(1, false);
+    expect(screen.getByTestId('search')).toHaveTextContent('?keep=yes');
+  });
+
   it('pushes user report selections and restores them with Back and Forward', async () => {
     const onSelect = vi.fn();
     renderHarness('/?recordId=1', { initialSelectedRecordId: 1, onSelect });
@@ -127,16 +166,10 @@ describe('useHomeUrlState', () => {
     expect(firstRecordTwoKey).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'record 2' }));
-    await waitFor(() => expect(screen.getByTestId('location-key').textContent).not.toBe(firstRecordTwoKey));
-    const repeatedRecordTwoKey = screen.getByTestId('location-key').textContent;
-    expect(repeatedRecordTwoKey).toBeTruthy();
+    expect(screen.getByTestId('location-key').textContent).toBe(firstRecordTwoKey);
+    expect(onSelect.mock.calls.map(([recordId]) => recordId)).toEqual([2]);
 
     fireEvent.click(screen.getByRole('button', { name: 'back' }));
-    await waitFor(() => expect(screen.getByTestId('location-key').textContent).toBe(firstRecordTwoKey));
-    expect(screen.getByTestId('location-key').textContent).not.toBe(repeatedRecordTwoKey);
-
-    fireEvent.click(screen.getByRole('button', { name: 'back' }));
-
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=1'));
     await waitFor(() => expect(onSelect.mock.calls.map(([recordId]) => recordId)).toEqual([2, 1]));
   });
@@ -182,5 +215,47 @@ describe('useHomeUrlState', () => {
 
     await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?keep=yes'));
     expect(onClear).toHaveBeenCalledWith(true);
+  });
+
+  it('retries the same record when Back restores a different entry after a permanent failure', async () => {
+    const onSelect = vi.fn();
+    const onClear = vi.fn();
+    const reportError = {
+      title: 'Requested content not found',
+      message: 'It may have been removed.',
+      rawMessage: 'not found',
+      status: 404,
+      category: 'http_error',
+      code: 'not_found',
+    } satisfies ParsedApiError;
+    const view = renderHarness('/?recordId=2', {
+      initialSelectedRecordId: 2,
+      onClear,
+      onSelect,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'task flow' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(
+      '?recordId=2&runFlow=task&runFlowTaskId=task-2',
+    ));
+
+    view.rerender(
+      <MemoryRouter initialEntries={['/?recordId=2']}>
+        <Harness
+          initialSelectedRecordId={2}
+          reportError={reportError}
+          onClear={onClear}
+          onSelect={onSelect}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent(
+      '?runFlow=task&runFlowTaskId=task-2',
+    ));
+    expect(onClear).toHaveBeenCalledWith(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'back' }));
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('?recordId=2'));
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith(2, true));
   });
 });

@@ -41,16 +41,16 @@ export type ConfigConditionOperator = 'equals' | 'notEquals' | 'in' | 'notEmpty'
 export interface ConfigCondition {
   key: string;
   operator: ConfigConditionOperator;
-  value?: string | string[];
+  value?: string | string[] | null;
 }
 
 export interface ConfigFieldContract {
   requirement?: 'required' | 'optional' | 'inherited';
-  requiredWhen?: ConfigCondition[];
-  visibleWhen?: ConfigCondition[];
-  enabledWhen?: ConfigCondition[];
-  requiresConnectionTest?: boolean;
-  restartRequired?: boolean;
+  requiredWhen?: ConfigCondition[] | null;
+  visibleWhen?: ConfigCondition[] | null;
+  enabledWhen?: ConfigCondition[] | null;
+  requiresConnectionTest?: boolean | null;
+  restartRequired?: boolean | null;
 }
 
 /**

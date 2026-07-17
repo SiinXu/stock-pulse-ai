@@ -1,10 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../types/systemConfig';
+import {
+  inspectConnectionSchemaDefinition,
+  type ConnectionSchemaDefinition,
+} from '../utils/connectionSchemaAuthority';
 
 interface ProviderCatalogState {
   providers: LlmProviderCatalogEntry[];
   connectionFields?: LlmConnectionFieldSchema[];
+  connectionSchemaDefinition: ConnectionSchemaDefinition;
   emptyApiKeyHosts: string[];
   isLoading: boolean;
   error: string | null;
@@ -60,5 +65,18 @@ export function useProviderCatalog(): ProviderCatalogState {
     };
   }, [reloadToken]);
 
-  return { providers, connectionFields, emptyApiKeyHosts, isLoading, error, reload };
+  const connectionSchemaDefinition = useMemo(
+    () => inspectConnectionSchemaDefinition(connectionFields),
+    [connectionFields],
+  );
+
+  return {
+    providers,
+    connectionFields,
+    connectionSchemaDefinition,
+    emptyApiKeyHosts,
+    isLoading,
+    error,
+    reload,
+  };
 }
