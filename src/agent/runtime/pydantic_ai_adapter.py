@@ -148,7 +148,7 @@ class PydanticAIRuntimeAdapter:
     the product default.
     """
 
-    def __init__(self, *, model: Any = None, llm_adapter: Any = None):
+    def __init__(self, *, model: Any = None, llm_adapter: Any = None, tool_session: Any = None):
         if model is None and llm_adapter is None:
             raise ValueError(
                 "PydanticAIRuntimeAdapter requires an explicit 'model' or an "
@@ -156,6 +156,7 @@ class PydanticAIRuntimeAdapter:
             )
         self._model = model
         self._llm_adapter = llm_adapter
+        self._tool_session = tool_session
 
     @property
     def name(self) -> str:
@@ -208,7 +209,12 @@ class PydanticAIRuntimeAdapter:
         from src.agent.executor import AgentResult
         from src.agent.runner import parse_dashboard_json
 
-        agent = Agent(model=self._resolve_model())
+        toolsets = []
+        if self._tool_session is not None:
+            from src.agent.runtime.pydantic_ai_toolset import build_bound_session_toolset
+
+            toolsets.append(build_bound_session_toolset(self._tool_session))
+        agent = Agent(model=self._resolve_model(), toolsets=toolsets)
         run_result = agent.run_sync(context.prompt)
         content = str(run_result.output or "")
         usage = run_result.usage

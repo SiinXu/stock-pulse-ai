@@ -32,6 +32,13 @@ from src.agent.runtime.pydantic_ai_adapter import (
     _to_stockpulse_messages,
     is_pydantic_ai_available,
 )
+from src.agent.runtime.tool_session import BoundToolSession
+from src.agent.tools.registry import (
+    ToolDefinition,
+    ToolParameter,
+    ToolPolicy,
+    ToolRegistry,
+)
 
 pydantic_ai = pytest.importorskip("pydantic_ai")
 
@@ -62,6 +69,55 @@ def _fake_model(output_text: str):
             )
 
     return _FakeModel()
+
+
+def _tool_then_final_model(tool_name: str, tool_args: dict, final_text: str):
+    """Fake Model: emit one tool call, then a final text answer."""
+    from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _ToolCallingModel(Model):
+        def __init__(self):
+            self.step = 0
+
+        @property
+        def model_name(self) -> str:
+            return "tool-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.step += 1
+            if self.step == 1:
+                return ModelResponse(
+                    parts=[ToolCallPart(tool_name=tool_name, args=tool_args, tool_call_id="c1")],
+                    usage=RequestUsage(input_tokens=2, output_tokens=1),
+                    model_name=self.model_name,
+                )
+            return ModelResponse(
+                parts=[TextPart(content=final_text)],
+                usage=RequestUsage(input_tokens=2, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _ToolCallingModel()
+
+
+def _echo_registry() -> ToolRegistry:
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="echo",
+            description="Echoes the message",
+            parameters=[ToolParameter(name="message", type="string", description="Message")],
+            handler=lambda message: {"echo": message},
+            policy=ToolPolicy.declared(read_only=True, side_effects=[], permissions=["test:read"]),
+        )
+    )
+    return registry
 
 
 def _run_context(prompt: str) -> ExecutionContext:
@@ -140,6 +196,68 @@ def test_name_is_experimental_and_non_default():
 # ---------------------------------------------------------------------------
 # Message conversion (deterministic, no model)
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# BoundToolSession -> PydanticAI toolset bridge
+# ---------------------------------------------------------------------------
+
+
+def test_tool_call_routes_through_bound_session():
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-tool-1",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "buy"}'),
+        tool_session=session,
+    )
+    handle = adapter.execute(_run_context("Analyze 600519"))
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert session.dispatched_calls == 1  # dispatched through the fail-closed gate
+    assert handle.result.dashboard == {"signal": "buy"}
+
+
+def test_gate_rejection_is_fail_closed_at_dispatch():
+    # 'echo' is exposed (allowlisted) but the session lacks its required
+    # permission -> execute() must reject at the gate without dispatching,
+    # returning the shared error contract; the model then finalizes.
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-tool-2",
+        allowed_tools=["echo"],
+        granted_permissions=[],  # missing 'test:read'
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_final_model("echo", {"message": "hi"}, '{"signal": "hold"}'),
+        tool_session=session,
+    )
+    handle = adapter.execute(_run_context("Analyze 600519"))
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert session.dispatched_calls == 0  # rejection never counts as a dispatch
+    assert handle.result.dashboard == {"signal": "hold"}
+
+
+def test_toolset_exposes_only_allowed_tools():
+    from src.agent.runtime.pydantic_ai_toolset import build_bound_session_toolset
+
+    registry = _echo_registry()
+    registry.register(
+        ToolDefinition(
+            name="secret",
+            description="hidden",
+            parameters=[],
+            handler=lambda: {"x": 1},
+        )
+    )
+    session = BoundToolSession(registry, execution_id="ex-tool-3", allowed_tools=["echo"])
+    toolset = build_bound_session_toolset(session)
+    tool_names = {t.name for t in toolset.tools.values()}
+    assert tool_names == {"echo"}
 
 
 def test_message_conversion_maps_text_parts_only():

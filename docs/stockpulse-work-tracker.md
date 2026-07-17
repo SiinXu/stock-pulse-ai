@@ -21,7 +21,7 @@
 | AR-PY-01 | Runtime Contract + Native Adapter | **In progress(实现完成,待合入)** | `src/agent/runtime/`(contract + native adapter)+ `tests/agent/runtime/`(29 tests)+ `build_agent_runtime` 工厂;replay/executor/chat 回归绿;待 PR 合入后转 Done |
 | AR-PY-02 | BoundToolSession | **In progress(实现完成,待合入)** | `src/agent/runtime/tool_session.py` + `tool_surface.py` 共享错误结构提取 + 23 项 fail-closed 测试;replay 45 项零修改通过;native runner 接线按计划留待 AR-PY-03 |
 | AR-PY-03 | Lifecycle / typed events / 真实取消 | **In progress(实现完成,待合入)** | `src/agent/runtime/events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);runner/orchestrator/executor/base_agent 协作取消检查点;SSE endpoint 经 `to_public_sse_event` 单一降级点 + 断连 `request_cancel`;chat_context/native_adapter 收敛;29 项新测试;replay 45 项与冻结 SSE 测试零修改绿;native runner 工具路径仍不改线(留待 AR-PY-04) |
-| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **In progress(首片实现,待合入)** | Spike 完成(隔离 venv 实测):选定**方案 B**(自定义 `Model` 包裹 `LLMToolAdapter`);依赖精化为 **`pydantic-ai-slim==2.12.0`**(避开 openai extra 的 `tiktoken>=0.12` 与 StockPulse #537 `<0.12` 冲突);`src/agent/runtime/pydantic_ai_adapter.py`(惰性 import,仅 Single Agent run,内部注入点)+ `requirements-pydanticai.txt` 可选依赖 + 9 项测试(依赖缺失路径 + fake model 跑通);未进默认/设置页,Native 零依赖;Spike 报告见 `.claude/reviews/ar-py-04-model-integration-spike.md` |
+| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **In progress(首片实现,待合入)** | Spike 完成(隔离 venv 实测):选定**方案 B**(自定义 `Model` 包裹 `LLMToolAdapter`);依赖精化为 **`pydantic-ai-slim==2.12.0`**(避开 openai extra 的 `tiktoken>=0.12` 与 StockPulse #537 `<0.12` 冲突);`src/agent/runtime/pydantic_ai_adapter.py`(惰性 import,仅 Single Agent run,内部注入点)+ `pydantic_ai_toolset.py`(`BoundToolSession`→PydanticAI `Tool.from_schema` 单一工具桥接,经 `execute()` fail-closed 分发)+ `requirements-pydanticai.txt` 可选依赖 + 12 项测试(依赖缺失路径、fake model 跑通、工具调用经 fail-closed 门、gate 拒绝、仅暴露 allowlist 工具);未进默认/设置页,Native 零依赖;Spike 报告见 `.claude/reviews/ar-py-04-model-integration-spike.md` |
 | AR-PY-05 | Conformance / benchmark / 决策门禁 | Blocked | 前置:AR-PY-04 合入 |
 | AR-PY-06 | 有限产品化(条件阶段) | Blocked | 前置:AR-PY-05 通过 + 维护者再批准(审批点 6/7) |
 
@@ -55,3 +55,4 @@
 | 2026-07-17 | AR-PY-02 实现完成(BoundToolSession fail-closed 会话 + 23 项新测试);状态 -> In progress(待合入) |
 | 2026-07-17 | AR-PY-03 实现完成(versioned events + late-write fence + 协作取消 + UsageRecorder/classify 收敛 + SSE 单一降级点 + 29 项新测试);状态 -> In progress(待合入) |
 | 2026-07-17 | AR-PY-04 Spike 完成并定方案 B(维护者裁决审批点 3);实测 pydantic-ai-slim 绕开 tiktoken #537 冲突;首片实验 Adapter + 可选依赖 + 9 项测试落地;状态 -> In progress(首片,待合入) |
+| 2026-07-17 | AR-PY-04 次片:BoundToolSession→PydanticAI 工具桥接(Tool.from_schema,经 execute() fail-closed 分发);测试增至 12 项;runtime 全套 93 项绿 |
