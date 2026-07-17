@@ -15,13 +15,13 @@ Each migration has these stable properties:
 | `id` | Globally unique, strictly increasing, and immutable after release |
 | `description` | Stable English diagnostic text |
 | `checksum` | Deterministic SHA-256 of the complete normalized migration module source |
-| `upgrade` | Synchronous upgrade function accepting a SQLAlchemy `Connection` |
+| `upgrade` | Synchronous upgrade callable accepting a SQLAlchemy `Connection` and returning `None` |
 
 `src.migrations.registry` is the only source of truth for execution order. The runner does not use filesystem traversal order and does not infer upgrade functions from filenames. Repeated imports must produce the same IDs, order, and checksums.
 
 Production migrations use `Migration.from_source_file()` so the checksum covers the complete module containing the real `upgrade`, helper functions, and constants. Normalization changes only CRLF/CR physical line endings to LF; every other character, including semantic whitespace inside strings and the final file newline, remains covered. Absolute paths never enter the hash. A released migration must never be edited, reordered, or deleted. Add a migration with a higher ID whenever schema or data behavior must change. Editing an applied migration causes checksum verification to fail and the application to fail closed.
 
-Production migrations are reviewed, trusted code shipped with the repository. They are not user scripts, plugins, or remote payloads. The runner statically checks the Python AST of source-bound production migrations and rejects direct access to the underlying DBAPI connection and known transaction-control calls. Runtime guards also block public SQLAlchemy transaction APIs and SQLite transaction or savepoint opcodes. These checks are defense in depth against mistakes and regressions, not a Python security sandbox, and they cannot make untrusted migration code safe to execute. Every new migration still requires source review and complete tests; never load upgrade code dynamically from configuration, a database, or the network.
+Production migrations are reviewed, trusted code shipped with the repository. They are not user scripts, plugins, or remote payloads. Migration registration recursively checks `inspect.unwrap` wrappers, `functools.partial` targets, and callable objects, rejecting coroutine, generator, and async-generator functions as well as wrapper cycles. A `contextmanager` or `asynccontextmanager` therefore cannot hide a lazy upgrade. The runner statically checks the Python AST of source-bound production migrations and rejects direct access to the underlying DBAPI connection and known transaction-control calls. Runtime guards also block public SQLAlchemy transaction APIs and SQLite transaction or savepoint opcodes. These checks are defense in depth against mistakes and regressions, not a Python security sandbox, and they cannot make untrusted migration code safe to execute. Every new migration still requires source review and complete tests; never load upgrade code dynamically from configuration, a database, or the network.
 
 ## Applied Registry
 
@@ -59,6 +59,7 @@ The general `/api/health` endpoint is not currently a database readiness probe, 
 
 - SQLite initialization first uses `BEGIN IMMEDIATE` to serialize `create_all + _ensure_* + baseline`. Each formal migration then obtains its own database-level write lock and reuses the application's existing busy timeout contract.
 - Each migration commits independently. Its DDL or DML and applied row share one transaction.
+- An `upgrade` must execute synchronously and return `None`. Registration rejects known lazy functions and wrapper cycles. Any non-`None` runtime return fails closed with `migration_upgrade_invalid_return`. The runner first closes a natively closeable coroutine or generator and then rolls back the current transaction, so DDL or DML performed before the invalid return and the applied row are not committed.
 - The runner exclusively owns transaction control. An `upgrade` must not call `begin`, `commit`, `rollback`, or `close`, or access the underlying DBAPI transaction. Public SQLAlchemy controls are blocked, and a SQLite authorizer rejects transaction or savepoint opcodes issued through explicit SQL or the underlying DBAPI. Before calling `upgrade`, the runner creates a random savepoint as a marker for the original transaction. After `upgrade` returns, it reinstalls the authorizer, confirms that the DBAPI transaction remains active, and releases that marker before writing the applied row. Clearing the authorizer and committing or rolling back destroys the marker, so the runner refuses to record success even if the migration opens a replacement transaction. Because detection follows the prohibited call, it guarantees only that no applied row is written; it cannot undo database state already committed around the guard.
 - Later migrations do not run after the first failure.
 - When two processes start together, the second process waits for the write lock and then reloads the applied registry. The same upgrade does not run twice.
@@ -162,7 +163,7 @@ In addition to importing `src.migrations.registry`, calling `get_migrations()`, 
 
 1. Add a stable ID higher than the current target under `src/migrations/versions/`.
 2. Use a stable English description, and do not let business configuration change the schema shape.
-3. Keep `upgrade` limited to this migration's DDL or DML. Do not begin, commit, roll back, close, or access the underlying DBAPI transaction, and make sure the source-bound guard passes. Do not treat the guard as a sandbox for untrusted migrations.
+3. Use a synchronous, non-generator `upgrade` callable that explicitly or implicitly returns `None`, and keep it limited to this migration's DDL or DML. Do not begin, commit, roll back, close, or access the underlying DBAPI transaction, and make sure the source-bound guard passes. Do not treat the guard as a sandbox for untrusted migrations.
 4. Register it explicitly in strictly increasing order. Do not use directory auto-discovery.
 5. Add fresh, historical, repeat, failure and recovery, checksum, and concurrency tests.
 6. Pass the Desktop package probe, Docker legacy-volume startup and restart smoke, and complete backend gate before release.

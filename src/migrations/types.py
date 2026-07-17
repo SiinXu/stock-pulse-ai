@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from functools import partial
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import re
@@ -45,6 +47,50 @@ _TRANSACTION_CONTROL_SOURCE_ATTRIBUTES = frozenset(
         "set_authorizer",
     }
 )
+
+
+def _is_lazy_upgrade_callable(upgrade: MigrationUpgrade) -> bool:
+    """Return whether registration cannot prove immediate synchronous execution."""
+    checked = set()
+    active = set()
+
+    def visit(candidate) -> bool:
+        candidate_key = id(candidate)
+        if candidate_key in active:
+            return True
+        if candidate_key in checked:
+            return False
+
+        active.add(candidate_key)
+        try:
+            try:
+                unwrapped = inspect.unwrap(candidate)
+            except ValueError:
+                return True
+
+            if any(
+                inspect.iscoroutinefunction(current)
+                or inspect.isasyncgenfunction(current)
+                or inspect.isgeneratorfunction(current)
+                for current in (candidate, unwrapped)
+            ):
+                return True
+
+            dependencies = []
+            if unwrapped is not candidate:
+                dependencies.append(unwrapped)
+            if isinstance(candidate, partial):
+                dependencies.append(candidate.func)
+            elif not inspect.isroutine(candidate):
+                call = getattr(type(candidate), "__call__", None)
+                if call is not None:
+                    dependencies.append(call)
+            return any(visit(dependency) for dependency in dependencies)
+        finally:
+            active.remove(candidate_key)
+            checked.add(candidate_key)
+
+    return visit(upgrade)
 
 
 def normalize_checksum_source(source: str) -> str:
@@ -270,6 +316,8 @@ class Migration:
             raise ValueError("Migration description exceeds 255 characters")
         if not callable(self.upgrade):
             raise TypeError("Migration upgrade must be callable")
+        if _is_lazy_upgrade_callable(self.upgrade):
+            raise TypeError("Migration upgrade must be synchronous")
         checksum = calculate_checksum(
             migration_id=self.id,
             description=self.description,

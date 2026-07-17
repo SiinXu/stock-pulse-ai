@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager, contextmanager
+from functools import partial, wraps
+import gc
 import hashlib
 import importlib
 import json
@@ -12,6 +15,7 @@ import sqlite3
 import threading
 import time
 from typing import Callable, Iterable
+import warnings
 
 import pytest
 from sqlalchemy import create_engine, inspect
@@ -75,6 +79,43 @@ def _reset_database_singletons() -> Iterable[None]:
 
 def _no_op_upgrade(_connection: Connection) -> None:
     return None
+
+
+async def _async_no_op_upgrade(_connection: Connection) -> None:
+    return None
+
+
+async def _async_generator_no_op_upgrade(_connection: Connection):
+    yield None
+
+
+def _generator_no_op_upgrade(_connection: Connection):
+    yield None
+
+
+@asynccontextmanager
+async def _async_contextmanager_upgrade(_connection: Connection):
+    yield None
+
+
+@contextmanager
+def _contextmanager_upgrade(_connection: Connection):
+    yield None
+
+
+class _AsyncCallableUpgrade:
+    async def __call__(self, _connection: Connection) -> None:
+        return None
+
+
+class _AsyncGeneratorCallableUpgrade:
+    async def __call__(self, _connection: Connection):
+        yield None
+
+
+class _GeneratorCallableUpgrade:
+    def __call__(self, _connection: Connection):
+        yield None
 
 
 def _custom_migration(
@@ -488,6 +529,104 @@ def test_source_bound_migration_rejects_a_different_module_file() -> None:
             upgrade=_no_op_upgrade,
             source_file=REGISTRY_METADATA_MIGRATION.upgrade.__code__.co_filename,
         )
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        "async def upgrade(connection):\n    return None\n",
+        "async def upgrade(connection):\n    yield None\n",
+        "def upgrade(connection):\n    yield None\n",
+        (
+            "from contextlib import asynccontextmanager\n\n"
+            "@asynccontextmanager\n"
+            "async def upgrade(connection):\n"
+            "    yield None\n"
+        ),
+        (
+            "from contextlib import contextmanager\n\n"
+            "@contextmanager\n"
+            "def upgrade(connection):\n"
+            "    yield None\n"
+        ),
+    ),
+    ids=(
+        "coroutine",
+        "async-generator",
+        "generator",
+        "async-contextmanager",
+        "contextmanager",
+    ),
+)
+def test_source_bound_migration_rejects_lazy_upgrade(
+    tmp_path: Path,
+    source: str,
+) -> None:
+    with pytest.raises(TypeError, match="upgrade must be synchronous"):
+        _source_bound_migration_from_source(tmp_path, source)
+
+
+@pytest.mark.parametrize(
+    "upgrade",
+    (
+        _async_no_op_upgrade,
+        partial(_async_no_op_upgrade),
+        _AsyncCallableUpgrade(),
+        partial(_AsyncCallableUpgrade()),
+        _async_generator_no_op_upgrade,
+        partial(_async_generator_no_op_upgrade),
+        _AsyncGeneratorCallableUpgrade(),
+        partial(_AsyncGeneratorCallableUpgrade()),
+        _generator_no_op_upgrade,
+        partial(_generator_no_op_upgrade),
+        _GeneratorCallableUpgrade(),
+        partial(_GeneratorCallableUpgrade()),
+        _async_contextmanager_upgrade,
+        _contextmanager_upgrade,
+    ),
+    ids=(
+        "async-function",
+        "partial-async-function",
+        "async-callable-object",
+        "partial-async-callable-object",
+        "async-generator-function",
+        "partial-async-generator-function",
+        "async-generator-callable-object",
+        "partial-async-generator-callable-object",
+        "generator-function",
+        "partial-generator-function",
+        "generator-callable-object",
+        "partial-generator-callable-object",
+        "async-contextmanager",
+        "contextmanager",
+    ),
+)
+def test_migration_registration_rejects_lazy_callable(upgrade) -> None:
+    with pytest.raises(TypeError, match="upgrade must be synchronous"):
+        _custom_migration(1, "lazy_registration", upgrade=upgrade)
+
+
+def test_migration_registration_rejects_wrapped_lazy_chain() -> None:
+    @wraps(_generator_no_op_upgrade)
+    def middle(_connection: Connection) -> None:
+        return None
+
+    @wraps(middle)
+    def outer(_connection: Connection) -> None:
+        return None
+
+    with pytest.raises(TypeError, match="upgrade must be synchronous"):
+        _custom_migration(1, "wrapped_lazy_registration", upgrade=outer)
+
+
+def test_migration_registration_rejects_wrapped_cycle() -> None:
+    def cyclic_upgrade(_connection: Connection) -> None:
+        return None
+
+    cyclic_upgrade.__wrapped__ = cyclic_upgrade
+
+    with pytest.raises(TypeError, match="upgrade must be synchronous"):
+        _custom_migration(1, "cyclic_registration", upgrade=cyclic_upgrade)
 
 
 @pytest.mark.parametrize(
@@ -1377,6 +1516,78 @@ def test_failure_before_ddl_records_nothing(tmp_path: Path) -> None:
     assert result.failed_migration_id == migration.id
     assert _applied_ids(database._engine) == before_ids
     assert migration.id not in _applied_ids(database._engine)
+
+
+@pytest.mark.parametrize(
+    "invalid_kind",
+    (
+        "coroutine",
+        "async-generator",
+        "generator",
+        "async-contextmanager",
+        "contextmanager",
+        "non-none",
+    ),
+)
+def test_invalid_upgrade_return_rolls_back_ddl_dml_without_applied_row_or_warning(
+    tmp_path: Path,
+    invalid_kind: str,
+) -> None:
+    db_path = tmp_path / f"{invalid_kind}-upgrade.sqlite"
+    database = DatabaseManager(db_url=_database_url(db_path))
+    table_name = f"migration_{invalid_kind.replace('-', '_')}_upgrade_probe"
+
+    def return_invalid_result(connection: Connection):
+        connection.exec_driver_sql(
+            f"CREATE TABLE {table_name} (id INTEGER PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            f"INSERT INTO {table_name} (id, value) VALUES (1, 'must-roll-back')"
+        )
+
+        async def coroutine_upgrade() -> None:
+            return None
+
+        async def async_generator_upgrade():
+            yield None
+
+        def generator_upgrade():
+            yield None
+
+        if invalid_kind == "coroutine":
+            return coroutine_upgrade()
+        if invalid_kind == "async-generator":
+            return async_generator_upgrade()
+        if invalid_kind == "generator":
+            return generator_upgrade()
+        if invalid_kind == "async-contextmanager":
+            return _async_contextmanager_upgrade(connection)
+        if invalid_kind == "contextmanager":
+            return _contextmanager_upgrade(connection)
+        return "unexpected return value"
+
+    migration = _custom_migration(
+        1,
+        f"{invalid_kind.replace('-', '_')}_upgrade",
+        upgrade=return_invalid_result,
+    )
+    before_ids = _applied_ids(database._engine)
+
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        warnings.simplefilter("always", RuntimeWarning)
+        result = _runner_with(migration).apply_pending(database._engine)
+        gc.collect()
+
+    assert result.success is False
+    assert result.failure_code == "migration_upgrade_invalid_return"
+    assert result.failed_migration_id == migration.id
+    assert _table_exists(database._engine, table_name) is False
+    assert _applied_ids(database._engine) == before_ids
+    assert not [
+        warning
+        for warning in caught_warnings
+        if issubclass(warning.category, RuntimeWarning)
+    ]
 
 
 def test_failure_after_real_ddl_and_dml_rolls_back_everything(tmp_path: Path) -> None:

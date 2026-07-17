@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import inspect
 import logging
 import secrets
 import sqlite3
@@ -248,7 +249,23 @@ class MigrationRunner:
 
                 try:
                     with self._guard_upgrade_transaction(connection, migration.id):
-                        migration.upgrade(connection)
+                        upgrade_result = migration.upgrade(connection)
+                        if upgrade_result is not None:
+                            cleanup_error = None
+                            if inspect.iscoroutine(upgrade_result) or inspect.isgenerator(
+                                upgrade_result
+                            ):
+                                try:
+                                    upgrade_result.close()
+                                except Exception as exc:
+                                    cleanup_error = exc
+                            invalid_return = MigrationError(
+                                "migration_upgrade_invalid_return",
+                                migration.id,
+                            )
+                            if cleanup_error is not None:
+                                raise invalid_return from cleanup_error
+                            raise invalid_return
                 except MigrationError:
                     raise
                 except Exception as exc:
