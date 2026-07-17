@@ -1,6 +1,29 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomeStockWorkspace } from '../HomeStockWorkspace';
+import type { HomeWorkspaceTab } from '../HomeStockWorkspace';
+
+const buildProps = (activeTab: HomeWorkspaceTab, onTabChange = vi.fn()) => ({
+  activeTab,
+  onTabChange,
+  watchlistRows: [],
+  watchlistLoading: false,
+  watchlistActioning: false,
+  watchlistMessage: null,
+  onAddToWatchlist: vi.fn(async () => undefined),
+  onRemoveFromWatchlist: vi.fn(async () => undefined),
+  onRefreshWatchlist: vi.fn(async () => undefined),
+  onAnalyzeWatchlist: vi.fn(async () => undefined),
+  isBatchAnalyzing: false,
+  batchStatus: null,
+  todayItems: [],
+  isLoadingTodayItems: false,
+  todayLoadError: false,
+  watchlistAnalyzedTodayCount: 0,
+  historyItems: [],
+  isLoadingHistory: false,
+  onHistoryItemClick: vi.fn(),
+});
 
 describe('HomeStockWorkspace', () => {
   it('keeps add and remove icon actions at least 44px square', () => {
@@ -28,7 +51,7 @@ describe('HomeStockWorkspace', () => {
       />,
     );
 
-    for (const tab of screen.getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'))) {
+    for (const tab of screen.getAllByRole('tab')) {
       expect(tab).toHaveClass('h-11');
     }
     expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveClass('h-11');
@@ -66,5 +89,45 @@ describe('HomeStockWorkspace', () => {
     expect(addButton).toHaveAttribute('aria-busy', 'true');
     expect(addButton.textContent).toBe('');
     expect(addButton.querySelector('svg.animate-spin')).toBeInTheDocument();
+  });
+
+  it.each<HomeWorkspaceTab>(['history', 'watchlist', 'today'])(
+    'keeps the tablist outside the switching panel on the %s tab',
+    (activeTab) => {
+      render(<HomeStockWorkspace {...buildProps(activeTab)} />);
+
+      const tablist = screen.getByRole('tablist', { name: '工作台视图切换' });
+      const tabs = screen.getAllByRole('tab');
+      expect(tabs).toHaveLength(3);
+
+      const selected = screen.getByRole('tab', { selected: true });
+      const panel = screen.getByRole('tabpanel');
+      expect(panel).toHaveAttribute('aria-labelledby', selected.id);
+      expect(tabs.every((tab) => tab.getAttribute('aria-controls') === panel.id)).toBe(true);
+
+      // The unified shell: tab bar and panel are siblings, so the tab bar
+      // keeps the same position/size no matter which tab renders.
+      expect(tablist.parentElement).toBe(panel.parentElement);
+      expect(panel.contains(tablist)).toBe(false);
+    },
+  );
+
+  it('moves selection with arrow keys and keeps a roving tabindex', () => {
+    const onTabChange = vi.fn();
+    render(<HomeStockWorkspace {...buildProps('history', onTabChange)} />);
+
+    const [historyTab, watchlistTab, todayTab] = screen.getAllByRole('tab');
+    expect(historyTab).toHaveAttribute('tabindex', '0');
+    expect(watchlistTab).toHaveAttribute('tabindex', '-1');
+    expect(todayTab).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.keyDown(historyTab, { key: 'ArrowRight' });
+    expect(onTabChange).toHaveBeenCalledWith('watchlist');
+
+    fireEvent.keyDown(historyTab, { key: 'End' });
+    expect(onTabChange).toHaveBeenCalledWith('today');
+
+    fireEvent.keyDown(historyTab, { key: 'ArrowLeft' });
+    expect(onTabChange).toHaveBeenCalledWith('today');
   });
 });

@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web 侧栏搜索框移除误导性的 `/` 快捷键提示（此前并无全局 `/` 监听），避免暗示不存在的键盘快捷键。
+- [修复] Web 登录深链不再丢失：已登录用户访问带 `?redirect=` 的 `/login`、或登录成功后，都会按 `?redirect=` 返回原页面而非首页；redirect 仅接受同源绝对路径，外部 URL、协议相对与反斜杠变体一律回退首页。
+- [改进] Web 剩余按钮观感控件统一为胶囊形（设置帮助弹窗文档链接、持仓 CSV 文件选择、首页通知勾选 chip），与全站按钮形状规范一致。
+- [修复] Web 页面容器与回测页不再在应用外壳的 `main` 地标内嵌套第二个 `main`，回测页补充屏幕阅读器可见的 h1 标题，页面地标语义唯一。
+- [修复] Web 设置页文本/路径类输入框改为填满 240px 控件列，数值输入保持紧凑宽度，日志目录等长值不再被裁切到约 170px。
+- [修复] Web 设置页定时任务启用改为统一开关控件（44px 命中区），定时时间输入改为固定 24 小时制文本输入：部分输入保持本地草稿不写入配置，失焦时自动补全（如 `9:5` → `09:05`）或还原无效值。
+- [修复] Web 设置页与模型渠道编辑器的密码类输入框统一包裹在 `form` 中，消除浏览器关于表单外密码框的告警。
+- [修复] 首页侧栏「历史/自选/今日」标签栏统一到共享容器中，切换视图时标签栏不再位移；标签栏改为标准 tablist/tab 语义并支持方向键与 Home/End 键切换。
+- [改进] Web 设置页多选类字段（大盘复盘市场、通知路由渠道等）从平铺 checkbox 改为下拉多选控件，支持搜索、已选摘要与未知存量值保留。
+- [改进] Web 通知路由（报告/告警/系统错误渠道）下拉选项只展示已配置成功的通知渠道；未配置任何渠道时展示空态引导并可一键跳转渠道配置。
+- [改进] `REALTIME_SOURCE_PRIORITY` 改为保序多选下拉：按选择顺序决定数据源优先级，后端 Schema 提供候选项但不强制 allowed_values，历史别名与自定义源继续兼容。
 - [测试] 新增 Agent Runtime characterization 回放数据集与兼容性门禁：36 个 fixture（24 个 A/HK/US 财务场景 + 12 个 ModelRef/fallback/工具范围/超时/取消竞态/畸形输出契约场景）经严格 transcript 回放冻结当前 Native runtime 行为，`tests/test_agent_runtime_compatibility.py` 校验回放期望、manifest 覆盖矩阵与工厂契约（模型路由不可变、数值回退、ToolRegistry 共享、SkillManager 克隆与失效、`build_executor` 别名、Risk(Intel) 输入契约）。
 - [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
 - [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。

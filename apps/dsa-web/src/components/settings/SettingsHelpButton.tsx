@@ -194,7 +194,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
               <div className="flex flex-wrap gap-2">
                 {docs.map((doc) => (
                   <a
-                    className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border border-border/70 bg-background/60 px-3 py-2 text-xs text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
                     href={doc.href}
                     key={`${doc.label}-${doc.href}`}
                     rel="noreferrer"

@@ -28,6 +28,15 @@ const zh = {
   sourceLegacy: 'Legacy Provider',
   configModeIssue: '请求的配置来源 {mode} 尚未配置。',
   unknownConfigIssue: '模型配置来源存在需要处理的问题。',
+  selectOptions: '选择选项',
+  selectedOptions: '已选 {selected} / {total}',
+  removeOption: '移除 {option}',
+  searchOptions: '搜索选项',
+  searchOptionsPlaceholder: '搜索…',
+  availableOptions: '可选项',
+  noMatchingOptions: '无匹配选项',
+  orderedHint: '按选择顺序决定优先级，取消后重新勾选可调整顺序',
+  priorityPosition: '优先级 {position}',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -58,6 +67,15 @@ const en: Record<keyof typeof zh, string> = {
   sourceLegacy: 'Legacy provider keys',
   configModeIssue: 'The requested {mode} configuration source is not configured.',
   unknownConfigIssue: 'The model configuration source needs attention.',
+  selectOptions: 'Select options',
+  selectedOptions: '{selected} of {total} selected',
+  removeOption: 'Remove {option}',
+  searchOptions: 'Search options',
+  searchOptionsPlaceholder: 'Search…',
+  availableOptions: 'Available options',
+  noMatchingOptions: 'No matching options',
+  orderedHint: 'Selection order sets priority; deselect and reselect to reorder',
+  priorityPosition: 'Priority {position}',
 };
 
 export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
