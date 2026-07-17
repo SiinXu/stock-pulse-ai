@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
+- [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。
+- [改进] Migration Runner 只向 upgrade 提供受限且仅在同步调用期间有效的 SQL execution capability；返回或抛错时先拒绝新调用和排队调用，等待已进入 driver path 的语句在同一事务内完成并物化结果后再撤销连接租约；语句失败与禁用能力请求使用不可清除 latch，migration 捕获异常也不能提交；`execute` 只接受精确 `sqlalchemy.text()` 的单次 SQL 快照，`exec_driver_sql` 只接受内建字符串，任意 executable、实例覆写回调和并发 statement mutation 都不能获得真实 Connection；事务控制 SQL（含注释、空语句或 BOM 前缀）在进入 Connection 前 fail closed，调用方 SQLite authorizer 保持不变，DDL/DML 与 applied row 仍由 runner 独占同一事务，source guard、随机 savepoint 与 transaction 状态检查保留为纵深防御而非 Python 安全沙箱。
+- [修复] Migration Runner 递归拒绝 coroutine/generator/async-generator、context-manager wrapper 和循环 upgrade callable，并要求运行时严格返回 `None`；非法返回会关闭可同步关闭的 coroutine/generator 并回滚 DDL/DML，避免未完整执行的 migration 被错误记录为 applied 或产生未 await warning。
+- [测试] Docker CI 将受支持的 legacy SQLite fixture 作为 `/app/data` volume 启动真实 `DatabaseManager`，校验业务 canary、migration checksum 和 target version，并复用同一 volume 二次启动验证幂等。
 - [修复] Web 可搜索选择器在移动端底部弹窗中会根据可用空间向上展开并限制在视口内，避免模型服务选择列表超出屏幕后无法操作。
 - [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
 - [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。

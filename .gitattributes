@@ -3,6 +3,9 @@
 # 适用于 append-only 的 changelog 文件。
 docs/CHANGELOG.md merge=union
 
+# Fixed SQLite release dumps preserve the exact exported DDL used by schema digests.
+tests/fixtures/schema_migrations/*.sql whitespace=-trailing-space
+
 # Documentation image/design assets are binary. Keep GitHub review diffs from
 # trying to decode moved binary files as UTF-8.
 sources/**/*.ai binary

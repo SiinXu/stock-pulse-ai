@@ -93,6 +93,8 @@ Data is automatically saved to host directories:
 - `./logs/` - Log files
 - `./reports/` - Analysis reports
 
+When a new image first initializes `DatabaseManager`, it runs ordered database migrations synchronously. Fresh databases and supported existing `./data/` volumes use the same registry. Registry-free `v3.0.0`, `v3.4.0`, and `v3.20.0` databases are identified by fixed release profiles; `v3.21.0` and `v3.26.3` are identified by their legacy baseline. A failed migration receives no applied row and blocks database-dependent paths. The general health endpoint is not a database-readiness probe. Before upgrading an image, stop writers and back up or snapshot `./data/`. The `status` and `verify` commands inspect an existing volume through a SQLite read-only URI plus `query_only`; they neither apply pending migrations nor create a missing database. Application startup still applies synchronously. CI mounts a supported legacy fixture at `/app/data`, uses the image's default entrypoint to run the real startup migration as the dropped-privilege `dsa` user (UID 1000), verifies canaries and checksums, and starts a second container against the same volume to prove idempotency. This smoke uses only an isolated fixture and never a default or real user database. See the [Database Migrations guide](database-migrations_EN.md) for the complete trust boundary and forward-recovery procedures.
+
 ### 6. Permissions
 
 The Docker image startup entrypoint automatically creates and fixes ownership for the mounted `./data`, `./logs`, and `./reports` directories, then drops privileges to the non-root `dsa` user (UID 1000). Normal deployments do not require manual host-side `chown` / `chmod`.

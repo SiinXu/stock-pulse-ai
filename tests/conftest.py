@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import os
 import time
 import threading
 from collections.abc import Awaitable, Callable
@@ -16,10 +17,21 @@ from warnings import warn
 import anyio.to_thread
 import fastapi.testclient
 import httpx
+import pytest
 import starlette.testclient
 from anyio._backends import _asyncio
 
 T = TypeVar("T")
+
+_EXTERNAL_DATABASE_PATH = os.environ.get("DATABASE_PATH")
+
+
+@pytest.fixture(autouse=True)
+def _restore_external_database_path():
+    """Keep a caller-provided test database isolated across test teardown."""
+    yield
+    if _EXTERNAL_DATABASE_PATH is not None:
+        os.environ["DATABASE_PATH"] = _EXTERNAL_DATABASE_PATH
 
 _original_call_soon_threadsafe = asyncio.BaseEventLoop.call_soon_threadsafe
 

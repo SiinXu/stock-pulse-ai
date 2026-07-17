@@ -3515,14 +3515,11 @@ class Config:
         """
         return [issue.message for issue in self.validate_structured()]
     
-    def get_db_url(self) -> str:
-        """
-        获取 SQLAlchemy 数据库连接 URL
-        
-        自动创建数据库目录（如果不存在）
-        """
+    def get_db_url(self, *, create_parent: bool = True) -> str:
+        """Return the configured SQLAlchemy URL, optionally creating its parent."""
         db_path = Path(self.database_path)
-        db_path.parent.mkdir(parents=True, exist_ok=True)
+        if create_parent:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{db_path.absolute()}"
 
 
