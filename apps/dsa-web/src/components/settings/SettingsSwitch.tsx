@@ -36,7 +36,7 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
     data-testid={testId}
     onClick={() => onCheckedChange(!checked)}
     className={cn(
-      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
+      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors',
       disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
     )}
   >

@@ -48,7 +48,7 @@ const PRIMARY_CTA_GRADIENT_PATTERN = /(?<![a-zA-Z0-9_-])(?:-?bg-(?:(?:(?:[a-zA-Z
 const PRIMARY_CTA_SHIMMER_PATTERN = /(?<![a-zA-Z0-9_-])(?:animate-\[[^\]\r\n]*shimmer[^\]\r\n]*\]|\[(?:animation|animation-name):[^\]\r\n]*shimmer[^\]\r\n]*\]|(?:[a-zA-Z0-9_-]*-)?shimmer(?:-[a-zA-Z0-9_-]*)?)(?![a-zA-Z0-9_-])/i;
 const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(|var\(--[\w-]*gradient[\w-]*\))/i;
 const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
-const NON_PILL_RADIUS_PATTERN = /\brounded-(?!full\b)(?:[trblse]{1,2}-)?(?:none|sm|md|lg|xl|2xl|3xl|\[[^\]]+\])/g;
+const PILL_RADIUS_CLASS_PATTERN = /\brounded-(?:[trblse]{1,2}-)?full\b/g;
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
 const MAGIC_PIXEL_SIZE_PATTERN = /\b(?:text|size|[wh]|min-[wh]|max-[wh]|basis)-\[[^\]\r\n]*\d(?:\.\d+)?px[^\]\r\n]*\]/g;
@@ -153,12 +153,12 @@ function selectorTargetsButton(selector: string, buttonClassNames: Set<string>):
   ));
 }
 
-function hasGlobalPillButtonRule(source: string): boolean {
+function hasGlobalNonPillButtonRule(source: string): boolean {
   for (const ruleMatch of source.matchAll(CSS_RULE_PATTERN)) {
     const selectors = ruleMatch[1].split(',').map((selector) => selector.trim());
     if (!selectors.includes('button')) continue;
     const radius = ruleMatch[2].match(CSS_RADIUS_DECLARATION_PATTERN)?.[1];
-    if (radius && isPillRadius(radius)) return true;
+    if (radius && !isPillRadius(radius)) return true;
   }
   return false;
 }
@@ -1408,7 +1408,7 @@ function findProductionDesignViolations(
   for (const buttonMatch of source.matchAll(BUTTON_OPENING_TAG_PATTERN)) {
     const button = buttonMatch[0];
     const buttonIndex = buttonMatch.index ?? 0;
-    for (const radiusMatch of button.matchAll(NON_PILL_RADIUS_PATTERN)) {
+    for (const radiusMatch of button.matchAll(PILL_RADIUS_CLASS_PATTERN)) {
       violations.push({
         file: filename,
         line: lineNumberAt(source, buttonIndex + (radiusMatch.index ?? 0)),
@@ -1424,7 +1424,7 @@ function findProductionDesignViolations(
       const selector = ruleMatch[1];
       if (!selectorTargetsButton(selector, buttonClassNames)) continue;
       const radiusMatch = ruleMatch[2].match(CSS_RADIUS_DECLARATION_PATTERN);
-      if (!radiusMatch || isPillRadius(radiusMatch[1])) continue;
+      if (!radiusMatch || !isPillRadius(radiusMatch[1])) continue;
       const ruleIndex = ruleMatch.index ?? 0;
       const radiusIndex = ruleIndex + ruleMatch[0].indexOf(radiusMatch[0]);
       violations.push({
@@ -1580,16 +1580,16 @@ describe('production design guard', () => {
     expect(Object.keys(productionStyles).sort()).toEqual(productionCssPaths);
   });
 
-  it('self-test detects a non-pill button shape', () => {
-    expect(findProductionDesignViolations('fixture.tsx', productionDesignGuardFixtures.nonPillButton))
-      .toEqual([expect.objectContaining({ rule: 'button-shape', token: 'rounded-lg' })]);
-    expect(findProductionDesignViolations('fixture.css', productionDesignGuardFixtures.nonPillCssButton))
-      .toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 0.9rem' })]);
+  it('self-test detects a pill button shape', () => {
+    expect(findProductionDesignViolations('fixture.tsx', productionDesignGuardFixtures.pillButton))
+      .toEqual([expect.objectContaining({ rule: 'button-shape', token: 'rounded-full' })]);
+    expect(findProductionDesignViolations('fixture.css', productionDesignGuardFixtures.pillCssButton))
+      .toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 9999px' })]);
     expect(findProductionDesignViolations(
       'fixture.css',
-      productionDesignGuardFixtures.mappedNonPillCssButton,
+      productionDesignGuardFixtures.mappedPillCssButton,
       new Set(['session-item']),
-    )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 0.75rem' })]);
+    )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 50%' })]);
   });
 
   it('self-test detects a hardcoded hex colour', () => {
@@ -1601,10 +1601,10 @@ describe('production design guard', () => {
       .toEqual([expect.objectContaining({ rule: 'hardcoded-color', token: 'hsl(0 0% 0% / 0.2)' })]);
   });
 
-  it('keeps native buttons pill-shaped when they have no local radius class', () => {
+  it('keeps native buttons soft-rounded when they have no local radius class', () => {
     const indexStyles = Object.entries(productionSources)
       .find(([filename]) => filename.endsWith('/index.css'))?.[1] ?? '';
-    expect(hasGlobalPillButtonRule(indexStyles)).toBe(true);
+    expect(hasGlobalNonPillButtonRule(indexStyles)).toBe(true);
   });
 
   it('allows index.css theme tokens but rejects hex variables outside theme blocks', () => {

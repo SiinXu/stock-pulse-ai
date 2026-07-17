@@ -1418,7 +1418,7 @@ const HomePage: React.FC = () => {
           <button
             type="button"
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
             aria-label={t('common.closeDrawer')}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -1500,7 +1500,7 @@ const HomePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('home.historyButton')}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1531,7 +1531,7 @@ const HomePage: React.FC = () => {
                     onClick={() => setStrategyMenuOpen((open) => !open)}
                     onKeyDown={handleStrategyButtonKeyDown}
                     disabled={isAnalyzing}
-                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-full px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
+                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-lg px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                   >
                     <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                     <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
@@ -1557,7 +1557,7 @@ const HomePage: React.FC = () => {
                             aria-checked={selected}
                             tabIndex={-1}
                             onClick={() => selectStrategy(option.id)}
-                            className="flex min-h-11 w-full items-start gap-2 rounded-full px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                            className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
                           >
                             <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
                             <span className="min-w-0">
@@ -1638,7 +1638,7 @@ const HomePage: React.FC = () => {
                     type="button"
                     onClick={dismissDuplicateBanner}
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>

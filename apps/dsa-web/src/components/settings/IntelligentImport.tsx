@@ -426,7 +426,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
                     </Badge>
                     <button
                       type="button"
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-text transition-colors hover:text-foreground"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:text-foreground"
                       onClick={() => removeItem(it.id)}
                       disabled={disabled}
                     >

@@ -800,7 +800,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
-              className="mt-1.5 flex min-h-11 min-w-11 max-w-full flex-wrap items-center gap-1 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+              className="mt-1.5 flex min-h-11 min-w-11 max-w-full flex-wrap items-center gap-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
               data-testid={`connection-models-${channel.id}`}
             >
               {selectedModels.slice(0, 4).map((model) => (
@@ -821,7 +821,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
               disabled={busy}
-              className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-full text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
+              className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-lg text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
             >
               {text.noModels}
             </button>
@@ -875,7 +875,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   type="button"
                   role="menuitem"
                   disabled={!canToggleEnabled}
-                  className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
+                  className="flex min-h-11 w-full items-center rounded-lg px-3 py-1.5 text-left text-xs text-foreground hover:bg-hover"
                   onClick={() => {
                     if (!canToggleEnabled) {
                       return;
@@ -890,7 +890,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   type="button"
                   role="menuitem"
                   disabled={!canRemove}
-                  className="flex min-h-11 w-full items-center rounded-full px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
+                  className="flex min-h-11 w-full items-center rounded-lg px-3 py-1.5 text-left text-xs text-danger hover:bg-hover"
                   onClick={() => {
                     if (!canRemove) {
                       return;
@@ -1827,7 +1827,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       aria-label={formatUiText(text.removeModel, { model })}
                       disabled={modelsAreReadOnly}
                       onClick={() => requestRemoveModel(model)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger"
                     >
                       ×
                     </button>

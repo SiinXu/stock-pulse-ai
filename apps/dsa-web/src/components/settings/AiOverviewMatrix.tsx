@@ -43,7 +43,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
         {onEditRouting ? (
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-full border border-[var(--settings-border)] px-3 py-1.5 text-xs text-secondary-text transition-colors hover:border-foreground hover:text-foreground"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-lg border border-[var(--settings-border)] px-3 py-1.5 text-xs text-secondary-text transition-colors hover:border-foreground hover:text-foreground"
             onClick={onEditRouting}
           >
             {text.editRouting}

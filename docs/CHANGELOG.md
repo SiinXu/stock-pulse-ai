@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
+- [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。
+- [修复] 修复 Web 前端登录状态竞态：过期的 auth status 响应晚到时不再覆盖较新的登录状态，避免登录成功后偶发被弹回登录页。
 - [修复] Web 设置多选下拉改用视口定位并在空间不足时向上展开，避免被设置分组或弹窗的 `overflow` 边界裁切；弹层在窄屏中保留 8px 安全边距。
 - [修复] Web 通知路由严格按运行时完整凭据组判断可用渠道，辅助字段或半套 Telegram、邮件、飞书、Discord、Slack、Pushover、ntfy、Gotify 等配置不再误显示为可路由。
 - [修复] Web 登录 `redirect` 在解析前拒绝 ASCII 控制字符、空格、DEL 与任意反斜杠，并在固定同源基准上二次校验，防止 URL 规范化绕过或登录后跳转失败。

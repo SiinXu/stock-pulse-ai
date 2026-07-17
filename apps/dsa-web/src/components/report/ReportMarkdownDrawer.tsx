@@ -77,7 +77,7 @@ const ReportMarkdownChunkErrorState: React.FC<{
     <button
       type="button"
       onClick={onRequestClose}
-      className="home-surface-button mt-4 min-h-11 min-w-11 rounded-full px-4 py-2 text-sm text-secondary-text"
+      className="home-surface-button mt-4 min-h-11 min-w-11 rounded-lg px-4 py-2 text-sm text-secondary-text"
     >
       {dismissText}
     </button>

@@ -210,7 +210,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           aria-invalid={hasError || undefined}
           aria-describedby={ariaDescribedBy}
           onClick={() => (isOpen ? close(false) : open())}
-          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="shrink-0 text-muted-text">
             {formatUiText(text.selectedOptions, { selected: selected.length, total: entries.length })}
@@ -227,7 +227,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
               disabled={disabled}
               aria-label={formatUiText(text.removeOption, { option: getLabel(value) })}
               onClick={() => toggle(value)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
             >
               <X className="h-3 w-3" aria-hidden="true" />
             </button>
