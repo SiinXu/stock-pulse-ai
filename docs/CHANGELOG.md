@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Agent 流式对话（`/api/v1/agent/chat/stream`）在客户端断连或流提前结束时协作取消后端执行：Agent 循环在每步开始、每次 LLM 调用后与流水线各阶段边界处检查取消意图并及时停止，取消结果记为 cancelled 而非失败，不再写入"分析失败"占位助手消息，也不残留部分 provider trace；SSE 事件线经单一降级点保持逐字节不变。
 - [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
 - [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。
 - [修复] 修复 Web 前端登录状态竞态：过期的 auth status 响应晚到时不再覆盖较新的登录状态，避免登录成功后偶发被弹回登录页。

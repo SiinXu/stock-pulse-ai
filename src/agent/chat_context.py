@@ -26,8 +26,8 @@ from src.agent.provider_trace import (
     strip_trace_metadata,
     trace_model_matches,
 )
-from src.llm.usage import should_persist_usage_telemetry
-from src.storage import get_db, persist_llm_usage
+from src.agent.runtime.lifecycle import get_default_usage_recorder
+from src.storage import get_db
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -334,12 +334,11 @@ def _build_visible_history_state(
             estimated_tokens=estimated_tokens,
         )
         usage = getattr(response, "usage", {}) or {}
-        if should_persist_usage_telemetry(usage):
-            persist_llm_usage(
-                usage,
-                getattr(response, "model", "") or get_effective_agent_primary_model(config) or "unknown",
-                call_type="agent",
-            )
+        get_default_usage_recorder().record(
+            usage,
+            getattr(response, "model", "") or get_effective_agent_primary_model(config) or "unknown",
+            call_type="agent",
+        )
         messages = [build_summary_message(summary_text)] + _to_chat_messages(protected_tail, include_ids=True)
         return VisibleHistoryState(
             messages=messages,

@@ -80,6 +80,8 @@ class OrchestratorResult:
     model: str = ""
     error: Optional[str] = None
     stats: Optional[AgentRunStats] = None
+    cancelled: bool = False
+    timed_out: bool = False
 
 
 class AgentOrchestrator:
@@ -182,6 +184,7 @@ class AgentOrchestrator:
             tool_calls_log=all_tool_calls,
             provider=provider,
             model=model,
+            timed_out=True,
         )
 
     def _build_budget_skip_result(
@@ -228,6 +231,35 @@ class AgentOrchestrator:
             model=", ".join(stats.models_used),
         )
 
+    def _build_cancelled_result(
+        self,
+        stats: AgentRunStats,
+        all_tool_calls: List[Dict[str, Any]],
+        models_used: List[str],
+        elapsed_s: float,
+    ) -> OrchestratorResult:
+        """Build a cancelled result.
+
+        Cancellation must never masquerade as a degraded pseudo-success:
+        no partial dashboard is synthesized and ``success`` stays False so
+        the terminal state classifies as ``CANCELLED`` rather than
+        ``SUCCEEDED``.
+        """
+        stats.total_duration_s = round(elapsed_s, 2)
+        stats.models_used = list(dict.fromkeys(models_used))
+        return OrchestratorResult(
+            success=False,
+            content="",
+            dashboard=None,
+            error="Pipeline cancelled",
+            stats=stats,
+            total_steps=stats.total_stages,
+            total_tokens=stats.total_tokens,
+            tool_calls_log=all_tool_calls,
+            provider=stats.models_used[0] if stats.models_used else "",
+            model=", ".join(stats.models_used),
+            cancelled=True,
+        )
 
     def _prepare_agent(self, agent: Any) -> Any:
         """Apply orchestrator-level runtime settings to a child agent.
@@ -253,8 +285,8 @@ class AgentOrchestrator:
                 agent.max_steps = min(agent.max_steps, self.max_steps)
         return agent
 
-    def _callable_accepts_timeout_kwarg(self, func: Any) -> Optional[bool]:
-        """Return whether a callable accepts ``timeout_seconds`` when inspectable."""
+    def _callable_accepts_kwarg(self, func: Any, param_name: str) -> Optional[bool]:
+        """Return whether a callable accepts ``param_name`` when inspectable."""
         if not callable(func):
             return None
         try:
@@ -262,23 +294,23 @@ class AgentOrchestrator:
         except (TypeError, ValueError):
             return None
 
-        if "timeout_seconds" in signature.parameters:
+        if param_name in signature.parameters:
             return True
         return any(
             param.kind is inspect.Parameter.VAR_KEYWORD
             for param in signature.parameters.values()
         )
 
-    def _agent_run_accepts_timeout(self, run_callable: Any) -> bool:
+    def _agent_run_accepts_kwarg(self, run_callable: Any, param_name: str) -> bool:
         """Best-effort compatibility check for legacy test doubles / custom agents."""
         side_effect = getattr(run_callable, "side_effect", None)
-        accepts_timeout = self._callable_accepts_timeout_kwarg(side_effect)
-        if accepts_timeout is not None:
-            return accepts_timeout
+        accepts = self._callable_accepts_kwarg(side_effect, param_name)
+        if accepts is not None:
+            return accepts
 
-        accepts_timeout = self._callable_accepts_timeout_kwarg(run_callable)
-        if accepts_timeout is not None:
-            return accepts_timeout
+        accepts = self._callable_accepts_kwarg(run_callable, param_name)
+        if accepts is not None:
+            return accepts
 
         return True
 
@@ -288,6 +320,7 @@ class AgentOrchestrator:
         ctx: AgentContext,
         progress_callback: Optional[Callable] = None,
         timeout_seconds: Optional[float] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> StageResult:
         """Run a stage agent while preserving compatibility with older call signatures."""
         # Clamp by per-agent limit when configured.
@@ -307,16 +340,26 @@ class AgentOrchestrator:
         if (
             timeout_seconds is not None
             and timeout_seconds > 0
-            and self._agent_run_accepts_timeout(agent.run)
+            and self._agent_run_accepts_kwarg(agent.run, "timeout_seconds")
         ):
             run_kwargs["timeout_seconds"] = timeout_seconds
+        if (
+            cancelled_check is not None
+            and self._agent_run_accepts_kwarg(agent.run, "cancelled_check")
+        ):
+            run_kwargs["cancelled_check"] = cancelled_check
         return agent.run(ctx, **run_kwargs)
 
     # -----------------------------------------------------------------
     # Public interface (mirrors AgentExecutor)
     # -----------------------------------------------------------------
 
-    def run(self, task: str, context: Optional[Dict[str, Any]] = None) -> "AgentResult":
+    def run(
+        self,
+        task: str,
+        context: Optional[Dict[str, Any]] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
+    ) -> "AgentResult":
         """Run the multi-agent pipeline for a dashboard analysis.
 
         Returns an ``AgentResult`` (same type as ``AgentExecutor.run``).
@@ -325,7 +368,9 @@ class AgentOrchestrator:
 
         ctx = self._build_context(task, context)
         ctx.meta["response_mode"] = "dashboard"
-        orch_result = self._execute_pipeline(ctx, parse_dashboard=True)
+        orch_result = self._execute_pipeline(
+            ctx, parse_dashboard=True, cancelled_check=cancelled_check
+        )
 
         return AgentResult(
             success=orch_result.success,
@@ -337,6 +382,8 @@ class AgentOrchestrator:
             provider=orch_result.provider,
             model=orch_result.model,
             error=orch_result.error,
+            cancelled=orch_result.cancelled,
+            timed_out=orch_result.timed_out,
         )
 
     def chat(
@@ -345,6 +392,7 @@ class AgentOrchestrator:
         session_id: str,
         progress_callback: Optional[Callable] = None,
         context: Optional[Dict[str, Any]] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> "AgentResult":
         """Run the pipeline in chat mode (free-form answer, no dashboard parse).
 
@@ -376,6 +424,7 @@ class AgentOrchestrator:
                 ctx,
                 parse_dashboard=False,
                 progress_callback=progress_callback,
+                cancelled_check=cancelled_check,
             )
         except Exception as exc:
             log_safe_exception(
@@ -396,9 +445,16 @@ class AgentOrchestrator:
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
 
-        # Persist assistant response
+        # Persist assistant response.
+        # A cancelled run is user intent, not an agent failure: skip the
+        # failure sentinel so the cancelled turn leaves no misleading
+        # "analysis failed" assistant message in the visible history.
         if orch_result.success:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
+        elif orch_result.cancelled:
+            logger.info(
+                "Agent orchestrator chat cancelled: session_id=%s", session_id
+            )
         else:
             logger.error(
                 "Agent orchestrator chat failed: session_id=%s diagnostic=%s",
@@ -421,6 +477,8 @@ class AgentOrchestrator:
             provider=orch_result.provider,
             model=orch_result.model,
             error=orch_result.error,
+            cancelled=orch_result.cancelled,
+            timed_out=orch_result.timed_out,
         )
 
     # -----------------------------------------------------------------
@@ -432,6 +490,7 @@ class AgentOrchestrator:
         ctx: AgentContext,
         parse_dashboard: bool = True,
         progress_callback: Optional[Callable] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> OrchestratorResult:
         """Run the agent pipeline according to ``self.mode``."""
         stats = AgentRunStats()
@@ -454,6 +513,16 @@ class AgentOrchestrator:
         while index < len(agents):
             agent = agents[index]
             elapsed_s = time.time() - t0
+
+            # Cancellation wins over timeout / degradation: probe before any
+            # other pre-stage gate so a cancelled run terminates as CANCELLED
+            # rather than masquerading as a degraded timeout pseudo-success.
+            if cancelled_check is not None and cancelled_check():
+                logger.info("[Orchestrator] pipeline cancelled before stage '%s'", agent.agent_name)
+                return self._build_cancelled_result(
+                    stats, all_tool_calls, models_used, elapsed_s
+                )
+
             remaining_budget = timeout_s - elapsed_s if timeout_s else None
             stage_min_budget_s = (
                 _MIN_STAGE_BUDGET_S
@@ -558,6 +627,7 @@ class AgentOrchestrator:
                 ctx,
                 progress_callback=progress_callback,
                 timeout_seconds=remaining_timeout_s,
+                cancelled_check=cancelled_check,
             )
             stats.record_stage(result)
             all_tool_calls.extend(
@@ -573,6 +643,14 @@ class AgentOrchestrator:
                     status=result.status.value,
                     duration=result.duration_s,
                 ))
+
+            # Cancellation wins over the post-stage timeout / degradation
+            # gates below, so a run cancelled mid-stage terminates cleanly.
+            if cancelled_check is not None and cancelled_check():
+                logger.info("[Orchestrator] pipeline cancelled after stage '%s'", agent.agent_name)
+                return self._build_cancelled_result(
+                    stats, all_tool_calls, models_used, elapsed_s
+                )
 
             if timeout_s and elapsed_s >= timeout_s:
                 logger.error("[Orchestrator] pipeline timed out after stage '%s'", agent.agent_name)

@@ -60,6 +60,8 @@ class AgentResult:
     model: str = ""                            # comma-separated models used (supports fallback)
     error: Optional[str] = None
     messages: List[Dict[str, Any]] = field(default_factory=list)
+    cancelled: bool = False
+    timed_out: bool = False
 
 
 # ============================================================
@@ -524,12 +526,19 @@ class AgentExecutor:
         self.max_steps = max_steps
         self.timeout_seconds = timeout_seconds
 
-    def run(self, task: str, context: Optional[Dict[str, Any]] = None) -> AgentResult:
+    def run(
+        self,
+        task: str,
+        context: Optional[Dict[str, Any]] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
+    ) -> AgentResult:
         """Execute the agent loop for a given task.
 
         Args:
             task: The user task / analysis request.
             context: Optional context dict (e.g., {"stock_code": "600519"}).
+            cancelled_check: Optional cooperative-cancellation probe threaded
+                into the shared runner.
 
         Returns:
             AgentResult with parsed dashboard or error.
@@ -567,9 +576,11 @@ class AgentExecutor:
             {"role": "user", "content": self._build_user_message(task, context)},
         ]
 
-        return self._run_loop(messages, tool_decls, parse_dashboard=True)
+        return self._run_loop(
+            messages, tool_decls, parse_dashboard=True, cancelled_check=cancelled_check
+        )
 
-    def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None) -> AgentResult:
+    def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None, cancelled_check: Optional[Callable[[], bool]] = None) -> AgentResult:
         """Execute the agent loop for a free-form chat message.
 
         Args:
@@ -674,6 +685,7 @@ class AgentExecutor:
                 parse_dashboard=False,
                 progress_callback=progress_callback,
                 stock_scope=scope_resolution.stock_scope,
+                cancelled_check=cancelled_check,
             )
         except Exception as exc:
             log_safe_exception(
@@ -694,7 +706,11 @@ class AgentExecutor:
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
 
-        # Persist assistant reply (or error note) for context continuity
+        # Persist assistant reply (or error note) for context continuity.
+        # A cancelled run is user intent, not an agent failure: skip the
+        # failure sentinel and the provider trace so the cancelled turn
+        # leaves no misleading "analysis failed" assistant message and no
+        # late partial trace behind.
         if result.success:
             assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
             self._persist_provider_trace(
@@ -705,6 +721,8 @@ class AgentExecutor:
                 user_message_id=user_message_id,
                 assistant_message_id=assistant_message_id,
             )
+        elif result.cancelled:
+            logger.info("Agent chat cancelled: session_id=%s", session_id)
         else:
             logger.error(
                 "Agent chat failed: session_id=%s diagnostic=%s",
@@ -809,6 +827,7 @@ class AgentExecutor:
         parse_dashboard: bool,
         progress_callback: Optional[Callable] = None,
         stock_scope: Optional[StockScope] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> AgentResult:
         """Delegate to the shared runner and adapt the result.
 
@@ -824,6 +843,7 @@ class AgentExecutor:
             progress_callback=progress_callback,
             max_wall_clock_seconds=self.timeout_seconds,
             stock_scope=stock_scope,
+            cancelled_check=cancelled_check,
         )
 
         model_str = loop_result.model
@@ -841,6 +861,8 @@ class AgentExecutor:
                 model=model_str,
                 error=None if dashboard else "Failed to parse dashboard JSON from agent response",
                 messages=loop_result.messages,
+                cancelled=loop_result.cancelled,
+                timed_out=loop_result.timed_out,
             )
 
         return AgentResult(
@@ -854,6 +876,8 @@ class AgentExecutor:
             model=model_str,
             error=loop_result.error,
             messages=loop_result.messages,
+            cancelled=loop_result.cancelled,
+            timed_out=loop_result.timed_out,
         )
 
     def _build_user_message(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:

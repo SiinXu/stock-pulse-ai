@@ -12,8 +12,11 @@ error contract (same shape as ``ToolSurface`` results), are audited and
 never silently degrade. Results that land after the session was closed
 or cancelled are dropped behind a late-result fence.
 
-The native runner keeps its direct path until AR-PY-03 wires it through
-this session; replay-frozen semantics are therefore untouched here.
+The native runner keeps its direct, replay-frozen tool path: its
+byte-exact behaviour is the characterization gate, so it is deliberately
+*not* rewired through this session. ``BoundToolSession`` is instead the
+tool bridge for external runtime adapters (AR-PY-04+), which have no
+legacy tool path of their own to preserve.
 """
 
 from __future__ import annotations

@@ -38,9 +38,8 @@ from src.agent.tools.execution import (
     serialize_tool_result,
 )
 from src.agent.stock_scope import StockScope
-from src.llm.usage import should_persist_usage_telemetry
+from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
 from src.utils.data_processing import normalize_report_signal_attribution
-from src.storage import persist_llm_usage as _persist_usage
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +96,8 @@ class RunLoopResult:
     error: Optional[str] = None
     # Raw messages list at the end of the loop (callers may want to persist)
     messages: List[Dict[str, Any]] = field(default_factory=list)
+    cancelled: bool = False
+    timed_out: bool = False
 
     @property
     def model(self) -> str:
@@ -278,6 +279,30 @@ def _build_timeout_result(
         models_used=models_used,
         error=f"Agent timed out after {elapsed:.2f}s (limit: {max_wall_clock_seconds:.2f}s)",
         messages=messages,
+        timed_out=True,
+    )
+
+
+def _build_cancelled_result(
+    *,
+    step: int,
+    tool_calls_log: List[Dict[str, Any]],
+    total_tokens: int,
+    provider_used: str,
+    models_used: List[str],
+    messages: List[Dict[str, Any]],
+) -> RunLoopResult:
+    return RunLoopResult(
+        success=False,
+        content="",
+        tool_calls_log=tool_calls_log,
+        total_steps=step,
+        total_tokens=total_tokens,
+        provider=provider_used,
+        models_used=models_used,
+        error="Agent execution cancelled",
+        messages=messages,
+        cancelled=True,
     )
 
 
@@ -326,6 +351,8 @@ def run_agent_loop(
     tool_call_timeout_seconds: Optional[float] = None,
     stock_scope: Optional[StockScope] = None,
     emit_stage_events: bool = True,
+    cancelled_check: Optional[Callable[[], bool]] = None,
+    usage_recorder: Optional[UsageRecorder] = None,
 ) -> RunLoopResult:
     """Execute the ReAct LLM ↔ tool loop.
 
@@ -346,6 +373,12 @@ def run_agent_loop(
         emit_stage_events: Whether to emit the synthetic ``agent_loop``
             stage lifecycle. Orchestrated business stages disable this so
             ``stage_start`` / ``stage_done`` only describe real stages.
+        cancelled_check: Optional cooperative-cancellation probe. Checked at
+            the top of every step and right after each LLM call; when it
+            returns True the loop stops with ``cancelled=True`` before
+            dispatching further tools or LLM calls.
+        usage_recorder: Optional usage-telemetry sink; defaults to the
+            process-wide recorder from the runtime lifecycle layer.
 
     Returns:
         A :class:`RunLoopResult` with the final content, stats, and the
@@ -353,6 +386,7 @@ def run_agent_loop(
     """
     labels = thinking_labels or _THINKING_TOOL_LABELS
     tool_decls = tool_registry.to_openai_tools()
+    recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
 
     start_time = time.time()
     tool_calls_log: List[Dict[str, Any]] = []
@@ -390,6 +424,17 @@ def run_agent_loop(
         )
 
     for step in range(max_steps):
+        if cancelled_check is not None and cancelled_check():
+            logger.info("Agent loop cancelled before step %d", step + 1)
+            return _finish(_build_cancelled_result(
+                step=step,
+                tool_calls_log=tool_calls_log,
+                total_tokens=total_tokens,
+                provider_used=provider_used,
+                models_used=models_used,
+                messages=messages,
+            ))
+
         remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
         timeout_exhausted = remaining_timeout is not None and remaining_timeout <= 0
         budget_guard_triggered = (
@@ -455,8 +500,19 @@ def run_agent_loop(
         if m and m != "error":
             models_used.append(m)
         model_for_usage = m or response.provider
-        if model_for_usage and model_for_usage != "error" and should_persist_usage_telemetry(response.usage):
-            _persist_usage(response.usage, model_for_usage, call_type="agent")
+        if model_for_usage and model_for_usage != "error":
+            recorder.record(response.usage, model_for_usage, call_type="agent")
+
+        if cancelled_check is not None and cancelled_check():
+            logger.info("Agent loop cancelled after LLM call at step %d", step + 1)
+            return _finish(_build_cancelled_result(
+                step=step + 1,
+                tool_calls_log=tool_calls_log,
+                total_tokens=total_tokens,
+                provider_used=provider_used,
+                models_used=models_used,
+                messages=messages,
+            ))
 
         remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
         if remaining_timeout is not None and remaining_timeout <= 0:

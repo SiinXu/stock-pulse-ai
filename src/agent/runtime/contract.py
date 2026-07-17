@@ -10,12 +10,15 @@ Contract rules (ADR-001):
 - No external agent framework types may appear in this module.
 - Terminal states are immutable; on concurrent terminal transitions the
   first one wins and later attempts are dropped and audited.
-- ``request_cancel()`` records intent only; the ``CANCELLED`` terminal
-  state is produced by adapters once cooperative cancellation lands
-  (AR-PY-03). In AR-PY-01 the flag is observable but not yet acted upon.
+- ``request_cancel()`` records intent only. As of AR-PY-03 the native
+  loop consumes that intent at cooperative checkpoints (top of each step,
+  after every LLM call, at pipeline stage boundaries) and terminates as
+  ``CANCELLED`` via ``classify_terminal_state``; cancellation always wins
+  over degraded synthesis and timeout so a cancelled run never reports a
+  pseudo-success.
 - ``ExecutionContext`` only carries fields that are actually consumed at
   the current stage. Tool allowlists, budgets and resolved model routes
-  are added in AR-PY-02/03 when they become enforced, to avoid
+  are added in later phases when they become enforced, to avoid
   declared-but-unenforced contract surface.
 """
 

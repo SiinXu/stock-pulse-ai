@@ -500,7 +500,7 @@ def test_summary_compression_does_not_persist_agent_usage_without_provider_usage
     )
 
     with patch("src.agent.chat_context.estimate_messages_tokens", return_value=999999):
-        with patch("src.agent.chat_context.persist_llm_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             history = build_visible_chat_history(session_id, adapter, _config(trigger=1, protected=1))
 
     assert history[0]["content"].startswith(SUMMARY_USER_PREFIX)
@@ -531,7 +531,7 @@ def test_summary_compression_does_not_persist_metadata_only_provider_usage() -> 
     )
 
     with patch("src.agent.chat_context.estimate_messages_tokens", return_value=999999):
-        with patch("src.agent.chat_context.persist_llm_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             history = build_visible_chat_history(session_id, adapter, _config(trigger=1, protected=1))
 
     assert history[0]["content"].startswith(SUMMARY_USER_PREFIX)
@@ -560,7 +560,7 @@ def test_summary_compression_persists_invalid_provider_usage_diagnostics() -> No
     )
 
     with patch("src.agent.chat_context.estimate_messages_tokens", return_value=999999):
-        with patch("src.agent.chat_context.persist_llm_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             history = build_visible_chat_history(session_id, adapter, _config(trigger=1, protected=1))
 
     assert history[0]["content"].startswith(SUMMARY_USER_PREFIX)
@@ -590,7 +590,7 @@ def test_summary_compression_persists_agent_usage_with_provider_usage() -> None:
     )
 
     with patch("src.agent.chat_context.estimate_messages_tokens", return_value=999999):
-        with patch("src.agent.chat_context.persist_llm_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             history = build_visible_chat_history(session_id, adapter, _config(trigger=1, protected=1))
 
     assert history[0]["content"].startswith(SUMMARY_USER_PREFIX)

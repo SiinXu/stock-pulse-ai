@@ -20,7 +20,7 @@
 | AR-PY-00 | 决策与基线收敛(docs-only) | **Done** | 开发计划 `Approved`;ADR-001 `Accepted`(2026-07-17,含 D2 裁决);framework comparison 与本文档首版创建 |
 | AR-PY-01 | Runtime Contract + Native Adapter | **In progress(实现完成,待合入)** | `src/agent/runtime/`(contract + native adapter)+ `tests/agent/runtime/`(29 tests)+ `build_agent_runtime` 工厂;replay/executor/chat 回归绿;待 PR 合入后转 Done |
 | AR-PY-02 | BoundToolSession | **In progress(实现完成,待合入)** | `src/agent/runtime/tool_session.py` + `tool_surface.py` 共享错误结构提取 + 23 项 fail-closed 测试;replay 45 项零修改通过;native runner 接线按计划留待 AR-PY-03 |
-| AR-PY-03 | Lifecycle / typed events / 真实取消 | Blocked | 前置:AR-PY-02 合入 |
+| AR-PY-03 | Lifecycle / typed events / 真实取消 | **In progress(实现完成,待合入)** | `src/agent/runtime/events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);runner/orchestrator/executor/base_agent 协作取消检查点;SSE endpoint 经 `to_public_sse_event` 单一降级点 + 断连 `request_cancel`;chat_context/native_adapter 收敛;29 项新测试;replay 45 项与冻结 SSE 测试零修改绿;native runner 工具路径仍不改线(留待 AR-PY-04) |
 | AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | Blocked | 前置:AR-PY-03 合入 + 方案 A/B 裁决(审批点 3/4) |
 | AR-PY-05 | Conformance / benchmark / 决策门禁 | Blocked | 前置:AR-PY-04 合入 |
 | AR-PY-06 | 有限产品化(条件阶段) | Blocked | 前置:AR-PY-05 通过 + 维护者再批准(审批点 6/7) |
@@ -53,3 +53,4 @@
 | 2026-07-17 | ADR-001 Accepted + D2 裁决批准;AR-PY-00 -> Done,AR-PY-01 -> Ready |
 | 2026-07-17 | AR-PY-01 实现完成(Contract 状态机 + Native Adapter + 29 项新测试);状态 -> In progress(待合入) |
 | 2026-07-17 | AR-PY-02 实现完成(BoundToolSession fail-closed 会话 + 23 项新测试);状态 -> In progress(待合入) |
+| 2026-07-17 | AR-PY-03 实现完成(versioned events + late-write fence + 协作取消 + UsageRecorder/classify 收敛 + SSE 单一降级点 + 29 项新测试);状态 -> In progress(待合入) |

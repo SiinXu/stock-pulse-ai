@@ -21,6 +21,7 @@ from src.agent.runtime.contract import (
     ExecutionState,
     ProgressCallback,
 )
+from src.agent.runtime.lifecycle import classify_terminal_state
 from src.agent.public_contract import sanitize_agent_diagnostic
 
 logger = logging.getLogger(__name__)
@@ -132,8 +133,8 @@ class NativeRuntimeAdapter:
 
     @staticmethod
     def _terminal_state_for(result: Any) -> ExecutionState:
-        if getattr(result, "success", False):
-            return ExecutionState.SUCCEEDED
-        if getattr(result, "timed_out", False):
-            return ExecutionState.TIMED_OUT
-        return ExecutionState.FAILED
+        return classify_terminal_state(
+            success=bool(getattr(result, "success", False)),
+            cancelled=bool(getattr(result, "cancelled", False)),
+            timed_out=bool(getattr(result, "timed_out", False)),
+        )
