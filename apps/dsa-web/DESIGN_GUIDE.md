@@ -18,9 +18,11 @@
    lint/build 报错涉及任务范围外逻辑、拿不准是否需要扩展公共组件——一律停下提问。
    提问时给出：页面/文件、现状、StockPulse 依据、外部参考（如有）和倾向方案。
 4. **禁止硬编码**：
-   - 颜色一律走 CSS 变量 / tailwind token；**hex 色值只允许出现在
-     `src/index.css` 的 `:root` / `.dark` 变量定义里（WP1 唯一入口）**，
-     禁止在组件里写 `bg-[#151514]`、`text-[#41B83D]` 这类任意值类名或内联 hex。
+   - 生产 `TS/TSX/JS/CSS` 中不得新增 hardcoded hex；运行时颜色必须来自
+     `src/index.css` 的 semantic token，禁止在组件里写 `bg-[#151514]`、
+     `text-[#41B83D]` 这类任意值类名或内联 hex。
+   - 设计文档中的 HSL-to-hex 换算值只用于人工审阅，不是可复制到生产组件或样式的实现值。
+     合法测试 fixture 如确需固定 hex，必须进入明确白名单，并说明它验证的颜色语义。
    - 字号/圆角/间距优先用现有 tailwind 阶梯与 `--radius` 体系，不写魔法数字。
    - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑（仓库硬规则）。
 
@@ -34,8 +36,9 @@
 ## 2. 颜色 Token（当前项目定义）
 
 下表是审计基线 `ed729c1b` 中 `src/index.css` semantic token 的文档快照。HSL 源值是精确
-代码事实，hex 仅是便于审阅的换算值。代码取值与本表不一致时，应先核对当前实现和变更
-历史，再更新本表；不得用外部文件变量静默覆盖项目 token。
+代码事实，hex 仅是便于人工审阅的换算值，不是生产实现值或测试 fixture 的默认来源。代码
+取值与本表不一致时，应先核对当前实现和变更历史，再更新本表；不得用外部文件变量静默
+覆盖项目 token。
 
 ### 2.1 基础色
 
@@ -128,7 +131,8 @@
 | 保留 CSS 变量名，只改取值 | 重命名/删除现有 token 变量 |
 | 保留 tailwind 的 cyan/purple key（值改为新色） | 删除 key 导致未清扫处编译爆炸 |
 | 用边框补层次（去辉光后） | 用新的发光/渐变替代旧辉光 |
-| 颜色走 token/CSS 变量，hex 只进 `index.css` 变量定义 | 组件里写 `bg-[#xxx]` 任意值类名或内联 hex |
+| 生产颜色走 `index.css` semantic token；文档 hex 只作审阅换算 | 在生产 TS/TSX/JS/CSS 写 hardcoded hex，或把文档换算值复制进组件 |
+| 测试 fixture 的固定 hex 有白名单和颜色语义说明 | 用无说明的 fixture hex 绕过生产 token 规则 |
 | 尺寸用 tailwind 阶梯 / `--radius` 体系 | 魔法数字（`h-[37px]` 之类） |
 | token 缺口 → 停下提问 | 自己发明颜色值 |
 
