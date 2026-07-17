@@ -4,40 +4,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  resolvePlaywrightPorts,
+  resolvePlaywrightResultDirectories,
+} from './e2e/playwright-result-paths.mjs';
+import {
   resolvePlaywrightRunKey,
   resolvePlaywrightTracePolicy,
 } from './src/utils/playwrightTracePolicy';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../..');
-const backendPort = Number(process.env.DSA_WEB_SMOKE_BACKEND_PORT || 18100);
-const frontendPort = Number(process.env.DSA_WEB_SMOKE_FRONTEND_PORT || 14173);
-const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
+const {
+  backendPort,
+  frontendPort,
+  fakeProviderPort,
+  defaultRunKey,
+} = resolvePlaywrightPorts(process.env);
 const smokePassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
 process.env.DSA_WEB_SMOKE_PASSWORD = smokePassword;
 const { requestedTraceMode } = resolvePlaywrightTracePolicy(process.env, process.argv.slice(2));
 
-const defaultRunKey = `${backendPort}-${frontendPort}-${fakeProviderPort}`;
 const runKey = resolvePlaywrightRunKey(process.env.DSA_WEB_E2E_RUN_ID, defaultRunKey);
-const resultRoot = path.resolve(currentDir, 'test-results');
-const resultDir = path.resolve(resultRoot, runKey);
-if (path.dirname(resultDir) !== resultRoot) {
-  throw new Error('DSA_WEB_E2E_RUN_ID must stay inside the Playwright test-results directory.');
-}
-const assertNotSymbolicLink = (candidate: string, label: string): void => {
-  try {
-    if (fs.lstatSync(candidate).isSymbolicLink()) {
-      throw new Error(`${label} cannot be a symbolic link.`);
-    }
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error
-      ? error.code
-      : undefined;
-    if (code !== 'ENOENT') throw error;
-  }
-};
-assertNotSymbolicLink(resultRoot, 'Playwright test-results directory');
-assertNotSymbolicLink(resultDir, 'Playwright run directory');
+const { resultDir } = resolvePlaywrightResultDirectories(currentDir, runKey);
 const runtimeDir = path.join(resultDir, 'runtime');
 const serviceLogDir = path.join(resultDir, 'service-logs');
 console.info(

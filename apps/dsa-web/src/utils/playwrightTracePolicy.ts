@@ -1,3 +1,5 @@
+import { resolvePlaywrightRunKey as resolveSharedPlaywrightRunKey } from '../../e2e/playwright-result-paths.mjs';
+
 export type PlaywrightTraceMode = 'off' | 'retain-on-failure';
 
 export type PlaywrightTracePolicy = {
@@ -14,15 +16,7 @@ export function resolvePlaywrightRunKey(
   requestedRunKey: string | undefined,
   defaultRunKey: string,
 ): string {
-  const runKey = (requestedRunKey || defaultRunKey)
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, '-');
-  if (!runKey || runKey === '.' || runKey === '..') {
-    throw new Error(
-      'DSA_WEB_E2E_RUN_ID must resolve to one portable test-results child directory.',
-    );
-  }
-  return runKey;
+  return resolveSharedPlaywrightRunKey(requestedRunKey, defaultRunKey);
 }
 
 function parseCredentialBearingFlag(value: string | undefined): boolean | undefined {

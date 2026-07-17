@@ -1,5 +1,12 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  resolvePlaywrightPorts,
+  resolvePlaywrightResultDirectories,
+  resolvePlaywrightRunKey,
+} from './playwright-result-paths.mjs';
 
 const argv = process.argv.slice(2);
 if (argv.some((argument) => (
@@ -10,6 +17,15 @@ if (argv.some((argument) => (
   process.stderr.write('The repository Playwright entry point does not allow alternate config files.\n');
   process.exit(2);
 }
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const webRoot = path.resolve(currentDir, '..');
+const { defaultRunKey } = resolvePlaywrightPorts(process.env);
+const runKey = resolvePlaywrightRunKey(
+  process.env.DSA_WEB_E2E_RUN_ID,
+  defaultRunKey,
+);
+resolvePlaywrightResultDirectories(webRoot, runKey);
 
 const require = createRequire(import.meta.url);
 const playwrightCli = require.resolve('@playwright/test/cli');

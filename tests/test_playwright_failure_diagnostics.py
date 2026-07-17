@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -161,34 +162,91 @@ def test_failure_harness_prepends_the_active_interpreter_to_the_callers_path(
     assert windows_user_root not in source
 
 
-def test_repository_playwright_config_rejects_a_symlinked_run_directory(
+@pytest.mark.parametrize(
+    (
+        "run_id",
+        "port_environment",
+        "run_directory_name",
+        "link_result_root",
+        "expected_error",
+    ),
+    [
+        (
+            "symlink-policy",
+            {},
+            "symlink-policy",
+            False,
+            "Playwright run directory cannot be a symbolic link.",
+        ),
+        (
+            None,
+            {
+                "DSA_WEB_SMOKE_BACKEND_PORT": "018100",
+                "DSA_WEB_SMOKE_FRONTEND_PORT": "014173",
+                "DSA_WEB_SMOKE_PROVIDER_PORT": "018101",
+            },
+            "18100-14173-18101",
+            False,
+            "Playwright run directory cannot be a symbolic link.",
+        ),
+        (
+            "symlink-policy",
+            {},
+            "symlink-policy",
+            True,
+            "Playwright test-results directory cannot be a symbolic link.",
+        ),
+    ],
+    ids=("explicit-run-id", "numeric-default-run-id", "result-root-symlink"),
+)
+def test_repository_playwright_entrypoint_rejects_a_symlink_before_cli_resolution(
     tmp_path: Path,
+    run_id: str | None,
+    port_environment: dict[str, str],
+    run_directory_name: str,
+    link_result_root: bool,
+    expected_error: str,
 ) -> None:
-    web_root = failure_diagnostics.WEB_ROOT
+    source_e2e_root = failure_diagnostics.WEB_ROOT / "e2e"
+    source_entrypoint = source_e2e_root / "run-playwright-tests.mjs"
+    web_root = tmp_path / "isolated-web"
+    e2e_root = web_root / "e2e"
+    e2e_root.mkdir(parents=True)
+    shutil.copy2(source_entrypoint, e2e_root / source_entrypoint.name)
+    source_paths = source_e2e_root / "playwright-result-paths.mjs"
+    shutil.copy2(source_paths, e2e_root / source_paths.name)
     result_parent = web_root / "test-results"
-    result_parent.mkdir(exist_ok=True)
-    run_id = f"symlink-policy-{os.getpid()}-{tmp_path.name}"
-    run_directory = result_parent / run_id
-    run_directory.symlink_to(tmp_path, target_is_directory=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if link_result_root:
+        result_parent.symlink_to(outside, target_is_directory=True)
+    else:
+        result_parent.mkdir()
+        (result_parent / run_directory_name).symlink_to(
+            outside,
+            target_is_directory=True,
+        )
     environment = os.environ.copy()
     environment.update({
         "DSA_WEB_E2E_CREDENTIAL_BEARING": "true",
-        "DSA_WEB_E2E_RUN_ID": run_id,
         "DSA_WEB_E2E_TRACE": "off",
     })
+    environment.update(port_environment)
+    if run_id is None:
+        environment.pop("DSA_WEB_E2E_RUN_ID", None)
+    else:
+        environment["DSA_WEB_E2E_RUN_ID"] = run_id
 
-    try:
-        result = subprocess.run(
-            ["node", "e2e/run-playwright-tests.mjs", "--list"],
-            cwd=web_root,
-            env=environment,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    finally:
-        run_directory.unlink(missing_ok=True)
+    result = subprocess.run(
+        ["node", "e2e/run-playwright-tests.mjs", "--list"],
+        cwd=web_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
     assert result.returncode != 0
-    assert "Playwright run directory cannot be a symbolic link." in result.stderr
-    assert list(tmp_path.iterdir()) == []
+    assert expected_error in result.stderr
+    assert "Cannot find module '@playwright/test/cli'" not in result.stderr
+    assert list(outside.iterdir()) == []
