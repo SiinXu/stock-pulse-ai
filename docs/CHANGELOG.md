@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web Chat、持仓、决策信号、回测与告警页面的局部控件尺寸和空态卡片高度，避免筛选行、操作按钮和规则列表在桌面视口中过度撑大。
 - [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
 - [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。
 - [修复] 修复 Web 前端登录状态竞态：过期的 auth status 响应晚到时不再覆盖较新的登录状态，避免登录成功后偶发被弹回登录页。
