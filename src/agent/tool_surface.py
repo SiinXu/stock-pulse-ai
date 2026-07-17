@@ -251,41 +251,68 @@ class ToolSurface:
         result_text: Optional[str] = None,
         arguments: Any = None,
     ) -> Dict[str, Any]:
-        duration = time.time() - started_at
-        safe_text = result_text or serialize_tool_error_result(
-            message=message,
+        return build_tool_error_result(
+            tool_name=tool_name,
             code=code,
+            message=message,
+            started_at=started_at,
+            context=context,
             retriable=retriable,
+            details=details,
+            result_text=result_text,
+            arguments=arguments,
         )
-        result_truncated = False
-        if context.max_result_bytes is not None and context.max_result_bytes >= 0:
-            safe_text, result_truncated = _truncate_text_bytes(safe_text, int(context.max_result_bytes))
-        return {
-            "ok": False,
-            "tool_name": tool_name,
-            "result": None,
-            "result_text": safe_text,
-            "error": {
-                "code": code,
-                "message": message,
-                "retriable": retriable,
-                "details": details or {},
-            },
-            "audit": build_tool_audit(
-                tool_name=tool_name,
-                arguments=arguments if arguments is not None else {},
-                result=safe_text,
-                error_code=code,
-                duration=duration,
-                context=context,
-            ),
-            "diagnostics": {
-                "redacted": True,
-                "result_length": len(safe_text.encode("utf-8")),
-                "result_truncated": result_truncated,
-                "preview": redact_diagnostic_value(safe_text),
-            },
-        }
+
+
+def build_tool_error_result(
+    *,
+    tool_name: str,
+    code: str,
+    message: str,
+    started_at: float,
+    context: ToolAccessContext,
+    retriable: bool,
+    details: Optional[Dict[str, Any]] = None,
+    result_text: Optional[str] = None,
+    arguments: Any = None,
+) -> Dict[str, Any]:
+    """Build the shared structured error result used by ToolSurface and
+    session-level gates so every rejection carries the same contract shape."""
+    duration = time.time() - started_at
+    safe_text = result_text or serialize_tool_error_result(
+        message=message,
+        code=code,
+        retriable=retriable,
+    )
+    result_truncated = False
+    if context.max_result_bytes is not None and context.max_result_bytes >= 0:
+        safe_text, result_truncated = _truncate_text_bytes(safe_text, int(context.max_result_bytes))
+    return {
+        "ok": False,
+        "tool_name": tool_name,
+        "result": None,
+        "result_text": safe_text,
+        "error": {
+            "code": code,
+            "message": message,
+            "retriable": retriable,
+            "details": details or {},
+        },
+        "audit": build_tool_audit(
+            tool_name=tool_name,
+            arguments=arguments if arguments is not None else {},
+            result=safe_text,
+            error_code=code,
+            duration=duration,
+            context=context,
+        ),
+        "diagnostics": {
+            "redacted": True,
+            "result_length": len(safe_text.encode("utf-8")),
+            "result_truncated": result_truncated,
+            "preview": redact_diagnostic_value(safe_text),
+        },
+    }
 
 
 def _execute_with_timeout(tool_def: ToolDefinition, arguments: Dict[str, Any], timeout: float) -> Any:
