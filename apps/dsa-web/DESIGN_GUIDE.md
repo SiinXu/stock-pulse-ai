@@ -1,9 +1,10 @@
 # StockPulse Web 设计准则
 
 > `src/index.css` 和公共组件是当前可执行视觉事实；本文档是 StockPulse **已采纳视觉规则**的
-> 权威。当前 [UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 仅为
-> `Ready for HITL review, not approved` 的候选材料。只有维护者明确批准后，它才能成为导航、
-> 页面归属、URL、状态与交互契约；批准前不得据此启动 UI-02～UI-07。Coinstax/Figma 仅是
+> 权威。[UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 的 HITL-H1～H8
+> 已于 2026-07-17 由维护者批准（结论见其 §18.1），自此是导航、页面归属、URL、状态与交互
+> 契约的已批准目标；实施仍须按其 §17 顺序、tracker 登记与各 slice 门禁推进，不得越序启动
+> UI-02～UI-07 父任务。Coinstax/Figma 仅是
 > 外部模式参考，不是项目需求、token、组件 API、页面 IA 或像素级验收来源。
 
 ## 0. 铁律
