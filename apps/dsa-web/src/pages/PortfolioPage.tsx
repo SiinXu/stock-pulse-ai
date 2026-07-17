@@ -8,7 +8,8 @@ import { getParsedApiError } from '../api/error';
 import { ApiErrorAlert, Card, Badge, ConfirmDialog, EmptyState, InlineAlert, Modal, Select } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import { formatUiText } from '../i18n/uiText';
+import { getUiClauseSeparator } from '../utils/uiLocale';
+import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { PORTFOLIO_LIMITATION_LABELS, PORTFOLIO_TEXT } from '../locales/portfolio';
 import type { FxRefreshFeedback } from '../utils/portfolioFormat';
 import {
@@ -135,7 +136,7 @@ function isNewerSignal(left: DecisionSignalItem | undefined, right: DecisionSign
   return getSignalTime(right) > getSignalTime(left);
 }
 
-function formatPortfolioLimitation(limitation: string, language: 'zh' | 'en'): string {
+function formatPortfolioLimitation(limitation: string, language: UiLanguage): string {
   return PORTFOLIO_LIMITATION_LABELS[language][limitation] ?? limitation;
 }
 
@@ -1056,7 +1057,7 @@ const PortfolioPage: React.FC = () => {
   const snapshotQualityMessage = snapshot?.dataQuality === 'partial' && snapshot.limitations?.length
     ? snapshot.limitations
       .map((limitation) => formatPortfolioLimitation(limitation, language))
-      .join(language === 'en' ? '; ' : '；')
+      .join(getUiClauseSeparator(language))
     : null;
 
   return (

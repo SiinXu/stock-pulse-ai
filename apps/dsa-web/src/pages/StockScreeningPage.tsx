@@ -42,7 +42,7 @@ import { AppPage, Button, InlineAlert, Select } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
-import { formatUiDateTime, formatUiNumber } from '../utils/uiLocale';
+import { formatUiDateTime, formatUiNumber, getUiListSeparator } from '../utils/uiLocale';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 
@@ -440,7 +440,7 @@ const formatHotspotMetric = (value: unknown, text: ScreeningText, digits = 1) =>
 const getHotspotLeadersText = (item: AlphaSiftHotspot, language: UiLanguage, text: ScreeningText) => {
   const leaders = (item.leaders || []).map((value) => String(value).trim()).filter(Boolean);
   if (leaders.length > 0) {
-    return leaders.slice(0, 2).join(language === 'en' ? ', ' : '、');
+    return leaders.slice(0, 2).join(getUiListSeparator(language));
   }
   return text.observing;
 };
@@ -1188,7 +1188,7 @@ const StockScreeningPage: React.FC = () => {
                 </summary>
                 <div className="mt-2 space-y-1 leading-5">
                   {(hotspotDetail.missingFields || []).length > 0 ? (
-                    <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(language === 'en' ? ', ' : '、') })}</p>
+                    <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(getUiListSeparator(language)) })}</p>
                   ) : null}
                   {(hotspotDetail.sourceErrors || []).slice(0, 4).map((message, index) => (
                     <p key={`${message}-${index}`}>{summarizeAlphaSiftDiagnostic(message, text)}</p>
@@ -1557,13 +1557,13 @@ const StockScreeningPage: React.FC = () => {
                                 <div>
                                   <p className="text-xs font-semibold text-secondary-text">{text.watchItems}</p>
                                   <p className="mt-1 text-sm text-foreground">
-                                    {item.llmWatchItems?.length ? item.llmWatchItems.join(language === 'en' ? ', ' : '，') : llmDegraded ? text.degradedNoValue : text.none}
+                                    {item.llmWatchItems?.length ? item.llmWatchItems.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs font-semibold text-secondary-text">{text.catalysts}</p>
                                   <p className="mt-1 text-sm text-foreground">
-                                    {item.llmCatalysts?.length ? item.llmCatalysts.join(language === 'en' ? ', ' : '，') : llmDegraded ? text.degradedNoValue : text.none}
+                                    {item.llmCatalysts?.length ? item.llmCatalysts.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
                                   </p>
                                 </div>
                                 <div>

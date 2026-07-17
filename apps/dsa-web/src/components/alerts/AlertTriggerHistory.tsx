@@ -6,7 +6,8 @@ import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { ALERT_TRIGGER_TEXT } from '../../locales/alerts';
 import { formatUiText } from '../../i18n/uiText';
-import { formatUiDateTime } from '../../utils/uiLocale';
+import { formatUiDateTime, getUiClauseSeparator } from '../../utils/uiLocale';
+import type { UiLanguage } from '../../i18n/uiText';
 
 function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
   if (status === 'triggered') return 'success';
@@ -20,7 +21,7 @@ function formatNullable(value?: string | number | null): string {
   return String(value);
 }
 
-function renderPhaseQuality(trigger: AlertTriggerItem, language: 'zh' | 'en'): React.ReactNode {
+function renderPhaseQuality(trigger: AlertTriggerItem, language: UiLanguage): React.ReactNode {
   const text = ALERT_TRIGGER_TEXT[language];
   const phase = getMarketPhaseSummaryLabel(trigger.marketPhaseSummary, language);
   const quality = trigger.analysisContextPackOverview?.dataQuality?.level;
@@ -33,7 +34,7 @@ function renderPhaseQuality(trigger: AlertTriggerItem, language: 'zh' | 'en'): R
       {phase ? <Badge variant="default">{phase.replace(/^.*?:\s*/, '')}</Badge> : null}
       {quality ? <div className="text-xs text-secondary-text">{formatUiText(text.quality, { quality })}</div> : null}
       {limitations.length ? (
-        <div className="max-w-44 text-xs text-muted-text">{limitations.join(language === 'en' ? '; ' : '；')}</div>
+        <div className="max-w-44 text-xs text-muted-text">{limitations.join(getUiClauseSeparator(language))}</div>
       ) : null}
     </div>
   );

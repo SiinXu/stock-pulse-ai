@@ -4,6 +4,11 @@ import '@fontsource-variable/geist/index.css'
 import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from './components/theme/ThemeProvider'
+import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
+import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
+
+const initialUiLanguage = await prepareInitialUiLanguage(getRuntimeInitialLanguage())
+applyUiLanguageToDocument(initialUiLanguage)
 
 if (import.meta.env.DEV) {
   // Loupe dev annotator is an optional local tool; skip silently if not installed.
@@ -21,7 +26,7 @@ if (import.meta.env.DEV) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <App />
+      <App initialUiLanguage={initialUiLanguage} />
     </ThemeProvider>
   </StrictMode>,
 )

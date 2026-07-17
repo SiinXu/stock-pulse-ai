@@ -641,7 +641,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('04 UI language switch persists through refresh and browser back-forward navigation', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: '切换界面语言' }).click();
+    await page.locator('select[data-testid="ui-language-selector"]:visible').first().selectOption('en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();

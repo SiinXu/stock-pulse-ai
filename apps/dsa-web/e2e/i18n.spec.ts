@@ -5,6 +5,7 @@ import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { loginAsE2eAdmin, getE2eAuthStatus } from './auth-fixture';
+import { UI_LANGUAGE_METADATA, type UiLanguage } from '../src/i18n/uiLanguages';
 
 const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
 const BUILT_IN_PROVIDER_LABELS = {
@@ -14,12 +15,39 @@ const BUILT_IN_PROVIDER_LABELS = {
   custom: { zh: '自定义兼容服务', en: 'Custom compatible service' },
 } as const;
 const CHINESE_SCRIPT = /[\u3400-\u9fff]/;
+const HOME_NAV_LABELS: Record<UiLanguage, string> = {
+  zh: '首页',
+  'zh-TW': '首頁',
+  en: 'Home',
+  ja: 'ホーム',
+  ko: '홈',
+  de: 'Startseite',
+  es: 'Inicio',
+  ms: 'Laman Utama',
+  fr: 'Accueil',
+  id: 'Beranda',
+};
+
+const uiLanguageSelector = (page: Page) =>
+  page.locator('select[data-testid="ui-language-selector"]:visible').first();
 
 async function switchToEnglish(page: Page) {
-  const toggle = page.getByRole('button', { name: '切换界面语言' });
-  await expect(toggle).toBeVisible();
-  await toggle.click();
+  const selector = uiLanguageSelector(page);
+  await expect(selector).toBeVisible();
+  await selector.selectOption('en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+}
+
+async function assertUiLanguage(page: Page, language: UiLanguage) {
+  const selector = uiLanguageSelector(page);
+  await selector.selectOption(language);
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe(language);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  await expect(uiLanguageSelector(page)).toHaveValue(language);
+  await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
 }
 
 async function loginInEnglish(page: Page) {
@@ -34,7 +62,7 @@ test.describe('complete UI i18n acceptance', () => {
     await switchToEnglish(page); // 2
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible(); // 3
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible(); // 4
-    await expect(page.getByRole('button', { name: 'Switch UI language' })).toBeVisible(); // 5
+    await expect(uiLanguageSelector(page)).toBeVisible(); // 5
     expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe('en'); // 6
 
     await page.reload();
@@ -57,8 +85,48 @@ test.describe('complete UI i18n acceptance', () => {
     await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/); // 11
 
-    await page.getByRole('button', { name: 'Switch UI language' }).click();
+    await uiLanguageSelector(page).selectOption('zh');
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); // 12
+  });
+
+  test('Traditional Chinese selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'zh-TW');
+  });
+
+  test('Japanese selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ja');
+  });
+
+  test('Korean selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ko');
+  });
+
+  test('German selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'de');
+  });
+
+  test('Spanish selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'es');
+  });
+
+  test('Malay selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ms');
+  });
+
+  test('French selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'fr');
+  });
+
+  test('Indonesian selection persists with localized navigation', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'id');
   });
 
   test('login supports English for both first setup and returning admin states', async ({ page }) => {
@@ -154,9 +222,7 @@ test.describe('complete UI i18n acceptance', () => {
     await expect(providerSelect).toHaveAttribute('data-value', 'openai');
     await dialog.evaluate((element) => element.setAttribute('data-language-switch-modal', 'same'));
 
-    await page.locator('button[aria-label="切换界面语言"]').first().evaluate(
-      (button: HTMLButtonElement) => button.click(),
-    );
+    await uiLanguageSelector(page).selectOption('en');
 
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     const sameDialog = page.locator('[data-language-switch-modal="same"]');

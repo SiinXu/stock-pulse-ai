@@ -1,4 +1,5 @@
 import type { UiLanguage } from '../i18n/uiText';
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import { getUiLocale } from './uiLocale';
 
 export const formatDateTime = (value?: string | null, language: UiLanguage = 'zh'): string => {
@@ -52,11 +53,14 @@ export const getRecentStartDate = (days: number): string => {
 export const getTodayInShanghai = (): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
 
+const REPORT_TYPE_LABELS = createUiLanguageRecord('utils.format.REPORT_TYPE_LABELS', {
+  zh: { simple: '普通', detailed: '标准', full: '完整', brief: '简版', market_review: '大盘' },
+  en: { simple: 'Standard', detailed: 'Detailed', full: 'Full', brief: 'Brief', market_review: 'Market review' },
+});
+
 export const formatReportType = (value?: string, language: UiLanguage = 'zh'): string => {
   if (!value) return '—';
-  const labels = language === 'en'
-    ? { simple: 'Standard', detailed: 'Detailed', full: 'Full', brief: 'Brief', market_review: 'Market review' }
-    : { simple: '普通', detailed: '标准', full: '完整', brief: '简版', market_review: '大盘' };
+  const labels = REPORT_TYPE_LABELS[language];
   if (value in labels) return labels[value as keyof typeof labels];
   return value;
 };

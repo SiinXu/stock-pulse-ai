@@ -1,3 +1,4 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -100,4 +101,4 @@ const en: Record<keyof typeof zh, string> = {
   next: 'Next',
 };
 
-export const SETTINGS_WIZARD_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_WIZARD_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsWizard.SETTINGS_WIZARD_TEXT", { zh, en });

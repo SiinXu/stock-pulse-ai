@@ -1,7 +1,13 @@
 import type { Message } from '../stores/agentChatStore';
 import type { UiLanguage } from '../i18n/uiText';
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import { getChatMessageDisplayContent } from './chatMessage';
 import { formatUiDateTime } from './uiLocale';
+
+const CHAT_EXPORT_TEXT = createUiLanguageRecord('utils.chatExport.CHAT_EXPORT_TEXT', {
+  zh: { title: '问股会话', generated: '生成时间：{time}', user: '用户', filename: '问股会话' },
+  en: { title: 'Ask Stock Session', generated: 'Generated: {time}', user: 'User', filename: 'ask_stock_session' },
+});
 
 /**
  * Format chat messages as Markdown for export.
@@ -15,16 +21,17 @@ export function formatSessionAsMarkdown(messages: Message[], language: UiLanguag
     hour: '2-digit',
     minute: '2-digit',
   });
+  const text = CHAT_EXPORT_TEXT[language];
 
   const lines: string[] = [
-    language === 'en' ? '# Ask Stock Session' : '# 问股会话',
+    `# ${text.title}`,
     '',
-    language === 'en' ? `Generated: ${timeStr}` : `生成时间: ${timeStr}`,
+    text.generated.replace('{time}', timeStr),
     '',
   ];
 
   for (const msg of messages) {
-    const heading = msg.role === 'user' ? (language === 'en' ? '## User' : '## 用户') : '## AI';
+    const heading = msg.role === 'user' ? `## ${text.user}` : '## AI';
     if (msg.role === 'assistant' && msg.skillName) {
       lines.push(`${heading} (${msg.skillName})`);
     } else {
@@ -49,7 +56,7 @@ export function downloadSession(messages: Message[], language: UiLanguage = 'zh'
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
   const pad = (n: number) => n.toString().padStart(2, '0');
   const timeStr = pad(now.getHours()) + pad(now.getMinutes());
-  const filename = `${language === 'en' ? 'ask_stock_session' : '问股会话'}_${dateStr}_${timeStr}.md`;
+  const filename = `${CHAT_EXPORT_TEXT[language].filename}_${dateStr}_${timeStr}.md`;
 
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

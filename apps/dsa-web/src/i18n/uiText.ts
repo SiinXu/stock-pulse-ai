@@ -1,4 +1,7 @@
-export type UiLanguage = 'zh' | 'en';
+import { createUiLanguageRecord } from './createUiLanguageRecord';
+import type { UiLanguage } from './uiLanguages';
+
+export type { UiLanguage } from './uiLanguages';
 
 const zh = {
   'common.cancel': '取消',
@@ -2014,10 +2017,10 @@ const en: Record<UiTextKey, string> = {
   'settings.envDockerNote': 'In Docker deployments, --env-file and Compose env_file inject environment variables only at startup. This export/import area uses the backend active .env file. To keep WebUI-saved values across container rebuilds, point ENV_FILE to a writable data-volume file such as /app/data/runtime.env and avoid keeping same-name old values in the startup environment.',
 };
 
-export const UI_TEXT: Record<UiLanguage, Record<UiTextKey, string>> = {
+export const UI_TEXT: Record<UiLanguage, Record<UiTextKey, string>> = createUiLanguageRecord('i18n.uiText.UI_TEXT', {
   zh,
   en,
-};
+});
 
 export type UiTextParams = Record<string, string | number>;
 
