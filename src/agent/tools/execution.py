@@ -13,12 +13,21 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
+
+if TYPE_CHECKING:
+    from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+
+class RunnerToolCall(Protocol):
+    name: str
+    arguments: Dict[str, Any]
+
 
 _SUMMARY_LIMIT = 500
 _TOKEN_PATTERN = re.compile(
@@ -87,6 +96,15 @@ def serialize_tool_result(result: Any) -> str:
         except (TypeError, ValueError):
             return str(result)
     return str(result)
+
+
+def serialize_tool_error_result(*, message: str, code: str, retriable: bool) -> str:
+    """Serialize the stable model-visible error contract shared by agent runtimes."""
+    return serialize_tool_result({
+        "error": message,
+        "code": code,
+        "retriable": retriable,
+    })
 
 
 def _normalize_tool_stock_code(value: Any) -> Any:
@@ -172,7 +190,7 @@ def _guard_tool_stock_scope(
     tool_registry: ToolRegistry,
     tool_name: str,
     arguments: Dict[str, Any],
-    stock_scope: Any,
+    stock_scope: Optional[StockScope],
 ) -> Optional[Dict[str, Any]]:
     if stock_scope is None or not isinstance(arguments, dict):
         return None
@@ -248,15 +266,31 @@ def _redact_json_string_if_possible(text: str) -> str:
 
 def execute_runner_tool_call(
     *,
-    tool_call: Any,
+    tool_call: RunnerToolCall,
     tool_registry: ToolRegistry,
-    stock_scope: Any = None,
+    stock_scope: Optional[StockScope] = None,
     non_retriable_tool_results: Optional[Dict[str, str]] = None,
 ) -> tuple[Any, str, bool, float, bool, Optional[Dict[str, Any]]]:
     """Execute a single tool call using the legacy runner semantics."""
     t0 = time.time()
-    cache_key = _build_tool_cache_key(tool_call.name, tool_call.arguments)
-    guard_result = _guard_tool_stock_scope(tool_registry, tool_call.name, tool_call.arguments, stock_scope)
+    tool_name = tool_call.name
+    if type(tool_name) is not str or not tool_name.strip():
+        dur = round(time.time() - t0, 2)
+        return (
+            tool_call,
+            serialize_tool_error_result(
+                message="Tool name must exactly match a registered StockPulse tool.",
+                code="invalid_tool_name",
+                retriable=False,
+            ),
+            False,
+            dur,
+            False,
+            None,
+        )
+
+    cache_key = _build_tool_cache_key(tool_name, tool_call.arguments)
+    guard_result = _guard_tool_stock_scope(tool_registry, tool_name, tool_call.arguments, stock_scope)
     if guard_result is not None:
         dur = round(time.time() - t0, 2)
         result_str = serialize_tool_result(guard_result)
@@ -264,7 +298,7 @@ def execute_runner_tool_call(
             non_retriable_tool_results[cache_key] = result_str
         logger.warning(
             "Tool '%s' blocked by stock scope: requested=%s expected=%s allowed=%s",
-            tool_call.name,
+            tool_name,
             guard_result.get("requested_stock_code"),
             guard_result.get("expected_stock_code"),
             guard_result.get("allowed_stock_codes"),
@@ -275,19 +309,34 @@ def execute_runner_tool_call(
         dur = round(time.time() - t0, 2)
         logger.info(
             "Tool '%s' skipped via non-retriable cache for arguments=%s",
-            tool_call.name,
-            tool_call.arguments,
+            tool_name,
+            _redact_structured_secrets(tool_call.arguments),
         )
         return tool_call, non_retriable_tool_results[cache_key], False, dur, True, None
 
+    registered_tool = None
     try:
-        res = tool_registry.execute(tool_call.name, **tool_call.arguments)
+        registered_tool = tool_registry.resolve(tool_name)
+        res = tool_registry.execute(tool_name, **tool_call.arguments)
         res_str = serialize_tool_result(res)
         ok = True
         if cache_key and non_retriable_tool_results is not None and _is_non_retriable_tool_result(res):
             non_retriable_tool_results[cache_key] = res_str
     except Exception as exc:
-        res_str = json.dumps({"error": str(exc)})
+        if registered_tool is None and (":" in tool_name or "." in tool_name):
+            error_code = "invalid_tool_name"
+            error_message = "Tool name must exactly match a registered StockPulse tool."
+        elif registered_tool is None:
+            error_code = "tool_not_found"
+            error_message = "Tool not found."
+        else:
+            error_code = "handler_error"
+            error_message = "Tool handler failed."
+        res_str = serialize_tool_error_result(
+            message=error_message,
+            code=error_code,
+            retriable=False,
+        )
         ok = False
         log_safe_exception(
             logger,
@@ -295,7 +344,8 @@ def execute_runner_tool_call(
             exc,
             error_code="agent_tool_execution_failed",
             level=logging.WARNING,
-            context={"tool_name": tool_call.name},
+            context={"tool_name": tool_name},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
     dur = round(time.time() - t0, 2)
     return tool_call, res_str, ok, dur, False, None

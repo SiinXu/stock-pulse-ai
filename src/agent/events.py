@@ -31,7 +31,11 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from src.config import Config
+    from src.notification import NotificationService
 
 from src.utils.sanitize import log_safe_exception
 
@@ -570,7 +574,10 @@ def validate_event_alert_rule(rule: Dict[str, Any]) -> None:
             raise ValueError("multiplier must be > 0")
 
 
-def build_event_monitor_from_config(config=None, notifier=None) -> Optional[EventMonitor]:
+def build_event_monitor_from_config(
+    config: Optional[Config] = None,
+    notifier: Optional[NotificationService] = None,
+) -> Optional[EventMonitor]:
     """Build an EventMonitor from runtime config and attach notification callbacks."""
     if config is None:
         from src.config import get_config

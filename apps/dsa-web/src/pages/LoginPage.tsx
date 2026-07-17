@@ -206,10 +206,10 @@ const LoginPage: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="lg"
-                className="group/btn relative h-12 w-full overflow-hidden rounded-full border-0 bg-gradient-to-r from-[var(--login-brand-button-start)] to-[var(--login-brand-button-end)] font-medium text-[var(--login-button-text)] shadow-lg hover:from-[var(--login-brand-button-start-hover)] hover:to-[var(--login-brand-button-end-hover)]"
+                className="h-12 w-full font-medium"
                 disabled={isSubmitting}
               >
-                <div className="relative z-10 flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -219,7 +219,6 @@ const LoginPage: React.FC = () => {
                     <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
                   )}
                 </div>
-                <div className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] pointer-events-none" />
               </Button>
             </form>
           </div>
@@ -236,13 +235,6 @@ const LoginPage: React.FC = () => {
         </motion.p>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes shimmer {
-          100% {
-            transform: translateX(100%);
-          }
-        }
-      `}} />
     </div>
   );
 };

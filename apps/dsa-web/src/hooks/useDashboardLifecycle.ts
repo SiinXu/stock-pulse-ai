@@ -4,14 +4,14 @@ import { useTaskStream } from './useTaskStream';
 
 type UseDashboardLifecycleOptions = {
   loadInitialHistory: () => Promise<void>;
-  refreshHistory: (silent?: boolean) => Promise<void>;
-  refreshHistoryForCompletedTask?: (task: TaskInfo) => Promise<void>;
+  refreshHistory: (silent?: boolean) => Promise<unknown>;
+  refreshHistoryForCompletedTask?: (task: TaskInfo) => Promise<unknown>;
   refreshActiveTasks: () => Promise<void>;
   pollKnownTasks?: () => Promise<void>;
   loadStockBar: () => Promise<void>;
   refreshStockBar: () => Promise<void>;
   loadMarketReviewHistory?: () => Promise<void>;
-  refreshMarketReviewHistory?: (silent?: boolean) => Promise<void>;
+  refreshMarketReviewHistory?: (silent?: boolean) => Promise<unknown>;
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;

@@ -13,6 +13,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.agent.tools.data_tools import _handle_get_stock_info
 
 
+STOCK_INFO_CANARY = "STOCK_INFO_PROVIDER_DIAGNOSTIC_CANARY"
+STOCK_INFO_PATH = "/Users/private-user/.config/stockpulse/fundamental.json"
+
+
 class _DummyManager:
     def __init__(self):
         self._context = {
@@ -64,6 +68,23 @@ class _DummyManager:
         return "贵州茅台"
 
 
+class _FailingContextManager(_DummyManager):
+    def __init__(self):
+        super().__init__()
+        self.failure_reason = None
+
+    def get_fundamental_context(self, _stock_code: str):
+        raise OSError(5, f"fundamental provider failed: {STOCK_INFO_CANARY}", STOCK_INFO_PATH)
+
+    def build_failed_fundamental_context(self, _stock_code: str, reason: str):
+        self.failure_reason = reason
+        return {
+            "market": "cn",
+            "status": "failed",
+            "coverage": {},
+        }
+
+
 class TestGetStockInfoContract(unittest.TestCase):
     def test_get_stock_info_preserves_board_semantics(self) -> None:
         manager = _DummyManager()
@@ -85,6 +106,20 @@ class TestGetStockInfoContract(unittest.TestCase):
             result["fundamental_context"]["boards"]["data"],
             result["sector_rankings"],
         )
+
+    def test_failure_fallback_does_not_receive_or_return_raw_exception(self) -> None:
+        manager = _FailingContextManager()
+        with patch(
+            "src.agent.tools.data_tools._get_fetcher_manager",
+            return_value=manager,
+        ), self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
+            result = _handle_get_stock_info("600519")
+
+        self.assertEqual(manager.failure_reason, "Fundamental data is unavailable.")
+        visible = str(result) + "\n" + "\n".join(logs.output)
+        self.assertNotIn(STOCK_INFO_CANARY, visible)
+        self.assertNotIn(STOCK_INFO_PATH, visible)
+        self.assertNotIn("fundamental provider failed", visible)
 
 
 if __name__ == "__main__":

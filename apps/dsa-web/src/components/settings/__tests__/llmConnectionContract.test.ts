@@ -174,14 +174,30 @@ describe('dynamic Connection field contract', () => {
   });
 
   it('gates discovery with schema-required test fields and unknown conditions', () => {
-    const fields: LlmConnectionFieldSchema[] = [
+    const partialFields: LlmConnectionFieldSchema[] = [
       { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: true, contract: { requirement: 'required', requiresConnectionTest: true } },
       { key: 'models', dataType: 'array', isSensitive: false, isRequired: false, contract: { requirement: 'optional', requiresConnectionTest: true } },
     ];
-    expect(isConnectionModelDiscoveryEnabled({ api_key: '', models: '' }, fields)).toBe(false);
-    expect(isConnectionModelDiscoveryEnabled({ api_key: 'key', models: '' }, fields)).toBe(true);
+    expect(isConnectionModelDiscoveryEnabled({ api_key: '', models: '' }, partialFields)).toBe(false);
+    expect(isConnectionModelDiscoveryEnabled({ api_key: 'key', models: '' }, partialFields)).toBe(false);
 
-    fields[1].contract.enabledWhen = [
+    const overrides = new Map(partialFields.map((field) => [field.key, field]));
+    const fields = CONNECTION_FIELDS.map((field) => {
+      const override = overrides.get(field.key);
+      return override
+        ? { ...override, contract: { ...override.contract } }
+        : { ...field, contract: { ...field.contract } };
+    });
+    expect(isConnectionModelDiscoveryEnabled({
+      connection_name: 'openai',
+      provider_id: 'openai',
+      api_key: 'key',
+      models: '',
+    }, fields)).toBe(true);
+
+    const providerField = fields.find((field) => field.key === 'provider_id');
+    expect(providerField).toBeDefined();
+    providerField!.contract.enabledWhen = [
       { key: 'provider_id', operator: 'futureOperator' as never, value: 'openai' },
     ];
     expect(isConnectionModelDiscoveryEnabled(

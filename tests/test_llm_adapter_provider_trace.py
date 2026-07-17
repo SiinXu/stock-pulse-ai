@@ -200,6 +200,36 @@ def test_parse_litellm_response_extracts_claude_blocks_and_tool_provider_fields(
     }
 
 
+def test_parse_litellm_response_normalizes_non_string_tool_name() -> None:
+    adapter = LLMToolAdapter.__new__(LLMToolAdapter)
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="",
+                    reasoning_content=None,
+                    tool_calls=[
+                        SimpleNamespace(
+                            id="call_bad",
+                            function=SimpleNamespace(
+                                name=["private", "tool"],
+                                arguments="{}",
+                                provider_specific_fields=None,
+                            ),
+                            provider_specific_fields=None,
+                        )
+                    ],
+                )
+            )
+        ],
+        usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1, total_tokens=2),
+    )
+
+    parsed = adapter._parse_litellm_response(response, "openai/test")
+
+    assert parsed.tool_calls[0].name == ""
+
+
 def test_parse_litellm_response_resolves_provider_for_slashless_router_alias() -> None:
     adapter = LLMToolAdapter.__new__(LLMToolAdapter)
     adapter._config = SimpleNamespace(

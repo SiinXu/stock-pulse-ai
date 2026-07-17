@@ -10,7 +10,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.config import (
@@ -28,6 +28,9 @@ from src.repositories.portfolio_repo import (
     PortfolioRepository,
 )
 from src.utils.sanitize import log_safe_exception
+
+if TYPE_CHECKING:
+    from src.storage import PortfolioAccount
 
 logger = logging.getLogger(__name__)
 
@@ -1086,7 +1089,7 @@ class PortfolioService:
     def _replay_account(
         self,
         *,
-        account: Any,
+        account: PortfolioAccount,
         as_of_date: date,
         cost_method: str,
         include_realtime: bool,
@@ -1316,7 +1319,7 @@ class PortfolioService:
     def _build_positions(
         self,
         *,
-        account: Any,
+        account: PortfolioAccount,
         as_of_date: date,
         cost_method: str,
         fifo_lots: Dict[Tuple[str, str, str], List[Dict[str, Any]]],
@@ -1813,7 +1816,7 @@ class PortfolioService:
     def _list_account_refresh_fx_currencies(
         self,
         *,
-        account: Any,
+        account: PortfolioAccount,
         as_of_date: date,
         strict: bool = True,
     ) -> List[str]:
@@ -1842,7 +1845,7 @@ class PortfolioService:
     def _refresh_account_fx_rates(
         self,
         *,
-        account: Any,
+        account: PortfolioAccount,
         as_of_date: date,
         refresh_enabled: bool,
     ) -> Dict[str, int]:

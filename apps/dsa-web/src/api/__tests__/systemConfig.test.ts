@@ -132,14 +132,16 @@ describe('systemConfigApi', () => {
         }],
         connection_fields: [{
           key: 'api_key',
-          env_suffix: 'API_KEY',
+          env_suffix: null,
           data_type: 'string',
           is_sensitive: true,
           is_required: false,
           contract: {
             requirement: 'optional',
             required_when: [{ key: 'enabled', operator: 'equals', value: 'true' }],
-            requires_connection_test: true,
+            visible_when: null,
+            enabled_when: null,
+            requires_connection_test: null,
           },
         }],
         empty_api_key_hosts: [],
@@ -158,13 +160,15 @@ describe('systemConfigApi', () => {
     });
     expect(result.connectionFields?.[0]).toMatchObject({
       key: 'api_key',
-      envSuffix: 'API_KEY',
+      envSuffix: null,
       dataType: 'string',
       isSensitive: true,
       isRequired: false,
       contract: {
         requiredWhen: [{ key: 'enabled', operator: 'equals', value: 'true' }],
-        requiresConnectionTest: true,
+        visibleWhen: null,
+        enabledWhen: null,
+        requiresConnectionTest: null,
       },
     });
   });

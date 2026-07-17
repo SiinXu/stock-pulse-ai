@@ -13,7 +13,6 @@ import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
-import { MarketReviewReportView } from '../components/report/MarketReviewReportView';
 import { ReportSummary } from '../components/report/ReportSummary';
 import { RunFlowPanel } from '../components/run-flow';
 import { TaskPanel } from '../components/tasks';
@@ -31,7 +30,6 @@ import { normalizeReportLanguage } from '../utils/reportLanguage';
 import type {
   AnalyzeAsyncResponse,
   HistoryItem,
-  MarketReviewPayload,
   StockBarItem,
   TaskInfo,
 } from '../types/analysis';
@@ -56,6 +54,17 @@ type StockAnalysisNavigationState = {
   autoAnalyze?: boolean;
   selectionSource?: string;
 };
+
+type HomeRecordIdentity = {
+  id?: number;
+  stockCode?: string;
+  reportType?: string;
+};
+
+type HomeRecordIdentityResolution =
+  | { status: 'found'; record: HomeRecordIdentity }
+  | { status: 'unavailable'; record: null }
+  | { status: 'unresolved'; record: null };
 
 const DUPLICATE_BANNER_AUTO_DISMISS_MS = 5000;
 const BATCH_ANALYSIS_CHUNK_SIZE = 50;
@@ -185,8 +194,6 @@ const HomePage: React.FC = () => {
   const [isSubmittingMarketReview, setIsSubmittingMarketReview] = useState(false);
   const [marketReviewNotice, setMarketReviewNotice] = useState<MarketReviewNotice>(null);
   const [marketReviewError, setMarketReviewError] = useState<ParsedApiError | null>(null);
-  const [marketReviewReport, setMarketReviewReport] = useState<string | null>(null);
-  const [marketReviewPayload, setMarketReviewPayload] = useState<MarketReviewPayload | null>(null);
   const [analysisSkills, setAnalysisSkills] = useState<SkillInfo[]>([]);
   const [selectedStrategyId, setSelectedStrategyId] = useState('');
   const [strategyMenuOpen, setStrategyMenuOpen] = useState(false);
@@ -209,6 +216,7 @@ const HomePage: React.FC = () => {
   const duplicateBannerTimer = useRef<number | null>(null);
   const marketReviewPollTimer = useRef<number | null>(null);
   const marketReviewPollGeneration = useRef(0);
+  const homeUrlOwnerActiveRef = useRef(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const stockBarLoadStartedRef = useRef(false);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
@@ -241,7 +249,13 @@ const HomePage: React.FC = () => {
     scrollContainer.scrollTop = 0;
   }, []);
 
-  useEffect(() => stopMarketReviewPolling, [stopMarketReviewPolling]);
+  useEffect(() => {
+    homeUrlOwnerActiveRef.current = true;
+    return () => {
+      homeUrlOwnerActiveRef.current = false;
+      stopMarketReviewPolling();
+    };
+  }, [stopMarketReviewPolling]);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
 
   const {
@@ -250,6 +264,8 @@ const HomePage: React.FC = () => {
     duplicateError,
     duplicateTask,
     error,
+    reportDetailError,
+    reportSelectionEpoch,
     isAnalyzing,
     historyItems,
     isLoadingHistory,
@@ -277,7 +293,6 @@ const HomePage: React.FC = () => {
     selectHistoryItem,
     retrySelectedRecord,
     clearSelectedRecord,
-    clearSelectedReportForStock,
     submitAnalysis,
     notify,
     setNotify,
@@ -304,11 +319,21 @@ const HomePage: React.FC = () => {
     defaultRecordId: historyItems[0]?.id ?? null,
     isHistoryLoading: isLoadingHistory,
     selectedRecordId,
+    selectedReportId: selectedReport?.meta.id ?? null,
     isReportLoading: isLoadingReport,
-    reportError: error,
+    reportError: reportDetailError,
+    reportSelectionEpoch,
     selectHistoryItem,
     clearSelectedRecord,
   });
+  const homeRecordIdRef = useRef(homeUrlState.recordId);
+  homeRecordIdRef.current = homeUrlState.recordId;
+  const homeUrlStateRef = useRef(homeUrlState);
+  homeUrlStateRef.current = homeUrlState;
+  const homeLocationRef = useRef({ key: location.key, search: location.search });
+  homeLocationRef.current = { key: location.key, search: location.search };
+  const selectedReportRef = useRef(selectedReport);
+  selectedReportRef.current = selectedReport;
 
   const clearDuplicateBannerTimer = useCallback(() => {
     if (duplicateBannerTimer.current !== null) {
@@ -405,7 +430,6 @@ const HomePage: React.FC = () => {
   }, [analysisSkills, selectedStrategyId]);
 
   const reportLanguage = normalizeReportLanguage(selectedReport?.meta.reportLanguage);
-  const liveMarketReviewLanguage = normalizeReportLanguage(marketReviewPayload?.language);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
   const isHistoryTrendUnavailable = !selectedReport || !selectedReport.meta.stockCode;
   const homeUrlIssueTitle = homeUrlState.urlIssue === 'invalid_record'
@@ -414,9 +438,14 @@ const HomePage: React.FC = () => {
   const homeUrlIssueMessage = homeUrlState.urlIssue === 'invalid_record'
     ? t('home.invalidRecordLinkMessage')
     : t('home.invalidRunFlowLinkMessage');
+  const hasUnresolvedReportIntent = homeUrlState.recordId !== null
+    && selectedRecordId === homeUrlState.recordId
+    && selectedReport?.meta.id !== homeUrlState.recordId
+    && !isLoadingReport;
   // A selected record failed to load: keep the failure (with retry) in view
   // instead of the stale previous report or the generic empty state.
-  const isReportLoadFailure = Boolean(error) && selectedRecordId !== null && !selectedReport;
+  const isReportLoadFailure = Boolean(reportDetailError) && hasUnresolvedReportIntent;
+  const visibleReportError = reportDetailError ?? error;
 
   useEffect(() => {
     if (!isHistoryTrendUnavailable || !isHistoryTrendOpen) {
@@ -545,6 +574,36 @@ const HomePage: React.FC = () => {
     }
   }, []);
 
+  const refreshCompletedTaskHistory = useCallback(async (task: TaskInfo) => {
+    const recordIdAtStart = homeUrlState.recordId;
+    const locationAtStart = homeLocationRef.current;
+    const selectedReportAtStart = selectedReport;
+    const selectedStockCode = selectedReportAtStart?.meta.reportType === 'market_review'
+      ? ''
+      : getStockCodeKey(selectedReportAtStart?.meta.stockCode);
+    const taskStockCode = getStockCodeKey(task.stockCode);
+    const mayOpenCompletedReport = recordIdAtStart === null || (
+      selectedReportAtStart?.meta.id === recordIdAtStart
+      && selectedStockCode.length > 0
+      && selectedStockCode === taskStockCode
+    );
+
+    const nextItem = await refreshHistoryForCompletedTask(task);
+    const latestLocation = homeLocationRef.current;
+    if (
+      !homeUrlOwnerActiveRef.current
+      || !mayOpenCompletedReport
+      || !nextItem
+      || nextItem.id === recordIdAtStart
+      || homeRecordIdRef.current !== recordIdAtStart
+      || latestLocation.key !== locationAtStart.key
+      || latestLocation.search !== locationAtStart.search
+    ) {
+      return;
+    }
+    homeUrlStateRef.current.replaceRecord(nextItem.id);
+  }, [homeUrlState, refreshHistoryForCompletedTask, selectedReport]);
+
   const handleDashboardDataRefresh = useCallback(() => {
     setTodayAnalysisRefreshVersion((version) => version + 1);
   }, []);
@@ -552,7 +611,7 @@ const HomePage: React.FC = () => {
   useDashboardLifecycle({
     loadInitialHistory,
     refreshHistory,
-    refreshHistoryForCompletedTask,
+    refreshHistoryForCompletedTask: refreshCompletedTaskHistory,
     loadMarketReviewHistory,
     refreshMarketReviewHistory,
     loadStockBar,
@@ -696,8 +755,6 @@ const HomePage: React.FC = () => {
 
   const clearMarketReviewState = useCallback(() => {
     stopMarketReviewPolling();
-    setMarketReviewReport(null);
-    setMarketReviewPayload(null);
     setMarketReviewNotice(null);
     setMarketReviewError(null);
   }, [stopMarketReviewPolling]);
@@ -711,21 +768,106 @@ const HomePage: React.FC = () => {
   const [isDeletingStock, setIsDeletingStock] = useState(false);
   const handleDeleteStock = useCallback(async (stockCode: string) => {
     if (isDeletingStock) return;
+    const recordIdAtStart = homeRecordIdRef.current;
+    const deletedStockCode = getStockCodeKey(stockCode);
+    const knownRecords = new Map<number, HomeRecordIdentity>();
+    const rememberRecord = (record: HomeRecordIdentity | null | undefined) => {
+      if (typeof record?.id === 'number') {
+        knownRecords.set(record.id, record);
+      }
+    };
+    rememberRecord(selectedReport?.meta);
+    historyItems.forEach(rememberRecord);
+    marketReviewHistoryItems.forEach(rememberRecord);
+    stockHistoryItems.forEach(rememberRecord);
+    stockBarItems.forEach(rememberRecord);
+    todayHistoryItems.forEach(rememberRecord);
+
+    const matchesDeletedStock = (record: HomeRecordIdentity | null): boolean => Boolean(record) && (
+      stockCode === 'MARKET'
+        ? record?.reportType === 'market_review'
+        : record?.reportType !== 'market_review'
+          && getStockCodeKey(record?.stockCode) === deletedStockCode
+    );
+    const resolveRecordIdentity = async (recordId: number): Promise<HomeRecordIdentityResolution> => {
+      const currentReport = selectedReportRef.current;
+      if (currentReport?.meta.id === recordId) {
+        rememberRecord(currentReport.meta);
+        return { status: 'found', record: currentReport.meta };
+      }
+      const knownRecord = knownRecords.get(recordId);
+      if (knownRecord) {
+        return { status: 'found', record: knownRecord };
+      }
+      try {
+        const report = await historyApi.getDetail(recordId);
+        rememberRecord(report.meta);
+        return { status: 'found', record: report.meta };
+      } catch (error) {
+        const parsedError = getParsedApiError(error);
+        return parsedError.status === 404 || parsedError.code === 'not_found'
+          ? { status: 'unavailable', record: null }
+          : { status: 'unresolved', record: null };
+      }
+    };
+
     setIsDeletingStock(true);
     try {
+      if (recordIdAtStart !== null) {
+        await resolveRecordIdentity(recordIdAtStart);
+      }
       await historyApi.deleteByCode(stockCode);
-      // Drop the open report if it belonged to the stock we just deleted,
-      // so the viewer doesn't keep showing a now-deleted record.
-      clearSelectedReportForStock(stockCode);
-      await refreshStockBar();
-      await refreshHistory(true);
-      if (stockCode === 'MARKET') {
-        await refreshMarketReviewHistory(false);
+      const [freshHistory] = await Promise.all([
+        refreshHistory(false),
+        refreshStockBar(),
+        stockCode === 'MARKET' ? refreshMarketReviewHistory(false) : Promise.resolve(),
+      ]);
+      if (!homeUrlOwnerActiveRef.current) {
+        return;
+      }
+      const nextItem = freshHistory?.items.find((item) => (
+        stockCode === 'MARKET'
+          ? item.reportType !== 'market_review'
+          : getStockCodeKey(item.stockCode) !== deletedStockCode
+      ));
+      const preserveError = freshHistory === null;
+
+      while (true) {
+        const currentRecordId = homeRecordIdRef.current;
+        if (currentRecordId === null) {
+          break;
+        }
+        const currentRecord = await resolveRecordIdentity(currentRecordId);
+        if (!homeUrlOwnerActiveRef.current) {
+          break;
+        }
+        if (homeRecordIdRef.current !== currentRecordId) {
+          continue;
+        }
+        if (currentRecord.status === 'unavailable' || matchesDeletedStock(currentRecord.record)) {
+          clearSelectedRecord(preserveError);
+          homeUrlStateRef.current.replaceRecord(nextItem?.id ?? null, preserveError);
+        }
+        break;
       }
     } finally {
-      setIsDeletingStock(false);
+      if (homeUrlOwnerActiveRef.current) {
+        setIsDeletingStock(false);
+      }
     }
-  }, [isDeletingStock, clearSelectedReportForStock, refreshMarketReviewHistory, refreshStockBar, refreshHistory]);
+  }, [
+    historyItems,
+    isDeletingStock,
+    marketReviewHistoryItems,
+    refreshHistory,
+    refreshMarketReviewHistory,
+    refreshStockBar,
+    selectedReport,
+    stockBarItems,
+    stockHistoryItems,
+    todayHistoryItems,
+    clearSelectedRecord,
+  ]);
 
   const handleSubmitAnalysis = useCallback(
     (
@@ -847,8 +989,6 @@ const HomePage: React.FC = () => {
 
       const poll = async (): Promise<boolean> => {
         if (attempts >= maxAttempts) {
-          setMarketReviewReport(null);
-          setMarketReviewPayload(null);
           setMarketReviewNotice({
             variant: 'danger',
             title: t('home.marketReviewTimeout'),
@@ -867,8 +1007,6 @@ const HomePage: React.FC = () => {
             return false;
           }
           if (status.status === 'pending' || status.status === 'processing') {
-            setMarketReviewReport(null);
-            setMarketReviewPayload(null);
             const progress = typeof status.progress === 'number'
               ? `${status.progress}%`
               : t('home.progressActive');
@@ -881,25 +1019,29 @@ const HomePage: React.FC = () => {
           }
 
           if (status.status === 'completed') {
-            const marketReviewText = typeof status.marketReviewReport === 'string'
-              ? status.marketReviewReport
-              : '';
-            setMarketReviewReport(marketReviewText ? marketReviewText.trim() : null);
-            setMarketReviewPayload(status.marketReviewPayload ?? null);
+            const refreshedHistory = await refreshMarketReviewHistory(true);
+            if (!isCurrent() || !homeUrlOwnerActiveRef.current) {
+              return false;
+            }
+            const persistedItem = refreshedHistory?.items.find((item) => (
+              item.reportType === 'market_review' && item.queryId === taskId
+            ));
             setMarketReviewNotice({
               variant: 'success',
               title: t('home.marketReviewCompleted'),
-              message: marketReviewText ? t('home.marketReviewCompletedWithReport') : t('home.marketReviewCompletedWithoutReport'),
+              message: persistedItem
+                ? t('home.marketReviewCompletedWithReport')
+                : t('home.marketReviewCompletedWithoutReport'),
             });
             setMarketReviewError(null);
-            await refreshMarketReviewHistory(true);
+            if (persistedItem) {
+              homeUrlStateRef.current.replaceRecord(persistedItem.id);
+            }
             scrollMarketReviewFeedbackIntoView();
             return false;
           }
 
           if (status.status === 'failed') {
-            setMarketReviewReport(null);
-            setMarketReviewPayload(null);
             setMarketReviewError(
               getParsedApiError({
                 response: {
@@ -916,8 +1058,6 @@ const HomePage: React.FC = () => {
             return false;
           }
 
-          setMarketReviewReport(null);
-          setMarketReviewPayload(null);
           setMarketReviewNotice({
             variant: 'danger',
             title: t('home.marketReviewUnknownStatus'),
@@ -931,8 +1071,6 @@ const HomePage: React.FC = () => {
           }
           const parsed = getParsedApiError(err);
           if (attempts >= maxAttempts) {
-            setMarketReviewReport(null);
-            setMarketReviewPayload(null);
             setMarketReviewError(parsed);
             setMarketReviewNotice(null);
             scrollMarketReviewFeedbackIntoView();
@@ -963,8 +1101,6 @@ const HomePage: React.FC = () => {
     setIsSubmittingMarketReview(true);
     setMarketReviewNotice(null);
     setMarketReviewError(null);
-    setMarketReviewReport(null);
-    setMarketReviewPayload(null);
     scrollMarketReviewFeedbackIntoView();
     try {
       const result = await analysisApi.triggerMarketReview({ sendNotification: notify });
@@ -1612,29 +1748,20 @@ const HomePage: React.FC = () => {
               />
             ) : null}
 
-            {marketReviewReport ? (
-              <MarketReviewReportView
-                content={marketReviewReport}
-                payload={marketReviewPayload}
-                reportLanguage={liveMarketReviewLanguage}
-                className="mb-3"
-              />
-            ) : null}
-
-            {error ? (
+            {visibleReportError ? (
               <ApiErrorAlert
-                error={error}
+                error={visibleReportError}
                 className="mb-3"
                 actionLabel={isReportLoadFailure ? t('common.retry') : undefined}
                 onAction={isReportLoadFailure ? () => void retrySelectedRecord() : undefined}
                 onDismiss={clearError}
               />
             ) : null}
-            {!marketReviewReport && isLoadingReport ? (
+            {isLoadingReport ? (
               <div className="flex h-full flex-col items-center justify-center">
                 <DashboardStateBlock title={t('home.loadingReport')} loading />
               </div>
-            ) : !marketReviewReport && selectedReport ? (
+            ) : selectedReport ? (
               <div className="space-y-4 pb-8">
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   {!isMarketReviewHistoryReport ? (
@@ -1734,7 +1861,17 @@ const HomePage: React.FC = () => {
                   />
                 )}
               </div>
-            ) : !marketReviewReport && !isReportLoadFailure ? (
+            ) : hasUnresolvedReportIntent && !reportDetailError ? (
+              <div className="flex h-full items-center justify-center">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void retrySelectedRecord()}
+                >
+                  {t('common.retry')}
+                </Button>
+              </div>
+            ) : !isReportLoadFailure ? (
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   title={t('home.startAnalysisTitle')}
@@ -1752,7 +1889,10 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {markdownDrawerOpen && selectedReport?.meta.id ? (
+      {markdownDrawerOpen
+      && !isLoadingReport
+      && selectedReport?.meta.id
+      && selectedReport.meta.id === homeUrlState.recordId ? (
         <ReportMarkdownDrawer
           key={selectedReport.meta.id}
           recordId={selectedReport.meta.id}

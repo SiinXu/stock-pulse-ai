@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Modal } from '../Modal';
 import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect';
@@ -143,6 +143,42 @@ describe('SearchableSelect', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '主要模型' }));
     expect(within(dialog).getByRole('listbox')).toBeInTheDocument();
     expect(within(dialog).getByRole('combobox')).toHaveFocus();
+  });
+
+  it('opens above a bottom-anchored trigger so the popup stays in the viewport', async () => {
+    const triggerRect = new DOMRect(21, 706, 348, 44);
+    const popupRect = new DOMRect(21, 754, 348, 299);
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.getAttribute('aria-label') === '主要模型') {
+          return triggerRect;
+        }
+        if (this.getAttribute('data-dialog-popup') === 'true') {
+          return popupRect;
+        }
+        return new DOMRect();
+      });
+    vi.stubGlobal('innerHeight', 844);
+
+    try {
+      render(
+        <Modal isOpen title="配置连接" onClose={() => {}}>
+          <SearchableSelect value="" onChange={() => {}} options={options} ariaLabel="主要模型" />
+        </Modal>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '主要模型' }));
+      const popup = screen.getByRole('listbox', { name: '主要模型' }).parentElement;
+      expect(popup).not.toBeNull();
+
+      await waitFor(() => {
+        const popupTop = Number.parseFloat(popup?.style.top ?? '');
+        expect(popupTop).toBeLessThan(triggerRect.top);
+        expect(popupTop + popupRect.height).toBeLessThanOrEqual(window.innerHeight - 8);
+      });
+    } finally {
+      rectSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('lets Escape close the popup without dismissing its parent modal', () => {

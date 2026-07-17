@@ -87,6 +87,7 @@ PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER = (
 Base = declarative_base()
 
 if TYPE_CHECKING:
+    from src.analyzer import AnalysisResult
     from src.search_service import SearchResponse
 
 
@@ -2719,7 +2720,7 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
     def save_analysis_history(
         self,
-        result: Any,
+        result: "AnalysisResult",
         query_id: str,
         report_type: str,
         news_content: Optional[str],

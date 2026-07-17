@@ -956,10 +956,12 @@ class LLMToolAdapter:
                 sig = provider_specific_fields.get("thought_signature")
                 if sig is None:
                     sig = getattr(tc, "thought_signature", None)
+                raw_tool_name = tc.function.name
+                tool_name = raw_tool_name if type(raw_tool_name) is str else ""
 
                 tool_calls.append(ToolCall(
                     id=tc.id,
-                    name=tc.function.name,
+                    name=tool_name,
                     arguments=args,
                     thought_signature=sig,
                     provider_specific_fields=provider_specific_fields,

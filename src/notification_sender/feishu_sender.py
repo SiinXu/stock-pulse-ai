@@ -248,7 +248,7 @@ class FeishuSender:
 
         return self._app_send_once(client, formatted)
 
-    def _app_send_chunked(self, client: Any, content: str) -> bool:
+    def _app_send_chunked(self, client: "_lark.Client", content: str) -> bool:
         """Chunk and send long content through App Bot."""
         try:
             chunks = chunk_content_by_max_bytes(
@@ -273,7 +273,7 @@ class FeishuSender:
                 time.sleep(1)
         return success
 
-    def _app_send_once(self, client: Any, content: str) -> bool:
+    def _app_send_once(self, client: "_lark.Client", content: str) -> bool:
         """Single-shot send via App Bot with card-first / text-fallback.
 
         Content received here has already been through ``format_feishu_markdown``
@@ -289,7 +289,7 @@ class FeishuSender:
         text_payload = json.dumps({"text": content}, ensure_ascii=False)
         return self._app_send_raw(client, "text", text_payload)
 
-    def _app_send_raw(self, client: Any, msg_type: str, content_json: str) -> bool:
+    def _app_send_raw(self, client: "_lark.Client", msg_type: str, content_json: str) -> bool:
         """Low-level send via lark-oapi SDK with retry and idempotency UUID.
 
         Request construction is done once outside the retry loop; it is

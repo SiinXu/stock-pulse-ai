@@ -15,6 +15,14 @@ interface ScoreGaugeProps {
 
 type SentimentKey = 'greed' | 'neutral' | 'fear';
 
+type GaugeVisualStyle = {
+  svgFilter?: string;
+  glowBlur: number;
+  glowOpacity: number;
+  glowStrokeExtra: number;
+  valueTextShadow?: string;
+};
+
 /**
  * Sentiment score gauge with an animated progress ring.
  * Dynamically calculates colors based on sentiment score.
@@ -74,12 +82,12 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
 
   // Size configuration for each gauge variant.
   const sizeConfig = {
-    sm: { width: 100, stroke: 8, fontSize: 'text-2xl', labelSize: 'text-xs' },
-    md: { width: 140, stroke: 10, fontSize: 'text-4xl', labelSize: 'text-sm' },
-    lg: { width: 180, stroke: 12, fontSize: 'text-5xl', labelSize: 'text-base' },
+    sm: { width: 100, stroke: 8, fontSize: 'text-2xl', labelSize: 'text-xs', gap: 6 },
+    md: { width: 140, stroke: 10, fontSize: 'text-4xl', labelSize: 'text-sm', gap: 8 },
+    lg: { width: 180, stroke: 12, fontSize: 'text-5xl', labelSize: 'text-base', gap: 10 },
   };
 
-  const { width, stroke, fontSize, labelSize } = sizeConfig[size];
+  const { width, stroke, fontSize, labelSize, gap } = sizeConfig[size];
   const radius = (width - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -91,16 +99,19 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   const sentimentConfig = {
     greed: {
       color: 'hsl(var(--primary))',
+      glowFilter: 'transparent',
       lightColor: 'hsl(var(--primary))',
       lightEndColor: 'hsl(var(--primary))',
     },
     neutral: {
       color: 'hsl(var(--secondary-text))',
+      glowFilter: 'transparent',
       lightColor: 'hsl(var(--secondary-text))',
       lightEndColor: 'hsl(var(--secondary-text))',
     },
     fear: {
       color: 'hsl(var(--destructive))',
+      glowFilter: 'transparent',
       lightColor: 'hsl(var(--destructive))',
       lightEndColor: 'hsl(var(--destructive))',
     },
@@ -116,6 +127,29 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
   const sentimentKey = getSentimentKey(animatedScore);
   const colors = sentimentConfig[sentimentKey];
   const uniqueId = `${sentimentKey}-${score}-${animatedScore.toFixed(0)}`;
+  // Preserve the established SVG layers while disabling decorative glow.
+  const gaugeTheme: GaugeVisualStyle = isDark
+    ? {
+        svgFilter: 'none',
+        glowBlur: 0,
+        glowOpacity: 0,
+        glowStrokeExtra: gap,
+        valueTextShadow: 'none',
+      }
+    : {
+        svgFilter: 'none',
+        glowBlur: 0,
+        glowOpacity: 0,
+        glowStrokeExtra: Math.max(3, gap * 0.55),
+        valueTextShadow: 'none',
+      };
+  const {
+    svgFilter,
+    glowBlur: overlayBlur,
+    glowOpacity: overlayOpacity,
+    glowStrokeExtra: overlayStrokeExtra,
+    valueTextShadow,
+  } = gaugeTheme;
 
   return (
     <div className={cn('flex flex-col items-center', className)}>
@@ -130,6 +164,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
           className="gauge-ring overflow-visible"
           width={width}
           height={width}
+          style={svgFilter ? { filter: svgFilter } : {}}
         >
           <defs>
             {/* Keep the progress gradient theme-aware without decorative effects. */}
@@ -146,6 +181,14 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
                 </>
               )}
             </linearGradient>
+
+            <filter id={`gauge-glow-${uniqueId}`}>
+              <feGaussianBlur stdDeviation={overlayBlur} result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
           {/* Background track */}
@@ -159,6 +202,20 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
             strokeLinecap="round"
             strokeDasharray={`${arcLength} ${circumference}`}
             transform={`rotate(135 ${width / 2} ${width / 2})`}
+          />
+
+          <circle
+            cx={width / 2}
+            cy={width / 2}
+            r={radius}
+            fill="none"
+            stroke={isDark ? colors.color : colors.lightColor}
+            strokeWidth={stroke + overlayStrokeExtra}
+            strokeLinecap="round"
+            strokeDasharray={`${progress} ${circumference}`}
+            transform={`rotate(135 ${width / 2} ${width / 2})`}
+            opacity={overlayOpacity}
+            filter={`url(#gauge-glow-${uniqueId})`}
           />
 
           {/* Progress arc */}
@@ -177,7 +234,10 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
 
         {/* Center value */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn('font-bold', fontSize, isDark ? 'text-white' : 'text-foreground')}>
+          <span
+            className={cn('font-bold', fontSize, isDark ? 'text-white' : 'text-foreground')}
+            style={valueTextShadow ? { textShadow: valueTextShadow } : {}}
+          >
             {displayScore}
           </span>
           {showLabel && (

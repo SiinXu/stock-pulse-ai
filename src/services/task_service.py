@@ -240,7 +240,7 @@ class TaskService:
                 e,
                 error_code="task_service_analysis_failed",
                 context={"stock_code": code, "task_id": task_id},
-                redaction_values=exception_chain_redaction_values(e),
+                exception_redaction_values=exception_chain_redaction_values(e),
             )
 
             with self._tasks_lock:

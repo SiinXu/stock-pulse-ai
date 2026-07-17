@@ -253,6 +253,8 @@ jobs:
     env:
       DSA_PLAYWRIGHT_ARTIFACT_CANARY: stockpulse-playwright-canary-7f91c2a6b43d
       DSA_WEB_E2E_RUN_ID: ci-secret-bearing
+      DSA_WEB_E2E_CREDENTIAL_BEARING: "true"
+      DSA_WEB_E2E_TRACE: "off"
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v5
@@ -287,6 +289,9 @@ jobs:
       - name: 📦 Install frontend dependencies
         working-directory: apps/dsa-web
         run: npm ci
+      - name: 🔒 Playwright credential safety preflight
+        working-directory: apps/dsa-web
+        run: npm run test:e2e-security-preflight
       - name: 🎭 Install Playwright browsers
         working-directory: apps/dsa-web
         run: npx playwright install --with-deps chromium
@@ -304,10 +309,22 @@ jobs:
         id: artifact_scan
         if: always()
         run: python scripts/scan_playwright_artifacts.py "apps/dsa-web/test-results/${DSA_WEB_E2E_RUN_ID}/"
-      - name: 📤 Upload scanned Playwright diagnostics
+      - name: 📦 Stage allowlisted Playwright diagnostics
+        id: artifact_stage
         if: ${{ always() && steps.artifact_scan.outcome == 'success' }}
+        env:
+          SOURCE_DIR: apps/dsa-web/test-results/${{ env.DSA_WEB_E2E_RUN_ID }}
+          STAGING_DIR: ${{ runner.temp }}/playwright-upload
+        run: python scripts/stage_playwright_diagnostics.py "${SOURCE_DIR}" "${STAGING_DIR}"
+      - name: 🔐 Scan staged Playwright diagnostics
+        id: staged_artifact_scan
+        if: ${{ always() && steps.artifact_scan.outcome == 'success' && steps.artifact_stage.outcome == 'success' }}
+        run: python scripts/scan_playwright_artifacts.py "${{ runner.temp }}/playwright-upload/"
+      - name: 📤 Upload scanned Playwright diagnostics
+        if: ${{ always() && steps.artifact_scan.outcome == 'success' && steps.artifact_stage.outcome == 'success' && steps.staged_artifact_scan.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: playwright-artifacts
-          path: apps/dsa-web/test-results/${{ env.DSA_WEB_E2E_RUN_ID }}/
+          path: ${{ runner.temp }}/playwright-upload/
+          if-no-files-found: error
           retention-days: 7

@@ -902,7 +902,7 @@ class AnalysisTaskQueue:
                 e,
                 error_code="analysis_task_failed",
                 context={"task_id": task_id, "stock_code": stock_code},
-                redaction_values=redaction_values,
+                exception_redaction_values=redaction_values,
             )
             
             with self._data_lock:
@@ -1004,7 +1004,7 @@ class AnalysisTaskQueue:
                 e,
                 error_code="background_task_failed",
                 context={"task_id": task_id, "stock_code": task.stock_code},
-                redaction_values=redaction_values,
+                exception_redaction_values=redaction_values,
             )
 
             with self._data_lock:

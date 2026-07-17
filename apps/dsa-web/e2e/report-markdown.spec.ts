@@ -43,7 +43,9 @@ test.describe('ReportMarkdown component', () => {
     await detailedReportButton.click();
 
     // Verify drawer content is visible
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible();
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: '完整分析报告' }),
+    ).toBeVisible();
 
     // Click copy markdown button
     const copyMarkdownButton = page.getByRole('button', { name: '复制 Markdown 源码' });
@@ -90,7 +92,9 @@ test.describe('ReportMarkdown component', () => {
     await detailedReportButton.click();
 
     // Verify drawer content is visible
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible();
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: '完整分析报告' }),
+    ).toBeVisible();
 
     // Click copy plain text button
     const copyPlainTextButton = page.getByRole('button', { name: '复制纯文本' });
@@ -137,7 +141,9 @@ test.describe('ReportMarkdown component', () => {
     await detailedReportButton.click();
 
     // Verify drawer content is visible (this ensures drawer is fully open)
-    await expect(page.getByRole('dialog').getByText('完整分析报告')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: '完整分析报告' }),
+    ).toBeVisible({ timeout: 10000 });
 
     // Verify toolbar buttons are visible and clickable on mobile
     const copyMarkdownButton = page.getByRole('button', { name: '复制 Markdown 源码' });

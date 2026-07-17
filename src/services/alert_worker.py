@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from src.notification import ChannelAttemptResult, NotificationDispatchResult
+    from src.config import Config
 
 ALERT_WORKER_FINGERPRINT_TTL_SECONDS = 24 * 60 * 60
 DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
@@ -207,7 +208,7 @@ class AlertWorker:
 
         return stats
 
-    def _load_runtime_rules(self, config: Any) -> List[RuntimeAlertRule]:
+    def _load_runtime_rules(self, config: Config) -> List[RuntimeAlertRule]:
         runtime_rules: List[RuntimeAlertRule] = []
         seen_keys = set()
 
@@ -254,7 +255,7 @@ class AlertWorker:
 
         return runtime_rules
 
-    def _load_legacy_rules(self, config: Any) -> List[Tuple[str, Any]]:
+    def _load_legacy_rules(self, config: Config) -> List[Tuple[str, Any]]:
         raw_rules = getattr(config, "agent_event_alert_rules_json", "")
         try:
             parsed_rules = parse_event_alert_rules(raw_rules)
