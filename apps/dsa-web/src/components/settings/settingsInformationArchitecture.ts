@@ -1,3 +1,5 @@
+import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
+import type { UiLanguage } from '../../i18n/uiLanguages';
 // Web-only settings Information Architecture (IA) mapping layer.
 //
 // The backend groups config under coarse `category` values (base, ai_model,
@@ -12,12 +14,9 @@
 // templates use — so the taxonomy is self-contained and testable. Navigation
 // components read these labels via `sectionLabel` / `viewLabel`.
 
-export type UiLang = 'zh' | 'en';
+export type UiLang = UiLanguage;
 
-interface BilingualLabel {
-  zh: string;
-  en: string;
-}
+type BilingualLabel = Record<UiLanguage, string>;
 
 export type SettingsSectionId =
   | 'overview'
@@ -51,76 +50,76 @@ export interface SettingsSection {
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'overview',
-    label: { zh: '概览', en: 'Overview' },
-    views: [{ id: 'readiness', label: { zh: '就绪状态', en: 'Readiness' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.0.label", { zh: '概览', en: 'Overview' }),
+    views: [{ id: 'readiness', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.0.views.0.label", { zh: '就绪状态', en: 'Readiness' }) }],
     defaultView: 'readiness',
   },
   {
     id: 'ai_models',
-    label: { zh: 'AI 与模型', en: 'AI & Models' },
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.1.label", { zh: 'AI 与模型', en: 'AI & Models' }),
     views: [
-      { id: 'overview', label: { zh: '总览', en: 'Overview' } },
-      { id: 'connections', label: { zh: '模型接入', en: 'Model Access' } },
-      { id: 'task_routing', label: { zh: '任务路由', en: 'Task Routing' } },
-      { id: 'reliability', label: { zh: '可靠性', en: 'Reliability' } },
+      { id: 'overview', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.1.views.0.label", { zh: '总览', en: 'Overview' }) },
+      { id: 'connections', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.1.views.1.label", { zh: '模型接入', en: 'Model Access' }) },
+      { id: 'task_routing', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.1.views.2.label", { zh: '任务路由', en: 'Task Routing' }) },
+      { id: 'reliability', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.1.views.3.label", { zh: '可靠性', en: 'Reliability' }) },
     ],
     defaultView: 'connections',
   },
   {
     id: 'data_sources',
-    label: { zh: '数据源', en: 'Data Sources' },
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.2.label", { zh: '数据源', en: 'Data Sources' }),
     views: [
-      { id: 'sources', label: { zh: '行情与资讯', en: 'Sources' } },
-      { id: 'providers', label: { zh: '数据提供方', en: 'Providers' } },
+      { id: 'sources', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.2.views.0.label", { zh: '行情与资讯', en: 'Sources' }) },
+      { id: 'providers', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.2.views.1.label", { zh: '数据提供方', en: 'Providers' }) },
     ],
     defaultView: 'sources',
   },
   {
     id: 'agent_behavior',
-    label: { zh: 'Agent 行为', en: 'Agent Behavior' },
-    views: [{ id: 'execution', label: { zh: '执行', en: 'Execution' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.3.label", { zh: 'Agent 行为', en: 'Agent Behavior' }),
+    views: [{ id: 'execution', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.3.views.0.label", { zh: '执行', en: 'Execution' }) }],
     defaultView: 'execution',
   },
   {
     id: 'conversation',
-    label: { zh: '对话', en: 'Conversation' },
-    views: [{ id: 'context', label: { zh: '上下文', en: 'Context' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.4.label", { zh: '对话', en: 'Conversation' }),
+    views: [{ id: 'context', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.4.views.0.label", { zh: '上下文', en: 'Context' }) }],
     defaultView: 'context',
   },
   {
     id: 'reports',
-    label: { zh: '报告', en: 'Reports' },
-    views: [{ id: 'output', label: { zh: '输出', en: 'Output' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.5.label", { zh: '报告', en: 'Reports' }),
+    views: [{ id: 'output', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.5.views.0.label", { zh: '输出', en: 'Output' }) }],
     defaultView: 'output',
   },
   {
     id: 'alerts',
-    label: { zh: '告警与自动化', en: 'Alerts & Automation' },
-    views: [{ id: 'rules', label: { zh: '规则', en: 'Rules' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.6.label", { zh: '告警与自动化', en: 'Alerts & Automation' }),
+    views: [{ id: 'rules', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.6.views.0.label", { zh: '规则', en: 'Rules' }) }],
     defaultView: 'rules',
   },
   {
     id: 'notifications',
-    label: { zh: '通知', en: 'Notifications' },
-    views: [{ id: 'channels', label: { zh: '渠道', en: 'Channels' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.7.label", { zh: '通知', en: 'Notifications' }),
+    views: [{ id: 'channels', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.7.views.0.label", { zh: '渠道', en: 'Channels' }) }],
     defaultView: 'channels',
   },
   {
     id: 'backtesting',
-    label: { zh: '回测', en: 'Backtesting' },
-    views: [{ id: 'engine', label: { zh: '引擎', en: 'Engine' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.8.label", { zh: '回测', en: 'Backtesting' }),
+    views: [{ id: 'engine', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.8.views.0.label", { zh: '引擎', en: 'Engine' }) }],
     defaultView: 'engine',
   },
   {
     id: 'system_security',
-    label: { zh: '系统与安全', en: 'System & Security' },
-    views: [{ id: 'runtime', label: { zh: '运行时', en: 'Runtime' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.9.label", { zh: '系统与安全', en: 'System & Security' }),
+    views: [{ id: 'runtime', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.9.views.0.label", { zh: '运行时', en: 'Runtime' }) }],
     defaultView: 'runtime',
   },
   {
     id: 'advanced',
-    label: { zh: '高级', en: 'Advanced' },
-    views: [{ id: 'raw_config', label: { zh: '原始配置', en: 'Raw Config' } }],
+    label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.10.label", { zh: '高级', en: 'Advanced' }),
+    views: [{ id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.10.views.0.label", { zh: '原始配置', en: 'Raw Config' }) }],
     defaultView: 'raw_config',
   },
 ];

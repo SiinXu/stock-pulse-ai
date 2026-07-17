@@ -1,3 +1,4 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type {
   PortfolioCashDirection,
   PortfolioCorporateActionType,
@@ -9,6 +10,7 @@ import type {
 } from '../types/portfolio';
 import { toDateInputValue } from './format';
 import type { UiLanguage } from '../i18n/uiText';
+import { prefersChineseContent } from '../i18n/uiLanguages';
 import { formatUiText } from '../i18n/uiText';
 import {
   PORTFOLIO_CASH_DIRECTION_LABELS,
@@ -23,6 +25,21 @@ export type FxRefreshFeedback = {
 };
 
 export type PortfolioAlertVariant = 'info' | 'success' | 'warning' | 'danger';
+
+const POSITION_PRICE_LABELS = createUiLanguageRecord('utils.portfolioFormat.POSITION_PRICE_LABELS', {
+  zh: { missing: '缺价', realtime: '实时价', close: '收盘价', unknown: '未知来源' },
+  en: { missing: 'Price unavailable', realtime: 'Live price', close: 'Close', unknown: 'Unknown source' },
+});
+
+const BROKER_FALLBACK_NAMES: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord('utils.portfolioFormat.BROKER_FALLBACK_NAMES', {
+  zh: { huatai: '华泰', citic: '中信', cmb: '招商' },
+  en: { huatai: 'Huatai', citic: 'CITIC', cmb: 'CMB' },
+});
+
+const FX_REFRESH_TEXT = createUiLanguageRecord('utils.portfolioFormat.FX_REFRESH_TEXT', {
+  zh: { disabled: '汇率在线刷新已被禁用。', noPairs: '当前范围无可刷新的汇率对。', success: '汇率已刷新，共更新 {count} 对。', summary: '更新 {updated} 对，仍过期 {stale} 对，失败 {errors} 对。', stale: '已尝试刷新，但仍有部分货币对使用 stale/fallback 汇率。{summary}', partial: '在线刷新未完全成功。{summary}' },
+  en: { disabled: 'Online FX refresh is disabled.', noPairs: 'There are no FX pairs to refresh in this scope.', success: 'FX rates refreshed. {count} pairs updated.', summary: '{updated} updated, {stale} still stale, {errors} failed.', stale: 'Refresh completed, but some currency pairs still use stale or fallback rates. {summary}', partial: 'Online refresh did not fully succeed. {summary}' },
+});
 
 export function getTodayIso(): string {
   return toDateInputValue(new Date());
@@ -62,9 +79,7 @@ export function formatPositionMoney(value: number, row: PortfolioPositionItem, l
 }
 
 export function getPositionPriceLabel(row: PortfolioPositionItem, language: UiLanguage = 'zh'): string {
-  const labels = language === 'en'
-    ? { missing: 'Price unavailable', realtime: 'Live price', close: 'Close', unknown: 'Unknown source' }
-    : { missing: '缺价', realtime: '实时价', close: '收盘价', unknown: '未知来源' };
+  const labels = POSITION_PRICE_LABELS[language];
   if (!hasPositionPrice(row)) return labels.missing;
   if (row.priceSource === 'realtime_quote') {
     return row.priceProvider ? `${labels.realtime} · ${row.priceProvider}` : labels.realtime;
@@ -88,19 +103,13 @@ export function formatCorporateActionLabel(value: PortfolioCorporateActionType, 
 }
 
 export function formatBrokerLabel(value: string, displayName?: string, language: UiLanguage = 'zh'): string {
-  const fallbackNames: Record<UiLanguage, Record<string, string>> = {
-    zh: { huatai: '华泰', citic: '中信', cmb: '招商' },
-    en: { huatai: 'Huatai', citic: 'CITIC', cmb: 'CMB' },
-  };
-  const name = displayName?.trim() || fallbackNames[language][value];
-  if (name) return language === 'en' ? `${value} (${name})` : `${value}（${name}）`;
+  const name = displayName?.trim() || BROKER_FALLBACK_NAMES[language][value];
+  if (name) return prefersChineseContent(language) ? `${value}（${name}）` : `${value} (${name})`;
   return value;
 }
 
 export function buildFxRefreshFeedback(data: PortfolioFxRefreshResponse, language: UiLanguage = 'zh'): FxRefreshFeedback {
-  const text = language === 'en'
-    ? { disabled: 'Online FX refresh is disabled.', noPairs: 'There are no FX pairs to refresh in this scope.', success: 'FX rates refreshed. {count} pairs updated.', summary: '{updated} updated, {stale} still stale, {errors} failed.', stale: 'Refresh completed, but some currency pairs still use stale or fallback rates. {summary}', partial: 'Online refresh did not fully succeed. {summary}' }
-    : { disabled: '汇率在线刷新已被禁用。', noPairs: '当前范围无可刷新的汇率对。', success: '汇率已刷新，共更新 {count} 对。', summary: '更新 {updated} 对，仍过期 {stale} 对，失败 {errors} 对。', stale: '已尝试刷新，但仍有部分货币对使用 stale/fallback 汇率。{summary}', partial: '在线刷新未完全成功。{summary}' };
+  const text = FX_REFRESH_TEXT[language];
   if (data.refreshEnabled === false) {
     return {
       tone: 'neutral',

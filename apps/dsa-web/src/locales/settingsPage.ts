@@ -1,3 +1,4 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -138,14 +139,14 @@ const en: Record<keyof typeof zh, string> = {
   taskVisionModel: 'Vision model',
 };
 
-export const SETTINGS_PAGE_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_PAGE_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_PAGE_TEXT", { zh, en });
 
-export const SETTINGS_TASK_ROUTE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_TASK_ROUTE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_TASK_ROUTE_LABELS", {
   zh: { LITELLM_MODEL: zh.taskReportModel, MARKET_REVIEW_MODEL: zh.taskMarketReviewModel, AGENT_LITELLM_MODEL: zh.taskAgentModel, VISION_MODEL: zh.taskVisionModel },
   en: { LITELLM_MODEL: en.taskReportModel, MARKET_REVIEW_MODEL: en.taskMarketReviewModel, AGENT_LITELLM_MODEL: en.taskAgentModel, VISION_MODEL: en.taskVisionModel },
-};
+});
 
-export const SETTINGS_TASK_REFERENCE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_TASK_REFERENCE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_TASK_REFERENCE_LABELS", {
   zh: { LITELLM_MODEL: zh.routeReport, MARKET_REVIEW_MODEL: zh.routeMarketReview, AGENT_LITELLM_MODEL: zh.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: '备用' },
   en: { LITELLM_MODEL: en.routeReport, MARKET_REVIEW_MODEL: en.routeMarketReview, AGENT_LITELLM_MODEL: en.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: 'Fallback' },
-};
+});

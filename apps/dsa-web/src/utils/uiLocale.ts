@@ -1,9 +1,22 @@
 import type { UiLanguage } from '../i18n/uiText';
+import { UI_LANGUAGE_METADATA } from '../i18n/uiLanguages';
 
-export type UiLocale = 'zh-CN' | 'en-US';
+export type UiLocale = (typeof UI_LANGUAGE_METADATA)[UiLanguage]['intlLocale'];
 
 export function getUiLocale(language: UiLanguage): UiLocale {
-  return language === 'en' ? 'en-US' : 'zh-CN';
+  return UI_LANGUAGE_METADATA[language].intlLocale;
+}
+
+export function getUiListSeparator(language: UiLanguage): string {
+  return language === 'zh' || language === 'zh-TW' || language === 'ja' ? '、' : ', ';
+}
+
+export function getUiClauseSeparator(language: UiLanguage): string {
+  return language === 'zh' || language === 'zh-TW' ? '；' : '; ';
+}
+
+export function getUiColon(language: UiLanguage): string {
+  return language === 'zh' || language === 'zh-TW' || language === 'ja' ? '：' : ': ';
 }
 
 export function formatUiDateTime(

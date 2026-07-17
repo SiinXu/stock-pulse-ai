@@ -31,7 +31,7 @@ import { extractStockCodesFromMessage } from '../utils/chatStockCode';
 import { findMatchingStockCode, includesStockCode, normalizeStockCode } from '../utils/stockCode';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiTextKey } from '../i18n/uiText';
-import { formatUiDateTime } from '../utils/uiLocale';
+import { formatUiDateTime, getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 
@@ -684,7 +684,7 @@ const ChatPage: React.FC = () => {
       requestScrollToBottom('smooth');
       await startStream(payload, {
         skillNames: usedSkillNames,
-        skillName: usedSkillNames.join(language === 'en' ? ', ' : '、'),
+        skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
     [activeStockContext, getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
@@ -993,7 +993,7 @@ const ChatPage: React.FC = () => {
   );
 
   const selectedSkillSummary = selectedSkillIds.length > 0
-    ? getSkillNames(selectedSkillIds).join(language === 'en' ? ', ' : '、')
+    ? getSkillNames(selectedSkillIds).join(getUiListSeparator(language))
     : t('chat.generalAnalysis');
 
   return (
@@ -1468,7 +1468,7 @@ const ChatPage: React.FC = () => {
                       'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
                     )}
                   >
-                    <label className="flex min-h-11 items-center gap-1.5 text-sm cursor-pointer group">
+                    <label className="flex min-h-8 items-center gap-1.5 text-sm cursor-pointer group">
                       <input
                         type="checkbox"
                         name="general-analysis"
@@ -1490,7 +1490,7 @@ const ChatPage: React.FC = () => {
                       return (
                         <label
                           key={s.id}
-                          className={`flex min-h-11 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`flex min-h-8 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                           onMouseEnter={() => setShowSkillDesc(s.id)}
                           onMouseLeave={() => setShowSkillDesc(null)}
                         >

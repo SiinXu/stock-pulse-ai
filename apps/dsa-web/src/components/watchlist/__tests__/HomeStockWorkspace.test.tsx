@@ -51,9 +51,8 @@ describe('HomeStockWorkspace', () => {
       />,
     );
 
-    for (const tab of screen.getAllByRole('tab')) {
-      expect(tab).toHaveClass('h-11');
-    }
+    expect(screen.getByRole('tablist', { name: '工作台视图切换' })).toHaveClass('h-11');
+    expect(screen.getByRole('searchbox', { name: '搜索' })).toHaveClass('h-11');
     expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveClass('h-11');
     expect(screen.getByRole('button', { name: '添加自选股' })).toHaveClass('h-11', 'w-11');
     expect(screen.getByRole('button', { name: '从自选股移除 600519' })).toHaveClass('h-11', 'w-11');
@@ -105,9 +104,9 @@ describe('HomeStockWorkspace', () => {
       expect(panel).toHaveAttribute('aria-labelledby', selected.id);
       expect(tabs.every((tab) => tab.getAttribute('aria-controls') === panel.id)).toBe(true);
 
-      // The unified shell: tab bar and panel are siblings, so the tab bar
-      // keeps the same position/size no matter which tab renders.
-      expect(tablist.parentElement).toBe(panel.parentElement);
+      // The unified shell: filter toolbar and panel are siblings, so controls
+      // keep the same position/size no matter which tab renders.
+      expect(tablist.parentElement?.parentElement).toBe(panel.parentElement);
       expect(panel.contains(tablist)).toBe(false);
     },
   );

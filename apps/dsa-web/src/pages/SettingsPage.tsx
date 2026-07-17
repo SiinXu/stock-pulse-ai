@@ -6,6 +6,7 @@ import { useAuth, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { getUiListSeparator, getUiLocale } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
@@ -781,7 +782,7 @@ function formatSchedulerTimestamp(value: string | null | undefined, language: Ui
     return value;
   }
 
-  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'zh-CN', {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -1697,6 +1698,10 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const configItemByKey = useMemo(
+    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key, item])),
+    [itemsByCategory],
+  );
   // Page-level validation summary: every errored field, routed to its owning
   // section/view via the placement map so errors on a non-open section are
   // still reachable in one click (SR-19).
@@ -1710,16 +1715,20 @@ const SettingsPage: React.FC = () => {
       const target = parseModelAccessFieldKey(key)
         ? { section: 'ai_models', view: 'connections' }
         : placementForKey(categoryByKey[key] ?? '', key);
+      const item = configItemByKey.get(key);
+      const fallbackTitle = item?.schema?.title ?? key;
       entries.push({
         key,
-        label: uiLanguage === 'en' ? key : getFieldTitleZh(key, key),
+        label: uiLanguage === 'zh'
+          ? getFieldTitleZh(key, fallbackTitle)
+          : fallbackTitle,
         message: firstError.message,
         section: target.section,
         view: target.view,
       });
     }
     return entries;
-  }, [issueByKey, categoryByKey, uiLanguage]);
+  }, [issueByKey, categoryByKey, configItemByKey, uiLanguage]);
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
     if (parseModelAccessFieldKey(entry.key)) {
@@ -1757,18 +1766,11 @@ const SettingsPage: React.FC = () => {
   const isAiOverview = activeSection === 'ai_models' && activeView === 'overview';
   // Task Routing view: the single place to edit which model each task uses.
   const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
-  const aiModelItemByKey = useMemo(
-    // Placement, not the legacy category, owns these dedicated model views.
-    // This includes inferred keys such as VISION_MODEL that may arrive in a
-    // different backend category while still declaring task_routing ownership.
-    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key, item])),
-    [itemsByCategory],
-  );
   const pickAiModelItems = useCallback(
     (keys: string[]) => keys
-      .map((key) => aiModelItemByKey.get(key))
+      .map((key) => configItemByKey.get(key))
       .filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    [aiModelItemByKey],
+    [configItemByKey],
   );
   // Task Routing is the single canonical editor for per-task models and the
   // generation temperature. Fallback order is edited under Reliability only, so
@@ -1778,7 +1780,7 @@ const SettingsPage: React.FC = () => {
       .filter((item) => item.schema?.uiPlacement === 'task_routing'),
     [pickAiModelItems],
   );
-  const fallbackRoutingItem = aiModelItemByKey.get('LITELLM_FALLBACK_MODELS');
+  const fallbackRoutingItem = configItemByKey.get('LITELLM_FALLBACK_MODELS');
   const hasSafeFallbackPlacement = fallbackRoutingItem?.schema?.uiPlacement === 'task_routing';
   // Config keys whose value is a single model route (rendered via the selector).
   const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
@@ -2833,7 +2835,7 @@ const SettingsPage: React.FC = () => {
                   selectSectionView(target.section, target.view);
                 }}
                 onRunSmoke={handleRunSetupSmoke}
-                listSeparator={uiLanguage === 'en' ? ', ' : '、'}
+                listSeparator={getUiListSeparator(uiLanguage)}
                 t={t}
               />
             ) : null}
@@ -3227,7 +3229,7 @@ const SettingsPage: React.FC = () => {
                       ? allValuesByKey.LITELLM_FALLBACK_MODELS
                         .split(',')
                         .map((entry) => formatConfiguredModel(entry.trim()))
-                        .join(uiLanguage === 'en' ? ', ' : '、')
+                        .join(getUiListSeparator(uiLanguage))
                       : settingsText.noneSet}
                   </span>
                   {hasSafeFallbackPlacement ? (

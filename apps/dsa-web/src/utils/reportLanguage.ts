@@ -1,7 +1,11 @@
 import type { ReportLanguage } from '../types/analysis';
+import type { UiLanguage } from '../i18n/uiText';
 
 export const normalizeReportLanguage = (value?: string | null): ReportLanguage =>
   value === 'en' ? 'en' : value === 'ko' ? 'ko' : 'zh';
+
+export const getReportLanguageForUi = (language: UiLanguage): ReportLanguage =>
+  language === 'zh' || language === 'zh-TW' ? 'zh' : language === 'ko' ? 'ko' : 'en';
 
 const REPORT_TEXT = {
   zh: {

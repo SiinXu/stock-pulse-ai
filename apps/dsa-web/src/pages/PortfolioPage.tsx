@@ -8,7 +8,8 @@ import { getParsedApiError } from '../api/error';
 import { ApiErrorAlert, Card, Badge, ConfirmDialog, EmptyState, InlineAlert, Modal, Select } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import { formatUiText } from '../i18n/uiText';
+import { getUiClauseSeparator } from '../utils/uiLocale';
+import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { PORTFOLIO_LIMITATION_LABELS, PORTFOLIO_TEXT } from '../locales/portfolio';
 import type { FxRefreshFeedback } from '../utils/portfolioFormat';
 import {
@@ -135,7 +136,7 @@ function isNewerSignal(left: DecisionSignalItem | undefined, right: DecisionSign
   return getSignalTime(right) > getSignalTime(left);
 }
 
-function formatPortfolioLimitation(limitation: string, language: 'zh' | 'en'): string {
+function formatPortfolioLimitation(limitation: string, language: UiLanguage): string {
   return PORTFOLIO_LIMITATION_LABELS[language][limitation] ?? limitation;
 }
 
@@ -1056,7 +1057,7 @@ const PortfolioPage: React.FC = () => {
   const snapshotQualityMessage = snapshot?.dataQuality === 'partial' && snapshot.limitations?.length
     ? snapshot.limitations
       .map((limitation) => formatPortfolioLimitation(limitation, language))
-      .join(language === 'en' ? '; ' : '；')
+      .join(getUiClauseSeparator(language))
     : null;
 
   return (
@@ -1128,7 +1129,7 @@ const PortfolioPage: React.FC = () => {
             action={(
               <button
                 type="button"
-                className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-2 text-xs"
+                className="btn-secondary inline-flex !min-h-8 !min-w-0 items-center gap-2 !px-2.5 !py-1 text-xs"
                 onClick={() => {
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
@@ -1479,7 +1480,7 @@ const PortfolioPage: React.FC = () => {
         <button type="button" className="btn-secondary text-sm" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</button>
+        <button type="button" className="btn-secondary !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setEventModalOpen(true)}>{text.eventLog}</button>
       </div>
 

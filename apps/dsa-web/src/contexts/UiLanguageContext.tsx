@@ -1,7 +1,14 @@
 import type React from 'react';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { formatUiText, UI_TEXT, type UiLanguage, type UiTextKey, type UiTextParams } from '../i18n/uiText';
-import { getRuntimeInitialLanguage, getUiLanguageStorage, persistUiLanguage } from '../utils/uiLanguage';
+import { isUiLanguageTranslationsLoaded, loadUiLanguageTranslations } from '../i18n/translations';
+import {
+  applyUiLanguageToDocument,
+  getRuntimeInitialLanguage,
+  getUiLanguageStorage,
+  persistUiLanguage,
+  recoverFailedUiLanguageSwitch,
+} from '../utils/uiLanguage';
 
 type UiLanguageContextValue = {
   language: UiLanguage;
@@ -17,17 +24,34 @@ const fallbackContext: UiLanguageContextValue = {
 
 const UiLanguageContext = createContext<UiLanguageContextValue | null>(null);
 
-export const UiLanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<UiLanguage>(getRuntimeInitialLanguage);
+export const UiLanguageProvider: React.FC<{ children: React.ReactNode; initialLanguage?: UiLanguage }> = ({
+  children,
+  initialLanguage,
+}) => {
+  const [language, setLanguageState] = useState<UiLanguage>(() => initialLanguage ?? getRuntimeInitialLanguage());
+  const languageRequestRef = useRef(0);
 
   const setLanguage = useCallback((nextLanguage: UiLanguage) => {
-    setLanguageState(nextLanguage);
-    persistUiLanguage(getUiLanguageStorage(), nextLanguage);
+    const requestId = languageRequestRef.current + 1;
+    languageRequestRef.current = requestId;
+    const commit = () => {
+      if (languageRequestRef.current !== requestId) return;
+      setLanguageState(nextLanguage);
+      persistUiLanguage(getUiLanguageStorage(), nextLanguage);
+    };
+    if (isUiLanguageTranslationsLoaded(nextLanguage)) {
+      commit();
+      return;
+    }
+    void loadUiLanguageTranslations(nextLanguage).then(commit).catch(() => {
+      if (languageRequestRef.current !== requestId) return;
+      recoverFailedUiLanguageSwitch(nextLanguage);
+    });
   }, []);
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      document.documentElement.lang = language === 'en' ? 'en' : 'zh-CN';
+      applyUiLanguageToDocument(language);
     }
   }, [language]);
 

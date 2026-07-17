@@ -12,8 +12,9 @@ import type {
 import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import { getNotificationChannelLabel } from '../../locales/settingsNotifications';
+import type { UiLanguage } from '../../i18n/uiText';
 
-function getChannelOptions(language: 'zh' | 'en'): Array<{ value: NotificationTestChannel; label: string }> {
+function getChannelOptions(language: UiLanguage): Array<{ value: NotificationTestChannel; label: string }> {
   return [
     { value: 'wechat', label: getNotificationChannelLabel('wechat', language) },
     { value: 'feishu', label: getNotificationChannelLabel('feishu', language) },
