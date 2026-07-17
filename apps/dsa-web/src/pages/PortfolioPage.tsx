@@ -1129,7 +1129,7 @@ const PortfolioPage: React.FC = () => {
             action={(
               <button
                 type="button"
-                className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-2 text-xs"
+                className="btn-secondary inline-flex !min-h-8 !min-w-0 items-center gap-2 !px-2.5 !py-1 text-xs"
                 onClick={() => {
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
@@ -1480,7 +1480,7 @@ const PortfolioPage: React.FC = () => {
         <button type="button" className="btn-secondary text-sm" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</button>
+        <button type="button" className="btn-secondary !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</button>
         <button type="button" className="btn-secondary text-sm" onClick={() => setEventModalOpen(true)}>{text.eventLog}</button>
       </div>
 

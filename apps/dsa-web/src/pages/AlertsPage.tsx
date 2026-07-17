@@ -305,7 +305,7 @@ const AlertsPage: React.FC = () => {
         actions={(
           <button
             type="button"
-            className="btn-primary inline-flex items-center gap-2"
+            className="btn-primary inline-flex !min-h-9 !min-w-0 items-center gap-2 !px-3 !py-1.5 !text-xs"
             onClick={() => {
               setCreateError(null);
               setCreateRuleModalOpen(true);
@@ -352,7 +352,7 @@ const AlertsPage: React.FC = () => {
 
       <div className="flex h-full min-h-0 flex-col gap-4">
           <AlertRuleList
-            className="flex h-full min-h-0 flex-col"
+            className="flex flex-col"
             rules={rules}
             total={rulesTotal}
             page={rulesPage}
