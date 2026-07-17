@@ -3,6 +3,7 @@
 
 import copy
 import logging
+import pickle
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -1060,8 +1061,9 @@ def test_raising_exception_snapshot_set_copy_fails_closed_without_rerender(caplo
 def test_empty_exception_snapshot_markers_survive_set_union() -> None:
     left = EmptyFirstRotatingDiagnosticError()
     right = RaiseFirstRotatingDiagnosticError()
-    merged_values = set(exception_chain_redaction_values(left)) | set(
-        exception_chain_redaction_values(right)
+    merged_values = copy.deepcopy(
+        set(exception_chain_redaction_values(left))
+        | set(exception_chain_redaction_values(right))
     )
 
     assert sanitize_diagnostic_text(left, redaction_values=merged_values) == (
@@ -1083,6 +1085,30 @@ def test_exception_snapshot_survives_shallow_and_deep_copy() -> None:
             "EmptyFirstRotatingDiagnosticError: [REDACTED]"
         )
 
+    assert error.render_count == 1
+
+
+def test_plain_set_exception_snapshot_survives_deep_copy() -> None:
+    error = RotatingDiagnosticError()
+    plain_values = exception_chain_redaction_values(error).copy()
+
+    copied_values = copy.deepcopy(plain_values)
+
+    assert sanitize_diagnostic_text(error, redaction_values=copied_values) == (
+        "RotatingDiagnosticError: [REDACTED]"
+    )
+    assert error.render_count == 1
+
+
+def test_plain_set_exception_snapshot_survives_pickle_round_trip() -> None:
+    error = RotatingDiagnosticError()
+    plain_values = set(exception_chain_redaction_values(error))
+
+    copied_values = pickle.loads(pickle.dumps(plain_values))
+
+    assert sanitize_diagnostic_text(error, redaction_values=copied_values) == (
+        "RotatingDiagnosticError: [REDACTED]"
+    )
     assert error.render_count == 1
 
 

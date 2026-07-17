@@ -122,6 +122,16 @@ class _ExceptionRedactionValue(str):
         instance.snapshot = snapshot
         return instance
 
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo: dict[int, Any]):
+        memo[id(self)] = self
+        return self
+
+    def __reduce__(self):
+        return type(self), (str(self), self.snapshot)
+
 
 class _ExceptionRedactionMarker(str):
     """Keep provenance when an empty or failed snapshot is copied or merged."""
@@ -139,6 +149,16 @@ class _ExceptionRedactionMarker(str):
 
     def __ne__(self, other: object) -> bool:
         return self is not other
+
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo: dict[int, Any]):
+        memo[id(self)] = self
+        return self
+
+    def __reduce__(self):
+        return type(self), (self.snapshot,)
 
 
 class _ExceptionRedactionValues(set[str]):
