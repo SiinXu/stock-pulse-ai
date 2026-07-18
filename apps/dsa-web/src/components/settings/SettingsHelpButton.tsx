@@ -58,7 +58,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
     >
       <button
         type="button"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-text transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15"
         aria-label={helpButtonLabel}
       >
         <Info aria-hidden="true" className="h-4 w-4" />

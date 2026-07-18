@@ -1188,7 +1188,7 @@ describe('SettingsField', () => {
     );
 
     const helpTrigger = screen.getByRole('button', { name: '查看 自选股列表 配置说明' });
-    expect(helpTrigger).toHaveClass('h-7', 'w-7');
+    expect(helpTrigger).toHaveClass('h-11', 'w-11');
     fireEvent.mouseEnter(helpTrigger.parentElement!);
 
     const tooltip = screen.getByRole('tooltip');

@@ -380,8 +380,8 @@ async function expectOverlayIsolated(overlay: Locator, isolated: boolean) {
   }
 }
 
-test.describe('Settings Help shared overlay contract', () => {
-  test('320px Help stays in bounds, traps focus, and restores page state', async ({ page }) => {
+test.describe('Settings Help shared tooltip contract', () => {
+  test('320px Help stays in bounds without isolating the page', async ({ page }) => {
     await openOverlayFixture(page, 320);
     await page.evaluate(() => {
       document.body.style.overflow = 'clip';
@@ -392,26 +392,19 @@ test.describe('Settings Help shared overlay contract', () => {
     expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
 
     await trigger.click();
-    const dialog = page.getByRole('dialog', { name: 'Watchlist' });
-    const close = dialog.getByRole('button', { name: 'Close configuration help' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('#root')).toHaveAttribute('inert', '');
-    await expect(page.locator('#root')).toHaveAttribute('aria-hidden', 'true');
-    await expectBodyOverflow(page, 'hidden');
-    await expectFocusWithin(dialog);
-    const dialogBox = await dialog.boundingBox();
-    expect(dialogBox).not.toBeNull();
-    expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
-    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(320);
-    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    const closeBox = await close.boundingBox();
-    expect(closeBox?.width).toBeGreaterThanOrEqual(44);
-    expect(closeBox?.height).toBeGreaterThanOrEqual(44);
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden', 'true');
+    await expectBodyOverflow(page, 'clip');
+    const tooltipBox = await tooltip.boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox!.x).toBeGreaterThanOrEqual(0);
+    expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(320);
+    expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 
-    await page.keyboard.press('Tab');
-    await expectFocusWithin(dialog);
-    await close.click();
-    await expect(dialog).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(tooltip).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
     await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden', 'true');
@@ -424,18 +417,17 @@ test.describe('Settings Help shared overlay contract', () => {
     await trigger.focus();
     await trigger.click();
 
-    const dialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expect(dialog).toBeVisible();
-    await expectFocusWithin(dialog);
-    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.keyboard.press('Escape');
 
-    await expect(dialog).toHaveCount(0);
+    await expect(tooltip).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectBodyOverflow(page, '');
   });
 
-  test('Help over Modal closes topmost-first and keeps the lower modal isolated', async ({ page }) => {
+  test('Help over Modal closes without closing or isolating the modal', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
     await opener.click();
@@ -444,12 +436,13 @@ test.describe('Settings Help shared overlay contract', () => {
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
     await helpTrigger.click();
 
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expectOverlayIsolated(outerOverlay, true);
+    const helpTooltip = page.getByRole('tooltip');
+    await expect(helpTooltip).toBeVisible();
+    await expectOverlayIsolated(outerOverlay, false);
     await expectBodyOverflow(page, 'hidden');
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(helpTooltip).toHaveCount(0);
     await expect(outerDialog).toBeVisible();
     await expectOverlayIsolated(outerOverlay, false);
     await expect(helpTrigger).toBeFocused();
@@ -462,7 +455,7 @@ test.describe('Settings Help shared overlay contract', () => {
     await expectBodyOverflow(page, '');
   });
 
-  test('Help over Drawer closes topmost-first and restores the Drawer trigger', async ({ page }) => {
+  test('Help over Drawer closes without closing or isolating the drawer', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-drawer');
     await opener.click();
@@ -471,11 +464,12 @@ test.describe('Settings Help shared overlay contract', () => {
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Drawer help configuration help' });
     await helpTrigger.click();
 
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expectOverlayIsolated(outerOverlay, true);
+    const helpTooltip = page.getByRole('tooltip');
+    await expect(helpTooltip).toBeVisible();
+    await expectOverlayIsolated(outerOverlay, false);
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(helpTooltip).toHaveCount(0);
     await expect(outerDialog).toBeVisible();
     await expectOverlayIsolated(outerOverlay, false);
     await expect(helpTrigger).toBeFocused();
@@ -487,31 +481,31 @@ test.describe('Settings Help shared overlay contract', () => {
     await expectBodyOverflow(page, '');
   });
 
-  test('ConfirmDialog above Help is the only Escape target and restores Help focus', async ({ page }) => {
+  test('ConfirmDialog above Help remains the only Escape target and restores Help focus', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
     await opener.click();
     const outerDialog = page.getByRole('dialog', { name: 'Outer modal' });
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
     await helpTrigger.click();
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    const helpOverlay = page.locator('[data-overlay-root="modal"]').filter({ hasText: 'Watchlist' });
+    await expect(page.getByRole('tooltip')).toBeVisible();
 
     await page.getByTestId('open-confirm').evaluate((element: HTMLElement) => element.click());
     const confirmDialog = page.getByRole('dialog', { name: 'Confirm contract action' });
     await expect(confirmDialog).toBeVisible();
-    await expectOverlayIsolated(helpOverlay, true);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expectFocusWithin(confirmDialog);
     await page.keyboard.press('Escape');
 
     await expect(confirmDialog).toHaveCount(0);
-    await expect(helpDialog).toBeVisible();
-    await expectOverlayIsolated(helpOverlay, false);
-    await expectFocusWithin(helpDialog);
+    await expect(outerDialog).toBeVisible();
+    await expect(helpTrigger).toBeFocused();
+    const restoredTooltip = page.getByRole('tooltip');
+    await expect(restoredTooltip).toBeVisible();
     await expectBodyOverflow(page, 'hidden');
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(restoredTooltip).toHaveCount(0);
     await expect(outerDialog).toBeVisible();
     await expect(helpTrigger).toBeFocused();
     await expectBodyOverflow(page, 'hidden');
