@@ -3657,6 +3657,13 @@
               "$ref": "#/components/schemas/SystemConfigItem"
             }
           },
+          "configured_notification_channels": {
+            "type": "array",
+            "description": "由当前 live Config 快照通过通知运行时检测器计算的可路由静态渠道；reload_now=false 时保持旧运行时状态，旧服务端可省略",
+            "items": {
+              "type": "string"
+            }
+          },
           "updated_at": {
             "type": "string",
             "format": "date-time"

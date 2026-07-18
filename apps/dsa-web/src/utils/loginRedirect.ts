@@ -1,11 +1,17 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 const REDIRECT_VALIDATION_ORIGIN = 'https://login-redirect.invalid';
+const UNICODE_WHITE_SPACE_PATTERN = /\p{White_Space}/u;
 
 function hasUnsafeRedirectCharacter(value: string): boolean {
   for (const character of value) {
     const codePoint = character.codePointAt(0) ?? 0;
-    if (codePoint <= 0x20 || codePoint === 0x7f || character === '\\') {
+    if (
+      codePoint <= 0x20
+      || codePoint === 0x7f
+      || character === '\\'
+      || UNICODE_WHITE_SPACE_PATTERN.test(character)
+    ) {
       return true;
     }
   }
@@ -27,6 +33,10 @@ export function resolveLoginRedirect(search: string | URLSearchParams): string {
     const validationOrigin = new URL(REDIRECT_VALIDATION_ORIGIN);
     const destination = new URL(raw, validationOrigin);
     if (destination.origin !== validationOrigin.origin) {
+      return '/';
+    }
+
+    if (!destination.pathname.startsWith('/') || destination.pathname.startsWith('//')) {
       return '/';
     }
 

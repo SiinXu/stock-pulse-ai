@@ -27,6 +27,13 @@ from src.services.system_config_service import ConfigConflictError, ConfigImport
 
 class SystemConfigServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
+        self._saved_notification_env = {
+            key: os.environ[key]
+            for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP
+            if key in os.environ
+        }
+        for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
+            os.environ.pop(key, None)
         # A developer .env leaked into os.environ (e.g. litellm's load_dotenv at
         # import) must not bleed LLM config into these tests; the temp .env below
         # is the authoritative source. Restored in tearDown.
@@ -58,6 +65,9 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             os.environ.pop("ENV_FILE", None)
         else:
             os.environ["ENV_FILE"] = self._orig_env_file
+        for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
+            os.environ.pop(key, None)
+        os.environ.update(self._saved_notification_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 
@@ -615,6 +625,127 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             payload_without_schema["mask_token"],
         )
         self.assertNotIn("secret-key-value", str(payload_without_schema))
+
+    def test_get_config_notification_status_ignores_unrelated_advanced_values(self) -> None:
+        self._rewrite_env(
+            "WECHAT_WEBHOOK_URL=https://qyapi.example.com/hook",
+            "WECHAT_MAX_BYTES=not-an-integer",
+            "FEISHU_MAX_BYTES=also-not-an-integer",
+        )
+
+        payload = self.service.get_config(include_schema=False)
+
+        self.assertEqual(payload["configured_notification_channels"], ["wechat"])
+
+    def test_get_config_notification_status_honors_alternative_runtime_groups(self) -> None:
+        self._rewrite_env(
+            "FEISHU_APP_ID=cli_app",
+            "FEISHU_APP_SECRET=app-secret",
+            "FEISHU_CHAT_ID=oc_chat",
+            "DISCORD_BOT_TOKEN=discord-token",
+            "DISCORD_CHANNEL_ID=legacy-channel",
+            "SLACK_BOT_TOKEN=slack-token",
+            "SLACK_CHANNEL_ID=C123",
+        )
+
+        payload = self.service.get_config(include_schema=False)
+
+        self.assertEqual(
+            payload["configured_notification_channels"],
+            ["feishu", "discord", "slack"],
+        )
+
+    def test_get_config_notification_status_rejects_browser_normalized_urls(self) -> None:
+        self._rewrite_env(
+            "NTFY_URL=https:ntfy.example.com/topic",
+            "GOTIFY_URL=https:/gotify.example.com/base",
+            "GOTIFY_TOKEN=gotify-token",
+        )
+
+        payload = self.service.get_config(include_schema=False)
+
+        self.assertEqual(payload["configured_notification_channels"], [])
+
+    def test_get_config_notification_status_uses_live_runtime_snapshot(self) -> None:
+        """Saved values must not masquerade as already-reloaded runtime state."""
+        self._rewrite_env(
+            "DINGTALK_WEBHOOK_URL=https://saved.example.invalid/robot/send",
+        )
+        runtime = {"config": Config(stock_list=[])}
+        self.service = SystemConfigService(
+            manager=self.manager,
+            runtime_config_provider=lambda: runtime["config"],
+        )
+
+        before_reload = self.service.get_config(include_schema=False)
+        runtime["config"] = Config(
+            stock_list=[],
+            dingtalk_webhook_url="https://runtime.example.invalid/robot/send",
+        )
+        after_reload = self.service.get_config(include_schema=False)
+
+        self.assertEqual(before_reload["configured_notification_channels"], [])
+        self.assertEqual(after_reload["configured_notification_channels"], ["dingtalk"])
+
+    def test_update_without_reload_keeps_previous_runtime_notification_status(self) -> None:
+        runtime = {"config": Config(stock_list=[])}
+        self.service = SystemConfigService(
+            manager=self.manager,
+            runtime_config_provider=lambda: runtime["config"],
+        )
+
+        result = self.service.update(
+            config_version=self.manager.get_config_version(),
+            items=[
+                {
+                    "key": "DINGTALK_WEBHOOK_URL",
+                    "value": "https://saved.example.invalid/robot/send",
+                }
+            ],
+            reload_now=False,
+        )
+        payload = self.service.get_config(include_schema=False)
+
+        self.assertTrue(result["success"])
+        self.assertFalse(result["reload_triggered"])
+        self.assertEqual(payload["configured_notification_channels"], [])
+
+    def test_default_runtime_provider_reads_latest_config_instance(self) -> None:
+        first = Config(stock_list=[], dingtalk_webhook_url="https://first.example.invalid")
+        second = Config(
+            stock_list=[],
+            discord_bot_token="discord-secret",
+            discord_main_channel_id="legacy-channel",
+        )
+        self.service = SystemConfigService(manager=self.manager)
+
+        with patch.object(Config, "_load_from_env", side_effect=[first, second]):
+            Config.reset_instance()
+            first_payload = self.service.get_config(include_schema=False)
+            Config.reset_instance()
+            second_payload = self.service.get_config(include_schema=False)
+
+        self.assertEqual(first_payload["configured_notification_channels"], ["dingtalk"])
+        self.assertEqual(second_payload["configured_notification_channels"], ["discord"])
+
+    def test_runtime_notification_status_honors_process_only_and_legacy_config(self) -> None:
+        self._rewrite_env("STOCK_LIST=600519")
+        runtime_env = {
+            "DINGTALK_WEBHOOK_URL": "https://process.example.invalid/robot/send",
+            "DISCORD_BOT_TOKEN": "discord-secret",
+            "DISCORD_CHANNEL_ID": "legacy-channel",
+            "DISCORD_MAIN_CHANNEL_ID": "",
+        }
+
+        with patch.dict(os.environ, runtime_env, clear=False):
+            Config.reset_instance()
+            payload = self.service.get_config(include_schema=False)
+
+        Config.reset_instance()
+        self.assertEqual(
+            payload["configured_notification_channels"],
+            ["dingtalk", "discord"],
+        )
 
     def test_get_config_masks_alphasift_install_spec(self) -> None:
         self._rewrite_env(

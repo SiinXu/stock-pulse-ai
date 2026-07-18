@@ -32,6 +32,8 @@ for optional_module in ("litellm", "json_repair"):
 from src.config import Config
 from src.notification import NotificationBuilder, NotificationChannel, NotificationService
 from src.notification_noise import reset_notification_noise_state
+from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
+from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
 from bot.models import BotMessage, ChatType
 import requests
@@ -85,6 +87,28 @@ def _make_dingtalk_message() -> BotMessage:
             "sessionWebhook": "https://oapi.dingtalk.com/robot/sendBySession?session=abc123",
         },
     )
+
+
+class TestNotificationEndpointResolvers(unittest.TestCase):
+    def test_ntfy_malformed_authority_fails_closed(self) -> None:
+        endpoint = "https://user:private-token@[private-host.invalid/topic"
+
+        self.assertEqual(resolve_ntfy_endpoint(endpoint), (None, None))
+
+    def test_gotify_malformed_authority_fails_closed(self) -> None:
+        endpoint = "https://user:private-token@[private-host.invalid/base"
+
+        self.assertIsNone(resolve_gotify_message_endpoint(endpoint))
+
+    def test_notification_endpoints_reject_userinfo_and_invalid_ports(self) -> None:
+        for endpoint in (
+            "https://user:private-token@example.invalid/topic",
+            "https://user:private-token＠example.invalid/topic",
+            "https://example.invalid:not-a-port/topic",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(resolve_ntfy_endpoint(endpoint), (None, None))
+                self.assertIsNone(resolve_gotify_message_endpoint(endpoint))
 
 
 def _make_telegram_message() -> BotMessage:

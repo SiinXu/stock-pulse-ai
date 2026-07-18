@@ -30,6 +30,11 @@ describe('resolveLoginRedirect', () => {
     expect(resolveLoginRedirect('?redirect=javascript%3Aalert(1)')).toBe('/');
   });
 
+  it('rejects paths that normalize to a protocol-relative destination', () => {
+    expect(resolveLoginRedirect('?redirect=/%2e%2e//evil.example')).toBe('/');
+    expect(resolveLoginRedirect('?redirect=/%252e%252e//evil.example')).toBe('/');
+  });
+
   it.each([
     ['tab', '?redirect=%2F%09%2Fevil.example.com'],
     ['line feed', '?redirect=%2F%0A%2Fevil.example.com'],
@@ -51,4 +56,25 @@ describe('resolveLoginRedirect', () => {
       expect(resolveLoginRedirect(params)).toBe('/');
     },
   );
+
+  it.each([
+    ['non-breaking space', '\u00a0'],
+    ['line separator', '\u2028'],
+    ['em space', '\u2003'],
+    ['ideographic space', '\u3000'],
+  ])('rejects Unicode White_Space characters such as %s', (_label, whitespace) => {
+    const params = new URLSearchParams();
+    params.set('redirect', `/safe${whitespace}path`);
+
+    expect(resolveLoginRedirect(params)).toBe('/');
+  });
+
+  it('preserves ordinary Unicode paths with query strings and hashes', () => {
+    const params = new URLSearchParams();
+    params.set('redirect', '/持仓/腾讯?视图=详情#摘要');
+
+    expect(resolveLoginRedirect(params)).toBe(
+      '/%E6%8C%81%E4%BB%93/%E8%85%BE%E8%AE%AF?%E8%A7%86%E5%9B%BE=%E8%AF%A6%E6%83%85#%E6%91%98%E8%A6%81',
+    );
+  });
 });

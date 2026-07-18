@@ -23,7 +23,6 @@ import {
   DataProvidersPanel,
   NotificationTestPanel,
   isNotificationChannelKey,
-  getConfiguredRoutingValues,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
   getNotificationFieldOrder,
@@ -1194,6 +1193,7 @@ const SettingsPage: React.FC = () => {
     refreshAfterExternalSave,
     configVersion,
     maskToken,
+    configuredNotificationChannels,
   } = useSystemConfig(initialTab);
   // Authoritative provider catalog (single source of truth) for the wizard and
   // the model-access page.
@@ -1642,11 +1642,14 @@ const SettingsPage: React.FC = () => {
     }
     return keys;
   }, [itemsByCategory]);
-  // Channel routing fields only offer channels the user has configured;
-  // otherwise they get an empty state that links to the channel setup view.
+  // Channel routing fields only offer channels the backend confirms are
+  // configured. A null status means an older backend omitted the authority
+  // field during a rolling upgrade; in that case leave the catalog unfiltered
+  // instead of misrepresenting "unknown" as "none configured".
+  const hasConfiguredNotificationChannelStatus = configuredNotificationChannels !== null;
   const configuredRoutingValues = useMemo(
-    () => getConfiguredRoutingValues(allValuesByKey),
-    [allValuesByKey],
+    () => new Set(configuredNotificationChannels ?? []),
+    [configuredNotificationChannels],
   );
   const channelRoutingOptionFilter = useCallback(
     (optionValue: string) => configuredRoutingValues.has(optionValue),
@@ -2511,8 +2514,16 @@ const SettingsPage: React.FC = () => {
                       requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
                       dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                       readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-                      enumOptionFilter={CHANNEL_ROUTING_FIELD_KEYS.has(item.key) ? channelRoutingOptionFilter : undefined}
-                      enumEmptyState={CHANNEL_ROUTING_FIELD_KEYS.has(item.key) ? channelRoutingEmptyState : undefined}
+                      enumOptionFilter={
+                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
+                          ? channelRoutingOptionFilter
+                          : undefined
+                      }
+                      enumEmptyState={
+                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
+                          ? channelRoutingEmptyState
+                          : undefined
+                      }
                     />
                   ))}
                 </form>

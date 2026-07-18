@@ -118,6 +118,8 @@ export interface SystemConfigResponse {
   configVersion: string;
   maskToken: string;
   items: SystemConfigItem[];
+  /** Omitted by older backends; useSystemConfig exposes that absence as null (unknown). */
+  configuredNotificationChannels?: string[];
   updatedAt?: string;
 }
 

@@ -7,6 +7,7 @@ import type {
   ConfigValidationIssue,
   SystemConfigCategorySchema,
   SystemConfigItem,
+  SystemConfigResponse,
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
@@ -76,6 +77,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
   const [serverItems, setServerItems] = useState<SystemConfigItem[]>([]);
+  const [configuredNotificationChannels, setConfiguredNotificationChannels] = useState<string[] | null>(null);
 
   // UI state. The active tab may be seeded from the URL so deep links / refresh
   // restore the same category; applyServerPayload keeps it if the category loads.
@@ -98,6 +100,11 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   // instead of submitting a second, stale-version transaction concurrently.
   const savePromiseRef = useRef<Promise<SaveResult> | null>(null);
   const loadRequestIdRef = useRef(0);
+  // Every request that can produce a server snapshot shares this epoch. A
+  // response may update server state only while it is still the newest such
+  // request, regardless of whether it came from load, save, conflict recovery,
+  // or an external-editor refresh.
+  const serverSnapshotEpochRef = useRef(0);
   // Set when a save is rejected with a 409; carries the field-level three-way
   // diff (base/server/local) so the UI can resolve conflicts without clobbering.
   const [conflictState, setConflictState] = useState<ConfigConflictState | null>(null);
@@ -195,6 +202,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         preserveDirty?: boolean;
         committedKeys?: string[];
         committedValues?: Record<string, string>;
+        configuredNotificationChannels?: string[] | null;
       },
     ) => {
       const sorted = sortItemsByOrder(items);
@@ -206,6 +214,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       setServerItems(sorted);
       setConfigVersion(version);
       setMaskToken(token || '******');
+      setConfiguredNotificationChannels(options?.configuredNotificationChannels ?? null);
 
       setDraftValues((prevDraft) => {
         const nextDraft: Record<string, string> = {};
@@ -271,9 +280,58 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     [],
   );
 
+  const beginServerSnapshotRequest = useCallback(() => {
+    serverSnapshotEpochRef.current += 1;
+    return serverSnapshotEpochRef.current;
+  }, []);
+
+  const applyServerSnapshot = useCallback((
+    snapshot: SystemConfigResponse,
+    epoch: number,
+    options?: {
+      preserveDirty?: boolean;
+      committedKeys?: string[];
+      committedValues?: Record<string, string>;
+    },
+  ): boolean => {
+    if (serverSnapshotEpochRef.current !== epoch) {
+      return false;
+    }
+    applyServerPayload(snapshot.items, snapshot.configVersion, snapshot.maskToken, {
+      ...options,
+      configuredNotificationChannels: snapshot.configuredNotificationChannels ?? null,
+    });
+    return true;
+  }, [applyServerPayload]);
+
+  const refreshCommittedSnapshot = useCallback(async (
+    committedKeys: string[],
+    committedValues?: Record<string, string>,
+  ): Promise<void> => {
+    const snapshotEpoch = beginServerSnapshotRequest();
+    try {
+      const refreshed = await systemConfigApi.getConfig(true);
+      applyServerSnapshot(refreshed, snapshotEpoch, {
+        preserveDirty: true,
+        committedKeys,
+        committedValues,
+      });
+    } catch (error: unknown) {
+      // The update POST already committed. If a newer load/refresh owns server
+      // state now, this obsolete refresh failure must not turn that committed
+      // save into a UI error. A failure of the current refresh keeps the
+      // existing save-failed/retry behavior.
+      if (serverSnapshotEpochRef.current !== snapshotEpoch) {
+        return;
+      }
+      throw error;
+    }
+  }, [applyServerSnapshot, beginServerSnapshotRequest]);
+
   const load = useCallback(async (): Promise<boolean> => {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
+    const snapshotEpoch = beginServerSnapshotRequest();
     setIsLoading(true);
     setLoadError(null);
     setRetryAction(null);
@@ -283,12 +341,17 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       if (loadRequestIdRef.current !== requestId) {
         return false;
       }
-      applyServerPayload(config.items, config.configVersion, config.maskToken);
+      if (!applyServerSnapshot(config, snapshotEpoch)) {
+        return false;
+      }
       setConflictState(null);
       setToast(null);
       return true;
     } catch (error: unknown) {
-      if (loadRequestIdRef.current !== requestId) {
+      if (
+        loadRequestIdRef.current !== requestId
+        || serverSnapshotEpochRef.current !== snapshotEpoch
+      ) {
         return false;
       }
       setLoadError(getParsedApiError(error));
@@ -299,7 +362,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         setIsLoading(false);
       }
     }
-  }, [applyServerPayload]);
+  }, [applyServerSnapshot, beginServerSnapshotRequest]);
 
   const resetDraft = useCallback(() => {
     const next: Record<string, string> = {};
@@ -347,13 +410,9 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
 
   const refreshAfterExternalSave = useCallback(
     async (committedKeys: string[]) => {
-      const config = await systemConfigApi.getConfig(true);
-      applyServerPayload(config.items, config.configVersion, config.maskToken, {
-        preserveDirty: true,
-        committedKeys,
-      });
+      await refreshCommittedSnapshot(committedKeys);
     },
-    [applyServerPayload],
+    [refreshCommittedSnapshot],
   );
 
   const setDraftValue = useCallback((key: string, value: string) => {
@@ -407,7 +466,11 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
   const buildConflictState = useCallback(
     async (submittedItems: SystemConfigUpdateItem[]): Promise<ConfigConflictState> => {
       const baseByKey = serverItemByKeyRef.current;
+      const snapshotEpoch = beginServerSnapshotRequest();
       const latest = await systemConfigApi.getConfig(true);
+      if (serverSnapshotEpochRef.current !== snapshotEpoch) {
+        throw new Error('Server snapshot request was superseded');
+      }
       const latestByKey = new Map(latest.items.map((item) => [item.key, item]));
       const conflictFields: ConfigConflictField[] = [];
       for (const submitted of submittedItems) {
@@ -441,12 +504,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       }
       // Adopt the latest snapshot as the new base while preserving pending local
       // drafts (dirty keys stay editable; server-only changes are absorbed).
-      applyServerPayload(latest.items, latest.configVersion, latest.maskToken, {
+      applyServerSnapshot(latest, snapshotEpoch, {
         preserveDirty: true,
       });
       return { fields: conflictFields, serverVersion: latest.configVersion };
     },
-    [applyServerPayload],
+    [applyServerSnapshot, beginServerSnapshotRequest],
   );
 
   const runSave = useCallback(async (
@@ -506,15 +569,13 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         items: resolvedChangedItems,
       });
 
-      const refreshed = await systemConfigApi.getConfig(true);
       // Only clear drafts for the keys we just committed; preserve any other
       // pending edits (e.g. sensitive/excluded keys saved manually, or fields
       // edited while this save was in flight — see committedValues).
-      applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken, {
-        preserveDirty: true,
-        committedKeys: resolvedChangedItems.map((item) => item.key),
+      await refreshCommittedSnapshot(
+        resolvedChangedItems.map((item) => item.key),
         committedValues,
-      });
+      );
       setConflictState(null);
 
       const warningText = updateResult.warnings?.length
@@ -548,12 +609,10 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
               reloadNow: true,
               items: resolvedChangedItems,
             });
-            const refreshed = await systemConfigApi.getConfig(true);
-            applyServerPayload(refreshed.items, refreshed.configVersion, refreshed.maskToken, {
-              preserveDirty: true,
-              committedKeys: resolvedChangedItems.map((item) => item.key),
+            await refreshCommittedSnapshot(
+              resolvedChangedItems.map((item) => item.key),
               committedValues,
-            });
+            );
             setConflictState(null);
             const warningText = rebasedResult.warnings?.length
               ? `；警告：${rebasedResult.warnings.join('；')}`
@@ -594,12 +653,12 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       setIsSaving(false);
     }
   }, [
-    applyServerPayload,
     buildConflictState,
     configVersion,
     getChangedItems,
     hasDirty,
     maskToken,
+    refreshCommittedSnapshot,
   ]);
 
   // Serialize writes: a second save() while one is in flight reuses the pending
@@ -678,6 +737,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     configVersion,
     maskToken,
     serverItems,
+    configuredNotificationChannels,
     categories,
     itemsByCategory,
     issueByKey,

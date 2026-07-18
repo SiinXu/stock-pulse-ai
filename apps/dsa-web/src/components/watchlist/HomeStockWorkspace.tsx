@@ -6,9 +6,11 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Filter,
   Loader2,
   Play,
   Plus,
+  Search,
   Star,
   Trash2,
 } from 'lucide-react';
@@ -225,6 +227,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const { t } = useUiLanguage();
   const reactId = useId();
   const [draftCode, setDraftCode] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
     .length;
@@ -242,6 +245,31 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     if (batchStatus.variant === 'warning') return 'border-warning/30 bg-warning/10 text-warning';
     return 'border-success/30 bg-success/10 text-success';
   }, [batchStatus]);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredWatchlistRows = useMemo(() => {
+    if (!normalizedSearchQuery) return watchlistRows;
+    return watchlistRows.filter((row) => {
+      const stockName = row.latestItem?.stockName ?? '';
+      return (
+        row.code.toLowerCase().includes(normalizedSearchQuery) ||
+        stockName.toLowerCase().includes(normalizedSearchQuery)
+      );
+    });
+  }, [normalizedSearchQuery, watchlistRows]);
+  const filteredTodayItems = useMemo(() => {
+    if (!normalizedSearchQuery) return todayItems;
+    return todayItems.filter((item) => (
+      item.stockCode.toLowerCase().includes(normalizedSearchQuery) ||
+      (item.stockName ?? '').toLowerCase().includes(normalizedSearchQuery)
+    ));
+  }, [normalizedSearchQuery, todayItems]);
+  const filteredHistoryItems = useMemo(() => {
+    if (!normalizedSearchQuery) return historyItems;
+    return historyItems.filter((item) => (
+      item.stockCode.toLowerCase().includes(normalizedSearchQuery) ||
+      (item.stockName ?? '').toLowerCase().includes(normalizedSearchQuery)
+    ));
+  }, [historyItems, normalizedSearchQuery]);
 
   const handleAddSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -268,32 +296,46 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   };
 
   const renderTabs = (
-    <div
-      role="tablist"
-      aria-label={t('watchlist.tabsAria')}
-      onKeyDown={handleTabListKeyDown}
-      className="grid grid-cols-3 gap-1 rounded-xl border border-subtle bg-base/40 p-1"
-    >
-      {tabs.map((tab) => {
-        const selected = activeTab === tab.key;
-        return (
-          <button
-            key={tab.key}
-            id={tabId(tab.key)}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={panelId}
-            tabIndex={selected ? 0 : -1}
-            className={`h-11 rounded-lg px-2 text-xs font-medium transition-colors ${
-              selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
-            }`}
-            onClick={() => onTabChange(tab.key)}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+      <div
+        role="tablist"
+        aria-label={t('watchlist.tabsAria')}
+        onKeyDown={handleTabListKeyDown}
+        className="inline-flex h-11 items-center gap-1 rounded-lg border border-subtle bg-base/40 px-1"
+      >
+        <Filter className="ml-1 h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
+        {tabs.map((tab) => {
+          const selected = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              id={tabId(tab.key)}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={panelId}
+              tabIndex={selected ? 0 : -1}
+              className={`h-9 rounded-md px-2 text-xs font-medium transition-colors ${
+                selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
+              }`}
+              onClick={() => onTabChange(tab.key)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative min-w-0">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-text" aria-hidden="true" />
+        <Input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={t('common.searchPlaceholder')}
+          aria-label={t('layout.search')}
+          className="h-11 pl-8 pr-2"
+        />
+      </div>
     </div>
   );
 
@@ -316,7 +358,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   if (activeTab === 'history') {
     return workspaceShell(
       <StockBar
-        items={historyItems}
+        items={filteredHistoryItems}
         isLoading={isLoadingHistory}
         selectedStockCode={selectedStockCode}
         selectedRecordId={selectedRecordId}
@@ -442,13 +484,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               title={t('watchlist.emptyTitle')}
               description={t('watchlist.emptyDescription')}
             />
+          ) : filteredWatchlistRows.length === 0 ? (
+            <DashboardStateBlock compact title={t('common.noData')} />
           ) : (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('watchlist.listHint')}
               </div>
-              {watchlistRows.map((row) => (
+              {filteredWatchlistRows.map((row) => (
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
@@ -472,13 +516,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             title={t('watchlist.todayEmptyTitle')}
             description={t('watchlist.todayEmptyDescription')}
           />
+        ) : filteredTodayItems.length === 0 ? (
+          <DashboardStateBlock compact title={t('common.noData')} />
         ) : (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-muted-text">
               <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
               {t('watchlist.todaySortHint')}
             </div>
-            {todayItems.map((item) => (
+            {filteredTodayItems.map((item) => (
               <TodayItem key={`${item.stockCode}-${item.id}`} item={item} onClick={onHistoryItemClick} />
             ))}
           </div>

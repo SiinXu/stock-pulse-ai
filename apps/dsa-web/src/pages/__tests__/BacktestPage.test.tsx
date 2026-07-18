@@ -129,9 +129,9 @@ describe('BacktestPage', () => {
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
 
-    expect(filterInput).toHaveClass('h-11');
+    expect(filterInput).toHaveClass('h-9');
     expect(filterInput).toHaveClass('rounded-sm');
-    expect(windowInput).toHaveClass('h-11');
+    expect(windowInput).toHaveClass('h-9');
     expect(windowInput).toHaveClass('rounded-sm');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
@@ -245,7 +245,7 @@ describe('BacktestPage', () => {
     mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
-    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('h-11');
+    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('h-9');
     expect(screen.getByText('Evaluation window')).toBeInTheDocument();
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
@@ -453,8 +453,8 @@ describe('BacktestPage', () => {
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveClass('min-h-11', 'min-w-11');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(oneDayButton).toHaveClass('min-h-9', 'min-w-0');
+    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('min-h-9', 'min-w-0');
     const nextDayResults = createDeferred<{
       total: number;
       page: number;

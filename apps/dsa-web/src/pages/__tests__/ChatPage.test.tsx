@@ -650,8 +650,8 @@ describe('ChatPage', () => {
     expect(screen.getByRole('button', { name: '收起策略选择' })).toHaveAttribute('aria-expanded', 'true');
     expect(skillPanel).not.toHaveClass('hidden');
     expect(skillPanel).toHaveClass('flex');
-    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-8');
+    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-8');
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {

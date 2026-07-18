@@ -26,9 +26,9 @@ import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/de
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
 const BACKTEST_INPUT_CLASS =
-  'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-9 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const BACKTEST_COMPACT_INPUT_CLASS =
-  'h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-9 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
 
 type BacktestFilterSnapshot = {
@@ -528,7 +528,7 @@ const BacktestPage: React.FC = () => {
         {/* Visually hidden: the header is a dense filter toolbar, but the page
             still needs an h1 landmark for assistive technology. */}
         <h1 className="sr-only">{text.pageTitle}</h1>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <div className="relative min-w-0 flex-[1_1_220px]">
             <input
               type="text"
@@ -544,7 +544,7 @@ const BacktestPage: React.FC = () => {
             type="button"
             onClick={handleFilter}
             disabled={isLoadingResults}
-            className="btn-secondary flex items-center gap-1.5 whitespace-nowrap"
+            className="btn-secondary flex items-center gap-1.5 whitespace-nowrap !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs"
           >
             {text.filter}
           </button>
@@ -589,7 +589,7 @@ const BacktestPage: React.FC = () => {
             type="button"
             onClick={handleShowNextDay}
             disabled={isLoadingResults || isLoadingPerf}
-            className={`backtest-force-btn min-h-11 min-w-11 ${isNextDayValidation ? 'active' : ''}`}
+            className={`backtest-force-btn min-h-9 min-w-0 ${isNextDayValidation ? 'active' : ''}`}
           >
             <span className="dot" />
             {text.oneDayValidation}
@@ -598,7 +598,7 @@ const BacktestPage: React.FC = () => {
             type="button"
             onClick={() => setForceRerun(!forceRerun)}
             disabled={isRunning}
-            className={`backtest-force-btn min-h-11 min-w-11 ${forceRerun ? 'active' : ''}`}
+            className={`backtest-force-btn min-h-9 min-w-0 ${forceRerun ? 'active' : ''}`}
           >
             <span className="dot" />
             {text.forceRerun}
@@ -607,7 +607,7 @@ const BacktestPage: React.FC = () => {
             type="button"
             onClick={handleRun}
             disabled={isRunning}
-            className="btn-primary flex items-center gap-1.5 whitespace-nowrap"
+            className="btn-primary flex items-center gap-1.5 whitespace-nowrap !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs"
           >
             {isRunning ? (
               <>

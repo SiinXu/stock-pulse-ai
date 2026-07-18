@@ -109,6 +109,38 @@ describe('systemConfigApi', () => {
     });
   });
 
+  it('maps configured notification channels beside masked config items', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        config_version: 'v2',
+        mask_token: '******',
+        configured_notification_channels: ['ntfy', 'gotify'],
+        items: [
+          {
+            key: 'NTFY_URL',
+            value: '******',
+            raw_value_exists: true,
+            is_masked: true,
+          },
+          {
+            key: 'GOTIFY_URL',
+            value: '******',
+            raw_value_exists: true,
+            is_masked: true,
+          },
+        ],
+      },
+    });
+
+    const result = await systemConfigApi.getConfig(true);
+
+    expect(result.configuredNotificationChannels).toEqual(['ntfy', 'gotify']);
+    expect(result.items).toEqual([
+      expect.objectContaining({ key: 'NTFY_URL', value: '******', isMasked: true }),
+      expect.objectContaining({ key: 'GOTIFY_URL', value: '******', isMasked: true }),
+    ]);
+  });
+
   it('maps Provider Catalog labels, quick links, and Connection contracts to camelCase', async () => {
     get.mockResolvedValueOnce({
       data: {

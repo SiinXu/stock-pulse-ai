@@ -159,7 +159,9 @@ def _raise_env_backup_access_error(exc: EnvBackupAccessDenied) -> None:
     description=(
         "Read current configuration and return display values. Server-masked "
         "sensitive fields may return the mask token; clients should use "
-        "raw_value_exists and is_masked to interpret values."
+        "raw_value_exists and is_masked to interpret values. "
+        "configured_notification_channels is computed from the current live "
+        "Config snapshot with the runtime notification detector."
     ),
 )
 def get_system_config(

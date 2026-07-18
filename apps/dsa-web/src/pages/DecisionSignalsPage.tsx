@@ -1451,7 +1451,7 @@ const DecisionSignalsPage: React.FC = () => {
         </Modal>
 
         <Card padding="md">
-          <form className="grid items-end gap-3 md:grid-cols-3 xl:grid-cols-8 [&>*]:min-w-0" onSubmit={handleApplyFilters}>
+          <form className="grid items-end gap-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 [&>*]:min-w-0 [&>*]:!w-full [&_[role=combobox]]:min-h-9 [&_input]:h-9" onSubmit={handleApplyFilters}>
             <Select
               label={t('decisionSignals.market')}
               value={filters.market}
@@ -1521,7 +1521,7 @@ const DecisionSignalsPage: React.FC = () => {
                 ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
               ]}
             />
-            <button type="submit" className="btn-primary inline-flex h-11 items-center justify-center gap-2">
+            <button type="submit" className="btn-primary inline-flex h-9 !min-h-9 !min-w-0 items-center justify-center gap-2 !px-3 !py-1.5 !text-xs">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
             </button>
