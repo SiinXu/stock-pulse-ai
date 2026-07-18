@@ -27,7 +27,9 @@ from src.agent.executor import AgentResult
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.native_adapter import NativeRuntimeAdapter
 
-pytest.importorskip("pydantic_ai")
+from tests.agent.runtime._pydantic_ai_dependency import require_pydantic_ai
+
+require_pydantic_ai()
 
 from src.agent.runtime.pydantic_ai_adapter import PydanticAIRuntimeAdapter
 

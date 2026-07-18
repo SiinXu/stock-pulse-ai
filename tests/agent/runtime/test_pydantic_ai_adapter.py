@@ -42,7 +42,9 @@ from src.agent.tools.registry import (
     ToolRegistry,
 )
 
-pydantic_ai = pytest.importorskip("pydantic_ai")
+from tests.agent.runtime._pydantic_ai_dependency import require_pydantic_ai
+
+pydantic_ai = require_pydantic_ai()
 
 
 def _fake_model(output_text: str):
