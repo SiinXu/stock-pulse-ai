@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { SystemConfigItem } from '../../../types/systemConfig';
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
-import { getFieldDescriptionZh, getFieldTitleZh } from '../../../utils/systemConfigI18n';
+import { loadUiLanguageTranslations } from '../../../i18n/translations';
+import { getFieldDescriptionZh, getFieldTitle, getFieldTitleZh } from '../../../utils/systemConfigI18n';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { SettingsField } from '../SettingsField';
 
@@ -81,6 +82,144 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText('自选股列表')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stock List')).not.toBeInTheDocument();
+  });
+
+  it.each(['de', 'ja', 'zh-TW'] as const)(
+    'keeps distinct per-field %s titles when fields share one help key',
+    async (language) => {
+      await loadUiLanguageTranslations(language);
+      const senderTitle = getFieldTitle('EMAIL_SENDER', undefined, language);
+      const passwordTitle = getFieldTitle('EMAIL_PASSWORD', undefined, language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsField
+            item={{
+              key: 'EMAIL_SENDER',
+              value: 'sender@example.com',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'EMAIL_SENDER',
+                title: 'Email Sender',
+                category: 'notification',
+                dataType: 'string',
+                uiControl: 'text',
+                isSensitive: false,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 1,
+                helpKey: 'settings.notification.email',
+              },
+            }}
+            value="sender@example.com"
+            onChange={vi.fn()}
+          />
+          <SettingsField
+            item={{
+              key: 'EMAIL_PASSWORD',
+              value: 'secret',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'EMAIL_PASSWORD',
+                title: 'Email Password',
+                category: 'notification',
+                dataType: 'string',
+                uiControl: 'password',
+                isSensitive: true,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 2,
+                helpKey: 'settings.notification.email',
+              },
+            }}
+            value="secret"
+            onChange={vi.fn()}
+          />
+        </UiLanguageProvider>,
+      );
+
+      expect(senderTitle).not.toBe(passwordTitle);
+      expect(senderTitle).not.toBe('Email Sender');
+      expect(passwordTitle).not.toBe('Email Password');
+      expect(screen.getByLabelText(senderTitle)).toBeInTheDocument();
+      expect(screen.getByLabelText(passwordTitle)).toBeInTheDocument();
+    },
+  );
+
+  it('localizes a known field without a help key in an additional UI language', async () => {
+    const language = 'de';
+    await loadUiLanguageTranslations(language);
+    const expectedTitle = getFieldTitle('OPENAI_VISION_MODEL', undefined, language);
+
+    render(
+      <UiLanguageProvider initialLanguage={language}>
+        <SettingsField
+          item={{
+            key: 'OPENAI_VISION_MODEL',
+            value: 'gpt-4o',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'OPENAI_VISION_MODEL',
+              title: 'OpenAI Vision Model',
+              category: 'ai_model',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          }}
+          value="gpt-4o"
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(expectedTitle).not.toBe('OpenAI Vision Model');
+    expect(screen.getByLabelText(expectedTitle)).toBeInTheDocument();
+  });
+
+  it('preserves the live backend schema title for English', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <SettingsField
+          item={{
+            key: 'STOCK_LIST',
+            value: 'AAPL',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'STOCK_LIST',
+              title: 'Backend-owned watchlist title',
+              category: 'base',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          }}
+          value="AAPL"
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByLabelText('Backend-owned watchlist title')).toBeInTheDocument();
     expect(screen.queryByLabelText('Stock List')).not.toBeInTheDocument();
   });
 

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 - [文档] 项目改为双许可证：上游原始代码保持 MIT License，StockPulse 新增与大幅修改的代码采用 AGPL-3.0；同步更新 LICENSE 与三语 README（含 badge、fork 说明与 License 章节）。
 - [改进] Agent 流式对话（`/api/v1/agent/chat/stream`）在客户端断连或流提前结束时协作取消后端执行：Agent 循环在每步开始、每次 LLM 调用后与流水线各阶段边界处检查取消意图并及时停止，取消结果记为 cancelled 而非失败，不再写入"分析失败"占位助手消息，也不残留部分 provider trace；SSE 事件线经单一降级点保持逐字节不变。
+- [修复] 修正新增界面语言的设置字段标题、金融告警方向、LLM 未配置提示及 Markdown/AlphaSift 产品术语翻译，并将设置导航翻译键改为稳定语义键。
 - [修复] Web Chat、持仓、决策信号、回测与告警页面的局部控件尺寸和空态卡片高度，避免筛选行、操作按钮和规则列表在桌面视口中过度撑大。
 - [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
 - [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。

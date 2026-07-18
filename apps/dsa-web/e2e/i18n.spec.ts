@@ -29,6 +29,16 @@ const HOME_NAV_LABELS: Record<UiLanguage, string> = {
   fr: 'Accueil',
   id: 'Beranda',
 };
+const STOCK_LIST_FIELD_LABELS: Record<Exclude<UiLanguage, 'zh' | 'en'>, string> = {
+  'zh-TW': '自選股列表',
+  ja: '選択銘柄リスト',
+  ko: '선정된 종목 목록',
+  de: 'Liste ausgewählter Aktien',
+  es: 'Lista de acciones seleccionadas',
+  ms: 'Senarai saham terpilih',
+  fr: 'Liste des actions sélectionnées',
+  id: 'Daftar saham pilihan',
+};
 
 const uiLanguageSelector = (page: Page) =>
   page.locator('select[data-testid="ui-language-selector"]:visible').first();
@@ -50,6 +60,16 @@ async function assertUiLanguage(page: Page, language: UiLanguage) {
   await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
   await expect(uiLanguageSelector(page)).toHaveValue(language);
   await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
+}
+
+async function assertLocalizedStockListField(
+  page: Page,
+  language: keyof typeof STOCK_LIST_FIELD_LABELS,
+) {
+  await page.goto('/settings?section=overview&view=readiness');
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  await expect(page.getByLabel(STOCK_LIST_FIELD_LABELS[language], { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Stock List', { exact: true })).toHaveCount(0);
 }
 
 async function loginInEnglish(page: Page) {
@@ -91,44 +111,52 @@ test.describe('complete UI i18n acceptance', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); // 12
   });
 
-  test('Traditional Chinese selection persists with localized navigation', async ({ page }) => {
+  test('Traditional Chinese selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'zh-TW');
+    await assertLocalizedStockListField(page, 'zh-TW');
   });
 
-  test('Japanese selection persists with localized navigation', async ({ page }) => {
+  test('Japanese selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'ja');
+    await assertLocalizedStockListField(page, 'ja');
   });
 
-  test('Korean selection persists with localized navigation', async ({ page }) => {
+  test('Korean selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'ko');
+    await assertLocalizedStockListField(page, 'ko');
   });
 
-  test('German selection persists with localized navigation', async ({ page }) => {
+  test('German selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'de');
+    await assertLocalizedStockListField(page, 'de');
   });
 
-  test('Spanish selection persists with localized navigation', async ({ page }) => {
+  test('Spanish selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'es');
+    await assertLocalizedStockListField(page, 'es');
   });
 
-  test('Malay selection persists with localized navigation', async ({ page }) => {
+  test('Malay selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'ms');
+    await assertLocalizedStockListField(page, 'ms');
   });
 
-  test('French selection persists with localized navigation', async ({ page }) => {
+  test('French selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'fr');
+    await assertLocalizedStockListField(page, 'fr');
   });
 
-  test('Indonesian selection persists with localized navigation', async ({ page }) => {
+  test('Indonesian selection persists with localized navigation and Settings field titles', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await assertUiLanguage(page, 'id');
+    await assertLocalizedStockListField(page, 'id');
   });
 
   test('login supports English for both first setup and returning admin states', async ({ page }) => {

@@ -5,7 +5,8 @@ import { Badge, Button, Select, Input, Tooltip } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
-import { getFieldDescriptionZh, getFieldOptionLabel, getFieldTitleZh } from '../../utils/systemConfigI18n';
+import { resolveSettingsFieldTitle } from '../../locales/settingsFieldTitle';
+import { getFieldDescriptionZh, getFieldOptionLabel } from '../../utils/systemConfigI18n';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { SettingsHelpButton } from './SettingsHelpButton';
@@ -325,9 +326,12 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
   const localizationKey = schema?.key ?? item.key;
   const fallbackTitle = schema?.title ?? item.key;
-  const title = language === 'zh'
-    ? getFieldTitleZh(localizationKey, getFieldTitleZh(item.key, fallbackTitle))
-    : fallbackTitle;
+  const title = resolveSettingsFieldTitle({
+    itemKey: item.key,
+    schemaKey: schema?.key,
+    fallbackTitle,
+    language,
+  });
   const description = language === 'zh'
     ? getFieldDescriptionZh(localizationKey, getFieldDescriptionZh(item.key, schema?.description))
     : helpContent?.summary ?? schema?.description ?? '';
