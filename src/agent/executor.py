@@ -18,7 +18,7 @@ import json
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.config import get_config
 from src.agent.chat_context import build_agent_chat_context_bundle
@@ -545,7 +545,30 @@ class AgentExecutor:
         Returns:
             AgentResult with parsed dashboard or error.
         """
-        # Build system prompt with skills
+        system_prompt, user_message, tool_decls = self.build_run_messages(task, context)
+
+        # Initialize conversation
+        messages: List[Dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+
+        return self._run_loop(
+            messages, tool_decls, parse_dashboard=True, cancelled_check=cancelled_check
+        )
+
+    def build_run_messages(
+        self, task: str, context: Optional[Dict[str, Any]] = None
+    ) -> Tuple[str, str, List[Dict[str, Any]]]:
+        """Assemble the resolved single-run prompt inputs.
+
+        Single authority for the Single RUN system prompt, user message and
+        OpenAI tool declarations so every runtime (native loop and the
+        experimental PydanticAI adapter) seeds from the same resolved skill,
+        market and dashboard constraints instead of rebuilding them.
+
+        Returns ``(system_prompt, user_message, tool_decls)``.
+        """
         skills_section = ""
         if self.skill_instructions:
             skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
@@ -571,16 +594,8 @@ class AgentExecutor:
 
         # Build tool declarations in OpenAI format (litellm handles all providers)
         tool_decls = self.tool_registry.to_openai_tools()
-
-        # Initialize conversation
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": self._build_user_message(task, context)},
-        ]
-
-        return self._run_loop(
-            messages, tool_decls, parse_dashboard=True, cancelled_check=cancelled_check
-        )
+        user_message = self._build_user_message(task, context)
+        return system_prompt, user_message, tool_decls
 
     def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None, cancelled_check: Optional[Callable[[], bool]] = None) -> AgentResult:
         """Execute the agent loop for a free-form chat message.

@@ -27,6 +27,7 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
+from src.agent.llm_adapter import LLMResponse
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.pydantic_ai_adapter import (
     PydanticAIRuntimeAdapter,
@@ -184,30 +185,23 @@ def test_run_without_dashboard_json_fails_closed():
     assert "dashboard" in (handle.result.error or "").lower()
 
 
-def test_chat_returns_free_form_answer():
+def test_chat_mode_is_unsupported():
+    # RF-05: CHAT is frozen behind a stable unsupported_capability error until
+    # the RF-06 conformance decision — never a silent degrade into a second
+    # Conversation / SSE / trace surface.
     adapter = PydanticAIRuntimeAdapter(model=_fake_model("Here is my analysis."))
-    handle = adapter.execute(
-        ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
-    )
-    assert handle.state is ExecutionState.SUCCEEDED
-    assert handle.result.success is True
-    assert handle.result.content == "Here is my analysis."
-    assert handle.result.dashboard is None
+    with pytest.raises(NotImplementedError) as excinfo:
+        adapter.execute(
+            ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
+        )
+    assert "unsupported_capability" in str(excinfo.value)
 
 
-def test_chat_empty_response_fails_closed():
-    adapter = PydanticAIRuntimeAdapter(model=_fake_model("   "))
-    handle = adapter.execute(
-        ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
-    )
-    assert handle.state is ExecutionState.FAILED
-    assert handle.result.success is False
-
-
-def test_research_mode_is_not_implemented():
+def test_research_mode_is_unsupported():
     adapter = PydanticAIRuntimeAdapter(model=_fake_model('{"signal": "buy"}'))
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedError) as excinfo:
         adapter.execute(ExecutionContext(mode=ExecutionMode.RESEARCH, prompt="deep research"))
+    assert "unsupported_capability" in str(excinfo.value)
 
 
 def test_name_is_experimental_and_non_default():
@@ -265,6 +259,10 @@ def test_gate_rejection_is_fail_closed_at_dispatch():
 
 
 def test_usage_is_recorded_through_single_recorder():
+    # RF-05 #8 / AR-RF-10: usage is recorded once per wire call through the
+    # single recorder, reusing StockPulse's own usage dict — the same
+    # prompt/completion token field names the storage summary reads — so
+    # provider telemetry survives and the Usage page keeps counting.
     class _RecordingRecorder:
         def __init__(self):
             self.calls = []
@@ -273,17 +271,27 @@ def test_usage_is_recorded_through_single_recorder():
             self.calls.append((usage, model, call_type))
             return True
 
+    class _OneShotAdapter:
+        primary_model = "usage-model"
+
+        def call_with_tools(self, messages, tools, provider=None, timeout=None):
+            return LLMResponse(
+                content='{"signal": "buy"}',
+                usage={"prompt_tokens": 4, "completion_tokens": 6, "total_tokens": 10},
+                model=self.primary_model,
+            )
+
     recorder = _RecordingRecorder()
     adapter = PydanticAIRuntimeAdapter(
-        model=_fake_model('{"signal": "buy"}'), usage_recorder=recorder
+        llm_adapter=_OneShotAdapter(), usage_recorder=recorder
     )
     adapter.execute(_run_context("Analyze 600519"))
 
     assert len(recorder.calls) == 1
     usage, model, call_type = recorder.calls[0]
     assert call_type == "agent"
-    assert model == "fake-model"
-    assert usage == {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10}
+    assert model == "usage-model"
+    assert usage == {"prompt_tokens": 4, "completion_tokens": 6, "total_tokens": 10}
 
 
 def test_tool_calls_emit_events_through_shared_emitter():
