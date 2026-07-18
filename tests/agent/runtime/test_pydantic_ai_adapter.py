@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Tests for the experimental PydanticAI runtime adapter (AR-PY-04, 方案 B).
 
 Two contracts are asserted:
@@ -180,12 +182,30 @@ def test_run_without_dashboard_json_fails_closed():
     assert "dashboard" in (handle.result.error or "").lower()
 
 
-def test_non_run_mode_is_not_implemented():
+def test_chat_returns_free_form_answer():
+    adapter = PydanticAIRuntimeAdapter(model=_fake_model("Here is my analysis."))
+    handle = adapter.execute(
+        ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
+    )
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert handle.result.success is True
+    assert handle.result.content == "Here is my analysis."
+    assert handle.result.dashboard is None
+
+
+def test_chat_empty_response_fails_closed():
+    adapter = PydanticAIRuntimeAdapter(model=_fake_model("   "))
+    handle = adapter.execute(
+        ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
+    )
+    assert handle.state is ExecutionState.FAILED
+    assert handle.result.success is False
+
+
+def test_research_mode_is_not_implemented():
     adapter = PydanticAIRuntimeAdapter(model=_fake_model('{"signal": "buy"}'))
     with pytest.raises(NotImplementedError):
-        adapter.execute(
-            ExecutionContext(mode=ExecutionMode.CHAT, prompt="hi", session_id="s-1")
-        )
+        adapter.execute(ExecutionContext(mode=ExecutionMode.RESEARCH, prompt="deep research"))
 
 
 def test_name_is_experimental_and_non_default():

@@ -58,3 +58,4 @@
 | 2026-07-17 | AR-PY-04 次片:BoundToolSession→PydanticAI 工具桥接(Tool.from_schema,经 execute() fail-closed 分发);测试增至 12 项;runtime 全套 93 项绿 |
 | 2026-07-17 | AR-PY-04 event/usage 片:PydanticAI 运行 usage 收敛到单一 UsageRecorder(无第二套 usage 权威);工具桥接经 RuntimeEventEmitter 发 tool_start/tool_done;测试增至 14 项;runtime 全套 102 项绿 |
 | 2026-07-17 | AR-PY-05 脚手架(并行,不合入前提):契约一致性 conformance 测试(Native vs PydanticAI 参数化,5 项),断言两 runtime 契约等价、失败不伪成功 |
+| 2026-07-17 | AR-PY-04 第二条路径:adapter 支持单 Agent CHAT(自由文本、无 dashboard、无状态 POC);RESEARCH 仍 NotImplemented;Multi/Research/默认/设置页仍不碰;测试增至 16+5 项 |

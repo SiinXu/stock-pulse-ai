@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Experimental PydanticAI runtime adapter (AR-PY-04, 方案 B).
 
 An **isolated, opt-in** ``AgentRuntime`` backed by PydanticAI. It is never
@@ -183,11 +185,17 @@ class PydanticAIRuntimeAdapter:
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> ExecutionHandle:
-        """Run one Single Agent run synchronously and return a terminal handle."""
-        if context.mode is not ExecutionMode.RUN:
+        """Run one single-agent execution synchronously; return a terminal handle.
+
+        Two representative single-agent paths are supported: ``RUN`` (parses a
+        Decision Dashboard) and ``CHAT`` (free-form answer, no dashboard).
+        ``RESEARCH`` — like Multi-agent — is deliberately out of scope for the
+        experimental adapter and raises rather than degrading.
+        """
+        if context.mode not in (ExecutionMode.RUN, ExecutionMode.CHAT):
             raise NotImplementedError(
-                "PydanticAI runtime POC only supports ExecutionMode.RUN; "
-                f"mode {context.mode.value!r} is not migrated in this slice."
+                "PydanticAI runtime POC supports ExecutionMode.RUN / CHAT only; "
+                f"mode {context.mode.value!r} is not migrated."
             )
 
         _require_pydantic_ai()
@@ -195,7 +203,7 @@ class PydanticAIRuntimeAdapter:
         handle = ExecutionHandle(execution)
         execution.start()
         try:
-            result = self._dispatch_run(context)
+            result = self._dispatch(context, parse_dashboard=context.mode is ExecutionMode.RUN)
         except Exception as exc:
             execution.finish(
                 ExecutionState.FAILED,
@@ -213,7 +221,7 @@ class PydanticAIRuntimeAdapter:
         )
         return handle
 
-    def _dispatch_run(self, context: ExecutionContext) -> Any:
+    def _dispatch(self, context: ExecutionContext, *, parse_dashboard: bool) -> Any:
         from pydantic_ai import Agent
 
         from src.agent.executor import AgentResult
@@ -233,13 +241,27 @@ class PydanticAIRuntimeAdapter:
         content = str(run_result.output or "")
         usage = run_result.usage
         self._record_usage(usage, self._resolve_model().model_name)
+        total_tokens = int(getattr(usage, "total_tokens", 0) or 0)
+        model = self._resolve_model().model_name
+
+        if not parse_dashboard:
+            # Free-form CHAT path: success is a non-empty answer, no dashboard.
+            return AgentResult(
+                success=bool(content.strip()),
+                content=content,
+                dashboard=None,
+                total_tokens=total_tokens,
+                model=model,
+                error=None if content.strip() else "Empty agent response",
+            )
+
         dashboard = parse_dashboard_json(content)
         return AgentResult(
             success=dashboard is not None,
             content=content,
             dashboard=dashboard,
-            total_tokens=int(getattr(usage, "total_tokens", 0) or 0),
-            model=self._resolve_model().model_name,
+            total_tokens=total_tokens,
+            model=model,
             error=None if dashboard is not None else "Failed to parse dashboard JSON from agent response",
         )
 
