@@ -1144,8 +1144,8 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     const efinanceWarning = await screen.findByText('数据源降级：efinance（网络连接中断）');
-    const alert = efinanceWarning.closest('[role="alert"]');
-    expect(alert).toHaveClass('max-w-full');
+    const status = efinanceWarning.closest('[role="status"]');
+    expect(status).toHaveClass('max-w-full');
     expect(efinanceWarning).toBeInTheDocument();
     expect(screen.getByText('数据源降级：akshare_em（网络连接中断）')).toBeInTheDocument();
     expect(screen.queryByText(/HTTPConnectionPool/)).not.toBeInTheDocument();

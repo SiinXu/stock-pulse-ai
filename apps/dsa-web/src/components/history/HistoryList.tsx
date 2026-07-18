@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Button, ScrollArea } from '../common';
+import { Badge, Button, Checkbox, ScrollArea } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -118,22 +118,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({
 
           {items.length > 0 && (
             <div className="flex items-center gap-2">
-              <label
-                className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2 py-1"
-                htmlFor={selectAllId}
-              >
-                <input
-                  id={selectAllId}
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allVisibleSelected}
-                  onChange={onToggleSelectAll}
-                  disabled={isDeleting}
-                  aria-label={t('history.selectAllHistoryAria')}
-                  className="history-select-all-checkbox h-3.5 w-3.5 cursor-pointer bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
-                />
-                <span className="text-xs text-muted-text select-none">{t('common.selectAllCurrent')}</span>
-              </label>
+              <Checkbox
+                id={selectAllId}
+                ref={selectAllRef}
+                checked={allVisibleSelected}
+                onChange={onToggleSelectAll}
+                disabled={isDeleting}
+                aria-label={t('history.selectAllHistoryAria')}
+                containerClassName="min-h-11 flex-1 rounded-lg px-2 py-1"
+                label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
+              />
               <Button
                 variant="danger-subtle"
                 size="xsm"

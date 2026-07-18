@@ -129,6 +129,7 @@ class SystemConfigFieldSchema(BaseModel):
     )
     is_editable: bool
     default_value: Optional[str] = None
+    unit: Optional[str] = Field(None, description="Short unit label displayed next to the field value")
     options: List[str | SystemConfigOption] = Field(default_factory=list)
     validation: Dict[str, Any] = Field(default_factory=dict)
     display_order: int

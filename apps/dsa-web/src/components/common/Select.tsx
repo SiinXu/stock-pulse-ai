@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { useFixedPopup } from './useFixedPopup';
 
 interface SelectOption {
   value: string;
@@ -19,8 +20,10 @@ interface SelectProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  triggerClassName?: string;
   error?: boolean;
   menuAlign?: 'start' | 'end';
+  menuPlacement?: 'auto' | 'bottom' | 'top';
 }
 
 /**
@@ -38,8 +41,10 @@ export const Select: React.FC<SelectProps> = ({
   placeholder,
   disabled = false,
   className = '',
+  triggerClassName = '',
   error = false,
   menuAlign = 'start',
+  menuPlacement = 'auto',
 }) => {
   const { t } = useUiLanguage();
   const selectId = useId();
@@ -49,52 +54,52 @@ export const Select: React.FC<SelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const selectedIndex = options.findIndex((option) => option.value === value);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const selectedOption = selectedIndex >= 0 ? options[selectedIndex] : undefined;
   const resolvedPlaceholder = placeholder ?? t('common.selectPlaceholder');
+  const { portalHost, popupStyle, prepareForOpen, resetPosition } = useFixedPopup({
+    isOpen,
+    triggerRef,
+    popupRef: listRef,
+    contentVersion: `${activeIndex}:${options.length}:${value}`,
+    constrainWidthToViewport: true,
+    placement: menuPlacement,
+    align: menuAlign,
+  });
 
   const openList = useCallback(() => {
     setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
-    setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
+    prepareForOpen();
     setIsOpen(true);
-  }, [selectedIndex]);
+  }, [prepareForOpen, selectedIndex]);
+
+  const closeList = useCallback(() => {
+    setIsOpen(false);
+    resetPosition();
+  }, [resetPosition]);
 
   const commitOption = useCallback((index: number) => {
     const option = options[index];
     if (option) onChange(option.value);
-    setIsOpen(false);
-  }, [options, onChange]);
+    closeList();
+  }, [closeList, options, onChange]);
 
   useEffect(() => {
     if (!isOpen) return;
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (containerRef.current?.contains(target) || listRef.current?.contains(target)) return;
-      setIsOpen(false);
+      closeList();
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const updateRect = () => {
-      setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
-    };
-    window.addEventListener('scroll', updateRect, true);
-    window.addEventListener('resize', updateRect);
-    return () => {
-      window.removeEventListener('scroll', updateRect, true);
-      window.removeEventListener('resize', updateRect);
-    };
-  }, [isOpen]);
+  }, [closeList, isOpen]);
 
   useEffect(() => {
     if (!isOpen || !listRef.current) return;
     const activeItem = listRef.current.children[activeIndex] as HTMLElement | undefined;
-    activeItem?.scrollIntoView({ block: 'nearest' });
+    activeItem?.scrollIntoView?.({ block: 'nearest' });
   }, [isOpen, activeIndex]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -130,10 +135,10 @@ export const Select: React.FC<SelectProps> = ({
         break;
       case 'Escape':
         event.preventDefault();
-        setIsOpen(false);
+        closeList();
         break;
       case 'Tab':
-        setIsOpen(false);
+        closeList();
         break;
       default:
         break;
@@ -158,13 +163,14 @@ export const Select: React.FC<SelectProps> = ({
           aria-describedby={ariaDescribedBy}
           aria-activedescendant={isOpen ? `${resolvedId}-option-${activeIndex}` : undefined}
           data-value={value}
-          onClick={() => (isOpen ? setIsOpen(false) : openList())}
+          onClick={() => (isOpen ? closeList() : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+            triggerClassName,
           )}
         >
           <span className={cn('truncate', !selectedOption && 'text-muted-text')}>
@@ -180,19 +186,13 @@ export const Select: React.FC<SelectProps> = ({
           </svg>
         </button>
 
-        {isOpen && triggerRect && createPortal(
+        {isOpen && portalHost ? createPortal(
           <ul
             id={listboxId}
             ref={listRef}
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
-            style={{
-              top: triggerRect.bottom + 4,
-              minWidth: triggerRect.width,
-              ...(menuAlign === 'end'
-                ? { right: Math.max(document.documentElement.clientWidth - triggerRect.right, 0) }
-                : { left: triggerRect.left }),
-            }}
+            style={popupStyle}
             className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
@@ -218,8 +218,8 @@ export const Select: React.FC<SelectProps> = ({
               </li>
             ))}
           </ul>,
-          document.body,
-        )}
+          portalHost,
+        ) : null}
       </div>
     </div>
   );

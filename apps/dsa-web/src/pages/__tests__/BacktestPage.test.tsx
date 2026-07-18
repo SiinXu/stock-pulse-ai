@@ -129,10 +129,12 @@ describe('BacktestPage', () => {
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
 
-    expect(filterInput).toHaveClass('h-9');
+    expect(filterInput).toHaveClass('!h-9');
     expect(filterInput).toHaveClass('rounded-sm');
-    expect(windowInput).toHaveClass('h-9');
+    expect(windowInput).toHaveClass('!h-9');
     expect(windowInput).toHaveClass('rounded-sm');
+    expect(screen.getByLabelText('分析开始日期').parentElement).toHaveClass('h-9', '!rounded-xl');
+    expect(screen.getByLabelText('分析结束日期').parentElement).toHaveClass('h-9', '!rounded-xl');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -245,7 +247,7 @@ describe('BacktestPage', () => {
     mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
-    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('h-9');
+    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('!h-9');
     expect(screen.getByText('Evaluation window')).toBeInTheDocument();
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
@@ -317,10 +319,9 @@ describe('BacktestPage', () => {
 
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'AAPL', analysisPhase: 'intraday', page: 1 }),
+        expect.objectContaining({ code: undefined, analysisPhase: 'intraday', page: 1 }),
       );
-      expect(mockGetStockPerformance).toHaveBeenCalledWith(
-        'AAPL',
+      expect(mockGetOverallPerformance).toHaveBeenCalledWith(
         expect.objectContaining({ analysisPhase: 'intraday' }),
       );
     });
@@ -385,17 +386,7 @@ describe('BacktestPage', () => {
     expect(screen.getByText('未找到符合条件的历史分析记录')).toBeInTheDocument();
   });
 
-  it('uses backend-applied eval window when run input is empty', async () => {
-    mockRun.mockResolvedValueOnce({
-      processed: 0,
-      saved: 0,
-      completed: 0,
-      insufficient: 0,
-      errors: 0,
-      appliedEvalWindowDays: 10,
-      message: '未找到符合条件的历史分析记录',
-      diagnostics: { emptyReason: 'no_matching_analysis' },
-    });
+  it('rejects an empty evaluation window before running a backtest', async () => {
     render(<BacktestPage />);
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
@@ -409,43 +400,10 @@ describe('BacktestPage', () => {
     fireEvent.change(toInput, { target: { value: '2026-03-31' } });
     fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
-    await waitFor(() => {
-      expect(mockRun).toHaveBeenCalledWith({
-        code: '600519.SH',
-        force: undefined,
-        minAgeDays: undefined,
-        evalWindowDays: undefined,
-        analysisDateFrom: '2026-03-01',
-        analysisDateTo: '2026-03-31',
-      });
-    });
-
-    await waitFor(() => {
-      expect(windowInput).toHaveValue(10);
-      expect(mockGetResults).toHaveBeenLastCalledWith({
-        code: '600519.SH',
-        evalWindowDays: 10,
-        analysisDateFrom: '2026-03-01',
-        analysisDateTo: '2026-03-31',
-        analysisPhase: undefined,
-        page: 1,
-        limit: 20,
-      });
-      expect(mockGetStockPerformance).toHaveBeenLastCalledWith('600519.SH', {
-        evalWindowDays: 10,
-        analysisDateFrom: '2026-03-01',
-        analysisDateTo: '2026-03-31',
-        analysisPhase: undefined,
-      });
-      expect(mockGetOverallPerformance).toHaveBeenLastCalledWith({
-        evalWindowDays: 10,
-        analysisDateFrom: '2026-03-01',
-        analysisDateTo: '2026-03-31',
-        analysisPhase: undefined,
-      });
-    });
-
-    expect(await screen.findByText('未找到符合条件的历史分析记录')).toBeInTheDocument();
+    expect(mockRun).not.toHaveBeenCalled();
+    expect(windowInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('评估窗口必须是 1 到 120 之间的整数')).toBeInTheDocument();
+    expect(windowInput).toHaveFocus();
   });
 
   it('switches to next-day validation with the 1D shortcut', async () => {
@@ -453,8 +411,8 @@ describe('BacktestPage', () => {
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveClass('min-h-9', 'min-w-0');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('min-h-9', 'min-w-0');
+    expect(oneDayButton).toHaveClass('h-9', 'min-w-0');
+    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('h-9', 'min-w-0');
     const nextDayResults = createDeferred<{
       total: number;
       page: number;

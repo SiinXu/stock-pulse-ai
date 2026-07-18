@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Input } from '../common';
+import { Checkbox, Input } from '../common';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
 import type { UiLang } from './settingsInformationArchitecture';
@@ -151,15 +151,12 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
                 aria-selected={isSelected(model)}
                 className="rounded-md hover:bg-hover"
               >
-                <label className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-secondary-text">
-                  <input
-                    type="checkbox"
-                    checked={isSelected(model)}
-                    onChange={() => onToggle(model)}
-                    className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                  />
-                  <span className="min-w-0 truncate">{getOptionLabel(model)}</span>
-                </label>
+                <Checkbox
+                  checked={isSelected(model)}
+                  onChange={() => onToggle(model)}
+                  containerClassName="min-h-11 px-3 py-1.5 text-sm text-secondary-text"
+                  label={<span className="min-w-0 truncate font-normal text-secondary-text">{getOptionLabel(model)}</span>}
+                />
               </li>
             ))}
           </ul>

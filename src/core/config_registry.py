@@ -4011,6 +4011,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_required": False,
         "is_editable": True,
         "default_value": "600",
+        "unit": "s",
         "options": [],
         "validation": {"min": 0, "max": 3600},
         "display_order": 62,

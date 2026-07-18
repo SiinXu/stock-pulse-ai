@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, PanelLeft, PanelRight, Search, Settings2 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ALPHASIFT_CONFIG_CHANGED_EVENT, SYSTEM_CONFIG_CHANGED_EVENT, alphasiftApi } from '../../api/alphasift';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -9,8 +8,7 @@ import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { StatusDot } from '../common/StatusDot';
-import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
-import { ThemeToggle } from '../theme/ThemeToggle';
+import { SidebarProfile } from './SidebarProfile';
 
 type SidebarNavProps = {
   collapsed?: boolean;
@@ -46,44 +44,15 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   const navigate = useNavigate();
 
   const openSearch = () => {
-    navigate('/');
+    navigate('/', { state: { focusStockSearch: true, focusToken: Date.now() } });
     onNavigate?.();
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [showAlphaSiftNav, setShowAlphaSiftNav] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    const refreshAlphaSiftStatus = async () => {
-      try {
-        const status = await alphasiftApi.getStatus();
-        if (active) {
-          setShowAlphaSiftNav(status.enabled);
-        }
-      } catch {
-        if (active) {
-          setShowAlphaSiftNav(false);
-        }
-      }
-    };
-
-    void refreshAlphaSiftStatus();
-    window.addEventListener(ALPHASIFT_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-    window.addEventListener(SYSTEM_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-
-    return () => {
-      active = false;
-      window.removeEventListener(ALPHASIFT_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-      window.removeEventListener(SYSTEM_CONFIG_CHANGED_EVENT, refreshAlphaSiftStatus);
-    };
-  }, []);
-
-  const navItems = showAlphaSiftNav ? NAV_ITEMS : NAV_ITEMS.filter((item) => item.key !== 'screening');
+  const navItems = NAV_ITEMS;
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-full border border-transparent text-sm leading-none text-secondary-text transition-all',
+    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
@@ -103,7 +72,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
       {collapsed ? (
         <div className="mb-4 flex justify-center">
           <div className="group relative h-11 w-11">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity group-hover:opacity-0">
+            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity group-hover:opacity-0">
               <BarChart3 className="size-4.5" />
             </div>
             {onToggleCollapse ? (
@@ -111,7 +80,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
                 type="button"
                 onClick={onToggleCollapse}
                 aria-label={t('layout.expandSidebar')}
-                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <PanelRight className="size-4.5" />
               </button>
@@ -203,29 +172,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
 
       </nav>
 
-      <div className={cn('mt-2 flex gap-1', collapsed ? 'flex-col items-center' : 'items-center')}>
-        <ThemeToggle
-          variant="nav"
-          collapsed
-          wrapperClassName={collapsed ? '' : 'flex-1'}
-          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
-          triggerActiveClassName={itemActiveClass}
-          iconClassName="size-4.5 shrink-0"
-        />
-        <UiLanguageToggle
-          variant="nav"
-          collapsed
-          wrapperClassName={collapsed ? '' : 'flex-1'}
-          triggerClassName={cn('inline-flex h-11 items-center justify-center rounded-full border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground', collapsed ? 'w-11' : 'w-full')}
-          triggerActiveClassName={itemActiveClass}
-          iconClassName="size-4.5 shrink-0"
-        />
-      </div>
+      <SidebarProfile collapsed={collapsed} />
 
       {authEnabled ? (
         <button
           type="button"
           onClick={() => setShowLogoutConfirm(true)}
+          aria-label={collapsed ? t('layout.logout') : undefined}
           className={cn(
             itemInteractiveClass,
             isRail ? 'mt-1.5' : 'mt-5'

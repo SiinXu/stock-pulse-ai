@@ -1180,7 +1180,7 @@ describe('LLMChannelEditor', () => {
     expect(within(dialog).getByRole('button', { name: /手动添加模型/ })).toHaveClass('min-h-11', 'min-w-11');
     const enabledSwitch = within(dialog).getByRole('switch', { name: '启用此连接' });
     expect(enabledSwitch).toHaveClass('h-11', 'w-11');
-    expect(within(dialog).getByTestId('connection-enabled-switch-visual')).toHaveClass('h-5', 'w-8');
+    expect(within(dialog).getByTestId('connection-enabled-switch-visual')).toHaveClass('h-6', 'w-10');
   });
 
   it('keeps stable connection identity when its display name changes', async () => {

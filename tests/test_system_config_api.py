@@ -464,6 +464,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(stock_schema["help_key"], "settings.base.STOCK_LIST")
         self.assertTrue(stock_schema["examples"])
         self.assertTrue(stock_schema["docs"])
+        self.assertEqual(item_map["AGENT_ORCHESTRATOR_TIMEOUT_S"]["schema"]["unit"], "s")
 
     def test_get_config_schema_exposes_generation_backend_bounds_and_agent_options(self) -> None:
         payload = system_config.get_system_config(include_schema=True, service=self.service).model_dump(by_alias=True)

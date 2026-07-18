@@ -11,6 +11,19 @@ export const BACKTEST_TEXT = createUiLanguageRecord("locales.backtest.BACKTEST_T
   en: { documentTitle: 'Strategy Backtest - StockPulse', pageTitle: 'Strategy Backtest', codePlaceholder: 'Filter by stock code (leave empty for all)', filter: 'Filter', evalWindow: 'Evaluation window', phase: 'Phase', resultFilters: 'Result filters', resultPhaseHint: 'Filters the results below; does not rerun the backtest', startDate: 'Start date', startDateAria: 'Analysis start date', endDate: 'End date', endDateAria: 'Analysis end date', oneDayValidation: '1D validation', forceRerun: 'Force rerun', running: 'Backtesting...', runBacktest: 'Run backtest', oneDayModeDescription: '1D validation checks AI predictions against the next trading day close.', windowModeDescription: 'Set the evaluation window to 1 to compare AI predictions with the next trading day close.', overallPerformance: 'Overall performance', noMetricsTitle: 'No metrics', noMetricsDescription: 'Portfolio-level performance metrics appear after a backtest runs.', loadingResults: 'Loading results...', noResultsTitle: 'No results', noResultsDescription: 'Run a backtest to evaluate historical analysis accuracy.', nextDayValidation: 'Next-day validation', resultSet: 'Result set', allStocks: 'All stocks', filteredStock: 'Filtered {code}', dayWindow: '{days}-day window', fromDate: 'from {date}', toDate: 'to {date}', scrollHint: 'Scroll horizontally on small screens', stock: 'Stock', analysisDate: 'Analysis date', aiPrediction: 'AI prediction', actualPerformance: 'Actual performance', windowReturn: 'Window return', accuracy: 'Accuracy', directionMatch: 'Direction match', result: 'Result', status: 'Status', totalPage: '{total} results · Page {page} / {pages}', directionAccuracy: 'Direction accuracy', winRate: 'Win rate', avgSimulatedReturn: 'Avg simulated return', avgStockReturn: 'Avg stock return', stopLossTriggerRate: 'Stop-loss trigger rate', takeProfitTriggerRate: 'Take-profit trigger rate', avgDaysToFirstHit: 'Avg days to first hit', evaluationCount: 'Evaluations', outcomeSummary: 'Win / Loss / Neutral', phaseDistribution: 'Phase breakdown: {text}', processed: 'Processed:', saved: 'Saved:', completed: 'Completed:', insufficient: 'Insufficient:', errors: 'Errors:', yes: 'Yes', no: 'No', unknown: 'Unknown' },
 } as const);
 
+export const BACKTEST_VALIDATION_TEXT = createUiLanguageRecord("locales.backtest.BACKTEST_VALIDATION_TEXT", {
+  zh: {
+    evalWindow: '评估窗口必须是 1 到 120 之间的整数',
+    invalidDate: '请输入有效的日期',
+    dateRange: '开始日期不能晚于结束日期',
+  },
+  en: {
+    evalWindow: 'Evaluation window must be an integer from 1 to 120.',
+    invalidDate: 'Enter a valid date.',
+    dateRange: 'Start date must not be later than end date.',
+  },
+});
+
 export const BACKTEST_PHASE_FILTER_OPTIONS: Record<UiLanguage, Array<Option<BacktestPhaseFilter>>> = createUiLanguageRecord("locales.backtest.BACKTEST_PHASE_FILTER_OPTIONS", {
   zh: [{ value: 'all', label: '全部阶段' }, { value: 'premarket', label: '盘前' }, { value: 'intraday', label: '盘中' }, { value: 'postmarket', label: '盘后' }, { value: 'unknown', label: '未知' }],
   en: [{ value: 'all', label: 'All phases' }, { value: 'premarket', label: 'Pre-market' }, { value: 'intraday', label: 'Intraday' }, { value: 'postmarket', label: 'Post-market' }, { value: 'unknown', label: 'Unknown' }],

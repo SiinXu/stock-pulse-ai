@@ -1,10 +1,10 @@
 import type React from 'react';
-import { Activity } from 'lucide-react';
-import { Badge, Card, EmptyState, Loading } from '../common';
+import { Activity, RefreshCw } from 'lucide-react';
+import { Badge, Button, Card, EmptyState, Loading, Pagination } from '../common';
 import type { AlertTriggerItem } from '../../types/alerts';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { ALERT_TRIGGER_TEXT } from '../../locales/alerts';
+import { ALERT_HISTORY_CONTROLS_TEXT, ALERT_TRIGGER_TEXT } from '../../locales/alerts';
 import { formatUiText } from '../../i18n/uiText';
 import { formatUiDateTime, getUiClauseSeparator } from '../../utils/uiLocale';
 import type { UiLanguage } from '../../i18n/uiText';
@@ -43,13 +43,45 @@ function renderPhaseQuality(trigger: AlertTriggerItem, language: UiLanguage): Re
 interface AlertTriggerHistoryProps {
   triggers: AlertTriggerItem[];
   isLoading?: boolean;
+  page?: number;
+  pageSize?: number;
+  total?: number;
+  lastUpdated?: string | null;
+  onPageChange?: (page: number) => void;
+  onRefresh?: () => void;
 }
 
-export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({ triggers, isLoading = false }) => {
+export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
+  triggers,
+  isLoading = false,
+  page = 1,
+  pageSize = 20,
+  total = triggers.length,
+  lastUpdated = null,
+  onPageChange,
+  onRefresh,
+}) => {
   const { language } = useUiLanguage();
   const text = ALERT_TRIGGER_TEXT[language];
+  const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <Card title={text.title} subtitle={text.subtitle} variant="bordered" padding="md">
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+        {lastUpdated ? (
+          <span className="text-xs text-muted-text">
+            {formatUiText(controlsText.lastUpdated, {
+              time: formatUiDateTime(lastUpdated, language, { dateStyle: 'medium', timeStyle: 'short' }),
+            })}
+          </span>
+        ) : null}
+        {onRefresh ? (
+          <Button type="button" size="sm" variant="secondary" onClick={onRefresh} isLoading={isLoading} loadingText={text.loading}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {controlsText.refresh}
+          </Button>
+        ) : null}
+      </div>
       {isLoading ? <Loading label={text.loading} /> : null}
       {!isLoading && triggers.length === 0 ? (
         <EmptyState
@@ -97,6 +129,14 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({ trigge
             </tbody>
           </table>
         </div>
+      ) : null}
+      {onPageChange ? (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          className="mt-4"
+        />
       ) : null}
     </Card>
   );

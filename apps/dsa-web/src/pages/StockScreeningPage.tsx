@@ -38,7 +38,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, InlineAlert, Select } from '../components/common';
+import { AppPage, Button, InlineAlert, Input, Select } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
@@ -538,6 +538,8 @@ const StockScreeningPage: React.FC = () => {
   const [strategy, setStrategy] = useState(initialRunParameters.strategy);
   const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
   const [maxResults, setMaxResults] = useState(initialRunParameters.maxResults);
+  const [maxResultsDraft, setMaxResultsDraft] = useState(String(initialRunParameters.maxResults));
+  const [maxResultsError, setMaxResultsError] = useState('');
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
@@ -935,27 +937,37 @@ const StockScreeningPage: React.FC = () => {
     setMarket(nextMarket);
   };
 
-  const handleMaxResultsChange = (nextMaxResults: number) => {
-    if (nextMaxResults !== maxResults) {
+  const handleMaxResultsChange = (nextMaxResults: string) => {
+    if (nextMaxResults !== String(maxResults)) {
       clearScreeningResults();
     }
-    setMaxResults(nextMaxResults);
+    setMaxResultsDraft(nextMaxResults);
+    setMaxResultsError('');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const parsedMaxResults = Number(maxResultsDraft);
+    if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
+      setMaxResultsError(text.resultCountError);
+      document.getElementById('screening-max-results')?.focus();
+      return;
+    }
+    setMaxResults(parsedMaxResults);
+    setMaxResultsError('');
     setLoading(true);
     setError('');
     setScreenMeta(null);
     setTaskProgress(0);
     setTaskMessage(text.submittingTask);
     try {
-      const task = await alphasiftApi.startScreen({ market, strategy, maxResults });
+      const task = await alphasiftApi.startScreen({ market, strategy, maxResults: parsedMaxResults });
       if (!mountedRef.current) return;
       persistScreenTask({
         taskId: task.taskId,
         market,
         strategy,
-        maxResults,
+        maxResults: parsedMaxResults,
       });
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
@@ -1323,7 +1335,7 @@ const StockScreeningPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
+      <form className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           {text.parameters}
@@ -1338,41 +1350,40 @@ const StockScreeningPage: React.FC = () => {
             options={markets.map((item) => ({ value: item.id, label: item.label }))}
           />
 
-          <label className="space-y-2 text-xs font-medium text-secondary-text">
-            {text.strategyParameter}
-            <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              value={strategy}
-              disabled={loading}
-              onChange={(event) => handleStrategyChange(event.target.value)}
-            />
-          </label>
+          <Input
+            label={text.strategyParameter}
+            className="rounded-xl bg-surface text-sm focus:border-primary"
+            value={strategy}
+            disabled={loading}
+            onChange={(event) => handleStrategyChange(event.target.value)}
+          />
 
-          <label className="space-y-2 text-xs font-medium text-secondary-text">
-            {text.resultCount}
-            <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              type="number"
-              min={1}
-              max={100}
-              value={maxResults}
-              disabled={loading}
-              onChange={(event) => handleMaxResultsChange(Number(event.target.value))}
-            />
-          </label>
+          <Input
+            id="screening-max-results"
+            label={text.resultCount}
+            className="rounded-xl bg-surface text-sm focus:border-primary"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={maxResultsDraft}
+            error={maxResultsError}
+            disabled={loading}
+            onChange={(event) => handleMaxResultsChange(event.target.value)}
+          />
 
           <Button
             className="h-11 min-w-40"
             isLoading={loading}
             loadingText={text.screening}
             disabled={!isScreeningEnabled || loading}
-            onClick={() => void handleSubmit()}
+            type="submit"
           >
             <Play className="h-4 w-4" />
             {text.run}
           </Button>
         </div>
-      </section>
+      </form>
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

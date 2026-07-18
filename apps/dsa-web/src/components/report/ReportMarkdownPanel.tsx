@@ -8,6 +8,8 @@ import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
 import { Tooltip } from '../common/Tooltip';
 import { ApiErrorAlert } from '../common/ApiErrorAlert';
+import { InlineAlert } from '../common/InlineAlert';
+import { useClipboard } from '../common/useClipboard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
 export interface ReportMarkdownPanelProps {
@@ -30,29 +32,24 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [copiedType, setCopiedType] = useState<'markdown' | 'text' | null>(null);
+  const { copyText, copyError } = useClipboard();
 
   const handleCopyMarkdown = useCallback(async () => {
     if (!content) return;
-    try {
-      await navigator.clipboard.writeText(content);
+    if (await copyText(content)) {
       setCopiedType('markdown');
       setTimeout(() => setCopiedType(null), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
     }
-  }, [content]);
+  }, [content, copyText]);
 
   const handleCopyPlainText = useCallback(async () => {
     if (!content) return;
-    try {
-      const plainText = markdownToPlainText(content);
-      await navigator.clipboard.writeText(plainText);
+    const plainText = markdownToPlainText(content);
+    if (await copyText(plainText)) {
       setCopiedType('text');
       setTimeout(() => setCopiedType(null), 2000);
-    } catch (error) {
-      console.error('Copy failed:', error);
     }
-  }, [content]);
+  }, [content, copyText]);
 
   useEffect(() => {
     let isMounted = true;
@@ -144,6 +141,8 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           </Tooltip>
         </div>
       </div>
+
+      {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-4" /> : null}
 
       {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center">

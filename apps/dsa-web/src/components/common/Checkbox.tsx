@@ -1,22 +1,22 @@
 import type React from 'react';
-import { useId } from 'react';
+import { forwardRef, useId } from 'react';
 import { cn } from '../../utils/cn';
 
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  label?: string;
+  label?: React.ReactNode;
   containerClassName?: string;
 }
 
 /**
- * Compact visual checkbox with a 44px interactive target.
+ * Shared checkbox matching the 24px Figma control and preserving native input semantics.
  */
-export const Checkbox: React.FC<CheckboxProps> = ({
+export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(({
   label,
   id,
   className = '',
   containerClassName = '',
   ...props
-}) => {
+}, ref) => {
   const generatedId = useId();
   const checkboxId = id ?? generatedId;
 
@@ -24,23 +24,28 @@ export const Checkbox: React.FC<CheckboxProps> = ({
     <label
       htmlFor={checkboxId}
       className={cn(
-        'flex min-h-11 min-w-11 items-center gap-3 select-none',
+        'flex min-h-6 min-w-6 items-center gap-2 select-none',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         containerClassName
       )}
     >
-      <input
-        id={checkboxId}
-        type="checkbox"
-        className={cn(
-          'h-4 w-4 cursor-pointer rounded border border-border/70 bg-base text-primary transition-all',
-          'focus:ring-2 focus:ring-primary/20 focus:outline-none',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          className
-        )}
-        {...props}
-      />
+      <span className="relative h-6 w-6 shrink-0">
+        <input
+          ref={ref}
+          id={checkboxId}
+          type="checkbox"
+          className={cn(
+            'shared-checkbox-input absolute inset-0 z-10 h-6 w-6 cursor-pointer appearance-none opacity-0',
+            'focus:outline-none disabled:cursor-not-allowed',
+            className
+          )}
+          {...props}
+        />
+        <span className="shared-checkbox-control absolute inset-0.5" aria-hidden="true" />
+      </span>
       {label ? <span className="text-sm font-medium text-foreground">{label}</span> : null}
     </label>
   );
-};
+});
+
+Checkbox.displayName = 'Checkbox';

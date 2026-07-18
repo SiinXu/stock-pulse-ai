@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { InlineAlert } from './InlineAlert';
+import { useClipboard } from './useClipboard';
 
 interface JsonViewerProps {
   data: Record<string, unknown> | unknown[] | null | undefined;
@@ -57,6 +59,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const { t } = useUiLanguage();
+  const { copyText, copyError } = useClipboard();
 
   if (!data) {
     return (
@@ -67,7 +70,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   const jsonString = JSON.stringify(data, null, 2);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(jsonString);
+    if (!await copyText(jsonString)) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -83,27 +86,30 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Copy action */}
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-lg
-          border border-border bg-elevated hover:bg-hover text-secondary-text
-          transition-colors z-10"
-      >
-        {copied ? t('common.copied') : t('common.copy')}
-      </button>
+    <div className={className}>
+      {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-2" /> : null}
+      <div className="relative">
+        {/* Copy action */}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-lg
+            border border-border bg-elevated hover:bg-hover text-secondary-text
+            transition-colors z-10"
+        >
+          {copied ? t('common.copied') : t('common.copy')}
+        </button>
 
-      {/* JSON content */}
-      <div
-        className="bg-elevated/80 rounded-lg p-4 overflow-auto custom-scrollbar
-          border border-border/60 font-mono text-sm text-secondary-text"
-        style={{ maxHeight }}
-      >
-        <pre className="whitespace-pre-wrap break-words">
-          {highlightJson(jsonString)}
-        </pre>
+        {/* JSON content */}
+        <div
+          className="bg-elevated/80 rounded-lg p-4 overflow-auto custom-scrollbar
+            border border-border/60 font-mono text-sm text-secondary-text"
+          style={{ maxHeight }}
+        >
+          <pre className="whitespace-pre-wrap break-words">
+            {highlightJson(jsonString)}
+          </pre>
+        </div>
       </div>
     </div>
   );

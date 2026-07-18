@@ -80,6 +80,7 @@ const userFacingAttributes = new Set([
 const userCopyObjectProperties = new Set(['message', 'title', 'description']);
 const han = /[\p{Script=Han}]/u;
 const latinLetter = /[A-Za-z]/;
+const technicalIdentifier = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -709,6 +710,7 @@ export function collectHardcodedUiStrings(
   const add = (part: StaticTextPart, context: HardcodedUiStringContext) => {
     const text = normalizeText(part.text);
     if (!text || !containsUserCopy(text)) return;
+    if (context === 'error-call' && technicalIdentifier.test(text)) return;
     const start = part.node.getStart(source);
     const key = `${start}:${context}:${text}`;
     if (seen.has(key)) return;

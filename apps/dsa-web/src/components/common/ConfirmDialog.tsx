@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   cancelText?: string;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
+  error?: string | null;
   isDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -30,6 +31,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelText,
   confirmDisabled = false,
   cancelDisabled = false,
+  error = null,
   isDanger = false,
   onConfirm,
   onCancel,
@@ -76,6 +78,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <p id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
           {message}
         </p>
+        {error ? (
+          <p className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-left text-xs text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-3">
           <button
             type="button"

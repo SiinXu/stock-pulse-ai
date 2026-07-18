@@ -122,20 +122,20 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
   },
 ];
 
-function collectTsxFiles(directory: string): string[] {
+function collectSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry: { name: string; isDirectory: () => boolean; isFile: () => boolean }) => {
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      return ['__tests__', '__stories__', 'generated'].includes(entry.name) ? [] : collectTsxFiles(fullPath);
+      return ['__tests__', '__stories__', 'generated'].includes(entry.name) ? [] : collectSourceFiles(fullPath);
     }
-    if (!entry.isFile() || !entry.name.endsWith('.tsx')) return [];
-    if (/\.(?:test|spec|stories|generated)\.tsx$/.test(entry.name)) return [];
+    if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) return [];
+    if (/\.(?:test|spec|stories|generated)\.tsx?$/.test(entry.name)) return [];
     return [fullPath];
   });
 }
 
 function productionCandidates() {
-  return collectTsxFiles(sourceRoot).flatMap((filename) => {
+  return collectSourceFiles(sourceRoot).flatMap((filename) => {
     const relative = path.relative(sourceRoot, filename);
     return collectHardcodedUiStrings(relative, fs.readFileSync(filename, 'utf8'));
   });

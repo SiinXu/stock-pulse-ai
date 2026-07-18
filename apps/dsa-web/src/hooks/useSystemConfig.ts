@@ -12,6 +12,8 @@ import type {
 } from '../types/systemConfig';
 import { serializeStockListValue } from '../utils/stockList';
 import { getDefaultSubCategory, getSubCategories } from '../components/settings/settingsSubCategories';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { SETTINGS_PAGE_TEXT } from '../locales/settingsPage';
 
 type ToastState = {
   type: 'success';
@@ -73,6 +75,7 @@ function normalizeFieldValue(value: string, schema: SystemConfigItem['schema'] |
 }
 
 export function useSystemConfig(initialTab?: { category: string; subCategory: string | null }) {
+  const { language, t } = useUiLanguage();
   // Server state
   const [configVersion, setConfigVersion] = useState<string>('');
   const [maskToken, setMaskToken] = useState<string>('******');
@@ -522,16 +525,16 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
 
     if (!explicitItems.length && !hasDirty) {
       if (!silent) {
-        setToast({ type: 'success', message: '当前没有可保存的修改。' });
+        setToast({ type: 'success', message: t('settings.noChangesToSave') });
       }
-      return { success: true, message: '当前没有可保存的修改' };
+      return { success: true, message: t('settings.noChangesToSave') };
     }
 
     if (!resolvedChangedItems.length) {
       if (!silent) {
-        setToast({ type: 'success', message: '当前没有可保存的修改。' });
+        setToast({ type: 'success', message: t('settings.noChangesToSave') });
       }
-      return { success: true, message: '当前没有可保存的修改' };
+      return { success: true, message: t('settings.noChangesToSave') };
     }
 
     setIsSaving(true);
@@ -549,15 +552,15 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
 
       if (!validateResult.valid) {
         setSaveError(createParsedApiError({
-          title: '配置校验未通过',
-          message: '请先修正表单错误后再保存。',
-          rawMessage: '配置校验未通过，请先修正表单错误。',
+          title: t('settings.validationFailedTitle'),
+          message: t('settings.validationFailedMessage'),
+          rawMessage: `${t('settings.validationFailedTitle')}: ${t('settings.validationFailedMessage')}`,
           category: 'http_error',
         }));
         setRetryAction('save');
         return {
           success: false,
-          message: '配置校验未通过',
+          message: t('settings.validationFailedTitle'),
           issues: validateResult.issues,
         };
       }
@@ -578,11 +581,13 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       );
       setConflictState(null);
 
-      const warningText = updateResult.warnings?.length
-        ? `；警告：${updateResult.warnings.join('；')}`
-        : '';
       if (!silent) {
-        setToast({ type: 'success', message: `配置已更新${warningText}` });
+        setToast({
+          type: 'success',
+          message: updateResult.warnings?.length
+            ? t('settings.configUpdatedWithWarnings', { warnings: updateResult.warnings.join('; ') })
+            : t('settings.configUpdated'),
+        });
       }
       return { success: true };
     } catch (error: unknown) {
@@ -593,7 +598,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
           setToast({ type: 'error', error: getParsedApiError(error) });
         }
         setRetryAction('save');
-        return { success: false, message: '保存失败' };
+        return { success: false, message: t('settings.saveFailed') };
       }
 
       if (error instanceof SystemConfigConflictError) {
@@ -614,11 +619,13 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
               committedValues,
             );
             setConflictState(null);
-            const warningText = rebasedResult.warnings?.length
-              ? `；警告：${rebasedResult.warnings.join('；')}`
-              : '';
             if (!silent) {
-              setToast({ type: 'success', message: `配置已更新${warningText}` });
+              setToast({
+                type: 'success',
+                message: rebasedResult.warnings?.length
+                  ? t('settings.configUpdatedWithWarnings', { warnings: rebasedResult.warnings.join('; ') })
+                  : t('settings.configUpdated'),
+              });
             }
             return { success: true };
           }
@@ -629,8 +636,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
           setConflictState(null);
         }
         setSaveError(createParsedApiError({
-          title: '配置版本冲突',
-          message: '配置在你编辑期间被其他会话更新，请在下方逐项选择“采用服务器值”或“保留本地值”后再保存。',
+          title: SETTINGS_PAGE_TEXT[language].conflictTitle,
+          message: SETTINGS_PAGE_TEXT[language].conflictDescription,
           rawMessage: error.parsedError.rawMessage,
           status: error.parsedError.status,
           category: error.parsedError.category,
@@ -648,7 +655,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         setToast({ type: 'error', error: getParsedApiError(error) });
       }
       setRetryAction('save');
-      return { success: false, message: '保存失败' };
+      return { success: false, message: t('settings.saveFailed') };
     } finally {
       setIsSaving(false);
     }
@@ -659,6 +666,8 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     hasDirty,
     maskToken,
     refreshCommittedSnapshot,
+    language,
+    t,
   ]);
 
   // Serialize writes: a second save() while one is in flight reuses the pending

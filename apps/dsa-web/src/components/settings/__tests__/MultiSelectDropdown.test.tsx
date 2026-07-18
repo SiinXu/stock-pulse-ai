@@ -67,14 +67,16 @@ describe('MultiSelectDropdown', () => {
     expect(screen.getByRole('button', { name: 'Later page control' })).not.toHaveFocus();
   });
 
-  it('keeps unknown selected values visible, counted, and removable', () => {
+  it('keeps unknown selected values counted and removable from the popup', () => {
     const onChange = vi.fn();
     render(<MultiSelectDropdown options={options} selected={['b', 'mystery']} onChange={onChange} />);
 
-    expect(screen.getByRole('button', { name: /已选/ })).toHaveTextContent('已选 2 / 4');
-    expect(screen.getByText('mystery')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: /已选/ });
+    expect(trigger).toHaveTextContent('已选 2 / 4');
+    expect(screen.queryByText('mystery')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '移除 mystery' }));
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByText('mystery'));
     expect(onChange).toHaveBeenCalledWith(['b']);
   });
 
@@ -82,9 +84,10 @@ describe('MultiSelectDropdown', () => {
     const onChange = vi.fn();
     render(<MultiSelectDropdown options={options} selected={['c', 'a']} onChange={onChange} ordered />);
 
-    // Chips carry priority positions in ordered mode.
-    expect(screen.getByText('1. Gamma')).toBeInTheDocument();
-    expect(screen.getByText('2. Alpha')).toBeInTheDocument();
+    // Closed state stays compact and only shows the selection count.
+    expect(screen.getByRole('button', { name: /已选/ })).toHaveTextContent('已选 2 / 3');
+    expect(screen.queryByText('1. Gamma')).not.toBeInTheDocument();
+    expect(screen.queryByText('2. Alpha')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /已选/ }));
     expect(screen.getByText('优先级 1')).toBeInTheDocument();

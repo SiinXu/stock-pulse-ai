@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { SETTINGS_PAGE_TEXT } from '../locales/settingsPage';
 import type { AvailableModelEntry } from '../types/systemConfig';
 
 interface AvailableModelsState {
@@ -22,6 +24,7 @@ interface AvailableModelsState {
  * distinguish "no models configured" from "failed to load" and offer a retry.
  */
 export function useAvailableModels(reloadKey?: string | number): AvailableModelsState {
+  const { language } = useUiLanguage();
   const [models, setModels] = useState<AvailableModelEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +55,13 @@ export function useAvailableModels(reloadKey?: string | number): AvailableModels
         // Do NOT fold the failure into an empty list — surface it so the UI can
         // distinguish "no models" from "load failed" and offer a retry.
         setModels([]);
-        setError(err instanceof Error ? err.message : 'Failed to load available models');
+        setError(err instanceof Error ? err.message : SETTINGS_PAGE_TEXT[language].modelCatalogFailed);
         setIsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [reloadKey, reloadToken]);
+  }, [language, reloadKey, reloadToken]);
 
   return { models, isLoading, error, reload };
 }

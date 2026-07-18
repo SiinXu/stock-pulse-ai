@@ -7,7 +7,7 @@ import type {
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
+import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -740,22 +740,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
   );
   const isComplete = issues.length === 0;
   const actionName = channel.displayName.trim() || channel.name;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [menuOpen]);
-
   return (
     <div
       data-testid={`connection-card-${channel.name}`}
@@ -852,25 +836,27 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           >
             {text.edit}
           </Button>
-          <div className="relative" ref={menuRef}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs text-muted-text"
-              disabled={busy}
-              aria-label={formatUiText(text.moreActions, { name: actionName })}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((previous) => !previous)}
-            >
-              ⋮
-            </Button>
-            {menuOpen ? (
-              <div
-                role="menu"
-                className="absolute right-0 top-full z-20 mt-1 w-36 rounded-xl border border-border bg-elevated p-1 shadow-lg"
+          <Popover
+            contentRole="menu"
+            contentClassName="right-0 top-full z-20 mt-1 w-36 p-1"
+            trigger={({ open, toggle }) => (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs text-muted-text"
+                disabled={busy}
+                aria-label={formatUiText(text.moreActions, { name: actionName })}
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onClick={toggle}
               >
+                ⋮
+              </Button>
+            )}
+          >
+            {({ close }) => (
+              <>
                 <button
                   type="button"
                   role="menuitem"
@@ -880,7 +866,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                     if (!canToggleEnabled) {
                       return;
                     }
-                    setMenuOpen(false);
+                    close();
                     onToggleEnabled();
                   }}
                 >
@@ -895,15 +881,15 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                     if (!canRemove) {
                       return;
                     }
-                    setMenuOpen(false);
+                    close();
                     onRemove();
                   }}
                 >
                   {text.deleteConnection}
                 </button>
-              </div>
-            ) : null}
-          </div>
+              </>
+            )}
+          </Popover>
         </div>
       </div>
 
@@ -1610,7 +1596,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               disabled={disabled}
             />
           ) : null}
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+          <div className="flex items-center justify-end gap-2 pt-4">
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"

@@ -33,7 +33,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   className = '',
 }) => {
   return (
-    <div className={cn('rounded-2xl border bg-card/75 p-4 shadow-soft-card', toneStyles[tone], className)}>
+    <div className={cn('rounded-xl border bg-card/75 p-4 shadow-soft-card', toneStyles[tone], className)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-secondary-text">{label}</p>

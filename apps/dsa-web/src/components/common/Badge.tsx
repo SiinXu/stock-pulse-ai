@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'history';
+type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'history' | 'trend-up' | 'trend-down';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
@@ -19,6 +19,8 @@ const variantStyles: Record<BadgeVariant, string> = {
   danger: 'border-danger/20 bg-danger/10 text-danger',
   info: 'border-primary/30 bg-primary/12 text-primary',
   history: 'border-secondary-text/20 bg-secondary-text/10 text-secondary-text',
+  'trend-up': 'badge-trend-up',
+  'trend-down': 'badge-trend-down',
 };
 
 /**
@@ -33,14 +35,19 @@ export const Badge: React.FC<BadgeProps> = ({
   style,
   ...rest
 }) => {
-  const sizeStyles = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm';
+  const isTrend = variant === 'trend-up' || variant === 'trend-down';
+  const sizeStyles = isTrend
+    ? 'gap-1 border-[0.5px] px-1.5 py-1 text-xxs leading-none'
+    : size === 'sm'
+      ? 'px-2 py-0.5 text-xs'
+      : 'px-3 py-1 text-sm';
 
   return (
     <span
       {...rest}
       style={style}
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border font-medium backdrop-blur-sm',
+        'inline-flex items-center gap-1 rounded-full border font-medium tracking-normal backdrop-blur-sm',
         sizeStyles,
         variantStyles[variant],
         glow && 'shadow-soft-card',

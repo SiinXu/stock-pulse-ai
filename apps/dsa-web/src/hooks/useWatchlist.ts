@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
+import { getParsedApiError, type ParsedApiError } from '../api/error';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { findMatchingStockCode, includesStockCode } from '../utils/stockCode';
 
 export interface UseWatchlistReturn {
   watchlistCodes: string[];
   isLoading: boolean;
   isActioning: boolean;
+  loadError: ParsedApiError | null;
   actionMessage: string | null;
   isInWatchlist: (stockCode: string) => boolean;
-  addToWatchlist: (stockCode: string) => Promise<void>;
-  removeFromWatchlist: (stockCode: string) => Promise<void>;
-  toggleWatchlist: (stockCode: string) => Promise<void>;
-  refresh: () => Promise<void>;
+  addToWatchlist: (stockCode: string) => Promise<boolean>;
+  removeFromWatchlist: (stockCode: string) => Promise<boolean>;
+  toggleWatchlist: (stockCode: string) => Promise<boolean>;
+  refresh: () => Promise<boolean>;
 }
 
 export function useWatchlist(): UseWatchlistReturn {
+  const { t } = useUiLanguage();
   const [codes, setCodes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const messageTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
@@ -37,9 +42,12 @@ export function useWatchlist(): UseWatchlistReturn {
       const result = await systemConfigApi.getWatchlist();
       if (mountedRef.current) {
         setCodes(result);
+        setLoadError(null);
       }
-    } catch {
-      // keep existing codes
+      return true;
+    } catch (error) {
+      if (mountedRef.current) setLoadError(getParsedApiError(error));
+      return false;
     }
   }, []);
 
@@ -70,43 +78,47 @@ export function useWatchlist(): UseWatchlistReturn {
   );
 
   const addToWatchlist = useCallback(async (stockCode: string) => {
-    if (!stockCode || isActioning) return;
+    if (!stockCode || isActioning) return false;
     setIsActioning(true);
     try {
       const result = await systemConfigApi.addToWatchlist(stockCode);
       if (mountedRef.current) {
         setCodes(result);
-        showMessage(`已加入自选 ${stockCode}`);
+        showMessage(t('chat.watchlistAdded', { stock: stockCode }));
       }
+      return true;
     } catch {
-      if (mountedRef.current) showMessage('操作失败');
+      if (mountedRef.current) showMessage(t('chat.actionFailed'));
+      return false;
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage]);
+  }, [isActioning, showMessage, t]);
 
   const removeFromWatchlist = useCallback(async (stockCode: string) => {
-    if (!stockCode || isActioning) return;
+    if (!stockCode || isActioning) return false;
     setIsActioning(true);
     try {
       const result = await systemConfigApi.removeFromWatchlist(stockCode);
       if (mountedRef.current) {
         setCodes(result);
-        showMessage(`已从自选移除 ${stockCode}`);
+        showMessage(t('chat.watchlistRemoved', { stock: stockCode }));
       }
+      return true;
     } catch {
-      if (mountedRef.current) showMessage('操作失败');
+      if (mountedRef.current) showMessage(t('chat.actionFailed'));
+      return false;
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage]);
+  }, [isActioning, showMessage, t]);
 
   const toggleWatchlist = useCallback(async (stockCode: string) => {
     const existingStockCode = findMatchingStockCode(codes, stockCode);
     if (existingStockCode) {
-      await removeFromWatchlist(existingStockCode);
+      return removeFromWatchlist(existingStockCode);
     } else {
-      await addToWatchlist(stockCode);
+      return addToWatchlist(stockCode);
     }
   }, [codes, removeFromWatchlist, addToWatchlist]);
 
@@ -114,6 +126,7 @@ export function useWatchlist(): UseWatchlistReturn {
     watchlistCodes: codes,
     isLoading,
     isActioning,
+    loadError,
     actionMessage,
     isInWatchlist,
     addToWatchlist,

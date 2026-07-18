@@ -238,6 +238,9 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
         for key, validation in expected.items():
             self.assertEqual(get_field_definition(key)["validation"], validation)
 
+    def test_agent_timeout_declares_display_unit(self):
+        self.assertEqual(get_field_definition("AGENT_ORCHESTRATOR_TIMEOUT_S")["unit"], "s")
+
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)

@@ -7,7 +7,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Drawer, EmptyState, InlineAlert } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, InlineAlert, Popover } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
@@ -54,6 +54,8 @@ type StockAnalysisNavigationState = {
   stockName?: string;
   autoAnalyze?: boolean;
   selectionSource?: string;
+  focusStockSearch?: boolean;
+  focusToken?: number;
 };
 
 type HomeRecordIdentity = {
@@ -221,7 +223,6 @@ const HomePage: React.FC = () => {
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const stockBarLoadStartedRef = useRef(false);
   const dashboardScrollRef = useRef<HTMLElement | null>(null);
-  const strategyMenuRef = useRef<HTMLDivElement | null>(null);
   const strategyButtonRef = useRef<HTMLButtonElement | null>(null);
   const strategyItemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const strategyInitialFocusIndexRef = useRef<number | null>(null);
@@ -406,23 +407,6 @@ const HomePage: React.FC = () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!strategyMenuOpen) {
-      return;
-    }
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (target instanceof Node && strategyMenuRef.current?.contains(target)) {
-        return;
-      }
-      setStrategyMenuOpen(false);
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [strategyMenuOpen]);
 
   useEffect(() => {
     if (selectedStrategyId && !analysisSkills.some((skill) => skill.id === selectedStrategyId)) {
@@ -886,6 +870,16 @@ const HomePage: React.FC = () => {
     },
     [query, selectedAnalysisSkills, submitAnalysis],
   );
+
+  useEffect(() => {
+    const state = location.state as StockAnalysisNavigationState | null;
+    if (!state?.focusStockSearch) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('home-stock-search')?.focus();
+    });
+    navigate(location.pathname, { replace: true, state: null });
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     const state = location.state as StockAnalysisNavigationState | null;
@@ -1434,6 +1428,7 @@ const HomePage: React.FC = () => {
           watchlistRows={watchlistRows}
           watchlistLoading={watchlistState.isLoading}
           watchlistActioning={watchlistState.isActioning}
+          watchlistLoadError={Boolean(watchlistState.loadError)}
           watchlistMessage={watchlistState.actionMessage}
           onAddToWatchlist={watchlistState.addToWatchlist}
           onRemoveFromWatchlist={watchlistState.removeFromWatchlist}
@@ -1483,6 +1478,7 @@ const HomePage: React.FC = () => {
       watchlistState.addToWatchlist,
       watchlistState.isActioning,
       watchlistState.isLoading,
+      watchlistState.loadError,
       watchlistState.refresh,
       watchlistState.removeFromWatchlist,
     ],
@@ -1509,6 +1505,7 @@ const HomePage: React.FC = () => {
               </button>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
+                  id="home-stock-search"
                   value={query}
                   onChange={setQuery}
                   onSubmit={(stockCode, stockName, selectionSource) => {
@@ -1520,30 +1517,35 @@ const HomePage: React.FC = () => {
                 />
               </div>
               {analysisSkills.length > 0 ? (
-                <div ref={strategyMenuRef} className="relative flex-shrink-0">
-                  <button
-                    ref={strategyButtonRef}
-                    id="strategy-menu-button"
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={strategyMenuOpen}
-                    aria-controls={strategyMenuOpen ? 'strategy-menu' : undefined}
-                    onClick={() => setStrategyMenuOpen((open) => !open)}
-                    onKeyDown={handleStrategyButtonKeyDown}
-                    disabled={isAnalyzing}
-                    className="home-surface-button flex h-11 max-w-[8.5rem] items-center gap-1.5 rounded-lg px-3 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
-                  >
-                    <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-                    <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
-                  </button>
-                  {strategyMenuOpen ? (
-                    <div
-                      id="strategy-menu"
-                      role="menu"
-                      aria-labelledby="strategy-menu-button"
-                      onKeyDown={handleStrategyMenuKeyDown}
-                      className="absolute right-0 top-11 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-subtle bg-elevated p-1.5 text-sm text-foreground shadow-2xl"
+                <Popover
+                  open={strategyMenuOpen}
+                  onOpenChange={setStrategyMenuOpen}
+                  rootClassName="flex-shrink-0"
+                  contentRole="menu"
+                  contentId="strategy-menu"
+                  ariaLabelledBy="strategy-menu-button"
+                  closeOnEscape={false}
+                  onContentKeyDown={handleStrategyMenuKeyDown}
+                  contentClassName="right-0 top-10 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
+                  trigger={({ open, toggle }) => (
+                    <button
+                      ref={strategyButtonRef}
+                      id="strategy-menu-button"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={open}
+                      aria-controls={open ? 'strategy-menu' : undefined}
+                      onClick={toggle}
+                      onKeyDown={handleStrategyButtonKeyDown}
+                      disabled={isAnalyzing}
+                      className="home-surface-button flex h-9 max-w-[8.5rem] items-center gap-1.5 rounded-lg px-2 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
                     >
+                      <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                      <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
+                    </button>
+                  )}
+                >
+                  <>
                       {strategyOptions.map((option, index) => {
                         const selected = selectedStrategyId === option.id;
                         return (
@@ -1567,21 +1569,17 @@ const HomePage: React.FC = () => {
                           </button>
                         );
                       })}
-                    </div>
-                  ) : null}
-                </div>
+                  </>
+                </Popover>
               ) : null}
             </div>
-            <div className="flex min-w-0 flex-wrap items-center gap-2.5 md:flex-nowrap md:flex-shrink-0">
-              <label className="flex h-11 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
-                <input
-                  type="checkbox"
-                  checked={notify}
-                  onChange={(e) => setNotify(e.target.checked)}
-                  className="chat-skill-checkbox"
-                />
-                {t('home.notify')}
-              </label>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap md:flex-shrink-0">
+              <Checkbox
+                checked={notify}
+                onChange={(event) => setNotify(event.target.checked)}
+                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-surface/60 px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
+                label={<span className="text-xs font-normal text-secondary-text">{t('home.notify')}</span>}
+              />
               <Button
                 type="button"
                 variant="secondary"
@@ -1589,7 +1587,7 @@ const HomePage: React.FC = () => {
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
-                className="h-10 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
+                className="h-9 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
@@ -1598,7 +1596,7 @@ const HomePage: React.FC = () => {
                 type="button"
                 onClick={() => handleSubmitAnalysis()}
                 disabled={!query || isAnalyzing}
-                className="btn-primary flex h-11 min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap md:flex-none md:basis-auto"
+                className="btn-primary flex !min-h-9 !min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap !px-3 !py-1.5 !text-xs md:flex-none md:basis-auto"
               >
                 {isAnalyzing ? (
                   <>

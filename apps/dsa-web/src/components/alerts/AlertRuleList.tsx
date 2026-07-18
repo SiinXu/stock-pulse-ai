@@ -165,7 +165,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-x-auto">
+        <div className={`relative min-h-0 flex-1 overflow-x-auto ${isLoading ? 'pointer-events-none opacity-60' : ''}`} aria-busy={isLoading}>
           <table className="w-full min-w-240 text-left text-sm">
             <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
               <tr>
@@ -220,7 +220,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         onClick={() => onTest(rule)}
                         isLoading={isRuleActionBusy(rule, 'test')}
                         loadingText={text.testing}
-                        disabled={isRuleBusy(rule) && !isRuleActionBusy(rule, 'test')}
+                        disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'test'))}
                       >
                         {text.test}
                       </Button>
@@ -230,7 +230,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         onClick={() => onToggleEnabled(rule)}
                         isLoading={isRuleActionBusy(rule, 'toggle')}
                         loadingText={rule.enabled ? text.disabling : text.enabling}
-                        disabled={isRuleBusy(rule) && !isRuleActionBusy(rule, 'toggle')}
+                        disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'toggle'))}
                       >
                         {rule.enabled ? text.disable : text.enable}
                       </Button>
@@ -239,7 +239,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         variant="danger-subtle"
                         aria-label={formatUiText(text.deleteAria, { name: rule.name })}
                         onClick={() => setPendingDelete(rule)}
-                        disabled={isRuleBusy(rule)}
+                        disabled={isLoading || isRuleBusy(rule)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         {text.delete}

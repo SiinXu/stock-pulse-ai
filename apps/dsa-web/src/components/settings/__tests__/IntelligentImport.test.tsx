@@ -197,7 +197,7 @@ describe('IntelligentImport', () => {
     }
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox.closest('label')).toHaveClass('min-h-11');
-    expect(checkbox).toHaveClass('h-4', 'w-4');
+    expect(checkbox).toHaveClass('h-6', 'w-6');
     expect(screen.getByRole('button', { name: '×' })).toHaveClass('h-11', 'w-11');
   });
 });

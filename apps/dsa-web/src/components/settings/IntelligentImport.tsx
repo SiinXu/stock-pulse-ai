@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { getParsedApiError } from '../../api/error';
 import { stocksApi, type ExtractItem } from '../../api/stocks';
 import { systemConfigApi, SystemConfigConflictError } from '../../api/systemConfig';
-import { Badge, Button, InlineAlert } from '../common';
+import { Badge, Button, Checkbox, InlineAlert } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../i18n/uiText';
 import { parseStockListValue } from '../../utils/stockList';
@@ -407,19 +407,20 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
                     it.code ? 'settings-border bg-[var(--settings-surface-strong)]' : 'border-danger/25 bg-danger/10'
                   }`}
                 >
-                  <label className="flex min-h-11 min-w-0 flex-1 items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={it.checked}
-                      onChange={() => toggleChecked(it.id)}
-                      disabled={!it.code || disabled}
-                      className="settings-input-checkbox h-4 w-4 shrink-0 rounded border-border/70 bg-base"
-                    />
-                    <span className={it.code ? 'font-medium text-foreground' : 'font-medium text-danger'}>
-                      {it.code || t('settings.intelligentImportParseFailed')}
-                    </span>
-                    {it.name && <span className="min-w-0 truncate text-secondary-text">({it.name})</span>}
-                  </label>
+                  <Checkbox
+                    checked={it.checked}
+                    onChange={() => toggleChecked(it.id)}
+                    disabled={!it.code || disabled}
+                    containerClassName="min-h-11 min-w-0 flex-1"
+                    label={(
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className={it.code ? 'font-medium text-foreground' : 'font-medium text-danger'}>
+                          {it.code || t('settings.intelligentImportParseFailed')}
+                        </span>
+                        {it.name && <span className="min-w-0 truncate font-normal text-secondary-text">({it.name})</span>}
+                      </span>
+                    )}
+                  />
                   <div className="ml-auto flex items-center gap-2">
                     <Badge variant={confidenceMeta.badge} size="sm">
                       {confidenceMeta.label}
