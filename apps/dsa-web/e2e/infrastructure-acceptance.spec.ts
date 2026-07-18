@@ -168,6 +168,15 @@ async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
   await page.locator(`[role="option"][data-value="${language}"]`).click();
 }
 
+async function selectTheme(page: Page, optionName: '浅色' | '深色') {
+  const toggle = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await toggle.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  }
+  await toggle.click();
+  await page.getByRole('menuitemradio', { name: optionName, exact: true }).click();
+}
+
 async function installMockAuth(page: Page, options: {
   language: 'zh' | 'en';
   passwordSet: boolean;
@@ -1670,15 +1679,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('40 light and dark themes keep Home and Settings key content readable', async ({ page }, testInfo) => {
     await login(page);
     const homeText = page.getByRole('button', { name: '大盘复盘', exact: true });
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
     const homeLightContrast = await getElementContrast(homeText);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '深色', exact: true }).click();
+    await selectTheme(page, '深色');
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1696,8 +1703,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const settingsDarkHeadingContrast = await getElementContrast(settingsHeading);
     const settingsDarkBodyContrast = await getElementContrast(settingsBody);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect.poll(async () => (await getElementContrast(settingsHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(settingsBody)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1752,7 +1758,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await fallbackSelector.click();
     await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
     const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-    await expectMinimumTouchTarget(fallbackCheckbox.locator('..'));
+    await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
     await page.goto('/settings?section=system_security&view=runtime');
     const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
