@@ -305,10 +305,8 @@ function renderFieldControl(
       aria-describedby={ariaDescribedBy}
       className={cn(
         commonClass,
-        'block h-9 md:ml-auto',
-        // Numbers stay compact; text/path fields fill the 240px control column
-        // so long values (e.g. directory paths) are not clipped to ~170px.
-        inputType === 'number' ? (unit ? 'pr-8 md:w-full' : 'md:w-44') : 'md:w-full',
+        'block h-9 md:ml-auto md:w-full',
+        inputType === 'number' && unit ? 'pr-8' : '',
         hasError && 'border-danger',
       )}
       value={value}
@@ -323,7 +321,7 @@ function renderFieldControl(
   }
 
   return (
-    <div className="relative md:ml-auto md:w-44">
+    <div className="relative w-full md:ml-auto">
       {input}
       <span
         aria-hidden="true"

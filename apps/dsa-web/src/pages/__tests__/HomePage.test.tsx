@@ -140,6 +140,12 @@ function duplicateTaskFailure() {
   });
 }
 
+async function selectWorkspaceView(name: '历史' | '自选' | '今日') {
+  const selector = await screen.findByRole('combobox', { name: '工作台视图切换' });
+  fireEvent.click(selector);
+  fireEvent.click(await screen.findByRole('option', { name }));
+}
+
 const marketReviewHistoryItem = {
   id: 2,
   queryId: 'market-review-q-1',
@@ -493,7 +499,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
 
     expect(await screen.findByLabelText('今日已分析')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '仅未分析' })).toBeDisabled();
@@ -530,7 +536,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     expect(await screen.findByLabelText('今日未分析')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '仅未分析' })).toBeEnabled();
 
@@ -628,7 +634,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
 
     expect(await screen.findByLabelText('今日已分析')).toBeInTheDocument();
     const analyzePendingButton = screen.getByRole('button', { name: '仅未分析' });
@@ -636,7 +642,7 @@ describe('HomePage', () => {
     fireEvent.click(analyzePendingButton);
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(screen.queryByText('今天还没有分析结果')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
     expect(await screen.findByRole('button', { name: /Apple/ })).toBeInTheDocument();
   });
 
@@ -680,7 +686,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
 
     await waitFor(() => {
       expect(historyApi.getList).toHaveBeenCalledWith({ stockCode: 'AAPL', limit: 1 });
@@ -734,7 +740,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
 
     expect(await screen.findByLabelText('确认今日状态中')).toBeInTheDocument();
     expect(
@@ -788,7 +794,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
 
     expect(await screen.findByLabelText('今日状态未知')).toBeInTheDocument();
     const analyzePendingButton = screen.getByRole('button', { name: '仅未分析' });
@@ -875,7 +881,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
 
     await waitFor(() => {
       expect(historyApi.getList).toHaveBeenCalledWith({
@@ -942,7 +948,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
 
     expect(await screen.findByRole('button', { name: /Apple/ })).toBeInTheDocument();
   });
@@ -987,7 +993,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
 
     expect(await screen.findByText('今日排行加载失败')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Apple/ })).not.toBeInTheDocument();
@@ -1064,7 +1070,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
     expect(await screen.findByRole('button', { name: /Apple/ })).toBeInTheDocument();
 
     const taskStreamOptions = vi.mocked(useTaskStream).mock.calls.at(-1)?.[0];
@@ -1140,7 +1146,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '今日' }));
+    await selectWorkspaceView('今日');
     expect(await screen.findByRole('button', { name: /Apple/ })).toBeInTheDocument();
 
     refreshed = true;
@@ -1174,7 +1180,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     const taskRefreshCallsBeforeSubmit = vi.mocked(analysisApi.getTasks).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
 
@@ -1209,7 +1215,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     const taskRefreshCallsBeforeSubmit = vi.mocked(analysisApi.getTasks).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
 
@@ -1238,7 +1244,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     const taskRefreshCallsBeforeSubmit = vi.mocked(analysisApi.getTasks).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
 
@@ -1259,7 +1265,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     const taskRefreshCallsBeforeSubmit = vi.mocked(analysisApi.getTasks).mock.calls.length;
     fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
 
@@ -1281,7 +1287,7 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole('tab', { name: '自选' }));
+    await selectWorkspaceView('自选');
     fireEvent.click(screen.getByRole('button', { name: '分析全部' }));
 
     expect(await screen.findByText('已提交 0 个任务，1 个正在运行')).toBeInTheDocument();

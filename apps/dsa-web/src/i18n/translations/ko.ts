@@ -116,6 +116,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.aiTaskMatrix.TASK_LABELS.report": "종목 보고서",
   "components.settings.providerQuickLinksText.PROVIDER_QUICK_LINKS_TEXT.opensInNewTab": "새 탭에서 열림",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label": "고급",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label": "개발자 진단",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label": "원시 구성",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.label": "에이전트 행동",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label": "실행",

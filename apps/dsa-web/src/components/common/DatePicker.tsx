@@ -231,7 +231,7 @@ export const DatePicker = ({
       <div
         ref={triggerRef}
         className={cn(
-          'flex h-11 min-h-11 min-w-11 w-full cursor-text items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'flex h-9 min-h-9 min-w-9 w-full cursor-text items-center justify-between gap-1 rounded-lg border border-border bg-transparent px-2 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
           triggerClassName,
         )}
@@ -273,7 +273,7 @@ export const DatePicker = ({
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={() => (isOpen ? closePicker() : openPicker())}
-          className="flex h-11 w-11 shrink-0 items-center justify-center gap-1 rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <CalendarDays className="h-4 w-4" aria-hidden="true" />
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-200', isOpen && 'rotate-180')} aria-hidden="true" />

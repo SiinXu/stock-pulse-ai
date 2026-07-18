@@ -1816,7 +1816,7 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
 
     // The status panel now lives in the top-level Advanced diagnostics area.
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
 
     const statusItems = await screen.findByTestId('generation-backend-status-items');
@@ -1841,7 +1841,7 @@ describe('SettingsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'emit llm draft' }));
 
     // The status panel now lives in the top-level Advanced diagnostics area.
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
     expect(await screen.findByTestId('generation-backend-status-items')).toHaveTextContent('LLM_CHANNELS=draft,backup');
 
@@ -1969,7 +1969,7 @@ describe('SettingsPage', () => {
   it('runs the unified post-save effects after a legacy migration applies', async () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
     // The migration banner lives in the top-level Advanced diagnostics area.
-    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced' });
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
 
     render(<SettingsPage />);
 
@@ -3502,7 +3502,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-9', 'w-9');
+    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-8', 'w-8');
     const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
     expect(enabledSwitch).toHaveAttribute('role', 'switch');
     expect(enabledSwitch).toHaveClass('h-11', 'w-11');

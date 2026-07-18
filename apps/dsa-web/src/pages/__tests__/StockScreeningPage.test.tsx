@@ -787,7 +787,8 @@ describe('StockScreeningPage', () => {
       ['超跌', 'oversold_reversal'],
       ['缩量回踩', 'shrink_pullback'],
     ].forEach(([label, id]) => {
-      fireEvent.click(screen.getByRole('button', { name: new RegExp(label) }));
+      fireEvent.click(screen.getByRole('combobox', { name: '选择策略' }));
+      fireEvent.click(screen.getByRole('option', { name: new RegExp(label) }));
       expect(screen.getByDisplayValue(id)).toBeInTheDocument();
     });
 
@@ -897,7 +898,8 @@ describe('StockScreeningPage', () => {
     expect(await screen.findByText('旧策略股票')).toBeInTheDocument();
     expect(screen.getByText('选股完成')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /资金热度/ }));
+    fireEvent.click(screen.getByRole('combobox', { name: '选择策略' }));
+    fireEvent.click(screen.getByRole('option', { name: /资金热度/ }));
 
     expect(screen.queryByText('旧策略股票')).not.toBeInTheDocument();
     expect(screen.getByText('等待运行')).toBeInTheDocument();

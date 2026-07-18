@@ -3,7 +3,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ListOrdered } from 'lucide-react';
 import { Checkbox, Input } from '../common';
 import { useFixedPopup } from '../common/useFixedPopup';
 import { formatUiText } from '../../i18n/uiText';
@@ -97,6 +97,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
     popupRef,
     contentVersion: popupContentVersion,
     constrainWidthToViewport: true,
+    matchTriggerWidth: true,
   });
 
   const open = useCallback(() => {
@@ -207,7 +208,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           ref={popupRef}
           data-dialog-popup="true"
           style={popupStyle}
-          className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+          className="fixed z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();
@@ -246,7 +247,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                 }}
                 aria-label={text.searchOptions}
                 placeholder={text.searchOptionsPlaceholder}
-                className="min-h-11 rounded-2xl"
+                className="min-h-9 rounded-lg"
               />
             </div>
           ) : null}
@@ -307,13 +308,21 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                         }
                       }
                     }}
-                    containerClassName="min-h-11 px-3 py-1.5 text-sm text-secondary-text"
+                    containerClassName="min-h-9 px-3 py-1.5 text-sm text-secondary-text"
                     label={(
                       <span className="flex min-w-0 flex-1 items-center gap-2 font-normal text-secondary-text">
-                        <span className="min-w-0 truncate">{entry.label}</span>
+                        <span className="min-w-0 truncate">
+                          {ordered ? entry.label.replace(/\s*[（(][^）)]*[）)]\s*$/, '') : entry.label}
+                        </span>
                         {ordered && isSelected ? (
-                          <span className="ml-auto shrink-0 text-xs text-muted-text">
-                            {formatUiText(text.priorityPosition, { position: positionOf(entry.value) })}
+                          <span
+                            className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs text-muted-text"
+                          >
+                            <ListOrdered className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span aria-hidden="true">{positionOf(entry.value)}</span>
+                            <span className="sr-only">
+                              {formatUiText(text.priorityPosition, { position: positionOf(entry.value) })}
+                            </span>
                           </span>
                         ) : null}
                       </span>

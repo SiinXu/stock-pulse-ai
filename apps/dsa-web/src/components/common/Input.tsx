@@ -88,7 +88,7 @@ export const Input = ({
     <button
       type="button"
       className={cn(
-        'inline-flex h-11 w-11 items-center justify-center rounded-lg border border-transparent bg-transparent transition-all duration-200 focus:outline-none focus-visible:ring-2',
+        'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent bg-transparent transition-all duration-200 focus:outline-none focus-visible:ring-2',
         isLoginAppearance
           ? visible
             ? 'text-[var(--login-text-secondary)] focus-visible:ring-[var(--login-input-toggle-ring)]'
@@ -140,11 +140,11 @@ export const Input = ({
           className={cn(
             isLoginAppearance
               ? 'input-surface input-focus-ring input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-base transition-all focus:outline-none sm:text-sm'
-              : 'h-11 w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text sm:text-xs',
+              : 'h-9 w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text sm:text-xs',
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
             finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',
-            'min-h-11 min-w-11 disabled:cursor-not-allowed disabled:opacity-60',
+            'min-h-9 min-w-9 disabled:cursor-not-allowed disabled:opacity-60',
             className,
           )}
           {...props}

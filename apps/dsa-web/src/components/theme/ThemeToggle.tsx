@@ -125,7 +125,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
                     ? 'relative min-h-14 min-w-0 flex-col justify-center gap-1 px-2 text-xs'
                     : 'min-h-11 justify-between',
                   isActive
-                    ? 'bg-primary/10 text-foreground'
+                    ? 'bg-hover text-foreground'
                     : 'text-secondary-text hover:bg-hover hover:text-foreground'
                 )}
               >
@@ -134,7 +134,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
                   {t(labelKey)}
                 </span>
                 {isActive ? (
-                  <Check className={cn('text-primary', isHorizontalMenu ? 'absolute right-1.5 top-1.5 h-3 w-3' : 'h-4 w-4')} />
+                  <Check className={cn('text-foreground', isHorizontalMenu ? 'absolute right-1.5 top-1.5 h-3 w-3' : 'h-4 w-4')} />
                 ) : null}
               </button>
             );

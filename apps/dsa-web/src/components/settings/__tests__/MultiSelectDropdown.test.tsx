@@ -34,6 +34,7 @@ describe('MultiSelectDropdown', () => {
     const trigger = screen.getByRole('button', { name: /已选/ });
     expect(trigger).toHaveTextContent('已选 1 / 3');
     expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(trigger).toHaveClass('min-h-9');
 
     fireEvent.click(trigger);
     const listbox = screen.getByRole('listbox');
@@ -330,6 +331,7 @@ describe('MultiSelectDropdown', () => {
         expect(popup?.style.maxWidth).toBe(
           `calc(100vw - ${FIXED_POPUP_VIEWPORT_MARGIN_PX * 2}px)`,
         );
+        expect(popup?.style.width).toBe(`${triggerRect.width}px`);
 
         const popupTop = Number.parseFloat(popup?.style.top ?? '');
         const popupLeft = Number.parseFloat(popup?.style.left ?? '');

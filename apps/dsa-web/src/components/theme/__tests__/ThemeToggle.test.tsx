@@ -36,6 +36,11 @@ describe('ThemeToggle', () => {
     for (const option of screen.getAllByRole('menuitemradio')) {
       expect(option).toHaveClass('min-h-11');
     }
+    const activeOption = screen.getAllByRole('menuitemradio').find(
+      (option) => option.getAttribute('aria-checked') === 'true',
+    );
+    expect(activeOption).toHaveClass('bg-hover', 'text-foreground');
+    expect(activeOption).not.toHaveClass('bg-primary/10');
     expect(screen.getByRole('menuitemradio', { name: '浅色' })).toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: '深色' })).toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: '跟随系统' })).toBeInTheDocument();

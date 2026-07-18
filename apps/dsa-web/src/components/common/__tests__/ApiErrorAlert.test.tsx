@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiErrorAlert } from '../ApiErrorAlert';
 
 describe('ApiErrorAlert', () => {
-  it('keeps disclosure and action targets at least 44px', () => {
+  it('keeps compact icon, disclosure, and action targets accessible', () => {
     render(
       <ApiErrorAlert
         error={{
@@ -22,6 +22,7 @@ describe('ApiErrorAlert', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Dismiss' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.queryByText('Dismiss')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByText(/^(?:查看详情|View details)$/)).toHaveClass('min-h-11');
   });

@@ -1350,37 +1350,36 @@ const DecisionSignalsPage: React.FC = () => {
           title={t('decisionSignals.title')}
           description={t('decisionSignals.description')}
           actions={(
-            <Button
-              type="button"
-              variant="secondary"
-              size="xl"
-              onClick={() => {
-                void loadSignals();
-                void loadOutcomeStats();
-              }}
-              disabled={loading}
-              isLoading={loading}
-              loadingText={t('decisionSignals.refresh')}
-            >
-              <RefreshCw className="h-4 w-4" />
-              {t('decisionSignals.refresh')}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={() => setStockContextModalOpen(true)}
+              >
+                <Search className="h-4 w-4" />
+                {activeStockLabel
+                  ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
+                  : t('decisionSignals.stockContextTitle')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  void loadSignals();
+                  void loadOutcomeStats();
+                }}
+                disabled={loading}
+                isLoading={loading}
+                loadingText={t('decisionSignals.refresh')}
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('decisionSignals.refresh')}
+              </Button>
+            </>
           )}
         />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            size="xl"
-            onClick={() => setStockContextModalOpen(true)}
-          >
-            <Search className="h-4 w-4" />
-            {activeStockLabel
-              ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
-              : t('decisionSignals.stockContextTitle')}
-          </Button>
-        </div>
 
         <Modal
           isOpen={stockContextModalOpen}
@@ -1641,7 +1640,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>
           ) : undefined}
         >
-          <form className="grid items-end gap-3 md:grid-cols-5" onSubmit={handleTimelineSearch}>
+          <form className="grid items-end gap-2 md:grid-cols-5 [&>*]:min-w-0 [&>*]:!w-full [&>*>div]:w-full" onSubmit={handleTimelineSearch}>
             <Select
               label={t('decisionSignals.timelineMarket')}
               value={timelineFilters.market}
@@ -1693,7 +1692,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="submit"
               variant="secondary"
-              size="xl"
+              size="md"
               disabled={timelineLoading || !activeStockContext?.code}
               isLoading={timelineLoading}
               loadingText={t('decisionSignals.timelineSearch')}

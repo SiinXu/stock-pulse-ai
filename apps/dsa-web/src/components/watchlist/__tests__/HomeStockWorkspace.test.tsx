@@ -53,9 +53,9 @@ describe('HomeStockWorkspace', () => {
       />,
     );
 
-    expect(screen.getByRole('tablist', { name: '工作台视图切换' })).toHaveClass('rounded-full');
+    expect(screen.getByRole('combobox', { name: '工作台视图切换' })).toHaveClass('rounded-lg');
     expect(screen.getByRole('searchbox', { name: '搜索' }).parentElement).toHaveClass('h-11', 'sm:h-7');
-    expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveClass('h-11');
+    expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveClass('h-9');
     expect(screen.getByRole('button', { name: '添加自选股' })).toHaveClass('h-9', 'w-9');
     expect(screen.getByRole('button', { name: '从自选股移除 600519' })).toHaveClass('h-9', 'w-9');
   });
@@ -93,27 +93,26 @@ describe('HomeStockWorkspace', () => {
   });
 
   it.each<HomeWorkspaceTab>(['history', 'watchlist', 'today'])(
-    'keeps the segmented tabs outside the switching panel on the %s view',
+    'keeps the view selector outside the switching panel on the %s view',
     (activeTab) => {
       render(<HomeStockWorkspace {...buildProps(activeTab)} />);
 
-      const tablist = screen.getByRole('tablist', { name: '工作台视图切换' });
-      const options = screen.getAllByRole('tab');
-      expect(options).toHaveLength(3);
-      const selected = options.find((option) => option.getAttribute('aria-selected') === 'true');
-      const panel = screen.getByRole('tabpanel');
-      expect(panel).toHaveAccessibleName(selected?.textContent ?? '');
+      const selector = screen.getByRole('combobox', { name: '工作台视图切换' });
+      const panel = screen.getByRole('region');
+      expect(panel).toHaveAccessibleName(selector.textContent ?? '');
 
-      expect(panel.contains(tablist)).toBe(false);
+      expect(panel.contains(selector)).toBe(false);
     },
   );
 
-  it('selects a workspace view from the segmented control', () => {
+  it('selects a workspace view from the shared dropdown', () => {
     const onTabChange = vi.fn();
     render(<HomeStockWorkspace {...buildProps('history', onTabChange)} />);
 
-    expect(screen.getByRole('tab', { name: '历史' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.click(screen.getByRole('tab', { name: '自选' }));
+    const selector = screen.getByRole('combobox', { name: '工作台视图切换' });
+    expect(selector).toHaveAttribute('data-value', 'history');
+    fireEvent.click(selector);
+    fireEvent.click(screen.getByRole('option', { name: '自选' }));
 
     expect(onTabChange).toHaveBeenCalledWith('watchlist');
   });

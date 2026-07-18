@@ -12,7 +12,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
+import { Badge, Button, Input, ScrollArea, SearchInput, Select, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -284,21 +284,22 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const panelId = `${reactId}-panel`;
 
   const renderTabs = (
-    <div className="flex min-w-0 flex-col gap-2">
-      <SegmentedControl
-        value={activeTab}
-        options={tabs}
-        onChange={onTabChange}
-        ariaLabel={t('watchlist.tabsAria')}
-        className="w-fit"
-        getPanelId={() => panelId}
-      />
+    <div className="flex min-w-0 items-center gap-2">
       <SearchInput
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
         placeholder={t('common.searchPlaceholder')}
         aria-label={t('layout.search')}
-        wrapperClassName="w-full"
+        wrapperClassName="min-w-0 flex-1"
+      />
+      <Select
+        value={activeTab}
+        options={tabs}
+        onChange={(value) => onTabChange(value as HomeWorkspaceTab)}
+        ariaLabel={t('watchlist.tabsAria')}
+        className="w-24 shrink-0"
+        triggerClassName="h-11 min-h-11 px-2 sm:h-7 sm:min-h-7"
+        menuAlign="end"
       />
     </div>
   );
@@ -308,7 +309,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
       {renderTabs}
       <div
-        role="tabpanel"
+        role="region"
         id={panelId}
         aria-label={activeTabLabel}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -340,6 +341,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           <>
             <DashboardPanelHeader
               className="mb-0"
+              headingClassName="items-center"
               title={t('watchlist.title')}
               titleClassName="text-sm font-medium"
               leading={<Star className="h-4 w-4 text-primary" aria-hidden="true" />}
@@ -386,7 +388,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 value={draftCode}
                 onChange={(event) => setDraftCode(event.target.value)}
                 placeholder={t('watchlist.addPlaceholder')}
-                className="h-11 px-3 text-xs"
+                className="h-9 min-h-9 px-3 text-xs"
                 disabled={watchlistActioning}
                 aria-label={t('watchlist.addPlaceholder')}
               />
@@ -416,6 +418,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           <>
             <DashboardPanelHeader
               className="mb-0"
+              headingClassName="items-center"
               title={t('watchlist.todayTitle')}
               titleClassName="text-sm font-medium"
               leading={<CalendarDays className="h-4 w-4 text-success" aria-hidden="true" />}

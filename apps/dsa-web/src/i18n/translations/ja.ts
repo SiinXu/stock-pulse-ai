@@ -116,6 +116,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.aiTaskMatrix.TASK_LABELS.report": "株価報告",
   "components.settings.providerQuickLinksText.PROVIDER_QUICK_LINKS_TEXT.opensInNewTab": "新しいタブで開く",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label": "上級",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label": "開発者診断",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label": "生の設定",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.label": "エージェントの挙動",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label": "実行",

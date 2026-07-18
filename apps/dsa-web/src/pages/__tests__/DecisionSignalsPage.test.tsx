@@ -498,8 +498,8 @@ describe('DecisionSignalsPage', () => {
       });
     });
     expect(screen.getByLabelText('来源报告 ID')).toHaveValue(3001);
-    expect(screen.getByLabelText('股票代码')).toHaveClass('h-11');
-    expect(screen.getByLabelText('来源报告 ID')).toHaveClass('h-11');
+    expect(screen.getByLabelText('股票代码')).toHaveClass('h-9');
+    expect(screen.getByLabelText('来源报告 ID')).toHaveClass('h-9');
   });
 
   it('renders decision signal enum filter labels in Chinese', async () => {

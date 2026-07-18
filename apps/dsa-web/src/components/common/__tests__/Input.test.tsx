@@ -3,20 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { Input } from '../Input';
 
 describe('Input', () => {
-  it('keeps the default input target at least 44px tall and wide', () => {
+  it('keeps the default input at the compact shared height', () => {
     render(<Input aria-label="Search" />);
 
     expect(screen.getByRole('textbox', { name: 'Search' })).toHaveClass(
-      'h-11',
-      'min-h-11',
-      'min-w-11'
+      'h-9',
+      'min-h-9',
+      'min-w-9'
     );
   });
 
-  it('retains the minimum target size when a caller requests compact visual height', () => {
+  it('retains the shared minimum height when a caller requests compact visual height', () => {
     render(<Input aria-label="Compact search" className="h-9" />);
 
-    expect(screen.getByRole('textbox', { name: 'Compact search' })).toHaveClass('h-9', 'min-h-11');
+    expect(screen.getByRole('textbox', { name: 'Compact search' })).toHaveClass('h-9', 'min-h-9');
   });
 
   it('wires label and hint text to the input', () => {
@@ -62,8 +62,8 @@ describe('Input', () => {
     const input = screen.getByLabelText('密码');
     const toggle = screen.getByRole('button', { name: '显示内容' });
     expect(input).toHaveAttribute('type', 'password');
-    expect(input).toHaveClass('h-11');
-    expect(toggle).toHaveClass('h-11', 'w-11');
+    expect(input).toHaveClass('h-9');
+    expect(toggle).toHaveClass('h-9', 'w-9');
 
     fireEvent.click(toggle);
     expect(input).toHaveAttribute('type', 'text');

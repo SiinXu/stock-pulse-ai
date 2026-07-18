@@ -166,7 +166,7 @@ export const Select: React.FC<SelectProps> = ({
           onClick={() => (isOpen ? closeList() : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
@@ -192,6 +192,7 @@ export const Select: React.FC<SelectProps> = ({
             ref={listRef}
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
+            aria-label={!label ? ariaLabel : undefined}
             style={popupStyle}
             className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
@@ -205,7 +206,7 @@ export const Select: React.FC<SelectProps> = ({
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => commitOption(index)}
                 className={cn(
-                  'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
+                  'flex min-h-9 cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-1.5 text-xs text-foreground',
                   index === activeIndex && 'bg-hover',
                 )}
               >

@@ -33,7 +33,7 @@ describe('Button', () => {
   it('renders children', () => {
     render(<Button>Click me</Button>);
 
-    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-full');
+    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-lg');
   });
 
   it('uses button type by default and exposes the selected variant', () => {

@@ -662,7 +662,7 @@ describe('SettingsField', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
-      expect(checkbox.closest('label')).toHaveClass('min-h-11');
+      expect(checkbox.closest('label')).toHaveClass('min-h-9');
       expect(checkbox).toHaveClass('h-6', 'w-6');
     }
     expect(checkboxes[0]).toBeChecked(); // cn
@@ -852,7 +852,8 @@ describe('SettingsField', () => {
     );
 
     const integerInput = screen.getByLabelText('TickFlow 日 K 优先级');
-    expect(integerInput).toHaveClass('h-9');
+    expect(integerInput).toHaveClass('h-9', 'w-full', 'md:w-full');
+    expect(integerInput).not.toHaveClass('md:w-44');
     expect(integerInput).toHaveAttribute('min', '0');
     expect(integerInput).toHaveAttribute('max', '99');
     expect(integerInput).toHaveAttribute('step', '1');
@@ -917,6 +918,7 @@ describe('SettingsField', () => {
 
     const input = screen.getByRole('spinbutton', { name: 'Agent 超时（秒）' });
     expect(input).toHaveClass('pr-8');
+    expect(input.parentElement).toHaveClass('w-full');
     expect(input.parentElement).toHaveTextContent('s');
   });
 

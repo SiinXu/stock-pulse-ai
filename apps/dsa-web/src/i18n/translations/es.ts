@@ -116,6 +116,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.aiTaskMatrix.TASK_LABELS.report": "Informes de acciones",
   "components.settings.providerQuickLinksText.PROVIDER_QUICK_LINKS_TEXT.opensInNewTab": "se abre en una pestaña nueva",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label": "Avanzado",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label": "Diagnóstico para desarrolladores",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label": "Configuración en bruto",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.label": "Comportamiento del agente",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label": "Ejecución",

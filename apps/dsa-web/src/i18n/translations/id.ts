@@ -116,6 +116,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "components.settings.aiTaskMatrix.TASK_LABELS.report": "Laporan saham",
   "components.settings.providerQuickLinksText.PROVIDER_QUICK_LINKS_TEXT.opensInNewTab": "Terbuka di tab baru",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label": "Lanjutan",
+  "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label": "Diagnostik Pengembang",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label": "Konfigurasi Mentah",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.label": "Perilaku Agen",
   "components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.agent_behavior.views.execution.label": "Eksekusi",

@@ -1279,60 +1279,33 @@ const StockScreeningPage: React.FC = () => {
         ) : null}
       </section>
 
-      <section className="rounded-2xl border border-primary/35 bg-card/95 p-4 shadow-soft-card">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <section className="rounded-xl border border-border bg-card/95 p-3 shadow-soft-card">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-foreground">{text.selectStrategy}</h2>
-            <p className="mt-1 text-xs text-secondary-text">{text.strategyDescription}</p>
+            <p className="mt-1 text-xs text-secondary-text">
+              {selectedStrategyDisplay?.description || text.strategyDescription}
+            </p>
           </div>
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {selectedStrategyTag}
-          </span>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Select
+              value={strategy}
+              onChange={handleStrategyChange}
+              options={strategies.map((item) => ({
+                value: item.id,
+                label: getStrategyDisplay(item, language).name,
+              }))}
+              ariaLabel={text.selectStrategy}
+              placeholder={loadingStrategies ? text.loadingStrategies : text.strategiesUnavailable}
+              disabled={loading || loadingStrategies || strategies.length === 0}
+              className="w-full sm:w-72 [&>div]:w-full"
+            />
+            <span className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+              {selectedStrategyTag}
+            </span>
+          </div>
         </div>
-
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {loadingStrategies && strategies.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
-              {text.loadingStrategies}
-            </div>
-          ) : strategies.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
-              {strategyLoadError || text.strategiesUnavailable}
-            </div>
-          ) : (
-            <>
-              {loadingStrategies ? (
-                <p className="col-span-full text-sm text-secondary-text">{text.loadingStrategies}</p>
-              ) : null}
-              {strategyLoadError ? (
-                <p role="alert" className="col-span-full text-sm text-danger">{strategyLoadError}</p>
-              ) : null}
-              {strategies.map((item) => {
-              const selected = item.id === strategy;
-              const display = getStrategyDisplay(item, language);
-              return (
-                <button
-                  key={item.id}
-                  className={`min-h-28 rounded-lg border p-4 text-left transition-all ${
-                    selected
-                      ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
-                      : 'border-border/80 bg-surface/70 hover:border-primary/45 hover:bg-hover/70'
-                  }`}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleStrategyChange(item.id)}
-                >
-                  <span className="text-base font-semibold text-foreground">{display.name}</span>
-                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{display.description}</span>
-                  <span className="mt-3 inline-flex text-xs font-semibold text-primary">
-                    {display.category}
-                  </span>
-                </button>
-              );
-              })}
-            </>
-          )}
-        </div>
+        {strategyLoadError ? <p role="alert" className="mt-2 text-xs text-danger">{strategyLoadError}</p> : null}
       </section>
 
       <form className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card" onSubmit={(event) => void handleSubmit(event)} noValidate>

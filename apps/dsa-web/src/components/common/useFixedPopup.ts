@@ -20,6 +20,7 @@ interface UseFixedPopupOptions<
   /** Stable value that changes whenever popup content can affect its geometry. */
   contentVersion: unknown;
   constrainWidthToViewport?: boolean;
+  matchTriggerWidth?: boolean;
   placement?: 'auto' | 'top' | 'bottom';
   align?: 'start' | 'end';
 }
@@ -37,6 +38,7 @@ export const useFixedPopup = <
   popupRef,
   contentVersion,
   constrainWidthToViewport = false,
+  matchTriggerWidth = false,
   placement = 'auto',
   align = 'start',
 }: UseFixedPopupOptions<TTrigger, TPopup>) => {
@@ -123,6 +125,7 @@ export const useFixedPopup = <
     ? {
         top: popupPosition?.top ?? triggerRect.bottom + FIXED_POPUP_GAP_PX,
         left: popupPosition?.left ?? triggerRect.left,
+        width: matchTriggerWidth ? triggerRect.width : undefined,
         minWidth: triggerRect.width,
         maxWidth: constrainWidthToViewport
           ? `calc(100vw - ${FIXED_POPUP_VIEWPORT_MARGIN_PX * 2}px)`

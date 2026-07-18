@@ -783,7 +783,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await mockScreeningBase(page);
     await login(page, 'en');
     await page.goto('/screening');
-    await expect(page.getByRole('button', { name: /Bull Trend/ })).toBeVisible();
+    const strategySelect = page.getByRole('combobox', { name: 'Select strategy' });
+    await expect(strategySelect).toHaveAttribute('data-value', 'bull_trend');
+    await expect(strategySelect).toContainText('Bull Trend');
     await expect(page.getByText('中文原始策略名', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Capture established bullish trends', { exact: true })).toBeVisible();
   });
@@ -977,7 +979,6 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
     await expect(page.getByLabel('API 密钥')).toHaveCount(0);
     await page.goto('/settings?section=advanced&view=raw_config');
-    await page.locator('details').filter({ hasText: '开发者诊断' }).locator('summary').click();
     await expect(page.getByText(/schema_ui_placement_missing/).first()).toBeVisible();
   });
 
@@ -1730,7 +1731,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
   });
 
-  test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }) => {
+  test('41 Settings selectors use shared sizing and Chat switches keep 44px touch targets at 390px', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
     const alphaRef = encodeModelRef('alpha_conn', 'openai/model-alpha');
@@ -1762,9 +1763,9 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
     await page.goto('/settings?section=system_security&view=runtime');
     const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
-    await expectMinimumTouchTarget(logLevelSelect);
+    await expectMinimumTouchTarget(logLevelSelect, 36);
     await logLevelSelect.click();
-    await expectMinimumTouchTarget(page.locator('[role="option"][data-value="INFO"]'));
+    await expectMinimumTouchTarget(page.locator('[role="option"][data-value="INFO"]'), 36);
     await page.keyboard.press('Escape');
 
     await page.goto('/chat');

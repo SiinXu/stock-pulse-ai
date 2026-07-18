@@ -63,11 +63,15 @@ const MODEL_KEYS_TO_RESET = [
 ];
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
-  const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
-  if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
-    await profileTrigger.click();
+  let themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await themeTrigger.isVisible().catch(() => false)) {
+    const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+    if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
+      await profileTrigger.click();
+    }
+    themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
   }
-  await page.getByRole('button', { name: '切换主题' }).first().click();
+  await themeTrigger.click();
   await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
   if (theme === '深色') {
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -871,14 +875,14 @@ test.describe('model access product convergence', () => {
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible();
   });
 
-  test('28 developer diagnostics is top-level and collapsed by default', async ({ page }) => {
+  test('28 developer diagnostics is a dedicated top-level view', async ({ page }) => {
     await openSettings(page);
     await page.goto('/settings?section=advanced&view=raw_config');
-    const details = page.locator('details').filter({ hasText: '开发者诊断' });
-    await expect(details).not.toHaveAttribute('open', '');
-    await details.locator('summary').click();
-    await expect(details).toHaveAttribute('open', '');
-    await expect(details).toContainText(/模型配置生效来源|执行后端/);
+    const diagnosticsTab = page.getByRole('tab', { name: '开发者诊断' });
+    await expect(diagnosticsTab).toHaveAttribute('aria-selected', 'false');
+    await diagnosticsTab.click();
+    await expect(page).toHaveURL(/view=diagnostics/);
+    await expect(page.getByText(/模型配置生效来源|执行后端/).first()).toBeVisible();
   });
 
   test('29 a real 409 keeps the local draft and surfaces conflict UI', async ({ page }) => {

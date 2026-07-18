@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, PageHeader, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -645,7 +645,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
       contentBordered
     >
       <div data-testid="first-run-setup-card" className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-start md:justify-between">
+        <div className="flex flex-col gap-2 rounded-xl border settings-border bg-background/35 px-3 py-2.5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
               {summaryTitle}
@@ -925,7 +925,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               />
             </div>
 
-            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
+            <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Clock className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerTimes')}
@@ -940,7 +940,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                       data-testid={`scheduler-time-input-${index}`}
                       value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
                       ariaLabel={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="w-32"
+                      className="w-24"
                       triggerClassName="h-9 min-h-9 text-sm font-medium"
                       disabled={disabled}
                       onChange={(nextValue) => {
@@ -954,8 +954,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     {scheduleTimes.length > 1 ? (
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="ghost"
                         size="icon"
+                        className="h-8 w-8 min-w-8 text-muted-text hover:bg-danger/10 hover:text-danger"
                         aria-label={t('settings.schedulerRemoveTime')}
                         title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
@@ -974,7 +975,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     value=""
                     ariaLabel={t('settings.schedulerTimeInputAria', { index: scheduleTimes.length + 1 })}
                     placeholder={t('settings.schedulerTimePlaceholder')}
-                    className="w-32"
+                    className="w-24"
                     triggerClassName="h-9 min-h-9 text-sm font-medium"
                     disabled={disabled}
                     autoOpen
@@ -994,7 +995,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {timeTargetKey === 'SCHEDULE_TIMES' && !isAddingTime ? (
                   <Button
                     type="button"
-                    variant="settings-secondary"
+                    variant="ghost"
                     size="sm"
                     className="h-9 shrink-0"
                     data-testid="scheduler-add-time-button"
@@ -2607,16 +2608,11 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
-      <div className="mb-4 px-1 py-1">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">{t('settings.pageTitle')}</h1>
-            <p className="max-w-3xl text-xs leading-5 text-secondary-text sm:text-sm sm:leading-6">
-              {t('settings.pageDescription')}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
+      <div className="mb-4">
+        <PageHeader
+          title={t('settings.pageTitle')}
+          description={t('settings.pageDescription')}
+          actions={<div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
             {visibleGroupSaveStates.map(([group, state]) => (
               <span
                 key={group}
@@ -2655,8 +2651,8 @@ const SettingsPage: React.FC = () => {
                 {settingsText.autosaveResetGroup}
               </Button>
             ) : null}
-          </div>
-        </div>
+          </div>}
+        />
 
         {saveError ? (
           <ApiErrorAlert
@@ -3276,39 +3272,36 @@ const SettingsPage: React.FC = () => {
                 title={sectionLabel('advanced', uiLanguage)}
                 description={settingsText.advancedDescription}
               >
-                <details className="group/backend-diagnostics overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-                    <div className="min-w-0 space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {settingsText.diagnostics}
-                      </p>
-                      <p className="text-xs leading-5 text-muted-text">
-                        {settingsText.diagnosticsDescription}
-                      </p>
-                    </div>
-                    <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/backend-diagnostics:rotate-180" aria-hidden="true" />
-                  </summary>
-                  <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
-                    {advancedSectionItems.length > 0 ? (
-                      <form
-                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-                        onSubmit={(event) => event.preventDefault()}
-                      >
-                        {advancedSectionItems.map((item) => (
-                          <SettingsField
-                            key={item.key}
-                            item={item}
-                            value={item.value}
-                            disabled={isSaving}
-                            onChange={setDraftValue}
-                            issues={issueByKey[item.key] || []}
-                            requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                            dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                            readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
-                          />
-                        ))}
-                      </form>
-                    ) : null}
+                {activeView === 'raw_config' ? (
+                  advancedSectionItems.length > 0 ? (
+                    <form
+                      className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                      onSubmit={(event) => event.preventDefault()}
+                    >
+                      {advancedSectionItems.map((item) => (
+                        <SettingsField
+                          key={item.key}
+                          item={item}
+                          value={item.value}
+                          disabled={isSaving}
+                          onChange={setDraftValue}
+                          issues={issueByKey[item.key] || []}
+                          requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                          dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                          readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
+                        />
+                      ))}
+                    </form>
+                  ) : (
+                    <EmptyState
+                      title={t('settings.currentCategoryEmptyTitle')}
+                      description={t('settings.currentCategoryEmptyDescription')}
+                      className="border-none bg-transparent py-6 shadow-none"
+                    />
+                  )
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs leading-5 text-muted-text">{settingsText.diagnosticsDescription}</p>
                     <LLMConfigModeBanner
                       status={llmModeStatus}
                       configVersion={configVersion}
@@ -3325,7 +3318,7 @@ const SettingsPage: React.FC = () => {
                       disabled={isSaving || isLoading}
                     />
                   </div>
-                </details>
+                )}
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
@@ -3375,7 +3368,7 @@ const SettingsPage: React.FC = () => {
                   catalogUnavailable={Boolean(providerCatalogError)}
                   onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}
-                  onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
+                  onViewDiagnostics={() => selectSectionView('advanced', 'diagnostics')}
                   taskModelRefs={taskModelRefs}
                   onManageModels={() => selectSectionView('ai_models', 'task_routing')}
                   onReplaceModelReferences={replaceModelReferences}

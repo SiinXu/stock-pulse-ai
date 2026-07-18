@@ -45,9 +45,8 @@ export interface SettingsSection {
   defaultView: string;
 }
 
-// First-level sections in display order. Only AI & Models is split into
-// multiple second-level views in this phase; other sections carry a single
-// implicit view (`main`) so the two-level shell renders uniformly.
+// First-level sections in display order. Sections with multiple workflows use
+// second-level views; the rest carry a single implicit view.
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'overview',
@@ -120,7 +119,10 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     id: 'advanced',
     label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.label", { zh: '高级', en: 'Advanced' }),
-    views: [{ id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label", { zh: '原始配置', en: 'Raw Config' }) }],
+    views: [
+      { id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label", { zh: '原始配置', en: 'Raw Config' }) },
+      { id: 'diagnostics', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label", { zh: '开发者诊断', en: 'Developer Diagnostics' }) },
+    ],
     defaultView: 'raw_config',
   },
 ];
