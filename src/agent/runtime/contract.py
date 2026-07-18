@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Vendor-neutral agent runtime contract (AR-PY-01).
 
 Defines the execution state machine, the frozen per-execution input

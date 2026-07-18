@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Wrapper-parity tests for the native runtime adapter (AR-PY-01).
 
 The adapter must pass native results through unchanged (identity, not

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 export const productionDesignGuardFixtures = {
   pillButton: '<button className="min-h-11 rounded-full">Run</button>',
   pillCssButton: '.btn-primary { border-radius: 9999px; }',

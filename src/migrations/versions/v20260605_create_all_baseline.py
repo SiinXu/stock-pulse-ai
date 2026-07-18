@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Known legacy marker created by the pre-runner initialization flow."""
 
 from sqlalchemy.engine import Connection

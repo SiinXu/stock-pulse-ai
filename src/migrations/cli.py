@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Command-line status and verification for the configured database."""
 
 from __future__ import annotations

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Versioned internal runtime events (AR-PY-03).
 
 ``RuntimeEvent`` is the internal, versioned progress event carrying the

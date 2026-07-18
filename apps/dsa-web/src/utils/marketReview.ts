@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 const GENERIC_MARKET_REVIEW_TITLES = new Set([
   'market review',
   '大盘复盘',

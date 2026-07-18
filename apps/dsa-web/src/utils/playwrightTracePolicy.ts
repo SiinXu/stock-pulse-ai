@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { resolvePlaywrightRunKey as resolveSharedPlaywrightRunKey } from '../../e2e/playwright-result-paths.mjs';
 
 export type PlaywrightTraceMode = 'off' | 'retain-on-failure';

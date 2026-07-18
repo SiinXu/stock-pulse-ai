@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Fail-closed tests for the execution-bound tool session (AR-PY-02).
 
 Every gate must reject with the shared structured error contract and an

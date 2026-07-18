@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Native runtime adapter (AR-PY-01).
 
 Wraps the existing factory products (``AgentExecutor`` /

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Gate Playwright artifacts on text scanning and a no-media policy."""
 
 from __future__ import annotations

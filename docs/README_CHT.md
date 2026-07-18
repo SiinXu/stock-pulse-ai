@@ -4,7 +4,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=social)](https://github.com/SiinXu/stock-pulse-ai/stargazers)
 [![CI](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT + AGPL-3.0](https://img.shields.io/badge/License-MIT%20%2B%20AGPL--3.0-blue.svg)](../LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
 
@@ -19,7 +19,7 @@
 </div>
 
 > [!NOTE]
-> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的獨立維護 fork，遵循 MIT License。StockPulse 不是上游團隊發布的官方版本。感謝原作者和貢獻者；原始版權與授權條款見 [LICENSE](../LICENSE)。
+> **StockPulse** 是 [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis) 的獨立維護 fork。上游原始程式碼遵循 MIT License，StockPulse 新增與大幅修改的程式碼遵循 AGPL-3.0。StockPulse 不是上游團隊發布的官方版本。感謝原作者和貢獻者；完整授權條款見 [LICENSE](../LICENSE)。
 
 ## 🖥️ 產品預覽
 
@@ -236,7 +236,12 @@ python main.py --webui-only
 
 ## 📄 License
 
-[MIT License](../LICENSE)。StockPulse 保留上游專案的版權與授權聲明，並作為獨立專案持續維護。
+本專案採用雙授權條款：
+
+- **上游原始程式碼**：MIT License（Copyright © 2026 ZhuLinsen）
+- **StockPulse 新增與大幅修改的程式碼**：GNU Affero General Public License v3.0（AGPL-3.0）
+
+完整說明見 [LICENSE](../LICENSE) 檔案。透過網路提供本軟體服務（包括 Web 介面、API 或 Agent 平台）時，必須遵守 AGPL-3.0 的相應要求。StockPulse 保留上游專案的版權與授權聲明，並作為獨立專案持續維護。
 
 如果你使用或基於本專案進行二次開發，歡迎同時註明 StockPulse 與上游專案的程式碼來源。
 

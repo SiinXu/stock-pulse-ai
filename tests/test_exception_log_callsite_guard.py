@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Static guard for sanitized exception logging across production Python."""
 
 from __future__ import annotations

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Cross-runtime contract conformance (AR-PY-05 seam).
 
 Drives the same logical scenario through both the permanent Native runtime

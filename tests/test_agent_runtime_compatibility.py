@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """AR-01 agent-runtime characterization compatibility gate.
 
 Two layers of protection for any future runtime replacement (e.g. an

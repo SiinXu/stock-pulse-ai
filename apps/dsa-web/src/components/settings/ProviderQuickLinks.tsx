@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ExternalLink } from 'lucide-react';
 import type { LlmProviderCatalogEntry } from '../../types/systemConfig';
 import type { UiLanguage } from '../../i18n/uiText';

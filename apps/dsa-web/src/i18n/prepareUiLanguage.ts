@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getUiLanguageStorage, persistUiLanguage } from '../utils/uiLanguage';
 import { loadUiLanguageTranslations } from './translations';
 import type { UiLanguage } from './uiLanguages';

@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Guard English developer logs at the remediated API, Agent, Bot, and storage boundaries."""
 
 from __future__ import annotations

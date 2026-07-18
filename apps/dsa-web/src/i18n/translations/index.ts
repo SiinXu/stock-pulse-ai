@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { ADDITIONAL_UI_LANGUAGES, type UiLanguage } from '../uiLanguages';
 import type { UiTranslationKey } from './en';
 

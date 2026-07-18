@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Vendor-neutral agent runtime layer (AR-PY-01/AR-PY-02/AR-PY-03).
 
 This package is owned by StockPulse and must never import external agent

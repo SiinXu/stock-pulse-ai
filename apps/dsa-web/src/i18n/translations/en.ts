@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 // Generated stable-key inventory for complete UI locale bundles.
 export const UI_TRANSLATION_KEYS = [
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message",

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { getParsedApiError } from '../api/error';
 import type { UiLanguage } from '../i18n/uiText';
 import type { Message } from '../stores/agentChatStore';
