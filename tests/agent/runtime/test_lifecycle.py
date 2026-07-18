@@ -49,6 +49,7 @@ from src.agent.runtime.events import (
 from src.agent.runtime.lifecycle import (
     ExecutionLifecycle,
     UsageRecorder,
+    classify_result_terminal_state,
     classify_terminal_state,
 )
 from src.agent.runtime.native_adapter import NativeRuntimeAdapter
@@ -245,6 +246,29 @@ def test_classify_cancellation_wins_over_success_and_timeout():
         is ExecutionState.TIMED_OUT
     )
     assert classify_terminal_state(success=False) is ExecutionState.FAILED
+
+
+def test_classify_result_reads_attributes_through_single_authority():
+    """The result-object classifier the entry-point write fences share must
+    apply the same cancellation-wins precedence as classify_terminal_state."""
+
+    class _Result:
+        def __init__(self, success=False, cancelled=False, timed_out=False):
+            self.success = success
+            self.cancelled = cancelled
+            self.timed_out = timed_out
+
+    # Cancellation wins even when partial success/timeout coexist: a cancelled
+    # chat turn must never persist a success assistant message.
+    assert (
+        classify_result_terminal_state(_Result(success=True, cancelled=True, timed_out=True))
+        is ExecutionState.CANCELLED
+    )
+    assert classify_result_terminal_state(_Result(success=True)) is ExecutionState.SUCCEEDED
+    assert classify_result_terminal_state(_Result(timed_out=True)) is ExecutionState.TIMED_OUT
+    assert classify_result_terminal_state(_Result()) is ExecutionState.FAILED
+    # Missing attributes default to falsey -> FAILED (no crash on partial objects).
+    assert classify_result_terminal_state(object()) is ExecutionState.FAILED
 
 
 # ---------------------------------------------------------------------------
