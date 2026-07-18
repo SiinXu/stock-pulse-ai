@@ -13,6 +13,7 @@ is structural, not reimplemented.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Optional
 
 from src.agent.runtime.contract import (
@@ -22,6 +23,8 @@ from src.agent.runtime.contract import (
     ExecutionMode,
     ExecutionState,
     ProgressCallback,
+    _EventStream,
+    deep_thaw,
 )
 from src.agent.runtime.lifecycle import classify_terminal_state
 from src.agent.public_contract import sanitize_agent_diagnostic
@@ -43,34 +46,77 @@ class NativeRuntimeAdapter:
     def name(self) -> str:
         return "native"
 
+    def start(
+        self,
+        context: ExecutionContext,
+        *,
+        progress_callback: Optional[ProgressCallback] = None,
+    ) -> ExecutionHandle:
+        """Launch the native stack on a worker thread and return a live handle.
+
+        The handle is returned while the execution may still be ``RUNNING``
+        so callers can observe state, consume events, request cancellation
+        and await the terminal state. Terminal classification and the
+        first-wins rule are unchanged from the synchronous path.
+        """
+        execution = AgentExecution(context)
+        event_stream = _EventStream()
+        done_event = threading.Event()
+        handle = ExecutionHandle(
+            execution, event_stream=event_stream, done_event=done_event
+        )
+        execution.start()
+
+        def _emit(event: Any) -> None:
+            event_stream.publish(event)
+            if progress_callback is not None:
+                progress_callback(event)
+
+        def _worker() -> None:
+            try:
+                result = self._dispatch(context, _emit)
+            except Exception as exc:  # recorded as FAILED and re-raised via execute()
+                execution.finish(
+                    ExecutionState.FAILED,
+                    error=sanitize_agent_diagnostic(str(exc) or exc.__class__.__name__),
+                )
+                handle._set_worker_exception(exc)
+            else:
+                execution.finish(
+                    self._terminal_state_for(result),
+                    result=result,
+                    error=getattr(result, "error", None),
+                )
+            finally:
+                event_stream.close()
+                done_event.set()
+
+        worker = threading.Thread(
+            target=_worker,
+            name=f"agent-runtime-{context.execution_id}",
+            daemon=True,
+        )
+        handle._attach_worker(worker)
+        worker.start()
+        return handle
+
     def execute(
         self,
         context: ExecutionContext,
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> ExecutionHandle:
-        """Run synchronously and return a terminal handle.
+        """Synchronous compatibility helper: start, await terminal, return.
 
-        Exceptions raised by the native stack are recorded as ``FAILED``
-        and re-raised unchanged: the adapter never converts an error into
-        a silent degraded result.
+        Preserves the original semantics: exceptions raised by the native
+        stack are recorded as ``FAILED`` and re-raised unchanged, so the
+        adapter never converts an error into a silent degraded result.
         """
-        execution = AgentExecution(context)
-        handle = ExecutionHandle(execution)
-        execution.start()
-        try:
-            result = self._dispatch(context, progress_callback)
-        except Exception as exc:
-            execution.finish(
-                ExecutionState.FAILED,
-                error=sanitize_agent_diagnostic(str(exc) or exc.__class__.__name__),
-            )
-            raise
-        execution.finish(
-            self._terminal_state_for(result),
-            result=result,
-            error=getattr(result, "error", None),
-        )
+        handle = self.start(context, progress_callback=progress_callback)
+        handle.wait()
+        worker_exception = handle.worker_exception
+        if worker_exception is not None:
+            raise worker_exception
         return handle
 
     def _dispatch(
@@ -78,7 +124,7 @@ class NativeRuntimeAdapter:
         context: ExecutionContext,
         progress_callback: Optional[ProgressCallback],
     ) -> Any:
-        request_context = dict(context.request_context) or None
+        request_context = deep_thaw(context.request_context) or None
         if context.mode is ExecutionMode.RUN:
             # Native run() has no progress channel; the callback only
             # applies to chat/research until typed events land (AR-PY-03).

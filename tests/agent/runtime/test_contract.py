@@ -15,6 +15,7 @@ from src.agent.runtime.contract import (
     ExecutionHandle,
     ExecutionMode,
     ExecutionState,
+    deep_thaw,
 )
 from src.agent.runtime.native_adapter import NativeRuntimeAdapter
 
@@ -181,3 +182,175 @@ def test_native_adapter_satisfies_runtime_protocol():
     adapter = NativeRuntimeAdapter(config=object())
     assert isinstance(adapter, AgentRuntime)
     assert adapter.name == "native"
+    assert hasattr(adapter, "start")
+
+
+# ---------------------------------------------------------------------------
+# Deep-frozen execution context (AR-RF-02)
+# ---------------------------------------------------------------------------
+
+def test_context_deep_freezes_nested_containers():
+    source = {"filters": {"sectors": ["tech"]}, "codes": ["600519"], "tags": {"a"}}
+    ctx = make_context(request_context=source)
+    # Caller mutation of nested objects after construction must not leak in.
+    source["filters"]["sectors"].append("bank")
+    source["codes"].append("000001")
+    source["tags"].add("b")
+    assert ctx.request_context["filters"]["sectors"] == ("tech",)
+    assert ctx.request_context["codes"] == ("600519",)
+    assert ctx.request_context["tags"] == frozenset({"a"})
+    with pytest.raises(TypeError):
+        ctx.request_context["filters"]["sectors"] = ["x"]
+
+
+def test_deep_thaw_restores_mutable_containers():
+    ctx = make_context(
+        request_context={"filters": {"sectors": ["tech"]}, "codes": ["600519"], "tags": {"a"}}
+    )
+    thawed = deep_thaw(ctx.request_context)
+    assert thawed == {"filters": {"sectors": ["tech"]}, "codes": ["600519"], "tags": {"a"}}
+    assert isinstance(thawed, dict)
+    assert isinstance(thawed["filters"], dict)
+    assert isinstance(thawed["codes"], list)
+    assert isinstance(thawed["tags"], set)
+    thawed["codes"].append("000001")  # mutable, must not raise
+
+
+# ---------------------------------------------------------------------------
+# Live execution handle (RF-02)
+# ---------------------------------------------------------------------------
+
+class _Result:
+    def __init__(self, *, success=True, cancelled=False, timed_out=False, error=None):
+        self.success = success
+        self.cancelled = cancelled
+        self.timed_out = timed_out
+        self.error = error
+
+
+class _BlockingExecutor:
+    """Native-style executor whose run() blocks until released."""
+
+    def __init__(self, release, *, started=None, result=None, raise_exc=None):
+        self._release = release
+        self._started = started
+        self._result = result if result is not None else _Result()
+        self._raise = raise_exc
+        self.calls = []
+
+    def run(self, prompt, context=None):
+        self.calls.append(("run", prompt, context))
+        if self._started is not None:
+            self._started.set()
+        assert self._release.wait(5)
+        if self._raise is not None:
+            raise self._raise
+        return self._result
+
+
+class _ChatExecutor:
+    """Native-style executor whose chat() emits progress then blocks."""
+
+    def __init__(self, release, events, *, started=None, result=None):
+        self._release = release
+        self._events = events
+        self._started = started
+        self._result = result if result is not None else _Result()
+
+    def chat(self, prompt, session_id=None, progress_callback=None, context=None):
+        if self._started is not None:
+            self._started.set()
+        for event in self._events:
+            progress_callback(event)
+        assert self._release.wait(5)
+        return self._result
+
+
+def test_start_returns_running_handle_then_completes():
+    release = threading.Event()
+    started = threading.Event()
+    result = _Result(success=True)
+    adapter = NativeRuntimeAdapter(executor=_BlockingExecutor(release, started=started, result=result))
+    handle = adapter.start(make_context())
+    assert started.wait(5)
+    assert handle.state is ExecutionState.RUNNING
+    assert handle.is_terminal is False
+    release.set()
+    assert handle.wait(5) is True
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert handle.result is result
+    handle.close()
+
+
+def test_cancel_while_running_is_recorded():
+    release = threading.Event()
+    started = threading.Event()
+    adapter = NativeRuntimeAdapter(
+        executor=_BlockingExecutor(release, started=started, result=_Result(success=False, cancelled=True))
+    )
+    handle = adapter.start(make_context())
+    assert started.wait(5)
+    assert handle.request_cancel() is True
+    assert handle.cancel_requested is True
+    assert handle.state is ExecutionState.RUNNING
+    release.set()
+    assert handle.wait(5) is True
+    assert handle.state is ExecutionState.CANCELLED
+    handle.close()
+
+
+def test_wait_timeout_while_running_returns_false():
+    release = threading.Event()
+    started = threading.Event()
+    adapter = NativeRuntimeAdapter(executor=_BlockingExecutor(release, started=started))
+    handle = adapter.start(make_context())
+    assert started.wait(5)
+    assert handle.wait(timeout=0.05) is False
+    assert handle.state is ExecutionState.RUNNING
+    release.set()
+    assert handle.wait(5) is True
+    handle.close()
+
+
+def test_close_is_idempotent():
+    release = threading.Event()
+    release.set()
+    adapter = NativeRuntimeAdapter(executor=_BlockingExecutor(release))
+    handle = adapter.start(make_context())
+    assert handle.wait(5) is True
+    handle.close()
+    handle.close()
+
+
+def test_execute_reraises_native_exception():
+    release = threading.Event()
+    release.set()
+    boom = RuntimeError("native boom")
+    adapter = NativeRuntimeAdapter(executor=_BlockingExecutor(release, raise_exc=boom))
+    with pytest.raises(RuntimeError, match="native boom"):
+        adapter.execute(make_context())
+
+
+def test_events_are_observable_via_handle():
+    release = threading.Event()
+    started = threading.Event()
+    events = [{"type": "step", "n": 1}, {"type": "step", "n": 2}]
+    adapter = NativeRuntimeAdapter(
+        executor=_ChatExecutor(release, events, started=started)
+    )
+    handle = adapter.start(make_context(mode=ExecutionMode.CHAT))
+    assert started.wait(5)
+    release.set()
+    assert handle.wait(5) is True
+    assert list(handle.events) == events
+    # After terminal the stream is closed, so subscribe replays and returns.
+    assert list(handle.subscribe(timeout=0.1)) == events
+    handle.close()
+
+
+def test_cancel_before_start_records_intent():
+    execution = AgentExecution(make_context())
+    assert execution.request_cancel() is True
+    assert execution.cancel_requested is True
+    assert execution.start() is True
+    assert execution.state is ExecutionState.RUNNING

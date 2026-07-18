@@ -24,10 +24,11 @@ class FakeExecutor:
     """Records calls and returns pre-seeded results, mirroring the
     AgentExecutor / AgentOrchestrator run()/chat() interface."""
 
-    def __init__(self, run_result=None, chat_result=None, run_error=None):
+    def __init__(self, run_result=None, chat_result=None, run_error=None, chat_events=None):
         self.run_result = run_result
         self.chat_result = chat_result
         self.run_error = run_error
+        self.chat_events = chat_events or []
         self.run_calls = []
         self.chat_calls = []
 
@@ -46,6 +47,9 @@ class FakeExecutor:
                 "context": context,
             }
         )
+        for event in self.chat_events:
+            if progress_callback is not None:
+                progress_callback(event)
         return self.chat_result
 
 
@@ -141,9 +145,13 @@ def test_degraded_success_true_result_stays_succeeded():
 # chat mode
 # ---------------------------------------------------------------------------
 
-def test_chat_dispatch_passes_session_and_callback():
+def test_chat_dispatch_wraps_callback_and_forwards_events():
+    """RF-02: the adapter wraps the caller callback so progress reaches both
+    the caller and the live handle's event stream; message/session/context
+    pass through unchanged."""
     result = make_result(content="answer")
-    executor = FakeExecutor(chat_result=result)
+    event = {"type": "step", "n": 1}
+    executor = FakeExecutor(chat_result=result, chat_events=[event])
     adapter = NativeRuntimeAdapter(executor=executor)
     callback = MagicMock()
 
@@ -159,14 +167,16 @@ def test_chat_dispatch_passes_session_and_callback():
 
     assert handle.state is ExecutionState.SUCCEEDED
     assert handle.result is result
-    assert executor.chat_calls == [
-        {
-            "message": "what changed today?",
-            "session_id": "session-9",
-            "progress_callback": callback,
-            "context": {"stock_code": "hk00700"},
-        }
-    ]
+    assert len(executor.chat_calls) == 1
+    call = executor.chat_calls[0]
+    assert call["message"] == "what changed today?"
+    assert call["session_id"] == "session-9"
+    assert call["context"] == {"stock_code": "hk00700"}
+    # The executor receives a wrapper, not the raw caller callback.
+    assert call["progress_callback"] is not callback
+    # The caller callback still fires, and the event is captured on the handle.
+    callback.assert_called_once_with(event)
+    assert list(handle.events) == [event]
 
 
 # ---------------------------------------------------------------------------
@@ -204,12 +214,14 @@ def test_research_dispatch_builds_agent_and_maps_success():
         llm_adapter=llm_adapter,
         token_budget=12345,
     )
-    research_agent.research.assert_called_once_with(
-        "why did the sector rally?",
-        context=None,
-        progress_callback=None,
-        timeout_seconds=90,
-    )
+    # The caller passed no callback, but the adapter still supplies a wrapper
+    # so research progress is captured on the live handle's event stream.
+    research_agent.research.assert_called_once()
+    research_call = research_agent.research.call_args
+    assert research_call.args == ("why did the sector rally?",)
+    assert research_call.kwargs["context"] is None
+    assert research_call.kwargs["timeout_seconds"] == 90
+    assert callable(research_call.kwargs["progress_callback"])
 
 
 def test_research_timed_out_maps_to_timed_out_state():

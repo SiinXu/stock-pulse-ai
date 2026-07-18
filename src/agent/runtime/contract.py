@@ -32,7 +32,17 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Callable, Dict, Mapping, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    Mapping,
+    Optional,
+    Protocol,
+    Tuple,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +78,45 @@ def new_execution_id() -> str:
     return uuid.uuid4().hex
 
 
+def _deep_freeze(value: Any) -> Any:
+    """Recursively convert a value into an immutable snapshot.
+
+    Mappings become read-only proxies, sequences become tuples and sets
+    become frozensets, so a caller can never mutate an execution's inputs
+    after construction — not even through nested containers (AR-RF-02).
+    """
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: _deep_freeze(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_deep_freeze(item) for item in value)
+    if isinstance(value, (set, frozenset)):
+        return frozenset(_deep_freeze(item) for item in value)
+    return value
+
+
+def deep_thaw(value: Any) -> Any:
+    """Inverse of :func:`_deep_freeze`: a mutable deep copy for adapters.
+
+    The frozen snapshot protects the contract boundary; native code still
+    expects ordinary ``dict``/``list``/``set`` instances, so adapters thaw
+    the snapshot at the boundary rather than leaking immutable containers.
+    """
+    if isinstance(value, Mapping):
+        return {key: deep_thaw(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [deep_thaw(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return {deep_thaw(item) for item in value}
+    return value
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     """Frozen input snapshot for a single execution.
 
-    ``request_context`` is defensively copied into a read-only mapping so
-    an execution can never observe caller-side mutation after creation.
+    ``request_context`` is deep-frozen into a read-only snapshot so an
+    execution can never observe caller-side mutation after creation, not
+    even through nested dicts, lists or sets.
     """
 
     mode: ExecutionMode
@@ -90,7 +133,7 @@ class ExecutionContext:
         if self.mode is ExecutionMode.CHAT and not self.session_id:
             raise ValueError("chat execution requires a session_id")
         object.__setattr__(
-            self, "request_context", MappingProxyType(dict(self.request_context))
+            self, "request_context", _deep_freeze(dict(self.request_context))
         )
 
 
@@ -190,11 +233,70 @@ class AgentExecution:
         return False
 
 
-class ExecutionHandle:
-    """Caller-facing view of an execution: status queries plus cancel intent."""
+class _EventStream:
+    """Thread-safe, replayable event buffer for a running execution."""
 
-    def __init__(self, execution: AgentExecution):
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._events: list = []
+        self._closed = False
+
+    def publish(self, event: Any) -> None:
+        with self._condition:
+            if self._closed:
+                return
+            self._events.append(event)
+            self._condition.notify_all()
+
+    def close(self) -> None:
+        with self._condition:
+            self._closed = True
+            self._condition.notify_all()
+
+    def snapshot(self) -> Tuple[Any, ...]:
+        with self._condition:
+            return tuple(self._events)
+
+    def subscribe(self, timeout: Optional[float] = None) -> Iterator[Any]:
+        index = 0
+        while True:
+            with self._condition:
+                while index >= len(self._events) and not self._closed:
+                    if not self._condition.wait(timeout):
+                        if index >= len(self._events) and not self._closed:
+                            return
+                if index >= len(self._events) and self._closed:
+                    return
+                batch = self._events[index:]
+                index = len(self._events)
+            for event in batch:
+                yield event
+
+
+class ExecutionHandle:
+    """Caller-facing control handle for a possibly-running execution.
+
+    Returned by ``AgentRuntime.start`` while the worker may still be in
+    ``RUNNING``. Callers can observe state, consume events, request
+    cancellation, await the terminal state and release resources. The
+    single-argument form ``ExecutionHandle(execution)`` remains a pure
+    status view for callers that own the lifecycle themselves.
+    """
+
+    def __init__(
+        self,
+        execution: AgentExecution,
+        *,
+        event_stream: Optional["_EventStream"] = None,
+        done_event: Optional[threading.Event] = None,
+    ):
         self._execution = execution
+        self._event_stream = event_stream
+        self._done_event = done_event
+        self._worker: Optional[threading.Thread] = None
+        self._worker_exception: Optional[BaseException] = None
+        self._close_lock = threading.Lock()
+        self._closed = False
 
     @property
     def execution_id(self) -> str:
@@ -224,8 +326,51 @@ class ExecutionHandle:
     def cancel_requested(self) -> bool:
         return self._execution.cancel_requested
 
+    @property
+    def events(self) -> Tuple[Any, ...]:
+        if self._event_stream is None:
+            return ()
+        return self._event_stream.snapshot()
+
+    @property
+    def worker_exception(self) -> Optional[BaseException]:
+        return self._worker_exception
+
+    def subscribe(self, timeout: Optional[float] = None) -> Iterator[Any]:
+        if self._event_stream is None:
+            return iter(())
+        return self._event_stream.subscribe(timeout=timeout)
+
     def request_cancel(self) -> bool:
         return self._execution.request_cancel()
+
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        """Block until terminal (or ``timeout``); returns whether terminal."""
+        if self._done_event is not None:
+            self._done_event.wait(timeout)
+        return self._execution.is_terminal
+
+    def close(self) -> None:
+        """Idempotently join the worker and close the event stream."""
+        with self._close_lock:
+            if self._closed:
+                return
+            self._closed = True
+        worker = self._worker
+        if (
+            worker is not None
+            and worker.is_alive()
+            and worker is not threading.current_thread()
+        ):
+            worker.join()
+        if self._event_stream is not None:
+            self._event_stream.close()
+
+    def _attach_worker(self, worker: threading.Thread) -> None:
+        self._worker = worker
+
+    def _set_worker_exception(self, exc: BaseException) -> None:
+        self._worker_exception = exc
 
 
 ProgressCallback = Callable[[Dict[str, Any]], None]
@@ -235,14 +380,24 @@ ProgressCallback = Callable[[Dict[str, Any]], None]
 class AgentRuntime(Protocol):
     """Protocol every runtime adapter must implement.
 
-    AR-PY-01 semantics: ``execute`` runs synchronously and returns a
-    handle already in a terminal state. ``progress_callback`` bridges the
-    existing native progress events until typed runtime events replace it
-    (AR-PY-03).
+    ``start`` launches the execution and returns a live
+    ``ExecutionHandle`` that may still be ``RUNNING``; callers use it to
+    observe state, consume events, cancel and await the terminal state.
+    ``execute`` is a synchronous compatibility helper: it starts, waits
+    for the terminal state and returns the handle, re-raising any error
+    the native stack raised so existing callers keep their semantics.
     """
 
     @property
     def name(self) -> str:
+        ...
+
+    def start(
+        self,
+        context: ExecutionContext,
+        *,
+        progress_callback: Optional[ProgressCallback] = None,
+    ) -> ExecutionHandle:
         ...
 
     def execute(
