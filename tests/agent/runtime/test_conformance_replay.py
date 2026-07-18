@@ -82,14 +82,30 @@ _TERMINAL_ONLY = [c for c in _SINGLE_RUN if c["profile"] in _INTENTIONAL_DIFF_PR
 _EQUIVALENT_IDS = [c["id"] for c in _EQUIVALENT]
 _TERMINAL_ONLY_IDS = [c["id"] for c in _TERMINAL_ONLY]
 
-_NON_SUCCESS_TERMINALS = frozenset(
-    {ExecutionState.FAILED, ExecutionState.CANCELLED, ExecutionState.TIMED_OUT}
-)
-
 # Audit label for the experimental runtime's tool session; mirrors
 # PydanticAIRuntimeAdapter.name so the conformance session is not mislabelled
 # as the native runtime.
 _EXPERIMENTAL_RUNTIME = "pydantic_ai_experimental"
+
+
+def _native_terminal_from_expected(expected):
+    """Recover the native terminal classification from a frozen fixture.
+
+    The AR-01 ``expected`` block records ``success`` and a normalized error
+    signal but not the raw terminal flags. Timeout results carry the
+    "Agent timed out after ..." error prefix and cancellations the
+    "Agent execution cancelled" error, so the deterministic terminal state is
+    recoverable without re-running the fixture's real sleeps.
+    """
+    if expected.get("success"):
+        return ExecutionState.SUCCEEDED
+    prefix = expected.get("error_prefix") or ""
+    error = str(expected.get("error") or "")
+    if prefix.startswith("Agent timed out") or prefix.startswith("Pipeline timed out"):
+        return ExecutionState.TIMED_OUT
+    if "cancel" in error.lower():
+        return ExecutionState.CANCELLED
+    return ExecutionState.FAILED
 
 
 def _run_case_pydantic(case):
@@ -203,18 +219,20 @@ def test_timeout_cancel_is_terminal_equivalent(case_entry):
     # compatibility suite); read it rather than re-running the fixture's real
     # per-step sleeps a second time. Only the experimental side executes here.
     native_expected = case["expected"]
+    native_terminal = _native_terminal_from_expected(native_expected)
     handle, _pyd_replay, _pyd_tools = _run_case_pydantic(case)
     pyd_result = handle.result
 
     # Native fences timeout/cancel before the step's tools; the experimental
     # runtime after (ADR-001 D5), so tool logs may differ. What must hold: the
-    # frozen native verdict is non-success with no dashboard, and the
-    # experimental runtime reaches the same non-success terminal, never faking
-    # success.
+    # experimental runtime reaches the SAME terminal classification as the
+    # frozen native verdict — not merely some non-success terminal, so an
+    # unrelated FAILED on a timeout fixture cannot pass silently — and writes
+    # no dashboard.
     assert native_expected["success"] is False
     assert native_expected["dashboard"] is None
     assert pyd_result.success is False
-    assert handle.state in _NON_SUCCESS_TERMINALS
+    assert handle.state is native_terminal
     assert pyd_result.dashboard is None
 
 
