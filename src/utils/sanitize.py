@@ -54,6 +54,16 @@ _SENSITIVE_COMPACT_KEY_PATTERN = re.compile(
     r"authorization|cookie|credential|password|secret|sendkey|token(?!s)|webhook"
 )
 _URL_PATTERN = re.compile(r"https?://[^\s,;)\]}]+", re.IGNORECASE)
+# Credentials in the userinfo of a connection-string URL of any scheme
+# (postgresql://, mysql://, redis://, mongodb://, amqp://, ...). _URL_PATTERN
+# only covers http(s), so a password embedded in a non-HTTP connection string
+# (e.g. a SQLAlchemy error) would otherwise leak into a diagnostic. The
+# password segment allows '@' and matches greedily up to the last '@' before
+# the host, so an unescaped '@' inside the password is redacted too; the '/'
+# boundary keeps the match from spilling into the host or path.
+_URL_CREDENTIALS_PATTERN = re.compile(
+    r"(?P<scheme>[a-zA-Z][a-zA-Z0-9+.\-]*://)[^\s:/?#@]*:[^\s/?#]*@"
+)
 _BEARER_PATTERN = re.compile(r"\b(bearer\s+)[^\s,;&]+", re.IGNORECASE)
 _AUTHORIZATION_HEADER_PATTERN = re.compile(
     r"\b(authorization|proxy[_-]?authorization)(\s*[:=]\s*)"
@@ -438,6 +448,7 @@ def sanitize_diagnostic_text(
         return ""
     sanitized = _redact_exact_values(sanitized, exact_values)
     sanitized = _URL_PATTERN.sub("[REDACTED_URL]", sanitized)
+    sanitized = _URL_CREDENTIALS_PATTERN.sub(r"\g<scheme>[REDACTED]@", sanitized)
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_ASSIGNMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
@@ -889,6 +900,7 @@ def sanitize_sensitive_text(text: Any) -> str:
     if not sanitized:
         return ""
     sanitized = _URL_PATTERN.sub(_redact_sensitive_url_match, sanitized)
+    sanitized = _URL_CREDENTIALS_PATTERN.sub(r"\g<scheme>[REDACTED]@", sanitized)
     sanitized = _AUTHORIZATION_HEADER_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _COOKIE_SEGMENT_PATTERN.sub(r"\1\2[REDACTED]", sanitized)
     sanitized = _BEARER_PATTERN.sub(r"\1[REDACTED]", sanitized)
