@@ -63,11 +63,15 @@ const MODEL_KEYS_TO_RESET = [
 ];
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
-  const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
-  if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
-    await profileTrigger.click();
+  let themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await themeTrigger.isVisible().catch(() => false)) {
+    const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+    if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
+      await profileTrigger.click();
+    }
+    themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
   }
-  await page.getByRole('button', { name: '切换主题' }).first().click();
+  await themeTrigger.click();
   await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
   if (theme === '深色') {
     await expect(page.locator('html')).toHaveClass(/dark/);
