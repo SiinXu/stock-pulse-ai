@@ -58,7 +58,7 @@ class BoundToolSession:
         call_timeout_seconds: Optional[float] = None,
         max_result_bytes: Optional[int] = None,
         max_tool_calls: Optional[int] = None,
-        deadline_seconds: Optional[float] = None,
+        deadline_monotonic: Optional[float] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
         audit_context: Optional[Mapping[str, Any]] = None,
         surface: Optional[ToolSurface] = None,
@@ -81,10 +81,11 @@ class BoundToolSession:
         self._call_timeout_seconds = call_timeout_seconds
         self._max_result_bytes = max_result_bytes
         self._max_tool_calls = max_tool_calls
+        # Absolute ``time.monotonic()`` deadline supplied by the caller; the
+        # session derives the remaining budget per call. An absolute contract
+        # removes the ambiguity of the old relative ``deadline_seconds`` name.
         self._deadline_monotonic = (
-            time.monotonic() + float(deadline_seconds)
-            if deadline_seconds is not None
-            else None
+            float(deadline_monotonic) if deadline_monotonic is not None else None
         )
         self._cancelled_check = cancelled_check
         base_audit_context: Dict[str, Any] = {"execution_id": execution_id}
