@@ -166,7 +166,7 @@ export const Select: React.FC<SelectProps> = ({
           onClick={() => (isOpen ? closeList() : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',

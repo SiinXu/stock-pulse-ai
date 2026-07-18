@@ -27,7 +27,7 @@ describe('Select', () => {
     const trigger = screen.getByRole('combobox', { name: '服务商' });
     expect(trigger).toHaveAttribute('aria-invalid', 'true');
     expect(trigger).toHaveAttribute('aria-describedby', 'provider-error');
-    expect(trigger).toHaveClass('min-h-9');
+    expect(trigger).toHaveClass('min-h-11');
     expect(trigger).not.toHaveClass('sm:min-h-0');
 
     fireEvent.click(trigger);
