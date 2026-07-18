@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Strict offline replay harness for agent-runtime characterization (AR-01).
 
 This module freezes the *current* behaviour of the Native agent runtime by

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 // Single source of truth for overlay stacking order. Higher sits closer to the
 // user. Components that set z-index dynamically (the shared Drawer, run-flow and
 // report drawers, ConfirmDialog) import from here; the remaining overlays use

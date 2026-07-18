@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 const MODEL_REF_PREFIX = 'modelref:v1:';
 
 export interface DecodedModelRef {

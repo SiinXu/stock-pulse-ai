@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { AlertTargetScope, AlertType, MarketLightStatus, MarketRegion, PortfolioStopLossMode } from '../types/alerts';
 import type { UiLanguage } from '../i18n/uiText';

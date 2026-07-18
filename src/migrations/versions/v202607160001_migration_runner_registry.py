@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Add persistent checksums to the legacy applied-migration registry."""
 
 from sqlalchemy import text

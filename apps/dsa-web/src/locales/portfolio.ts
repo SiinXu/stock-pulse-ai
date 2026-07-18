@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { PortfolioCashDirection, PortfolioCorporateActionType, PortfolioSide } from '../types/portfolio';
 import type { UiLanguage } from '../i18n/uiText';

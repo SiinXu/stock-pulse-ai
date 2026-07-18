@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Isolate ambient LLM runtime config from ``os.environ`` during config tests.
 
 A developer ``.env`` loaded into the process environment — most notably by

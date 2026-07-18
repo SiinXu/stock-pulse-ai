@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 const SECTOR_TYPE_ALIASES = new Set([
   '行业',
   '行业板块',

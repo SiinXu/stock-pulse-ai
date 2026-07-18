@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { RunFlowSnapshotSource } from '../types/runFlow';
 
 const HOME_RECORD_ID_PARAM = 'recordId';

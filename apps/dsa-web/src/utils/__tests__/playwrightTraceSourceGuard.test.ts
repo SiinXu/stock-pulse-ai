@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 /// <reference types="vite/client" />
 // @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
 import fs from 'node:fs';

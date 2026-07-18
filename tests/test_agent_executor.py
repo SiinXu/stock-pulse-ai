@@ -233,7 +233,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -350,7 +350,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -392,7 +392,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -424,7 +424,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False))
 
@@ -463,7 +463,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -489,7 +489,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -513,7 +513,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -538,7 +538,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -1077,7 +1077,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             return AgentResult(success=True, content="assistant reply")
 

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 const REDIRECT_VALIDATION_ORIGIN = 'https://login-redirect.invalid';
 const UNICODE_WHITE_SPACE_PATTERN = /\p{White_Space}/u;
 

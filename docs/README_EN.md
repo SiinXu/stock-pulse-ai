@@ -4,7 +4,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/SiinXu/stock-pulse-ai?style=social)](https://github.com/SiinXu/stock-pulse-ai/stargazers)
 [![CI](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/SiinXu/stock-pulse-ai/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT + AGPL-3.0](https://img.shields.io/badge/License-MIT%20%2B%20AGPL--3.0-blue.svg)](../LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Ready-2088FF?logo=github-actions&logoColor=white)](https://github.com/features/actions)
 
@@ -19,7 +19,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 </div>
 
 > [!NOTE]
-> **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis), developed under the MIT License. StockPulse is not an official upstream release. Thanks to the original author and contributors; see [LICENSE](../LICENSE) for the original copyright and license terms.
+> **StockPulse** is an independently maintained fork of [ZhuLinsen/daily_stock_analysis](https://github.com/ZhuLinsen/daily_stock_analysis). Upstream original code is under the MIT License; new contributions and substantial modifications by StockPulse are under AGPL-3.0. StockPulse is not an official upstream release. Thanks to the original author and contributors; see [LICENSE](../LICENSE) for the full copyright and license terms.
 
 ## 🖥️ Product Preview
 
@@ -236,7 +236,12 @@ After configuring any available AI API key, the Web `/chat` page can use strateg
 
 ## 📄 License
 
-[MIT License](../LICENSE). StockPulse retains the upstream copyright and license notices and is maintained as an independent project.
+This project uses a dual-license model:
+
+- **Upstream / original code**: MIT License (Copyright © 2026 ZhuLinsen)
+- **New contributions by StockPulse**: GNU Affero General Public License v3.0 (AGPL-3.0)
+
+See the [LICENSE](../LICENSE) file for full details. When the software is made available over a network (including as a web service, API, or hosted agent platform), the AGPL-3.0 terms apply. StockPulse retains the upstream copyright and license notices and is maintained as an independent project.
 
 If you use or build on this project, attribution to both StockPulse and its upstream code lineage is appreciated.
 

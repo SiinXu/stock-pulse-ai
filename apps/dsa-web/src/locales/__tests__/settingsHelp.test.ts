@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { getSettingsHelpContent } from '../settingsHelp';
 import { UI_LANGUAGES } from '../../i18n/uiLanguages';

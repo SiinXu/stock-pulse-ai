@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Check safe diagnostics from one real authenticated Playwright failure."""
 
 from __future__ import annotations

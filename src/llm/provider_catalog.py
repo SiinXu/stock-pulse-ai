@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Authoritative catalog of LLM model-service providers.
 
 This is the single backend source of truth for provider metadata (labels,

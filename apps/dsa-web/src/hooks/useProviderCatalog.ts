@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../types/systemConfig';
