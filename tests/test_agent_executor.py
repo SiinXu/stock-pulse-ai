@@ -38,7 +38,8 @@ from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.runner import parse_dashboard_json, run_agent_loop, serialize_tool_result
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.data_tools import get_capital_flow_tool
-from src.agent.tools.execution import execute_runner_tool_call
+from src.agent.tools.execution import execute_runner_tool_call_via_session
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolRegistry, ToolDefinition, ToolParameter
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.config import Config
@@ -1558,7 +1559,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        with self.assertLogs("src.agent.tools.execution", level="WARNING") as captured_logs:
+        with self.assertLogs("src.agent.tool_surface", level="WARNING") as captured_logs:
             result = executor.run("Test error handling")
 
         # Should still succeed overall (agent handles tool errors gracefully)
@@ -1633,13 +1634,19 @@ class TestAgentExecutor(unittest.TestCase):
 
     def test_malformed_tool_names_return_stable_error(self):
         registry = ToolRegistry()
+        session = BoundToolSession(
+            registry,
+            execution_id="malformed-test",
+            allowed_tools=registry.list_names(),
+            enforce_access_policy=False,
+        )
 
         for malformed_name in (None, 7, ["echo"]):
             with self.subTest(malformed_name=malformed_name):
                 tool_call = ToolCall(id="bad", name=malformed_name, arguments={})
-                _, result_text, success, _, cached, guard_result = execute_runner_tool_call(
-                    tool_call=tool_call,
-                    tool_registry=registry,
+                _, result_text, success, _, cached, guard_result = execute_runner_tool_call_via_session(
+                    tool_call,
+                    session,
                 )
 
                 self.assertFalse(success)

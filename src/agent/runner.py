@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import time
+import uuid
 import contextvars
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
 from dataclasses import dataclass, field, replace
@@ -34,9 +35,10 @@ from src.agent.tools.execution import (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
-    execute_runner_tool_call,
+    execute_runner_tool_call_via_session,
     serialize_tool_result,
 )
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
 from src.utils.data_processing import normalize_report_signal_attribution
@@ -390,7 +392,22 @@ def run_agent_loop(
 
     start_time = time.time()
     tool_calls_log: List[Dict[str, Any]] = []
-    non_retriable_tool_results: Dict[str, str] = {}
+    # Single tool authority for the whole run: every tool call in every step is
+    # dispatched through this bound session. Native runs it in
+    # ``enforce_access_policy=False`` compatibility mode so the replay-frozen
+    # behaviour is preserved byte-for-byte while the direct ToolRegistry path is
+    # retired. The session's internal non-retriable memo replaces the previous
+    # ad-hoc per-run cache dict.
+    tool_session = BoundToolSession(
+        tool_registry,
+        execution_id=str(uuid.uuid4()),
+        allowed_tools=tool_registry.list_names(),
+        stock_scope=stock_scope,
+        cancelled_check=cancelled_check,
+        backend="native",
+        principal="native-runtime",
+        enforce_access_policy=False,
+    )
     total_tokens = 0
     provider_used = ""
     models_used: List[str] = []
@@ -403,6 +420,10 @@ def run_agent_loop(
     _MIN_STEP_BUDGET_S = 8.0
 
     def _finish(result: RunLoopResult) -> RunLoopResult:
+        # Terminal: close the tool session so any tool result still in flight
+        # (e.g. a timed-out worker) is dropped behind the late-result fence and
+        # can never re-enter the loop or a persisted success.
+        tool_session.close()
         if progress_callback and emit_stage_events:
             progress_callback(
                 stream_event(
@@ -574,13 +595,11 @@ def run_agent_loop(
                 )
             tool_results = _execute_tools(
                 tool_calls,
-                tool_registry,
+                tool_session,
                 step + 1,
                 progress_callback,
                 tool_calls_log,
-                non_retriable_tool_results,
                 tool_wait_timeout_seconds=effective_tool_timeout,
-                stock_scope=stock_scope,
             )
 
             # Append tool results preserving original call order
@@ -657,26 +676,21 @@ def run_agent_loop(
 
 def _execute_tools(
     tool_calls: List[ToolCall],
-    tool_registry: ToolRegistry,
+    tool_session: BoundToolSession,
     step: int,
     progress_callback: Optional[Callable],
     tool_calls_log: List[Dict[str, Any]],
-    non_retriable_tool_results: Optional[Dict[str, str]] = None,
     tool_wait_timeout_seconds: Optional[float] = None,
-    stock_scope: Optional[StockScope] = None,
 ) -> List[Dict[str, Any]]:
     """Execute one or more tool calls, returning ordered result dicts.
 
-    Single tools run inline; multiple tools run in parallel threads.
+    Single tools run inline; multiple tools run in parallel threads. Every
+    dispatch flows through the bound ``tool_session`` — the single tool
+    authority — via the migration mapper.
     """
 
     def _exec_single(tc_item):
-        return execute_runner_tool_call(
-            tool_call=tc_item,
-            tool_registry=tool_registry,
-            stock_scope=stock_scope,
-            non_retriable_tool_results=non_retriable_tool_results,
-        )
+        return execute_runner_tool_call_via_session(tc_item, tool_session)
 
     results: List[Dict[str, Any]] = []
 
