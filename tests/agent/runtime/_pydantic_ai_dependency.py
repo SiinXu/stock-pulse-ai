@@ -22,19 +22,26 @@ REQUIRE_ENV_VAR = "STOCKPULSE_REQUIRE_PYDANTIC_AI"
 def require_pydantic_ai():
     """Return the ``pydantic_ai`` module, or skip/fail per dependency state.
 
-    - Absent + ``STOCKPULSE_REQUIRE_PYDANTIC_AI`` unset: ``pytest.skip`` (native
-      gate; the experimental path is genuinely not installed).
-    - Absent + ``STOCKPULSE_REQUIRE_PYDANTIC_AI=1``: ``pytest.fail`` (the
-      installed matrix must exercise the adapter, never pass by skipping).
+    Called at module top level (like ``pytest.importorskip``), so the skip must
+    use ``allow_module_level=True`` and the required-but-missing path raises so
+    collection fails hard rather than skipping.
+
+    - Absent + ``STOCKPULSE_REQUIRE_PYDANTIC_AI`` unset: module-level skip
+      (native gate; the experimental path is genuinely not installed).
+    - Absent + ``STOCKPULSE_REQUIRE_PYDANTIC_AI=1``: raise (the installed matrix
+      must exercise the adapter, never pass by skipping — AR-RF-09).
     """
     required = os.environ.get(REQUIRE_ENV_VAR) == "1"
     try:
         import pydantic_ai
     except ImportError as exc:
         if required:
-            pytest.fail(
+            raise RuntimeError(
                 f"{REQUIRE_ENV_VAR}=1 but pydantic_ai is not importable: {exc}. "
                 "The installed matrix must not pass by skipping (AR-RF-09)."
-            )
-        pytest.skip("pydantic-ai-slim not installed; experimental runtime tests skipped")
+            ) from exc
+        pytest.skip(
+            "pydantic-ai-slim not installed; experimental runtime tests skipped",
+            allow_module_level=True,
+        )
     return pydantic_ai
