@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState, useEffect } from 'react';
 import { motion } from "motion/react";
-import { Loader2, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { Button, Input } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,14 +28,29 @@ const LoginPage: React.FC = () => {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | ParsedApiError | null>(null);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordConfirmError, setPasswordConfirmError] = useState('');
 
   const isFirstTime = setupState === 'no_password' || !passwordSet;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setPasswordError('');
+    setPasswordConfirmError('');
+    if (!password) {
+      setPasswordError(t('login.passwordRequired'));
+      document.getElementById('password')?.focus();
+      return;
+    }
+    if (isFirstTime && !passwordConfirm) {
+      setPasswordConfirmError(t('login.confirmPasswordRequired'));
+      document.getElementById('passwordConfirm')?.focus();
+      return;
+    }
     if (isFirstTime && password !== passwordConfirm) {
-      setError(t('login.passwordMismatch'));
+      setPasswordConfirmError(t('login.passwordMismatch'));
+      document.getElementById('passwordConfirm')?.focus();
       return;
     }
     setIsSubmitting(true);
@@ -44,7 +59,9 @@ const LoginPage: React.FC = () => {
       if (result.success) {
         navigate(redirect, { replace: true });
       } else {
-        setError(result.error ?? t('login.loginFailed'));
+        const nextError = result.error ?? t('login.loginFailed');
+        setError(nextError);
+        setPasswordError(isParsedApiError(nextError) ? localizeParsedApiError(nextError, language).message : nextError);
       }
     } finally {
       setIsSubmitting(false);
@@ -90,8 +107,13 @@ const LoginPage: React.FC = () => {
                 label={isFirstTime ? t('login.adminPassword') : t('login.loginPassword')}
                 placeholder={isFirstTime ? t('login.setupPasswordPlaceholder') : t('login.loginPasswordPlaceholder')}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordError('');
+                }}
+                error={passwordError}
                 disabled={isSubmitting}
+                required
                 autoFocus
                 autoComplete={isFirstTime ? 'new-password' : 'current-password'}
               />
@@ -106,8 +128,13 @@ const LoginPage: React.FC = () => {
                   label={t('login.confirmPassword')}
                   placeholder={t('login.confirmPasswordPlaceholder')}
                   value={passwordConfirm}
-                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  onChange={(e) => {
+                    setPasswordConfirm(e.target.value);
+                    setPasswordConfirmError('');
+                  }}
+                  error={passwordConfirmError}
                   disabled={isSubmitting}
+                  required
                   autoComplete="new-password"
                 />
               )}
@@ -134,17 +161,10 @@ const LoginPage: React.FC = () => {
               size="lg"
               className="h-12 w-full font-medium"
               disabled={isSubmitting}
+              isLoading={isSubmitting}
+              loadingText={isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}
             >
-              <div className="flex items-center justify-center gap-2">
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}</span>
-                  </>
-                ) : (
-                  <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
-                )}
-              </div>
+              <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
             </Button>
           </form>
 

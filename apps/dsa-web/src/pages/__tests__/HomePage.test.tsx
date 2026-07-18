@@ -283,8 +283,8 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('h-11');
-    expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-11');
+    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('!min-h-9');
+    expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-9');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -1361,7 +1361,7 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(screen.getByText(/600519 已有分析任务/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/600519 已有分析任务/).closest('[role="alert"]')).toBeInTheDocument();
+    expect(screen.getByText(/600519 已有分析任务/).closest('[role="status"]')).toBeInTheDocument();
   });
 
   it('dismisses the duplicate task banner when its close button is clicked', async () => {
@@ -2141,7 +2141,7 @@ describe('HomePage', () => {
     );
 
     const strategyTrigger = await screen.findByRole('button', { name: '策略' });
-    expect(strategyTrigger).toHaveClass('h-11');
+    expect(strategyTrigger).toHaveClass('h-9');
     fireEvent.click(strategyTrigger);
     const growthOption = screen.getByRole('menuitemradio', { name: /成长质量/ });
     expect(growthOption).toHaveClass('min-h-11');

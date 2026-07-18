@@ -18,9 +18,11 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
 
 const AUTOCOMPLETE_INPUT_CLASS =
-  'h-11 min-h-11 min-w-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'h-11 min-h-11 min-w-11 w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60 sm:h-9 sm:min-h-9 sm:min-w-9 sm:text-xs';
 
 export interface StockAutocompleteProps {
+  /** Input id */
+  id?: string;
   /** Input value */
   value: string;
   /** Value change callback */
@@ -43,6 +45,7 @@ export interface StockAutocompleteProps {
 }
 
 function FallbackInput({
+  id,
   value,
   onChange,
   onSubmit,
@@ -55,6 +58,7 @@ function FallbackInput({
   const resolvedPlaceholder = placeholder ?? STOCK_SEARCH_TEXT[language].placeholder;
   return (
     <input
+      id={id}
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -107,6 +111,7 @@ class StockAutocompleteBoundary extends Component<
 }
 
 function StockAutocompleteInner({
+  id,
   value,
   onChange,
   onSubmit,
@@ -246,6 +251,7 @@ function StockAutocompleteInner({
   if (fallback || loading || runtimeFallback) {
     return (
       <FallbackInput
+        id={id}
         value={value}
         onChange={onChange}
         onSubmit={onSubmit}
@@ -260,6 +266,7 @@ function StockAutocompleteInner({
   return (
     <div className="relative stock-autocomplete">
       <input
+        id={id}
         ref={inputRef}
         type="text"
         value={value}

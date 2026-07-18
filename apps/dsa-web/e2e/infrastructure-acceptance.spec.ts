@@ -161,6 +161,22 @@ async function login(page: Page, language: 'zh' | 'en' = 'zh') {
   }
 }
 
+async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
+  await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  const selector = page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+  await selector.click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
+
+async function selectTheme(page: Page, optionName: '浅色' | '深色') {
+  const toggle = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await toggle.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  }
+  await toggle.click();
+  await page.getByRole('menuitemradio', { name: optionName, exact: true }).click();
+}
+
 async function installMockAuth(page: Page, options: {
   language: 'zh' | 'en';
   passwordSet: boolean;
@@ -652,7 +668,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('04 UI language switch persists through refresh and browser back-forward navigation', async ({ page }) => {
     await login(page);
-    await page.locator('select[data-testid="ui-language-selector"]:visible').first().selectOption('en');
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
@@ -922,7 +938,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await selectPortfolioAccount(page, account.id);
     await page.getByRole('button', { name: '录入交易' }).click();
     const dialog = page.getByRole('dialog', { name: '手工录入：交易' });
-    const dateBox = await dialog.getByLabel('交易日期').boundingBox();
+    const dateBox = await dialog.getByRole('textbox', { name: '交易日期', exact: true }).boundingBox();
     const sideBox = await dialog.getByRole('combobox', { name: '买卖方向' }).boundingBox();
     const submitBox = await dialog.getByRole('button', { name: '提交交易' }).boundingBox();
     expect(dateBox).not.toBeNull();
@@ -1663,15 +1679,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('40 light and dark themes keep Home and Settings key content readable', async ({ page }, testInfo) => {
     await login(page);
     const homeText = page.getByRole('button', { name: '大盘复盘', exact: true });
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
     const homeLightContrast = await getElementContrast(homeText);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '深色', exact: true }).click();
+    await selectTheme(page, '深色');
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1689,8 +1703,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const settingsDarkHeadingContrast = await getElementContrast(settingsHeading);
     const settingsDarkBodyContrast = await getElementContrast(settingsBody);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect.poll(async () => (await getElementContrast(settingsHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(settingsBody)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1745,7 +1758,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await fallbackSelector.click();
     await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
     const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-    await expectMinimumTouchTarget(fallbackCheckbox.locator('..'));
+    await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
     await page.goto('/settings?section=system_security&view=runtime');
     const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });

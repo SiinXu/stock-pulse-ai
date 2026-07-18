@@ -25,7 +25,7 @@ describe('RunFlowNodeDetails', () => {
     expect(screen.queryByText('耗时')).not.toBeInTheDocument();
     expect(screen.queryByText('尝试次数')).not.toBeInTheDocument();
     expect(screen.queryByText('记录数')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭节点详情' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '关闭节点详情' })).toHaveClass('h-9', 'w-9');
   });
 
   it('renders ContextPack quality metadata as structured details instead of raw JSON', () => {

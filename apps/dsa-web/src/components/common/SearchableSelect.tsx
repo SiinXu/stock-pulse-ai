@@ -320,7 +320,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
+                className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-base text-foreground focus:outline-none sm:text-xs"
               />
             </div>
             <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="min-h-0 max-h-60 overflow-auto p-1">

@@ -20,6 +20,8 @@ interface UseFixedPopupOptions<
   /** Stable value that changes whenever popup content can affect its geometry. */
   contentVersion: unknown;
   constrainWidthToViewport?: boolean;
+  placement?: 'auto' | 'top' | 'bottom';
+  align?: 'start' | 'end';
 }
 
 /**
@@ -35,6 +37,8 @@ export const useFixedPopup = <
   popupRef,
   contentVersion,
   constrainWidthToViewport = false,
+  placement = 'auto',
+  align = 'start',
 }: UseFixedPopupOptions<TTrigger, TPopup>) => {
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
@@ -72,7 +76,8 @@ export const useFixedPopup = <
     const availableAbove = triggerRect.top
       - FIXED_POPUP_GAP_PX
       - FIXED_POPUP_VIEWPORT_MARGIN_PX;
-    const openAbove = popupHeight > availableBelow && availableAbove > availableBelow;
+    const openAbove = placement === 'top'
+      || (placement === 'auto' && popupHeight > availableBelow && availableAbove > availableBelow);
     const preferredTop = openAbove
       ? triggerRect.top - FIXED_POPUP_GAP_PX - popupHeight
       : triggerRect.bottom + FIXED_POPUP_GAP_PX;
@@ -88,13 +93,16 @@ export const useFixedPopup = <
       viewportWidth - FIXED_POPUP_VIEWPORT_MARGIN_PX - popupRect.width,
       FIXED_POPUP_VIEWPORT_MARGIN_PX,
     );
+    const preferredLeft = align === 'end'
+      ? triggerRect.right - popupRect.width
+      : triggerRect.left;
     const left = Math.min(
-      Math.max(triggerRect.left, FIXED_POPUP_VIEWPORT_MARGIN_PX),
+      Math.max(preferredLeft, FIXED_POPUP_VIEWPORT_MARGIN_PX),
       maxLeft,
     );
 
     setPopupPosition({ top, left, maxHeight });
-  }, [contentVersion, isOpen, popupRef, portalHost, triggerRect]);
+  }, [align, contentVersion, isOpen, placement, popupRef, portalHost, triggerRect]);
 
   useEffect(() => {
     if (!isOpen) {

@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -530,7 +530,6 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
 }
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const SCHEDULER_DEFAULT_TIME = '18:00';
 const SCHEDULER_SETTING_KEYS = new Set([
   'SCHEDULE_ENABLED',
   'SCHEDULE_TIME',
@@ -746,31 +745,27 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   );
 };
 
-function parseScheduleTimes(scheduleTimesValue?: string, fallbackValue?: string) {
+function parseScheduleTimes(scheduleTimesValue?: string, fallbackValue?: string, defaultValue?: string | null) {
   const values = String(scheduleTimesValue ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
 
   if (values.length > 0) {
-    return values;
+    return [...new Set(values)];
   }
 
   const fallback = String(fallbackValue ?? '').trim();
-  return fallback ? [fallback] : [SCHEDULER_DEFAULT_TIME];
+  if (fallback) {
+    return [fallback];
+  }
+
+  const schemaDefault = String(defaultValue ?? '').trim();
+  return schemaDefault ? [schemaDefault] : [];
 }
 
 function serializeScheduleTimes(times: string[]) {
   return times.map((time) => time.trim()).filter(Boolean).join(',');
-}
-
-function normalizeScheduleTimeDraft(value: string): string | null {
-  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value.trim());
-  if (!match) {
-    return null;
-  }
-  const candidate = `${match[1].padStart(2, '0')}:${match[2].padStart(2, '0')}`;
-  return SCHEDULE_TIME_PATTERN.test(candidate) ? candidate : null;
 }
 
 function formatSchedulerTimestamp(value: string | null | undefined, language: UiLanguage) {
@@ -827,7 +822,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
-  const [timeDraft, setTimeDraft] = useState<{ index: number; value: string } | null>(null);
+  const [isAddingTime, setIsAddingTime] = useState(false);
 
   const refreshSchedulerStatus = useCallback(async () => {
     setStatusError(null);
@@ -869,6 +864,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const scheduleTimes = parseScheduleTimes(
     String(scheduleTimesItem?.value ?? ''),
     String(scheduleTimeItem?.value ?? ''),
+    scheduleTimeItem?.schema?.defaultValue,
   );
   const timeTargetKey = scheduleTimesItem ? 'SCHEDULE_TIMES' : 'SCHEDULE_TIME';
   const statusEnabled = status?.enabled ?? scheduleEnabled;
@@ -929,7 +925,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               />
             </div>
 
-            <div className="space-y-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Clock className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerTimes')}
@@ -938,44 +934,19 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {scheduleTimes.map((time, index) => (
                   <div
                     key={index}
-                    className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border settings-border bg-card/90 px-1 shadow-inner"
+                    className="inline-flex shrink-0 items-center gap-1"
                   >
-                    {/* Plain text input instead of type="time": native pickers
-                        follow the OS locale and may render 12-hour AM/PM even
-                        in a 24-hour product context. */}
-                    <input
+                    <TimePicker
                       data-testid={`scheduler-time-input-${index}`}
-                      type="text"
-                      inputMode="numeric"
-                      placeholder={t('settings.schedulerTimePlaceholder')}
-                      value={
-                        timeDraft?.index === index
-                          ? timeDraft.value
-                          : SCHEDULE_TIME_PATTERN.test(time) ? time : ''
-                      }
-                      aria-label={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="h-11 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
+                      value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
+                      ariaLabel={t('settings.schedulerTimeInputAria', { index: index + 1 })}
+                      className="w-32"
+                      triggerClassName="h-9 min-h-9 text-sm font-medium"
                       disabled={disabled}
-                      onChange={(event) => {
-                        const nextValue = event.target.value;
+                      onChange={(nextValue) => {
                         if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
-                          setTimeDraft(null);
                           updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
                             currentIndex === index ? nextValue : currentTime
-                          )));
-                          return;
-                        }
-                        setTimeDraft({ index, value: nextValue });
-                      }}
-                      onBlur={() => {
-                        if (!timeDraft || timeDraft.index !== index) {
-                          return;
-                        }
-                        const normalized = normalizeScheduleTimeDraft(timeDraft.value);
-                        setTimeDraft(null);
-                        if (normalized) {
-                          updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
-                            currentIndex === index ? normalized : currentTime
                           )));
                         }
                       }}
@@ -989,7 +960,6 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                         title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
                         onClick={() => {
-                          setTimeDraft(null);
                           updateScheduleTimes(scheduleTimes.filter((_, currentIndex) => currentIndex !== index));
                         }}
                       >
@@ -998,21 +968,43 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     ) : null}
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="settings-secondary"
-                  size="sm"
-                  className="h-11 shrink-0"
-                  data-testid="scheduler-add-time-button"
-                  disabled={disabled}
-                  onClick={() => {
-                    setTimeDraft(null);
-                    updateScheduleTimes([...scheduleTimes, SCHEDULER_DEFAULT_TIME]);
-                  }}
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  {t('settings.schedulerAddTime')}
-                </Button>
+                {isAddingTime ? (
+                  <TimePicker
+                    data-testid="scheduler-new-time-input"
+                    value=""
+                    ariaLabel={t('settings.schedulerTimeInputAria', { index: scheduleTimes.length + 1 })}
+                    placeholder={t('settings.schedulerTimePlaceholder')}
+                    className="w-32"
+                    triggerClassName="h-9 min-h-9 text-sm font-medium"
+                    disabled={disabled}
+                    autoOpen
+                    onOpenChange={(open) => {
+                      if (!open) setIsAddingTime(false);
+                    }}
+                    onChange={(nextValue) => {
+                      if (SCHEDULE_TIME_PATTERN.test(nextValue) && !scheduleTimes.includes(nextValue)) {
+                        updateScheduleTimes([...scheduleTimes, nextValue]);
+                      }
+                      if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
+                        setIsAddingTime(false);
+                      }
+                    }}
+                  />
+                ) : null}
+                {timeTargetKey === 'SCHEDULE_TIMES' && !isAddingTime ? (
+                  <Button
+                    type="button"
+                    variant="settings-secondary"
+                    size="sm"
+                    className="h-9 shrink-0"
+                    data-testid="scheduler-add-time-button"
+                    disabled={disabled}
+                    onClick={() => setIsAddingTime(true)}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {t('settings.schedulerAddTime')}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -1486,6 +1478,8 @@ const SettingsPage: React.FC = () => {
     void refreshSetupStatus();
   }, [refreshSetupStatus]);
 
+  const [isToastPaused, setIsToastPaused] = useState(false);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -1495,7 +1489,7 @@ const SettingsPage: React.FC = () => {
   }, [refreshSetupStatus]);
 
   useEffect(() => {
-    if (!toast) {
+    if (!toast || toast.type !== 'success' || isToastPaused) {
       return;
     }
 
@@ -1506,7 +1500,7 @@ const SettingsPage: React.FC = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [clearToast, toast]);
+  }, [clearToast, isToastPaused, toast]);
 
   useEffect(() => {
     if (!canCheckDesktopUpdate) {
@@ -2504,7 +2498,7 @@ const SettingsPage: React.FC = () => {
               <div key={group.id} className="space-y-2">
                 <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
                 <form
-                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
                   onSubmit={(event) => event.preventDefault()}
                 >
                   {groupItems.map((item) => (
@@ -2537,7 +2531,7 @@ const SettingsPage: React.FC = () => {
         </div>
       ) : subFilteredItems.length ? (
         <form
-          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
           onSubmit={(event) => event.preventDefault()}
         >
           {subFilteredItems.map((item) => (
@@ -3443,7 +3437,17 @@ const SettingsPage: React.FC = () => {
       )}
 
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]">
+        <div
+          className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]"
+          onMouseEnter={() => setIsToastPaused(true)}
+          onMouseLeave={() => setIsToastPaused(false)}
+          onFocusCapture={() => setIsToastPaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setIsToastPaused(false);
+            }
+          }}
+        >
           {toast.type === 'success'
             ? (
                 <SettingsAlert

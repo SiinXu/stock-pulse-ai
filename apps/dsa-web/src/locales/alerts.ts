@@ -64,3 +64,18 @@ export const ALERT_TRIGGER_TEXT = createUiLanguageRecord("locales.alerts.ALERT_T
   zh: { title: '触发历史', subtitle: '评估记录', loading: '正在加载触发历史', emptyTitle: '暂无触发历史', emptyDescription: '后台评估会记录 triggered、skipped、degraded 和 failed 状态；正常未触发不会写入历史。', status: '状态', phaseQuality: '阶段 / 质量', target: '目标', observed: '观察值', threshold: '阈值', dataSource: '数据源', dataTime: '数据时间', reason: '原因', quality: '质量：{quality}', statuses: { triggered: '已触发', skipped: '已跳过', degraded: '降级', failed: '失败' } },
   en: { title: 'Trigger history', subtitle: 'Evaluation records', loading: 'Loading trigger history', emptyTitle: 'No trigger history', emptyDescription: 'Background evaluations record triggered, skipped, degraded, and failed states. Normal non-triggering evaluations are not stored.', status: 'Status', phaseQuality: 'Phase / quality', target: 'Target', observed: 'Observed', threshold: 'Threshold', dataSource: 'Data source', dataTime: 'Data time', reason: 'Reason', quality: 'Quality: {quality}', statuses: { triggered: 'Triggered', skipped: 'Skipped', degraded: 'Degraded', failed: 'Failed' } },
 } as const);
+
+export const ALERT_HISTORY_CONTROLS_TEXT = createUiLanguageRecord("locales.alerts.ALERT_HISTORY_CONTROLS_TEXT", {
+  zh: {
+    refresh: '刷新',
+    lastUpdated: '更新于 {time}',
+    testRule: '规则：{name}',
+    testStatuses: { triggered: '已触发', not_triggered: '未触发', evaluation_error: '评估失败' },
+  },
+  en: {
+    refresh: 'Refresh',
+    lastUpdated: 'Updated {time}',
+    testRule: 'Rule: {name}',
+    testStatuses: { triggered: 'Triggered', not_triggered: 'Not triggered', evaluation_error: 'Evaluation failed' },
+  },
+});

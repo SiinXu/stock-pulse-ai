@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsSectionNav, SettingsViewTabs } from '../SettingsNavigation';
 
@@ -47,11 +47,12 @@ describe('SettingsSectionNav', () => {
       />,
     );
     const select = screen.getByRole('combobox', { name: '设置导航' });
-    expect(select).toHaveValue('ai_models');
+    expect(select).toHaveAttribute('data-value', 'ai_models');
     expect(select).toHaveClass('min-h-11');
     // Every section is reachable in one tap from the current section.
-    expect(within(select).getAllByRole('option')).toHaveLength(11);
-    fireEvent.change(select, { target: { value: 'notifications' } });
+    fireEvent.click(select);
+    expect(screen.getAllByRole('option')).toHaveLength(11);
+    fireEvent.click(screen.getByRole('option', { name: '通知' }));
     expect(onSelect).toHaveBeenCalledWith('notifications');
   });
 
@@ -67,9 +68,8 @@ describe('SettingsSectionNav', () => {
         navLabel="设置导航"
       />,
     );
-    fireEvent.change(screen.getByRole('combobox', { name: '设置导航' }), {
-      target: { value: 'reports' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: '设置导航' }));
+    fireEvent.click(screen.getByRole('option', { name: '报告' }));
     // The mobile selector routes through the focus-shifting handler, not the
     // plain desktop one.
     expect(onMobileSelect).toHaveBeenCalledWith('reports');
@@ -118,7 +118,7 @@ describe('SettingsViewTabs', () => {
     ]);
     expect(screen.getByRole('tab', { name: 'Task Routing' })).toHaveAttribute('aria-selected', 'true');
     for (const tab of tabs) {
-      expect(tab).toHaveClass('min-h-11');
+      expect(tab).toHaveClass('min-h-6', 'segmented-control-tab');
     }
   });
 

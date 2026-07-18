@@ -73,7 +73,7 @@ export const Modal: React.FC<ModalProps> = ({
         className={cn(
           // On phones the dialog docks to the bottom as a full-width sheet
           // (same flow, same component); centered card from `sm` up.
-          'flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl focus:outline-none max-sm:max-h-[92dvh] max-sm:rounded-b-none',
+          'flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl focus:outline-none max-sm:max-h-[92dvh] max-sm:rounded-b-none',
           className,
         )}
         onClick={(event) => event.stopPropagation()}
@@ -90,7 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
             onClick={handleClose}
             disabled={closeDisabled}
             aria-label={closeLabel ?? t('common.close')}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

@@ -375,13 +375,28 @@ describe('PortfolioPage FX refresh', () => {
     expect(getRisk).toHaveBeenCalledWith({ accountId: undefined, costMethod: 'fifo', includeRealtime: false });
   });
 
+  it('does not synthesize broker options when the broker catalog is empty', async () => {
+    listImportBrokers.mockResolvedValueOnce({ brokers: [] });
+
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+    await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    const dialog = screen.getByRole('dialog', { name: '券商 CSV 导入' });
+
+    expect(within(dialog).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
+    expect(within(dialog).getByRole('combobox', { name: '券商' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: '解析文件' })).toBeDisabled();
+  });
+
   it('renders stale FX status with a manual refresh button', async () => {
     render(<PortfolioPage />);
 
     await waitForInitialLoad();
 
     expect(await screen.findByText('过期')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('h-11', 'min-w-11');
   });
 
   it('shows aggregate partial valuation limitations near summary totals', async () => {
@@ -892,7 +907,7 @@ describe('PortfolioPage FX refresh', () => {
     const row = screen.getByText('HK00700').closest('tr');
     expect(row).not.toBeNull();
     const analyzeButton = within(row as HTMLTableRowElement).getByRole('button', { name: '分析' });
-    expect(analyzeButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(analyzeButton).toHaveClass('h-11', 'min-w-11');
     fireEvent.click(analyzeButton);
 
     await waitFor(() => {
@@ -1195,7 +1210,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
     expect(screen.getByLabelText('股票代码')).toHaveClass('h-11');
-    expect(screen.getByLabelText('交易日期')).toHaveClass('h-11');
+    expect(screen.getByLabelText('交易日期').parentElement).toHaveClass('h-11');
     expect(screen.getByLabelText('数量')).toHaveClass('h-11');
     expect(screen.getByLabelText('成交价')).toHaveClass('h-11');
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });

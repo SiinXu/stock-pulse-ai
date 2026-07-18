@@ -83,6 +83,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="h-11 w-11 min-w-11"
                   onClick={(event) => {
                     event.stopPropagation();
                     onOpenRunFlow(task);
@@ -109,6 +110,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               type="button"
               variant="ghost"
               size="icon"
+              className="h-11 w-11 min-w-11"
               onClick={(event) => {
                 event.stopPropagation();
                 onDismiss(task.taskId);

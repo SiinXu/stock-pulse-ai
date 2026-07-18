@@ -41,24 +41,43 @@ const STOCK_LIST_FIELD_LABELS: Record<Exclude<UiLanguage, 'zh' | 'en'>, string> 
 };
 
 const uiLanguageSelector = (page: Page) =>
-  page.locator('select[data-testid="ui-language-selector"]:visible').first();
+  page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+
+async function openProfileMenu(page: Page) {
+  const trigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+  await expect(trigger).toBeVisible();
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    await trigger.click();
+  }
+}
+
+async function selectUiLanguage(page: Page, language: UiLanguage) {
+  let selector = uiLanguageSelector(page);
+  if (!await selector.isVisible().catch(() => false)) {
+    await openProfileMenu(page);
+    selector = uiLanguageSelector(page);
+  }
+  await expect(selector).toBeVisible();
+  await selector.click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
 
 async function switchToEnglish(page: Page) {
-  const selector = uiLanguageSelector(page);
-  await expect(selector).toBeVisible();
-  await selector.selectOption('en');
+  await selectUiLanguage(page, 'en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 }
 
 async function assertUiLanguage(page: Page, language: UiLanguage) {
-  const selector = uiLanguageSelector(page);
-  await selector.selectOption(language);
+  await selectUiLanguage(page, language);
   await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
   await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe(language);
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
-  await expect(uiLanguageSelector(page)).toHaveValue(language);
+  if (!await uiLanguageSelector(page).isVisible().catch(() => false)) {
+    await openProfileMenu(page);
+  }
+  await expect(uiLanguageSelector(page)).toHaveAttribute('data-value', language);
   await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
 }
 
@@ -103,11 +122,14 @@ test.describe('complete UI i18n acceptance', () => {
     await mobileBacktestLink.click();
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' }).first();
+    if (!await themeToggle.isVisible().catch(() => false)) {
+      await openProfileMenu(page);
+    }
     await themeToggle.click();
     await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/); // 11
 
-    await uiLanguageSelector(page).selectOption('zh');
+    await selectUiLanguage(page, 'zh');
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); // 12
   });
 
@@ -240,28 +262,21 @@ test.describe('complete UI i18n acceptance', () => {
     }
   });
 
-  test('an open Connection Modal updates immediately after switching UI language', async ({ page }) => {
+  test('Connection Modal opens in the language selected from Profile', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.goto('/settings?section=ai_models&view=connections');
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
-    const providerSelect = dialog.getByLabel('选择模型服务商');
-    await providerSelect.click();
-    await dialog.locator('[role="option"][data-value="openai"]').click();
-    await expect(providerSelect).toHaveAttribute('data-value', 'openai');
-    await dialog.evaluate((element) => element.setAttribute('data-language-switch-modal', 'same'));
-
-    await uiLanguageSelector(page).selectOption('en');
-
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    const sameDialog = page.locator('[data-language-switch-modal="same"]');
-    await expect(sameDialog).toContainText('Add model service');
-    const localizedSelect = sameDialog.getByLabel('Choose model provider');
+    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    const localizedSelect = dialog.getByLabel('Choose model provider');
+    await localizedSelect.click();
+    await dialog.locator('[role="option"][data-value="openai"]').click();
     await expect(localizedSelect).toHaveAttribute('data-value', 'openai');
     await expect(localizedSelect).toContainText('OpenAI Official');
     await localizedSelect.click();
-    const openAiOption = sameDialog.locator('[role="option"][data-value="openai"]');
+    const openAiOption = dialog.locator('[role="option"][data-value="openai"]');
     await expect(openAiOption).toContainText('OpenAI Official');
     expect(await openAiOption.innerText()).not.toMatch(CHINESE_SCRIPT);
   });

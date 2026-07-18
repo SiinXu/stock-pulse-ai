@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Badge } from '../common';
+import { Badge, Checkbox } from '../common';
 import type { HistoryItem } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
@@ -42,16 +42,13 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
 
   return (
     <div className="flex items-start gap-2 group">
-      <label className="-ml-2 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-center">
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onChange={() => onToggleChecked(item.id)}
-          disabled={isDeleting}
-          aria-label={t('history.selectRecordAria', { name: stockName })}
-          className="h-4 w-4 cursor-pointer rounded border-subtle-hover bg-transparent accent-primary focus:ring-primary/30 disabled:opacity-50"
-        />
-      </label>
+      <Checkbox
+        checked={isChecked}
+        onChange={() => onToggleChecked(item.id)}
+        disabled={isDeleting}
+        aria-label={t('history.selectRecordAria', { name: stockName })}
+        containerClassName="-ml-2 h-11 w-11 shrink-0 justify-center self-center"
+      />
       <button
         type="button"
         onClick={() => onClick(item.id)}

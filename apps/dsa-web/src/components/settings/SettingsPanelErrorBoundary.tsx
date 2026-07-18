@@ -97,7 +97,7 @@ class SettingsPanelErrorBoundaryImpl extends Component<
     }
 
     return (
-      <div className={cn('rounded-3xl border settings-border bg-card/94 p-5 shadow-soft-card-strong backdrop-blur-sm', this.props.className)}>
+      <div className={cn('rounded-xl border settings-border bg-card/94 p-5 shadow-soft-card-strong backdrop-blur-sm', this.props.className)}>
         <InlineAlert
           title={`${this.props.title}${this.props.labels.loadFailedSuffix}`}
           variant="danger"

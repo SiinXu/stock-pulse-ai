@@ -146,10 +146,12 @@ describe('AlertsPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '测试' }));
 
     await waitFor(() => expect(testRule).toHaveBeenCalledWith(1));
-    expect(await screen.findByText('测试结果')).toBeInTheDocument();
-    expect(screen.getByText(/600519 price above 1800/)).toBeInTheDocument();
-    expect(screen.getByText(/观察值: 1801/)).toBeInTheDocument();
-    expect(screen.queryByText(/realtime_quote/)).not.toBeInTheDocument();
+    const testResultTitle = await screen.findByText('测试结果');
+    const testResult = testResultTitle.closest('[role="status"]');
+    expect(testResult).not.toBeNull();
+    expect(within(testResult as HTMLElement).getByText(/600519 price above 1800/)).toBeInTheDocument();
+    expect(within(testResult as HTMLElement).getByText(/观察值: 1801/)).toBeInTheDocument();
+    expect(within(testResult as HTMLElement).queryByText(/realtime_quote/)).not.toBeInTheDocument();
   });
 
   it('renders batch dry-run summary and target results', async () => {
@@ -191,7 +193,7 @@ describe('AlertsPage', () => {
 
     expect(await screen.findByText(/评估 2 · 触发 1 · 降级 1 · 跳过 0/)).toBeInTheDocument();
     expect(screen.getByText('自选股 - 600519')).toBeInTheDocument();
-    expect(screen.getByText(/not_triggered \/ degraded/)).toBeInTheDocument();
+    expect(screen.getByText(/未触发 \/ 降级/)).toBeInTheDocument();
   });
 
   it('creates a rule through the page form and reloads rules', async () => {

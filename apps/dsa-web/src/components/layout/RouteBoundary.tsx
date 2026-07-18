@@ -3,22 +3,29 @@ import { Component, Suspense } from 'react';
 import type { ErrorInfo } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { Button } from '../common/Button';
 
 type PageLoadingFallbackProps = {
   fullPage?: boolean;
 };
 
-export const PageLoadingFallback: React.FC<PageLoadingFallbackProps> = ({ fullPage = true }) => (
-  <div
-    className={
-      fullPage
-        ? 'flex min-h-dvh items-center justify-center bg-base'
-        : 'flex min-h-[60vh] items-center justify-center'
-    }
-  >
-    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
-  </div>
-);
+export const PageLoadingFallback: React.FC<PageLoadingFallbackProps> = ({ fullPage = true }) => {
+  const { t } = useUiLanguage();
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={
+        fullPage
+          ? 'flex min-h-dvh items-center justify-center bg-base'
+          : 'flex min-h-[60vh] items-center justify-center'
+      }
+    >
+      <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+      <span className="sr-only">{t('common.loading')}</span>
+    </div>
+  );
+};
 
 type RouteErrorBoundaryProps = {
   children: React.ReactNode;
@@ -68,26 +75,27 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             : 'flex min-h-[60vh] items-center justify-center px-2 py-8'
         }
       >
-        <div className="w-full max-w-md rounded-2xl border border-border bg-card/94 p-6 text-center shadow-soft-card">
-          <h1 className="text-xl font-semibold text-foreground">{this.props.text.title}</h1>
-          <p className="mt-3 text-sm leading-6 text-secondary-text">
+        <div className="w-full max-w-sm rounded-lg border border-border bg-card/94 p-4 text-center shadow-soft-card">
+          <h1 className="text-lg font-semibold text-foreground">{this.props.text.title}</h1>
+          <p className="mt-2 text-sm leading-5 text-secondary-text">
             {this.props.text.description}
           </p>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button
               type="button"
-              className="btn-primary min-h-11 min-w-11"
+              size="sm"
               onClick={() => window.location.reload()}
             >
               {this.props.text.reload}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="min-h-11 min-w-11 rounded-lg border border-border/70 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-hover"
+              variant="secondary"
+              size="sm"
               onClick={() => window.location.assign('/')}
             >
               {this.props.text.backHome}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

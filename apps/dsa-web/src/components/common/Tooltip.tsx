@@ -111,12 +111,15 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
+          if (open && event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
             setOpen(false);
           }
         }}
         tabIndex={focusable ? 0 : undefined}
         aria-describedby={open ? tooltipId : undefined}
+        data-dialog-popup={open ? 'true' : undefined}
       >
         {children}
       </span>

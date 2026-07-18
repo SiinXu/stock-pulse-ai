@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
-import { Info, Trash2 } from 'lucide-react';
-import { Badge, Button, Select, Input, Tooltip } from '../common';
+import { Trash2 } from 'lucide-react';
+import { Badge, Button, Select, Input } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -105,6 +105,16 @@ function renderFieldControl(
   const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
+  const optionValues = (schema?.options ?? []).map((option) => (
+    typeof option === 'string' ? option : option.value
+  ));
+  const isBooleanControl = controlType === 'switch'
+    || schema?.dataType === 'boolean'
+    || (
+      optionValues.length === 2
+      && optionValues.some((option) => option.toLowerCase() === 'true')
+      && optionValues.some((option) => option.toLowerCase() === 'false')
+    );
 
   // Multi-value enums (finite options + multi_value validation) render as a
   // collapsed multi-select dropdown so users pick from the catalog instead of
@@ -145,6 +155,24 @@ function renderFieldControl(
     );
   }
 
+  if (isBooleanControl) {
+    const checked = value.trim().toLowerCase() === 'true';
+    const isDisabled = disabled || !schema?.isEditable;
+    return (
+      <div className="flex items-center gap-2 md:w-full md:justify-end">
+        <SettingsSwitch
+          id={controlId}
+          checked={checked}
+          disabled={isDisabled}
+          onCheckedChange={(next) => onChange(next ? 'true' : 'false')}
+          visualTestId={`${controlId}-switch-visual`}
+          aria-invalid={hasError}
+          aria-describedby={ariaDescribedBy}
+        />
+      </div>
+    );
+  }
+
   // Any field that declares a finite set of options is an enum: render a Select
   // regardless of the backend ui_control hint, so a stray ui_control=text never
   // degrades an enum into a free-text Input.
@@ -159,7 +187,7 @@ function renderFieldControl(
           placeholder={t('common.selectPlaceholder')}
           error={hasError}
           ariaDescribedBy={ariaDescribedBy}
-          className="md:ml-auto"
+          className="w-full md:ml-auto"
           menuAlign="end"
         />
       );
@@ -176,24 +204,6 @@ function renderFieldControl(
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}
       />
-    );
-  }
-
-  if (controlType === 'switch') {
-    const checked = value.trim().toLowerCase() === 'true';
-    const isDisabled = disabled || !schema?.isEditable;
-    return (
-      <div className="flex items-center gap-2 md:w-full md:justify-end">
-        <SettingsSwitch
-          id={controlId}
-          checked={checked}
-          disabled={isDisabled}
-          onCheckedChange={(next) => onChange(next ? 'true' : 'false')}
-          visualTestId={`${controlId}-switch-visual`}
-          aria-invalid={hasError}
-          aria-describedby={ariaDescribedBy}
-        />
-      </div>
     );
   }
 
@@ -286,7 +296,8 @@ function renderFieldControl(
       }
     : {};
 
-  return (
+  const unit = schema?.unit?.trim() || null;
+  const input = (
     <input
       id={controlId}
       type={inputType}
@@ -294,10 +305,10 @@ function renderFieldControl(
       aria-describedby={ariaDescribedBy}
       className={cn(
         commonClass,
-        'block h-11 md:ml-auto',
+        'block h-9 md:ml-auto',
         // Numbers stay compact; text/path fields fill the 240px control column
         // so long values (e.g. directory paths) are not clipped to ~170px.
-        inputType === 'number' ? 'md:w-44' : 'md:w-full',
+        inputType === 'number' ? (unit ? 'pr-8 md:w-full' : 'md:w-44') : 'md:w-full',
         hasError && 'border-danger',
       )}
       value={value}
@@ -305,6 +316,22 @@ function renderFieldControl(
       onChange={(event) => onChange(event.target.value)}
       {...numberProps}
     />
+  );
+
+  if (!unit) {
+    return input;
+  }
+
+  return (
+    <div className="relative md:ml-auto md:w-44">
+      {input}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-text"
+      >
+        {unit}
+      </span>
+    </div>
   );
 }
 
@@ -322,7 +349,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
-  const isTextarea = schema?.uiControl === 'textarea';
+  const isMultiEnum = Boolean(schema?.options?.length && isMultiValueField(item));
+  const isTextarea = schema?.uiControl === 'textarea' && !isMultiEnum;
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
   const localizationKey = schema?.key ?? item.key;
   const fallbackTitle = schema?.title ?? item.key;
@@ -345,23 +373,16 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   return (
     <div
       className={cn(
-        'grid gap-3 px-3 py-2.5 transition-colors duration-200',
-        isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:gap-6',
+        'grid gap-2 px-2 py-1.5 transition-colors duration-200',
+        isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:items-center md:gap-4',
         hasError ? 'bg-danger/5' : '',
       )}
     >
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-sm font-normal text-foreground" htmlFor={controlId}>
             {title}
           </label>
-          {description ? (
-            <Tooltip content={description}>
-              <span className="inline-flex cursor-help text-muted-text">
-                <Info aria-hidden="true" className="h-3.5 w-3.5" />
-              </span>
-            </Tooltip>
-          ) : null}
           <SettingsHelpButton
             fieldKey={localizationKey}
             title={title}
@@ -388,9 +409,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             <Badge variant="default" size="sm">{t('settings.fieldRestartRequired')}</Badge>
           ) : null}
         </div>
-        {/* External docs links and raw KEY=value examples are intentionally not
-            shown inline on everyday fields — they live in the field's help
-            dialog instead, so the everyday path stays free of config jargon. */}
+        {/* External docs links and raw KEY=value examples stay out of everyday fields. */}
         {readOnlyDiagnostic ? (
           <p className="text-xs text-warning" data-testid={`settings-schema-diagnostic-${item.key}`}>
             {readOnlyDiagnostic}

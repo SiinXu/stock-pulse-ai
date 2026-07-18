@@ -82,6 +82,7 @@ export interface SystemConfigFieldSchema {
   isRequired: boolean;
   isEditable: boolean;
   defaultValue?: string | null;
+  unit?: string | null;
   options: Array<string | SystemConfigOption>;
   validation: Record<string, unknown>;
   displayOrder: number;

@@ -63,6 +63,10 @@ const MODEL_KEYS_TO_RESET = [
 ];
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
+  const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+  if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
+    await profileTrigger.click();
+  }
   await page.getByRole('button', { name: '切换主题' }).first().click();
   await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
   if (theme === '深色') {
@@ -809,7 +813,7 @@ test.describe('model access product convergence', () => {
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await dialog.getByRole('button', { name: '移除模型 fake-report-model' }).click();
-    const conflict = dialog.getByRole('alert').filter({ hasText: '无法直接删除模型' });
+    const conflict = dialog.getByRole('status').filter({ hasText: '无法直接删除模型' });
     await expect(dialog.getByText('无法直接删除模型')).toBeVisible();
     for (const task of ['报告', 'Agent', 'Vision', '备用']) {
       await expect(conflict.getByText(task, { exact: true })).toBeVisible();

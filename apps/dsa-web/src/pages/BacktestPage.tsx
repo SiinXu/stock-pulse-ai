@@ -4,7 +4,7 @@ import { Check, Minus, X } from 'lucide-react';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Card, Badge, EmptyState, Pagination, Select, StatusDot, Tooltip } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, DatePicker, EmptyState, Input, Pagination, Select, StatusDot, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -15,6 +15,7 @@ import {
   BACKTEST_PHASE_LABELS,
   BACKTEST_STATUS_LABELS,
   BACKTEST_TEXT,
+  BACKTEST_VALIDATION_TEXT,
 } from '../locales/backtest';
 import type {
   BacktestResultItem,
@@ -25,8 +26,6 @@ import type {
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
 import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
 
-const BACKTEST_INPUT_CLASS =
-  'h-9 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const BACKTEST_COMPACT_INPUT_CLASS =
   'h-9 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
@@ -103,12 +102,21 @@ function parseEvalWindowDays(value: string): number | undefined {
     return undefined;
   }
 
-  const parsed = parseInt(trimmed, 10);
-  if (Number.isNaN(parsed) || parsed < 1) {
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 120) {
     return undefined;
   }
 
   return parsed;
+}
+
+function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
 }
 
 function labelFromMap(value: string | null | undefined, labels: Record<string, string>): string {
@@ -288,6 +296,7 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 const BacktestPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const text = BACKTEST_TEXT[language];
+  const validationText = BACKTEST_VALIDATION_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
   const [initialFilters] = useState(() => getInitialBacktestFilters());
@@ -303,6 +312,10 @@ const BacktestPage: React.FC = () => {
   const [analysisDateTo, setAnalysisDateTo] = useState(initialFilters.endDate);
   const [phaseFilter, setPhaseFilter] = useState<BacktestPhaseFilter>(initialFilters.phase);
   const [evalDays, setEvalDays] = useState(initialFilters.windowDays ? String(initialFilters.windowDays) : '');
+  const [evalDaysError, setEvalDaysError] = useState('');
+  const [dateFromError, setDateFromError] = useState('');
+  const [dateToError, setDateToError] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState<BacktestFilterSnapshot>(initialFilters);
   const [forceRerun, setForceRerun] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
@@ -327,6 +340,40 @@ const BacktestPage: React.FC = () => {
   const effectiveWindowDays = parseEvalWindowDays(evalDays) ?? overallPerf?.evalWindowDays;
   const isNextDayValidation = effectiveWindowDays === 1;
   const showNextDayActualColumns = isNextDayValidation;
+
+  const validateDraftFilters = (windowOverride?: number): BacktestFilterSnapshot | null => {
+    const windowDays = windowOverride ?? parseEvalWindowDays(evalDays);
+    const invalidWindow = windowDays === undefined;
+    const invalidStart = Boolean(analysisDateFrom) && !isValidIsoDate(analysisDateFrom);
+    const invalidEnd = Boolean(analysisDateTo) && !isValidIsoDate(analysisDateTo);
+    const invalidRange = !invalidStart
+      && !invalidEnd
+      && Boolean(analysisDateFrom)
+      && Boolean(analysisDateTo)
+      && analysisDateFrom > analysisDateTo;
+
+    setEvalDaysError(invalidWindow ? validationText.evalWindow : '');
+    setDateFromError(invalidStart || invalidRange ? (invalidStart ? validationText.invalidDate : validationText.dateRange) : '');
+    setDateToError(invalidEnd ? validationText.invalidDate : '');
+    if (invalidWindow || invalidStart || invalidEnd || invalidRange) {
+      const firstInvalidId = invalidWindow
+        ? 'backtest-eval-window'
+        : invalidStart || invalidRange
+          ? 'backtest-date-from'
+          : 'backtest-date-to';
+      document.getElementById(firstInvalidId)?.focus();
+      return null;
+    }
+
+    return {
+      code: normalizeBacktestCode(codeFilter) ?? '',
+      windowDays,
+      startDate: analysisDateFrom,
+      endDate: analysisDateTo,
+      phase: phaseFilter,
+      page: 1,
+    };
+  };
 
   // Fetch results
   const fetchResults = useCallback(async (
@@ -416,6 +463,7 @@ const BacktestPage: React.FC = () => {
       if (!overall) return;
       const inferredWindow = overall.evalWindowDays;
       setEvalDays(String(inferredWindow));
+      setAppliedFilters((current) => ({ ...current, windowDays: inferredWindow }));
       void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
     };
     void init();
@@ -428,6 +476,9 @@ const BacktestPage: React.FC = () => {
 
   // Run backtest
   const handleRun = async () => {
+    const validatedFilters = validateDraftFilters();
+    if (!validatedFilters) return;
+    setAppliedFilters(validatedFilters);
     const requestGeneration = runRequestGenerationRef.current + 1;
     runRequestGenerationRef.current = requestGeneration;
     const isLatestRequest = () => runRequestGenerationRef.current === requestGeneration;
@@ -435,10 +486,10 @@ const BacktestPage: React.FC = () => {
     setRunResult(null);
     setRunError(null);
     try {
-      const code = normalizeBacktestCode(codeFilter);
-      const requestedEvalWindowDays = parseEvalWindowDays(evalDays);
-      const dateFrom = analysisDateFrom || undefined;
-      const dateTo = analysisDateTo || undefined;
+      const code = validatedFilters.code || undefined;
+      const requestedEvalWindowDays = validatedFilters.windowDays;
+      const dateFrom = validatedFilters.startDate || undefined;
+      const dateTo = validatedFilters.endDate || undefined;
       const response = await backtestApi.run({
         code,
         force: forceRerun || undefined,
@@ -460,14 +511,16 @@ const BacktestPage: React.FC = () => {
       syncBacktestFiltersToUrl({
         code: code ?? '',
         windowDays: effectiveEvalWindowDays,
-        startDate: analysisDateFrom,
-        endDate: analysisDateTo,
-        phase: phaseFilter,
+        startDate: validatedFilters.startDate,
+        endDate: validatedFilters.endDate,
+        phase: validatedFilters.phase,
         page: 1,
       });
       // Refresh data with same eval_window_days
-      void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
-      void fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, phaseFilter);
+      const nextAppliedFilters = { ...validatedFilters, windowDays: effectiveEvalWindowDays, page: 1 };
+      setAppliedFilters(nextAppliedFilters);
+      void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
+      void fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
     } catch (err) {
       if (isLatestRequest()) setRunError(getParsedApiError(err));
     } finally {
@@ -479,22 +532,23 @@ const BacktestPage: React.FC = () => {
   // it immediately to the fetched results/performance rather than on Run.
   const handlePhaseChange = (value: BacktestPhaseFilter) => {
     setPhaseFilter(value);
-    const code = normalizeBacktestCode(codeFilter);
-    const windowDays = parseEvalWindowDays(evalDays);
+    const nextFilters = { ...appliedFilters, phase: value, page: 1 };
+    setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: value, page: 1 });
-    void fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, value);
-    void fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, value);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(1, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, value);
+    void fetchPerformance(nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, value);
   };
 
   // Filter by code
   const handleFilter = () => {
-    const code = normalizeBacktestCode(codeFilter);
-    const windowDays = parseEvalWindowDays(evalDays);
+    const nextFilters = validateDraftFilters();
+    if (!nextFilters) return;
+    setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page: 1 });
-    void fetchResults(1, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
-    void fetchPerformance(code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(1, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+    void fetchPerformance(nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -504,21 +558,24 @@ const BacktestPage: React.FC = () => {
   };
 
   const handleShowNextDay = () => {
-    const code = normalizeBacktestCode(codeFilter);
+    const nextFilters = validateDraftFilters(1);
+    if (!nextFilters) return;
     setEvalDays('1');
+    setEvalDaysError('');
+    setAppliedFilters(nextFilters);
     setCurrentPage(1);
-    syncBacktestFiltersToUrl({ code: code ?? '', windowDays: 1, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page: 1 });
-    void fetchResults(1, code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
-    void fetchPerformance(code, 1, analysisDateFrom, analysisDateTo, phaseFilter);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(1, nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
+    void fetchPerformance(nextFilters.code || undefined, 1, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
   // Pagination
   const totalPages = Math.ceil(totalResults / pageSize);
   const handlePageChange = (page: number) => {
-    const windowDays = parseEvalWindowDays(evalDays);
-    const code = normalizeBacktestCode(codeFilter);
-    syncBacktestFiltersToUrl({ code: code ?? '', windowDays, startDate: analysisDateFrom, endDate: analysisDateTo, phase: phaseFilter, page });
-    void fetchResults(page, code, windowDays, analysisDateFrom, analysisDateTo, phaseFilter);
+    const nextFilters = { ...appliedFilters, page };
+    setAppliedFilters(nextFilters);
+    syncBacktestFiltersToUrl(nextFilters);
+    void fetchResults(page, nextFilters.code || undefined, nextFilters.windowDays, nextFilters.startDate, nextFilters.endDate, nextFilters.phase);
   };
 
   return (
@@ -528,99 +585,107 @@ const BacktestPage: React.FC = () => {
         {/* Visually hidden: the header is a dense filter toolbar, but the page
             still needs an h1 landmark for assistive technology. */}
         <h1 className="sr-only">{text.pageTitle}</h1>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-end gap-1.5">
           <div className="relative min-w-0 flex-[1_1_220px]">
-            <input
+            <Input
               type="text"
               value={codeFilter}
               onChange={(e) => setCodeFilter(e.target.value.toUpperCase())}
               onKeyDown={handleKeyDown}
               placeholder={text.codePlaceholder}
               disabled={isRunning}
-              className={BACKTEST_INPUT_CLASS}
+              className="!h-9 !min-h-9 rounded-sm"
             />
           </div>
-          <button
+          <Button
             type="button"
             onClick={handleFilter}
             disabled={isLoadingResults}
-            className="btn-secondary flex items-center gap-1.5 whitespace-nowrap !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs"
+            variant="secondary"
+            size="md"
+            isLoading={isLoadingResults}
+            loadingText={text.filter}
+            className="min-w-0 whitespace-nowrap text-xs"
           >
             {text.filter}
-          </button>
-          <div className="flex flex-col gap-1 whitespace-nowrap">
-            <span className="text-xs text-muted-text">{text.evalWindow}</span>
-            <input
-              type="number"
-              min={1}
-              max={120}
-              value={evalDays}
-              onChange={(e) => setEvalDays(e.target.value)}
-              placeholder="10"
-              disabled={isRunning}
-              className={`${BACKTEST_COMPACT_INPUT_CLASS} w-24 text-center tabular-nums`}
-            />
-          </div>
-          <div className="flex flex-col gap-1 whitespace-nowrap">
-            <span className="text-xs text-muted-text">{text.startDate}</span>
-            <input
-              type="date"
-              aria-label={text.startDateAria}
-              value={analysisDateFrom}
-              onChange={(e) => setAnalysisDateFrom(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isRunning}
-              className={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 text-center tabular-nums`}
-            />
-          </div>
-          <div className="flex flex-col gap-1 whitespace-nowrap">
-            <span className="text-xs text-muted-text">{text.endDate}</span>
-            <input
-              type="date"
-              aria-label={text.endDateAria}
-              value={analysisDateTo}
-              onChange={(e) => setAnalysisDateTo(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isRunning}
-              className={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 text-center tabular-nums`}
-            />
-          </div>
-          <button
+          </Button>
+          <Input
+            id="backtest-eval-window"
+            label={text.evalWindow}
+            type="number"
+            min={1}
+            max={120}
+            value={evalDays}
+            onChange={(e) => {
+              setEvalDays(e.target.value);
+              setEvalDaysError('');
+            }}
+            error={evalDaysError}
+            placeholder="10"
+            disabled={isRunning}
+            className="!h-9 !min-h-9 w-24 rounded-sm text-center tabular-nums"
+          />
+          <DatePicker
+            id="backtest-date-from"
+            label={text.startDate}
+            ariaLabel={text.startDateAria}
+            value={analysisDateFrom}
+            onChange={(value) => {
+              setAnalysisDateFrom(value);
+              setDateFromError('');
+            }}
+            error={dateFromError}
+            disabled={isRunning}
+            className="w-40 whitespace-nowrap"
+            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
+          />
+          <DatePicker
+            id="backtest-date-to"
+            label={text.endDate}
+            ariaLabel={text.endDateAria}
+            value={analysisDateTo}
+            onChange={(value) => {
+              setAnalysisDateTo(value);
+              setDateToError('');
+            }}
+            error={dateToError}
+            disabled={isRunning}
+            className="w-40 whitespace-nowrap"
+            triggerClassName={`${BACKTEST_COMPACT_INPUT_CLASS} w-40 !rounded-xl text-center tabular-nums`}
+          />
+          <Button
             type="button"
             onClick={handleShowNextDay}
             disabled={isLoadingResults || isLoadingPerf}
-            className={`backtest-force-btn min-h-9 min-w-0 ${isNextDayValidation ? 'active' : ''}`}
+            variant={isNextDayValidation ? 'primary' : 'secondary'}
+            size="md"
+            aria-pressed={isNextDayValidation}
+            className="min-w-0 text-xs"
           >
-            <span className="dot" />
             {text.oneDayValidation}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setForceRerun(!forceRerun)}
             disabled={isRunning}
-            className={`backtest-force-btn min-h-9 min-w-0 ${forceRerun ? 'active' : ''}`}
+            variant={forceRerun ? 'primary' : 'secondary'}
+            size="md"
+            aria-pressed={forceRerun}
+            className="min-w-0 text-xs"
           >
-            <span className="dot" />
             {text.forceRerun}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={handleRun}
-            disabled={isRunning}
-            className="btn-primary flex items-center gap-1.5 whitespace-nowrap !min-h-9 !min-w-0 !px-3 !py-1.5 !text-xs"
+            variant="primary"
+            size="md"
+            isLoading={isRunning}
+            loadingText={text.running}
+            className="min-w-0 whitespace-nowrap text-xs"
           >
-            {isRunning ? (
-              <>
-                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                {text.running}
-              </>
-            ) : (
-              text.runBacktest
-            )}
-          </button>
+            {text.runBacktest}
+          </Button>
         </div>
         {runResult && (
           <div className="mt-2 max-w-4xl">

@@ -3,8 +3,8 @@
 import type React from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X } from 'lucide-react';
-import { Input } from '../common';
+import { ChevronDown } from 'lucide-react';
+import { Checkbox, Input } from '../common';
 import { useFixedPopup } from '../common/useFixedPopup';
 import { formatUiText } from '../../i18n/uiText';
 import type { UiLanguage } from '../../i18n/uiText';
@@ -72,12 +72,6 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
     () => [...options, ...unknownValues.map((entry) => ({ value: entry, label: entry }))],
     [options, unknownValues],
   );
-  const labelByValue = useMemo(
-    () => new Map(entries.map((entry) => [entry.value, entry.label])),
-    [entries],
-  );
-  const getLabel = (value: string) => labelByValue.get(value) ?? value;
-
   const showSearch = entries.length > SEARCH_THRESHOLD;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -182,7 +176,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
     <div ref={rootRef} className="relative" data-testid={testId}>
       <div
         className={cn(
-          'flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-transparent px-2 py-1 text-xs text-foreground transition-colors focus-within:border-muted-text',
+          'flex min-h-9 w-full items-center rounded-lg border bg-transparent px-0 py-0 text-xs text-foreground transition-colors focus-within:border-muted-text',
           hasError ? 'border-danger' : 'border-border',
         )}
       >
@@ -198,30 +192,13 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           aria-invalid={hasError || undefined}
           aria-describedby={ariaDescribedBy}
           onClick={() => (isOpen ? close(false) : open())}
-          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-2 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="shrink-0 text-muted-text">
             {formatUiText(text.selectedOptions, { selected: selected.length, total: entries.length })}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
         </button>
-        {selected.slice(0, 2).map((value) => (
-          <span key={value} className="inline-flex min-h-11 min-w-0 max-w-36 items-center gap-0.5 rounded-full border border-border pl-1.5">
-            <span className="truncate">
-              {ordered ? `${positionOf(value)}. ${getLabel(value)}` : getLabel(value)}
-            </span>
-            <button
-              type="button"
-              disabled={disabled}
-              aria-label={formatUiText(text.removeOption, { option: getLabel(value) })}
-              onClick={() => toggle(value)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
-            >
-              <X className="h-3 w-3" aria-hidden="true" />
-            </button>
-          </span>
-        ))}
-        {selected.length > 2 ? <span className="shrink-0 text-muted-text">+{selected.length - 2}</span> : null}
       </div>
 
       {isOpen && popupStyle && portalHost
@@ -239,7 +216,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           }}
         >
           {showSearch ? (
-            <div className="border-b border-border p-2">
+            <div className="p-2">
               <Input
                 id={searchId}
                 value={query}
@@ -269,12 +246,12 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                 }}
                 aria-label={text.searchOptions}
                 placeholder={text.searchOptionsPlaceholder}
-                className="min-h-11"
+                className="min-h-11 rounded-2xl"
               />
             </div>
           ) : null}
           {ordered ? (
-            <p className="border-b border-border px-3 py-2 text-xs text-muted-text">{text.orderedHint}</p>
+            <p className="px-3 py-2 text-xs text-muted-text">{text.orderedHint}</p>
           ) : null}
           <ul
             id={listboxId}
@@ -296,51 +273,52 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                   aria-selected={isSelected}
                   className="rounded-md hover:bg-hover"
                 >
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-secondary-text">
-                    <input
-                      type="checkbox"
-                      data-option-value={entry.value}
-                      checked={isSelected}
-                      disabled={disabled}
-                      onChange={() => toggle(entry.value)}
-                      onFocus={() => {
-                        lastFocusedOptionValueRef.current = entry.value;
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
+                  <Checkbox
+                    data-option-value={entry.value}
+                    checked={isSelected}
+                    disabled={disabled}
+                    onChange={() => toggle(entry.value)}
+                    onFocus={() => {
+                      lastFocusedOptionValueRef.current = entry.value;
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        toggle(entry.value);
+                        return;
+                      }
+                      if (event.key === 'Tab') {
+                        const enabledOptions = Array.from(
+                          popupRef.current?.querySelectorAll<HTMLInputElement>(
+                            'input[type="checkbox"]:not(:disabled)',
+                          ) ?? [],
+                        );
+                        if (event.shiftKey && enabledOptions[0] === event.currentTarget) {
+                          const search = document.getElementById(searchId);
                           event.preventDefault();
-                          toggle(entry.value);
-                          return;
-                        }
-                        if (event.key === 'Tab') {
-                          const enabledOptions = Array.from(
-                            popupRef.current?.querySelectorAll<HTMLInputElement>(
-                              'input[type="checkbox"]:not(:disabled)',
-                            ) ?? [],
-                          );
-                          if (event.shiftKey && enabledOptions[0] === event.currentTarget) {
-                            const search = document.getElementById(searchId);
-                            event.preventDefault();
-                            if (search) {
-                              search.focus();
-                            } else {
-                              close(true);
-                            }
-                          } else if (!event.shiftKey && enabledOptions.at(-1) === event.currentTarget) {
-                            event.preventDefault();
+                          if (search) {
+                            search.focus();
+                          } else {
                             close(true);
                           }
+                        } else if (!event.shiftKey && enabledOptions.at(-1) === event.currentTarget) {
+                          event.preventDefault();
+                          close(true);
                         }
-                      }}
-                      className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                    />
-                    <span className="min-w-0 truncate">{entry.label}</span>
-                    {ordered && isSelected ? (
-                      <span className="ml-auto shrink-0 text-xs text-muted-text">
-                        {formatUiText(text.priorityPosition, { position: positionOf(entry.value) })}
+                      }
+                    }}
+                    containerClassName="min-h-11 px-3 py-1.5 text-sm text-secondary-text"
+                    label={(
+                      <span className="flex min-w-0 flex-1 items-center gap-2 font-normal text-secondary-text">
+                        <span className="min-w-0 truncate">{entry.label}</span>
+                        {ordered && isSelected ? (
+                          <span className="ml-auto shrink-0 text-xs text-muted-text">
+                            {formatUiText(text.priorityPosition, { position: positionOf(entry.value) })}
+                          </span>
+                        ) : null}
                       </span>
-                    ) : null}
-                  </label>
+                    )}
+                  />
                 </li>
               );
             })}

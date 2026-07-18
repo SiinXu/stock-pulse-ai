@@ -3502,26 +3502,38 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-11', 'w-11');
+    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-9', 'w-9');
     const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
     expect(enabledSwitch).toHaveAttribute('role', 'switch');
     expect(enabledSwitch).toHaveClass('h-11', 'w-11');
+    expect(enabledSwitch.firstElementChild).toHaveClass('h-6', 'w-10');
     const timeInput = screen.getByTestId('scheduler-time-input-0');
-    expect(timeInput).toHaveClass('h-11');
-    expect(timeInput).toHaveAttribute('type', 'text');
+    expect(timeInput).toHaveClass('h-9', 'min-h-9');
+    expect(timeInput).toHaveAttribute('type', 'button');
 
-    fireEvent.change(screen.getByTestId('scheduler-time-input-0'), {
-      target: { value: '10:30' },
-    });
+    fireEvent.click(timeInput);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="10"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="30"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_TIMES', '10:30,15:10');
+
+    const callCountBeforeAdd = setDraftValue.mock.calls.length;
+    fireEvent.click(screen.getByTestId('scheduler-add-time-button'));
+    const newTimeInput = screen.getByTestId('scheduler-new-time-input');
+    expect(setDraftValue).toHaveBeenCalledTimes(callCountBeforeAdd);
+    await waitFor(() => expect(newTimeInput).toHaveAttribute('aria-expanded', 'true'));
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="18"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="30"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(setDraftValue).toHaveBeenLastCalledWith('SCHEDULE_TIMES', '09:20,15:10,18:30');
 
     fireEvent.click(screen.getByTestId('scheduler-run-now-button'));
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
   });
 
-  it('keeps partial schedule time drafts local and normalizes them on blur', async () => {
+  it('commits valid values from the shared schedule time picker', async () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3573,22 +3585,12 @@ describe('SettingsPage', () => {
 
     const timeInput = await screen.findByTestId('scheduler-time-input-0');
 
-    // Partial drafts must not autosave: only a full HH:MM commits.
-    fireEvent.change(timeInput, { target: { value: '9' } });
-    expect(setDraftValue).not.toHaveBeenCalled();
-    expect(timeInput).toHaveValue('9');
-
-    // Blur normalizes a shorthand draft (9:5 -> 09:05) and commits it.
-    fireEvent.change(timeInput, { target: { value: '9:5' } });
-    expect(setDraftValue).not.toHaveBeenCalled();
-    fireEvent.blur(timeInput);
+    expect(timeInput).toHaveAttribute('type', 'button');
+    fireEvent.click(timeInput);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="09"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="05"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_TIMES', '09:05,15:10');
-
-    // Blur discards an unparseable draft and falls back to the stored value.
-    fireEvent.change(timeInput, { target: { value: 'abc' } });
-    fireEvent.blur(timeInput);
-    expect(setDraftValue).toHaveBeenCalledTimes(1);
-    expect(timeInput).toHaveValue('18:00');
   });
 
   it('shows an error when run-now is rejected because analysis is already running', async () => {

@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, ConfirmDialog, InlineAlert, ScrollArea } from '../common';
+import { Badge, Button, Checkbox, ConfirmDialog, InlineAlert, ScrollArea } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBarItemComponent } from './StockBarItem';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
@@ -136,22 +136,16 @@ export const StockBar: React.FC<StockBarProps> = ({
 
           {items.length > 0 && onDeleteStock && (
             <div className="flex items-center gap-2">
-              <label
-                className="flex min-h-11 flex-1 cursor-pointer items-center gap-2 rounded-lg py-1"
-                htmlFor={selectAllId}
-              >
-                <input
-                  id={selectAllId}
-                  ref={selectAllRef}
-                  type="checkbox"
-                  checked={allVisibleSelected}
-                  onChange={toggleSelectAll}
-                  disabled={isDeleting}
-                  aria-label={t('history.selectAllStockAria')}
-                  className="chat-skill-checkbox cursor-pointer"
-                />
-                <span className="text-xs text-muted-text select-none">{t('common.selectAllCurrent')}</span>
-              </label>
+              <Checkbox
+                id={selectAllId}
+                ref={selectAllRef}
+                checked={allVisibleSelected}
+                onChange={toggleSelectAll}
+                disabled={isDeleting}
+                aria-label={t('history.selectAllStockAria')}
+                containerClassName="min-h-11 flex-1 rounded-lg py-1"
+                label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
+              />
               <Button
                 variant="danger-subtle"
                 size="xsm"
@@ -199,16 +193,13 @@ export const StockBar: React.FC<StockBarProps> = ({
               return (
                 <div key={`${code}-${item.id}`} className="flex items-start gap-2 group">
                   {onDeleteStock && (
-                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center self-center">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleCode(code)}
-                        disabled={isDeleting}
-                        aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
-                        className="chat-skill-checkbox cursor-pointer"
-                      />
-                    </label>
+                    <Checkbox
+                      checked={isChecked}
+                      onChange={() => toggleCode(code)}
+                      disabled={isDeleting}
+                      aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
+                      containerClassName="h-11 w-11 shrink-0 justify-center self-center"
+                    />
                   )}
                   <StockBarItemComponent
                     item={item}

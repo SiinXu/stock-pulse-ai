@@ -21,7 +21,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Card } from '../common';
+import { ApiErrorAlert, Card, InlineAlert, useClipboard } from '../common';
 import { Tooltip } from '../common/Tooltip';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
@@ -291,6 +291,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   const [loadedMarkdown, setLoadedMarkdown] = useState<LoadedMarkdown | null>(null);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [copiedType, setCopiedType] = useState<CopyType | null>(null);
+  const { copyText, copyError } = useClipboard();
   const summary = report?.summary;
   const meta = report?.meta;
   const contextPayload = report?.details?.contextSnapshot?.marketReviewPayload;
@@ -356,15 +357,12 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
     if (!content) {
       return;
     }
-    try {
-      const value = type === 'markdown' ? content : markdownToPlainText(content);
-      await navigator.clipboard.writeText(value);
+    const value = type === 'markdown' ? content : markdownToPlainText(content);
+    if (await copyText(value)) {
       setCopiedType(type);
       window.setTimeout(() => setCopiedType(null), 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
     }
-  }, [content]);
+  }, [content, copyText]);
 
   const insightCards = useMemo(() => [
     {
@@ -467,6 +465,8 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
           </div>
         </div>
       </Card>
+
+      {copyError ? <InlineAlert variant="danger" message={copyError} /> : null}
 
       {summary ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">

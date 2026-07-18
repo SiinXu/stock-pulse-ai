@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageToggle } from '../../components/i18n/UiLanguageToggle';
 import { UI_LANGUAGES, UI_LANGUAGE_METADATA, type UiLanguage } from '../../i18n/uiLanguages';
@@ -122,7 +122,7 @@ describe('UiLanguageContext', () => {
     }
   });
 
-  it('renders all ten native-language options and persists explicit selections', () => {
+  it('renders all ten native-language options and persists explicit selections', async () => {
     localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
     render(
       <UiLanguageProvider>
@@ -131,17 +131,21 @@ describe('UiLanguageContext', () => {
     );
 
     const selector = screen.getByTestId('ui-language-selector');
+    fireEvent.click(within(selector).getByRole('combobox'));
     expect(screen.getAllByRole('option')).toHaveLength(UI_LANGUAGES.length);
     expect(screen.getByRole('option', { name: '繁體中文' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Bahasa Indonesia' })).toBeInTheDocument();
+    fireEvent.keyDown(within(selector).getByRole('combobox'), { key: 'Escape' });
 
     for (const language of UI_LANGUAGES) {
-      fireEvent.change(selector, { target: { value: language } });
-      expect(localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe(language);
+      const combobox = within(selector).getByRole('combobox');
+      fireEvent.click(combobox);
+      fireEvent.click(screen.getByRole('option', { name: UI_LANGUAGE_METADATA[language].nativeLabel }));
+      await waitFor(() => expect(localStorage.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe(language));
       expect(document.documentElement.lang).toBe(UI_LANGUAGE_METADATA[language].htmlLang);
-      expect(selector).toHaveValue(language);
-      expect(selector).toHaveAccessibleName(UI_TEXT[language]['language.toggle']);
+      expect(within(selector).getByRole('combobox')).toHaveAttribute('data-value', language);
+      expect(within(selector).getByRole('combobox')).toHaveAccessibleName(UI_TEXT[language]['language.toggle']);
     }
-    expect(selector).toHaveValue('id');
+    expect(within(selector).getByRole('combobox')).toHaveAttribute('data-value', 'id');
   });
 });

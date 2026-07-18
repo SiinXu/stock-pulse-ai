@@ -612,7 +612,7 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.list).mockClear();
 
     const reassessButton = screen.getByRole('button', { name: '生成预览' });
-    expect(reassessButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(reassessButton).toHaveClass('h-11', 'min-w-11');
     fireEvent.click(reassessButton);
 
     await waitFor(() => {
@@ -1920,11 +1920,11 @@ describe('DecisionSignalsPage', () => {
         pageSize: 20,
       }));
     });
-    expect(screen.getByText('共 20 条信号')).toBeInTheDocument();
+    expect(await screen.findByText('共 20 条信号')).toBeInTheDocument();
     expect(screen.queryByText('暂无决策信号')).not.toBeInTheDocument();
   });
 
-  it('closes the status confirmation dialog and shows an error when status update fails', async () => {
+  it('keeps the status confirmation dialog open and shows an error when status update fails', async () => {
     vi.mocked(decisionSignalsApi.updateStatus).mockRejectedValueOnce(new Error('status update failed'));
     renderPage();
 
@@ -1937,9 +1937,8 @@ describe('DecisionSignalsPage', () => {
 
     const errorMessage = await screen.findByText('status update failed');
     expect(errorMessage.closest('[role="alert"]')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: '更新信号状态' })).not.toBeInTheDocument();
-    });
+    expect(screen.getByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
     expect(within(dialog).getByText('有效')).toBeInTheDocument();
   });
 
@@ -1956,9 +1955,9 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByRole('button', { name: '关闭信号' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '标记失效' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '归档' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '关闭信号' })).toHaveClass('min-h-11', 'min-w-11');
-    expect(within(dialog).getByRole('button', { name: '标记失效' })).toHaveClass('min-h-11', 'min-w-11');
-    expect(within(dialog).getByRole('button', { name: '归档' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '关闭信号' })).toHaveClass('h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '标记失效' })).toHaveClass('h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '归档' })).toHaveClass('h-11', 'min-w-11');
     expect(within(dialog).queryByRole('button', { name: '有效' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '已过期' })).not.toBeInTheDocument();
 

@@ -44,8 +44,17 @@
   --border: 80 7% 92%;
   --input: 80 7% 92%;
   --ring: 118 50% 48%;
-  --radius: 1rem;
+  --radius: 0.75rem;
   --radius-dot: 9999px;
+  --settings-switch-on-start: 255 255 127;
+  --settings-switch-on-end: 127 255 127;
+  --settings-switch-off: 234 235 232;
+  --trend-up-border: 221 249 220;
+  --trend-up-bg: 235 255 235;
+  --trend-up-text: 65 184 61;
+  --trend-down-border: 253 216 222;
+  --trend-down-bg: 254 236 239;
+  --trend-down-text: 233 53 83;
   --mask-opaque: #000;
   --elevated: 0 0% 100%;
   --hover: 80 7% 95%;
@@ -314,6 +323,12 @@
   --hover: 75 4% 16%;
   --secondary-text: 75 5% 72%;
   --muted-text: 75 4% 55%;
+  --trend-up-border: 39 86 36;
+  --trend-up-bg: 26 58 24;
+  --trend-up-text: 150 219 148;
+  --trend-down-border: 116 6 24;
+  --trend-down-bg: 78 4 16;
+  --trend-down-text: 248 119 141;
 
   --color-cyan: hsl(var(--primary));
   --color-cyan-dim: hsl(var(--primary) / 0.8);
@@ -906,11 +921,11 @@
 
 /* ============ Clean Surface Panels (Coinstax-style) ============ */
 .glass-panel {
-  @apply rounded-2xl border border-border bg-card transition-all;
+  @apply rounded-xl border border-border bg-card transition-all;
 }
 
 .glass-panel-lg {
-  @apply rounded-3xl border border-border bg-card transition-all;
+  @apply rounded-xl border border-border bg-card transition-all;
 }
 
 /* ============ Utilities ============ */
@@ -1955,7 +1970,134 @@ a {
 }
 
 .settings-input-checkbox {
-  accent-color: hsl(var(--primary));
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  border-radius: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--primary));
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.settings-input-checkbox::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  transform: scale(0);
+  border-radius: 0.125rem;
+  background: currentColor;
+  transition: transform 0.18s ease;
+}
+
+.settings-input-checkbox:checked {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.12);
+}
+
+.settings-input-checkbox:checked::before {
+  transform: scale(1);
+}
+
+.settings-input-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.18);
+}
+
+.shared-checkbox-control {
+  border: 1.5px solid hsl(var(--border));
+  border-radius: 0.25rem;
+  background: hsl(var(--card));
+  color: hsl(var(--background));
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.shared-checkbox-control::after {
+  content: "";
+  position: absolute;
+  left: 0.40625rem;
+  top: 0.1875rem;
+  width: 0.3125rem;
+  height: 0.5625rem;
+  border: solid currentColor;
+  border-width: 0 0.125rem 0.125rem 0;
+  opacity: 0;
+  transform: rotate(45deg);
+}
+
+.shared-checkbox-control::before {
+  content: "";
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  top: 50%;
+  height: 0.125rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.shared-checkbox-input:checked + .shared-checkbox-control,
+.shared-checkbox-input:indeterminate + .shared-checkbox-control {
+  border-color: hsl(var(--foreground));
+  background: hsl(var(--foreground));
+}
+
+.shared-checkbox-input:checked + .shared-checkbox-control::after {
+  opacity: 1;
+}
+
+.shared-checkbox-input:indeterminate + .shared-checkbox-control::before {
+  opacity: 1;
+}
+
+.shared-checkbox-input:focus-visible + .shared-checkbox-control {
+  box-shadow: 0 0 0 3px hsl(var(--foreground) / 0.14);
+}
+
+.shared-checkbox-input:disabled + .shared-checkbox-control {
+  opacity: 0.5;
+}
+
+.dark .shared-checkbox-control {
+  border-color: hsl(var(--border));
+  background: hsl(var(--background));
+}
+
+.dark .shared-checkbox-input:checked + .shared-checkbox-control,
+.dark .shared-checkbox-input:indeterminate + .shared-checkbox-control {
+  border-color: hsl(var(--foreground));
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.segmented-control {
+  background: hsl(var(--background));
+}
+
+.dark .segmented-control {
+  background: hsl(var(--card));
+}
+
+.segmented-control-tab,
+.notification-filter-button {
+  border-radius: var(--radius-dot);
+}
+
+.badge-trend-up {
+  border-color: rgb(var(--trend-up-border));
+  background: rgb(var(--trend-up-bg));
+  color: rgb(var(--trend-up-text));
+}
+
+.badge-trend-down {
+  border-color: rgb(var(--trend-down-border));
+  background: rgb(var(--trend-down-bg));
+  color: rgb(var(--trend-down-text));
 }
 
 .settings-panel-muted {
@@ -2491,46 +2633,6 @@ a {
   color: hsl(var(--color-danger));
 }
 
-.backtest-force-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--radius);
-  font-size: 0.75rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  border: 1px solid var(--backtest-border-light);
-  background: transparent;
-  color: var(--text-muted-text);
-}
-.backtest-force-btn:hover:not(:disabled) {
-  border-color: hsl(var(--foreground) / 0.20);
-  color: var(--text-secondary-text);
-}
-.backtest-force-btn.active {
-  border-color: hsl(var(--primary) / 0.4);
-  background: hsl(var(--primary) / 0.1);
-  color: hsl(var(--primary));
-  box-shadow: var(--shadow-soft-card);
-}
-.backtest-force-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.backtest-force-btn .dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: var(--radius-dot);
-  background: hsl(var(--border));
-  transition: background 0.2s ease, box-shadow 0.2s ease;
-}
-.backtest-force-btn.active .dot {
-  background: hsl(var(--primary));
-  box-shadow: none;
-}
-
 .backtest-spinner {
   border-radius: 9999px;
   border: 2px solid var(--backtest-spinner-track);
@@ -2710,5 +2812,16 @@ a {
 
   .backtest-table-scroll-hint {
     text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

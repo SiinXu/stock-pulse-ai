@@ -11,11 +11,13 @@ import {
   ApiErrorAlert,
   AppPage,
   Badge,
+  Button,
   Card,
   ConfirmDialog,
   Drawer,
   EmptyState,
   InlineAlert,
+  Input,
   Modal,
   PageHeader,
   Pagination,
@@ -47,7 +49,6 @@ import type {
   DecisionProfileDisplay,
 } from '../types/decisionSignals';
 import type { Market, StockIndexItem } from '../types/stockIndex';
-import { cn } from '../utils/cn';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import {
   getDecisionSignalMarketLabel,
@@ -482,6 +483,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [selected, setSelected] = useState<SelectedSignal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<PendingStatusChange | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -550,6 +552,7 @@ const DecisionSignalsPage: React.FC = () => {
 
   const handleCloseSignal = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
+    setStatusError(null);
     setSelected(null);
     updateDecisionSignalSearchParams({ signal: null });
   }, []);
@@ -1058,12 +1061,14 @@ const DecisionSignalsPage: React.FC = () => {
     if (!pendingStatus || statusUpdateInFlightRef.current) return;
     statusUpdateInFlightRef.current = true;
     setStatusUpdating(true);
+    setStatusError(null);
     try {
       const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
         status: pendingStatus.status,
       });
       if (!mountedRef.current) return;
       setPendingStatus(null);
+      setStatusError(null);
       setLatestItems((current) => current.flatMap((item) => {
         if (item.id !== updated.id) return [item];
         return updated.status === 'active' ? [updated] : [];
@@ -1088,13 +1093,11 @@ const DecisionSignalsPage: React.FC = () => {
         if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
         return { source: 'list', item: updated };
       });
-      setError(null);
       await loadSignalsForPage(page);
       await loadOutcomeStats();
     } catch (err) {
       if (mountedRef.current) {
-        setError(getParsedApiError(err));
-        setPendingStatus(null);
+        setStatusError(getParsedApiError(err));
       }
     } finally {
       if (mountedRef.current) setStatusUpdating(false);
@@ -1176,15 +1179,18 @@ const DecisionSignalsPage: React.FC = () => {
                 label: t(`decisionSignals.profile.${profile}` as UiTextKey),
               }))}
             />
-            <button
+            <Button
               type="button"
-              className="btn-secondary inline-flex min-h-11 min-w-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={() => void handleReassess()}
               disabled={!reassessSourceReportId || reassessLoading || reassessPersisting}
+              isLoading={reassessLoading}
+              loadingText={t('decisionSignals.reassessPreview')}
             >
-              <RefreshCw className={cn('h-4 w-4', reassessLoading ? 'animate-spin' : '')} />
+              <RefreshCw className="h-4 w-4" />
               {t('decisionSignals.reassessPreview')}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1297,17 +1303,18 @@ const DecisionSignalsPage: React.FC = () => {
             ) : null}
             {passed === true ? (
               <div className="flex justify-end">
-                <button
+                <Button
                   type="button"
-                  className="btn-primary inline-flex h-10 items-center justify-center gap-2"
+                  variant="primary"
+                  size="lg"
                   onClick={() => setReassessPersistConfirm(true)}
                   disabled={reassessLoading || reassessPersisting}
+                  isLoading={reassessPersisting}
+                  loadingText={t('decisionSignals.reassessPersisting')}
                 >
                   <ShieldCheck className="h-4 w-4" />
-                  {reassessPersisting
-                    ? t('decisionSignals.reassessPersisting')
-                    : t('decisionSignals.reassessPersist')}
-                </button>
+                  {t('decisionSignals.reassessPersist')}
+                </Button>
               </div>
             ) : null}
           </div>
@@ -1343,32 +1350,36 @@ const DecisionSignalsPage: React.FC = () => {
           title={t('decisionSignals.title')}
           description={t('decisionSignals.description')}
           actions={(
-            <button
+            <Button
               type="button"
-              className="btn-secondary inline-flex items-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={() => {
                 void loadSignals();
                 void loadOutcomeStats();
               }}
               disabled={loading}
+              isLoading={loading}
+              loadingText={t('decisionSignals.refresh')}
             >
-              <RefreshCw className={cn('h-4 w-4', loading ? 'animate-spin' : '')} />
+              <RefreshCw className="h-4 w-4" />
               {t('decisionSignals.refresh')}
-            </button>
+            </Button>
           )}
         />
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
-            className="btn-secondary inline-flex items-center gap-2"
+            variant="secondary"
+            size="xl"
             onClick={() => setStockContextModalOpen(true)}
           >
             <Search className="h-4 w-4" />
             {activeStockLabel
               ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
               : t('decisionSignals.stockContextTitle')}
-          </button>
+          </Button>
         </div>
 
         <Modal
@@ -1394,22 +1405,24 @@ const DecisionSignalsPage: React.FC = () => {
                 ariaLabel={t('decisionSignals.stockContextInput')}
               />
             </div>
-            <button
+            <Button
               type="submit"
-              className="btn-primary inline-flex h-11 items-center justify-center gap-2"
+              variant="primary"
+              size="xl"
               disabled={!stockDraft.trim()}
             >
               <Search className="h-4 w-4" />
               {t('decisionSignals.stockContextApply')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary inline-flex h-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={handleClearStockContext}
               disabled={!activeStockContext && !stockDraft}
             >
               {t('decisionSignals.stockContextClear')}
-            </button>
+            </Button>
           </form>
 
           {activeStockLabel ? (
@@ -1429,10 +1442,12 @@ const DecisionSignalsPage: React.FC = () => {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {stockCandidates.map((candidate) => (
-                  <button
+                  <Button
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
-                    className="min-h-11 min-w-11 rounded-lg border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
+                    variant="outline"
+                    size="xl"
+                    className="h-auto min-h-11 whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);
@@ -1441,7 +1456,7 @@ const DecisionSignalsPage: React.FC = () => {
                     <span className="font-mono">{candidate.displayCode ?? candidate.code}</span>
                     {candidate.name ? <span className="ml-1 text-secondary-text">{candidate.name}</span> : null}
                     {candidate.market ? <span className="ml-1 text-muted-text">/ {candidate.market}</span> : null}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -1461,16 +1476,14 @@ const DecisionSignalsPage: React.FC = () => {
                 ...MARKET_OPTIONS.map((market) => ({ value: market, label: getDecisionSignalMarketLabel(market, t) })),
               ]}
             />
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
-              <input
-                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
-                value={filters.stockCode}
-                onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
-                placeholder={t('decisionSignals.stockCode')}
-                aria-label={t('decisionSignals.stockCode')}
-              />
-            </label>
+            <Input
+              label={t('decisionSignals.stockCode')}
+              className="!h-9 !min-h-9 rounded-sm"
+              value={filters.stockCode}
+              onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
+              placeholder={t('decisionSignals.stockCode')}
+              aria-label={t('decisionSignals.stockCode')}
+            />
             <Select
               label={t('decisionSignals.action')}
               value={filters.action}
@@ -1498,20 +1511,18 @@ const DecisionSignalsPage: React.FC = () => {
                 ...SOURCE_OPTIONS.map((source) => ({ value: source, label: getDecisionSignalSourceTypeLabel(source, t) })),
               ]}
             />
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
-              <input
-                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
-                value={filters.sourceReportId}
-                onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
-                placeholder={t('decisionSignals.sourceReportId')}
-                aria-label={t('decisionSignals.sourceReportId')}
-                inputMode="numeric"
-                min={1}
-                step={1}
-                type="number"
-              />
-            </label>
+            <Input
+              label={t('decisionSignals.sourceReportId')}
+              className="!h-9 !min-h-9 rounded-sm"
+              value={filters.sourceReportId}
+              onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
+              placeholder={t('decisionSignals.sourceReportId')}
+              aria-label={t('decisionSignals.sourceReportId')}
+              inputMode="numeric"
+              min={1}
+              step={1}
+              type="number"
+            />
             <Select
               label={t('decisionSignals.status')}
               value={filters.status}
@@ -1521,10 +1532,10 @@ const DecisionSignalsPage: React.FC = () => {
                 ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
               ]}
             />
-            <button type="submit" className="btn-primary inline-flex h-9 !min-h-9 !min-w-0 items-center justify-center gap-2 !px-3 !py-1.5 !text-xs">
+            <Button type="submit" variant="primary" size="md" className="min-w-0 text-xs">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
-            </button>
+            </Button>
           </form>
         </Card>
 
@@ -1679,14 +1690,17 @@ const DecisionSignalsPage: React.FC = () => {
                 { value: 'unknown', label: t('decisionSignals.profile.unknown') },
               ]}
             />
-            <button
+            <Button
               type="submit"
-              className="btn-secondary inline-flex h-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               disabled={timelineLoading || !activeStockContext?.code}
+              isLoading={timelineLoading}
+              loadingText={t('decisionSignals.timelineSearch')}
             >
               <Search className="h-4 w-4" />
               {t('decisionSignals.timelineSearch')}
-            </button>
+            </Button>
           </form>
           <div className="mt-4">
             {!timelineSearched ? (
@@ -1766,6 +1780,9 @@ const DecisionSignalsPage: React.FC = () => {
       >
         {selected ? (
           <div className="space-y-4">
+            {statusError ? (
+              <ApiErrorAlert error={statusError} onDismiss={() => setStatusError(null)} />
+            ) : null}
             {renderReassessPanel()}
             <DecisionSignalDetails
               item={selected.item}
@@ -1778,19 +1795,24 @@ const DecisionSignalsPage: React.FC = () => {
               feedbackError={selectedFeedbackError?.message ?? null}
               onFeedbackSubmit={handleFeedbackSubmit}
               actions={STATUS_ACTIONS.map((status) => (
-                <button
+                <Button
                   key={status}
                   type="button"
-                  className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
-                  onClick={() => setPendingStatus({
-                    item: selected.item,
-                    status,
-                    message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
-                  })}
+                  variant="secondary"
+                  size="xl"
+                  className="px-3 text-xs"
+                  onClick={() => {
+                    setStatusError(null);
+                    setPendingStatus({
+                      item: selected.item,
+                      status,
+                      message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
+                    });
+                  }}
                   disabled={statusUpdating || selected.item.status === status}
                 >
                   {t(STATUS_ACTION_LABEL_KEYS[status])}
-                </button>
+                </Button>
               ))}
             />
           </div>
@@ -1824,8 +1846,12 @@ const DecisionSignalsPage: React.FC = () => {
         confirmText={t('common.confirm')}
         confirmDisabled={statusUpdating}
         cancelDisabled={statusUpdating}
+        error={statusError?.message}
         onConfirm={() => void handleStatusUpdate()}
-        onCancel={() => setPendingStatus(null)}
+        onCancel={() => {
+          setPendingStatus(null);
+          setStatusError(null);
+        }}
       />
     </AppPage>
   );

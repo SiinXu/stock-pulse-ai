@@ -84,6 +84,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
   const [marketLightStatuses, setMarketLightStatuses] = useState<MarketLightStatus[]>(['red', 'yellow']);
   const [minDrop, setMinDrop] = useState('10');
   const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isPortfolioScope(targetScope)) return undefined;
@@ -160,50 +161,56 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     ));
   };
 
-  const parsePositiveNumber = (value: string, label: string): number | null => {
+  const setValidationError = (fieldId: string, message: string) => {
+    setFormError(message);
+    setFieldErrors({ [fieldId]: message });
+    globalThis.setTimeout(() => document.getElementById(fieldId)?.focus(), 0);
+  };
+
+  const parsePositiveNumber = (value: string, label: string, fieldId: string): number | null => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      setFormError(formatUiText(text.positiveNumber, { label }));
+      setValidationError(fieldId, formatUiText(text.positiveNumber, { label }));
       return null;
     }
     return parsed;
   };
 
-  const parseIntegerInRange = (value: string, label: string, min = 2, max = 250): number | null => {
+  const parseIntegerInRange = (value: string, label: string, fieldId: string, min = 2, max = 250): number | null => {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-      setFormError(formatUiText(text.integerRange, { label, min, max }));
+      setValidationError(fieldId, formatUiText(text.integerRange, { label, min, max }));
       return null;
     }
     return parsed;
   };
 
-  const parseFiniteNumber = (value: string, label: string): number | null => {
+  const parseFiniteNumber = (value: string, label: string, fieldId: string): number | null => {
     if (value.trim() === '') {
-      setFormError(formatUiText(text.required, { label }));
+      setValidationError(fieldId, formatUiText(text.required, { label }));
       return null;
     }
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
-      setFormError(formatUiText(text.finiteNumber, { label }));
+      setValidationError(fieldId, formatUiText(text.finiteNumber, { label }));
       return null;
     }
     return parsed;
   };
 
   const parseRsiThreshold = (value: string): number | null => {
-    const parsed = parseFiniteNumber(value, text.rsiThreshold);
+    const parsed = parseFiniteNumber(value, text.rsiThreshold, 'alert-rsi-threshold');
     if (parsed == null) return null;
     if (parsed < 0 || parsed > 100) {
-      setFormError(text.rsiRange);
+      setValidationError('alert-rsi-threshold', text.rsiRange);
       return null;
     }
     return parsed;
   };
 
-  const ensureRequiredBarsWithinLimit = (label: string, requiredBars: number): boolean => {
+  const ensureRequiredBarsWithinLimit = (label: string, requiredBars: number, fieldId: string): boolean => {
     if (requiredBars > MAX_REQUESTED_DAYS) {
-      setFormError(formatUiText(text.requiredBarsLimit, { label, requiredBars, max: MAX_REQUESTED_DAYS }));
+      setValidationError(fieldId, formatUiText(text.requiredBarsLimit, { label, requiredBars, max: MAX_REQUESTED_DAYS }));
       return false;
     }
     return true;
@@ -211,41 +218,41 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
 
   const buildParameters = (): AlertRuleCreateRequest['parameters'] | null => {
     if (alertType === 'price_cross') {
-      const parsedPrice = parsePositiveNumber(price, text.priceThreshold);
+      const parsedPrice = parsePositiveNumber(price, text.priceThreshold, 'alert-price');
       if (parsedPrice == null) return null;
       return { direction: priceDirection, price: parsedPrice };
     }
     if (alertType === 'price_change_percent') {
-      const parsedChangePct = parsePositiveNumber(changePct, text.changePctThreshold);
+      const parsedChangePct = parsePositiveNumber(changePct, text.changePctThreshold, 'alert-change-pct');
       if (parsedChangePct == null) return null;
       return { direction: changeDirection, changePct: parsedChangePct };
     }
     if (alertType === 'volume_spike') {
-      const parsedMultiplier = parsePositiveNumber(multiplier, text.volumeMultiplier);
+      const parsedMultiplier = parsePositiveNumber(multiplier, text.volumeMultiplier, 'alert-volume-multiplier');
       if (parsedMultiplier == null) return null;
       return { multiplier: parsedMultiplier };
     }
     if (alertType === 'ma_price_cross') {
-      const parsedWindow = parseIntegerInRange(window, text.maWindow);
+      const parsedWindow = parseIntegerInRange(window, text.maWindow, 'alert-ma-window');
       if (parsedWindow == null) return null;
       return { direction: thresholdDirection, window: parsedWindow };
     }
     if (alertType === 'rsi_threshold') {
-      const parsedPeriod = parseIntegerInRange(period, text.rsiPeriod);
+      const parsedPeriod = parseIntegerInRange(period, text.rsiPeriod, 'alert-rsi-period');
       const parsedThreshold = parseRsiThreshold(threshold);
       if (parsedPeriod == null || parsedThreshold == null) return null;
       return { direction: thresholdDirection, period: parsedPeriod, threshold: parsedThreshold };
     }
     if (alertType === 'macd_cross') {
-      const parsedFast = parseIntegerInRange(fastPeriod, text.fastPeriod);
-      const parsedSlow = parseIntegerInRange(slowPeriod, text.slowPeriod);
-      const parsedSignal = parseIntegerInRange(signalPeriod, text.signalPeriod);
+      const parsedFast = parseIntegerInRange(fastPeriod, text.fastPeriod, 'alert-fast-period');
+      const parsedSlow = parseIntegerInRange(slowPeriod, text.slowPeriod, 'alert-slow-period');
+      const parsedSignal = parseIntegerInRange(signalPeriod, text.signalPeriod, 'alert-signal-period');
       if (parsedFast == null || parsedSlow == null || parsedSignal == null) return null;
       if (parsedFast >= parsedSlow) {
-        setFormError(text.fastLessThanSlow);
+        setValidationError('alert-fast-period', text.fastLessThanSlow);
         return null;
       }
-      if (!ensureRequiredBarsWithinLimit('MACD', parsedSlow + parsedSignal + 1)) return null;
+      if (!ensureRequiredBarsWithinLimit('MACD', parsedSlow + parsedSignal + 1, 'alert-slow-period')) return null;
       return {
         direction: crossDirection,
         fastPeriod: parsedFast,
@@ -254,16 +261,16 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
       };
     }
     if (alertType === 'kdj_cross') {
-      const parsedPeriod = parseIntegerInRange(period, text.kdjPeriod);
-      const parsedK = parseIntegerInRange(kPeriod, text.kPeriod);
-      const parsedD = parseIntegerInRange(dPeriod, text.dPeriod);
+      const parsedPeriod = parseIntegerInRange(period, text.kdjPeriod, 'alert-kdj-period');
+      const parsedK = parseIntegerInRange(kPeriod, text.kPeriod, 'alert-k-period');
+      const parsedD = parseIntegerInRange(dPeriod, text.dPeriod, 'alert-d-period');
       if (parsedPeriod == null || parsedK == null || parsedD == null) return null;
-      if (!ensureRequiredBarsWithinLimit('KDJ', parsedPeriod + parsedK + parsedD + 1)) return null;
+      if (!ensureRequiredBarsWithinLimit('KDJ', parsedPeriod + parsedK + parsedD + 1, 'alert-kdj-period')) return null;
       return { direction: crossDirection, period: parsedPeriod, kPeriod: parsedK, dPeriod: parsedD };
     }
     if (alertType === 'cci_threshold') {
-      const parsedPeriod = parseIntegerInRange(period, text.cciPeriod);
-      const parsedThreshold = parseFiniteNumber(threshold, text.cciThreshold);
+      const parsedPeriod = parseIntegerInRange(period, text.cciPeriod, 'alert-cci-period');
+      const parsedThreshold = parseFiniteNumber(threshold, text.cciThreshold, 'alert-cci-threshold');
       if (parsedPeriod == null || parsedThreshold == null) return null;
       return { direction: thresholdDirection, period: parsedPeriod, threshold: parsedThreshold };
     }
@@ -278,7 +285,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
       return { statuses: marketLightStatuses };
     }
     if (alertType === 'market_light_score_drop') {
-      const parsedMinDrop = parsePositiveNumber(minDrop, text.scoreDropThreshold);
+      const parsedMinDrop = parsePositiveNumber(minDrop, text.scoreDropThreshold, 'alert-score-drop');
       if (parsedMinDrop == null) return null;
       return { minDrop: parsedMinDrop };
     }
@@ -294,15 +301,20 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     setMarketRegion('cn');
     resetParameters(nextType);
     setFormError(null);
+    setFieldErrors({});
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setFieldErrors({});
     let resolvedTarget = target.trim();
     if (targetScope === 'single_symbol') {
       const targetValidation = validateStockCode(target);
       if (!targetValidation.valid) {
-        setFormError(language === 'zh' ? (targetValidation.message ?? text.invalidStockCode) : text.invalidStockCode);
+        setValidationError(
+          'alert-target-code',
+          language === 'zh' ? (targetValidation.message ?? text.invalidStockCode) : text.invalidStockCode,
+        );
         return;
       }
       resolvedTarget = targetValidation.normalized;
@@ -353,10 +365,12 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
     if (targetScope === 'single_symbol') {
       return (
         <Input
+          id="alert-target-code"
           label={text.targetCode}
           value={target}
           onChange={(event) => setTarget(event.target.value)}
           placeholder="600519 / AAPL / hk00700"
+          error={fieldErrors['alert-target-code']}
           disabled={isSubmitting}
         />
       );
@@ -444,11 +458,13 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setPriceDirection(value as 'above' | 'below')}
             />
             <Input
+              id="alert-price"
               label={text.priceThreshold}
               type="number"
               min="0"
               step="0.0001"
               value={price}
+              error={fieldErrors['alert-price']}
               onChange={(event) => setPrice(event.target.value)}
               disabled={isSubmitting}
             />
@@ -465,11 +481,13 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setChangeDirection(value as 'up' | 'down')}
             />
             <Input
+              id="alert-change-pct"
               label={text.changePctThreshold}
               type="number"
               min="0"
               step="0.01"
               value={changePct}
+              error={fieldErrors['alert-change-pct']}
               onChange={(event) => setChangePct(event.target.value)}
               disabled={isSubmitting}
             />
@@ -478,11 +496,13 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
 
         {alertType === 'volume_spike' ? (
           <Input
+            id="alert-volume-multiplier"
             label={text.volumeMultiplier}
             type="number"
             min="0"
             step="0.01"
             value={multiplier}
+            error={fieldErrors['alert-volume-multiplier']}
             onChange={(event) => setMultiplier(event.target.value)}
             disabled={isSubmitting}
           />
@@ -498,12 +518,14 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
             />
             <Input
+              id="alert-ma-window"
               label={text.maWindow}
               type="number"
               min="2"
               max="250"
               step="1"
               value={window}
+              error={fieldErrors['alert-ma-window']}
               onChange={(event) => setWindow(event.target.value)}
               disabled={isSubmitting}
             />
@@ -520,22 +542,26 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
             />
             <Input
+              id="alert-rsi-period"
               label={text.rsiPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={period}
+              error={fieldErrors['alert-rsi-period']}
               onChange={(event) => setPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-rsi-threshold"
               label={text.rsiThreshold}
               type="number"
               min="0"
               max="100"
               step="0.01"
               value={threshold}
+              error={fieldErrors['alert-rsi-threshold']}
               onChange={(event) => setThreshold(event.target.value)}
               disabled={isSubmitting}
             />
@@ -552,32 +578,38 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setCrossDirection(value as 'bullish_cross' | 'bearish_cross')}
             />
             <Input
+              id="alert-fast-period"
               label={text.fastPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={fastPeriod}
+              error={fieldErrors['alert-fast-period']}
               onChange={(event) => setFastPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-slow-period"
               label={text.slowPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={slowPeriod}
+              error={fieldErrors['alert-slow-period']}
               onChange={(event) => setSlowPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-signal-period"
               label={text.signalPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={signalPeriod}
+              error={fieldErrors['alert-signal-period']}
               onChange={(event) => setSignalPeriod(event.target.value)}
               disabled={isSubmitting}
             />
@@ -594,32 +626,38 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setCrossDirection(value as 'bullish_cross' | 'bearish_cross')}
             />
             <Input
+              id="alert-kdj-period"
               label={text.kdjPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={period}
+              error={fieldErrors['alert-kdj-period']}
               onChange={(event) => setPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-k-period"
               label={text.kPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={kPeriod}
+              error={fieldErrors['alert-k-period']}
               onChange={(event) => setKPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-d-period"
               label={text.dPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={dPeriod}
+              error={fieldErrors['alert-d-period']}
               onChange={(event) => setDPeriod(event.target.value)}
               disabled={isSubmitting}
             />
@@ -636,20 +674,24 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
               onChange={(value) => setThresholdDirection(value as 'above' | 'below')}
             />
             <Input
+              id="alert-cci-period"
               label={text.cciPeriod}
               type="number"
               min="2"
               max="250"
               step="1"
               value={period}
+              error={fieldErrors['alert-cci-period']}
               onChange={(event) => setPeriod(event.target.value)}
               disabled={isSubmitting}
             />
             <Input
+              id="alert-cci-threshold"
               label={text.cciThreshold}
               type="number"
               step="0.01"
               value={threshold}
+              error={fieldErrors['alert-cci-threshold']}
               onChange={(event) => setThreshold(event.target.value)}
               disabled={isSubmitting}
             />
@@ -685,12 +727,14 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
 
         {alertType === 'market_light_score_drop' ? (
           <Input
+            id="alert-score-drop"
             label={text.scoreDropThreshold}
             type="number"
             min="0"
             max="100"
             step="1"
             value={minDrop}
+            error={fieldErrors['alert-score-drop']}
             onChange={(event) => setMinDrop(event.target.value)}
             disabled={isSubmitting}
           />
@@ -707,7 +751,11 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
             {text.create}
           </Button>
         </div>
-        {formError ? <p role="alert" className="text-sm text-danger">{formError}</p> : null}
+        {formError ? (
+          <p role={Object.keys(fieldErrors).length === 0 ? 'alert' : undefined} className="text-sm text-danger">
+            {formError}
+          </p>
+        ) : null}
     </form>
   );
 };

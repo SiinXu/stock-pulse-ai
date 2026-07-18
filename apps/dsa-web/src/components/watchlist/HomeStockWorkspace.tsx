@@ -6,15 +6,13 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
-  Filter,
   Loader2,
   Play,
   Plus,
-  Search,
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, Input, ScrollArea, StatusDot } from '../common';
+import { Badge, Button, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -48,10 +46,11 @@ interface HomeStockWorkspaceProps {
   watchlistRows: HomeWatchlistRow[];
   watchlistLoading: boolean;
   watchlistActioning: boolean;
+  watchlistLoadError?: boolean;
   watchlistMessage: string | null;
-  onAddToWatchlist: (code: string) => Promise<void>;
-  onRemoveFromWatchlist: (code: string) => Promise<void>;
-  onRefreshWatchlist: () => Promise<void>;
+  onAddToWatchlist: (code: string) => Promise<boolean | void>;
+  onRemoveFromWatchlist: (code: string) => Promise<boolean | void>;
+  onRefreshWatchlist: () => Promise<boolean | void>;
   onAnalyzeWatchlist: (mode: WatchlistAnalyzeMode) => Promise<void>;
   isBatchAnalyzing: boolean;
   batchStatus: BatchStatus | null;
@@ -112,7 +111,7 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
 
 const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
-  onRemove: (code: string) => Promise<void>;
+  onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
 }> = ({ row, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
@@ -204,6 +203,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   watchlistRows,
   watchlistLoading,
   watchlistActioning,
+  watchlistLoadError = false,
   watchlistMessage,
   onAddToWatchlist,
   onRemoveFromWatchlist,
@@ -233,11 +233,12 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     .length;
   const isTodayStatusUnavailable = watchlistRows.some((row) => row.isTodayStatusLoading || row.isTodayStatusUnknown);
   const topTodayItem = todayItems[0];
-  const tabs: Array<{ key: HomeWorkspaceTab; label: string }> = [
-    { key: 'history', label: t('watchlist.tabHistory') },
-    { key: 'watchlist', label: t('watchlist.tabWatchlist') },
-    { key: 'today', label: t('watchlist.tabToday') },
+  const tabs: Array<{ value: HomeWorkspaceTab; label: string }> = [
+    { value: 'history', label: t('watchlist.tabHistory') },
+    { value: 'watchlist', label: t('watchlist.tabWatchlist') },
+    { value: 'today', label: t('watchlist.tabToday') },
   ];
+  const activeTabLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? tabs[0].label;
 
   const statusClassName = useMemo(() => {
     if (!batchStatus) return '';
@@ -275,79 +276,41 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     event.preventDefault();
     const code = draftCode.trim();
     if (!code) return;
-    void onAddToWatchlist(code).then(() => setDraftCode(''));
+    void onAddToWatchlist(code).then((success) => {
+      if (success !== false) setDraftCode('');
+    });
   };
 
-  const tabId = (key: HomeWorkspaceTab) => `${reactId}-tab-${key}`;
   const panelId = `${reactId}-panel`;
 
-  const handleTabListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    const currentIndex = tabs.findIndex((tab) => tab.key === activeTab);
-    let nextIndex = -1;
-    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
-    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-    else if (event.key === 'Home') nextIndex = 0;
-    else if (event.key === 'End') nextIndex = tabs.length - 1;
-    if (nextIndex < 0) return;
-    event.preventDefault();
-    const nextKey = tabs[nextIndex].key;
-    onTabChange(nextKey);
-    document.getElementById(tabId(nextKey))?.focus();
-  };
-
   const renderTabs = (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
-      <div
-        role="tablist"
-        aria-label={t('watchlist.tabsAria')}
-        onKeyDown={handleTabListKeyDown}
-        className="inline-flex h-11 items-center gap-1 rounded-lg border border-subtle bg-base/40 px-1"
-      >
-        <Filter className="ml-1 h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
-        {tabs.map((tab) => {
-          const selected = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              id={tabId(tab.key)}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={panelId}
-              tabIndex={selected ? 0 : -1}
-              className={`h-9 rounded-md px-2 text-xs font-medium transition-colors ${
-                selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
-              }`}
-              onClick={() => onTabChange(tab.key)}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
-      <div className="relative min-w-0">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-text" aria-hidden="true" />
-        <Input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={t('common.searchPlaceholder')}
-          aria-label={t('layout.search')}
-          className="h-11 pl-8 pr-2"
-        />
-      </div>
+    <div className="flex min-w-0 flex-col gap-2">
+      <SegmentedControl
+        value={activeTab}
+        options={tabs}
+        onChange={onTabChange}
+        ariaLabel={t('watchlist.tabsAria')}
+        className="w-fit"
+        getPanelId={() => panelId}
+      />
+      <SearchInput
+        value={searchQuery}
+        onChange={(event) => setSearchQuery(event.target.value)}
+        placeholder={t('common.searchPlaceholder')}
+        aria-label={t('layout.search')}
+        wrapperClassName="w-full"
+      />
     </div>
   );
 
-  // Both branches share one skeleton so the tab bar keeps an identical
-  // position/size when switching tabs; only the panel content changes.
+  // Both branches share one skeleton so the controls keep an identical position.
   const workspaceShell = (content: React.ReactNode) => (
     <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
       {renderTabs}
       <div
         role="tabpanel"
         id={panelId}
-        aria-labelledby={tabId(activeTab)}
+        aria-label={activeTabLabel}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         {content}
@@ -478,6 +441,16 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         {activeTab === 'watchlist' ? (
           watchlistLoading ? (
             <DashboardStateBlock loading compact title={t('watchlist.loading')} />
+          ) : watchlistLoadError ? (
+            <DashboardStateBlock
+              compact
+              title={t('chat.actionFailed')}
+              action={(
+                <Button type="button" size="sm" variant="secondary" onClick={() => void onRefreshWatchlist()}>
+                  {t('common.retry')}
+                </Button>
+              )}
+            />
           ) : watchlistRows.length === 0 ? (
             <DashboardStateBlock
               compact

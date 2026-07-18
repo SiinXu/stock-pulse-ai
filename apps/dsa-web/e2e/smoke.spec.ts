@@ -6,6 +6,22 @@ async function login(page: Page) {
   await page.waitForTimeout(1000);
 }
 
+const uiLanguageSelector = (page: Page) =>
+  page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+
+async function openProfileMenu(page: Page) {
+  const trigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    await trigger.click();
+  }
+}
+
+async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
+  await openProfileMenu(page);
+  await uiLanguageSelector(page).click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
+
 test.describe('web smoke', () => {
   test.use({ locale: 'zh-CN' });
 
@@ -117,14 +133,15 @@ test.describe('web smoke', () => {
   test('language switch updates UI copy and persists after page refresh', async ({ page }) => {
     await login(page);
 
-    const languageSelector = page.locator('select[data-testid="ui-language-selector"]:visible').first();
+    await openProfileMenu(page);
+    const languageSelector = uiLanguageSelector(page);
     await expect(languageSelector).toBeVisible();
     await expect(page.getByRole('link', { name: '设置' })).toBeVisible();
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
 
-    await languageSelector.selectOption('en');
+    await selectUiLanguage(page, 'en');
 
-    await expect(languageSelector).toHaveValue('en');
+    await expect(languageSelector).toHaveAttribute('data-value', 'en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
 
@@ -133,9 +150,11 @@ test.describe('web smoke', () => {
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
-    await expect(languageSelector).toHaveValue('en');
+    await openProfileMenu(page);
+    await expect(uiLanguageSelector(page)).toHaveAttribute('data-value', 'en');
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible();
+    await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
 
     await page.getByRole('link', { name: 'Settings' }).click();
     await page.waitForLoadState('domcontentloaded');
