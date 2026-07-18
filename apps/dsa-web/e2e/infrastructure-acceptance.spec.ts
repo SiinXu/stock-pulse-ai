@@ -161,6 +161,13 @@ async function login(page: Page, language: 'zh' | 'en' = 'zh') {
   }
 }
 
+async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
+  await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  const selector = page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+  await selector.click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
+
 async function installMockAuth(page: Page, options: {
   language: 'zh' | 'en';
   passwordSet: boolean;
@@ -652,7 +659,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('04 UI language switch persists through refresh and browser back-forward navigation', async ({ page }) => {
     await login(page);
-    await page.locator('select[data-testid="ui-language-selector"]:visible').first().selectOption('en');
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
