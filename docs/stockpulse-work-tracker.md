@@ -2,9 +2,10 @@
 
 - 状态:`Living`(每个 AR 阶段合入/裁决后更新)
 - 日期:2026-07-17(首版,随 AR-PY-00 创建;此前不存在,属治理文档漂移修复)
-- 代码 baseline:`main@fa7a6ee1`
+- 代码 baseline:`main@30926876`(PR #18 合入 commit)
 - 权威计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Approved`)
 - 权威决策:`docs/architecture/ADR-001-agent-runtime.md`
+- 修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Proposed`,RF-00～RF-07)
 
 ## 1. 追踪原则
 
@@ -18,12 +19,12 @@
 | --- | --- | --- | --- |
 | AR-01 | Replay characterization suite(36 fixtures + ReplayLLMAdapter) | **Done** | PR #11 合入主线;`tests/test_agent_runtime_compatibility.py`、`tests/agent_runtime_replay.py`、`tests/fixtures/agent_runtime/`(36 fixture:24 financial + 12 contract) |
 | AR-PY-00 | 决策与基线收敛(docs-only) | **Done** | 开发计划 `Approved`;ADR-001 `Accepted`(2026-07-17,含 D2 裁决);framework comparison 与本文档首版创建 |
-| AR-PY-01 | Runtime Contract + Native Adapter | **In progress(实现完成,待合入)** | `src/agent/runtime/`(contract + native adapter)+ `tests/agent/runtime/`(29 tests)+ `build_agent_runtime` 工厂;replay/executor/chat 回归绿;待 PR 合入后转 Done |
-| AR-PY-02 | BoundToolSession | **In progress(实现完成,待合入)** | `src/agent/runtime/tool_session.py` + `tool_surface.py` 共享错误结构提取 + 23 项 fail-closed 测试;replay 45 项零修改通过;native runner 接线按计划留待 AR-PY-03 |
-| AR-PY-03 | Lifecycle / typed events / 真实取消 | **In progress(实现完成,待合入)** | `src/agent/runtime/events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);runner/orchestrator/executor/base_agent 协作取消检查点;SSE endpoint 经 `to_public_sse_event` 单一降级点 + 断连 `request_cancel`;chat_context/native_adapter 收敛;29 项新测试;replay 45 项与冻结 SSE 测试零修改绿;native runner 工具路径仍不改线(留待 AR-PY-04) |
-| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **In progress(首片实现,待合入)** | Spike 完成(隔离 venv 实测):选定**方案 B**(自定义 `Model` 包裹 `LLMToolAdapter`);依赖精化为 **`pydantic-ai-slim==2.12.0`**(避开 openai extra 的 `tiktoken>=0.12` 与 StockPulse #537 `<0.12` 冲突);`src/agent/runtime/pydantic_ai_adapter.py`(惰性 import,仅 Single Agent run,内部注入点)+ `pydantic_ai_toolset.py`(`BoundToolSession`→PydanticAI `Tool.from_schema` 单一工具桥接,经 `execute()` fail-closed 分发)+ `requirements-pydanticai.txt` 可选依赖 + 12 项测试(依赖缺失路径、fake model 跑通、工具调用经 fail-closed 门、gate 拒绝、仅暴露 allowlist 工具);未进默认/设置页,Native 零依赖;Spike 报告见 `.claude/reviews/ar-py-04-model-integration-spike.md` |
-| AR-PY-05 | Conformance / benchmark / 决策门禁 | Blocked(部分脚手架先行) | 前置:AR-PY-04 合入。已并行落地契约一致性 conformance 脚手架 `tests/agent/runtime/test_conformance.py`(Native vs PydanticAI 参数化,确定性 fake,断言终态/AgentResult/失败不伪成功);replay fixture 双跑与 benchmark 仍待 adapter 覆盖完整路径 + 合入后展开 |
-| AR-PY-06 | 有限产品化(条件阶段) | Blocked | 前置:AR-PY-05 通过 + 维护者再批准(审批点 6/7) |
+| AR-PY-01 | Runtime Contract + Native Adapter | **Partial** | 已随 PR #18 合入:`src/agent/runtime/`(contract + native adapter)+ `tests/agent/runtime/` + `build_agent_runtime` 工厂;缺口:`execute()` 终态后才返回 handle(非运行中控制柄)、`ExecutionContext` 输入不完整且仅浅层冻结(AR-RF-01/02);修复走 RF-02 |
+| AR-PY-02 | BoundToolSession | **Partial** | 已随 PR #18 合入:`src/agent/runtime/tool_session.py`(allowlist/权限/预算/deadline/审计/late-result fence)+ fail-closed 测试;缺口:Native 仍走 legacy direct path,存在两套工具权威(AR-RF-03);修复走 RF-03 |
+| AR-PY-03 | Lifecycle / typed events / 真实取消 | **Partial** | 已随 PR #18 合入:`src/agent/runtime/events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`)+ 部分 runner/orchestrator 取消检查点 + Chat SSE 断连取消(`to_public_sse_event` 单一降级点);缺口:lifecycle 主要由 Chat SSE 单独持有,未形成全入口统一生命周期、终态分类与持久化 fence(AR-RF-07);修复走 RF-04 |
+| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Experimental / Incomplete** | 已随 PR #18 合入:方案 B(自定义 `Model` 包裹 `LLMToolAdapter`)+ `pydantic-ai-slim==2.12.0` 可选依赖(`requirements-pydanticai.txt`)+ `pydantic_ai_adapter.py` / `pydantic_ai_toolset.py`;Spike 结论以本行与 ADR-001 D4 记录为准,原报告为本地评审产物未入库;缺口:模型桥固定发送空工具 schema、ToolCall/ToolReturn 历史丢失、Prompt 等价未证明、timeout/cancel 未消费、CHAT 提前扩面、usage 字段与存储摘要列不匹配(AR-RF-04/05/06/10/11);修复走 RF-05;裁决前不得启用或宣传该路径 |
+| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Not started** | 仅有 5 个简化 fake conformance tests(`tests/agent/runtime/test_conformance.py`,AR-RF-08);无 replay 支持矩阵、benchmark 与可选依赖 CI(默认 CI 经 `importorskip` 静默跳过 PydanticAI 测试,AR-RF-09);修复走 RF-01/RF-06 |
+| AR-PY-06 | 有限产品化(条件阶段) | Blocked | Native 仍默认,实验 Runtime 未向用户公开;前置:RF-06 通过 + 维护者裁决(RF-07,默认 `Native Only`) |
 
 ## 3. 裁决记录
 
@@ -40,6 +41,7 @@
 | --- | --- |
 | `docs/architecture/pydanticai-runtime-development-plan.md` | `Approved`(2026-07-17) |
 | `docs/architecture/ADR-001-agent-runtime.md` | `Accepted`(2026-07-17) |
+| `docs/architecture/pydanticai-runtime-recovery-plan.md` | `Proposed`(2026-07-18,PR #18 合入后修复计划,RF-00～RF-07) |
 | `docs/stockpulse-agent-runtime-framework-comparison.md` | `Living`(首版) |
 | `docs/stockpulse-work-tracker.md` | `Living`(本文档) |
 | `docs/agent-stream-events.md` | 既存,SSE 事件契约权威 |
@@ -59,3 +61,4 @@
 | 2026-07-17 | AR-PY-04 event/usage 片:PydanticAI 运行 usage 收敛到单一 UsageRecorder(无第二套 usage 权威);工具桥接经 RuntimeEventEmitter 发 tool_start/tool_done;测试增至 14 项;runtime 全套 102 项绿 |
 | 2026-07-17 | AR-PY-05 脚手架(并行,不合入前提):契约一致性 conformance 测试(Native vs PydanticAI 参数化,5 项),断言两 runtime 契约等价、失败不伪成功 |
 | 2026-07-17 | AR-PY-04 第二条路径:adapter 支持单 Agent CHAT(自由文本、无 dashboard、无状态 POC);RESEARCH 仍 NotImplemented;Multi/Research/默认/设置页仍不碰;测试增至 16+5 项 |
+| 2026-07-18 | PR #18 合入后审计(RF-00):创建 recovery plan 并登记 AR-RF-01～13;代码 baseline -> `main@30926876`;AR-PY-01～03 -> Partial,AR-PY-04 -> Experimental / Incomplete,AR-PY-05 -> Not started,AR-PY-06 -> Blocked;移除未入库 Spike 报告文件引用;RF-06 裁决前冻结 PydanticAI CHAT/Multi/Research 与产品入口扩展 |

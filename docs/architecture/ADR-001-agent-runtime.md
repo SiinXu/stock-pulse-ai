@@ -129,3 +129,4 @@ PydanticAI 只允许拥有:单个 Execution/Stage 内部的模型调用与工具
 | --- | --- | --- |
 | 2026-07-17 | Proposed | 初稿随 AR-PY-00 送审;D2 为建议裁决,待维护者批准 |
 | 2026-07-17 | Accepted | 维护者批准审批点 1(架构)与审批点 2(D2 冻结为兼容契约);AR-PY-01 解除阻断 |
+| 2026-07-18 | Accepted(不变) | PR #18 合入后实施状态审计:实现与计划存在差距(AR-RF-01～13),修复按 `docs/architecture/pydanticai-runtime-recovery-plan.md` 执行;本 ADR 已批准决策不变 |
