@@ -929,7 +929,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await selectPortfolioAccount(page, account.id);
     await page.getByRole('button', { name: '录入交易' }).click();
     const dialog = page.getByRole('dialog', { name: '手工录入：交易' });
-    const dateBox = await dialog.getByLabel('交易日期').boundingBox();
+    const dateBox = await dialog.getByRole('textbox', { name: '交易日期', exact: true }).boundingBox();
     const sideBox = await dialog.getByRole('combobox', { name: '买卖方向' }).boundingBox();
     const submitBox = await dialog.getByRole('button', { name: '提交交易' }).boundingBox();
     expect(dateBox).not.toBeNull();
