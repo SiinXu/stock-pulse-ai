@@ -262,28 +262,21 @@ test.describe('complete UI i18n acceptance', () => {
     }
   });
 
-  test('an open Connection Modal updates immediately after switching UI language', async ({ page }) => {
+  test('Connection Modal opens in the language selected from Profile', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.goto('/settings?section=ai_models&view=connections');
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
-    const providerSelect = dialog.getByLabel('选择模型服务商');
-    await providerSelect.click();
-    await dialog.locator('[role="option"][data-value="openai"]').click();
-    await expect(providerSelect).toHaveAttribute('data-value', 'openai');
-    await dialog.evaluate((element) => element.setAttribute('data-language-switch-modal', 'same'));
-
-    await uiLanguageSelector(page).selectOption('en');
-
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    const sameDialog = page.locator('[data-language-switch-modal="same"]');
-    await expect(sameDialog).toContainText('Add model service');
-    const localizedSelect = sameDialog.getByLabel('Choose model provider');
+    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    const localizedSelect = dialog.getByLabel('Choose model provider');
+    await localizedSelect.click();
+    await dialog.locator('[role="option"][data-value="openai"]').click();
     await expect(localizedSelect).toHaveAttribute('data-value', 'openai');
     await expect(localizedSelect).toContainText('OpenAI Official');
     await localizedSelect.click();
-    const openAiOption = sameDialog.locator('[role="option"][data-value="openai"]');
+    const openAiOption = dialog.locator('[role="option"][data-value="openai"]');
     await expect(openAiOption).toContainText('OpenAI Official');
     expect(await openAiOption.innerText()).not.toMatch(CHINESE_SCRIPT);
   });
