@@ -570,6 +570,81 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
         )
 
 
+class TestSettingsFieldTitleContract(unittest.TestCase):
+    """The Web field-title catalog must cover the backend registry exactly."""
+
+    _FIELD_TITLE_FILE = (
+        Path(__file__).resolve().parents[1]
+        / "apps/dsa-web/src/utils/systemConfigI18n.ts"
+    )
+    _FIELD_TITLE_MAP_RE = re.compile(
+        r"const fieldTitleMapZh = \{\n(?P<body>.*?)\n\} as const;",
+        flags=re.DOTALL,
+    )
+    _FIELD_TITLE_EN_MAP_RE = re.compile(
+        r"const fieldTitleMapEn = \{\n(?P<body>.*?)\n\} satisfies",
+        flags=re.DOTALL,
+    )
+    _FIELD_TITLE_KEY_RE = re.compile(
+        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:",
+        flags=re.MULTILINE,
+    )
+    _FIELD_TITLE_EN_ENTRY_RE = re.compile(
+        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)',$",
+        flags=re.MULTILINE,
+    )
+
+    @classmethod
+    def _collect_web_field_title_keys(cls) -> set[str]:
+        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        match = cls._FIELD_TITLE_MAP_RE.search(content)
+        if match is None:
+            raise AssertionError("Unable to locate fieldTitleMapZh in systemConfigI18n.ts")
+        keys = cls._FIELD_TITLE_KEY_RE.findall(match.group("body"))
+        if len(keys) != len(set(keys)):
+            raise AssertionError("fieldTitleMapZh contains duplicate field keys")
+        return set(keys)
+
+    @classmethod
+    def _collect_web_english_field_titles(cls) -> dict[str, str]:
+        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
+        if match is None:
+            raise AssertionError("Unable to locate fieldTitleMapEn in systemConfigI18n.ts")
+        entries = cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body"))
+        titles = dict(entries)
+        if len(entries) != len(titles):
+            raise AssertionError("fieldTitleMapEn contains duplicate field keys")
+        return titles
+
+    def test_web_field_titles_match_registered_fields(self) -> None:
+        registered_keys = set(get_registered_field_keys())
+        field_title_keys = self._collect_web_field_title_keys()
+
+        self.assertEqual(
+            (
+                sorted(registered_keys - field_title_keys),
+                sorted(field_title_keys - registered_keys),
+            ),
+            ([], []),
+            "Web field-title catalog differs from the backend registry "
+            "(missing titles, stale titles)",
+        )
+
+    def test_web_english_field_titles_match_backend_schema_titles(self) -> None:
+        web_titles = self._collect_web_english_field_titles()
+        backend_titles = {
+            key: get_field_definition(key)["title"]
+            for key in get_registered_field_keys()
+        }
+
+        self.assertEqual(
+            web_titles,
+            backend_titles,
+            "The English translation inventory must mirror backend schema titles",
+        )
+
+
 class TestSettingsHelpContract(unittest.TestCase):
     """Help keys must map to registry metadata or be editor-only.
 

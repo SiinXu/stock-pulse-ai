@@ -5,6 +5,9 @@ import { resolveWebBuildInfo } from '../../utils/constants';
 import type { LlmConnectionFieldSchema, SetupStatusResponse } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
+import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { loadUiLanguageTranslations } from '../../i18n/translations';
+import { getFieldTitle } from '../../utils/systemConfigI18n';
 import SettingsPage from '../SettingsPage';
 
 const {
@@ -541,6 +544,20 @@ type ConfigState = {
   loadError: null;
   saveError: null;
   retryAction: null;
+  conflictState?: {
+    fields: Array<{
+      key: string;
+      base: string;
+      server: string;
+      local: string;
+      isSensitive: boolean;
+      title?: string;
+      category?: string;
+    }>;
+    serverVersion: string;
+  } | null;
+  resolveConflictField?: ReturnType<typeof vi.fn>;
+  resolveAllConflicts?: ReturnType<typeof vi.fn>;
   load: typeof load;
   retry: ReturnType<typeof vi.fn>;
   save: typeof save;
@@ -1909,6 +1926,46 @@ describe('SettingsPage', () => {
     expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
   });
 
+  it.each([
+    { language: 'de', expectedTitle: 'Liste ausgewählter Aktien', backendTitleVisible: false },
+    { language: 'en', expectedTitle: 'Server Watchlist Title', backendTitleVisible: true },
+  ] as const)(
+    'uses the $language field-title contract in the 409 conflict panel',
+    async ({ language, expectedTitle, backendTitleVisible }) => {
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'base',
+        conflictState: {
+          fields: [{
+            key: 'STOCK_LIST',
+            base: 'AAPL',
+            server: 'MSFT',
+            local: 'NVDA',
+            isSensitive: false,
+            title: 'Server Watchlist Title',
+            category: 'base',
+          }],
+          serverVersion: 'v2',
+        },
+        resolveConflictField: vi.fn(),
+        resolveAllConflicts: vi.fn(),
+      }));
+      await loadUiLanguageTranslations(language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsPage />
+        </UiLanguageProvider>,
+      );
+
+      expect(screen.getByText(expectedTitle)).toBeInTheDocument();
+      if (backendTitleVisible) {
+        expect(screen.getByText('Server Watchlist Title')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Server Watchlist Title')).not.toBeInTheDocument();
+      }
+    },
+  );
+
   it('runs the unified post-save effects after a legacy migration applies', async () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
     // The migration banner lives in the top-level Advanced diagnostics area.
@@ -2637,6 +2694,64 @@ describe('SettingsPage', () => {
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
   });
+
+  it.each(['de', 'ja', 'zh-TW'] as const)(
+    'uses the per-field %s title for a known field without a help key in the validation error summary',
+    async (language) => {
+      const configState = buildSystemConfigState();
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'system',
+        itemsByCategory: {
+          ...configState.itemsByCategory,
+          ai_model: [
+            ...configState.itemsByCategory.ai_model,
+            {
+              key: 'OPENAI_VISION_MODEL',
+              value: 'gpt-4o',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'OPENAI_VISION_MODEL',
+                title: 'OpenAI Vision Model',
+                category: 'ai_model',
+                dataType: 'string',
+                uiControl: 'text',
+                isSensitive: false,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 2,
+              },
+            },
+          ],
+        },
+        issueByKey: {
+          OPENAI_VISION_MODEL: [
+            {
+              key: 'OPENAI_VISION_MODEL',
+              code: 'invalid',
+              message: 'Unsupported backend',
+              severity: 'error',
+            },
+          ],
+        },
+      }));
+      routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'runtime' });
+      await loadUiLanguageTranslations(language);
+      const expectedTitle = getFieldTitle('OPENAI_VISION_MODEL', undefined, language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsPage />
+        </UiLanguageProvider>,
+      );
+
+      expect(expectedTitle).not.toBe('OpenAI Vision Model');
+      expect(screen.getByRole('button', { name: `前往修正: ${expectedTitle}` })).toBeInTheDocument();
+      expect(screen.queryByText('OpenAI Vision Model')).not.toBeInTheDocument();
+    },
+  );
 
   it('routes a dynamic connection error to Model Access and sends an explicit field-focus request', async () => {
     const configState = buildSystemConfigState();

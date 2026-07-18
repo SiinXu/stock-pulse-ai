@@ -98,6 +98,7 @@ import type {
 import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
+import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 
 type DesktopWindow = Window & {
   dsaDesktop?: {
@@ -1719,9 +1720,12 @@ const SettingsPage: React.FC = () => {
       const fallbackTitle = item?.schema?.title ?? key;
       entries.push({
         key,
-        label: uiLanguage === 'zh'
-          ? getFieldTitleZh(key, fallbackTitle)
-          : fallbackTitle,
+        label: resolveSettingsFieldTitle({
+          itemKey: item?.key ?? key,
+          schemaKey: item?.schema?.key,
+          fallbackTitle,
+          language: uiLanguage,
+        }),
         message: firstError.message,
         section: target.section,
         view: target.view,
@@ -2710,7 +2714,13 @@ const SettingsPage: React.FC = () => {
                 <div key={field.key} className="rounded-lg border border-[var(--settings-border)] bg-background/70 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{field.title || field.key}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {resolveSettingsFieldTitle({
+                          itemKey: field.key,
+                          fallbackTitle: field.title || field.key,
+                          language: uiLanguage,
+                        })}
+                      </p>
                       <p className="text-xs text-muted-text">{field.key}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
