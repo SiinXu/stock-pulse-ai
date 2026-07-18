@@ -30,6 +30,8 @@ from src.agent.public_contract import (
     sanitize_agent_diagnostic,
 )
 from src.agent.runner import run_agent_loop, parse_dashboard_json
+from src.agent.runtime.contract import ExecutionState
+from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
@@ -707,11 +709,14 @@ class AgentExecutor:
             )
 
         # Persist assistant reply (or error note) for context continuity.
-        # A cancelled run is user intent, not an agent failure: skip the
-        # failure sentinel and the provider trace so the cancelled turn
-        # leaves no misleading "analysis failed" assistant message and no
-        # late partial trace behind.
-        if result.success:
+        # The terminal state is classified through the single shared authority
+        # so this write fence stays byte-identical to the SSE endpoint's
+        # lifecycle classification. A cancelled run is user intent, not an
+        # agent failure: skip the failure sentinel and the provider trace so
+        # the cancelled turn leaves no misleading "analysis failed" assistant
+        # message and no late partial trace behind.
+        terminal_state = classify_result_terminal_state(result)
+        if terminal_state is ExecutionState.SUCCEEDED:
             assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
             self._persist_provider_trace(
                 session_id=session_id,
@@ -721,7 +726,7 @@ class AgentExecutor:
                 user_message_id=user_message_id,
                 assistant_message_id=assistant_message_id,
             )
-        elif result.cancelled:
+        elif terminal_state is ExecutionState.CANCELLED:
             logger.info("Agent chat cancelled: session_id=%s", session_id)
         else:
             logger.error(

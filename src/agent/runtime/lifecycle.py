@@ -79,6 +79,22 @@ def classify_terminal_state(
     return ExecutionState.FAILED
 
 
+def classify_result_terminal_state(result: Any) -> ExecutionState:
+    """Classify any native result object (``RunLoopResult`` / ``AgentResult`` /
+    ``OrchestratorResult``) through the single terminal contract.
+
+    Entry-point persistence fences share this classifier so the terminal
+    decision — and its cancellation-wins-over-success priority — is defined
+    once and can never diverge between the Chat SSE endpoint and the
+    conversation write fences.
+    """
+    return classify_terminal_state(
+        success=bool(getattr(result, "success", False)),
+        cancelled=bool(getattr(result, "cancelled", False)),
+        timed_out=bool(getattr(result, "timed_out", False)),
+    )
+
+
 class ExecutionLifecycle:
     """Binds one execution's state machine, event stream and cancellation."""
 
@@ -140,11 +156,7 @@ class ExecutionLifecycle:
 
     def finish_from_result(self, result: Any) -> ExecutionState:
         """Classify a native result and finish the execution (first wins)."""
-        state = classify_terminal_state(
-            success=bool(getattr(result, "success", False)),
-            cancelled=bool(getattr(result, "cancelled", False)),
-            timed_out=bool(getattr(result, "timed_out", False)),
-        )
+        state = classify_result_terminal_state(result)
         self._execution.finish(state, result=result, error=getattr(result, "error", None))
         return state
 
