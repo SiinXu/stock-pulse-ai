@@ -90,9 +90,18 @@ class TestAgentConfig(unittest.TestCase):
         config = Config._load_from_env()
         self.assertEqual(config.agent_skills, ['dragon_head', 'shrink_pullback'])
 
-    @patch.dict(os.environ, {'AGENT_LITELLM_MODEL': 'gpt-4o-mini'}, clear=True)
+    @patch.dict(
+        os.environ,
+        {'AGENT_LITELLM_MODEL': 'gpt-4o-mini', 'ENV_FILE': os.devnull},
+        clear=True,
+    )
     def test_agent_is_available_when_agent_primary_model_is_configured(self):
         """Agent availability auto-detection should use effective Agent primary model."""
+        # ``ENV_FILE=os.devnull`` keeps ``_load_from_env`` hermetic: without it
+        # ``setup_env`` loads the developer's local ``.env`` (bypassing the
+        # ``clear=True`` isolation) and can inject ``AGENT_MODE=false`` plus a
+        # populated model list, so this "AGENT_MODE unset" case would fail only
+        # on machines that have a local ``.env``.
         from src.config import Config
         Config._instance = None
         config = Config._load_from_env()
