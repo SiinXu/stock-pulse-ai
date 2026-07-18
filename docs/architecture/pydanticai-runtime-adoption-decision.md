@@ -2,12 +2,12 @@
 
 ## 1. 文档状态与用途
 
-- 状态：`Draft`（证据不完整；真实 provider benchmark 与 Desktop 打包证据待补，见第 4 章）
-- 版本：v0.1
+- 状态：`Accepted`（RF-07 裁决 `Native Only`，2026-07-18 维护者裁决）
+- 版本：v1.0
 - 日期：2026-07-18
 - 上位决策：`docs/architecture/ADR-001-agent-runtime.md`（`Accepted`）
 - 修复计划：`docs/architecture/pydanticai-runtime-recovery-plan.md`（`Accepted`，RF-00～RF-07）
-- 用途：汇总 RF-06 阶段已收集的证据，为 RF-07 的 `Native Only` / `Continue Experimental` 裁决提供依据。**本报告不做最终裁决**：裁决权归维护者，且默认结论是 `Native Only`（recovery plan RF-07）。
+- 用途：汇总 RF-06 阶段已收集的证据并记录 RF-07 裁决。维护者于 2026-07-18 裁决 `Native Only`（recovery plan 默认结论），据此收尾 RF-00～RF-07 修复计划。
 
 本报告只固化“已经证明的事实”与“尚未收集的缺口”，不以脚手架冒充证据。
 
@@ -56,12 +56,14 @@ recovery plan RF-07 的裁决规则：
 
 在上述证据补齐前，`Continue Experimental` 所需的“明确收益”无法成立。
 
-## 5. provisional 建议
+## 5. 裁决（RF-07）
 
-- 契约等价性（3.1）与安全脱敏（3.2）已满足硬门禁的**离线**部分；依赖足迹（3.3）显示 source/Docker 增量成本可控。
-- 但 RF-07 的 `Continue Experimental` 要求“RF-06 全部硬门禁通过 **且** 有明确收益”。**收益证据（真实 benchmark）与 Desktop 打包证据缺失**（第 4 章）。
-- 因此在缺口补齐前，**建议维持默认裁决 `Native Only`**：Native 永久默认、零 PydanticAI 依赖运行；实验 Runtime 保持默认关闭、可整体删除。
-- 若维护者后续补齐第 4 章证据且显示明确收益，可将本报告状态推进为 `Accepted`，并按 recovery plan RF-07 约束启动 `Continue Experimental`（Source/Docker 先于 Desktop，公开入口另立全链路计划）。
+**维护者 2026-07-18 裁决：`Native Only`。**
+
+- 依据：契约等价性（3.1）与安全脱敏（3.2）已满足硬门禁的离线部分，依赖足迹（3.3）显示 source/Docker 增量成本可控；但 `Continue Experimental` 另要求“明确收益”，而其收益证据（真实 provider benchmark）与 Desktop 多平台打包证据未收集（第 4 章），故不满足 `Continue Experimental` 的启用条件。
+- 生效结果：Native Runtime 永久默认并可零 PydanticAI 依赖运行；实验 PydanticAI Runtime 保持默认关闭、内部注入点、测试覆盖、可整体删除；本轮不新增用户设置、环境变量开关、公开 API 或持久 Agent Job。
+- 保留资产：Contract（RF-02）、BoundToolSession（RF-03）、统一生命周期/fence（RF-04）等已在 Native 证明价值的架构收益保留，不随实验资产删除而回滚。
+- 重启条件：若未来维护者补齐第 4 章证据（真实 benchmark 显示明确收益 + Desktop 多平台打包证据），可另立 ADR 将本裁决改判为 `Continue Experimental`，并按 recovery plan RF-07 约束推进（Source/Docker 先于 Desktop，公开入口另立配置/API/Web/Desktop 全链路计划）。
 
 ## 6. 回滚
 
