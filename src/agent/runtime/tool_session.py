@@ -14,11 +14,15 @@ error contract (same shape as ``ToolSurface`` results), are audited and
 never silently degrade. Results that land after the session was closed
 or cancelled are dropped behind a late-result fence.
 
-The native runner keeps its direct, replay-frozen tool path: its
-byte-exact behaviour is the characterization gate, so it is deliberately
-*not* rewired through this session. ``BoundToolSession`` is instead the
-tool bridge for external runtime adapters (AR-PY-04+), which have no
-legacy tool path of their own to preserve.
+The native runner now dispatches through this same session too (RF-03):
+there is a single tool authority for every runtime. Native uses the
+``enforce_access_policy=False`` construction so the allowlist, policy and
+permission gates stay in equivalent pass-through mode and the surface
+skips its declared-contract validation, reproducing the replay-frozen
+direct path byte-for-byte while still routing through one authority. The
+lifecycle gates (closed, cancellation, deadline and budget) remain active
+in both modes; external runtime adapters (AR-PY-04+) keep the strict
+default so their access is fully enforced.
 """
 
 from __future__ import annotations
@@ -58,10 +62,11 @@ class BoundToolSession:
         call_timeout_seconds: Optional[float] = None,
         max_result_bytes: Optional[int] = None,
         max_tool_calls: Optional[int] = None,
-        deadline_seconds: Optional[float] = None,
+        deadline_monotonic: Optional[float] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
         audit_context: Optional[Mapping[str, Any]] = None,
         surface: Optional[ToolSurface] = None,
+        enforce_access_policy: bool = True,
     ) -> None:
         if not isinstance(execution_id, str) or not execution_id.strip():
             raise ValueError("BoundToolSession requires a non-empty execution_id")
@@ -81,12 +86,19 @@ class BoundToolSession:
         self._call_timeout_seconds = call_timeout_seconds
         self._max_result_bytes = max_result_bytes
         self._max_tool_calls = max_tool_calls
+        # Absolute ``time.monotonic()`` deadline supplied by the caller; the
+        # session derives the remaining budget per call. An absolute contract
+        # removes the ambiguity of the old relative ``deadline_seconds`` name.
         self._deadline_monotonic = (
-            time.monotonic() + float(deadline_seconds)
-            if deadline_seconds is not None
-            else None
+            float(deadline_monotonic) if deadline_monotonic is not None else None
         )
         self._cancelled_check = cancelled_check
+        # When False the access-policy gates (allowlist, declared policy,
+        # permissions and unknown-name resolution) are delegated to the surface
+        # in equivalent pass-through mode; used by the native runner to preserve
+        # its replay-frozen behaviour while still dispatching through one
+        # authority. Lifecycle gates below stay active regardless.
+        self._enforce_access_policy = bool(enforce_access_policy)
         base_audit_context: Dict[str, Any] = {"execution_id": execution_id}
         if stage is not None:
             base_audit_context["stage"] = stage
@@ -155,6 +167,16 @@ class BoundToolSession:
         """Close the session. Idempotent; later calls and late results are dropped."""
         with self._lock:
             self._closed = True
+
+    def is_non_retriable_cached(self, cache_key: str) -> bool:
+        """Return whether a non-retriable result is already memoized.
+
+        Checked before dispatch by the native migration mapper to report the
+        runner's ``cached`` flag with the same before-dispatch semantics as the
+        legacy direct path.
+        """
+        with self._lock:
+            return cache_key in self._non_retriable_results
 
     def describe_tools(self) -> List[dict]:
         """Neutral descriptors for allowed tools only; never exposes handlers."""
@@ -256,6 +278,11 @@ class BoundToolSession:
             )
         if self._deadline_exceeded():
             return ("deadline_exceeded", "Session deadline exceeded.", None)
+        if not self._enforce_access_policy:
+            # Native-compatibility: name validity, unknown-tool resolution and
+            # (permissive) access policy are delegated to the surface so the
+            # error contract matches the legacy direct path exactly.
+            return None
         if not tool_name.strip():
             return (
                 "invalid_tool_name",
@@ -342,6 +369,7 @@ class BoundToolSession:
             timeout_seconds=timeout,
             max_result_bytes=self._max_result_bytes,
             audit_context=dict(self._base_audit_context),
+            enforce_contract=self._enforce_access_policy,
         )
 
     @staticmethod

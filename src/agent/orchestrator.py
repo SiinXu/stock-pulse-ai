@@ -49,6 +49,8 @@ from src.agent.public_contract import (
 )
 from src.agent.risk_override import build_risk_override_plan
 from src.agent.runner import parse_dashboard_json
+from src.agent.runtime.contract import ExecutionState
+from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
@@ -445,13 +447,15 @@ class AgentOrchestrator:
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
 
-        # Persist assistant response.
-        # A cancelled run is user intent, not an agent failure: skip the
-        # failure sentinel so the cancelled turn leaves no misleading
-        # "analysis failed" assistant message in the visible history.
-        if orch_result.success:
+        # Persist assistant response through the single shared terminal
+        # classifier so the multi-agent write fence matches the single-agent
+        # and SSE paths exactly. A cancelled run is user intent, not an agent
+        # failure: skip the failure sentinel so the cancelled turn leaves no
+        # misleading "analysis failed" assistant message in the visible history.
+        terminal_state = classify_result_terminal_state(orch_result)
+        if terminal_state is ExecutionState.SUCCEEDED:
             conversation_manager.add_message(session_id, "assistant", orch_result.content)
-        elif orch_result.cancelled:
+        elif terminal_state is ExecutionState.CANCELLED:
             logger.info(
                 "Agent orchestrator chat cancelled: session_id=%s", session_id
             )

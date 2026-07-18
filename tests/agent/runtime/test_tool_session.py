@@ -12,6 +12,7 @@ barrier for parallel budget contention) - no sleep-based timing.
 from __future__ import annotations
 
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -266,7 +267,7 @@ def test_cancellation_token_rejects_before_dispatch():
 
 def test_elapsed_deadline_rejects_before_dispatch():
     calls = []
-    session = _session(_echo_registry(calls), deadline_seconds=0)
+    session = _session(_echo_registry(calls), deadline_monotonic=time.monotonic() - 1.0)
 
     result = session.execute("echo", {"message": "hi"})
 
@@ -293,7 +294,7 @@ def test_call_timeout_is_clamped_to_remaining_deadline():
     session = _session(
         _echo_registry(),
         call_timeout_seconds=100.0,
-        deadline_seconds=50.0,
+        deadline_monotonic=time.monotonic() + 50.0,
         surface=RecordingSurface(),
     )
 

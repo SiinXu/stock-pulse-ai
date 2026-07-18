@@ -16,10 +16,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Protocol
 
 if TYPE_CHECKING:
+    from src.agent.runtime.tool_session import BoundToolSession
     from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
-from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,13 @@ class ToolAccessContext:
     timeout_seconds: Optional[float] = None
     max_result_bytes: Optional[int] = None
     audit_context: Dict[str, Any] = field(default_factory=dict)
+    # When False the surface skips its declared-contract validation (argument
+    # schema + scope-dimension contract) and applies the legacy stock-scope
+    # guard keyed on the presence of a ``stock_code`` parameter. This mirrors
+    # the historical native runner path byte-for-byte so the same
+    # ``BoundToolSession`` authority can serve native replay without the
+    # stricter checks reserved for external runtimes.
+    enforce_contract: bool = True
 
 
 def serialize_tool_result(result: Any) -> str:
@@ -264,91 +271,61 @@ def _redact_json_string_if_possible(text: str) -> str:
         return text
 
 
-def execute_runner_tool_call(
-    *,
+def execute_runner_tool_call_via_session(
     tool_call: RunnerToolCall,
-    tool_registry: ToolRegistry,
-    stock_scope: Optional[StockScope] = None,
-    non_retriable_tool_results: Optional[Dict[str, str]] = None,
+    session: "BoundToolSession",
 ) -> tuple[Any, str, bool, float, bool, Optional[Dict[str, Any]]]:
-    """Execute a single tool call using the legacy runner semantics."""
+    """Single migration mapper: dispatch one runner tool call through the
+    ``BoundToolSession`` authority and adapt its dict result to the 6-tuple the
+    runner loop consumes: ``(tool_call, res_str, ok, dur, cached, guard_result)``.
+
+    This is the only bridge between the native runner and the bound session; it
+    never touches the tool registry directly, so the session remains the single
+    tool-dispatch authority. Byte-exactness with the historical direct path is
+    preserved because the session runs in native-compatibility mode (see
+    :class:`~src.agent.runtime.tool_session.BoundToolSession`): the serialized
+    ``result_text`` is produced by the same :func:`serialize_tool_result` /
+    :func:`serialize_tool_error_result` helpers on the same inputs.
+    """
     t0 = time.time()
-    tool_name = tool_call.name
-    if type(tool_name) is not str or not tool_name.strip():
-        dur = round(time.time() - t0, 2)
-        return (
-            tool_call,
-            serialize_tool_error_result(
-                message="Tool name must exactly match a registered StockPulse tool.",
-                code="invalid_tool_name",
-                retriable=False,
-            ),
-            False,
-            dur,
-            False,
-            None,
-        )
+    name = tool_call.name
+    arguments = tool_call.arguments
+    # Coerce exactly like the session/surface so a non-string name never leaks
+    # its ``__str__`` into a cache key or log line.
+    tool_name = name if isinstance(name, str) else ""
+    cache_key = (
+        _build_tool_cache_key(tool_name, arguments)
+        if isinstance(arguments, dict)
+        else None
+    )
+    # Mirror the legacy semantics of reporting ``cached`` for a non-retriable
+    # memo that already existed *before* this dispatch.
+    cached = bool(cache_key) and session.is_non_retriable_cached(cache_key)
 
-    cache_key = _build_tool_cache_key(tool_name, tool_call.arguments)
-    guard_result = _guard_tool_stock_scope(tool_registry, tool_name, tool_call.arguments, stock_scope)
-    if guard_result is not None:
-        dur = round(time.time() - t0, 2)
-        result_str = serialize_tool_result(guard_result)
-        if cache_key and non_retriable_tool_results is not None:
-            non_retriable_tool_results[cache_key] = result_str
-        logger.warning(
-            "Tool '%s' blocked by stock scope: requested=%s expected=%s allowed=%s",
-            tool_name,
-            guard_result.get("requested_stock_code"),
-            guard_result.get("expected_stock_code"),
-            guard_result.get("allowed_stock_codes"),
-        )
-        return tool_call, result_str, False, dur, False, guard_result
+    result = session.execute(name, arguments)
 
-    if cache_key and non_retriable_tool_results is not None and cache_key in non_retriable_tool_results:
-        dur = round(time.time() - t0, 2)
-        logger.info(
-            "Tool '%s' skipped via non-retriable cache for arguments=%s",
-            tool_name,
-            _redact_structured_secrets(tool_call.arguments),
-        )
-        return tool_call, non_retriable_tool_results[cache_key], False, dur, True, None
-
-    registered_tool = None
-    try:
-        registered_tool = tool_registry.resolve(tool_name)
-        res = tool_registry.execute(tool_name, **tool_call.arguments)
-        res_str = serialize_tool_result(res)
-        ok = True
-        if cache_key and non_retriable_tool_results is not None and _is_non_retriable_tool_result(res):
-            non_retriable_tool_results[cache_key] = res_str
-    except Exception as exc:
-        if registered_tool is None and (":" in tool_name or "." in tool_name):
-            error_code = "invalid_tool_name"
-            error_message = "Tool name must exactly match a registered StockPulse tool."
-        elif registered_tool is None:
-            error_code = "tool_not_found"
-            error_message = "Tool not found."
-        else:
-            error_code = "handler_error"
-            error_message = "Tool handler failed."
-        res_str = serialize_tool_error_result(
-            message=error_message,
-            code=error_code,
-            retriable=False,
-        )
-        ok = False
-        log_safe_exception(
-            logger,
-            "Agent tool execution failed",
-            exc,
-            error_code="agent_tool_execution_failed",
-            level=logging.WARNING,
-            context={"tool_name": tool_name},
-            exception_redaction_values=exception_chain_redaction_values(exc),
-        )
+    res_str = result["result_text"]
+    # A non-retriable cache hit is reported as a non-success skip, exactly like
+    # the legacy direct path (it short-circuited with ``ok=False`` regardless of
+    # the memoized result's original outcome).
+    ok = False if cached else bool(result["ok"])
     dur = round(time.time() - t0, 2)
-    return tool_call, res_str, ok, dur, False, None
+
+    guard_result: Optional[Dict[str, Any]] = None
+    if not cached:
+        error = result.get("error") or {}
+        if error.get("code") == "stock_scope_violation":
+            details = error.get("details") or {}
+            # Reconstruct the runner log_entry contract (guarded fields) from
+            # the structured surface error details.
+            guard_result = {
+                "error": "stock_scope_violation",
+                "expected_stock_code": details.get("expected_stock_code", ""),
+                "requested_stock_code": details.get("requested_stock_code", ""),
+                "allowed_stock_codes": details.get("allowed_stock_codes", []),
+                "retriable": False,
+            }
+    return tool_call, res_str, ok, dur, cached, guard_result
 
 
 def redact_diagnostic_value(value: Any, *, limit: int = _SUMMARY_LIMIT) -> str:

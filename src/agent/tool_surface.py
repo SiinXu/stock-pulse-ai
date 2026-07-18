@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
@@ -23,6 +24,9 @@ from src.agent.tools.registry import (
     ToolParameter,
     ToolRegistry,
 )
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 
 _JSON_TYPE_TO_PYTHON = {
@@ -99,47 +103,59 @@ class ToolSurface:
                 arguments=arguments,
             )
 
-        validation_error = _validate_arguments(tool_def, arguments)
-        if validation_error is not None:
-            return self._error_result(
-                tool_name=tool_name,
-                code="invalid_arguments",
-                message=validation_error,
-                started_at=started_at,
-                context=ctx,
-                retriable=False,
-                arguments=arguments,
-            )
-
-        scope_contract_error = _validate_scope_contract(tool_def)
-        if scope_contract_error is not None:
-            return self._error_result(
-                tool_name=tool_name,
-                code="scope_contract_violation",
-                message=scope_contract_error["message"],
-                started_at=started_at,
-                context=ctx,
-                retriable=False,
-                details=scope_contract_error["details"],
-                arguments=arguments,
-            )
-
-        guard_result = None
-        if _requires_stock_scope(tool_def):
-            if ctx.stock_scope is None:
+        if ctx.enforce_contract:
+            validation_error = _validate_arguments(tool_def, arguments)
+            if validation_error is not None:
                 return self._error_result(
                     tool_name=tool_name,
-                    code="stock_scope_violation",
-                    message="Tool call requires an explicit stock scope.",
+                    code="invalid_arguments",
+                    message=validation_error,
                     started_at=started_at,
                     context=ctx,
                     retriable=False,
-                    details={
-                        "reason": "stock_scope_required",
-                        "scope_dimensions": list(tool_def.policy.scope_dimensions),
-                    },
                     arguments=arguments,
                 )
+
+            scope_contract_error = _validate_scope_contract(tool_def)
+            if scope_contract_error is not None:
+                return self._error_result(
+                    tool_name=tool_name,
+                    code="scope_contract_violation",
+                    message=scope_contract_error["message"],
+                    started_at=started_at,
+                    context=ctx,
+                    retriable=False,
+                    details=scope_contract_error["details"],
+                    arguments=arguments,
+                )
+
+        guard_result = None
+        if ctx.enforce_contract:
+            if _requires_stock_scope(tool_def):
+                if ctx.stock_scope is None:
+                    return self._error_result(
+                        tool_name=tool_name,
+                        code="stock_scope_violation",
+                        message="Tool call requires an explicit stock scope.",
+                        started_at=started_at,
+                        context=ctx,
+                        retriable=False,
+                        details={
+                            "reason": "stock_scope_required",
+                            "scope_dimensions": list(tool_def.policy.scope_dimensions),
+                        },
+                        arguments=arguments,
+                    )
+                guard_result = _guard_tool_stock_scope(
+                    self._registry,
+                    tool_name,
+                    arguments,
+                    ctx.stock_scope,
+                )
+        elif ctx.stock_scope is not None:
+            # Native-compatibility guard: keyed on the presence of a
+            # ``stock_code`` parameter, applied only when a scope is supplied,
+            # exactly like the historical direct runner path.
             guard_result = _guard_tool_stock_scope(
                 self._registry,
                 tool_name,
@@ -186,7 +202,16 @@ class ToolSurface:
                 },
                 arguments=arguments,
             )
-        except Exception:
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Agent tool execution failed",
+                exc,
+                error_code="agent_tool_execution_failed",
+                level=logging.WARNING,
+                context={"tool_name": tool_name},
+                exception_redaction_values=exception_chain_redaction_values(exc),
+            )
             return self._error_result(
                 tool_name=tool_name,
                 code="handler_error",

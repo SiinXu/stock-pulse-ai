@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [chore] Agent 各入口的终态写入 fence 统一经单一分类器 `classify_result_terminal_state`（RF-04）：单智能体 `AgentExecutor.chat`、多智能体 `AgentOrchestrator.chat` 与 SSE 端点的 `ExecutionLifecycle.finish_from_result` 现共用同一终态判定，`cancelled` 优先于 `success`，取消的对话不再可能写入成功助手消息；纯内部重构，行为逐字节不变，36 replay fixture 与 SSE 测试零改。
+- [改进] Native Agent runtime 的工具调用统一改由单一 `BoundToolSession` 门禁分发（RF-03，AR-RF-03），消除绕过会话的第二套 ToolRegistry 权威：runner 每次运行构造一个 native 兼容会话（等价放行 allowlist/policy/permission，surface 跳过声明式契约校验）并在终态关闭，保持 36 个 replay fixture 逐字节不变；运行结束后迟到的工具结果（如超时 worker）经 late-result fence 丢弃，不再重新进入模型或写入成功结果。
 - [测试] CI 新增 `pydanticai-installed` 独立作业与 `backend-gate` 的 native 隔离断言：安装 `requirements-pydanticai.txt` 后强制导入 `pydantic-ai-slim` 并执行实验运行时测试，`STOCKPULSE_REQUIRE_PYDANTIC_AI=1` 下依赖缺失或模块级跳过判为失败（不再以 skip 冒充通过，AR-RF-09）；默认 `backend-gate` 保持零 PydanticAI 依赖。
 - [文档] 项目改为双许可证：上游原始代码保持 MIT License，StockPulse 新增与大幅修改的代码采用 AGPL-3.0；同步更新 LICENSE 与三语 README（含 badge、fork 说明与 License 章节）。
 - [改进] Agent 流式对话（`/api/v1/agent/chat/stream`）在客户端断连或流提前结束时协作取消后端执行：Agent 循环在每步开始、每次 LLM 调用后与流水线各阶段边界处检查取消意图并及时停止，取消结果记为 cancelled 而非失败，不再写入"分析失败"占位助手消息，也不残留部分 provider trace；SSE 事件线经单一降级点保持逐字节不变。
@@ -30,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 剩余按钮观感控件统一为胶囊形（设置帮助弹窗文档链接、持仓 CSV 文件选择、首页通知勾选 chip），与全站按钮形状规范一致。
 - [修复] Web 页面容器与回测页不再在应用外壳的 `main` 地标内嵌套第二个 `main`，回测页补充屏幕阅读器可见的 h1 标题，页面地标语义唯一。
 - [修复] Web 设置页文本、路径、数值及带单位输入统一填满 240px 控件列，并与 Select、MultiSelect 保持 36px 控件高度，避免同组控件宽高不一致或长值被裁切。
+- [修复] Web 设置页文本/路径类输入框改为填满 240px 控件列，数值输入保持紧凑宽度，日志目录等长值不再被裁切到约 170px。
 - [修复] Web 设置页定时任务启用改为统一开关控件，定时时间改用共享时间选择器；“添加时间”直接展开小时/分钟面板、确认后才保存，并在展示层去重已有时间。新增共享日期选择器并替换回测、持仓页的原生日期控件，统一月历弹层、键盘输入和表单行为。
 - [修复] Web 设置页与模型渠道编辑器的密码类输入框统一包裹在 `form` 中，消除浏览器关于表单外密码框的告警。
 - [修复] 首页侧栏「历史/自选/今日」视图切换器统一到共享容器中并改用下拉选择，切换视图时控件不再位移。
