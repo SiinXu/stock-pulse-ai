@@ -58,12 +58,47 @@ async function expectSecurityWarningContrast(page: Page, theme: 'light' | 'dark'
     document.documentElement.classList.remove('light', 'dark');
     document.documentElement.classList.add(nextTheme);
   }, theme);
-  const foreground = await page.locator('[data-connection-status="insecure-http"]').evaluate((element) => {
-    const match = getComputedStyle(element).color.match(/\d+(?:\.\d+)?/g);
-    return match?.slice(0, 3).map(Number) ?? [];
+  const { background, foreground } = await page.locator('[data-connection-status="insecure-http"]').evaluate((element) => {
+    type Rgba = [number, number, number, number];
+
+    const parseColor = (value: string): Rgba => {
+      const match = value.match(
+        /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/,
+      );
+      if (!match) throw new Error(`Unsupported computed color: ${value}`);
+      return [Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4] ?? 1)];
+    };
+
+    const composite = (front: Rgba, back: Rgba): Rgba => {
+      const alpha = front[3] + (back[3] * (1 - front[3]));
+      if (alpha === 0) return [0, 0, 0, 0];
+      return [
+        ((front[0] * front[3]) + (back[0] * back[3] * (1 - front[3]))) / alpha,
+        ((front[1] * front[3]) + (back[1] * back[3] * (1 - front[3]))) / alpha,
+        ((front[2] * front[3]) + (back[2] * back[3] * (1 - front[3]))) / alpha,
+        alpha,
+      ];
+    };
+
+    const backgroundLayers: Rgba[] = [];
+    for (let current: Element | null = element; current; current = current.parentElement) {
+      backgroundLayers.push(parseColor(getComputedStyle(current).backgroundColor));
+    }
+    let renderedBackground: Rgba = [255, 255, 255, 1];
+    for (const layer of backgroundLayers.reverse()) {
+      renderedBackground = composite(layer, renderedBackground);
+    }
+    const renderedForeground = composite(parseColor(getComputedStyle(element).color), renderedBackground);
+    return {
+      background: renderedBackground.slice(0, 3),
+      foreground: renderedForeground.slice(0, 3),
+    };
   });
-  const conservativeBackground = theme === 'light' ? [255, 255, 255] : [0, 0, 0];
-  expect(contrastRatio(foreground, conservativeBackground)).toBeGreaterThanOrEqual(4.5);
+  const ratio = contrastRatio(foreground, background);
+  expect(
+    ratio,
+    `${theme} warning contrast ${ratio.toFixed(2)}:1 for foreground ${foreground.join(',')} on ${background.join(',')}`,
+  ).toBeGreaterThanOrEqual(4.5);
 }
 
 test.describe('web smoke', () => {
@@ -92,45 +127,41 @@ test.describe('web smoke', () => {
     await expect(page.getByText(/StockPulse-V3-TLS/)).toHaveCount(0);
   });
 
-  for (const transportCase of [
-    {
-      origin: 'https://secure.stockpulse.test',
-      protocol: 'https:',
+  test('login page derives HTTPS from the browser origin', async ({ page }) => {
+    await openLoginAtBrowserOrigin(page, 'https://secure.stockpulse.test');
+
+    await expect.poll(() => page.evaluate(() => ({
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+    }))).toEqual({
       hostname: 'secure.stockpulse.test',
-      status: 'https',
-      role: 'status',
-      copy: '此登录页面使用 HTTPS 加密传输。',
-    },
-    {
-      origin: 'http://stocks.example.test',
-      protocol: 'http:',
-      hostname: 'stocks.example.test',
-      status: 'insecure-http',
-      role: 'alert',
-      copy: '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。',
-    },
-  ] as const) {
-    test(`login page derives ${transportCase.status} from the browser origin`, async ({ page }) => {
-      await openLoginAtBrowserOrigin(page, transportCase.origin);
-
-      await expect.poll(() => page.evaluate(() => ({
-        hostname: window.location.hostname,
-        protocol: window.location.protocol,
-      }))).toEqual({
-        hostname: transportCase.hostname,
-        protocol: transportCase.protocol,
-      });
-      const connectionNotice = page.locator('[data-connection-status]');
-      await expect(connectionNotice).toHaveAttribute('data-connection-status', transportCase.status);
-      await expect(connectionNotice).toHaveAttribute('role', transportCase.role);
-      await expect(connectionNotice).toHaveText(transportCase.copy);
-
-      if (transportCase.status === 'insecure-http') {
-        await expectSecurityWarningContrast(page, 'light');
-        await expectSecurityWarningContrast(page, 'dark');
-      }
+      protocol: 'https:',
     });
-  }
+    const connectionNotice = page.locator('[data-connection-status]');
+    await expect(connectionNotice).toHaveAttribute('data-connection-status', 'https');
+    await expect(connectionNotice).toHaveAttribute('role', 'status');
+    await expect(connectionNotice).toHaveText('此登录页面使用 HTTPS 加密传输。');
+  });
+
+  test('login page warns on non-loopback HTTP from the browser origin', async ({ page }) => {
+    await openLoginAtBrowserOrigin(page, 'http://stocks.example.test');
+
+    await expect.poll(() => page.evaluate(() => ({
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+    }))).toEqual({
+      hostname: 'stocks.example.test',
+      protocol: 'http:',
+    });
+    const connectionNotice = page.locator('[data-connection-status]');
+    await expect(connectionNotice).toHaveAttribute('data-connection-status', 'insecure-http');
+    await expect(connectionNotice).toHaveAttribute('role', 'alert');
+    await expect(connectionNotice).toHaveText(
+      '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。',
+    );
+    await expectSecurityWarningContrast(page, 'light');
+    await expectSecurityWarningContrast(page, 'dark');
+  });
 
   test('home page shows analysis entry and history panel after login', async ({ page }) => {
     await login(page);
