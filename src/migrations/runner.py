@@ -493,6 +493,77 @@ class MigrationRunner:
             executed_ids=tuple(executed_ids),
         )
 
+    def apply_pending_within_transaction(self, connection: Connection) -> MigrationResult:
+        """Apply pending migrations inside a caller-owned open transaction.
+
+        Startup already serializes compatibility work behind a single
+        BEGIN IMMEDIATE and owns commit/rollback, so each migration runs in that
+        same transaction instead of taking its own write lock. Applied rows are
+        written but never committed here; a failure surfaces as an unsuccessful
+        result and the caller rolls the whole transaction back atomically.
+        """
+        if not isinstance(connection, Connection):
+            raise MigrationError("invalid_connection")
+        if not connection.in_transaction():
+            raise MigrationError("initialization_transaction_required")
+
+        current = self._inspect_connection(connection)
+        executed_ids: list[str] = []
+        if not current.success:
+            return self._result_from_state(current, executed_ids=())
+
+        while current.pending_ids:
+            migration_id = current.pending_ids[0]
+            migration = self._by_id[migration_id]
+            if migration.is_legacy_baseline:
+                return self._result_from_state(
+                    current,
+                    success=False,
+                    failure_code="legacy_baseline_missing",
+                    failed_migration_id=migration.id,
+                    executed_ids=tuple(executed_ids),
+                )
+            try:
+                executed = self._execute_within_transaction(connection, migration)
+            except MigrationError as exc:
+                return self._result_from_state(
+                    exc.state or current,
+                    success=False,
+                    failure_code=exc.failure_code,
+                    failed_migration_id=exc.migration_id,
+                    executed_ids=tuple(executed_ids),
+                )
+            if executed:
+                executed_ids.append(migration.id)
+
+            current = self._inspect_connection(connection)
+            if not current.success:
+                return self._result_from_state(
+                    current,
+                    executed_ids=tuple(executed_ids),
+                )
+
+        return self._result_from_state(
+            current,
+            success=True,
+            executed_ids=tuple(executed_ids),
+        )
+
+    def _execute_within_transaction(
+        self,
+        connection: Connection,
+        migration: Migration,
+    ) -> bool:
+        locked_state = self._inspect_connection(connection)
+        if not locked_state.success:
+            raise MigrationError.from_state(locked_state)
+        if migration.id in locked_state.applied_ids:
+            return False
+        if not locked_state.pending_ids or locked_state.pending_ids[0] != migration.id:
+            raise MigrationError("migration_order_invalid", migration.id)
+        self._run_guarded_upgrade(connection, migration)
+        return True
+
     def _apply_one(self, bind: MigrationBind, migration: Migration) -> bool:
         with self._connection_scope(bind) as connection:
             if connection.in_transaction():
@@ -516,63 +587,7 @@ class MigrationRunner:
                 if not locked_state.pending_ids or locked_state.pending_ids[0] != migration.id:
                     raise MigrationError("migration_order_invalid", migration.id)
 
-                try:
-                    with self._guard_upgrade_transaction(connection, migration.id):
-                        execution_lease = _MigrationExecutionLease(
-                            connection,
-                            migration.id,
-                        )
-                        try:
-                            upgrade_result = migration.upgrade(
-                                _MigrationExecutionFacade(execution_lease)
-                            )
-                        finally:
-                            execution_outcome = execution_lease.revoke()
-                        if execution_outcome.capability_violation:
-                            raise MigrationError(
-                                "migration_transaction_control_forbidden",
-                                migration.id,
-                            )
-                        if execution_outcome.statement_failed:
-                            raise MigrationError(
-                                "migration_upgrade_failed",
-                                migration.id,
-                            )
-                        if upgrade_result is not None:
-                            cleanup_error = None
-                            if inspect.iscoroutine(upgrade_result) or inspect.isgenerator(
-                                upgrade_result
-                            ):
-                                try:
-                                    upgrade_result.close()
-                                except Exception as exc:
-                                    cleanup_error = exc
-                            invalid_return = MigrationError(
-                                "migration_upgrade_invalid_return",
-                                migration.id,
-                            )
-                            if cleanup_error is not None:
-                                raise invalid_return from cleanup_error
-                            raise invalid_return
-                except MigrationError:
-                    raise
-                except _ForbiddenMigrationCapabilityAccess as exc:
-                    raise MigrationError(
-                        "migration_transaction_control_forbidden",
-                        migration.id,
-                    ) from exc
-                except Exception as exc:
-                    raise MigrationError("migration_upgrade_failed", migration.id) from exc
-
-                if migration.bootstraps_registry:
-                    bootstrapped_state = self._inspect_connection(connection)
-                    if not bootstrapped_state.success:
-                        raise MigrationError.from_state(bootstrapped_state)
-
-                try:
-                    self._insert_applied(connection, migration)
-                except Exception as exc:
-                    raise MigrationError("applied_registry_write_failed", migration.id) from exc
+                self._run_guarded_upgrade(connection, migration)
 
                 self._commit(connection, migration.id)
                 return True
@@ -582,6 +597,72 @@ class MigrationRunner:
             except Exception as exc:
                 self._rollback(connection, migration.id)
                 raise MigrationError("migration_execution_failed", migration.id) from exc
+
+    def _run_guarded_upgrade(self, connection: Connection, migration: Migration) -> None:
+        """Run one migration upgrade under the transaction guard and record it.
+
+        The caller owns the surrounding transaction (a per-migration
+        BEGIN IMMEDIATE for the engine path, or the startup transaction for the
+        in-initialization path); this only isolates the upgrade with a savepoint
+        and writes the applied row.
+        """
+        try:
+            with self._guard_upgrade_transaction(connection, migration.id):
+                execution_lease = _MigrationExecutionLease(
+                    connection,
+                    migration.id,
+                )
+                try:
+                    upgrade_result = migration.upgrade(
+                        _MigrationExecutionFacade(execution_lease)
+                    )
+                finally:
+                    execution_outcome = execution_lease.revoke()
+                if execution_outcome.capability_violation:
+                    raise MigrationError(
+                        "migration_transaction_control_forbidden",
+                        migration.id,
+                    )
+                if execution_outcome.statement_failed:
+                    raise MigrationError(
+                        "migration_upgrade_failed",
+                        migration.id,
+                    )
+                if upgrade_result is not None:
+                    cleanup_error = None
+                    if inspect.iscoroutine(upgrade_result) or inspect.isgenerator(
+                        upgrade_result
+                    ):
+                        try:
+                            upgrade_result.close()
+                        except Exception as exc:
+                            cleanup_error = exc
+                    invalid_return = MigrationError(
+                        "migration_upgrade_invalid_return",
+                        migration.id,
+                    )
+                    if cleanup_error is not None:
+                        raise invalid_return from cleanup_error
+                    raise invalid_return
+        except MigrationError:
+            raise
+        except _ForbiddenMigrationCapabilityAccess as exc:
+            raise MigrationError(
+                "migration_transaction_control_forbidden",
+                migration.id,
+            ) from exc
+        except Exception as exc:
+            raise MigrationError("migration_upgrade_failed", migration.id) from exc
+
+        if migration.bootstraps_registry:
+            bootstrapped_state = self._inspect_connection(connection)
+            if not bootstrapped_state.success:
+                raise MigrationError.from_state(bootstrapped_state)
+
+        try:
+            self._insert_applied(connection, migration)
+        except Exception as exc:
+            raise MigrationError("applied_registry_write_failed", migration.id) from exc
 
     def _inspect_connection(self, connection: Connection) -> MigrationStatus:
         if connection.dialect.name != "sqlite":
@@ -989,6 +1070,11 @@ def verify(bind: MigrationBind) -> VerificationResult:
 def apply_pending(bind: MigrationBind) -> MigrationResult:
     """Apply the production registry."""
     return _DEFAULT_RUNNER.apply_pending(bind)
+
+
+def apply_pending_within_transaction(connection: Connection) -> MigrationResult:
+    """Apply the production registry inside a caller-owned open transaction."""
+    return _DEFAULT_RUNNER.apply_pending_within_transaction(connection)
 
 
 def preflight_existing(bind: MigrationBind) -> MigrationStatus:
