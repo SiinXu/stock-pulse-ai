@@ -82,8 +82,37 @@ const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
 const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
 const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
 const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
-const STATE_SURFACE_COMPONENT_NAMES = ['Surface', 'Section', 'StatePanel', 'Alert', 'EmptyState', 'Loading', 'DashboardStateBlock'] as const;
+const STATE_SURFACE_COMPONENT_NAMES = [
+  'Surface',
+  'Section',
+  'StatePanel',
+  'Alert',
+  'EmptyState',
+  'Loading',
+  'InlineAlert',
+  'ApiErrorAlert',
+  'Card',
+  'SectionCard',
+  'StatCard',
+  'DashboardStateBlock',
+  'SettingsSectionCard',
+] as const;
 const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*)/;
+const STATE_SURFACE_IMPLEMENTATION_SUFFIXES = [
+  '/common/Alert.tsx',
+  '/common/ApiErrorAlert.tsx',
+  '/common/Card.tsx',
+  '/common/EmptyState.tsx',
+  '/common/InlineAlert.tsx',
+  '/common/Loading.tsx',
+  '/common/Section.tsx',
+  '/common/SectionCard.tsx',
+  '/common/StatCard.tsx',
+  '/common/StatePanel.tsx',
+  '/common/Surface.tsx',
+  '/dashboard/DashboardStateBlock.tsx',
+  '/settings/SettingsSectionCard.tsx',
+] as const;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
     line: 1448,
@@ -91,12 +120,12 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
   ['../../pages/PortfolioPage.tsx', [
-    ...[1145, 1158, 1170, 1770, 1773].map((line) => ({
+    ...[1145, 1158, 1170, 1774, 1777].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['flex-1'],
     })),
-    ...[1601, 1638, 1682].map((line) => ({
+    ...[1605, 1642, 1686].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['w-full'],
@@ -106,6 +135,70 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     line: 1375,
     removeBy: 'UI-SCR01',
     tokens: ['min-w-40'],
+  }]],
+]);
+const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../history/StockHistoryTrendDrawer.tsx', [205, 239, 272].map((line) => ({
+    line,
+    removeBy: 'UI-R02',
+    tokens: ['home-panel-card'],
+  }))],
+  ['../report/AnalysisContextSummary.tsx', [{
+    line: 119,
+    removeBy: 'UI-R01',
+    tokens: ['home-panel-card'],
+  }]],
+  ['../report/MarketReviewReportView.tsx', [474, 490, 635, 642, 650].map((line) => ({
+    line,
+    removeBy: 'UI-R01',
+    tokens: ['home-panel-card'],
+  }))],
+  ['../report/ReportDetails.tsx', [{
+    line: 91,
+    removeBy: 'UI-R02',
+    tokens: ['home-panel-card'],
+  }]],
+  ['../report/ReportDiagnostics.tsx', [{
+    line: 209,
+    removeBy: 'UI-R02',
+    tokens: ['home-panel-card'],
+  }]],
+  ['../report/ReportNews.tsx', [{
+    line: 60,
+    removeBy: 'UI-R02',
+    tokens: ['home-panel-card'],
+  }]],
+  ['../report/ReportOverview.tsx', [
+    ...[298, 321].map((line) => ({
+      line,
+      removeBy: 'UI-R01',
+      tokens: ['home-panel-card', 'home-insight-card'],
+    })),
+    ...[345, 363].map((line) => ({
+      line,
+      removeBy: 'UI-R01',
+      tokens: ['home-panel-card'],
+    })),
+    {
+      line: 382,
+      removeBy: 'UI-R01',
+      tokens: ['home-panel-card', 'home-rail-card'],
+    },
+  ]],
+  ['../report/ReportStrategy.tsx', [{
+    line: 72,
+    removeBy: 'UI-R01',
+    tokens: ['home-panel-card'],
+  }]],
+  ['../settings/SettingsAlert.tsx', [{
+    line: 45,
+    removeBy: 'UI-F03',
+    tokens: ['dynamic:toastVariantStyles[variant]', 'dynamic:className'],
+  }]],
+  ['../tasks/TaskPanel.tsx', [{
+    line: 218,
+    removeBy: 'UI-R03',
+    tokens: ['home-panel-card', 'dynamic:className'],
   }]],
 ]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
@@ -291,6 +384,10 @@ function isSharedButtonModuleSpecifier(specifier: string, componentName = 'Butto
   if (componentName === 'DashboardStateBlock') {
     return /(?:^|\/)(?:components\/)?dashboard$/.test(specifier)
       || specifier.endsWith('/dashboard/DashboardStateBlock');
+  }
+  if (componentName === 'SettingsSectionCard') {
+    return /(?:^|\/)(?:components\/)?settings$/.test(specifier)
+      || /(?:^|\/)SettingsSectionCard$/.test(specifier);
   }
   return /(?:^|\/)(?:components\/)?common$/.test(specifier)
     || specifier.endsWith(`/common/${componentName}`);
@@ -850,8 +947,10 @@ function appendButtonSizeUsageViolations(
   });
 }
 
+type ExactVisualAllowanceRule = 'button-xl-allowlist' | 'button-visual-override' | 'state-surface-visual-override';
+
 function exactButtonAllowanceKey(
-  rule: 'button-xl-allowlist' | 'button-visual-override',
+  rule: ExactVisualAllowanceRule,
   filename: string,
   line: number,
   token: string,
@@ -860,7 +959,7 @@ function exactButtonAllowanceKey(
 }
 
 function consumeExactButtonAllowance(
-  rule: 'button-xl-allowlist' | 'button-visual-override',
+  rule: ExactVisualAllowanceRule,
   allowlist: Map<string, readonly ExactButtonAllowance[]>,
   filename: string,
   line: number,
@@ -878,7 +977,7 @@ function consumeExactButtonAllowance(
 }
 
 function exactButtonAllowanceKeys(
-  rule: 'button-xl-allowlist' | 'button-visual-override',
+  rule: ExactVisualAllowanceRule,
   allowlist: Map<string, readonly ExactButtonAllowance[]>,
 ): string[] {
   return Array.from(allowlist.entries()).flatMap(([filename, allowances]) => (
@@ -997,23 +1096,29 @@ function appendStateSurfaceVisualOverrideViolations(
   sourceFile: ts.SourceFile,
   initializers: StaticInitializerMap,
   bindings: SharedButtonBindings,
+  allowlistHits: string[],
   violations: DesignViolation[],
 ): void {
-  if (
-    filename.includes('/components/common/')
-    || filename.endsWith('/dashboard/DashboardStateBlock.tsx')
-    || filename.endsWith('/settings/SettingsSectionCard.tsx')
-  ) return;
+  if (STATE_SURFACE_IMPLEMENTATION_SUFFIXES.some((suffix) => filename.endsWith(suffix))) return;
 
   const componentName = STATE_SURFACE_COMPONENT_NAMES.find((name) => (
     isSharedButtonOpening(opening, bindings, name)
   ));
   if (!componentName) return;
 
+  const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
   const scan = classNameFragments(opening, sourceFile, initializers);
   for (const fragment of scan.fragments) {
     for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
       if (!STATE_SURFACE_VISUAL_OVERRIDE_PATTERN.test(buttonUtilityName(token))) continue;
+      if (consumeExactButtonAllowance(
+        'state-surface-visual-override',
+        STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
+        filename,
+        openingLine,
+        token,
+        allowlistHits,
+      )) continue;
       violations.push({
         file: filename,
         line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
@@ -1023,11 +1128,20 @@ function appendStateSurfaceVisualOverrideViolations(
     }
   }
   for (const unresolved of scan.unresolved) {
+    const token = `dynamic:${unresolved.text}`;
+    if (consumeExactButtonAllowance(
+      'state-surface-visual-override',
+      STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
+      filename,
+      openingLine,
+      token,
+      allowlistHits,
+    )) continue;
     violations.push({
       file: filename,
       line: lineNumberAt(source, unresolved.index),
       rule: 'state-surface-visual-override',
-      token: `${componentName}:dynamic:${unresolved.text}`,
+      token: `${componentName}:${token}`,
     });
   }
 }
@@ -1687,33 +1801,47 @@ function appendSurfaceLevelContractViolations(
     });
   };
   const classesFor = (level: string): string[] => surfaceLevelClasses(entries.get(level)?.fragments ?? []);
-  const boundaryClasses = (classes: string[]): string[] => classes.filter((token) => (
-    /^(?:border(?:-|$)|shadow(?:-|$))/.test(token)
-  ));
+  const semanticClasses = (classes: string[], prefix: 'bg' | 'border' | 'shadow'): string[] => (
+    classes.filter((token) => token === prefix || token.startsWith(`${prefix}-`))
+  );
+  const enforceExactClasses = (
+    level: string,
+    kind: 'background' | 'border' | 'shadow',
+    actual: string[],
+    expected: readonly string[],
+  ): void => {
+    for (const token of expected) {
+      if (!actual.includes(token)) report(level, entries.get(level), `${kind}:${token}:missing`);
+    }
+    for (const token of actual) {
+      if (!expected.includes(token)) report(level, entries.get(level), token);
+    }
+  };
 
   for (const level of ['canvas', 'section', 'interactive', 'overlay']) {
     if (!entries.has(level)) report(level, undefined, 'missing');
   }
 
   const canvas = classesFor('canvas');
-  if (!canvas.includes('bg-transparent')) report('canvas', entries.get('canvas'), 'background');
+  enforceExactClasses('canvas', 'background', semanticClasses(canvas, 'bg'), ['bg-transparent']);
   for (const token of canvas.filter((entry) => /^(?:border(?:-|$)|shadow(?:-|$)|rounded(?:-|$))/.test(entry))) {
     report('canvas', entries.get('canvas'), token);
   }
 
   const section = classesFor('section');
-  if (!section.some((token) => token.startsWith('bg-'))) report('section', entries.get('section'), 'background');
-  for (const token of boundaryClasses(section)) report('section', entries.get('section'), token);
+  enforceExactClasses('section', 'background', semanticClasses(section, 'bg'), ['bg-card']);
+  enforceExactClasses('section', 'border', semanticClasses(section, 'border'), []);
+  enforceExactClasses('section', 'shadow', semanticClasses(section, 'shadow'), []);
 
   const interactive = classesFor('interactive');
-  if (!interactive.includes('border')) report('interactive', entries.get('interactive'), 'border:missing');
-  for (const token of interactive.filter((entry) => entry.startsWith('shadow'))) {
-    report('interactive', entries.get('interactive'), token);
-  }
+  enforceExactClasses('interactive', 'background', semanticClasses(interactive, 'bg'), ['bg-card']);
+  enforceExactClasses('interactive', 'border', semanticClasses(interactive, 'border'), ['border', 'border-border']);
+  enforceExactClasses('interactive', 'shadow', semanticClasses(interactive, 'shadow'), []);
 
   const overlay = classesFor('overlay');
-  if (!overlay.includes('border')) report('overlay', entries.get('overlay'), 'border:missing');
-  if (!overlay.some((token) => token.startsWith('shadow'))) report('overlay', entries.get('overlay'), 'shadow:missing');
+  enforceExactClasses('overlay', 'background', semanticClasses(overlay, 'bg'), ['bg-elevated']);
+  enforceExactClasses('overlay', 'border', semanticClasses(overlay, 'border'), ['border', 'border-border']);
+  enforceExactClasses('overlay', 'shadow', semanticClasses(overlay, 'shadow'), ['shadow-soft-card-strong']);
 }
 
 function buttonHeightClasses(fragments: StaticClassFragment[]): string[] {
@@ -2023,6 +2151,7 @@ function scanPrimaryCtasInBoundSource(
         sourceFile,
         initializers,
         buttonBindings,
+        result.allowlistHits,
         result.violations,
       );
       appendButtonIconOnlyViolation(
@@ -2072,6 +2201,7 @@ function scanPrimaryCtasInBoundSource(
         sourceFile,
         initializers,
         buttonBindings,
+        result.allowlistHits,
         result.violations,
       );
       if (isPrimaryButtonOpening(node, buttonBindings)) {
@@ -2650,23 +2780,30 @@ describe('production design guard', () => {
   it('self-tests the semantic Surface level boundary contract', () => {
     const source = `
       const SURFACE_LEVEL_STYLES = {
-        canvas: 'rounded-xl border bg-card shadow-soft-card',
-        section: 'rounded-xl border bg-card',
-        interactive: 'rounded-xl bg-card shadow-soft-card',
-        overlay: 'rounded-xl border bg-elevated',
+        canvas: 'rounded-xl border bg-transparent bg-card shadow-soft-card',
+        section: 'rounded-xl border bg-elevated',
+        interactive: 'rounded-xl border border-danger bg-elevated shadow-soft-card',
+        overlay: 'rounded-xl border border-border bg-card shadow-lg',
       } as const;
     `;
     const violations = findProductionDesignViolations('fixture.tsx', source)
       .filter(({ rule }) => rule === 'surface-level-contract');
 
     expect(violations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ token: 'canvas:background' }),
+      expect.objectContaining({ token: 'canvas:bg-card' }),
       expect.objectContaining({ token: 'canvas:rounded-xl' }),
       expect.objectContaining({ token: 'canvas:border' }),
       expect.objectContaining({ token: 'section:border' }),
-      expect.objectContaining({ token: 'interactive:border:missing' }),
+      expect.objectContaining({ token: 'section:background:bg-card:missing' }),
+      expect.objectContaining({ token: 'section:bg-elevated' }),
+      expect.objectContaining({ token: 'interactive:border:border-border:missing' }),
+      expect.objectContaining({ token: 'interactive:border-danger' }),
+      expect.objectContaining({ token: 'interactive:background:bg-card:missing' }),
       expect.objectContaining({ token: 'interactive:shadow-soft-card' }),
-      expect.objectContaining({ token: 'overlay:shadow:missing' }),
+      expect.objectContaining({ token: 'overlay:background:bg-elevated:missing' }),
+      expect.objectContaining({ token: 'overlay:bg-card' }),
+      expect.objectContaining({ token: 'overlay:shadow:shadow-soft-card-strong:missing' }),
+      expect.objectContaining({ token: 'overlay:shadow-lg' }),
     ]));
   });
 
@@ -2720,6 +2857,7 @@ describe('production design guard', () => {
     for (const allowances of [
       ...BUTTON_XL_ALLOWLIST.values(),
       ...BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values(),
+      ...STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST.values(),
     ]) {
       for (const { line, removeBy, tokens } of allowances) {
         expect(line).toBeGreaterThan(0);
@@ -3292,6 +3430,10 @@ describe('production design guard', () => {
       ...exactButtonAllowanceKeys(
         'button-visual-override',
         BUTTON_VISUAL_OVERRIDE_ALLOWLIST,
+      ),
+      ...exactButtonAllowanceKeys(
+        'state-surface-visual-override',
+        STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
       ),
     ].sort();
     const totalMatchedPrimaryButtons = Array.from(primaryScans.values()).reduce(

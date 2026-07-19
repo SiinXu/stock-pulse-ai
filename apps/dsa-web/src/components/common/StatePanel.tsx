@@ -9,7 +9,7 @@ export type StatePanelSize = 'compact' | 'default';
 
 type StatePanelTitleElement = 'p' | 'h2' | 'h3' | 'h4' | 'span';
 
-export interface StatePanelProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
+export interface StatePanelProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title' | 'role' | 'aria-live' | 'aria-busy'> {
   state: StatePanelState;
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -51,14 +51,11 @@ export const StatePanel = forwardRef<HTMLElement, StatePanelProps>(({
   titleAs = 'h2',
   surfaceLevel = 'canvas',
   className,
-  role: roleProp,
-  'aria-live': ariaLiveProp,
-  'aria-busy': ariaBusyProp,
   ...props
 }, ref) => {
   const isBusy = state === 'loading' || state === 'retrying';
-  const role = roleProp ?? (state === 'error' ? 'alert' : isBusy || state === 'partial' || state === 'success' ? 'status' : undefined);
-  const ariaLive = ariaLiveProp ?? (state === 'error' ? 'assertive' : role === 'status' ? 'polite' : undefined);
+  const role = state === 'error' ? 'alert' : isBusy || state === 'partial' || state === 'success' ? 'status' : undefined;
+  const ariaLive = state === 'error' ? 'assertive' : role === 'status' ? 'polite' : undefined;
   const stateIcon = icon ?? defaultStateIcon(state);
   const Title = titleAs;
 
@@ -69,7 +66,7 @@ export const StatePanel = forwardRef<HTMLElement, StatePanelProps>(({
       level={surfaceLevel}
       role={role}
       aria-live={ariaLive}
-      aria-busy={ariaBusyProp ?? (isBusy || undefined)}
+      aria-busy={isBusy || undefined}
       data-state-panel={state}
       className={cn(
         'flex flex-col items-center justify-center px-4 text-center',

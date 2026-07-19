@@ -5,9 +5,11 @@ import { cn } from '../../utils/cn';
 import { IconButton } from './IconButton';
 
 export type AlertTone = 'info' | 'success' | 'warning' | 'danger';
+export type AlertSize = 'compact' | 'default';
 
-type AlertBaseProps = Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'children'> & {
+type AlertBaseProps = Omit<React.HTMLAttributes<HTMLDivElement>, 'title' | 'children' | 'role' | 'aria-live'> & {
   tone?: AlertTone;
+  size?: AlertSize;
   title?: React.ReactNode;
   children: React.ReactNode;
   action?: React.ReactNode;
@@ -33,6 +35,7 @@ const ALERT_TONE_STYLES: Record<AlertTone, string> = {
 
 export const Alert = forwardRef<HTMLDivElement, AlertProps>(({
   tone = 'info',
+  size = 'default',
   title,
   children,
   action,
@@ -40,12 +43,10 @@ export const Alert = forwardRef<HTMLDivElement, AlertProps>(({
   dismissLabel,
   onDismiss,
   className,
-  role: roleProp,
-  'aria-live': ariaLiveProp,
   ...props
 }, ref) => {
-  const role = roleProp ?? (tone === 'danger' || urgent ? 'alert' : 'status');
-  const ariaLive = ariaLiveProp ?? (role === 'alert' ? 'assertive' : 'polite');
+  const role = tone === 'danger' || urgent ? 'alert' : 'status';
+  const ariaLive = role === 'alert' ? 'assertive' : 'polite';
 
   return (
     <div
@@ -54,7 +55,13 @@ export const Alert = forwardRef<HTMLDivElement, AlertProps>(({
       role={role}
       aria-live={ariaLive}
       data-alert-tone={tone}
-      className={cn('max-w-full overflow-hidden rounded-lg border px-4 py-3', ALERT_TONE_STYLES[tone], className)}
+      data-alert-size={size}
+      className={cn(
+        'max-w-full overflow-hidden rounded-lg border',
+        size === 'compact' ? 'px-3 py-2' : 'px-4 py-3',
+        ALERT_TONE_STYLES[tone],
+        className,
+      )}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">

@@ -161,6 +161,31 @@ test.describe('surface and task-state foundation', () => {
     expect(requestCounts['refresh-error']).toBeGreaterThan(0);
   });
 
+  test('does not present a stale snapshot under a newly selected period', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await page.route('**/api/v1/usage/dashboard**', async (route) => {
+      const period = new URL(route.request().url()).searchParams.get('period');
+      if (period === 'today') {
+        await fulfillJson(route, {
+          error: 'usage_unavailable',
+          message: 'Today usage is temporarily unavailable.',
+          params: {},
+        }, 503);
+        return;
+      }
+      await fulfillJson(route, usageDashboard);
+    });
+
+    await page.goto('/usage');
+    await expect(page.getByText('400', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await page.getByRole('tab', { name: '今日' }).click();
+
+    await expect(page.locator('[data-state-panel="error"]')).toHaveCount(1);
+    await expect(page.getByText('400', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('table')).toHaveCount(0);
+  });
+
   test('keeps semantic surface boundaries responsive in both themes', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.route('**/api/v1/usage/dashboard**', async (route) => {

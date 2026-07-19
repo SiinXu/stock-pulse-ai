@@ -8,6 +8,7 @@ import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { getUiLocale } from '../utils/uiLocale';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
+type UsageDashboardSnapshot = { period: UsagePeriod; dashboard: UsageDashboard };
 
 const PERIOD_OPTIONS: UsagePeriod[] = ['today', 'month', 'all'];
 
@@ -101,10 +102,11 @@ const TokenUsagePage: React.FC = () => {
     document.title = t('usage.documentTitle');
   }, [t]);
   const [period, setPeriod] = useState<UsagePeriod>('month');
-  const [dashboard, setDashboard] = useState<UsageDashboard | null>(null);
+  const [snapshot, setSnapshot] = useState<UsageDashboardSnapshot | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [loading, setLoading] = useState(true);
   const requestSeqRef = useRef(0);
+  const dashboard = snapshot?.period === period ? snapshot.dashboard : null;
 
   const loadDashboard = useCallback(async () => {
     const requestSeq = requestSeqRef.current + 1;
@@ -116,7 +118,7 @@ const TokenUsagePage: React.FC = () => {
       if (requestSeq !== requestSeqRef.current) {
         return;
       }
-      setDashboard(data);
+      setSnapshot({ period, dashboard: data });
     } catch (err) {
       if (requestSeq !== requestSeqRef.current) {
         return;
@@ -135,6 +137,13 @@ const TokenUsagePage: React.FC = () => {
       requestSeqRef.current += 1;
     };
   }, [loadDashboard]);
+
+  const handlePeriodChange = useCallback((nextPeriod: UsagePeriod) => {
+    if (nextPeriod === period) return;
+    setError(null);
+    setLoading(true);
+    setPeriod(nextPeriod);
+  }, [period]);
 
   const largestCallTypeTotal = useMemo(() => {
     return Math.max(...(dashboard?.byCallType.map((item) => item.totalTokens) ?? [0]), 1);
@@ -156,7 +165,7 @@ const TokenUsagePage: React.FC = () => {
               <SegmentedControl
                 value={period}
                 options={PERIOD_OPTIONS.map((option) => ({ value: option, label: t(PERIOD_LABEL_KEYS[option]) }))}
-                onChange={setPeriod}
+                onChange={handlePeriodChange}
                 ariaLabel={t('usage.title')}
               />
               <Button

@@ -381,7 +381,6 @@ const AlertsPage: React.FC = () => {
 
       <div className="flex h-full min-h-0 flex-col gap-4">
           <AlertRuleList
-            className="flex flex-col"
             rules={rules}
             total={rulesTotal}
             page={rulesPage}

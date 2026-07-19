@@ -23,7 +23,7 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
 | `Textarea` | Reuses `Field`, forwards the native textarea ref, and owns invalid/description semantics. |
 | `Surface` | Forwards native sectioning-element attributes and refs while exposing one semantic `canvas` / `section` / `interactive` / `overlay` level. |
-| `Alert` | Owns info/success/warning/danger presentation, live-region urgency, shared dismiss controls, and action placement. |
+| `Alert` | Owns info/success/warning/danger presentation, `compact` / `default` density, live-region urgency, shared dismiss controls, and action placement. |
 
 Shared patterns compose these primitives:
 
@@ -62,7 +62,8 @@ or `Section` directly instead of adding another `Card` variant.
 `error`, `retrying`, or `success`. Loading and retrying states expose
 `role="status"`, polite announcements, and `aria-busy`; errors expose an
 assertive alert. Persistent empty and blocked guidance is not a live region.
-Callers choose the correct heading level and provide one relevant next action.
+Callers choose the correct heading level and provide one relevant next action;
+they cannot replace the component-owned role, live-region, or busy semantics.
 
 `StatePanel` is borderless by default. A page-level task may opt into the
 borderless `section` surface for stable tonal separation, but it must not show
@@ -73,7 +74,9 @@ last successful result stays readable.
 `Alert` uses `status` for non-urgent information and `alert` for danger or an
 explicit urgent announcement. A dismissible Alert requires a dismiss label at
 the type boundary and uses the shared `IconButton`; command actions remain
-shared Buttons.
+shared Buttons. Callers select semantic `compact` or `default` density instead
+of overriding padding, radius, or shadow classes, and cannot replace the
+component-owned role or live-region urgency.
 
 ## Button Intent
 
@@ -144,7 +147,11 @@ item:
 | Owner | Temporary reason |
 | --- | --- |
 | `UI-D01` | Replace the multiline Decision Signals candidate Button with the shared filter/pressable pattern. |
+| `UI-F03` | Replace Settings toast visual overrides with the shared Overlay and Toast contract. |
 | `UI-P01` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
+| `UI-R01` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
+| `UI-R02` | Remove report/history compatibility card classes during route-level reading and trend migration. |
+| `UI-R03` | Move TaskPanel layout and visual ownership into the route-level Run Flow workspace. |
 | `UI-SCR01` | Replace the Stock Screening loading-width shim with stable task-action layout. |
 
 The sole temporary `size="xl"` caller is the NotFound recovery CTA; `UI-QA01`

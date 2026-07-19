@@ -963,7 +963,6 @@ const ChatPage: React.FC = () => {
         ) : sessionsError ? (
           <ApiErrorAlert
             error={sessionsError}
-            className="rounded-2xl"
             actionLabel={t('common.retry')}
             onAction={() => void loadSessions()}
           />
@@ -1224,9 +1223,10 @@ const ChatPage: React.FC = () => {
           {sendToast ? (
             <InlineAlert
               variant={sendToast.type === 'success' ? 'success' : 'danger'}
+              size="compact"
               title={sendToast.type === 'success' ? t('chat.sendSuccess') : t('chat.sendFailure')}
               message={sendToast.message}
-              className="max-w-md rounded-xl px-3 py-2 text-xs shadow-none"
+              className="max-w-md"
             />
           ) : null}
         </header>
@@ -1430,9 +1430,9 @@ const ChatPage: React.FC = () => {
               {sessionLoading ? (
                 <InlineAlert
                   variant="info"
+                  size="compact"
                   title={t('chat.loadingSessions')}
                   message={t('common.loading')}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
               {chatError ? (
@@ -1445,9 +1445,9 @@ const ChatPage: React.FC = () => {
               {isFollowUpContextLoading ? (
                 <InlineAlert
                   variant="info"
+                  size="compact"
                   title={t('chat.followUpLoadingTitle')}
                   message={t('chat.followUpLoadingMessage')}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
@@ -1471,9 +1471,9 @@ const ChatPage: React.FC = () => {
               {contextCompressionError ? (
                 <InlineAlert
                   variant="danger"
+                  size="compact"
                   title={t('chat.contextCompressionUnsaved')}
                   message={contextCompressionError}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               ) : null}
               {skills.length > 0 && (

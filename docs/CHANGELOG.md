@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [改进] Web 新增权威 `Surface`、`Section`、`StatePanel` 与 `Alert` 契约，以 L0/L1/L2/Overlay 语义层级替代默认卡片边界；现有 Card、空态、加载态和 API 错误通过兼容适配器收敛，Token Usage 在加载、无数据与错误时只显示一个主状态并隐藏零值指标墙，AST 守卫阻止页面重新叠加背景、边框、圆角和阴影。
+- [改进] Web 新增权威 `Surface`、`Section`、`StatePanel` 与 `Alert` 契约，以 L0/L1/L2/Overlay 语义层级替代默认卡片边界；组件统一拥有 live-region / busy 语义与 compact/default Alert 密度，现有 Card、空态、加载态和 API 错误通过兼容适配器收敛，Token Usage 在加载、无数据与错误时只显示一个主状态、隐藏零值指标墙，并在跨周期请求失败时不再把旧周期数据标为当前结果；AST 守卫阻止页面重新叠加背景、边框、圆角和阴影。
 - [chore] Agent Runtime 完整执行 `Native Only` 裁决：删除休眠的 PydanticAI Adapter、toolset、可选依赖、内部注入点、cross-runtime 测试与专用 CI；保留 vendor-neutral Contract、Native Adapter、BoundToolSession、生命周期、事件、sanitizer 和 36 个 replay fixture，并将 API key、带凭据 URL、Bearer token 脱敏及 300 字符诊断上限迁入 Native 异常回归。
 - [改进] Web 共享 `Button` 的 90 处 `xsm`/`sm`/`md`/`lg` 旧尺寸调用改用 `compact`/`default`/`comfortable`/`primary` 语义档位，并删除兼容类型和重复样式；AST 设计守卫同时阻止共享样式表、直接调用、别名及命名空间调用重新引入旧尺寸，现有 28/32/36/40px 可见高度与交互行为保持不变。
 - [改进] Web 共享交互控件建立业务无关的 `Button` / `IconButton` / `Input` / `Field` / `Textarea` 权威：按钮必须显式声明 intent，普通控件使用 28/32/36/40px 可见档位与软圆角，粗指针命中区独立扩展到 44px；移除 Settings/Home/Chat 私有 Button variant、Button 图标尺寸和 29 处非必要 `size="xl"`，新增 AST 守卫阻止页面通过尺寸、圆角、宽度或 flex class 绕过公共契约；Chat 在默认策略目录请求完成前阻断 Composer、Enter 与快捷问题发送，请求失败后再降级为“通用”，避免慢环境绕过已配置的默认策略。

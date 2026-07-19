@@ -137,9 +137,9 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
       <div className="space-y-4" data-testid="run-flow-panel-error">
         <InlineAlert
           variant="danger"
+          size="compact"
           title={error.title || t('runFlow.errorTitle')}
           message={error.message}
-          className="rounded-xl px-3 py-2 text-sm shadow-none"
         />
         <Button type="button" variant="secondary" size="default" onClick={() => void refetch()}>
           <RefreshCw className="h-4 w-4" aria-hidden="true" />

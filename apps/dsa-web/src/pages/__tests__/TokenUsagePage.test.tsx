@@ -177,6 +177,32 @@ describe('TokenUsagePage', () => {
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
+  it('does not label a stale period snapshot as the newly selected period', async () => {
+    const todayRequest = createDeferred<{ data: typeof dashboardResponse }>();
+    get
+      .mockResolvedValueOnce({ data: dashboardResponse })
+      .mockReturnValueOnce(todayRequest.promise);
+
+    const { container } = renderPage();
+
+    expect(await screen.findByText('400')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '今日' }));
+
+    expect(screen.getByRole('status')).toHaveAttribute('data-state-panel', 'loading');
+    expect(screen.queryByText('400')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    await act(async () => {
+      todayRequest.reject(new Error('today unavailable'));
+    });
+
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-state-panel', 'error');
+    expect(container.querySelectorAll('[data-state-panel]')).toHaveLength(1);
+    expect(screen.queryByText('400')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('renders token summary, model breakdowns, and recent calls from the dashboard API shape', async () => {
     renderPage();
 

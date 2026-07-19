@@ -63,7 +63,7 @@ describe('Section', () => {
 });
 
 describe('StatePanel', () => {
-  it('uses typed state semantics without making a persistent empty state live', () => {
+  it('owns typed state semantics even when unsafe native attributes are spread', () => {
     const { rerender } = render(
       <StatePanel state="empty" title="No reports" description="Run an analysis to create one." />,
     );
@@ -72,7 +72,13 @@ describe('StatePanel', () => {
     expect(empty).toHaveAttribute('data-state-panel', 'empty');
     expect(empty).not.toHaveAttribute('role');
 
-    rerender(<StatePanel state="loading" title="Loading reports" />);
+    rerender(
+      <StatePanel
+        {...{ role: 'presentation', 'aria-live': 'off', 'aria-busy': false }}
+        state="loading"
+        title="Loading reports"
+      />,
+    );
     const loading = screen.getByRole('status');
     expect(loading).toHaveAttribute('data-state-panel', 'loading');
     expect(loading).toHaveAttribute('aria-busy', 'true');
@@ -82,6 +88,24 @@ describe('StatePanel', () => {
     const error = screen.getByRole('alert');
     expect(error).toHaveAttribute('data-state-panel', 'error');
     expect(error).toHaveAttribute('aria-live', 'assertive');
+  });
+
+  it.each([
+    ['blocked', null, null, null],
+    ['partial', 'status', 'polite', null],
+    ['retrying', 'status', 'polite', 'true'],
+    ['success', 'status', 'polite', null],
+  ] as const)('defines the %s state contract', (state, role, ariaLive, ariaBusy) => {
+    const { container } = render(<StatePanel state={state} title={`${state} title`} />);
+    const panel = container.querySelector(`[data-state-panel="${state}"]`);
+
+    expect(panel).not.toBeNull();
+    if (role) expect(panel).toHaveAttribute('role', role);
+    else expect(panel).not.toHaveAttribute('role');
+    if (ariaLive) expect(panel).toHaveAttribute('aria-live', ariaLive);
+    else expect(panel).not.toHaveAttribute('aria-live');
+    if (ariaBusy) expect(panel).toHaveAttribute('aria-busy', ariaBusy);
+    else expect(panel).not.toHaveAttribute('aria-busy');
   });
 });
 
@@ -93,8 +117,10 @@ describe('Alert', () => {
 
     render(
       <Alert
+        {...{ role: 'presentation', 'aria-live': 'off' }}
         ref={ref}
         tone="danger"
+        size="compact"
         title="Request failed"
         dismissLabel="Dismiss request error"
         onDismiss={onDismiss}
@@ -106,6 +132,8 @@ describe('Alert', () => {
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveAttribute('data-alert-tone', 'danger');
+    expect(alert).toHaveAttribute('data-alert-size', 'compact');
+    expect(alert).toHaveAttribute('aria-live', 'assertive');
     expect(ref.current).toBe(alert);
 
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss request error' }));
@@ -125,6 +153,11 @@ describe('legacy surface and state adapters', () => {
 
     rerender(<Card data-testid="card" variant="bordered">Card content</Card>);
     expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'interactive');
+    expect(screen.getByTestId('card')).not.toHaveClass('terminal-card', 'gradient-border-card');
+
+    rerender(<Card data-testid="card" variant="gradient">Card content</Card>);
+    expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'interactive');
+    expect(screen.getByTestId('card')).not.toHaveClass('terminal-card', 'gradient-border-card');
 
     rerender(<EmptyState title="Nothing here" />);
     expect(screen.getByText('Nothing here').closest('[data-state-panel]')).toHaveAttribute('data-state-panel', 'empty');

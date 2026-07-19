@@ -1619,14 +1619,15 @@ const HomePage: React.FC = () => {
             {inputError ? (
               <InlineAlert
                 variant="danger"
+                size="compact"
                 title={t('home.inputInvalid')}
                 message={inputError}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {!inputError && duplicateError && duplicateBannerVisible ? (
               <InlineAlert
                 variant="warning"
+                size="compact"
                 title={t('home.duplicateTask')}
                 message={duplicateTask
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
@@ -1641,7 +1642,6 @@ const HomePage: React.FC = () => {
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
           </div>
@@ -1651,6 +1651,7 @@ const HomePage: React.FC = () => {
           <div className="px-3 pb-2 md:px-4">
             <InlineAlert
               variant="warning"
+              size="compact"
               title={t('home.setupIncomplete')}
               message={
                 setupMissingLabels
@@ -1667,7 +1668,6 @@ const HomePage: React.FC = () => {
                   {t('home.goSettings')}
                 </Button>
               )}
-              className="rounded-xl px-3 py-2 text-xs shadow-none"
             />
           </div>
         ) : null}
@@ -1701,9 +1701,9 @@ const HomePage: React.FC = () => {
               <div className="mb-3">
                 <InlineAlert
                   variant={marketReviewNotice.variant}
+                  size="compact"
                   title={marketReviewNotice.title}
                   message={marketReviewNotice.message}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               </div>
             ) : null}

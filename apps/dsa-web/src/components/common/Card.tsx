@@ -39,12 +39,6 @@ export const Card = forwardRef<HTMLElement, CardProps>(({
     </div>
   ) : null;
   const level: SurfaceLevel = variant === 'default' ? 'section' : 'interactive';
-  const legacyVariantClass = variant === 'bordered'
-    ? 'terminal-card'
-    : variant === 'gradient'
-      ? 'gradient-border-card'
-      : '';
-
   return (
     <Surface
       {...props}
@@ -53,7 +47,7 @@ export const Card = forwardRef<HTMLElement, CardProps>(({
       level={level}
       padding={padding}
       hoverable={hoverable}
-      className={cn(legacyVariantClass, hoverable && 'terminal-card-hover cursor-pointer', className)}
+      className={cn(hoverable && 'terminal-card-hover cursor-pointer', className)}
     >
       {header}
       {children}
