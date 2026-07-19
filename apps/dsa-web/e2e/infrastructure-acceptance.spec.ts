@@ -879,13 +879,20 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const rowTwo = page.getByRole('row').filter({ hasText: 'Rule Two' });
     await rowOne.getByRole('button', { name: '停用' }).click();
     await rowTwo.getByRole('button', { name: '停用' }).click();
-    await expect(rowOne.getByRole('button', { name: '停用中' })).toBeDisabled();
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toBeDisabled();
+    const firstToggle = rowOne.getByRole('button', { name: '停用' });
+    const secondToggle = rowTwo.getByRole('button', { name: '停用' });
+    await expect(firstToggle).toBeDisabled();
+    await expect(firstToggle).toHaveAttribute('aria-busy', 'true');
+    await expect(firstToggle).toContainText('停用中');
+    await expect(secondToggle).toBeDisabled();
+    await expect(secondToggle).toHaveAttribute('aria-busy', 'true');
+    await expect(secondToggle).toContainText('停用中');
     first.resolve();
-    await expect(rowOne.getByRole('button', { name: '停用中' })).toHaveCount(0);
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toBeDisabled();
+    await expect(rowOne.locator('button[aria-busy="true"]')).toHaveCount(0);
+    await expect(secondToggle).toBeDisabled();
+    await expect(secondToggle).toHaveAttribute('aria-busy', 'true');
     second.resolve();
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toHaveCount(0);
+    await expect(rowTwo.locator('button[aria-busy="true"]')).toHaveCount(0);
   });
 
   test('17 Portfolio timeout-after-commit retry reuses the operation ID and creates only one ledger row', async ({ page }) => {
@@ -1351,7 +1358,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(task.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });
     expect(statusCalls).toBeGreaterThan(0);
     const runFlowButton = task.getByRole('button', { name: /查看.*运行流/ });
-    await expectMinimumTouchTarget(runFlowButton);
+    await expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
+    await expect(runFlowButton).toHaveAttribute('data-size', 'default');
     await runFlowButton.click();
     await expectMinimumTouchTarget(
       page.getByTestId('run-flow-node-topology_data_realtime_quote-toggle'),
@@ -1939,44 +1947,75 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('button', { name: /添加模型服务/ }).first()).toBeVisible();
   });
 
-  test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await login(page);
-    const alphaRef = encodeModelRef('alpha_conn', 'openai/model-alpha');
-    const betaRef = encodeModelRef('beta_conn', 'openai/model-beta');
-    await configureConnections(page, [
-      { id: 'alpha_conn', model: 'model-alpha' },
-      { id: 'beta_conn', model: 'model-beta' },
-    ], [
-      { key: 'LITELLM_MODEL', value: alphaRef },
-      { key: 'LITELLM_FALLBACK_MODELS', value: betaRef },
-    ]);
+  test.describe('touch-capable control targets', () => {
+    test.use({ hasTouch: true });
 
-    await page.goto('/settings?section=ai_models&view=task_routing');
-    const primaryModel = page.getByRole('button', { name: '主要模型', exact: true });
-    await expectMinimumTouchTarget(primaryModel);
-    await primaryModel.click();
-    const betaOption = page.locator(`[role="option"][data-value="${betaRef}"]`);
-    await expectMinimumTouchTarget(betaOption);
-    await page.keyboard.press('Escape');
+    test('41 Settings selectors and Chat switches keep 44px touch targets at 390px', async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await login(page);
+      const alphaRef = encodeModelRef('alpha_conn', 'openai/model-alpha');
+      const betaRef = encodeModelRef('beta_conn', 'openai/model-beta');
+      await configureConnections(page, [
+        { id: 'alpha_conn', model: 'model-alpha' },
+        { id: 'beta_conn', model: 'model-beta' },
+      ], [
+        { key: 'LITELLM_MODEL', value: alphaRef },
+        { key: 'LITELLM_FALLBACK_MODELS', value: betaRef },
+      ]);
 
-    await page.goto('/settings?section=ai_models&view=reliability');
-    const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
-    await expectMinimumTouchTarget(fallbackSelector);
-    await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
-    await fallbackSelector.click();
-    await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
-    const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-    await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
+      await page.goto('/settings?section=ai_models&view=task_routing');
+      const primaryModel = page.getByRole('button', { name: '主要模型', exact: true });
+      await expectMinimumTouchTarget(primaryModel);
+      await primaryModel.click();
+      const betaOption = page.locator(`[role="option"][data-value="${betaRef}"]`);
+      await expectMinimumTouchTarget(betaOption);
+      await page.keyboard.press('Escape');
 
-    await page.goto('/settings?section=system_security&view=runtime');
-    const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
-    await expectMinimumTouchTarget(logLevelSelect);
-    await logLevelSelect.click();
-    await expectMinimumTouchTarget(page.locator('[role="option"][data-value="INFO"]'));
-    await page.keyboard.press('Escape');
+      await page.goto('/settings?section=ai_models&view=reliability');
+      const fallbackSelector = page.getByRole('button', { name: '选择备用模型', exact: true });
+      await expectMinimumTouchTarget(fallbackSelector);
+      await expectMinimumTouchTarget(page.getByRole('button', { name: /移除模型 model-beta/ }));
+      await fallbackSelector.click();
+      const fallbackSearch = page.getByRole('textbox', { name: '搜索模型' });
+      await expect(fallbackSearch).toHaveAttribute('data-size', 'comfortable');
+      const fallbackSearchTarget = fallbackSearch.locator('..');
+      await expectMinimumTouchTarget(fallbackSearchTarget);
 
-    await page.goto('/chat');
-    await expectMinimumTouchTarget(page.getByRole('switch', { name: '上下文压缩' }));
+      const fallbackSearchBox = await fallbackSearch.boundingBox();
+      const fallbackSearchTargetBox = await fallbackSearchTarget.boundingBox();
+      expect(fallbackSearchBox).not.toBeNull();
+      expect(fallbackSearchTargetBox).not.toBeNull();
+      expect(fallbackSearchBox!.height).toBeLessThan(44);
+      const topGap = fallbackSearchBox!.y - fallbackSearchTargetBox!.y;
+      const bottomGap = fallbackSearchTargetBox!.y + fallbackSearchTargetBox!.height
+        - fallbackSearchBox!.y - fallbackSearchBox!.height;
+      expect(Math.max(topGap, bottomGap)).toBeGreaterThan(0);
+      const slopPoint = {
+        x: fallbackSearchBox!.x + fallbackSearchBox!.width / 2,
+        y: topGap > bottomGap
+          ? fallbackSearchTargetBox!.y + topGap / 2
+          : fallbackSearchBox!.y + fallbackSearchBox!.height + bottomGap / 2,
+      };
+      expect(await fallbackSearch.evaluate((element, point) => (
+        document.elementFromPoint(point.x, point.y) === element.parentElement
+      ), slopPoint)).toBe(true);
+      await fallbackSearch.evaluate((element) => element.blur());
+      await expect(fallbackSearch).not.toBeFocused();
+      await page.touchscreen.tap(slopPoint.x, slopPoint.y);
+      await expect(fallbackSearch).toBeFocused();
+
+      const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
+      await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
+
+      await page.goto('/settings?section=system_security&view=runtime');
+      const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });
+      await expectMinimumTouchTarget(logLevelSelect);
+      await logLevelSelect.click();
+      await expectMinimumTouchTarget(page.locator('[role="option"][data-value="INFO"]'));
+      await page.keyboard.press('Escape');
+
+      await page.goto('/chat');
+      await expectMinimumTouchTarget(page.getByRole('switch', { name: '上下文压缩' }));
+    });
   });
 });

@@ -6,7 +6,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, InlineAlert, Input, Modal, Select } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -117,7 +117,7 @@ function resolveOperationAttempt(
   return { fingerprint, operationId: createOperationId(scope) };
 }
 
-const PORTFOLIO_INPUT_CLASS =
+const PORTFOLIO_DATE_TRIGGER_CLASS =
   'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const PORTFOLIO_FILE_PICKER_CLASS =
   'flex h-11 w-full cursor-pointer items-center justify-center rounded-full border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
@@ -1145,7 +1145,7 @@ const PortfolioPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xl"
+                  size="comfortable"
                   className="flex-1"
                   onClick={() => {
                     setShowCreateAccount(true);
@@ -1160,7 +1160,7 @@ const PortfolioPage: React.FC = () => {
                   onClick={() => void handleRefresh()}
                   disabled={isLoading || fxRefreshing}
                   variant="secondary"
-                  size="xl"
+                  size="comfortable"
                   isLoading={isLoading}
                   loadingText={text.refreshing}
                   className="flex-1"
@@ -1172,7 +1172,7 @@ const PortfolioPage: React.FC = () => {
                   onClick={openAccountDeleteDialog}
                   disabled={!canDeleteSelectedAccount}
                   variant="danger-subtle"
-                  size="xl"
+                  size="comfortable"
                   isLoading={accountDeleteLoading}
                   loadingText={text.deletingAccount}
                   className="flex-1"
@@ -1255,21 +1255,18 @@ const PortfolioPage: React.FC = () => {
           <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
             <Input
               label={text.accountName}
-              className={PORTFOLIO_INPUT_CLASS}
               placeholder={text.required}
               value={accountForm.name}
               onChange={(e) => setAccountForm((prev) => ({ ...prev, name: e.target.value }))}
             />
             <Input
               label={text.broker}
-              className={PORTFOLIO_INPUT_CLASS}
               placeholder={text.brokerPlaceholder}
               value={accountForm.broker}
               onChange={(e) => setAccountForm((prev) => ({ ...prev, broker: e.target.value }))}
             />
             <Input
               label={text.baseCurrency}
-              className={PORTFOLIO_INPUT_CLASS}
               placeholder={text.baseCurrencyPlaceholder}
               value={accountForm.baseCurrency}
               onChange={(e) => setAccountForm((prev) => ({ ...prev, baseCurrency: e.target.value.toUpperCase() }))}
@@ -1290,7 +1287,7 @@ const PortfolioPage: React.FC = () => {
             <Button
               type="submit"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               className="md:col-span-2"
               isLoading={accountCreating}
               loadingText={text.creatingAccount}
@@ -1328,7 +1325,7 @@ const PortfolioPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               className="shrink-0 text-xs"
               onClick={() => void handleRefreshFx()}
               disabled={!hasAccounts || isLoading || fxRefreshing}
@@ -1436,10 +1433,10 @@ const PortfolioPage: React.FC = () => {
                           onClick={() => void handleAnalyzePosition(row)}
                           disabled={analyzing}
                           variant="secondary"
-                          size="xl"
+                          size="comfortable"
                           isLoading={analyzing}
                           loadingText={text.submitting}
-                          className="px-2 text-xs"
+                          className="text-xs"
                         >
                           {text.analyze}
                         </Button>
@@ -1548,11 +1545,11 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="xl" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
         <Button type="button" variant="secondary" size="md" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 
       <Modal isOpen={tradeModalOpen} closeDisabled={tradeSubmitting} onClose={() => { setTradeError(null); setTradeModalOpen(false); }} title={text.manualTrade}>
@@ -1560,7 +1557,6 @@ const PortfolioPage: React.FC = () => {
             <fieldset disabled={tradeSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <Input
               label={text.stockCode}
-              className={PORTFOLIO_INPUT_CLASS}
               placeholder={text.stockExample}
               value={tradeForm.symbol}
               onChange={(e) => setTradeForm((prev) => ({ ...prev, symbol: e.target.value }))}
@@ -1573,7 +1569,7 @@ const PortfolioPage: React.FC = () => {
                 onChange={(tradeDate) => setTradeForm((prev) => ({ ...prev, tradeDate }))}
                 required
                 className="w-full"
-                triggerClassName={PORTFOLIO_INPUT_CLASS}
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
               />
               <Select
                 label={text.side}
@@ -1587,22 +1583,22 @@ const PortfolioPage: React.FC = () => {
               />
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Input id="portfolio-trade-quantity" label={text.quantity} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.quantity}
+              <Input id="portfolio-trade-quantity" label={text.quantity} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.quantity}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, quantity: e.target.value }))} required />
-              <Input id="portfolio-trade-price" label={text.tradePrice} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.price}
+              <Input id="portfolio-trade-price" label={text.tradePrice} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.price}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, price: e.target.value }))} required />
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Input label={text.fee} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.fee}
+              <Input label={text.fee} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.fee}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, fee: e.target.value }))} />
-              <Input label={text.tax} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.tax}
+              <Input label={text.tax} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.tax}
                 onChange={(e) => setTradeForm((prev) => ({ ...prev, tax: e.target.value }))} />
             </div>
             <p className="text-xs text-secondary">{text.feeHint}</p>
             {tradeError ? (
               <ApiErrorAlert error={tradeError} onDismiss={() => setTradeError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
               {text.submitTrade}
             </Button>
             </fieldset>
@@ -1619,7 +1615,7 @@ const PortfolioPage: React.FC = () => {
                 onChange={(eventDate) => setCashForm((prev) => ({ ...prev, eventDate }))}
                 required
                 className="w-full"
-                triggerClassName={PORTFOLIO_INPUT_CLASS}
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
               />
               <Select
                 label={text.direction}
@@ -1632,14 +1628,14 @@ const PortfolioPage: React.FC = () => {
                 ]}
               />
             </div>
-            <Input id="portfolio-cash-amount" label={text.amount} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.amount}
+            <Input id="portfolio-cash-amount" label={text.amount} type="number" min="0.0001" step="0.0001" placeholder={text.amount}
               value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} required />
-            <Input label={text.currency} className={PORTFOLIO_INPUT_CLASS} placeholder={formatUiText(text.defaultCurrency, { currency: writableAccount?.baseCurrency || text.accountBaseCurrency })} value={cashForm.currency}
+            <Input label={text.currency} placeholder={formatUiText(text.defaultCurrency, { currency: writableAccount?.baseCurrency || text.accountBaseCurrency })} value={cashForm.currency}
               onChange={(e) => setCashForm((prev) => ({ ...prev, currency: e.target.value }))} />
             {cashError ? (
               <ApiErrorAlert error={cashError} onDismiss={() => setCashError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
               {text.submitCash}
             </Button>
             </fieldset>
@@ -1649,7 +1645,7 @@ const PortfolioPage: React.FC = () => {
       <Modal isOpen={corpModalOpen} closeDisabled={corpSubmitting} onClose={() => { setCorpError(null); setCorpModalOpen(false); }} title={text.manualCorporate}>
           <form onSubmit={handleCorporateSubmit} aria-busy={corpSubmitting}>
             <fieldset disabled={corpSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
-            <Input label={text.stockCode} className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockCode} value={corpForm.symbol}
+            <Input label={text.stockCode} placeholder={text.stockCode} value={corpForm.symbol}
               onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <DatePicker
@@ -1658,7 +1654,7 @@ const PortfolioPage: React.FC = () => {
                 onChange={(effectiveDate) => setCorpForm((prev) => ({ ...prev, effectiveDate }))}
                 required
                 className="w-full"
-                triggerClassName={PORTFOLIO_INPUT_CLASS}
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
               />
               <Select
                 label={text.actionType}
@@ -1672,18 +1668,18 @@ const PortfolioPage: React.FC = () => {
               />
             </div>
             {corpForm.actionType === 'cash_dividend' ? (
-              <Input label={text.dividendPerShare} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.000001" placeholder={text.dividendPerShare}
+              <Input label={text.dividendPerShare} type="number" min="0" step="0.000001" placeholder={text.dividendPerShare}
                 value={corpForm.cashDividendPerShare}
                 onChange={(e) => setCorpForm((prev) => ({ ...prev, cashDividendPerShare: e.target.value, splitRatio: '' }))} required />
             ) : (
-              <Input id="portfolio-split-ratio" label={text.splitRatio} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.000001" step="0.000001" placeholder={text.splitRatio}
+              <Input id="portfolio-split-ratio" label={text.splitRatio} type="number" min="0.000001" step="0.000001" placeholder={text.splitRatio}
                 value={corpForm.splitRatio}
                 onChange={(e) => setCorpForm((prev) => ({ ...prev, splitRatio: e.target.value, cashDividendPerShare: '' }))} required />
             )}
             {corpError ? (
               <ApiErrorAlert error={corpError} onDismiss={() => setCorpError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
               {text.submitCorporate}
             </Button>
             </fieldset>
@@ -1741,10 +1737,10 @@ const PortfolioPage: React.FC = () => {
                     <span className="shrink-0 text-xs text-muted-text">
                       {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
                     </span>
-                    <Button
+                    <IconButton
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size="default"
                       aria-label={fileText.clear}
                       onClick={() => {
                         setCsvFile(null);
@@ -1755,7 +1751,7 @@ const PortfolioPage: React.FC = () => {
                       }}
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                    </IconButton>
                   </div>
                 ) : null}
               </div>
@@ -1771,10 +1767,10 @@ const PortfolioPage: React.FC = () => {
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
             />
             <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="xl" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
+              <Button type="button" variant="secondary" size="comfortable" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
                 {text.parseFile}
               </Button>
-              <Button type="button" variant="secondary" size="xl" className="flex-1"
+              <Button type="button" variant="secondary" size="comfortable" className="flex-1"
                 disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
                 {text.commitImport}
               </Button>
@@ -1814,7 +1810,7 @@ const PortfolioPage: React.FC = () => {
                   { value: 'corporate', label: text.corporateAction },
                 ]}
               />
-              <Button type="button" variant="secondary" size="xl" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
+              <Button type="button" variant="secondary" size="comfortable" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
                 {text.refreshLedger}
               </Button>
             </div>
@@ -1824,18 +1820,18 @@ const PortfolioPage: React.FC = () => {
                 value={eventDateFrom}
                 onChange={setEventDateFrom}
                 className="w-full"
-                triggerClassName={PORTFOLIO_INPUT_CLASS}
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
               />
               <DatePicker
                 label={text.endDate}
                 value={eventDateTo}
                 onChange={setEventDateTo}
                 className="w-full"
-                triggerClassName={PORTFOLIO_INPUT_CLASS}
+                triggerClassName={PORTFOLIO_DATE_TRIGGER_CLASS}
               />
             </div>
             {(eventType === 'trade' || eventType === 'corporate') ? (
-              <Input label={text.stockCode} className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockFilter} value={eventSymbol}
+              <Input label={text.stockCode} placeholder={text.stockFilter} value={eventSymbol}
                 onChange={(e) => setEventSymbol(e.target.value)} />
             ) : null}
             {eventType === 'trade' ? (
@@ -1895,7 +1891,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
@@ -1917,7 +1913,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
@@ -1939,7 +1935,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
@@ -1966,11 +1962,11 @@ const PortfolioPage: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-secondary">
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
-                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage <= 1}
+                <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
                   onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
                   {text.prevPage}
                 </Button>
-                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage >= totalEventPages}
+                <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
                   onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
                   {text.nextPage}
                 </Button>

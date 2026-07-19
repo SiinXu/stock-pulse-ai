@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
 
@@ -101,6 +101,14 @@ export const Tooltip: React.FC<TooltipProps> = ({
     return <>{children}</>;
   }
 
+  const describedChildren = !focusable && isValidElement<{ 'aria-describedby'?: string }>(children)
+    ? cloneElement(children, {
+        'aria-describedby': open
+          ? [children.props['aria-describedby'], tooltipId].filter(Boolean).join(' ')
+          : children.props['aria-describedby'],
+      })
+    : children;
+
   return (
     <>
       <span
@@ -118,10 +126,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
           }
         }}
         tabIndex={focusable ? 0 : undefined}
-        aria-describedby={open ? tooltipId : undefined}
+        aria-describedby={focusable && open ? tooltipId : undefined}
         data-dialog-popup={open ? 'true' : undefined}
       >
-        {children}
+        {describedChildren}
       </span>
 
       {typeof document !== 'undefined' && open

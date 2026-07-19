@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, ChevronRight, Info, X } from 'lucide-react';
-import { Badge, Button, StatusDot } from '../common';
+import { Badge, Button, IconButton, StatusDot } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -215,10 +215,9 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
             <Button
               type="button"
               variant="secondary"
-              size="xsm"
+              size="compact"
               onClick={() => onToggleExpanded?.(node.id)}
               aria-expanded={isExpanded}
-              className="h-7 px-2"
             >
               {isExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
@@ -233,15 +232,15 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
             {getRunFlowStatusLabel(node.status, t)}
           </Badge>
           {onClose ? (
-            <Button
+            <IconButton
               type="button"
               variant="ghost"
-              size="icon"
+              size="default"
               onClick={onClose}
               aria-label={t('runFlow.nodeDetails.close')}
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
       </div>

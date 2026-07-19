@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createParsedApiError } from '../../api/error';
@@ -17,6 +17,15 @@ function createDeferred<T>() {
     reject = rej;
   });
   return { promise, resolve, reject };
+}
+
+async function getReadySendButton(): Promise<HTMLButtonElement> {
+  await act(async () => {
+    await Promise.resolve();
+  });
+  const sendButton = screen.getByRole('button', { name: '发送' }) as HTMLButtonElement;
+  expect(sendButton).not.toBeDisabled();
+  return sendButton;
 }
 
 const LanguageSwitchButton = () => {
@@ -589,6 +598,115 @@ describe('ChatPage', () => {
     expect(screen.getByRole('checkbox', { name: '通用分析' })).not.toBeChecked();
   });
 
+  it('waits for the default skill before enabling message submission', async () => {
+    const skillsDeferred = createDeferred<{
+      skills: Array<{ id: string; name: string; description: string }>;
+      default_skill_id: string;
+    }>();
+    mockGetSkills.mockReturnValue(skillsDeferred.promise);
+
+    render(
+      <MemoryRouter initialEntries={['/chat?stock=AAPL']}>
+        <ChatPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByDisplayValue('请深入分析 AAPL')).toBeInTheDocument();
+    const sendButton = screen.getByRole('button', { name: '发送' });
+    const messageInput = screen.getByRole('textbox', { name: '消息输入框' });
+    const quickQuestion = screen.getByRole('button', { name: '用缠论分析茅台' });
+
+    expect(sendButton).toBeDisabled();
+    expect(quickQuestion).toBeDisabled();
+    fireEvent.click(sendButton);
+    fireEvent.click(quickQuestion);
+    fireEvent.keyDown(messageInput, { key: 'Enter' });
+    expect(mockStartStream).not.toHaveBeenCalled();
+
+    await act(async () => {
+      skillsDeferred.resolve({
+        skills: [{ id: 'bull_trend', name: '趋势分析', description: '测试技能' }],
+        default_skill_id: 'bull_trend',
+      });
+    });
+
+    expect(sendButton).not.toBeDisabled();
+    expect(quickQuestion).not.toBeDisabled();
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(mockStartStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: '请深入分析 AAPL',
+          skills: ['bull_trend'],
+        }),
+        expect.objectContaining({
+          skillName: '趋势分析',
+        }),
+      );
+    });
+  });
+
+  it('falls back to general analysis after skill loading fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSkills.mockRejectedValue(new Error('skills unavailable'));
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/chat?stock=AAPL']}>
+          <ChatPage />
+        </MemoryRouter>
+      );
+
+      expect(await screen.findByDisplayValue('请深入分析 AAPL')).toBeInTheDocument();
+      fireEvent.click(await getReadySendButton());
+
+      await waitFor(() => {
+        expect(mockStartStream).toHaveBeenCalledWith(
+          expect.not.objectContaining({ skills: expect.anything() }),
+          expect.objectContaining({
+            skillNames: ['通用'],
+            skillName: '通用',
+          }),
+        );
+      });
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('keeps quick questions on the general fallback after skill loading fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSkills.mockRejectedValue(new Error('skills unavailable'));
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage />
+        </MemoryRouter>
+      );
+
+      const quickQuestion = screen.getByRole('button', { name: '用缠论分析茅台' });
+      await waitFor(() => expect(quickQuestion).not.toBeDisabled());
+      fireEvent.click(quickQuestion);
+
+      await waitFor(() => {
+        expect(mockStartStream).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: '用缠论分析茅台',
+          }),
+          expect.objectContaining({
+            skillNames: ['通用'],
+            skillName: '通用',
+          }),
+        );
+      });
+      expect(mockStartStream.mock.calls[0]?.[0]).not.toHaveProperty('skills');
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('sends multiple selected skills in order', async () => {
     mockGetSkills.mockResolvedValue({
       skills: [
@@ -608,7 +726,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 600519' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
@@ -658,7 +776,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 600519' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
@@ -689,7 +807,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 AAPL' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalled();
@@ -951,7 +1069,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '如果不考虑 TTM 呢' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1004,7 +1122,7 @@ describe('ChatPage', () => {
       expect(screen.queryByText('正在加载历史分析上下文；加载完成后可发送追问。')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
@@ -1036,7 +1154,7 @@ describe('ChatPage', () => {
 
     expect(await screen.findByDisplayValue('请深入分析 AAPL')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
@@ -1057,7 +1175,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看估值' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1087,7 +1205,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '换成 AAPL 看看' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1117,7 +1235,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '先不看 600519，换成 AAPL 看看' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1137,7 +1255,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看支撑位' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1167,7 +1285,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '比较 600519 和 AAPL' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1197,7 +1315,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 600519 和 AAPL 的差异' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1227,7 +1345,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 AAPL 和 600519 的差异' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1257,7 +1375,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: 'AAPL 和 TSLA 哪个更值得买' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1287,7 +1405,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析 AAPL 的差异化优势' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1317,7 +1435,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '分析tsla' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1349,7 +1467,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看成交量' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1386,7 +1504,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看支撑位' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1429,7 +1547,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看成交量' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1460,7 +1578,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看成交量' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1494,7 +1612,7 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看成交量' },
     });
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenLastCalledWith(
@@ -1593,7 +1711,7 @@ describe('ChatPage', () => {
       expect(screen.queryByText('正在加载历史分析上下文；加载完成后可发送追问。')).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    fireEvent.click(await getReadySendButton());
 
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
@@ -1778,6 +1896,7 @@ describe('IME composition guard on Enter', () => {
     expect((textarea as HTMLTextAreaElement).value).toBe('茅台怎么看');
 
     // A plain Enter (composition finished) submits.
+    await getReadySendButton();
     fireEvent.keyDown(textarea, { key: 'Enter' });
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(

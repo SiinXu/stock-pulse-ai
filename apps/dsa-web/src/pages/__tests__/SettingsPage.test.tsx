@@ -3502,7 +3502,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-9', 'w-9');
+    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveAttribute('data-size', 'default');
     const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
     expect(enabledSwitch).toHaveAttribute('role', 'switch');
     expect(enabledSwitch).toHaveClass('h-11', 'w-11');

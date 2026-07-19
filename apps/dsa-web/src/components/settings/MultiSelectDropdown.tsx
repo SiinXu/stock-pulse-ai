@@ -246,7 +246,6 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
                 }}
                 aria-label={text.searchOptions}
                 placeholder={text.searchOptionsPlaceholder}
-                className="min-h-11 rounded-2xl"
               />
             </div>
           ) : null}

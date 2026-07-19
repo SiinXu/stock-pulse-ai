@@ -65,6 +65,7 @@
 | --- | --- |
 | [API 规格](architecture/api_spec.json) | FastAPI OpenAPI 规格产物 |
 | [贡献指南](CONTRIBUTING.md) | Issue、PR、测试、文档同步和协作要求 |
+| [Web UI 基础控件契约](web-ui-foundation.md) | Button、IconButton、Input、Field、Textarea 的语义、尺寸、命中区、守卫和迁移边界 |
 | [多语言金融术语指导](financial-terminology-guide.md) | 十语言 UI 金融术语单一治理源：语义边界、术语表、已知译文漂移、风险表达、格式化与审查流程 |
 | [Web 国际化开发约定](web-i18n.md) | 界面语言与报告语言边界、翻译文件结构、错误/格式化、Overlay 与验证 |
 

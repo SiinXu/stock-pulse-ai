@@ -594,7 +594,6 @@ const BacktestPage: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder={text.codePlaceholder}
               disabled={isRunning}
-              className="!h-9 !min-h-9 rounded-sm"
             />
           </div>
           <Button
@@ -605,7 +604,7 @@ const BacktestPage: React.FC = () => {
             size="md"
             isLoading={isLoadingResults}
             loadingText={text.filter}
-            className="min-w-0 whitespace-nowrap text-xs"
+            className="whitespace-nowrap text-xs"
           >
             {text.filter}
           </Button>
@@ -623,7 +622,8 @@ const BacktestPage: React.FC = () => {
             error={evalDaysError}
             placeholder="10"
             disabled={isRunning}
-            className="!h-9 !min-h-9 w-24 rounded-sm text-center tabular-nums"
+            fieldClassName="w-24"
+            className="text-center tabular-nums"
           />
           <DatePicker
             id="backtest-date-from"
@@ -660,7 +660,7 @@ const BacktestPage: React.FC = () => {
             variant={isNextDayValidation ? 'primary' : 'secondary'}
             size="md"
             aria-pressed={isNextDayValidation}
-            className="min-w-0 text-xs"
+            className="text-xs"
           >
             {text.oneDayValidation}
           </Button>
@@ -671,7 +671,7 @@ const BacktestPage: React.FC = () => {
             variant={forceRerun ? 'primary' : 'secondary'}
             size="md"
             aria-pressed={forceRerun}
-            className="min-w-0 text-xs"
+            className="text-xs"
           >
             {text.forceRerun}
           </Button>
@@ -682,7 +682,7 @@ const BacktestPage: React.FC = () => {
             size="md"
             isLoading={isRunning}
             loadingText={text.running}
-            className="min-w-0 whitespace-nowrap text-xs"
+            className="whitespace-nowrap text-xs"
           >
             {text.runBacktest}
           </Button>

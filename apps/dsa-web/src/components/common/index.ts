@@ -1,4 +1,7 @@
 export * from './Button';
+export * from './IconButton';
+export * from './Field';
+export * from './Textarea';
 export * from './SegmentedControl';
 export * from './SearchInput';
 export * from './NotificationPanel';

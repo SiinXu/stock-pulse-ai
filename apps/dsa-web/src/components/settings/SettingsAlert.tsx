@@ -50,7 +50,7 @@ export const SettingsAlert: React.FC<SettingsAlertProps> = ({
       action={actionLabel && onAction ? (
         <Button
           type="button"
-          variant="settings-secondary"
+          variant="secondary"
           size="xsm"
           onClick={onAction}
         >

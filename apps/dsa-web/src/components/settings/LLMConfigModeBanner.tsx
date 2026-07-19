@@ -92,7 +92,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
         {canMigrate ? (
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="xsm"
             className="ml-auto"
             isLoading={isLoadingPreview}
@@ -144,12 +144,12 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           </div>
           {error ? <ApiErrorAlert error={error} /> : null}
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsPreviewOpen(false)}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setIsPreviewOpen(false)}>
               {text.cancel}
             </Button>
             <Button
               type="button"
-              variant="settings-primary"
+              variant="primary"
               size="sm"
               isLoading={isApplying}
               disabled={(preview?.channels ?? []).length === 0}
