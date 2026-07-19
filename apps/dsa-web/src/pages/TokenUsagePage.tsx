@@ -68,7 +68,7 @@ function buildParsedError(error: unknown, t: Translate): ParsedApiError {
 
 const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguage; t: Translate }> = ({ model, language, t }) => {
   return (
-    <Surface as="article" level="interactive" padding="sm">
+    <Surface as="article" level="section" padding="sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>

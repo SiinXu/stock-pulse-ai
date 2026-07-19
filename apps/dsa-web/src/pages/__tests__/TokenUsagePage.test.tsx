@@ -210,6 +210,8 @@ describe('TokenUsagePage', () => {
     expect(document.title).toBe('Token 用量监控 - StockPulse');
     expect(await screen.findByText('400')).toBeInTheDocument();
     expect(screen.getAllByText('openai/gpt-test')).toHaveLength(2);
+    expect(screen.getByRole('heading', { level: 3, name: 'openai/gpt-test' }).closest('article'))
+      .toHaveAttribute('data-surface-level', 'section');
     expect(screen.getAllByText('个股分析')).toHaveLength(2);
     expect(screen.getByText(/600519/)).toBeInTheDocument();
     expect(get).toHaveBeenCalledWith('/api/v1/usage/dashboard', {

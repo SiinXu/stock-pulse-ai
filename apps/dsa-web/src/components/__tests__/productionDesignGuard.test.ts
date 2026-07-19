@@ -97,22 +97,8 @@ const STATE_SURFACE_COMPONENT_NAMES = [
   'DashboardStateBlock',
   'SettingsSectionCard',
 ] as const;
-const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*)/;
-const STATE_SURFACE_IMPLEMENTATION_SUFFIXES = [
-  '/common/Alert.tsx',
-  '/common/ApiErrorAlert.tsx',
-  '/common/Card.tsx',
-  '/common/EmptyState.tsx',
-  '/common/InlineAlert.tsx',
-  '/common/Loading.tsx',
-  '/common/Section.tsx',
-  '/common/SectionCard.tsx',
-  '/common/StatCard.tsx',
-  '/common/StatePanel.tsx',
-  '/common/Surface.tsx',
-  '/dashboard/DashboardStateBlock.tsx',
-  '/settings/SettingsSectionCard.tsx',
-] as const;
+const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*|\[(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|border-radius|box-shadow):)/;
+const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
     line: 1499,
@@ -138,6 +124,61 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
   }]],
 ]);
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
+    line,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className'],
+  }))],
+  ['../common/Card.tsx', [{
+    line: 43,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style'],
+  }]],
+  ['../common/EmptyState.tsx', [{
+    line: 22,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+  }]],
+  ['../common/InlineAlert.tsx', [{
+    line: 26,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+  }]],
+  ['../common/Loading.tsx', [{
+    line: 14,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className'],
+  }]],
+  ['../common/Section.tsx', [{
+    line: 42,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+  }]],
+  ['../common/SectionCard.tsx', [{
+    line: 22,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+  }]],
+  ['../common/StatCard.tsx', [{
+    line: 37,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:toneStyles[tone]', 'dynamic:className'],
+  }]],
+  ['../common/StatePanel.tsx', [{
+    line: 67,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
+  }]],
+  ['../dashboard/DashboardStateBlock.tsx', [{
+    line: 30,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className'],
+  }]],
+  ['../settings/SettingsSectionCard.tsx', [{
+    line: 23,
+    removeBy: 'UI-QA01',
+    tokens: ['dynamic:className'],
+  }]],
   ['../history/StockHistoryTrendDrawer.tsx', [205, 239, 272].map((line) => ({
     line,
     removeBy: 'UI-R02',
@@ -390,7 +431,8 @@ function isSharedButtonModuleSpecifier(specifier: string, componentName = 'Butto
       || /(?:^|\/)SettingsSectionCard$/.test(specifier);
   }
   return /(?:^|\/)(?:components\/)?common$/.test(specifier)
-    || specifier.endsWith(`/common/${componentName}`);
+    || specifier.endsWith(`/common/${componentName}`)
+    || specifier === `./${componentName}`;
 }
 
 function importDeclarationFor(node: ts.Node): ts.ImportDeclaration | undefined {
@@ -1099,8 +1141,6 @@ function appendStateSurfaceVisualOverrideViolations(
   allowlistHits: string[],
   violations: DesignViolation[],
 ): void {
-  if (STATE_SURFACE_IMPLEMENTATION_SUFFIXES.some((suffix) => filename.endsWith(suffix))) return;
-
   const componentName = STATE_SURFACE_COMPONENT_NAMES.find((name) => (
     isSharedButtonOpening(opening, bindings, name)
   ));
@@ -1129,6 +1169,44 @@ function appendStateSurfaceVisualOverrideViolations(
   }
   for (const unresolved of scan.unresolved) {
     const token = `dynamic:${unresolved.text}`;
+    if (consumeExactButtonAllowance(
+      'state-surface-visual-override',
+      STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
+      filename,
+      openingLine,
+      token,
+      allowlistHits,
+    )) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.index),
+      rule: 'state-surface-visual-override',
+      token: `${componentName}:${token}`,
+    });
+  }
+
+  const styleScan = stylePropertyFragments(opening, sourceFile, initializers);
+  for (const fragment of styleScan.fragments) {
+    const property = fragment.text.replace(/[A-Z]/g, (character) => `-${character.toLowerCase()}`);
+    if (!STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN.test(property)) continue;
+    const token = `style:${fragment.text}`;
+    if (consumeExactButtonAllowance(
+      'state-surface-visual-override',
+      STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
+      filename,
+      openingLine,
+      token,
+      allowlistHits,
+    )) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, fragment.index),
+      rule: 'state-surface-visual-override',
+      token: `${componentName}:${token}`,
+    });
+  }
+  for (const unresolved of styleScan.unresolved) {
+    const token = `style:dynamic:${unresolved.text}`;
     if (consumeExactButtonAllowance(
       'state-surface-visual-override',
       STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST,
@@ -1225,6 +1303,18 @@ function unresolvedClassExpression(
       text: label ?? expression.getText(sourceFile),
     }],
   };
+}
+
+function unresolvedSpreadExpression(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  label: string,
+): StaticClassScan {
+  return unresolvedClassExpression(
+    expression,
+    sourceFile,
+    `${label}:${expression.getText(sourceFile)}`,
+  );
 }
 
 function isFunctionScope(node: ts.Node): boolean {
@@ -1581,7 +1671,7 @@ function classNameFragments(
   const trailingSpreads = properties
     .slice(classNameIndex + 1)
     .filter((property): property is ts.JsxSpreadAttribute => ts.isJsxSpreadAttribute(property))
-    .map((property) => unresolvedClassExpression(property.expression, sourceFile, 'className spread'));
+    .map((property) => unresolvedSpreadExpression(property.expression, sourceFile, 'className spread'));
   if (!className) {
     return mergeStaticClassScans(...trailingSpreads);
   }
@@ -1644,7 +1734,7 @@ function scanStaticStyleExpression(
   if (ts.isObjectLiteralExpression(current)) {
     return mergeStaticClassScans(...current.properties.map((property) => {
       if (ts.isSpreadAssignment(property)) {
-        return unresolvedClassExpression(property.expression, sourceFile, 'style spread');
+        return unresolvedSpreadExpression(property.expression, sourceFile, 'style spread');
       }
       if (ts.isShorthandPropertyAssignment(property)) {
         return scanStaticStyleExpression(property.name, sourceFile, initializers, resolving);
@@ -1681,7 +1771,7 @@ function styleFragments(
   const trailingSpreads = properties
     .slice(styleIndex + 1)
     .filter((property): property is ts.JsxSpreadAttribute => ts.isJsxSpreadAttribute(property))
-    .map((property) => unresolvedClassExpression(property.expression, sourceFile, 'style spread'));
+    .map((property) => unresolvedSpreadExpression(property.expression, sourceFile, 'style spread'));
   if (styleIndex < 0) {
     return mergeStaticClassScans(...trailingSpreads);
   }
@@ -1706,6 +1796,136 @@ function styleFragments(
   }
   return mergeStaticClassScans(
     scanStaticStyleExpression(style.initializer.expression, sourceFile, initializers),
+    ...trailingSpreads,
+  );
+}
+
+function staticStylePropertyFragments(
+  name: ts.PropertyName,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+): StaticClassScan {
+  const names = propertyNameValues(name, initializers);
+  if (!names) {
+    return unresolvedClassExpression(name, sourceFile, 'style property');
+  }
+  return {
+    fragments: names.map((text) => ({
+      index: name.getStart(sourceFile),
+      text,
+    })),
+    unresolved: [],
+  };
+}
+
+function scanStaticStylePropertyExpression(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  resolving: Set<string> = new Set(),
+): StaticClassScan {
+  const current = unwrapExpression(expression);
+  if (ts.isIdentifier(current)) {
+    if (current.text === 'undefined') {
+      return { fragments: [], unresolved: [] };
+    }
+    const initializer = initializers.get(current.text);
+    if (!initializer || resolving.has(current.text)) {
+      return unresolvedClassExpression(current, sourceFile, 'style');
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return scanStaticStylePropertyExpression(
+      initializer,
+      sourceFile,
+      initializers,
+      nextResolving,
+    );
+  }
+  if (ts.isConditionalExpression(current)) {
+    return mergeStaticClassScans(
+      scanStaticStylePropertyExpression(current.whenTrue, sourceFile, initializers, resolving),
+      scanStaticStylePropertyExpression(current.whenFalse, sourceFile, initializers, resolving),
+    );
+  }
+  if (ts.isBinaryExpression(current)) {
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      || current.operatorToken.kind === ts.SyntaxKind.CommaToken
+    ) {
+      return scanStaticStylePropertyExpression(current.right, sourceFile, initializers, resolving);
+    }
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      || current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+    ) {
+      return mergeStaticClassScans(
+        scanStaticStylePropertyExpression(current.left, sourceFile, initializers, resolving),
+        scanStaticStylePropertyExpression(current.right, sourceFile, initializers, resolving),
+      );
+    }
+  }
+  if (ts.isObjectLiteralExpression(current)) {
+    return mergeStaticClassScans(...current.properties.map((property) => {
+      if (ts.isSpreadAssignment(property)) {
+        return scanStaticStylePropertyExpression(
+          property.expression,
+          sourceFile,
+          initializers,
+          resolving,
+        );
+      }
+      if (ts.isShorthandPropertyAssignment(property) || ts.isPropertyAssignment(property)) {
+        return staticStylePropertyFragments(property.name, sourceFile, initializers);
+      }
+      return unresolvedClassExpression(property, sourceFile, 'style property');
+    }));
+  }
+  if (
+    current.kind === ts.SyntaxKind.FalseKeyword
+    || current.kind === ts.SyntaxKind.NullKeyword
+    || ts.isVoidExpression(current)
+  ) {
+    return { fragments: [], unresolved: [] };
+  }
+  return unresolvedClassExpression(current, sourceFile, 'style');
+}
+
+function stylePropertyFragments(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+): StaticClassScan {
+  const properties = opening.attributes.properties;
+  let styleIndex = -1;
+  for (let index = properties.length - 1; index >= 0; index -= 1) {
+    const property = properties[index];
+    if (ts.isJsxAttribute(property) && property.name.getText() === 'style') {
+      styleIndex = index;
+      break;
+    }
+  }
+  const trailingSpreads = properties
+    .slice(styleIndex + 1)
+    .filter((property): property is ts.JsxSpreadAttribute => ts.isJsxSpreadAttribute(property))
+    .map((property) => unresolvedSpreadExpression(property.expression, sourceFile, 'style spread'));
+  if (styleIndex < 0) {
+    return mergeStaticClassScans(...trailingSpreads);
+  }
+  const style = properties[styleIndex];
+  if (
+    !ts.isJsxAttribute(style)
+    || !style.initializer
+    || !ts.isJsxExpression(style.initializer)
+    || !style.initializer.expression
+  ) {
+    return mergeStaticClassScans(
+      unresolvedClassExpression(style, sourceFile, 'style'),
+      ...trailingSpreads,
+    );
+  }
+  return mergeStaticClassScans(
+    scanStaticStylePropertyExpression(style.initializer.expression, sourceFile, initializers),
     ...trailingSpreads,
   );
 }
@@ -2814,8 +3034,17 @@ describe('production design guard', () => {
       import { DashboardStateBlock } from '../dashboard';
       declare const dynamicClasses: string;
       <Status state="empty" title="Empty" className="rounded-2xl border border-dashed bg-card shadow-soft-card" />;
+      <Status
+        state="empty"
+        title="Inline styles"
+        style={{ background: 'var(--card)', border: '1px solid', borderRadius: '1rem', boxShadow: 'none' }}
+      />;
       <EmptyState title="Empty" className="max-w-xl" />;
-      <Common.Surface level="section" className={dynamicClasses}>Content</Common.Surface>;
+      <Common.Surface
+        level="section"
+        className="[background:var(--card)] [border:1px_solid] [border-radius:1rem] [box-shadow:none]"
+      >Content</Common.Surface>;
+      <Common.Surface level="section" className={dynamicClasses}>Dynamic content</Common.Surface>;
       <DashboardStateBlock title="Empty" className="dashboard-card" />;
     `;
     const violations = findProductionDesignViolations('fixture.tsx', source)
@@ -2827,12 +3056,51 @@ describe('production design guard', () => {
       expect.objectContaining({ token: 'StatePanel:border-dashed' }),
       expect.objectContaining({ token: 'StatePanel:bg-card' }),
       expect.objectContaining({ token: 'StatePanel:shadow-soft-card' }),
+      expect.objectContaining({ token: 'StatePanel:style:background' }),
+      expect.objectContaining({ token: 'StatePanel:style:border' }),
+      expect.objectContaining({ token: 'StatePanel:style:borderRadius' }),
+      expect.objectContaining({ token: 'StatePanel:style:boxShadow' }),
+      expect.objectContaining({ token: 'Surface:[background:var(--card)]' }),
+      expect.objectContaining({ token: 'Surface:[border:1px_solid]' }),
+      expect.objectContaining({ token: 'Surface:[border-radius:1rem]' }),
+      expect.objectContaining({ token: 'Surface:[box-shadow:none]' }),
       expect.objectContaining({ token: expect.stringContaining('Surface:dynamic:') }),
       expect.objectContaining({ token: 'DashboardStateBlock:dashboard-card' }),
     ]));
     expect(violations).not.toContainEqual(
       expect.objectContaining({ token: 'EmptyState:max-w-xl' }),
     );
+  });
+
+  it('scans compatibility adapter internals for newly owned visual layers', () => {
+    const source = `
+      import { Surface } from './Surface';
+      <Surface level="section" className="shadow-soft-card">Card content</Surface>;
+    `;
+
+    expect(findProductionDesignViolations('../common/Card.tsx', source)).toContainEqual(
+      expect.objectContaining({
+        rule: 'state-surface-visual-override',
+        token: 'Surface:shadow-soft-card',
+      }),
+    );
+
+    const changedForwarding = [
+      "import { StatePanel } from './StatePanel';",
+      'declare const className: string, otherProps: object;',
+      ...Array.from({ length: 19 }, () => ''),
+      '<StatePanel state="empty" title="Empty" {...otherProps} className={className} />;',
+    ].join('\n');
+    const forwardingViolations = findProductionDesignViolations(
+      '../common/EmptyState.tsx',
+      changedForwarding,
+    );
+    expect(forwardingViolations).toEqual([
+      expect.objectContaining({
+        rule: 'state-surface-visual-override',
+        token: 'StatePanel:style:dynamic:style spread:otherProps',
+      }),
+    ]);
   });
 
   it('keeps Button visual-override exceptions exact, consumable, and expiring', () => {
@@ -3213,11 +3481,11 @@ describe('production design guard', () => {
     )).toEqual(expect.arrayContaining([
       expect.objectContaining({
         rule: 'primary-cta-unresolved-class',
-        token: 'className spread',
+        token: 'className spread:props',
       }),
       expect.objectContaining({
         rule: 'primary-cta-unresolved-class',
-        token: 'style spread',
+        token: 'style spread:props',
       }),
     ]));
     expect(findProductionDesignViolations(
