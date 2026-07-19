@@ -109,11 +109,13 @@ export const ChangePasswordCard: React.FC = () => {
           />
         </div>
 
-        {error
-          ? isParsedApiError(error)
-            ? <SettingsAlert title={t('settings.changePasswordFailure')} message={error.message} variant="error" className="!mt-3" />
-            : <SettingsAlert title={t('settings.changePasswordFailure')} message={error} variant="error" className="!mt-3" />
-          : null}
+        {error ? (
+          <div className="mt-3">
+            {isParsedApiError(error)
+              ? <SettingsAlert title={t('settings.changePasswordFailure')} message={error.message} variant="error" />
+              : <SettingsAlert title={t('settings.changePasswordFailure')} message={error} variant="error" />}
+          </div>
+        ) : null}
         {success ? (
           <SettingsAlert title={t('settings.changePasswordSuccess')} message={t('settings.changePasswordSuccessMessage')} variant="success" />
         ) : null}

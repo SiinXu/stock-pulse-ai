@@ -42,6 +42,7 @@ export const productionDesignGuardFixtures = {
   drawerGeometrySpread: '<Drawer variant="detail" {...drawerGeometry}>Report</Drawer>',
   drawerMissingVariant: '<Drawer>Report</Drawer>',
   modalGeometryOverride: '<Modal className="max-w-[96vw]">Form</Modal>',
+  sheetGeometryOverride: '<Sheet className="max-w-[96vw]">Filters</Sheet>',
   arbitraryOverlayZ: '<div className="fixed z-[999]">Overlay</div>',
   highOverlayZ: '<div className="fixed z-50">Overlay</div>',
   inlineOverlayZ: '<div style={{ zIndex: 90 }}>Overlay</div>',

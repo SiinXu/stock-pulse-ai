@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, SearchableSelect, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -3467,28 +3467,29 @@ const SettingsPage: React.FC = () => {
       )}
 
       {toast ? (
-        <div
-          className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]"
-          onMouseEnter={() => setIsToastPaused(true)}
-          onMouseLeave={() => setIsToastPaused(false)}
-          onFocusCapture={() => setIsToastPaused(true)}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setIsToastPaused(false);
-            }
-          }}
-        >
-          {toast.type === 'success'
-            ? (
-                <SettingsAlert
-                  title={t('settings.actionSuccess')}
-                  message={toast.message}
-                  variant="success"
-                  presentation="toast"
-                />
-              )
-            : <ApiErrorAlert error={toast.error} />}
-        </div>
+        <ToastViewport>
+          <div
+            className="pointer-events-auto"
+            onMouseEnter={() => setIsToastPaused(true)}
+            onMouseLeave={() => setIsToastPaused(false)}
+            onFocusCapture={() => setIsToastPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsToastPaused(false);
+              }
+            }}
+          >
+            {toast.type === 'success'
+              ? (
+                  <SettingsAlert
+                    title={t('settings.actionSuccess')}
+                    message={toast.message}
+                    variant="success"
+                  />
+                )
+              : <ApiErrorAlert error={toast.error} />}
+          </div>
+        </ToastViewport>
       ) : null}
       <ConfirmDialog
         isOpen={showImportConfirm}
