@@ -12,6 +12,7 @@ import logging
 from typing import List, Optional
 
 from bot.commands.base import BotCommand
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, BotResponse
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.utils.sanitize import log_safe_exception
@@ -91,7 +92,7 @@ class AnalyzeCommand(BotCommand):
             result = service.submit_analysis(
                 code=code,
                 report_type=ReportType.from_str(report_type),
-                source_message=message
+                request_context=to_analysis_request_context(message),
             )
             
             if result.get("success"):

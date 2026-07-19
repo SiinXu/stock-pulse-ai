@@ -35,6 +35,7 @@ from src.notification_noise import reset_notification_noise_state
 from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType
 import requests
 
@@ -358,7 +359,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=True) as mock_reply, \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -379,7 +382,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=False), \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -400,7 +405,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_dingtalk_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
 
         with mock.patch.object(service, "_send_dingtalk_chunked", return_value=True) as mock_dingtalk, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
@@ -420,7 +427,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_telegram_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_telegram_message())
+        )
 
         with mock.patch.object(service, "send_to_telegram", return_value=True) as mock_telegram, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:

@@ -21,8 +21,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
 
 from src.enums import ReportType
+from src.schemas.request_context import AnalysisRequestContext
 from src.storage import get_db
-from bot.models import BotMessage
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
@@ -71,7 +71,7 @@ class TaskService:
         self,
         code: str,
         report_type: Union[ReportType, str] = ReportType.SIMPLE,
-        source_message: Optional[BotMessage] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
         save_context_snapshot: Optional[bool] = None,
         query_source: str = "bot"
     ) -> Dict[str, Any]:
@@ -81,7 +81,7 @@ class TaskService:
         Args:
             code: 股票代码
             report_type: 报告类型枚举
-            source_message: 来源消息（用于回复）
+            request_context: 请求来源与会话回复上下文
             save_context_snapshot: 是否保存上下文快照
             query_source: 任务来源标识（bot/api/cli/system）
 
@@ -104,7 +104,7 @@ class TaskService:
             normalized_code,
             task_id,
             report_type,
-            source_message,
+            request_context,
             save_context_snapshot,
             query_source
         )
@@ -152,7 +152,7 @@ class TaskService:
         code: str,
         task_id: str,
         report_type: ReportType = ReportType.SIMPLE,
-        source_message: Optional[BotMessage] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
         save_context_snapshot: Optional[bool] = None,
         query_source: str = "bot"
     ) -> Dict[str, Any]:
@@ -185,7 +185,7 @@ class TaskService:
             pipeline = StockAnalysisPipeline(
                 config=config,
                 max_workers=1,
-                source_message=source_message,
+                request_context=request_context,
                 query_id=task_id,
                 query_source=query_source,
                 save_context_snapshot=save_context_snapshot

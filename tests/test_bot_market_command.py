@@ -14,6 +14,7 @@ except ModuleNotFoundError:
     ensure_litellm_stub()
 
 from bot.commands.market import MarketCommand
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType
 
 
@@ -110,11 +111,12 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         )
 
         cmd = MarketCommand()
-        cmd._run_market_review(message, config, None)
+        request_context = to_analysis_request_context(message)
+        cmd._run_market_review(request_context, config, None)
 
         runtime_module.build_market_review_runtime.assert_called_once_with(
             config,
-            source_message=message,
+            request_context=request_context,
         )
         market_review_module.run_market_review.assert_called_once_with(
             notifier=notifier,
@@ -136,11 +138,12 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         )
 
         cmd = MarketCommand()
-        cmd._run_market_review(message, config, None)
+        request_context = to_analysis_request_context(message)
+        cmd._run_market_review(request_context, config, None)
 
         runtime_module.build_market_review_runtime.assert_called_once_with(
             config,
-            source_message=message,
+            request_context=request_context,
         )
         market_review_module.run_market_review.assert_called_once_with(
             notifier=notifier,
@@ -163,7 +166,8 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         )
 
         cmd = MarketCommand()
-        cmd._run_market_review(message, config, None)
+        request_context = to_analysis_request_context(message)
+        cmd._run_market_review(request_context, config, None)
 
         market_review_module.run_market_review.assert_not_called()
         runtime_module.build_market_review_runtime.assert_not_called()
@@ -182,11 +186,12 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         )
 
         cmd = MarketCommand()
-        cmd._run_market_review(message, config, None)
+        request_context = to_analysis_request_context(message)
+        cmd._run_market_review(request_context, config, None)
 
         runtime_module.build_market_review_runtime.assert_called_once_with(
             config,
-            source_message=message,
+            request_context=request_context,
         )
         market_review_module.run_market_review.assert_called_once_with(
             notifier=notifier,
@@ -211,8 +216,9 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         cmd = MarketCommand()
         lock_token = object()
         runtime_module.build_market_review_runtime.side_effect = RuntimeError("runtime init failed")
+        request_context = to_analysis_request_context(message)
         with patch.object(cmd, "_release_market_review_lock") as release_market_review_lock:
-            cmd._run_market_review(message, config, lock_token)
+            cmd._run_market_review(request_context, config, lock_token)
 
         release_market_review_lock.assert_called_once_with(lock_token)
         market_review_module.run_market_review.assert_not_called()

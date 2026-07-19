@@ -78,6 +78,7 @@ from src.services.run_diagnostics import (
 )
 from src.services.decision_signal_extractor import extract_and_persist_from_analysis_result
 from src.services.decision_signal_summary import summarize_decision_signal
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.sanitize import log_safe_exception
 from src.enums import ReportType
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult
@@ -89,9 +90,6 @@ from src.core.trading_calendar import (
     is_market_open,
 )
 from data_provider.us_index_mapping import is_us_stock_code
-from bot.models import BotMessage
-
-
 logger = logging.getLogger(__name__)
 
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
@@ -179,7 +177,7 @@ class StockAnalysisPipeline:
         self,
         config: Optional[Config] = None,
         max_workers: Optional[int] = None,
-        source_message: Optional[BotMessage] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
         query_id: Optional[str] = None,
         trace_id: Optional[str] = None,
         query_source: Optional[str] = None,
@@ -200,7 +198,7 @@ class StockAnalysisPipeline:
         """
         self.config = config or get_config()
         self.max_workers = max_workers or self.config.max_workers
-        self.source_message = source_message
+        self.request_context = request_context
         self.query_id = query_id
         self.trace_id = trace_id or query_id
         self.query_source = self._resolve_query_source(query_source)
@@ -224,7 +222,7 @@ class StockAnalysisPipeline:
         # 不再单独创建 akshare_fetcher，统一使用 fetcher_manager 获取增强数据
         self.trend_analyzer = StockTrendAnalyzer()  # 技术分析器
         self.analyzer = GeminiAnalyzer(config=self.config, skills=self.analysis_skills)
-        self.notifier = NotificationService(source_message=source_message)
+        self.notifier = NotificationService(request_context=request_context)
         self.market_structure_service = MarketStructureService(fetcher_manager=self.fetcher_manager)
         self.market_hotspot_service: Optional[MarketHotspotService] = None
         try:
@@ -3054,8 +3052,8 @@ class StockAnalysisPipeline:
         解析请求来源。
 
         优先级（从高到低）：
-        1. 显式传入的 query_source：调用方明确指定时优先使用，便于覆盖推断结果或兼容未来 source_message 来自非 bot 的场景
-        2. 存在 source_message 时推断为 "bot"：当前约定为机器人会话上下文
+        1. 显式传入的 query_source：调用方明确指定时优先使用，便于覆盖推断结果或兼容未来非 bot 的请求上下文
+        2. 存在 request_context 时推断为 "bot"：当前约定为机器人会话上下文
         3. 存在 query_id 时推断为 "web"：Web 触发的请求会带上 query_id
         4. 默认 "system"：定时任务或 CLI 等无上述上下文时
 
@@ -3067,7 +3065,7 @@ class StockAnalysisPipeline:
         """
         if query_source:
             return query_source
-        if getattr(self, "source_message", None):
+        if getattr(self, "request_context", None):
             return "bot"
         if getattr(self, "query_id", None):
             return "web"
@@ -3084,14 +3082,15 @@ class StockAnalysisPipeline:
             "query_source": self.query_source or "",
         }
 
-        if self.source_message:
+        request_context = getattr(self, "request_context", None)
+        if request_context:
             context.update({
-                "requester_platform": self.source_message.platform or "",
-                "requester_user_id": self.source_message.user_id or "",
-                "requester_user_name": self.source_message.user_name or "",
-                "requester_chat_id": self.source_message.chat_id or "",
-                "requester_message_id": self.source_message.message_id or "",
-                "requester_query": self.source_message.content or "",
+                "requester_platform": request_context.requester_platform,
+                "requester_user_id": request_context.requester_user_id,
+                "requester_user_name": request_context.requester_user_name,
+                "requester_chat_id": request_context.requester_chat_id,
+                "requester_message_id": request_context.requester_message_id,
+                "requester_query": request_context.requester_query,
             })
 
         return context
