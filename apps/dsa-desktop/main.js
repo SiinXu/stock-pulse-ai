@@ -32,6 +32,13 @@ const LATEST_RELEASE_API_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${G
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const DESKTOP_UPDATE_BACKUP_DIR = '.dsa-desktop-update-backup';
 const DESKTOP_UPDATE_BACKUP_MANIFEST_FILE = 'runtime-state.json';
+const DESKTOP_BRAND_MIGRATION_RECORD_FILE = '.stockpulse-brand-migration.json';
+const DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX = '.stockpulse-migration.tmp';
+const LEGACY_DESKTOP_PRODUCT_NAMES = Object.freeze(['Daily Stock Analysis']);
+const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
+  'Uninstall StockPulse.exe',
+  'Uninstall Daily Stock Analysis.exe',
+]);
 const DESKTOP_BACKEND_DEFAULT_HOST = '127.0.0.1';
 const PUBLIC_BIND_HOSTS = Object.freeze(new Set(['0.0.0.0', '::', '[::]', '*']));
 const MAC_DESKTOP_CLI_PATH_ENTRIES = Object.freeze([
@@ -57,6 +64,19 @@ const DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES = Object.freeze([
   path.join('data', 'alphasift', 'hotspot_details'),
   path.join('data', 'alphasift', 'snapshot.last_good.json'),
   path.join('logs', 'desktop.log'),
+]);
+const LEGACY_USER_DATA_RELATIVE_PATHS = Object.freeze([
+  '.env',
+  'data',
+  'logs',
+  DESKTOP_UPDATE_BACKUP_DIR,
+  'Local Storage',
+  'Session Storage',
+  'IndexedDB',
+  path.join('Network', 'Cookies'),
+  path.join('Network', 'Cookies-journal'),
+  'Preferences',
+  'Local State',
 ]);
 
 const UPDATE_STATUS = Object.freeze({
@@ -484,6 +504,237 @@ function copyRuntimeStatePathSync(source, target) {
   fs.copyFileSync(source, target);
 }
 
+function resolveLegacyProductUserDataDirs(currentUserDataDir = app.getPath('userData')) {
+  const currentPath = path.resolve(currentUserDataDir);
+  const parentDir = path.dirname(currentPath);
+  return LEGACY_DESKTOP_PRODUCT_NAMES
+    .map((productName) => path.join(parentDir, productName))
+    .filter((candidate) => path.resolve(candidate) !== currentPath);
+}
+
+function readDesktopBrandMigrationRecord(targetDir) {
+  const recordPath = path.join(targetDir, DESKTOP_BRAND_MIGRATION_RECORD_FILE);
+  if (!fs.existsSync(recordPath)) {
+    return null;
+  }
+
+  try {
+    const record = JSON.parse(fs.readFileSync(recordPath, 'utf-8'));
+    return record && typeof record === 'object' ? record : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeDesktopBrandMigrationRecord(result) {
+  ensureDirectory(result.targetDir);
+  const recordPath = path.join(result.targetDir, DESKTOP_BRAND_MIGRATION_RECORD_FILE);
+  const temporaryPath = `${recordPath}.tmp`;
+  fs.writeFileSync(
+    temporaryPath,
+    JSON.stringify({
+      schemaVersion: 1,
+      status: result.completed ? 'completed' : 'incomplete',
+      migratedAt: new Date().toISOString(),
+      sourceDir: result.sourceDir,
+      targetDir: result.targetDir,
+      sourcePreservedForRollback: true,
+      migrated: result.migrated,
+      skipped: result.skipped,
+      failed: result.failed,
+      rolledBack: result.rolledBack,
+      rollbackFailed: result.rollbackFailed,
+      usingLegacyFallback: result.usingLegacyFallback,
+    }, null, 2),
+    'utf-8'
+  );
+  fs.rmSync(recordPath, { force: true });
+  fs.renameSync(temporaryPath, recordPath);
+  result.recordPath = recordPath;
+}
+
+function copyLegacyUserDataFileAtomically(source, target) {
+  const temporaryTarget = `${target}${DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX}`;
+  fs.rmSync(temporaryTarget, { force: true });
+  try {
+    fs.copyFileSync(source, temporaryTarget, fs.constants.COPYFILE_EXCL);
+    fs.linkSync(temporaryTarget, target);
+  } finally {
+    fs.rmSync(temporaryTarget, { force: true });
+  }
+}
+
+function copyMissingLegacyUserDataPath(source, target, relativePath, result) {
+  try {
+    const sourceStats = fs.lstatSync(source);
+    if (sourceStats.isSymbolicLink()) {
+      result.failed.push(`${relativePath} (source symbolic link is not migrated)`);
+      return;
+    }
+
+    if (sourceStats.isDirectory()) {
+      if (fs.existsSync(target)) {
+        const targetStats = fs.lstatSync(target);
+        if (targetStats.isSymbolicLink()) {
+          result.skipped.push(`${relativePath} (target symbolic link)`);
+          return;
+        }
+        if (!targetStats.isDirectory()) {
+          result.failed.push(`${relativePath} (target type differs)`);
+          return;
+        }
+      }
+      ensureDirectory(target);
+      fs.readdirSync(source, { withFileTypes: true }).forEach((entry) => {
+        copyMissingLegacyUserDataPath(
+          path.join(source, entry.name),
+          path.join(target, entry.name),
+          path.join(relativePath, entry.name),
+          result
+        );
+      });
+      return;
+    }
+
+    if (!sourceStats.isFile()) {
+      result.skipped.push(`${relativePath} (unsupported file type)`);
+      return;
+    }
+    if (fs.existsSync(target)) {
+      const targetStats = fs.lstatSync(target);
+      if (!targetStats.isFile() && !targetStats.isSymbolicLink()) {
+        result.failed.push(`${relativePath} (target type differs)`);
+        return;
+      }
+      result.skipped.push(relativePath);
+      return;
+    }
+
+    ensureDirectory(path.dirname(target));
+    copyLegacyUserDataFileAtomically(source, target);
+    result.migrated.push(relativePath);
+  } catch (error) {
+    result.failed.push(`${relativePath} (${error instanceof Error ? error.message : String(error)})`);
+  }
+}
+
+function rollbackCopiedLegacyUserData(result) {
+  [...result.migrated].reverse().forEach((relativePath) => {
+    const target = path.join(result.targetDir, relativePath);
+    try {
+      fs.rmSync(target, { force: true });
+      result.rolledBack.push(relativePath);
+    } catch (error) {
+      result.rollbackFailed.push(
+        `${relativePath} (${error instanceof Error ? error.message : String(error)})`
+      );
+    }
+  });
+  result.migrated = result.migrated.filter(
+    (relativePath) => !result.rolledBack.includes(relativePath)
+  );
+}
+
+function isCriticalLegacyMigrationFailure(failure) {
+  const relativePath = String(failure).split(' (', 1)[0];
+  const criticalRoots = ['.env', 'data', DESKTOP_UPDATE_BACKUP_DIR];
+  return criticalRoots.some(
+    (root) => relativePath === root || relativePath.startsWith(`${root}${path.sep}`)
+  );
+}
+
+function migrateLegacyProductUserData({
+  currentUserDataDir = app.getPath('userData'),
+  legacyUserDataDirs = resolveLegacyProductUserDataDirs(currentUserDataDir),
+} = {}) {
+  const result = {
+    sourceDir: null,
+    targetDir: currentUserDataDir,
+    recordPath: null,
+    migrated: [],
+    skipped: [],
+    failed: [],
+    rolledBack: [],
+    rollbackFailed: [],
+    completed: false,
+    alreadyCompleted: false,
+    usingLegacyFallback: false,
+  };
+
+  if (!app.isPackaged) {
+    return result;
+  }
+
+  const sourceDir = legacyUserDataDirs.find((candidate) => fs.existsSync(candidate));
+  if (!sourceDir || path.resolve(sourceDir) === path.resolve(currentUserDataDir)) {
+    return result;
+  }
+
+  result.sourceDir = sourceDir;
+  const existingRecord = readDesktopBrandMigrationRecord(currentUserDataDir);
+  if (
+    existingRecord?.status === 'completed' &&
+    typeof existingRecord.sourceDir === 'string' &&
+    typeof existingRecord.targetDir === 'string' &&
+    path.resolve(existingRecord.sourceDir) === path.resolve(sourceDir) &&
+    path.resolve(existingRecord.targetDir) === path.resolve(currentUserDataDir)
+  ) {
+    result.recordPath = path.join(currentUserDataDir, DESKTOP_BRAND_MIGRATION_RECORD_FILE);
+    result.completed = true;
+    result.alreadyCompleted = true;
+    return result;
+  }
+  if (
+    existingRecord?.status === 'incomplete' &&
+    typeof existingRecord.sourceDir === 'string' &&
+    path.resolve(existingRecord.sourceDir) === path.resolve(sourceDir) &&
+    Array.isArray(existingRecord.rollbackFailed) &&
+    existingRecord.rollbackFailed.length > 0 &&
+    typeof app.setPath === 'function'
+  ) {
+    app.setPath('userData', sourceDir);
+    result.recordPath = path.join(currentUserDataDir, DESKTOP_BRAND_MIGRATION_RECORD_FILE);
+    result.failed = Array.isArray(existingRecord.failed) ? existingRecord.failed : [];
+    result.rollbackFailed = existingRecord.rollbackFailed;
+    result.usingLegacyFallback = true;
+    return result;
+  }
+
+  LEGACY_USER_DATA_RELATIVE_PATHS.forEach((relativePath) => {
+    const source = path.join(sourceDir, relativePath);
+    if (!fs.existsSync(source)) {
+      return;
+    }
+    copyMissingLegacyUserDataPath(
+      source,
+      path.join(currentUserDataDir, relativePath),
+      relativePath,
+      result
+    );
+  });
+
+  result.completed = result.failed.length === 0;
+  const criticalCopyFailed = result.failed.some(isCriticalLegacyMigrationFailure);
+  if (criticalCopyFailed && typeof app.setPath === 'function') {
+    rollbackCopiedLegacyUserData(result);
+    try {
+      app.setPath('userData', sourceDir);
+      result.usingLegacyFallback = true;
+    } catch (error) {
+      result.failed.push(`[legacy fallback] ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  try {
+    writeDesktopBrandMigrationRecord(result);
+  } catch (error) {
+    result.completed = false;
+    result.failed.push(`[migration record] ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return result;
+}
+
 function backupPackagedRuntimeState() {
   if (!isWindowsNsisInstalledApp()) {
     return;
@@ -602,9 +853,29 @@ function restorePackagedRuntimeStateFromBackup() {
   return result;
 }
 
+function resolveMacPackagedRuntimeSourceDirs() {
+  const currentExecutableDir = resolvePackagedExeDir();
+  const candidates = [currentExecutableDir];
+  const currentBundleDir = path.resolve(currentExecutableDir, '..', '..');
+  if (path.extname(currentBundleDir).toLowerCase() === '.app') {
+    const bundleParentDir = path.dirname(currentBundleDir);
+    LEGACY_DESKTOP_PRODUCT_NAMES.forEach((productName) => {
+      candidates.push(
+        path.join(bundleParentDir, `${productName}.app`, 'Contents', 'MacOS')
+      );
+    });
+  }
+
+  return candidates.filter(
+    (candidate, index) =>
+      candidates.findIndex((item) => path.resolve(item) === path.resolve(candidate)) === index
+  );
+}
+
 function migrateMacPackagedRuntimeState() {
   const result = {
     sourceDir: null,
+    sourceDirs: [],
     targetDir: null,
     migrated: [],
     skipped: [],
@@ -615,34 +886,38 @@ function migrateMacPackagedRuntimeState() {
     return result;
   }
 
-  const sourceDir = resolvePackagedExeDir();
   const targetDir = resolveAppDir();
-  result.sourceDir = sourceDir;
   result.targetDir = targetDir;
 
-  if (sourceDir === targetDir || !fs.existsSync(sourceDir)) {
-    return result;
-  }
-
-  DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES.forEach((relativePath) => {
-    const source = path.join(sourceDir, relativePath);
-    const target = path.join(targetDir, relativePath);
-
-    if (!fs.existsSync(source)) {
+  resolveMacPackagedRuntimeSourceDirs().forEach((sourceDir) => {
+    if (path.resolve(sourceDir) === path.resolve(targetDir) || !fs.existsSync(sourceDir)) {
       return;
     }
-    if (fs.existsSync(target)) {
-      result.skipped.push(relativePath);
-      return;
+    result.sourceDirs.push(sourceDir);
+    if (!result.sourceDir) {
+      result.sourceDir = sourceDir;
     }
 
-    try {
-      copyRuntimeStatePathSync(source, target);
-      result.migrated.push(relativePath);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      result.failed.push(`${relativePath} (${message})`);
-    }
+    DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES.forEach((relativePath) => {
+      const source = path.join(sourceDir, relativePath);
+      const target = path.join(targetDir, relativePath);
+
+      if (!fs.existsSync(source)) {
+        return;
+      }
+      if (fs.existsSync(target)) {
+        result.skipped.push(relativePath);
+        return;
+      }
+
+      try {
+        copyRuntimeStatePathSync(source, target);
+        result.migrated.push(relativePath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        result.failed.push(`${relativePath} (${message})`);
+      }
+    });
   });
 
   return result;
@@ -1342,7 +1617,7 @@ function isWindowsNsisInstalledApp() {
   }
 
   const appDir = path.dirname(app.getPath('exe'));
-  return fs.existsSync(path.join(appDir, 'Uninstall Daily Stock Analysis.exe'));
+  return WINDOWS_NSIS_UNINSTALLER_NAMES.some((name) => fs.existsSync(path.join(appDir, name)));
 }
 
 function getElectronAutoUpdater() {
@@ -1741,12 +2016,30 @@ ipcMain.handle('desktop:open-release-page', async (_event, releaseUrl) => {
   return true;
 });
 
-async function createWindow() {
+async function createWindow(brandMigrationResult) {
   const restoreResult = isWindowsNsisInstalledApp() ? restorePackagedRuntimeStateFromBackup() : null;
   const macMigrationResult = migrateMacPackagedRuntimeState();
   initLogging();
+  if (brandMigrationResult?.sourceDir) {
+    if (brandMigrationResult.alreadyCompleted) {
+      logLine(`[brand-migration] legacy user data migration already completed; rollback source retained at ${brandMigrationResult.sourceDir}`);
+    } else {
+      logLine(
+        `[brand-migration] migrated ${brandMigrationResult.migrated.length} legacy user data files from ${brandMigrationResult.sourceDir} to ${brandMigrationResult.targetDir}; source retained for rollback`
+      );
+    }
+  }
+  if (brandMigrationResult?.skipped.length) {
+    logLine(`[brand-migration] preserved ${brandMigrationResult.skipped.length} existing or unsupported target entries`);
+  }
+  if (brandMigrationResult?.failed.length) {
+    logLine(`[brand-migration] failed entries: ${brandMigrationResult.failed.join(', ')}`);
+  }
+  if (brandMigrationResult?.usingLegacyFallback) {
+    logLine(`[brand-migration] using legacy user data directory after a critical migration failure: ${brandMigrationResult.sourceDir}`);
+  }
   if (macMigrationResult.migrated.length) {
-    logLine(`[migration] migrated macOS runtime files from ${macMigrationResult.sourceDir} to ${macMigrationResult.targetDir}: ${macMigrationResult.migrated.join(', ')}`);
+    logLine(`[migration] migrated macOS runtime files from ${macMigrationResult.sourceDirs.join(', ')} to ${macMigrationResult.targetDir}: ${macMigrationResult.migrated.join(', ')}`);
   }
   if (macMigrationResult.skipped.length) {
     logLine(`[migration] skipped existing macOS runtime files: ${macMigrationResult.skipped.join(', ')}`);
@@ -1938,13 +2231,44 @@ async function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow);
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+function requestPackagedSingleInstanceLock() {
+  if (!app.isPackaged || typeof app.requestSingleInstanceLock !== 'function') {
+    return true;
   }
-});
+  return app.requestSingleInstanceLock();
+}
+
+function focusExistingMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (typeof mainWindow.isMinimized === 'function' && mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  if (typeof mainWindow.show === 'function') {
+    mainWindow.show();
+  }
+  if (typeof mainWindow.focus === 'function') {
+    mainWindow.focus();
+  }
+}
+
+const hasDesktopInstanceLock = requestPackagedSingleInstanceLock();
+const desktopBrandMigrationResult = hasDesktopInstanceLock
+  ? migrateLegacyProductUserData()
+  : null;
+
+if (hasDesktopInstanceLock) {
+  app.whenReady().then(() => createWindow(desktopBrandMigrationResult));
+  app.on('second-instance', focusExistingMainWindow);
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+} else {
+  app.quit();
+}
 
 app.on('window-all-closed', () => {
   void stopBackend();
@@ -1979,11 +2303,15 @@ module.exports = {
   fetchLatestReleaseJson,
   findAvailablePort,
   buildMainPageUrl,
+  isWindowsNsisInstalledApp,
   migrateMacPackagedRuntimeState,
+  migrateLegacyProductUserData,
   normalizeVersionString,
   parseSemver,
   readEnvFileValue,
+  requestPackagedSingleInstanceLock,
   resolveAppDir,
+  resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
   resolveDesktopConnectHost,
   restorePackagedRuntimeStateFromBackup,

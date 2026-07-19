@@ -81,6 +81,7 @@ import {
   computeGroupFingerprint,
   shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
+import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
@@ -3425,6 +3426,17 @@ const SettingsPage: React.FC = () => {
                 {activeConfigPanel}
               </SettingsPanelErrorBoundary>
             ) : activeConfigPanel}
+            {activeCategory === 'data_source' && activeSubCategory !== 'providers' ? (
+              <SettingsPanelErrorBoundary
+                title={t('settings.pageTitle')}
+                resetKey={`intelligence:${configVersion}`}
+                diagnosticHint={settingsPanelDiagnosticHint}
+              >
+                <div className="mt-2">
+                  <IntelligenceSourcesPanel />
+                </div>
+              </SettingsPanelErrorBoundary>
+            ) : null}
             {isAlertsSection && eventMonitorItems.length > 0 ? (
               <SettingsSectionCard
                 title={settingsText.eventMonitor}

@@ -68,7 +68,7 @@ if ($normalizedLatestVersion -ne $normalizedReleaseTag) {
   throw "Version mismatch: latest.yml=$normalizedLatestVersion, expected=$normalizedReleaseTag"
 }
 
-$expectedInstallerFileName = "daily-stock-analysis-windows-installer-v$normalizedReleaseTag.exe"
+$expectedInstallerFileName = "stockpulse-windows-installer-v$normalizedReleaseTag.exe"
 
 if ($ymlText -match '(?m)^\s*path:\s*[''"]?([^''"\r\n]+)[''"]?\s*$') {
   $latestInstallerPath = $matches[1].Trim()
