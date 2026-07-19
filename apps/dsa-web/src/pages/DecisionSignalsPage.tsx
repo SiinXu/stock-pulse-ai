@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, BarChart3, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
@@ -27,6 +27,11 @@ import {
   DecisionSignalCard,
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
+import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
+import {
+  EMPTY_MANUAL_SIGNAL_DRAFT,
+  type ManualSignalDraft,
+} from '../components/decision-signals/manualSignalDraft';
 import { DecisionSignalTimeline } from '../components/decision-signals/DecisionSignalTimeline';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -39,6 +44,7 @@ import type {
   DecisionSignalFeedbackValue,
   DecisionSignalListParams,
   DecisionSignalMarket,
+  DecisionSignalMutationResponse,
   DecisionSignalOutcomeItem,
   DecisionSignalOutcomeStatsResponse,
   DecisionSignalReassessResponse,
@@ -495,6 +501,8 @@ const DecisionSignalsPage: React.FC = () => {
   const [statsError, setStatsError] = useState<ParsedApiError | null>(null);
   const [stockDraft, setStockDraft] = useState('');
   const [stockContextModalOpen, setStockContextModalOpen] = useState(false);
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<ManualSignalDraft>(() => ({ ...EMPTY_MANUAL_SIGNAL_DRAFT }));
   const [activeStockContext, setActiveStockContext] = useState<StockContext | null>(null);
   const [historyCandidates, setHistoryCandidates] = useState<StockCandidate[]>([]);
   const [historyCandidatesLoaded, setHistoryCandidatesLoaded] = useState(false);
@@ -1128,6 +1136,29 @@ const DecisionSignalsPage: React.FC = () => {
     }
   }, [feedbackSaving, selected]);
 
+  const handleManualSignalCreated = useCallback((result: DecisionSignalMutationResponse) => {
+    void loadSignalsForPage(page);
+    void loadOutcomeStats();
+    const created = result.item;
+    if (activeStockContext && areStockCodesEquivalent(created.stockCode, activeStockContext.code)) {
+      void loadLatestForContext(activeStockContext);
+      if (appliedTimelineContext) {
+        void loadTimelineForContext(
+          { code: appliedTimelineContext.stockCode, market: appliedTimelineContext.market || undefined },
+          appliedTimelineContext,
+        );
+      }
+    }
+  }, [
+    activeStockContext,
+    appliedTimelineContext,
+    loadLatestForContext,
+    loadOutcomeStats,
+    loadSignalsForPage,
+    loadTimelineForContext,
+    page,
+  ]);
+
   const renderReassessPanel = () => {
     const preview = reassessResponse?.preview ?? null;
     const persistedItem = reassessResponse?.item ?? null;
@@ -1353,21 +1384,32 @@ const DecisionSignalsPage: React.FC = () => {
           title={t('decisionSignals.title')}
           description={t('decisionSignals.description')}
           actions={(
-            <Button
-              type="button"
-              variant="secondary"
-              size="comfortable"
-              onClick={() => {
-                void loadSignals();
-                void loadOutcomeStats();
-              }}
-              disabled={loading}
-              isLoading={loading}
-              loadingText={t('decisionSignals.refresh')}
-            >
-              <RefreshCw className="h-4 w-4" />
-              {t('decisionSignals.refresh')}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="primary"
+                size="comfortable"
+                onClick={() => setCreateDrawerOpen(true)}
+              >
+                <PlusCircle className="h-4 w-4" />
+                {t('decisionSignals.create.button')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="comfortable"
+                onClick={() => {
+                  void loadSignals();
+                  void loadOutcomeStats();
+                }}
+                disabled={loading}
+                isLoading={loading}
+                loadingText={t('decisionSignals.refresh')}
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('decisionSignals.refresh')}
+              </Button>
+            </div>
           )}
         />
 
@@ -1384,6 +1426,14 @@ const DecisionSignalsPage: React.FC = () => {
               : t('decisionSignals.stockContextTitle')}
           </Button>
         </div>
+
+        <DecisionSignalCreateDrawer
+          isOpen={createDrawerOpen}
+          onClose={() => setCreateDrawerOpen(false)}
+          draft={createDraft}
+          onDraftChange={setCreateDraft}
+          onCreated={handleManualSignalCreated}
+        />
 
         <Modal
           isOpen={stockContextModalOpen}
