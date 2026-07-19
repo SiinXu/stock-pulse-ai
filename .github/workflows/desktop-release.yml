@@ -70,7 +70,7 @@ jobs:
       - name: Prepare release artifact (Windows)
         shell: pwsh
         run: |
-          $expectedInstallerName = "daily-stock-analysis-windows-installer-$env:RELEASE_TAG.exe"
+          $expectedInstallerName = "stockpulse-windows-installer-$env:RELEASE_TAG.exe"
           $installerPath = Join-Path 'apps/dsa-desktop/dist' $expectedInstallerName
           $installerExe = Get-Item -Path $installerPath -ErrorAction SilentlyContinue
           if (-not $installerExe) {
@@ -82,7 +82,7 @@ jobs:
           }
           New-Item -ItemType Directory -Path 'dist/release-assets' -Force | Out-Null
           $exeTarget = "dist/release-assets/$expectedInstallerName"
-          $zipTarget = "dist/release-assets/daily-stock-analysis-windows-noinstall-$env:RELEASE_TAG.zip"
+          $zipTarget = "dist/release-assets/stockpulse-windows-noinstall-$env:RELEASE_TAG.zip"
           Copy-Item -Path $installerExe.FullName -Destination $exeTarget -Force
           Compress-Archive -Path $winUnpacked -DestinationPath $zipTarget -CompressionLevel Optimal -Force
           Get-ChildItem -Path 'apps/dsa-desktop/dist' -File |
@@ -201,7 +201,7 @@ jobs:
           fi
           test -n "$dmg_file"
           mkdir -p dist/release-assets
-          cp "$dmg_file" "dist/release-assets/daily-stock-analysis-macos-${{ matrix.arch }}-${RELEASE_TAG}.dmg"
+          cp "$dmg_file" "dist/release-assets/stockpulse-macos-${{ matrix.arch }}-${RELEASE_TAG}.dmg"
 
       - uses: actions/upload-artifact@v6
         with:
