@@ -300,6 +300,87 @@ def test_api_json_export_contract_prefers_canonical_presentation(client_and_db) 
         }
 
 
+@pytest.mark.parametrize(
+    ("replacement_metadata", "expected_metadata"),
+    [
+        ({}, {"decision_profile": "balanced", "report_language": "en"}),
+        (
+            {"closed_by": "review", "report_language": "ko"},
+            {
+                "closed_by": "review",
+                "decision_profile": "balanced",
+                "report_language": "en",
+            },
+        ),
+        (None, {"report_language": "en"}),
+    ],
+    ids=("object-replacement", "conflicting-language-replacement", "null-replacement"),
+)
+def test_status_metadata_replacement_preserves_presentation_language(
+    client_and_db,
+    replacement_metadata,
+    expected_metadata,
+) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4002,
+            trace_id="trace-presentation-language-4002",
+            action="buy",
+            action_label="Sell",
+            report_language="en",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    signal_id = create_resp.json()["item"]["id"]
+
+    patch_resp = client.patch(
+        f"/api/v1/decision-signals/{signal_id}/status",
+        json={"status": "closed", "metadata": replacement_metadata},
+    )
+
+    assert patch_resp.status_code == 200, patch_resp.text
+    updated = patch_resp.json()
+    assert updated["action"] == "buy"
+    assert updated["action_label"] == "Sell"
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "Buy"
+    assert updated["metadata"] == expected_metadata
+    assert client.get(f"/api/v1/decision-signals/{signal_id}").json()["presentation"] == updated["presentation"]
+
+
+def test_status_metadata_replacement_cannot_promote_presentation_language(client_and_db) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4003,
+            trace_id="trace-presentation-language-4003",
+            action="buy",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    signal_id = create_resp.json()["item"]["id"]
+
+    patch_resp = client.patch(
+        f"/api/v1/decision-signals/{signal_id}/status",
+        json={
+            "status": "closed",
+            "metadata": {"closed_by": "review", "report_language": "en"},
+        },
+    )
+
+    assert patch_resp.status_code == 200, patch_resp.text
+    updated = patch_resp.json()
+    assert updated["metadata"] == {
+        "closed_by": "review",
+        "decision_profile": "balanced",
+    }
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "买入"
+
+
 def test_create_rejects_explicit_null_decision_profile_and_accepts_null_metadata(client_and_db) -> None:
     client, _db = client_and_db
 

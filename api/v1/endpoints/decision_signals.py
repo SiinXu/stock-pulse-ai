@@ -521,8 +521,9 @@ def put_feedback(signal_id: int, request: DecisionSignalFeedbackRequest) -> Deci
     },
     summary="更新决策信号状态",
     description=(
-        "只更新合法状态和可选 metadata；省略 metadata 时保留原值，null 时清空，"
-        "object 时按整包替换并保持正式 decision_profile 身份。"
+        "只更新合法状态和可选 metadata；省略 metadata 时保留原值，null 时清空调用方 metadata，"
+        "object 时按整包替换调用方 metadata；两种替换都保持正式 decision_profile 身份和"
+        "已持久化的 presentation report_language provenance，且不会从替换 metadata 提升正式值。"
         "expired/invalidated/closed/archived 等 terminal 状态不能直接 PATCH 回 active。"
     ),
     operation_id="updateDecisionSignalStatus",

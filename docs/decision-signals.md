@@ -75,7 +75,7 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - `POST /api/v1/decision-signals`：创建或按同源键去重，返回 `{ item, created }`。
 - `GET /api/v1/decision-signals`：分页查询，支持市场、股票、动作、阶段、`decision_profile`、来源、状态、时间范围和持仓过滤。省略或传空 `decision_profile` 不加 profile 条件，返回所有 profile；`decision_profile=unknown` 查询 `NULL` 行；合法 profile 精确匹配。
 - `GET /api/v1/decision-signals/{signal_id}`：查询单条。
-- `PATCH /api/v1/decision-signals/{signal_id}/status`：更新状态和可选 metadata。
+- `PATCH /api/v1/decision-signals/{signal_id}/status`：更新状态和可选 metadata。object/null 替换只替换调用方 metadata；已持久化的 `report_language` 作为 canonical presentation provenance 保留，没有正式 provenance 时也不会从替换 object 提升该键，避免单纯状态更新改变同一信号的本地化标签。
 - `GET /api/v1/decision-signals/latest/{stock_code}`：查询股票最新 active 信号。
 - `POST /api/v1/decision-signals/outcomes/run`：显式触发后验评估。
 - `GET /api/v1/decision-signals/outcomes`、`GET /api/v1/decision-signals/outcomes/stats`、`GET /api/v1/decision-signals/{signal_id}/outcomes`：查询后验结果与统计。

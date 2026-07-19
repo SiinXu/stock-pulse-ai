@@ -1302,6 +1302,33 @@ def test_service_status_metadata_preserves_null_contract_and_profile_identity(is
     assert legacy_updated["metadata"] == {"closed_by": "tester"}
 
 
+@pytest.mark.parametrize("legacy_metadata_json", ("{invalid", '["legacy"]'))
+def test_status_metadata_replacement_repairs_unreadable_legacy_metadata(
+    isolated_db,
+    legacy_metadata_json,
+) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    signal = service.create_signal(
+        _payload(source_report_id=367, trace_id="trace-status-repair")
+    )["item"]
+    with isolated_db.get_session() as session:
+        row = session.get(DecisionSignalRecord, signal["id"])
+        assert row is not None
+        row.metadata_json = legacy_metadata_json
+        session.commit()
+
+    updated = service.update_status(
+        signal["id"],
+        status="closed",
+        metadata={"repaired": True},
+        replace_metadata=True,
+    )
+
+    assert updated["metadata"] == {"decision_profile": "balanced", "repaired": True}
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "买入"
+
+
 def test_service_invalidates_opposing_active_signals(isolated_db) -> None:
     service = DecisionSignalService(db_manager=isolated_db)
     old_buy = service.create_signal(

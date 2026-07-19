@@ -17,7 +17,10 @@ from src.repositories.decision_signal_repo import (
     DecisionSignalRepository,
 )
 from src.repositories.portfolio_repo import PortfolioRepository
-from src.report_language import normalize_report_language
+from src.report_language import (
+    is_supported_report_language_value,
+    normalize_report_language,
+)
 from src.schemas.decision_action import (
     DecisionAction,
     build_action_fields,
@@ -377,6 +380,7 @@ class DecisionSignalService:
             raise ValueError("terminal decision signal cannot be reactivated through status update")
         metadata_json = None
         if replace_metadata:
+            presentation_language = self._persisted_presentation_language(existing)
             if isinstance(metadata, dict):
                 normalized_metadata = dict(metadata)
                 if existing.decision_profile is None:
@@ -386,7 +390,13 @@ class DecisionSignalService:
                         normalized_metadata,
                         existing.decision_profile,
                     )
+                if presentation_language is not None:
+                    normalized_metadata["report_language"] = presentation_language
+                else:
+                    normalized_metadata.pop("report_language", None)
                 metadata_json = self._json_dumps(normalized_metadata)
+            elif metadata is None and presentation_language is not None:
+                metadata_json = self._json_dumps({"report_language": presentation_language})
             else:
                 metadata_json = self._json_dumps(metadata)
         row = self.repo.update_status(
@@ -1045,6 +1055,24 @@ class DecisionSignalService:
         normalized = dict(metadata)
         normalized["decision_profile"] = decision_profile
         return normalized
+
+    def _persisted_presentation_language(
+        self,
+        row: DecisionSignalRecord,
+    ) -> Optional[str]:
+        if not row.metadata_json:
+            return None
+        try:
+            metadata = json.loads(row.metadata_json)
+        except (TypeError, ValueError, RecursionError):
+            # A replacement remains the recovery path for malformed legacy metadata.
+            return None
+        if not isinstance(metadata, dict):
+            return None
+        value = metadata.get("report_language")
+        if not isinstance(value, str) or not is_supported_report_language_value(value):
+            return None
+        return normalize_report_language(value)
 
     @staticmethod
     def _metadata_for_invalidation(row: DecisionSignalRecord) -> Dict[str, Any]:

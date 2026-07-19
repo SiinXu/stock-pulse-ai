@@ -77,8 +77,10 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "top-level explicit `null`, empty value, or invalid value is rejected" in full_guide_en
     assert "metadata 省略或显式 `null` 均按无 metadata 处理" in full_guide
     assert "Omitted or explicit `null` metadata is treated as absent" in full_guide_en
-    assert "显式 `null` 时清空为 SQL `NULL`" in full_guide
-    assert "explicit `null` clears it to SQL `NULL`" in full_guide_en
+    assert "显式 `null` 时清空调用方 metadata" in full_guide
+    assert "null replacement retains that one metadata key instead of writing SQL `NULL`" in full_guide_en
+    assert "object/null 替换都会保留这一 presentation provenance" in full_guide
+    assert "object and null replacements preserve that formal presentation provenance" in full_guide_en
     assert "正式字段为 legacy `NULL` 时会移除请求 object 中的 profile key" in full_guide
     assert "for a legacy formal `NULL`, the profile key is removed" in full_guide_en
     assert "API 响应 schema 不变" not in full_guide
