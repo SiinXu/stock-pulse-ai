@@ -137,6 +137,7 @@ Web 入口位于 `/decision-signals`：
 - 时间线 status filter 只支持 `all` 与 `active`：`all` 不传 `status`，`active` 传 `status=active`。P1 不提供 terminal status filter，也不做前端 terminal 过滤。
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
+- 统计卡片内提供“运行后验”入口，按安全默认参数触发 `POST /api/v1/decision-signals/outcomes/run`：固定 `status=active`、`force=false`、`limit=100`，只补算 active 信号中缺失或可重试的 outcome，不会重算全部或强制覆盖，避免误触发大批量重算或反复请求数据源。触发前需二次确认；运行同步返回后展示 `evaluated`/`created`/`updated`/`skipped` 汇总与引擎版本，并把本次运行追加到“最近运行”会话列表（仅前端会话内保留，后端无运行历史）。运行期间禁用触发并由 in-flight 守卫防重复提交，失败时展示错误与 trace，成功后刷新后验统计。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
 - 卡片、详情、组合摘要和时间线统一以顶层 `action` 决定方向，并读取 `presentation` 的 confidence、summary、risk、timestamp；`presentation.action` 只作为同值派生镜像返回。时间线 rank、颜色和 tooltip 不再各自解释方向，排序与持仓等价代码匹配只按 canonical timestamp 选择最新信号。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。

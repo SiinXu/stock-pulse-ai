@@ -115,7 +115,7 @@ const STATE_SURFACE_IMPLEMENTATION_SUFFIXES = [
 ] as const;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1498,
+    line: 1499,
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
