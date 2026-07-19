@@ -493,6 +493,45 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.queryByText('600519 · sell')).not.toBeInTheDocument();
   });
 
+  it('uses canonical presentation action when portfolio risk compatibility fields conflict', async () => {
+    getRisk.mockResolvedValueOnce(makeRisk({
+      decisionSignalRisk: {
+        available: true,
+        total: 1,
+        actions: { sell: 1, reduce: 0, alert: 0 },
+        items: [
+          {
+            accountId: 1,
+            symbol: '600519',
+            market: 'cn',
+            signal: makeDecisionSignal({
+              id: 204,
+              action: 'buy',
+              actionLabel: 'Buy',
+              presentation: {
+                action: 'sell',
+                label: 'Sell',
+                confidence: 0.91,
+                summary: 'Canonical summary',
+                risk: 'Canonical risk',
+                timestamp: '2026-07-18T12:00:00Z',
+              },
+            }),
+          },
+        ],
+      },
+    }));
+
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    expect(screen.getByText(/卖出: 1 · 减仓: 0 · 预警: 0/)).toBeInTheDocument();
+    expect(screen.getByText('600519 · 卖出')).toBeInTheDocument();
+    expect(screen.queryByText('600519 · 买入')).not.toBeInTheDocument();
+    expect(screen.queryByText('600519 · Buy')).not.toBeInTheDocument();
+  });
+
   it('renders portfolio decision signal risk fail-open state', async () => {
     getRisk.mockResolvedValueOnce(makeRisk({
       decisionSignalRisk: {
@@ -646,6 +685,50 @@ describe('PortfolioPage FX refresh', () => {
       limit: 1,
     });
     expect(decisionSignalsApi.list).not.toHaveBeenCalled();
+  });
+
+  it('selects the latest equivalent holding signal by canonical presentation timestamp', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({ positions: [
+      { symbol: '600519', market: 'cn', currency: 'CNY', quantity: 1, avgCost: 1500, totalCost: 1500, lastPrice: 1600, marketValueBase: 1600, unrealizedPnlBase: 100, unrealizedPnlPct: 6.67, valuationCurrency: 'CNY', priceSource: 'history_close', priceDate: '2026-06-17', priceStale: false, priceAvailable: true },
+    ] }));
+    const flatNewerCanonicalOlder = makeDecisionSignal({
+      id: 301,
+      createdAt: '2026-12-01T00:00:00Z',
+      riskSummary: 'Flat timestamp winner must not render',
+      presentation: {
+        action: 'hold',
+        label: 'Hold',
+        confidence: 0.5,
+        summary: 'Canonical older',
+        risk: 'Canonical older risk',
+        timestamp: '2026-01-01T00:00:00Z',
+      },
+    });
+    const flatOlderCanonicalNewer = makeDecisionSignal({
+      id: 302,
+      createdAt: '2026-01-01T00:00:00Z',
+      riskSummary: 'Flat timestamp loser',
+      presentation: {
+        action: 'sell',
+        label: 'Sell',
+        confidence: 0.9,
+        summary: 'Canonical newest',
+        risk: 'Canonical timestamp winner',
+        timestamp: '2026-12-01T00:00:00Z',
+      },
+    });
+    getLatestDecisionSignals.mockResolvedValueOnce({
+      items: [flatNewerCanonicalOlder, flatOlderCanonicalNewer],
+      total: 2,
+      page: 1,
+      pageSize: 1,
+    });
+
+    render(<PortfolioPage />);
+
+    expect(await screen.findByText('Canonical timestamp winner')).toBeInTheDocument();
+    expect(screen.queryByText('Canonical older risk')).not.toBeInTheDocument();
+    expect(screen.queryByText('Flat timestamp winner must not render')).not.toBeInTheDocument();
   });
 
   it('refreshes holding signals when manually refreshing unchanged portfolio data', async () => {

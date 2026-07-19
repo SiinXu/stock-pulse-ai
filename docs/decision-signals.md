@@ -35,7 +35,7 @@
 
 Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标签；API 响应继续保留原始枚举值。
 
-`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。`presentation.action` 永远来自 canonical 八态 `action`；`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API 导出消费者必须优先读取 `presentation`，只有滚动升级连接旧后端时才回退平铺字段。通知会按通知报告语言重新本地化 `presentation.action`，Web 会按当前 UI 语言本地化同一 action。
+`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。`presentation.action` 永远来自 canonical 八态 `action`；`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API JSON 序列化消费者必须优先读取 `presentation`，只有滚动升级连接旧后端时才回退平铺字段。当前没有独立的 DecisionSignal 导出端点或导出 UI，API JSON 是现有唯一导出面。通知会读取本次 worker 的 `REPORT_LANGUAGE`（`zh/en/ko`）重新本地化 `presentation.action`，Web 会按当前 UI 语言本地化同一 action。
 
 该模型只属于独立 `DecisionSignal` 资源和低敏 `decision_signal_summary`。主报告、历史列表、StockBar 与回测 schema 继续保持字段隔离，不嵌入完整 signal presentation。
 
@@ -136,7 +136,7 @@ Web 入口位于 `/decision-signals`：
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
-- 卡片、详情、组合摘要和时间线统一读取 `presentation` 的 action、confidence、summary、risk、timestamp；时间线 rank、颜色、tooltip 和排序不再各自读取平铺字段。
+- 卡片、详情、组合摘要和时间线统一读取 `presentation` 的 action、confidence、summary、risk、timestamp；时间线 rank、颜色、tooltip 和排序不再各自读取平铺字段，持仓等价代码匹配也只按 canonical timestamp 选择最新信号。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
 - 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。
 - 详情抽屉或已有来源报告 ID 的页面上下文可以发起 reassess preview；没有可用来源报告 ID 时入口禁用。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。

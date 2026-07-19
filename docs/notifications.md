@@ -234,7 +234,7 @@ P5 强化聚合报告通知路径的失败边界：`_send_notifications()` 在 r
 - 任一静态渠道发送成功时，P4 降噪 reservation 会写入正式记录；全部静态渠道失败或抛异常时，会释放 reservation。
 - `send_to_context()` 仍独立于静态渠道 route 和降噪记录，用于回复触发任务的 Bot 会话上下文。
 
-#1390 P6 的决策信号摘要沿用同一失败隔离边界：分析流程只在运行时挂载低敏 `decision_signal_summary`，聚合分析报告仍不重复渲染 DecisionSignal excerpt；告警通知会追加 canonical `presentation` 的动作、标签、置信度、摘要、风险和时间戳，以及周期、观察条件和来源报告。两条路径都不会输出 signal `metadata`、`evidence`、raw diagnostics 或 webhook/token。告警通知标签由 `presentation.action` 按报告语言生成，不使用可能冲突的兼容 `action_label`。告警通知发送失败只记录通知尝试或 dispatch fallback，不回滚已经写入的 trigger 或 DecisionSignal。
+#1390 P6 的决策信号摘要沿用同一失败隔离边界：分析流程只在运行时挂载低敏 `decision_signal_summary`，聚合分析报告仍不重复渲染 DecisionSignal excerpt；告警通知会追加 canonical `presentation` 的动作/标签、置信度、摘要、风险和时间戳，以及周期、观察条件和来源报告。两条路径都不会输出 signal `metadata`、`evidence`、raw diagnostics 或 webhook/token。告警 worker 从本次运行配置读取 `REPORT_LANGUAGE`，完整支持 `zh/en/ko`，并由 `presentation.action` 生成对应语言标签，不使用可能冲突的兼容 `action_label`。告警通知发送失败只记录通知尝试或 dispatch fallback，不回滚已经写入的 trigger 或 DecisionSignal。
 
 DecisionSignal 通知摘要字段、敏感信息边界、迁移与回滚说明见 [DecisionSignal 决策信号专题](decision-signals.md)。
 

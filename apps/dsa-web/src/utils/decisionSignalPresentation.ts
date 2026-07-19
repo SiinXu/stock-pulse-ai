@@ -8,11 +8,13 @@ import {
   type DecisionActionLabelMap,
 } from './decisionAction';
 
+type DecisionSignalPresentationSource = Pick<DecisionSignalItem, 'action'> & Partial<DecisionSignalItem>;
+
 const hasOwn = (value: object, key: PropertyKey): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
 function presentationValue<K extends keyof DecisionSignalPresentation>(
-  item: DecisionSignalItem,
+  item: DecisionSignalPresentationSource,
   key: K,
   fallback: DecisionSignalPresentation[K],
 ): DecisionSignalPresentation[K] {
@@ -22,7 +24,7 @@ function presentationValue<K extends keyof DecisionSignalPresentation>(
 }
 
 export function getDecisionSignalPresentation(
-  item: DecisionSignalItem,
+  item: DecisionSignalPresentationSource,
   labels?: Partial<DecisionActionLabelMap>,
 ): DecisionSignalPresentation {
   const action = presentationValue(item, 'action', item.action) as DecisionAction;

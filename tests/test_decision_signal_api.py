@@ -263,6 +263,43 @@ def test_create_duplicate_list_detail_latest_and_status_update(client_and_db) ->
     assert missing_resp.status_code == 404
 
 
+def test_api_json_export_contract_prefers_canonical_presentation(client_and_db) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4001,
+            trace_id="trace-export-4001",
+            action="buy",
+            action_label="Sell",
+            confidence=0.91,
+            reason="Canonical export summary",
+            risk_summary="Canonical export risk",
+            report_language="en",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    signal_id = create_resp.json()["item"]["id"]
+
+    responses = (
+        create_resp.json()["item"],
+        client.get(f"/api/v1/decision-signals/{signal_id}").json(),
+        client.get("/api/v1/decision-signals", params={"source_report_id": 4001}).json()["items"][0],
+        client.get("/api/v1/decision-signals/latest/600519", params={"limit": 1}).json()["items"][0],
+    )
+    for item in responses:
+        assert item["action"] == "buy"
+        assert item["action_label"] == "Sell"
+        assert item["presentation"] == {
+            "action": "buy",
+            "label": "Buy",
+            "confidence": 0.91,
+            "summary": "Canonical export summary",
+            "risk": "Canonical export risk",
+            "timestamp": item["created_at"],
+        }
+
+
 def test_create_rejects_explicit_null_decision_profile_and_accepts_null_metadata(client_and_db) -> None:
     client, _db = client_and_db
 

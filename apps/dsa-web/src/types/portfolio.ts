@@ -133,7 +133,7 @@ export interface PortfolioDecisionSignalRiskItem {
   accountId?: number | null;
   symbol: string;
   market: string;
-  signal: Partial<DecisionSignalItem>;
+  signal: Pick<DecisionSignalItem, 'action'> & Partial<DecisionSignalItem>;
 }
 
 export interface PortfolioDecisionSignalRiskBlock {

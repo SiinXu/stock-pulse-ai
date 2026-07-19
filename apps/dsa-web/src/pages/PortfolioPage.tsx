@@ -53,7 +53,8 @@ import type {
 } from '../types/portfolio';
 import { areStockCodesEquivalent, normalizeStockCode } from '../utils/stockCode';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
-import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
+import { buildDecisionActionLabelMap } from '../utils/decisionAction';
+import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { createOperationId } from '../utils/operationId';
 
 const PIE_COLORS = [
@@ -122,9 +123,7 @@ const PORTFOLIO_FILE_PICKER_CLASS =
   'flex h-11 w-full cursor-pointer items-center justify-center rounded-full border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 
 function getSignalTime(item: DecisionSignalItem): number {
-  return parseDecisionSignalDate(item.createdAt)?.getTime()
-    ?? parseDecisionSignalDate(item.updatedAt)?.getTime()
-    ?? 0;
+  return parseDecisionSignalDate(getDecisionSignalPresentation(item).timestamp)?.getTime() ?? 0;
 }
 
 function isNewerSignal(left: DecisionSignalItem | undefined, right: DecisionSignalItem): boolean {
@@ -1103,15 +1102,9 @@ const PortfolioPage: React.FC = () => {
   };
 
   const decisionSignalRiskPreviewItems = (risk?.decisionSignalRisk?.items ?? []).slice(0, 3);
-  const formatDecisionSignalRiskAction = (signal: Partial<DecisionSignalItem>): string => (
-    getDecisionActionLabel(
-      signal.action,
-      signal.actionLabel,
-      null,
-      text.alert,
-      decisionActionLabels,
-    ) ?? text.alert
-  );
+  const formatDecisionSignalRiskAction = (
+    signal: Pick<DecisionSignalItem, 'action'> & Partial<DecisionSignalItem>,
+  ): string => getDecisionSignalPresentation(signal, decisionActionLabels).label;
   const snapshotQualityMessage = snapshot?.dataQuality === 'partial' && snapshot.limitations?.length
     ? snapshot.limitations
       .map((limitation) => formatPortfolioLimitation(limitation, language))

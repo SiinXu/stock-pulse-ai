@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, Optional
 
+from src.report_language import normalize_report_language
 from src.schemas.decision_signal_presentation import build_decision_signal_presentation
 from src.utils.sanitize import sanitize_decision_signal_payload, sanitize_decision_signal_text
 
@@ -57,11 +59,13 @@ def format_decision_signal_excerpt(summary: Any, report_language: str = "zh") ->
 
     if not isinstance(summary, dict) or not summary:
         return ""
-    language = "en" if str(report_language or "").lower().startswith("en") else "zh"
+    language = normalize_report_language(report_language)
     labels = {
         "zh": {
             "heading": "AI 决策信号",
             "action": "动作",
+            "confidence": "置信度",
+            "timestamp": "时间",
             "horizon": "周期",
             "reason": "理由",
             "watch_conditions": "观察条件",
@@ -71,11 +75,24 @@ def format_decision_signal_excerpt(summary: Any, report_language: str = "zh") ->
         "en": {
             "heading": "AI decision signal",
             "action": "Action",
+            "confidence": "Confidence",
+            "timestamp": "Time",
             "horizon": "Horizon",
             "reason": "Reason",
             "watch_conditions": "Watch",
             "risk_summary": "Risk",
             "source_report_id": "Report",
+        },
+        "ko": {
+            "heading": "AI 의사결정 신호",
+            "action": "조치",
+            "confidence": "신뢰도",
+            "timestamp": "생성일",
+            "horizon": "투자 기간",
+            "reason": "이유",
+            "watch_conditions": "감시 조건",
+            "risk_summary": "위험",
+            "source_report_id": "출처 보고서",
         },
     }[language]
 
@@ -87,6 +104,17 @@ def format_decision_signal_excerpt(summary: Any, report_language: str = "zh") ->
     )
     if action_label:
         parts.append(f"{labels['action']}: {action_label}")
+    confidence = _public_confidence(
+        presentation.get("confidence") if presentation else summary.get("confidence")
+    )
+    if confidence:
+        parts.append(f"{labels['confidence']}: {confidence}")
+    timestamp = _public_scalar(
+        presentation.get("timestamp") if presentation else summary.get("created_at"),
+        max_length=64,
+    )
+    if timestamp:
+        parts.append(f"{labels['timestamp']}: {timestamp}")
     horizon = _public_scalar(summary.get("horizon"), max_length=16)
     if horizon:
         parts.append(f"{labels['horizon']}: {horizon}")
@@ -121,6 +149,18 @@ def _public_scalar(value: Any, *, max_length: int) -> str:
     if value in (None, ""):
         return ""
     return sanitize_decision_signal_text(value)[:max_length]
+
+
+def _public_confidence(value: Any) -> str:
+    if value in (None, "") or isinstance(value, bool):
+        return ""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return ""
+    if not math.isfinite(parsed) or not 0.0 <= parsed <= 1.0:
+        return ""
+    return f"{parsed * 100:.0f}%"
 
 
 def _public_text(value: Any, *, max_length: Optional[int]) -> str:

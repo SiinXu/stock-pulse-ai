@@ -93,6 +93,8 @@ def test_format_decision_signal_excerpt_formats_chinese_list_and_dict_fields() -
 def test_format_decision_signal_excerpt_formats_english_and_redacts_text() -> None:
     excerpt = format_decision_signal_excerpt({
         "action": "alert",
+        "confidence": 0.875,
+        "created_at": "2026-07-19T01:02:03Z",
         "horizon": "5d",
         "reason": "authorization: Bearer raw-token",
         "watch_conditions": "Check price",
@@ -100,10 +102,35 @@ def test_format_decision_signal_excerpt_formats_english_and_redacts_text() -> No
     }, report_language="en")
 
     assert excerpt.startswith("**AI decision signal**")
-    assert "Action: Alert | Horizon: 5d" in excerpt
+    assert "Action: Alert | Confidence: 88% | Time: 2026-07-19T01:02:03Z | Horizon: 5d" in excerpt
     assert "- Reason: authorization: [REDACTED]" in excerpt
     assert "- Watch: Check price" in excerpt
     assert "- Risk: token=[REDACTED]" in excerpt
+
+
+def test_format_decision_signal_excerpt_formats_korean_canonical_fields() -> None:
+    excerpt = format_decision_signal_excerpt({
+        "action": "buy",
+        "action_label": "Sell",
+        "confidence": 0.91,
+        "created_at": "2026-07-19T01:02:03Z",
+        "horizon": "3d",
+        "reason": "상승 모멘텀 확인",
+        "watch_conditions": "거래량 확인",
+        "risk_summary": "갭 위험",
+        "source_report_id": 88,
+    }, report_language="ko")
+
+    assert excerpt.startswith("**AI 의사결정 신호**")
+    assert "조치: 매수" in excerpt
+    assert "신뢰도: 91%" in excerpt
+    assert "생성일: 2026-07-19T01:02:03Z" in excerpt
+    assert "투자 기간: 3d" in excerpt
+    assert "출처 보고서: #88" in excerpt
+    assert "- 이유: 상승 모멘텀 확인" in excerpt
+    assert "- 감시 조건: 거래량 확인" in excerpt
+    assert "- 위험: 갭 위험" in excerpt
+    assert "Sell" not in excerpt
 
 
 def test_format_decision_signal_excerpt_uses_canonical_action_when_label_conflicts() -> None:
