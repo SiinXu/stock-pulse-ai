@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
+import { getOverlayStyle } from './overlayZ';
 
 export const FIXED_POPUP_GAP_PX = 4;
 export const FIXED_POPUP_VIEWPORT_MARGIN_PX = 8;
@@ -48,7 +49,9 @@ export const useFixedPopup = <
     const trigger = triggerRef.current;
     setPopupPosition(null);
     setTriggerRect(trigger?.getBoundingClientRect() ?? null);
-    setPortalHost((trigger?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body);
+    setPortalHost(
+      (trigger?.closest('[data-overlay-dialog="true"]') as HTMLElement | null) ?? document.body,
+    );
   }, [triggerRef]);
 
   const resetPosition = useCallback(() => {
@@ -120,7 +123,7 @@ export const useFixedPopup = <
   }, [isOpen, triggerRef]);
 
   const popupStyle: CSSProperties | undefined = triggerRect
-    ? {
+    ? getOverlayStyle('popover', {
         top: popupPosition?.top ?? triggerRect.bottom + FIXED_POPUP_GAP_PX,
         left: popupPosition?.left ?? triggerRect.left,
         minWidth: triggerRect.width,
@@ -129,7 +132,7 @@ export const useFixedPopup = <
           : undefined,
         maxHeight: popupPosition?.maxHeight,
         visibility: popupPosition ? 'visible' : 'hidden',
-      }
+      })
     : undefined;
 
   return {

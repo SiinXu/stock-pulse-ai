@@ -1,5 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { Modal } from '../Modal';
+import { OVERLAY_Z } from '../overlayZ';
 import { Popover } from '../Popover';
 
 describe('Popover', () => {
@@ -44,5 +47,41 @@ describe('Popover', () => {
       </Popover>,
     );
     expect(screen.queryByText('内容')).not.toBeInTheDocument();
+  });
+
+  it('portals into a parent dialog and consumes Escape before the dialog', async () => {
+    const onModalClose = vi.fn();
+    render(
+      <UiLanguageProvider>
+        <Modal isOpen title="Edit filters" onClose={onModalClose}>
+          <Popover
+            defaultOpen
+            contentRole="menu"
+            ariaLabel="Filter actions"
+            trigger={({ open, toggle }) => (
+              <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+                Actions
+              </button>
+            )}
+          >
+            <button type="button" role="menuitem">Reset filter</button>
+          </Popover>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit filters' });
+    const trigger = screen.getByRole('button', { name: 'Actions' });
+    const menu = screen.getByRole('menu', { name: 'Filter actions' });
+    expect(dialog).toContainElement(menu);
+    expect(trigger.parentElement).not.toContainElement(menu);
+    expect(menu).toHaveAttribute('data-dialog-popup', 'true');
+    expect(menu.style.zIndex).toBe(String(OVERLAY_Z.popover));
+
+    fireEvent.keyDown(menu, { key: 'Escape' });
+
+    expect(screen.queryByRole('menu', { name: 'Filter actions' })).not.toBeInTheDocument();
+    expect(onModalClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

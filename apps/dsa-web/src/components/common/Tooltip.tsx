@@ -2,6 +2,7 @@ import type React from 'react';
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle } from './overlayZ';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -138,13 +139,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
               ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
-              style={{
+              style={getOverlayStyle('tooltip', {
                 position: 'fixed',
                 top: style.top,
                 left: style.left,
-              }}
+              })}
               className={cn(
-                'pointer-events-none z-[120] min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
+                'pointer-events-none min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
                 resolvedSide === 'top' ? 'origin-bottom' : 'origin-top',
                 contentClassName,
               )}

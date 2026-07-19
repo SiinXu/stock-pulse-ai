@@ -30,10 +30,10 @@ describe('ConfirmDialog', () => {
     renderDialog();
 
     const root = screen.getByRole('dialog', { name: '确认操作' }).closest<HTMLElement>('[data-overlay-root]');
-    expect(root?.style.zIndex).toBe(String(OVERLAY_Z.confirm));
-    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.settingsModal);
-    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.reportDrawer);
-    expect(OVERLAY_Z.confirm).toBeGreaterThan(OVERLAY_Z.runFlowDrawer);
+    expect(root?.style.zIndex).toBe(String(OVERLAY_Z.confirmation));
+    expect(OVERLAY_Z.confirmation).toBeGreaterThan(OVERLAY_Z.toast);
+    expect(OVERLAY_Z.confirmation).toBeGreaterThan(OVERLAY_Z.tooltip);
+    expect(OVERLAY_Z.confirmation).toBeGreaterThan(OVERLAY_Z.dialog);
   });
 
   it('disables confirm and cancel actions independently', () => {
@@ -62,10 +62,10 @@ describe('ConfirmDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps both actions at least 44px tall for touch input', () => {
+  it('uses the comfortable shared control tier for both actions', () => {
     renderDialog();
 
-    expect(screen.getByRole('button', { name: '确定' })).toHaveClass('min-h-11');
-    expect(screen.getByRole('button', { name: '取消' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '确定' })).toHaveAttribute('data-size', 'comfortable');
+    expect(screen.getByRole('button', { name: '取消' })).toHaveAttribute('data-size', 'comfortable');
   });
 });

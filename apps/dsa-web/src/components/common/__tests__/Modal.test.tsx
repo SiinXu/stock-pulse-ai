@@ -30,6 +30,30 @@ function renderModalWithSelect() {
 }
 
 describe('Modal escape behavior', () => {
+  it('keeps header, scrollable body, and footer as separate layout slots', () => {
+    render(
+      <UiLanguageProvider>
+        <Modal
+          isOpen
+          onClose={() => undefined}
+          title="Edit connection"
+          description="Connection details"
+          footer={<button type="button">Save connection</button>}
+        >
+          <p>Connection form</p>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit connection' });
+    expect(dialog).toHaveAttribute('data-modal-size', 'default');
+    expect(dialog.querySelector('[data-overlay-slot="header"]')).toHaveTextContent('Connection details');
+    expect(dialog.querySelector('[data-overlay-slot="body"]')).toHaveTextContent('Connection form');
+    expect(dialog.querySelector('[data-overlay-slot="footer"]')).toContainElement(
+      screen.getByRole('button', { name: 'Save connection' }),
+    );
+  });
+
   it('blocks backdrop, Escape, and close-button dismissal while closing is disabled', () => {
     const onClose = vi.fn();
     render(
