@@ -749,15 +749,22 @@ async function expectConnectionDraftAutosaveBlockedBySchema(
   save.mockResolvedValue({ success: true });
   useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-  render(<SettingsPage />);
-  await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
-    .toHaveAttribute('data-disabled', 'true'));
-  fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+  vi.useFakeTimers();
+  try {
+    render(<SettingsPage />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-  await act(async () => {
-    await new Promise((resolve) => window.setTimeout(resolve, 850));
-  });
-  expect(save).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(850);
+    });
+    expect(save).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
 describe('SettingsPage', () => {
@@ -1541,24 +1548,32 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
-
-    await act(async () => {
-      catalog.resolve({
-        providers: [
-          { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' },
-        ],
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
       });
-      await catalog.promise;
-    });
-    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2500 });
+      expect(save).not.toHaveBeenCalled();
+
+      await act(async () => {
+        catalog.resolve({
+          providers: [
+            { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' },
+          ],
+        });
+        await catalog.promise;
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700);
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not autosave a Connection draft under a present empty schema', async () => {
@@ -1624,13 +1639,18 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
 
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('autosaves when an unknown required field stays hidden for the draft provider', async () => {
@@ -1766,19 +1786,27 @@ describe('SettingsPage', () => {
       },
     }));
 
-    render(<SettingsPage />);
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
 
-    const inspect = await screen.findByRole('button', { name: 'inspect existing connection' });
-    await waitFor(() => expect(inspect).toBeEnabled());
-    expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
-    fireEvent.click(inspect);
-    expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const inspect = screen.getByRole('button', { name: 'inspect existing connection' });
+      expect(inspect).toBeEnabled();
+      expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+      fireEvent.click(inspect);
+      expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps AI autosave and the editor blocked after a Catalog failure', async () => {
@@ -1786,16 +1814,23 @@ describe('SettingsPage', () => {
     save.mockResolvedValue({ success: true });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
 
-    render(<SettingsPage />);
-    await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
-      .toHaveAttribute('data-catalog-unavailable', 'true'));
-    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    vi.useFakeTimers();
+    try {
+      render(<SettingsPage />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-catalog-unavailable', 'true');
+      fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
 
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 850));
-    });
-    expect(save).not.toHaveBeenCalled();
-    expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(850);
+      });
+      expect(save).not.toHaveBeenCalled();
+      expect(screen.getByTestId('llm-channel-editor-items')).toHaveAttribute('data-disabled', 'true');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('passes merged generation backend draft items to the backend status panel', async () => {

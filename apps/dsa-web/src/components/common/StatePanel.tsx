@@ -17,6 +17,8 @@ export interface StatePanelProps extends Omit<React.HTMLAttributes<HTMLElement>,
   action?: React.ReactNode;
   size?: StatePanelSize;
   titleAs?: StatePanelTitleElement;
+  titleClassName?: string;
+  descriptionClassName?: string;
   surfaceLevel?: 'canvas' | 'section';
 }
 
@@ -49,6 +51,8 @@ export const StatePanel = forwardRef<HTMLElement, StatePanelProps>(({
   action,
   size = 'default',
   titleAs = 'h2',
+  titleClassName,
+  descriptionClassName,
   surfaceLevel = 'canvas',
   className,
   ...props
@@ -80,8 +84,12 @@ export const StatePanel = forwardRef<HTMLElement, StatePanelProps>(({
         </div>
       ) : null}
       <div className="space-y-1">
-        <Title className="text-sm font-semibold text-foreground">{title}</Title>
-        {description ? <div className="mx-auto max-w-md text-sm text-secondary-text">{description}</div> : null}
+        <Title className={cn('text-sm font-semibold text-foreground', titleClassName)}>{title}</Title>
+        {description ? (
+          <div className={cn('mx-auto max-w-md text-sm text-secondary-text', descriptionClassName)}>
+            {description}
+          </div>
+        ) : null}
       </div>
       {action ? <div className="flex items-center justify-center">{action}</div> : null}
     </Surface>

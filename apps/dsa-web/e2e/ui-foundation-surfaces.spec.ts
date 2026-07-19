@@ -198,6 +198,18 @@ test.describe('surface and task-state foundation', () => {
     const callTypeSection = page.getByRole('region', { name: '调用类型' });
     await expect(modelSection).toHaveAttribute('data-surface-level', 'canvas');
     await expect(callTypeSection).toHaveAttribute('data-surface-level', 'section');
+    const modelUsageCard = modelSection.locator('article');
+    await expect(modelUsageCard).toHaveCount(1);
+    await expect(modelUsageCard).toHaveAttribute('data-surface-level', 'section');
+
+    const modelBoundary = await modelUsageCard.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        borderTopWidth: style.borderTopWidth,
+        boxShadow: style.boxShadow,
+      };
+    });
+    expect(modelBoundary).toEqual({ borderTopWidth: '0px', boxShadow: 'none' });
 
     const sectionBoundary = await callTypeSection.evaluate((element) => {
       const style = getComputedStyle(element);
