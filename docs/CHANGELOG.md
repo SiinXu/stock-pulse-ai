@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
 - [改进] `portfolio_idempotency_records` 的 scope 列、唯一索引、legacy 数据规范化与 legacy 冲突 guard trigger 的 startup 兼容步骤转为正式 migration `202607190003_portfolio_idempotency_scope_schema`（稳定 ID + 源码 checksum，内联冻结 v2 storage-id 哈希，仅规范化未 scoped 的 legacy 行、不发明 owner scope，索引/触发器创建后校验，幂等）；移除运行时 `_ensure_portfolio_idempotency_scope_schema` / `_backfill_portfolio_idempotency_scopes` / `_ensure_portfolio_legacy_idempotency_guard_trigger` DDL/DML。guard trigger 作为持久数据库对象保护回退 runtime 的 legacy 冲突写入，不再依赖每次启动自愈重建。
 - [改进] `decision_signals` 的 `decision_profile` 列、profile 感知索引与从 `metadata_json` 的 legacy 回填的 startup 兼容步骤转为正式 migration `202607190002_decision_signal_profile_schema`（稳定 ID + 源码 checksum，冻结的 profile 归一化，仅回填合法 profile 且不覆盖既有值，对无效/非对象/超深 JSON 安全跳过，幂等）；移除运行时 `_ensure_decision_signal_profile_schema` / `_ensure_decision_signal_profile_indexes` / `_backfill_decision_signal_profile_from_metadata` DDL/DML。
 - [新功能] Web 决策信号页新增“运行后验”入口：按安全默认参数（仅 active 信号、`force=false`、单次上限 100，只补算缺失或可重试结果）触发后验引擎，需二次确认；显示运行进度、`evaluated`/`created`/`updated`/`skipped` 结果、本会话内最近运行列表和失败时的错误 trace，并通过 in-flight 守卫与禁用态防重复提交，运行完成后刷新后验统计。
@@ -167,6 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] TickFlow 新增基于申万一级行业池的行业涨跌排行 fallback，并将基本面/市场结构单能力默认超时由 3 秒调整为 8 秒，降低正常慢响应被提前降级的概率。
 - [文档] 补充 macOS 未签名、未公证 DMG 被 Gatekeeper 拦截时的架构选择、安全排查与官方安装包临时放行步骤。
 - [新功能] Web AI 建议页支持确认保存基于历史报告快照重算的决策风格信号，以 created/existing/refreshed 区分新建、原样复用和既有记录续期或维度补齐，复用 profile-aware 去重与失效语义，将历史信号的创建时间、有效期和相反信号失效顺序锚定来源报告时间，并提供可审计 guardrail 提示与阻断。
+- [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
