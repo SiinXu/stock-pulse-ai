@@ -82,7 +82,7 @@ const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[t
 const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1448,
+    line: 1498,
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
