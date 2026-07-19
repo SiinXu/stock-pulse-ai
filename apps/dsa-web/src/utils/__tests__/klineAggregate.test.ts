@@ -62,6 +62,18 @@ describe('aggregateCandles', () => {
     expect(aggregateCandles([], 'weekly')).toEqual([]);
   });
 
+  it('does not poison high/low into NaN when a candle reports null high/low', () => {
+    const dirty: StockHistoryCandle[] = [
+      { date: '2026-04-06', open: 10, high: null as unknown as number, low: null as unknown as number, close: 11, volume: 100 },
+      candle('2026-04-07', 11, 13, 9, 12),
+    ];
+    const [weekly] = aggregateCandles(dirty, 'weekly');
+    expect(Number.isNaN(weekly.high)).toBe(false);
+    expect(Number.isNaN(weekly.low)).toBe(false);
+    expect(weekly.high).toBe(13);
+    expect(weekly.low).toBe(9);
+  });
+
   it('keeps volume null when no bucket member reports volume', () => {
     const noVolume = [candle('2026-03-02', 1, 2, 1, 2, null), candle('2026-03-03', 2, 3, 1, 2, null)];
     expect(aggregateCandles(noVolume, 'weekly')[0].volume).toBeNull();

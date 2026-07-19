@@ -29,6 +29,10 @@ function sumOptional(values: Array<number | null | undefined>): number | null {
   return seen ? total : null;
 }
 
+function finiteNumbers(values: Array<number | null | undefined>): number[] {
+  return values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+}
+
 function sortByDate(candles: StockHistoryCandle[]): StockHistoryCandle[] {
   return [...candles]
     .filter((candle) => candle && typeof candle.date === 'string' && candle.date)
@@ -62,11 +66,15 @@ export function aggregateCandles(
       const last = group[group.length - 1];
       const open = first.open;
       const close = last.close;
+      // Guard against dirty backend candles with null/NaN high/low, which
+      // would otherwise poison Math.max/min (NaN) and break the chart axis.
+      const highs = finiteNumbers(group.map((candle) => candle.high));
+      const lows = finiteNumbers(group.map((candle) => candle.low));
       return {
         date: last.date,
         open,
-        high: Math.max(...group.map((candle) => candle.high)),
-        low: Math.min(...group.map((candle) => candle.low)),
+        high: highs.length ? Math.max(...highs) : Math.max(open, close),
+        low: lows.length ? Math.min(...lows) : Math.min(open, close),
         close,
         volume: sumOptional(group.map((candle) => candle.volume)),
         amount: sumOptional(group.map((candle) => candle.amount)),
@@ -103,14 +111,16 @@ export function summarizeCandles(candles: StockHistoryCandle[]): StockHistorySum
   const last = candles[candles.length - 1];
   const firstClose = first.close;
   const lastClose = last.close;
+  const highs = finiteNumbers(candles.map((candle) => candle.high));
+  const lows = finiteNumbers(candles.map((candle) => candle.low));
   return {
     count: candles.length,
     periodStart: first.date,
     periodEnd: last.date,
     first: firstClose,
     last: lastClose,
-    high: Math.max(...candles.map((candle) => candle.high)),
-    low: Math.min(...candles.map((candle) => candle.low)),
+    high: highs.length ? Math.max(...highs) : null,
+    low: lows.length ? Math.min(...lows) : null,
     changePercent: firstClose ? ((lastClose - firstClose) / firstClose) * 100 : null,
   };
 }

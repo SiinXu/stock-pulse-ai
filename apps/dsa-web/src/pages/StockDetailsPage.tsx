@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   CartesianGrid,
   Line,
@@ -41,29 +41,14 @@ const MIN_DAYS = 1;
 const MAX_DAYS = 365;
 const DEFAULT_DAYS = 90;
 
-function readParam(search: string, key: string): string | null {
-  return new URLSearchParams(search).get(key);
-}
-
-function getInitialPeriod(search = typeof window === 'undefined' ? '' : window.location.search): StockHistoryPeriod {
-  const value = readParam(search, 'period');
+function parsePeriodParam(value: string | null): StockHistoryPeriod {
   return PERIOD_OPTIONS.includes(value as StockHistoryPeriod) ? (value as StockHistoryPeriod) : 'daily';
 }
 
-function getInitialDays(search = typeof window === 'undefined' ? '' : window.location.search): number {
-  const parsed = Number(readParam(search, 'days'));
+function parseDaysParam(value: string | null): number {
+  const parsed = Number(value);
   if (Number.isInteger(parsed) && parsed >= MIN_DAYS && parsed <= MAX_DAYS) return parsed;
   return DEFAULT_DAYS;
-}
-
-function syncStockSearchParams(values: Record<string, string | number | null>): void {
-  if (typeof window === 'undefined') return;
-  const url = new URL(window.location.href);
-  Object.entries(values).forEach(([key, value]) => {
-    if (value === null || value === '') url.searchParams.delete(key);
-    else url.searchParams.set(key, String(value));
-  });
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function formatNumber(value: number | null | undefined, fractionDigits = 2): string {
@@ -99,9 +84,12 @@ const StockDetailsPage: React.FC = () => {
   }, [rawParam]);
   const canonicalCode = useMemo(() => normalizeStockCode(decodedParam), [decodedParam]);
 
-  const [period, setPeriod] = useState<StockHistoryPeriod>(() => getInitialPeriod());
-  const [days, setDays] = useState<number>(() => getInitialDays());
-  const [daysDraft, setDaysDraft] = useState<string>(() => String(getInitialDays()));
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The URL is the source of truth for period/days so browser back/forward
+  // restore them (react-router observes searchParams, unlike replaceState).
+  const period = useMemo(() => parsePeriodParam(searchParams.get('period')), [searchParams]);
+  const days = useMemo(() => parseDaysParam(searchParams.get('days')), [searchParams]);
+  const [daysDraft, setDaysDraft] = useState<string>(() => String(days));
 
   const [quote, setQuote] = useState<StockQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
@@ -125,12 +113,18 @@ const StockDetailsPage: React.FC = () => {
     };
   }, []);
 
+  // Keep the editable days field in sync when days changes via back/forward.
+  useEffect(() => {
+    setDaysDraft(String(days));
+  }, [days]);
+
   // Canonicalize the URL so equivalent spellings share one route and cache key.
   useEffect(() => {
     if (decodedParam && canonicalCode && decodedParam !== canonicalCode) {
-      navigate(`/stocks/${encodeURIComponent(canonicalCode)}${window.location.search}`, { replace: true });
+      const search = searchParams.toString();
+      navigate(`/stocks/${encodeURIComponent(canonicalCode)}${search ? `?${search}` : ''}`, { replace: true });
     }
-  }, [decodedParam, canonicalCode, navigate]);
+  }, [decodedParam, canonicalCode, navigate, searchParams]);
 
   useEffect(() => {
     document.title = t('stocks.workspace.pageTitle', { code: canonicalCode || decodedParam });
@@ -190,17 +184,25 @@ const StockDetailsPage: React.FC = () => {
 
   const handlePeriodChange = useCallback((value: string) => {
     const next = value as StockHistoryPeriod;
-    setPeriod(next);
-    syncStockSearchParams({ period: next === 'daily' ? null : next });
-  }, []);
+    setSearchParams((prev) => {
+      const nextParams = new URLSearchParams(prev);
+      if (next === 'daily') nextParams.delete('period');
+      else nextParams.set('period', next);
+      return nextParams;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const handleDaysSubmit = useCallback((event: React.FormEvent) => {
     event.preventDefault();
     const parsed = Number(daysDraft);
     if (!Number.isInteger(parsed) || parsed < MIN_DAYS || parsed > MAX_DAYS) return;
-    setDays(parsed);
-    syncStockSearchParams({ days: parsed === DEFAULT_DAYS ? null : parsed });
-  }, [daysDraft]);
+    setSearchParams((prev) => {
+      const nextParams = new URLSearchParams(prev);
+      if (parsed === DEFAULT_DAYS) nextParams.delete('days');
+      else nextParams.set('days', String(parsed));
+      return nextParams;
+    }, { replace: true });
+  }, [daysDraft, setSearchParams]);
 
   const handleAddWatchlist = useCallback(async () => {
     if (!canonicalCode || watchState === 'adding') return;
