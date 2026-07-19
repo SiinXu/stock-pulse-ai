@@ -1,15 +1,15 @@
 # StockPulse Work Tracker — Agent Runtime(AR)工作线
 
 - 状态:`Living`(每个 AR 阶段合入/裁决后更新)
-- 日期:2026-07-17(首版,随 AR-PY-00 创建;此前不存在,属治理文档漂移修复)
-- 代码 baseline:`main@30926876`(PR #18 合入 commit)
-- 权威计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Approved`)
+- 日期:2026-07-19（Native Only 实施状态同步）
+- 代码 baseline:`main@b8983fc7`
+- 历史计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Historical / Superseded`)
 - 权威决策:`docs/architecture/ADR-001-agent-runtime.md`
-- 修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Accepted`,RF-00～RF-07;RF-00～RF-05 已合入,RF-06～RF-07 待执行)
+- 历史修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Historical / Completed`,RF-00～RF-07 已结束)
 
 ## 1. 追踪原则
 
-- 本 tracker 只记录 AR 工作线的阶段状态、合入证据与裁决记录;不复制计划细节(以开发计划为准)。
+- 本 tracker 只记录 AR 工作线的阶段状态、合入证据与裁决记录；现行架构以 ADR-001 为准，历史计划不再是执行权威。
 - 每行状态变更须附证据(PR 编号、commit、裁决日期);无证据不得标记完成。
 - 首版不含历史条目:此前不存在本文档,任何"旧 baseline"或"AR-07"历史描述均无从修正,以当前主线为唯一起点。
 
@@ -22,9 +22,9 @@
 | AR-PY-01 | Runtime Contract + Native Adapter | **Done** | 已随 PR #18 合入契约与 Native adapter;RF-02(PR #22,commit cc3a8e30)将 `execute()` 改造为运行中 `start() -> ExecutionHandle` 并深层冻结 `ExecutionContext`(`_deep_freeze`),关闭 AR-RF-01/02;缺口清零 |
 | AR-PY-02 | BoundToolSession | **Done** | 已随 PR #18 合入 `tool_session.py`(allowlist/权限/预算/deadline/审计/late-result fence);RF-03(PR #23,commit 4e0e820c;deadline 绝对单调化 9f4a7882)使 Native 经同一 `BoundToolSession`(`enforce_access_policy=False`)分发,消除第二套工具权威,关闭 AR-RF-03 |
 | AR-PY-03 | Lifecycle / typed events / 真实取消 | **Done** | 已随 PR #18 合入 `events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);RF-04(PR #25,commit 8ec4bdd4;changelog PR #27)以单一分类器统一全入口终态 write fence 与生命周期,关闭 AR-RF-07 |
-| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Experimental(Native Only 裁决;休眠可删)** | RF-05(PR #28,commit cb3aba8d)完成真实模型桥:工具 schema 下发、ToolCall/ToolReturn/reasoning/provider trace 无损往返、复用 `AgentExecutor.build_run_messages` prompt 权威、usage 单点记录并修字段、deadline/cancel fence、CHAT/RESEARCH -> `unsupported_capability`,关闭 AR-RF-04/05/06/10/11;RF-07 裁决 `Native Only`(见 AR-PY-06),该实验路径保持默认关闭、测试覆盖、可整体删除 |
-| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Done** | RF-01(PR #21)可选依赖安装态 CI 矩阵关闭 AR-RF-09;RF-06a(PR #32)离线 cross-runtime conformance 双跑(8 等价 + 3 有意差异 ADR-001 D5 + 非 RUN unsupported)关闭 AR-RF-08 的离线部分;RF-06b(PR #33)实验 Runtime 失败面泄漏扫描 + RF-07 决策证据卷宗;真实 provider benchmark / Desktop 打包证据在 RF-07 `Native Only` 裁决下不再作为阻断项(重启 Experimental 时另补) |
-| AR-PY-06 | 有限产品化(条件阶段) | **Resolved(Native Only)** | RF-07 裁决 `Native Only`(2026-07-18,维护者),见 `docs/architecture/pydanticai-runtime-adoption-decision.md`(`Accepted`):Native 永久默认、零 PydanticAI 依赖;实验 Runtime 不向用户公开、可整体删除;`Continue Experimental` 因缺真实 benchmark 与 Desktop 证据未启用 |
+| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Retired / Removed** | RF-05 曾完成隔离桥；RF-07 裁决 Native Only 后，2026-07-19 删除 Adapter、toolset、可选依赖和注入点。历史实现不再是主线能力 |
+| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Historical evidence complete** | RF-01/RF-06a/RF-06b 为 RF-07 提供历史裁决证据；cross-runtime 测试和专用 CI 随实验实现删除，通用 secret/URL/token 脱敏与长度回归已迁入 Native 异常路径。依赖数字和证据表述的进一步校准由 RT-02 处理 |
+| AR-PY-06 | 有限产品化(条件阶段) | **Resolved / Implemented (Native Only)** | RF-07 于 2026-07-18 裁决 Native Only；2026-07-19 完整删除实验可执行面，不存在 runtime selector、fallback、休眠依赖或专用 CI |
 
 ## 3. 裁决记录
 
@@ -36,16 +36,17 @@
 | 2026-07-17 | 两个 degraded `success=true` 行为(审批点 2) | 批准 ADR-001 D2:冻结为兼容契约;未来修正走独立 ADR + versioned fixture |
 | 2026-07-18 | RF-05 范围审批(recovery plan 审批点 2/3) | 维护者批准:CHAT/RESEARCH 冻结为 `unsupported_capability`、复用 native prompt 权威(`build_run_messages`)、usage 单点记录;首版 conformance 仅覆盖 Single RUN 支持矩阵 |
 | 2026-07-18 | RF-07 产品化裁决 | 维护者裁决 `Native Only`(recovery plan 默认):Native 永久默认、零 PydanticAI 依赖;实验 Runtime 休眠可删;`Continue Experimental` 因缺真实 benchmark 与 Desktop 证据未启用;见 `docs/architecture/pydanticai-runtime-adoption-decision.md`(`Accepted`) |
+| 2026-07-19 | Native Only 实施 | 删除实验 Adapter、toolset、可选依赖、注入点、cross-runtime 测试与专用 CI；保留 Native Contract、BoundToolSession、生命周期、事件、sanitizer 与 36 replay fixture |
 
 ## 4. 治理文档清单与状态
 
 | 文档 | 状态 |
 | --- | --- |
-| `docs/architecture/pydanticai-runtime-development-plan.md` | `Approved`(2026-07-17) |
-| `docs/architecture/ADR-001-agent-runtime.md` | `Accepted`(2026-07-17) |
-| `docs/architecture/pydanticai-runtime-recovery-plan.md` | `Accepted`(2026-07-18;RF-00～RF-07 全部完成) |
-| `docs/architecture/pydanticai-runtime-adoption-decision.md` | `Accepted`(2026-07-18;RF-07 裁决 `Native Only`) |
-| `docs/stockpulse-agent-runtime-framework-comparison.md` | `Living`(首版) |
+| `docs/architecture/pydanticai-runtime-development-plan.md` | `Historical / Superseded` |
+| `docs/architecture/ADR-001-agent-runtime.md` | `Accepted`(2026-07-19 修订，Native Only 已实施) |
+| `docs/architecture/pydanticai-runtime-recovery-plan.md` | `Historical / Completed` |
+| `docs/architecture/pydanticai-runtime-adoption-decision.md` | `Accepted / Implemented`(2026-07-19) |
+| `docs/stockpulse-agent-runtime-framework-comparison.md` | `Historical` |
 | `docs/stockpulse-work-tracker.md` | `Living`(本文档) |
 | `docs/agent-stream-events.md` | 既存,SSE 事件契约权威 |
 | `docs/stockpulse-document-governance.md` 等其余漂移文档 | 不存在;是否创建由维护者按需决定(非 AR 工作线阻断项) |
@@ -73,3 +74,4 @@
 | 2026-07-18 | RF-06a 合入(PR #32):离线 cross-runtime conformance 双跑(Single RUN 8 等价 + 3 有意差异 ADR-001 D5 + 非 RUN unsupported);36 fixture 只读;含 review 强化(终态精确匹配) |
 | 2026-07-18 | RF-06b 合入(PR #33):实验 Runtime 失败面泄漏扫描(secret/URL/token 脱敏)+ RF-07 决策证据卷宗(`Draft`);关闭 AR-RF-08 离线部分;AR-PY-05 -> Done |
 | 2026-07-18 | RF-07 裁决(本 PR):维护者裁决 `Native Only`;决策报告 `Draft` -> `Accepted`;AR-PY-06 -> Resolved(Native Only);RF-00～RF-07 修复计划收尾 |
+| 2026-07-19 | Native Only 实施：实验 Runtime 的 Adapter、toolset、可选依赖、注入点、cross-runtime tests 与 `pydanticai-installed` CI 删除；AR-PY-04 -> Retired / Removed，AR-PY-06 -> Implemented |

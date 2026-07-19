@@ -2,14 +2,16 @@
 
 ## 1. 文档状态与用途
 
-- 状态：`Accepted`（RF-07 裁决 `Native Only`，2026-07-18 维护者裁决）
-- 版本：v1.0
-- 日期：2026-07-18
+- 状态：`Accepted / Implemented`（RF-07 裁决 `Native Only`，2026-07-19 完整实施）
+- 版本：v1.1
+- 日期：2026-07-19
 - 上位决策：`docs/architecture/ADR-001-agent-runtime.md`（`Accepted`）
-- 修复计划：`docs/architecture/pydanticai-runtime-recovery-plan.md`（`Accepted`，RF-00～RF-07）
+- 修复计划：`docs/architecture/pydanticai-runtime-recovery-plan.md`（历史，RF-00～RF-07 已结束）
 - 用途：汇总 RF-06 阶段已收集的证据并记录 RF-07 裁决。维护者于 2026-07-18 裁决 `Native Only`（recovery plan 默认结论），据此收尾 RF-00～RF-07 修复计划。
 
 本报告只固化“已经证明的事实”与“尚未收集的缺口”，不以脚手架冒充证据。
+第 3 节中的实验文件名和 CI 名称是裁决前的历史证据；Native Only 实施后这些
+可执行资产已从主线删除，不代表当前支持矩阵。
 
 ## 2. 决策框架
 
@@ -61,11 +63,11 @@ recovery plan RF-07 的裁决规则：
 **维护者 2026-07-18 裁决：`Native Only`。**
 
 - 依据：契约等价性（3.1）与安全脱敏（3.2）已满足硬门禁的离线部分，依赖足迹（3.3）显示 source/Docker 增量成本可控；但 `Continue Experimental` 另要求“明确收益”，而其收益证据（真实 provider benchmark）与 Desktop 多平台打包证据未收集（第 4 章），故不满足 `Continue Experimental` 的启用条件。
-- 生效结果：Native Runtime 永久默认并可零 PydanticAI 依赖运行；实验 PydanticAI Runtime 保持默认关闭、内部注入点、测试覆盖、可整体删除；本轮不新增用户设置、环境变量开关、公开 API 或持久 Agent Job。
+- 生效结果：Native Runtime 是唯一可执行 Runtime；实验 PydanticAI Adapter、toolset、可选依赖清单、内部注入点、cross-runtime 测试和专用 CI 已删除。本轮不新增用户设置、环境变量开关、公开 API 或持久 Agent Job。
 - 保留资产：Contract（RF-02）、BoundToolSession（RF-03）、统一生命周期/fence（RF-04）等已在 Native 证明价值的架构收益保留，不随实验资产删除而回滚。
-- 重启条件：若未来维护者补齐第 4 章证据（真实 benchmark 显示明确收益 + Desktop 多平台打包证据），可另立 ADR 将本裁决改判为 `Continue Experimental`，并按 recovery plan RF-07 约束推进（Source/Docker 先于 Desktop，公开入口另立配置/API/Web/Desktop 全链路计划）。
+- 重启条件：若未来维护者补齐第 4 章证据，必须另立 ADR 并从当前中立 Contract 重新接入；不得直接恢复历史 Adapter 或把 recovery plan 当作现行指令。
 
 ## 6. 回滚
 
-- 本报告为文档产物，可独立 revert，无运行时影响。
-- PydanticAI 资产（adapter + 可选依赖 + 注入点 + conformance/leak-scan/benchmark 测试）整体删除即回到 `Native Only`，不影响 RF-02～04 已证明的 Native 架构收益。
+- Native Only 实施可通过整体 revert 对应提交回滚；不得只恢复 Adapter、依赖或 CI 的一部分。
+- Contract、BoundToolSession、生命周期、事件、sanitizer 和 Native replay 测试不属于实验资产，不随回滚删除。

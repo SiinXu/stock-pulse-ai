@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [chore] Agent Runtime 完整执行 `Native Only` 裁决：删除休眠的 PydanticAI Adapter、toolset、可选依赖、内部注入点、cross-runtime 测试与专用 CI；保留 vendor-neutral Contract、Native Adapter、BoundToolSession、生命周期、事件、sanitizer 和 36 个 replay fixture，并将 API key、带凭据 URL、Bearer token 脱敏及 300 字符诊断上限迁入 Native 异常回归。
 - [改进] Web 共享 `Button` 的 90 处 `xsm`/`sm`/`md`/`lg` 旧尺寸调用改用 `compact`/`default`/`comfortable`/`primary` 语义档位，并删除兼容类型和重复样式；AST 设计守卫同时阻止共享样式表、直接调用、别名及命名空间调用重新引入旧尺寸，现有 28/32/36/40px 可见高度与交互行为保持不变。
 - [改进] Web 共享交互控件建立业务无关的 `Button` / `IconButton` / `Input` / `Field` / `Textarea` 权威：按钮必须显式声明 intent，普通控件使用 28/32/36/40px 可见档位与软圆角，粗指针命中区独立扩展到 44px；移除 Settings/Home/Chat 私有 Button variant、Button 图标尺寸和 29 处非必要 `size="xl"`，新增 AST 守卫阻止页面通过尺寸、圆角、宽度或 flex class 绕过公共契约；Chat 在默认策略目录请求完成前阻断 Composer、Enter 与快捷问题发送，请求失败后再降级为“通用”，避免慢环境绕过已配置的默认策略。
 - [修复] PR Review 静态检查只对仍存在的新增、修改、重命名或类型变更 Python 文件运行 Flake8，删除 Python 文件的 PR 不再因不存在路径被误判为代码质量失败；已删除文件仍保留在完整 diff 与自动审查范围内。

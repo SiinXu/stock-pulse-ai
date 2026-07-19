@@ -563,9 +563,8 @@ class AgentExecutor:
         """Assemble the resolved single-run prompt inputs.
 
         Single authority for the Single RUN system prompt, user message and
-        OpenAI tool declarations so every runtime (native loop and the
-        experimental PydanticAI adapter) seeds from the same resolved skill,
-        market and dashboard constraints instead of rebuilding them.
+        OpenAI tool declarations so every native execution seeds from the same
+        resolved skill, market and dashboard constraints.
 
         Returns ``(system_prompt, user_message, tool_decls)``.
         """

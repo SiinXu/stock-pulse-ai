@@ -377,21 +377,6 @@ def build_agent_executor(
     )
 
 
-def build_agent_runtime(
-    config: Optional[Config] = None,
-    skills: Optional[List[str]] = None,
-):
-    """Return the default runtime adapter behind the vendor-neutral contract.
-
-    Thin assembly seam (AR-PY-01): always returns the native adapter and
-    does not change any default execution behaviour. Existing callers of
-    ``build_agent_executor`` are unaffected.
-    """
-    from src.agent.runtime.native_adapter import NativeRuntimeAdapter
-
-    return NativeRuntimeAdapter(config=config, skills=skills)
-
-
 def _build_orchestrator(
     config: Config,
     registry,
