@@ -41,6 +41,21 @@ describe('SearchableSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
+  it('forwards the trigger ref', () => {
+    const ref = { current: null as HTMLButtonElement | null };
+    render(
+      <SearchableSelect
+        ref={ref}
+        value=""
+        onChange={() => {}}
+        options={options}
+        ariaLabel="Referenced model"
+      />,
+    );
+
+    expect(ref.current).toBe(screen.getByRole('button', { name: 'Referenced model' }));
+  });
+
   it('searches label, id, provider, connection, and extra keywords', () => {
     render(
       <SearchableSelect value="" onChange={() => {}} options={options} ariaLabel="主要模型" />,
@@ -216,6 +231,7 @@ describe('SearchableSelect', () => {
       const popup = screen.getByRole('listbox', { name: '主要模型' }).parentElement;
       expect(popup).not.toBeNull();
       expect(popup?.parentElement).toBe(document.body);
+      expect(popup).toHaveStyle({ width: '240px' });
 
       let initialTop = Number.NaN;
       await waitFor(() => {

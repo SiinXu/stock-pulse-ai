@@ -662,7 +662,7 @@ describe('SettingsField', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
-      expect(checkbox.closest('label')).toHaveClass('min-h-9');
+      expect(checkbox.closest('label')).toHaveClass('min-h-11');
       expect(checkbox).toHaveClass('h-6', 'w-6');
     }
     expect(checkboxes[0]).toBeChecked(); // cn
@@ -920,6 +920,43 @@ describe('SettingsField', () => {
     expect(input).toHaveClass('pr-8');
     expect(input.parentElement).toHaveClass('w-full');
     expect(input.parentElement).toHaveTextContent('s');
+  });
+
+  it('uses the shared time picker for time fields without changing serialization', () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsField
+        item={{
+          key: 'SCHEDULE_TIME',
+          value: '09:20',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'SCHEDULE_TIME',
+            category: 'system',
+            dataType: 'time',
+            uiControl: 'time',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 10,
+          },
+        }}
+        value="09:20"
+        onChange={onChange}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '定时任务时间' });
+    expect(trigger).toHaveAttribute('data-value', '09:20');
+    expect(trigger.parentElement).toHaveClass('w-full');
+    fireEvent.click(trigger);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="10"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="30"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(onChange).toHaveBeenCalledWith('SCHEDULE_TIME', '10:30');
   });
 
   it('backfills the schema default for unset non-select controls', () => {

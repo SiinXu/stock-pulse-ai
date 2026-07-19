@@ -235,7 +235,7 @@ export const ScoreGauge: React.FC<ScoreGaugeProps> = ({
         {/* Center value */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className={cn('font-bold', fontSize, isDark ? 'text-white' : 'text-foreground')}
+            className={cn('font-bold text-foreground', fontSize)}
             style={valueTextShadow ? { textShadow: valueTextShadow } : {}}
           >
             {displayScore}

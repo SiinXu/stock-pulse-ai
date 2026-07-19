@@ -19,6 +19,20 @@ import type {
 import type { StockIndexItem } from '../../types/stockIndex';
 import DecisionSignalsPage from '../DecisionSignalsPage';
 
+const { showToast, dismissToast, clearToasts } = vi.hoisted(() => ({
+  showToast: vi.fn(() => 'decision-signals-toast'),
+  dismissToast: vi.fn(),
+  clearToasts: vi.fn(),
+}));
+
+vi.mock('../../components/common/toastContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../components/common/toastContext')>();
+  return {
+    ...actual,
+    useToast: () => ({ showToast, dismissToast, clearToasts }),
+  };
+});
+
 // jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
@@ -363,21 +377,19 @@ function deferredPromise<T>() {
 }
 
 function openStockContextModal() {
-  // The modal title and the input share the label "当前股票"; the modal's
-  // aria-labelledby means a screen-level query matches both, so count matches
-  // (0 = closed) instead of asserting a single element.
-  if (screen.queryAllByLabelText('当前股票').length > 0) {
+  if (screen.queryByRole('dialog', { name: '当前股票' })) {
     return;
   }
-  fireEvent.click(screen.getByRole('button', { name: /^(当前股票$|当前查看：)/ }));
+  const trigger = screen.getAllByRole('button', { name: /^(当前股票$|当前查看：)/ })
+    .find((button) => button.getAttribute('role') !== 'tab');
+  if (!trigger) {
+    throw new Error('stock context trigger is not available');
+  }
+  fireEvent.click(trigger);
 }
 
 function getStockContextModal() {
-  const modal = screen.getAllByRole('dialog').find((dialog) => within(dialog).queryByLabelText('当前股票'));
-  if (!modal) {
-    throw new Error('stock context modal is not open');
-  }
-  return modal;
+  return screen.getByRole('dialog', { name: '当前股票' });
 }
 
 // Scoped to the modal body so it returns only the input, not the dialog itself
@@ -392,7 +404,15 @@ function closeStockContextModal() {
 
 function closeSignalDetailsDrawer() {
   const drawer = screen.getByRole('dialog', { name: '信号详情' });
-  fireEvent.click(within(drawer).getByRole('button', { name: '关闭抽屉' }));
+  fireEvent.click(within(drawer).getByRole('button', { name: '关闭' }));
+}
+
+function selectDecisionSignalsView(name: '全部信号' | '当前股票' | '股票信号时间线' | '信号表现统计') {
+  const tab = screen.getByRole('tab', { name });
+  if (tab.getAttribute('aria-selected') !== 'true') {
+    fireEvent.click(tab);
+  }
+  return screen.getByRole('tabpanel', { name });
 }
 
 function submitCurrentStock(value: string) {
@@ -443,6 +463,8 @@ describe('DecisionSignalsPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'AI 建议' })).toBeInTheDocument();
+    const signalsTab = screen.getByRole('tab', { name: '全部信号' });
+    expect(signalsTab).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => {
       expect(decisionSignalsApi.list).toHaveBeenCalledWith(expect.objectContaining({
         status: 'active',
@@ -451,16 +473,16 @@ describe('DecisionSignalsPage', () => {
       }));
     });
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
-    expect(await screen.findByText('信号表现统计')).toBeInTheDocument();
-    expect(screen.getByText('50%')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).toBeInTheDocument();
     expect(screen.getByText('贵州茅台').closest('button')).toBeNull();
     expect(screen.getByText('放量下跌风险')).toBeInTheDocument();
     expect(screen.getByText(formattedCreatedAt)).toBeInTheDocument();
-    expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
+    const statsPanel = selectDecisionSignalsView('信号表现统计');
+    expect(within(statsPanel).getByText('50%')).toBeInTheDocument();
+    expect(within(statsPanel).getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
     // Scope badges make each module's data range explicit.
-    expect(screen.getByText('全局')).toBeInTheDocument();
-    expect(screen.getByText('全部信号')).toBeInTheDocument();
+    expect(within(statsPanel).getByText('全局')).toBeInTheDocument();
+    expect(signalsTab).toBeInTheDocument();
   });
 
   it('shows a zero-sample outcome stats state instead of misleading zero metrics', async () => {
@@ -478,8 +500,9 @@ describe('DecisionSignalsPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('暂无已复盘样本')).toBeInTheDocument();
-    expect(screen.getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
+    const statsPanel = selectDecisionSignalsView('信号表现统计');
+    expect(await within(statsPanel).findByText('暂无已复盘样本')).toBeInTheDocument();
+    expect(within(statsPanel).getByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();
   });
 
@@ -1321,6 +1344,7 @@ describe('DecisionSignalsPage', () => {
     renderPage();
 
     await screen.findByText('贵州茅台');
+    selectDecisionSignalsView('股票信号时间线');
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
     expect(decisionSignalsApi.list).toHaveBeenCalledTimes(1);
@@ -1340,6 +1364,7 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('600519');
     await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(2));
+    selectDecisionSignalsView('股票信号时间线');
 
     chooseOption(screen.getByLabelText('时间线市场'), 'cn');
     chooseOption(screen.getByLabelText('时间范围'), '30d');
@@ -1467,6 +1492,7 @@ describe('DecisionSignalsPage', () => {
 
     submitCurrentStock('AAPL');
     await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(2));
+    selectDecisionSignalsView('股票信号时间线');
 
     chooseOption(screen.getByLabelText('时间线市场'), 'us');
     chooseOption(screen.getByLabelText('时间范围'), '30d');
@@ -1535,6 +1561,7 @@ describe('DecisionSignalsPage', () => {
     await screen.findByText('贵州茅台');
 
     submitCurrentStock('AAPL');
+    selectDecisionSignalsView('股票信号时间线');
     fireEvent.click(await screen.findByTestId('timeline-click-8'));
     expect(within(await screen.findByRole('dialog')).getByText('Timeline stale risk')).toBeInTheDocument();
 
@@ -1559,7 +1586,7 @@ describe('DecisionSignalsPage', () => {
     submitCurrentStock('AAPL');
     expect(await screen.findByText('当前查看：AAPL')).toBeInTheDocument();
 
-    // Latest and list can contain the same signal; the list section renders last.
+    selectDecisionSignalsView('全部信号');
     fireEvent.click(screen.getAllByRole('button', { name: '查看 贵州茅台 AI 建议详情' }).at(-1)!);
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
     closeSignalDetailsDrawer();
@@ -1569,7 +1596,9 @@ describe('DecisionSignalsPage', () => {
     expect(getStockContextInput()).toHaveValue('');
     closeStockContextModal();
     expect(screen.getAllByText('选择股票查看 AI 建议').length).toBeGreaterThan(0);
+    selectDecisionSignalsView('股票信号时间线');
     expect(screen.getByRole('button', { name: '查询时间线' })).toBeDisabled();
+    selectDecisionSignalsView('全部信号');
     fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
   });
@@ -1592,6 +1621,7 @@ describe('DecisionSignalsPage', () => {
 
     chooseOption(screen.getByLabelText('时间线状态'), 'active');
     submitCurrentStock('AAPL');
+    selectDecisionSignalsView('股票信号时间线');
     fireEvent.click(await screen.findByTestId('timeline-click-8'));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: '标记失效' }));
@@ -1789,9 +1819,11 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByText('Latest risk')).toBeInTheDocument();
     closeSignalDetailsDrawer();
 
+    selectDecisionSignalsView('全部信号');
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: '600519' } });
     fireEvent.click(screen.getByRole('button', { name: '筛选' }));
 
+    selectDecisionSignalsView('当前股票');
     fireEvent.click(await screen.findByRole('button', { name: '查看 Apple AI 建议详情' }));
     expect(within(await screen.findByRole('dialog')).getByText('Latest risk')).toBeInTheDocument();
   });
@@ -1871,6 +1903,7 @@ describe('DecisionSignalsPage', () => {
     submitCurrentStock('AAPL');
 
     expect(await screen.findByText('Latest lookup risk')).toBeInTheDocument();
+    selectDecisionSignalsView('全部信号');
     fireEvent.click(screen.getAllByRole('button', { name: '查看 贵州茅台 AI 建议详情' }).at(-1)!);
     expect(within(await screen.findByRole('dialog')).getByText('趋势保持')).toBeInTheDocument();
   });
@@ -2027,7 +2060,7 @@ describe('DecisionSignalsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: '信号详情' });
     expect(within(dialog).getByText('贵州茅台')).toBeInTheDocument();
     await waitFor(() => expect(decisionSignalsApi.getSignalOutcomes).toHaveBeenCalledWith(7));
-    fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
   });
 

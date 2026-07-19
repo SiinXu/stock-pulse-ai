@@ -1,15 +1,25 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
+import { Check, ChevronDown } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle } from './overlayZ';
 import { useFixedPopup } from './useFixedPopup';
 
-interface SelectOption {
+export interface SelectOption {
   value: string;
   label: string;
 }
 
-interface SelectProps {
+export interface SelectProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
@@ -24,13 +34,15 @@ interface SelectProps {
   error?: boolean;
   menuAlign?: 'start' | 'end';
   menuPlacement?: 'auto' | 'bottom' | 'top';
+  width?: 'content' | 'full';
+  popupWidth?: 'trigger' | 'min-trigger';
 }
 
 /**
  * Custom select with a compact trigger and a styled listbox popover
  * (native <select> popups cannot be styled consistently across platforms).
  */
-export const Select: React.FC<SelectProps> = ({
+export const Select = forwardRef<HTMLButtonElement, SelectProps>(({
   id,
   value,
   onChange,
@@ -45,7 +57,9 @@ export const Select: React.FC<SelectProps> = ({
   error = false,
   menuAlign = 'start',
   menuPlacement = 'auto',
-}) => {
+  width = 'content',
+  popupWidth = 'trigger',
+}, forwardedRef) => {
   const { t } = useUiLanguage();
   const selectId = useId();
   const resolvedId = id ?? selectId;
@@ -53,6 +67,8 @@ export const Select: React.FC<SelectProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const typeaheadRef = useRef('');
+  const typeaheadTimeRef = useRef(0);
   const [isOpen, setIsOpen] = useState(false);
   const selectedIndex = options.findIndex((option) => option.value === value);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
@@ -66,16 +82,20 @@ export const Select: React.FC<SelectProps> = ({
     constrainWidthToViewport: true,
     placement: menuPlacement,
     align: menuAlign,
+    matchTriggerWidth: popupWidth === 'trigger',
   });
 
-  const openList = useCallback(() => {
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+  useImperativeHandle(forwardedRef, () => triggerRef.current as HTMLButtonElement, []);
+
+  const openList = useCallback((initialIndex?: number) => {
+    setActiveIndex(initialIndex ?? (selectedIndex >= 0 ? selectedIndex : 0));
     prepareForOpen();
     setIsOpen(true);
   }, [prepareForOpen, selectedIndex]);
 
   const closeList = useCallback(() => {
     setIsOpen(false);
+    typeaheadRef.current = '';
     resetPosition();
   }, [resetPosition]);
 
@@ -102,8 +122,38 @@ export const Select: React.FC<SelectProps> = ({
     activeItem?.scrollIntoView?.({ block: 'nearest' });
   }, [isOpen, activeIndex]);
 
+  const findTypeaheadMatch = useCallback((query: string): number => {
+    const normalizedQuery = query.toLocaleLowerCase();
+    if (!normalizedQuery || options.length === 0) return -1;
+    const startIndex = Math.max(isOpen ? activeIndex : selectedIndex, -1);
+    for (let offset = 1; offset <= options.length; offset += 1) {
+      const index = (startIndex + offset) % options.length;
+      if (options[index]?.label.toLocaleLowerCase().startsWith(normalizedQuery)) {
+        return index;
+      }
+    }
+    return -1;
+  }, [activeIndex, isOpen, options, selectedIndex]);
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
+    if (event.key !== ' ' && event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      const now = Date.now();
+      typeaheadRef.current = now - typeaheadTimeRef.current > 500
+        ? event.key
+        : typeaheadRef.current + event.key;
+      typeaheadTimeRef.current = now;
+      const matchIndex = findTypeaheadMatch(typeaheadRef.current);
+      if (matchIndex >= 0) {
+        if (isOpen) {
+          setActiveIndex(matchIndex);
+        } else {
+          openList(matchIndex);
+        }
+      }
+      return;
+    }
     if (!isOpen) {
       if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) {
         event.preventDefault();
@@ -146,7 +196,7 @@ export const Select: React.FC<SelectProps> = ({
   };
 
   return (
-    <div className={cn('flex w-fit flex-col', className)}>
+    <div className={cn('flex flex-col', width === 'full' ? 'w-full' : 'w-fit', className)}>
       {label ? <label htmlFor={resolvedId} className="mb-1.5 text-xs font-medium text-secondary-text">{label}</label> : null}
       <div ref={containerRef}>
         <button
@@ -176,14 +226,10 @@ export const Select: React.FC<SelectProps> = ({
           <span className={cn('truncate', !selectedOption && 'text-muted-text')}>
             {selectedOption ? selectedOption.label : resolvedPlaceholder}
           </span>
-          <svg
+          <ChevronDown
             className={cn('h-3.5 w-3.5 shrink-0 text-secondary-text transition-transform duration-200', isOpen && 'rotate-180')}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+            aria-hidden="true"
+          />
         </button>
 
         {isOpen && portalHost ? createPortal(
@@ -193,8 +239,8 @@ export const Select: React.FC<SelectProps> = ({
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
             aria-label={!label ? ariaLabel : undefined}
-            style={popupStyle}
-            className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
+            style={getOverlayStyle('dropdown', popupStyle)}
+            className="fixed max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
               <li
@@ -212,9 +258,7 @@ export const Select: React.FC<SelectProps> = ({
               >
                 <span className="truncate">{option.label}</span>
                 {option.value === value && (
-                  <svg className="h-3.5 w-3.5 shrink-0 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="h-3.5 w-3.5 shrink-0 text-foreground" aria-hidden="true" />
                 )}
               </li>
             ))}
@@ -224,4 +268,6 @@ export const Select: React.FC<SelectProps> = ({
       </div>
     </div>
   );
-};
+});
+
+Select.displayName = 'Select';

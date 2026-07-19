@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
+import { BarChart3, Check, Clipboard, FileText, Gauge, Layers, ShieldAlert, TrendingUp, WalletCards, Workflow } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -21,8 +21,7 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Card, InlineAlert, useClipboard } from '../common';
-import { Tooltip } from '../common/Tooltip';
+import { ApiErrorAlert, Badge, Card, DataTable, IconButton, InlineAlert, Spinner, useClipboard, type DataTableColumn } from '../common';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
@@ -59,6 +58,7 @@ type StructuredMarketData = {
   sectors?: MarketReviewPayload['sectors'];
   concepts?: MarketReviewPayload['concepts'];
 };
+type MarketIndexRow = StructuredMarketData['indices'][number];
 
 const isMarketReviewPayload = (value: unknown): value is MarketReviewPayload =>
   Boolean(value && typeof value === 'object');
@@ -388,10 +388,39 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       value: summary?.trendPrediction || marketReviewText.noRiskWatch,
     },
   ], [marketReviewText, reportText.marketSentiment, summary]);
+  const marketIndexColumns = useMemo<DataTableColumn<MarketIndexRow>[]>(() => [
+    {
+      id: 'index',
+      header: marketReviewText.index,
+      cell: (index) => <span className="font-medium text-foreground">{index.name}</span>,
+    },
+    {
+      id: 'last',
+      header: marketReviewText.last,
+      cell: (index) => formatMarketNumber(index.current),
+      priority: 'secondary',
+      cellClassName: 'text-secondary-text',
+    },
+    {
+      id: 'change',
+      header: marketReviewText.change,
+      cell: (index) => formatMarketPercent(index.changePct),
+      align: 'right',
+      cellClassName: 'text-secondary-text',
+    },
+    {
+      id: 'high-low',
+      header: marketReviewText.highLow,
+      cell: (index) => formatMarketHighLow(index.high, index.low),
+      priority: 'tertiary',
+      align: 'right',
+      cellClassName: 'text-secondary-text',
+    },
+  ], [marketReviewText]);
 
   return (
     <div className={`animate-fade-in space-y-4 pb-8 ${className}`}>
-      <Card variant="gradient" padding="md" className="home-report-hero text-left">
+      <Card variant="gradient" padding="md" className="report-hero text-left">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold text-secondary-text">
@@ -403,7 +432,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
             </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-text">
               {meta?.stockCode ? (
-                <span className="home-accent-chip px-2 py-0.5 font-mono">{meta.stockCode}</span>
+                <Badge variant="default" size="sm" className="font-mono">{meta.stockCode}</Badge>
               ) : null}
               {meta?.createdAt ? <span>{new Date(meta.createdAt).toLocaleString(getUiLocale(uiLanguage))}</span> : null}
             </div>
@@ -411,57 +440,41 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
 
           <div className="flex shrink-0 items-center gap-2">
             {canOpenRunFlow ? (
-              <Tooltip content={runFlowText['runFlow.open']}>
-                <span className="inline-flex">
-                  <button
+              <IconButton
                     type="button"
                     onClick={() => onOpenRunFlow(recordId)}
-                    className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
                     aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
+                    tooltip={runFlowText['runFlow.open']}
                   >
                     <Workflow className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </span>
-              </Tooltip>
+              </IconButton>
             ) : null}
-            <Tooltip content={chromeText.copyMarkdownSource}>
-              <span className="inline-flex">
-                <button
+            <IconButton
                   type="button"
                   onClick={() => void handleCopy('markdown')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyMarkdownSource}
+                  tooltip={chromeText.copyMarkdownSource}
                 >
                   {copiedType === 'markdown' ? (
-                    <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="h-5 w-5 text-success" aria-hidden="true" />
                   ) : (
                     <Clipboard className="h-5 w-5" aria-hidden="true" />
                   )}
-                </button>
-              </span>
-            </Tooltip>
-            <Tooltip content={chromeText.copyPlainText}>
-              <span className="inline-flex">
-                <button
+            </IconButton>
+            <IconButton
                   type="button"
                   onClick={() => void handleCopy('text')}
                   disabled={isLoading || !content || copiedType !== null}
-                  className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                   aria-label={chromeText.copyPlainText}
+                  tooltip={chromeText.copyPlainText}
                 >
                   {copiedType === 'text' ? (
-                    <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="h-5 w-5 text-success" aria-hidden="true" />
                   ) : (
                     <FileText className="h-5 w-5" aria-hidden="true" />
                   )}
-                </button>
-              </span>
-            </Tooltip>
+            </IconButton>
           </div>
         </div>
       </Card>
@@ -471,7 +484,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       {summary ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insightCards.map(({ icon: Icon, label, value }) => (
-            <Card key={label} variant="bordered" padding="sm" className="home-panel-card text-left">
+            <Card key={label} variant="bordered" padding="sm" className="text-left">
               <div className="flex items-start gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
@@ -487,7 +500,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {structuredMarketData.length > 0 ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -532,28 +545,15 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                   <p className="text-sm text-secondary-text">{marketReviewText.noBreadthData}</p>
                 )}
                 {marketData.indices.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="text-left text-xs uppercase text-muted-text">
-                        <tr>
-                          <th className="px-2 py-2">{marketReviewText.index}</th>
-                          <th className="px-2 py-2">{marketReviewText.last}</th>
-                          <th className="px-2 py-2">{marketReviewText.change}</th>
-                          <th className="px-2 py-2">{marketReviewText.highLow}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-subtle">
-                        {marketData.indices.map((index) => (
-                          <tr key={index.code || index.name}>
-                            <td className="px-2 py-2 font-medium text-foreground">{index.name}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketNumber(index.current)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketPercent(index.changePct)}</td>
-                            <td className="px-2 py-2 text-secondary-text">{formatMarketHighLow(index.high, index.low)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <DataTable
+                    ariaLabel={marketReviewText.index}
+                    columns={marketIndexColumns}
+                    rows={marketData.indices}
+                    getRowKey={(index) => index.code || index.name}
+                    emptyState={null}
+                    loadingLabel={chromeText.loadingReport}
+                    minWidthClassName="min-w-128"
+                  />
                 ) : null}
                 {(() => {
                   const boardTypes = [{
@@ -632,14 +632,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {isLoading ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
-            <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
+            <Spinner size="lg" />
             <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>
       ) : error ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <ApiErrorAlert error={error} className="w-full max-w-lg" />
           </div>
@@ -647,7 +647,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : (
         <div data-testid="market-review-report" className="space-y-4">
           {sections.map(({ id, title, content: sectionContent, icon: Icon }) => (
-            <Card key={id} variant="bordered" padding="md" className="home-panel-card text-left">
+            <Card key={id} variant="bordered" padding="md" className="text-left">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />

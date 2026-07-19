@@ -1,17 +1,17 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, CircleAlert, CircleDashed, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import { getUiListSeparator, getUiLocale } from '../utils/uiLocale';
+import { getUiListSeparator } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, PageHeader, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, FileInput, PageHeader, SearchableSelect, StatePanel, useToast, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -42,6 +42,8 @@ import {
   FirstRunWizard,
   type WizardDraftItem,
   type WizardCompleteResult,
+  FirstRunSetupCard,
+  SchedulerSettingsCard,
   ModelFallbackEditor,
   type ModelReferenceReplacement,
 } from '../components/settings';
@@ -59,7 +61,6 @@ import {
   type ConnectionCredentialField,
 } from '../components/settings/llmConnectionContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
-import { SettingsSwitch } from '../components/settings/SettingsSwitch';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
   SETTINGS_SECTIONS,
@@ -84,18 +85,15 @@ import {
   resolveFieldRequirement,
 } from '../utils/configConditions';
 import type {
-  ConfigValidationIssue,
   LLMConfigModeStatus,
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
-  SchedulerStatusResponse,
-  SetupStatusCheck,
   SetupStatusResponse,
   SystemConfigCategory,
   SystemConfigItem,
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
-import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
+import { formatUiText, type UiTextKey } from '../i18n/uiText';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
@@ -529,7 +527,6 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
   return `${isDesktopRuntime ? 'dsa-desktop-env' : 'dsa-env'}_${date}_${time}.env`;
 }
 
-const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const SCHEDULER_SETTING_KEYS = new Set([
   'SCHEDULE_ENABLED',
   'SCHEDULE_TIME',
@@ -545,557 +542,10 @@ function parseSetupStockList(value: unknown) {
   return parseStockListValue(String(value ?? ''));
 }
 
-function isEnabledConfigValue(value: unknown) {
-  return String(value ?? '').trim().toLowerCase() === 'true';
-}
-
-function getSetupCheckIcon(check: SetupStatusCheck) {
-  if (check.status === 'configured' || check.status === 'inherited') {
-    return <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />;
-  }
-  if (check.status === 'needs_action') {
-    return <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />;
-  }
-  return <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />;
-}
-
-function getSetupCheckStatusLabel(
-  check: SetupStatusCheck,
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string,
-) {
-  if (check.status === 'configured') return t('settings.setupStatusConfigured');
-  if (check.status === 'inherited') return t('settings.setupStatusInherited');
-  if (check.status === 'needs_action') return t('settings.setupStatusNeedsAction');
-  return t('settings.setupStatusOptional');
-}
-
-type FirstRunSetupCardProps = {
-  status: SetupStatusResponse | null;
-  isLoading: boolean;
-  error: ParsedApiError | null;
-  firstStockCode: string;
-  isSaving: boolean;
-  isRunningSmoke: boolean;
-  smokeError: ParsedApiError | null;
-  smokeSuccess: string;
-  onRefresh: () => void | Promise<void>;
-  onSelectCategory: (category: SystemConfigCategory) => void;
-  onRunSmoke: () => void | Promise<void>;
-  listSeparator: string;
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string;
-};
-
-const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
-  status,
-  isLoading,
-  error,
-  firstStockCode,
-  isSaving,
-  isRunningSmoke,
-  smokeError,
-  smokeSuccess,
-  onRefresh,
-  onSelectCategory,
-  onRunSmoke,
-  listSeparator,
-  t,
-}) => {
-  const [isHidden, setIsHidden] = useState(false);
-  const requiredMissing = status?.checks.filter((check) => check.required && check.status === 'needs_action') || [];
-  const isComplete = Boolean(status?.isComplete);
-  const canRunSmoke = Boolean(status?.readyForSmoke && firstStockCode);
-  const summaryTitle = !status
-    ? error
-      ? t('settings.setupGuideUnknownTitle')
-      : t('settings.setupGuideCheckingTitle')
-    : isComplete
-      ? t('settings.setupGuideCompleteTitle')
-      : t('settings.setupGuideIncompleteTitle');
-  const summaryMessage = !status
-    ? error
-      ? t('settings.setupGuideUnknownSummary')
-      : t('settings.setupGuideCheckingSummary')
-    : requiredMissing.length
-      ? t('settings.setupGuideMissingSummary', {
-        count: requiredMissing.length,
-        labels: requiredMissing.slice(0, 3).map((check) => check.title).join(listSeparator),
-      })
-      : t('settings.setupGuideReadySummary');
-
-  if (isHidden) {
-    return (
-      <div className="rounded-2xl border settings-border bg-card/90 px-4 py-3 shadow-soft-card">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{t('settings.setupGuideHiddenTitle')}</p>
-            <p className="mt-1 text-xs leading-5 text-muted-text">{t('settings.setupGuideHiddenDescription')}</p>
-          </div>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsHidden(false)}>
-            {t('settings.setupGuideOpen')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <SettingsSectionCard
-      title={t('settings.setupGuideTitle')}
-      description={t('settings.setupGuideDescription')}
-      contentBordered
-    >
-      <div data-testid="first-run-setup-card" className="space-y-4">
-        <div className="flex flex-col gap-2 rounded-xl border settings-border bg-background/35 px-3 py-2.5 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">
-              {summaryTitle}
-            </p>
-            <p className="mt-1 text-xs leading-6 text-muted-text">
-              {summaryMessage}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="settings-secondary"
-              size="sm"
-              disabled={isLoading}
-              isLoading={isLoading}
-              loadingText={t('settings.setupGuideRefreshing')}
-              onClick={() => void onRefresh()}
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              {t('settings.setupGuideRefresh')}
-            </Button>
-            <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsHidden(true)}>
-              {t('settings.setupGuideHide')}
-            </Button>
-          </div>
-        </div>
-
-        {error ? <ApiErrorAlert error={error} /> : null}
-
-        {isLoading && !status ? (
-          <p className="text-sm text-muted-text">{t('common.loading')}</p>
-        ) : null}
-
-        {status ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {status.checks.map((check) => (
-              <div
-                key={check.key}
-                className="rounded-2xl border settings-border bg-card/65 px-4 py-3"
-              >
-                <div className="flex items-start gap-3">
-                  {getSetupCheckIcon(check)}
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{check.title}</p>
-                      <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
-                        {getSetupCheckStatusLabel(check, t)}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-muted-text">{check.message}</p>
-                    {check.nextStep ? (
-                      <p className="mt-2 text-xs leading-5 text-secondary-text">{check.nextStep}</p>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('ai_model')}>
-            {t('settings.setupGuideConfigureLlm')}
-          </Button>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('base')}>
-            {t('settings.setupGuideAddStocks')}
-          </Button>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('notification')}>
-            {t('settings.setupGuideConfigureNotification')}
-          </Button>
-          <Button
-            type="button"
-            variant="settings-primary"
-            size="sm"
-            disabled={!canRunSmoke || isSaving || isRunningSmoke}
-            isLoading={isRunningSmoke}
-            loadingText={t('settings.setupGuideSmokeRunning')}
-            title={!firstStockCode ? t('settings.setupGuideSmokeNeedsStock') : undefined}
-            onClick={() => void onRunSmoke()}
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            {t('settings.setupGuideRunSmoke')}
-          </Button>
-        </div>
-
-        {!canRunSmoke && status ? (
-          <p className="text-xs leading-6 text-muted-text">
-            {firstStockCode ? t('settings.setupGuideSmokeNotReady') : t('settings.setupGuideSmokeNeedsStock')}
-          </p>
-        ) : null}
-        {smokeError ? <ApiErrorAlert error={smokeError} /> : null}
-        {!smokeError && smokeSuccess ? (
-          <SettingsAlert title={t('settings.actionSuccess')} message={smokeSuccess} variant="success" />
-        ) : null}
-      </div>
-    </SettingsSectionCard>
-  );
-};
-
-function parseScheduleTimes(scheduleTimesValue?: string, fallbackValue?: string, defaultValue?: string | null) {
-  const values = String(scheduleTimesValue ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (values.length > 0) {
-    return [...new Set(values)];
-  }
-
-  const fallback = String(fallbackValue ?? '').trim();
-  if (fallback) {
-    return [fallback];
-  }
-
-  const schemaDefault = String(defaultValue ?? '').trim();
-  return schemaDefault ? [schemaDefault] : [];
-}
-
-function serializeScheduleTimes(times: string[]) {
-  return times.map((time) => time.trim()).filter(Boolean).join(',');
-}
-
-function formatSchedulerTimestamp(value: string | null | undefined, language: UiLanguage) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(getUiLocale(language), {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-type SchedulerSettingsCardProps = {
-  items: SystemConfigItem[];
-  disabled: boolean;
-  issueByKey: Record<string, ConfigValidationIssue[]>;
-  statusRefreshToken: number;
-  onChange: (key: string, value: string) => void;
-  onSchedulerStateChange?: (payload: {
-    runtimeEnabled: boolean | null;
-    overrideEnabled: boolean | null;
-  }) => void;
-  t: (key: UiTextKey, params?: Record<string, string | number>) => string;
-  language: UiLanguage;
-};
-
-const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
-  items,
-  disabled,
-  issueByKey,
-  statusRefreshToken,
-  onChange,
-  onSchedulerStateChange,
-  t,
-  language,
-}) => {
-  const scheduleEnabledItem = getConfigItem(items, 'SCHEDULE_ENABLED');
-  const scheduleTimesItem = getConfigItem(items, 'SCHEDULE_TIMES');
-  const scheduleTimeItem = getConfigItem(items, 'SCHEDULE_TIME');
-  const hasSchedulerSettings = Boolean(scheduleEnabledItem || scheduleTimesItem || scheduleTimeItem);
-  const [status, setStatus] = useState<SchedulerStatusResponse | null>(null);
-  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-  const [isRunningNow, setIsRunningNow] = useState(false);
-  const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
-  const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
-  const [runNowSuccess, setRunNowSuccess] = useState('');
-  const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
-  const [isAddingTime, setIsAddingTime] = useState(false);
-
-  const refreshSchedulerStatus = useCallback(async () => {
-    setStatusError(null);
-    setIsRefreshingStatus(true);
-    try {
-      const payload = await systemConfigApi.getSchedulerStatus();
-      setStatus(payload);
-    } catch (error: unknown) {
-      setStatusError(getParsedApiError(error));
-    } finally {
-      setIsRefreshingStatus(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hasSchedulerSettings) {
-      return;
-    }
-    void refreshSchedulerStatus();
-  }, [hasSchedulerSettings, refreshSchedulerStatus, statusRefreshToken]);
-
-  useEffect(() => {
-    if (!onSchedulerStateChange) {
-      return;
-    }
-
-    const runtimeEnabled = status?.enabled ?? null;
-    onSchedulerStateChange({
-      runtimeEnabled,
-      overrideEnabled: scheduleEnabledOverride,
-    });
-  }, [onSchedulerStateChange, status?.enabled, scheduleEnabledOverride]);
-
-  if (!hasSchedulerSettings) {
-    return null;
-  }
-
-  const scheduleEnabled = isEnabledConfigValue(scheduleEnabledItem?.value);
-  const scheduleTimes = parseScheduleTimes(
-    String(scheduleTimesItem?.value ?? ''),
-    String(scheduleTimeItem?.value ?? ''),
-    scheduleTimeItem?.schema?.defaultValue,
-  );
-  const timeTargetKey = scheduleTimesItem ? 'SCHEDULE_TIMES' : 'SCHEDULE_TIME';
-  const statusEnabled = status?.enabled ?? scheduleEnabled;
-  const displayedScheduleEnabled = scheduleEnabledOverride ?? statusEnabled;
-  const effectiveStatusTimes = status?.scheduleTimes?.length ? status.scheduleTimes : scheduleTimes.filter(Boolean);
-  const validationIssues = [
-    ...(issueByKey.SCHEDULE_ENABLED || []),
-    ...(issueByKey.SCHEDULE_TIMES || []),
-    ...(issueByKey.SCHEDULE_TIME || []),
-  ];
-
-  const updateScheduleTimes = (nextTimes: string[]) => {
-    if (timeTargetKey === 'SCHEDULE_TIME') {
-      onChange(timeTargetKey, nextTimes[0] || '');
-      return;
-    }
-    onChange(timeTargetKey, serializeScheduleTimes(nextTimes));
-  };
-
-  const runSchedulerNow = async () => {
-    setRunNowError(null);
-    setRunNowSuccess('');
-    setIsRunningNow(true);
-    try {
-      await systemConfigApi.runSchedulerNow();
-      setRunNowSuccess(t('settings.schedulerRunAccepted'));
-      await refreshSchedulerStatus();
-    } catch (error: unknown) {
-      setRunNowError(getParsedApiError(error));
-    } finally {
-      setIsRunningNow(false);
-    }
-  };
-
-  return (
-    <SettingsSectionCard
-      title={t('settings.schedulerTitle')}
-      description={t('settings.schedulerDescription')}
-      contentBordered
-    >
-      <div data-testid="scheduler-settings-card" className="space-y-4">
-        <div className="grid grid-cols-1 gap-3">
-          <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
-            <div className="flex min-h-11 items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
-                <p className="text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</p>
-              </div>
-              <SettingsSwitch
-                checked={displayedScheduleEnabled}
-                disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
-                onCheckedChange={(nextEnabled) => {
-                  setScheduleEnabledOverride(nextEnabled);
-                  onChange('SCHEDULE_ENABLED', nextEnabled ? 'true' : 'false');
-                }}
-                testId="scheduler-enabled-switch"
-                aria-label={t('settings.schedulerEnable')}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Clock className="h-4 w-4" aria-hidden="true" />
-                {t('settings.schedulerTimes')}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {scheduleTimes.map((time, index) => (
-                  <div
-                    key={index}
-                    className="inline-flex shrink-0 items-center gap-1"
-                  >
-                    <TimePicker
-                      data-testid={`scheduler-time-input-${index}`}
-                      value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
-                      ariaLabel={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="w-24"
-                      triggerClassName="h-9 min-h-9 text-sm font-medium"
-                      disabled={disabled}
-                      onChange={(nextValue) => {
-                        if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
-                          updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
-                            currentIndex === index ? nextValue : currentTime
-                          )));
-                        }
-                      }}
-                    />
-                    {scheduleTimes.length > 1 ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 min-w-8 text-muted-text hover:bg-danger/10 hover:text-danger"
-                        aria-label={t('settings.schedulerRemoveTime')}
-                        title={t('settings.schedulerRemoveTime')}
-                        disabled={disabled}
-                        onClick={() => {
-                          updateScheduleTimes(scheduleTimes.filter((_, currentIndex) => currentIndex !== index));
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                  </div>
-                ))}
-                {isAddingTime ? (
-                  <TimePicker
-                    data-testid="scheduler-new-time-input"
-                    value=""
-                    ariaLabel={t('settings.schedulerTimeInputAria', { index: scheduleTimes.length + 1 })}
-                    placeholder={t('settings.schedulerTimePlaceholder')}
-                    className="w-24"
-                    triggerClassName="h-9 min-h-9 text-sm font-medium"
-                    disabled={disabled}
-                    autoOpen
-                    onOpenChange={(open) => {
-                      if (!open) setIsAddingTime(false);
-                    }}
-                    onChange={(nextValue) => {
-                      if (SCHEDULE_TIME_PATTERN.test(nextValue) && !scheduleTimes.includes(nextValue)) {
-                        updateScheduleTimes([...scheduleTimes, nextValue]);
-                      }
-                      if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
-                        setIsAddingTime(false);
-                      }
-                    }}
-                  />
-                ) : null}
-                {timeTargetKey === 'SCHEDULE_TIMES' && !isAddingTime ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 shrink-0"
-                    data-testid="scheduler-add-time-button"
-                    disabled={disabled}
-                    onClick={() => setIsAddingTime(true)}
-                  >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    {t('settings.schedulerAddTime')}
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-2xl border settings-border bg-background/35 px-4 py-4">
-            <div>
-              <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
-              <p className="mt-1 text-xs leading-6 text-muted-text">
-                {status?.running
-                  ? t('settings.schedulerRunning')
-                  : statusEnabled
-                    ? t('settings.schedulerEnabled')
-                    : t('settings.schedulerDisabled')}
-              </p>
-            </div>
-            <dl className="grid grid-cols-1 gap-2 text-xs">
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
-                <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
-                <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
-                <dt className="text-muted-text">{t('settings.schedulerNextRun')}</dt>
-                <dd className="mt-1 font-medium text-foreground">
-                  {formatSchedulerTimestamp(status?.nextRunAt, language)}
-                </dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
-                <dt className="text-muted-text">{t('settings.schedulerLastSuccess')}</dt>
-                <dd data-testid="scheduler-last-success" className="mt-1 font-medium text-foreground">
-                  {formatSchedulerTimestamp(status?.lastSuccessAt, language)}
-                </dd>
-              </div>
-              {status?.lastError ? (
-                <div className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2">
-                  <dt className="text-danger">{t('settings.schedulerLastError')}</dt>
-                  <dd data-testid="scheduler-last-error" className="mt-1 break-words text-danger">{status.lastError}</dd>
-                </div>
-              ) : null}
-            </dl>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="settings-secondary"
-                size="sm"
-                data-testid="scheduler-refresh-status-button"
-                disabled={disabled || isRefreshingStatus}
-                isLoading={isRefreshingStatus}
-                loadingText={t('settings.schedulerRefreshing')}
-                onClick={() => void refreshSchedulerStatus()}
-              >
-                <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                {t('settings.schedulerRefresh')}
-              </Button>
-              <Button
-                type="button"
-                variant="settings-primary"
-                size="sm"
-                data-testid="scheduler-run-now-button"
-                disabled={disabled || isRunningNow}
-                isLoading={isRunningNow}
-                loadingText={t('settings.schedulerRunningNow')}
-                onClick={() => void runSchedulerNow()}
-              >
-                <Play className="h-4 w-4" aria-hidden="true" />
-                {t('settings.schedulerRunNow')}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {validationIssues.length ? (
-          <div className="space-y-1 text-xs text-danger">
-            {validationIssues.map((issue) => (
-              <p key={`${issue.key}-${issue.code}`}>{issue.message}</p>
-            ))}
-          </div>
-        ) : null}
-        {statusError ? <ApiErrorAlert error={statusError} /> : null}
-        {runNowError ? <ApiErrorAlert error={runNowError} /> : null}
-        {!runNowError && runNowSuccess ? (
-          <SettingsAlert title={t('settings.actionSuccess')} message={runNowSuccess} variant="success" />
-        ) : null}
-      </div>
-    </SettingsSectionCard>
-  );
-};
-
 const SettingsPage: React.FC = () => {
   const { authEnabled, passwordChangeable } = useAuth();
   const { language: uiLanguage, t } = useUiLanguage();
+  const { showToast } = useToast();
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
   const [envBackupActionError, setEnvBackupActionError] = useState<ParsedApiError | null>(null);
@@ -1479,8 +929,6 @@ const SettingsPage: React.FC = () => {
     void refreshSetupStatus();
   }, [refreshSetupStatus]);
 
-  const [isToastPaused, setIsToastPaused] = useState(false);
-
   useEffect(() => {
     void load();
   }, [load]);
@@ -1490,18 +938,23 @@ const SettingsPage: React.FC = () => {
   }, [refreshSetupStatus]);
 
   useEffect(() => {
-    if (!toast || toast.type !== 'success' || isToastPaused) {
-      return;
+    if (!toast) return;
+    if (toast.type === 'success') {
+      showToast({
+        title: t('settings.actionSuccess'),
+        message: toast.message,
+        tone: 'success',
+        durationMs: 3200,
+      });
+    } else {
+      showToast({
+        title: toast.error.title,
+        message: toast.error.message,
+        tone: 'danger',
+      });
     }
-
-    const timer = window.setTimeout(() => {
-      clearToast();
-    }, 3200);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [clearToast, isToastPaused, toast]);
+    clearToast();
+  }, [clearToast, showToast, t, toast]);
 
   useEffect(() => {
     if (!canCheckDesktopUpdate) {
@@ -1657,7 +1110,7 @@ const SettingsPage: React.FC = () => {
       <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
       <Button
         type="button"
-        variant="settings-secondary"
+        variant="secondary"
         size="sm"
         className="text-xs shadow-none"
         onClick={() => selectSectionView('notifications', 'channels')}
@@ -2585,7 +2038,7 @@ const SettingsPage: React.FC = () => {
       ) : null}
     </SettingsSectionCard>
   ) : hasSubNav || hasActiveConfigItems || activeSection === 'ai_models' || isTopLevelAdvanced ? null : (
-    <EmptyState
+    <StatePanel status="empty"
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
       className="settings-surface-panel settings-border-strong border-none bg-transparent shadow-none"
@@ -2607,7 +2060,7 @@ const SettingsPage: React.FC = () => {
     .filter(([, state]) => state.status !== 'idle');
 
   return (
-    <div className="settings-page min-h-full px-4 pb-6 pt-4 md:px-6">
+    <AppPage className="settings-page pb-6">
       <div className="mb-4">
         <PageHeader
           title={t('settings.pageTitle')}
@@ -2627,21 +2080,21 @@ const SettingsPage: React.FC = () => {
                 )}
                 <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
                 {state.status === 'failed' ? (
-                  <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
+                  <Button type="button" variant="ghost" size="md" className="h-auto min-h-11 min-w-11 px-1 underline" onClick={() => retryAutosaveGroup(group)}>
                     {settingsText.autosaveRetry}
-                  </button>
+                  </Button>
                 ) : null}
                 {state.status === 'failed' || state.status === 'conflicted' ? (
-                  <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+                  <Button type="button" variant="ghost" size="md" className="h-auto min-h-11 min-w-11 px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
                     {settingsText.autosaveRestore}
-                  </button>
+                  </Button>
                 ) : null}
               </span>
             ))}
             {activeGroupDirtyCount > 0 ? (
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="secondary"
                 size="sm"
                 className="px-2.5"
                 onClick={() => setShowResetConfirm(true)}
@@ -2682,7 +2135,7 @@ const SettingsPage: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => resolveAllSettingsConflicts('server')}
                 >
@@ -2690,7 +2143,7 @@ const SettingsPage: React.FC = () => {
                 </Button>
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => resolveAllSettingsConflicts('local')}
                 >
@@ -2716,7 +2169,7 @@ const SettingsPage: React.FC = () => {
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         size="xsm"
                         onClick={() => resolveSettingsConflict(field.key, 'server')}
                       >
@@ -2724,7 +2177,7 @@ const SettingsPage: React.FC = () => {
                       </Button>
                       <Button
                         type="button"
-                        variant="settings-primary"
+                        variant="primary"
                         size="xsm"
                         onClick={() => resolveSettingsConflict(field.key, 'local')}
                       >
@@ -2809,7 +2262,7 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <Button
                   type="button"
-                  variant="settings-primary"
+                  variant="primary"
                   size="sm"
                   className="shrink-0"
                   disabled={isProviderCatalogLoading || providerCatalog.length === 0}
@@ -2852,21 +2305,21 @@ const SettingsPage: React.FC = () => {
                     <p className="mt-1 text-xs leading-6 text-muted-text">
                       {t('settings.alphaSiftSummary')}
                     </p>
-                    <p className="mt-2 text-xs leading-6 text-amber-700 dark:text-amber-300">
+                    <p className="mt-2 text-xs leading-6 text-warning">
                       {t('settings.alphaSiftRisk')}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
-                      variant="settings-secondary"
+                      variant="secondary"
                       onClick={() => selectSectionView('data_sources', 'providers')}
                     >
                       {t('settings.viewConfigItems')}
                     </Button>
                     <Button
                       type="button"
-                      variant={alphasiftEnabled ? 'settings-secondary' : 'settings-primary'}
+                      variant={alphasiftEnabled ? 'secondary' : 'primary'}
                       onClick={() => void updateAlphaSiftEnabled(!alphasiftEnabled)}
                       disabled={isSaving || isLoading || isUpdatingAlphaSift}
                       isLoading={isUpdatingAlphaSift}
@@ -2911,7 +2364,7 @@ const SettingsPage: React.FC = () => {
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
                 >
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold text-muted-text">
                       {t('settings.versionWebui')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2919,7 +2372,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold text-muted-text">
                       {t('settings.versionBuildId')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2927,7 +2380,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
+                    <p className="text-xs font-semibold text-muted-text">
                       {t('settings.versionBuildTime')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2936,7 +2389,7 @@ const SettingsPage: React.FC = () => {
                   </div>
                   {shouldShowDesktopVersionCard ? (
                     <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
+                      <p className="text-xs font-semibold text-muted-text">
                         {t('settings.versionDesktop')}
                       </p>
                       <p className="mt-2 break-all font-mono text-sm text-foreground">
@@ -2959,7 +2412,7 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         onClick={() => void handleDesktopUpdateCheck()}
                         disabled={isCheckingDesktopUpdate}
                         isLoading={isCheckingDesktopUpdate}
@@ -2990,7 +2443,7 @@ const SettingsPage: React.FC = () => {
                   </div>
                 ) : null}
                 {WEB_BUILD_INFO.isFallbackVersion ? (
-                  <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
+                  <p className="text-xs leading-6 text-warning">
                     {t('settings.fallbackVersionWarning')}
                   </p>
                 ) : null}
@@ -3003,14 +2456,14 @@ const SettingsPage: React.FC = () => {
               >
                 <div className="space-y-4 rounded-xl border settings-border p-4">
                   {!isEnvBackupAllowed ? (
-                    <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
+                    <p className="text-xs leading-6 text-warning">
                       {t('settings.disabledAuthBackupWarning')}
                     </p>
                   ) : null}
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
                       type="button"
-                      variant="settings-secondary"
+                      variant="secondary"
                       onClick={() => void downloadEnvBackup()}
                       disabled={envBackupActionDisabled}
                       isLoading={isExportingEnv}
@@ -3020,7 +2473,7 @@ const SettingsPage: React.FC = () => {
                     </Button>
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       onClick={beginEnvBackupImport}
                       disabled={envBackupActionDisabled}
                       isLoading={isImportingEnv}
@@ -3028,11 +2481,10 @@ const SettingsPage: React.FC = () => {
                     >
                       {t('settings.importEnv')}
                     </Button>
-                    <input
+                    <FileInput
                       ref={envBackupImportRef}
-                      type="file"
+                      aria-label={t('settings.importEnv')}
                       accept=".env,.txt"
-                      className="hidden"
                       onChange={(event) => {
                         void handleEnvBackupImportFile(event);
                       }}
@@ -3122,7 +2574,7 @@ const SettingsPage: React.FC = () => {
                 ) : availableModelsLoading && availableModels.length === 0 ? (
                   <p className="mb-3 text-xs text-secondary-text">{settingsText.loadingModels}</p>
                 ) : availableModels.length === 0 ? (
-                  <div className="mb-3 rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
+                  <div className="mb-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
                     <p className="text-sm font-medium text-foreground">
                       {settingsText.noModels}
                     </p>
@@ -3133,7 +2585,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       size="sm"
                       className="mt-3"
                       onClick={goToModelAccessFromTaskRouting}
@@ -3233,13 +2685,15 @@ const SettingsPage: React.FC = () => {
                       : settingsText.noneSet}
                   </span>
                   {hasSafeFallbackPlacement ? (
-                    <button
+                    <Button
                       type="button"
-                      className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
+                      variant="ghost"
+                      size="md"
+                      className="h-auto min-h-11 min-w-11 px-1 underline-offset-2 hover:underline"
                       onClick={() => selectSectionView('ai_models', 'reliability')}
                     >
                       {settingsText.editReliability}
-                    </button>
+                    </Button>
                   ) : null}
                     </div>
                   </>
@@ -3293,7 +2747,7 @@ const SettingsPage: React.FC = () => {
                       ))}
                     </form>
                   ) : (
-                    <EmptyState
+                    <StatePanel status="empty"
                       title={t('settings.currentCategoryEmptyTitle')}
                       description={t('settings.currentCategoryEmptyDescription')}
                       className="border-none bg-transparent py-6 shadow-none"
@@ -3334,13 +2788,13 @@ const SettingsPage: React.FC = () => {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {searchParams.get('from') === 'task_routing' ? (
-                      <Button type="button" variant="settings-secondary" onClick={returnToTaskRouting}>
+                      <Button type="button" variant="secondary" onClick={returnToTaskRouting}>
                         {settingsText.returnTaskRouting}
                       </Button>
                     ) : null}
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || providerConnectionSchemaUnavailable || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
                       onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
                     >
@@ -3429,30 +2883,6 @@ const SettingsPage: React.FC = () => {
         </div>
       )}
 
-      {toast ? (
-        <div
-          className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]"
-          onMouseEnter={() => setIsToastPaused(true)}
-          onMouseLeave={() => setIsToastPaused(false)}
-          onFocusCapture={() => setIsToastPaused(true)}
-          onBlurCapture={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-              setIsToastPaused(false);
-            }
-          }}
-        >
-          {toast.type === 'success'
-            ? (
-                <SettingsAlert
-                  title={t('settings.actionSuccess')}
-                  message={toast.message}
-                  variant="success"
-                  presentation="toast"
-                />
-              )
-            : <ApiErrorAlert error={toast.error} />}
-        </div>
-      ) : null}
       <ConfirmDialog
         isOpen={showImportConfirm}
         title={t('settings.importConfirmTitle')}
@@ -3506,7 +2936,7 @@ const SettingsPage: React.FC = () => {
           emptyApiKeyHosts={providerEmptyApiKeyHosts}
         />
       ) : null}
-    </div>
+    </AppPage>
   );
 };
 

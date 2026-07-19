@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Badge, Checkbox } from '../common';
+import { Badge, Checkbox, Pressable } from '../common';
 import type { HistoryItem } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
@@ -49,12 +49,12 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
         aria-label={t('history.selectRecordAria', { name: stockName })}
         containerClassName="-ml-2 h-11 w-11 shrink-0 justify-center self-center"
       />
-      <button
+      <Pressable
         type="button"
         onClick={() => onClick(item.id)}
         aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
-        className={`home-history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
-          isViewing ? 'home-history-item-selected' : ''
+        className={`history-item w-full min-w-0 flex-1 text-left p-2.5 group/item ${
+          isViewing ? 'history-item-selected' : ''
         }`}
       >
         <div className="relative z-10 flex items-center gap-2.5">
@@ -70,7 +70,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <span className="block w-full truncate text-sm font-semibold text-foreground tracking-tight">
+                <span className="block w-full truncate text-sm font-semibold text-foreground">
                   {truncateStockName(stockName)}
                 </span>
               </div>
@@ -79,7 +79,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="home-history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
+                    className="history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
                     style={{
                       color: sentimentColor,
                       borderColor: `${sentimentColor}30`,
@@ -110,7 +110,7 @@ export const HistoryListItem: React.FC<HistoryListItemProps> = ({
             </div>
           </div>
         </div>
-      </button>
+      </Pressable>
     </div>
   );
 };

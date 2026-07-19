@@ -1,8 +1,9 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
+import { History } from 'lucide-react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Button, Checkbox, ScrollArea } from '../common';
-import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
+import { Badge, Button, Checkbox, ScrollArea, Spinner, StatePanel } from '../common';
+import { DashboardPanelHeader } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -94,7 +95,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
       <ScrollArea
         viewportRef={scrollContainerRef}
         viewportClassName="p-4"
-        testId="home-history-list-scroll"
+        testId="history-list-scroll"
       >
         <div className="mb-4 space-y-3">
           <DashboardPanelHeader
@@ -102,9 +103,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             title={title ?? t('history.defaultTitle')}
             titleClassName="text-sm font-medium"
             leading={(
-              <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <History className="h-4 w-4 text-primary" aria-hidden="true" />
             )}
             headingClassName="items-center"
             actions={
@@ -143,19 +142,16 @@ export const HistoryList: React.FC<HistoryListProps> = ({
         </div>
 
         {isLoading ? (
-          <DashboardStateBlock
-            loading
+          <StatePanel status="loading"
             compact
             title={t('history.loading')}
           />
         ) : items.length === 0 ? (
-          <DashboardStateBlock
+          <StatePanel status="empty"
             title={emptyTitle ?? t('history.defaultEmptyTitle')}
             description={emptyDescription ?? t('history.defaultEmptyDescription')}
             icon={(
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <History className="h-5 w-5" aria-hidden="true" />
             )}
           />
         ) : (
@@ -176,14 +172,14 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             
             {isLoadingMore && (
               <div className="flex justify-center py-4">
-                <div className="home-spinner h-5 w-5 animate-spin border-2" />
+                <Spinner size="md" label={t('history.loading')} />
               </div>
             )}
 
             {!hasMore && items.length > 0 && (
               <div className="text-center py-5">
                 <div className="h-px bg-subtle w-full mb-3" />
-                <span className="text-xs text-secondary-text uppercase tracking-[0.2em]">{t('history.bottomReached')}</span>
+                <span className="text-xs text-secondary-text">{t('history.bottomReached')}</span>
               </div>
             )}
           </div>

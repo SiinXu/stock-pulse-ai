@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { InlineAlert } from './InlineAlert';
 import { useClipboard } from './useClipboard';
 
@@ -7,18 +10,19 @@ interface JsonViewerProps {
   data: Record<string, unknown> | unknown[] | null | undefined;
   maxHeight?: string;
   className?: string;
+  copyIconOnly?: boolean;
 }
 
 const JSON_TOKEN_PATTERN = /"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b|true|false|null/g;
 
 function getTokenClassName(token: string, remainingLine: string): string {
   if (token.startsWith('"')) {
-    return /^\s*:/.test(remainingLine) ? 'text-primary' : 'text-emerald-400';
+    return /^\s*:/.test(remainingLine) ? 'text-primary' : 'text-success';
   }
   if (token === 'true' || token === 'false' || token === 'null') {
     return 'text-secondary-text';
   }
-  return 'text-amber-400';
+  return 'text-warning';
 }
 
 function renderHighlightedLine(line: string): React.ReactNode[] {
@@ -56,6 +60,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
   data,
   maxHeight = '400px',
   className = '',
+  copyIconOnly = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const { t } = useUiLanguage();
@@ -90,15 +95,27 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
       {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-2" /> : null}
       <div className="relative">
         {/* Copy action */}
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="absolute top-2 right-2 min-h-11 min-w-11 px-2 py-1 text-xs rounded-lg
-            border border-border bg-elevated hover:bg-hover text-secondary-text
-            transition-colors z-10"
-        >
-          {copied ? t('common.copied') : t('common.copy')}
-        </button>
+        {copyIconOnly ? (
+          <IconButton
+            onClick={handleCopy}
+            aria-label={copied ? t('common.copied') : t('common.copy')}
+            tooltip={false}
+            className="absolute right-2 top-2 z-10"
+          >
+            {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+          </IconButton>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            size="xl"
+            onClick={handleCopy}
+            aria-label={copied ? t('common.copied') : t('common.copy')}
+            className="absolute right-2 top-2 z-10 min-h-11 min-w-11 px-3 text-xs"
+          >
+            {copied ? t('common.copied') : t('common.copy')}
+          </Button>
+        )}
 
         {/* JSON content */}
         <div

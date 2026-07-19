@@ -19,6 +19,29 @@ const baseSummary = {
 };
 
 describe('ReportOverview', () => {
+  it('uses the canonical action before conflicting labels and legacy advice', () => {
+    render(
+      <ReportOverview
+        meta={baseMeta}
+        summary={{
+          ...baseSummary,
+          action: 'sell',
+          actionLabel: '买入',
+          operationAdvice: '继续持有，等待反弹',
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('report-canonical-action')).toHaveTextContent('卖出');
+    expect(screen.getByText('继续持有，等待反弹')).toBeInTheDocument();
+  });
+
+  it('keeps ambiguous legacy advice visible when no structured action exists', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    expect(screen.getByTestId('report-canonical-action')).toHaveTextContent('继续观察买点');
+  });
+
   it('renders final market phase and partial-bar labels from report metadata', () => {
     render(
       <ReportOverview
@@ -227,7 +250,7 @@ describe('ReportOverview', () => {
 
     const actionAdviceTitle = screen.getByText('操作建议');
     const relatedBoardsRegion = screen.getByRole('region', { name: '关联板块' });
-    const boardLists = container.querySelectorAll('.home-related-board-list');
+    const boardLists = container.querySelectorAll('.report-related-board-list');
 
     expect(actionAdviceTitle.compareDocumentPosition(relatedBoardsRegion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText('关联板块')).toBeInTheDocument();

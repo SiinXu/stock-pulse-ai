@@ -6,7 +6,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, InlineAlert, Input, Modal, Select } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, DatePicker, FileInput, InlineAlert, Input, Modal, PageHeader, Select, StatePanel } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -118,9 +118,6 @@ function resolveOperationAttempt(
 
 const PORTFOLIO_INPUT_CLASS =
   'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
-const PORTFOLIO_FILE_PICKER_CLASS =
-  'flex h-11 w-full cursor-pointer items-center justify-center rounded-full border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
-
 function getSignalTime(item: DecisionSignalItem): number {
   return parseDecisionSignalDate(item.createdAt)?.getTime()
     ?? parseDecisionSignalDate(item.updatedAt)?.getTime()
@@ -194,6 +191,7 @@ const PortfolioPage: React.FC = () => {
   }, [text.documentTitle]);
 
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
   const [selectedAccount, setSelectedAccount] = useState<AccountOption>('all');
   const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [tradeModalOpen, setTradeModalOpen] = useState(false);
@@ -305,6 +303,7 @@ const PortfolioPage: React.FC = () => {
   const corporateOperationRef = useRef<OperationAttempt | null>(null);
   const csvOperationRef = useRef<OperationAttempt | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const accountNameInputRef = useRef<HTMLInputElement>(null);
   const snapshotRequestRef = useRef(0);
   const eventRequestRef = useRef(0);
 
@@ -331,6 +330,7 @@ const PortfolioPage: React.FC = () => {
   };
 
   const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true);
     try {
       const response = await portfolioApi.getAccounts(false);
       const items = response.accounts || [];
@@ -342,6 +342,8 @@ const PortfolioPage: React.FC = () => {
       });
     } catch (err) {
       setError(getParsedApiError(err));
+    } finally {
+      setAccountsLoading(false);
     }
   }, []);
 
@@ -967,6 +969,7 @@ const PortfolioPage: React.FC = () => {
     if (!name) {
       setAccountCreateError(text.accountNameRequired);
       setAccountCreateSuccess(null);
+      requestAnimationFrame(() => accountNameInputRef.current?.focus());
       return;
     }
     try {
@@ -1119,16 +1122,11 @@ const PortfolioPage: React.FC = () => {
     : null;
 
   return (
-    <div className="portfolio-page min-h-dvh space-y-4 p-4 md:p-6">
+    <AppPage className="portfolio-page space-y-4">
       <section className="space-y-3">
-        <div className="space-y-2">
-          <h1 className="text-xl md:text-2xl font-semibold text-foreground">{text.title}</h1>
-          <p className="text-xs md:text-sm text-secondary">
-            {text.description}
-          </p>
-        </div>
+        <PageHeader title={text.title} description={text.description} />
         {hasAccounts ? (
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+          <div className="rounded-xl border border-border bg-surface-1 p-3">
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px_280px] gap-2 items-end">
               <Select
                 label={text.accountView}
@@ -1152,8 +1150,8 @@ const PortfolioPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xl"
-                  className="flex-1"
+                  size="sm"
+                  className="shrink-0 whitespace-nowrap"
                   onClick={() => {
                     setShowCreateAccount(true);
                     setAccountCreateError(null);
@@ -1189,45 +1187,25 @@ const PortfolioPage: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : (
-          <InlineAlert
-            variant="warning"
-            className="rounded-lg px-3 py-2 text-xs shadow-none"
-            message={text.noAccounts}
-            action={(
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setShowCreateAccount(true);
-                  setAccountCreateError(null);
-                  setAccountCreateSuccess(null);
-                }}
-              >
-                {text.addAccount}
-              </Button>
-            )}
-          />
-        )}
+        ) : null}
       </section>
 
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
-      {riskWarning ? (
+      {hasAccounts && riskWarning ? (
         <InlineAlert
           variant="warning"
           title={text.riskDegraded}
           message={riskWarning}
         />
       ) : null}
-      {writeWarning ? (
+      {hasAccounts && writeWarning ? (
         <InlineAlert
           variant="warning"
           title={text.operationHint}
           message={writeWarning}
         />
       ) : null}
-      {positionAnalysisMessage ? (
+      {hasAccounts && positionAnalysisMessage ? (
         <InlineAlert
           variant="success"
           title={text.analysisTask}
@@ -1239,11 +1217,23 @@ const PortfolioPage: React.FC = () => {
         isOpen={showCreateAccount}
         onClose={() => setShowCreateAccount(false)}
         title={text.newAccount}
+        footer={(
+          <Button
+            type="submit"
+            form="portfolio-create-account-form"
+            variant="primary"
+            size="sm"
+            isLoading={accountCreating}
+            loadingText={text.creatingAccount}
+          >
+            {text.createAccount}
+          </Button>
+        )}
       >
           {!hasAccounts ? (
             <p className="mb-3 text-xs text-secondary">{text.createAutoSwitch}</p>
           ) : null}
-          {accountCreateError ? (
+          {accountCreateError && accountCreateError !== text.accountNameRequired ? (
             <InlineAlert
               variant="danger"
               className="mt-2 rounded-lg px-2 py-1 text-xs shadow-none"
@@ -1259,13 +1249,18 @@ const PortfolioPage: React.FC = () => {
               message={accountCreateSuccess}
             />
           ) : null}
-          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
+          <form id="portfolio-create-account-form" className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
             <Input
+              ref={accountNameInputRef}
               label={text.accountName}
               className={PORTFOLIO_INPUT_CLASS}
-              placeholder={text.required}
+              error={accountCreateError === text.accountNameRequired ? accountCreateError : undefined}
+              required
               value={accountForm.name}
-              onChange={(e) => setAccountForm((prev) => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => {
+                setAccountForm((prev) => ({ ...prev, name: e.target.value }));
+                if (accountCreateError === text.accountNameRequired) setAccountCreateError(null);
+              }}
             />
             <Input
               label={text.broker}
@@ -1294,19 +1289,31 @@ const PortfolioPage: React.FC = () => {
                 { value: 'tw', label: text.marketTw },
               ]}
             />
-            <Button
-              type="submit"
-              variant="secondary"
-              size="xl"
-              className="md:col-span-2"
-              isLoading={accountCreating}
-              loadingText={text.creatingAccount}
-            >
-              {text.createAccount}
-            </Button>
           </form>
       </Modal>
 
+      {accountsLoading ? (
+        <StatePanel status="loading" title={text.loading} />
+      ) : !hasAccounts ? (
+        <StatePanel
+          status="empty"
+          title={text.noAccounts}
+          action={(
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => {
+                setShowCreateAccount(true);
+                setAccountCreateError(null);
+                setAccountCreateSuccess(null);
+              }}
+            >
+              {text.addAccount}
+            </Button>
+          )}
+        />
+      ) : (
+        <>
       {snapshotQualityMessage ? (
         <InlineAlert
           variant="warning"
@@ -1371,93 +1378,93 @@ const PortfolioPage: React.FC = () => {
               className="mb-3 rounded-xl px-3 py-2 text-xs shadow-none"
             />
           ) : null}
-          {positionRows.length === 0 ? (
-            <EmptyState
-              title={text.noPositionsTitle}
-              description={text.noPositionsDescription}
-              className="border-none bg-transparent px-4 py-8 shadow-none"
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-216 w-full text-sm">
-                <thead className="text-xs text-secondary border-b border-white/10">
-                  <tr>
-                    <th className="text-left py-2 pr-2">{text.account}</th>
-                    <th className="text-left py-2 pr-2">{text.code}</th>
-                    <th className="text-right py-2 pr-2">{text.quantity}</th>
-                    <th className="text-right py-2 pr-2">{text.avgCost}</th>
-                    <th className="text-right py-2 pr-2">{text.lastPrice}</th>
-                    <th className="text-right py-2 pr-2">{text.marketValue}</th>
-                    <th className="text-right py-2 pr-3">{text.unrealizedPnl}</th>
-                    <th className="text-right py-2 pr-3">{text.returnPct}</th>
-                    <th className="min-w-[9rem] text-right py-2 pr-3">{t('decisionSignals.portfolioColumn')}</th>
-                    <th className="w-20 text-right py-2">{text.action}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {positionRows.map((row) => {
-                    const rowKey = `${row.accountId}-${row.symbol}-${row.market}`;
-                    const analyzing = positionAnalysisLoadingKey === rowKey;
-                    const signal = signalByPositionKey.get(rowKey);
-                    return (
-                    <tr key={rowKey} className="border-b border-white/5">
-                      <td className="py-2 pr-2 text-secondary">{row.accountName}</td>
-                      <td className="py-2 pr-2 font-mono text-foreground">{row.symbol}</td>
-                      <td className="py-2 pr-2 text-right">{row.quantity.toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-right">{row.avgCost.toFixed(4)}</td>
-                      <td className="py-2 pr-2 text-right">
-                        <div>{formatPositionPrice(row)}</div>
-                        <div className={`text-xs ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
-                          {getPositionPriceLabel(row, language)}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2 text-right">{formatPositionMoney(row.marketValueBase, row, language)}</td>
-                      <td
-                        className={`py-2 pr-3 text-right ${
-                          hasPositionPrice(row)
-                            ? row.unrealizedPnlBase >= 0
-                              ? 'text-success'
-                              : 'text-danger'
-                            : 'text-secondary'
-                        }`}
-                      >
-                        {formatPositionMoney(row.unrealizedPnlBase, row, language)}
-                      </td>
-                      <td
-                        className={`py-2 pr-3 text-right ${
-                          hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
-                            ? row.unrealizedPnlPct >= 0
-                              ? 'text-success'
-                              : 'text-danger'
-                            : 'text-secondary'
-                        }`}
-                      >
-                        {formatSignedPct(row.unrealizedPnlPct)}
-                      </td>
-                      <td className="py-2 pr-3 text-right align-top">
-                        <PortfolioSignalSummary item={signal} loading={portfolioSignalsLoading} />
-                      </td>
-                      <td className="py-2 text-right">
-                        <Button
-                          type="button"
-                          onClick={() => void handleAnalyzePosition(row)}
-                          disabled={analyzing}
-                          variant="secondary"
-                          size="xl"
-                          isLoading={analyzing}
-                          loadingText={text.submitting}
-                          className="px-2 text-xs"
-                        >
-                          {text.analyze}
-                        </Button>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable<FlatPosition>
+            ariaLabel={text.positionsTitle}
+            rows={positionRows}
+            getRowKey={(row) => `${row.accountId}-${row.symbol}-${row.market}`}
+            loadingLabel={text.loading}
+            emptyState={(
+              <StatePanel status="empty"
+                title={text.noPositionsTitle}
+                description={text.noPositionsDescription}
+                className="border-none bg-transparent px-4 py-8 shadow-none"
+              />
+            )}
+            columns={[
+              { id: 'account', header: text.account, cell: (row) => row.accountName, priority: 'secondary', cellClassName: 'text-secondary' },
+              { id: 'code', header: text.code, cell: (row) => row.symbol, cellClassName: 'font-mono text-foreground' },
+              { id: 'quantity', header: text.quantity, cell: (row) => row.quantity.toFixed(2), priority: 'secondary', align: 'right' },
+              { id: 'avgCost', header: text.avgCost, cell: (row) => row.avgCost.toFixed(4), priority: 'tertiary', align: 'right' },
+              {
+                id: 'lastPrice',
+                header: text.lastPrice,
+                align: 'right',
+                cell: (row) => (
+                  <>
+                    <div>{formatPositionPrice(row)}</div>
+                    <div className={`text-xs ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
+                      {getPositionPriceLabel(row, language)}
+                    </div>
+                  </>
+                ),
+              },
+              { id: 'marketValue', header: text.marketValue, cell: (row) => formatPositionMoney(row.marketValueBase, row, language), align: 'right' },
+              {
+                id: 'unrealizedPnl',
+                header: text.unrealizedPnl,
+                priority: 'secondary',
+                align: 'right',
+                cellClassName: (row) => hasPositionPrice(row)
+                  ? row.unrealizedPnlBase >= 0 ? 'text-success' : 'text-danger'
+                  : 'text-secondary',
+                cell: (row) => formatPositionMoney(row.unrealizedPnlBase, row, language),
+              },
+              {
+                id: 'returnPct',
+                header: text.returnPct,
+                priority: 'secondary',
+                align: 'right',
+                cellClassName: (row) => hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
+                  ? row.unrealizedPnlPct >= 0 ? 'text-success' : 'text-danger'
+                  : 'text-secondary',
+                cell: (row) => formatSignedPct(row.unrealizedPnlPct),
+              },
+              {
+                id: 'signal',
+                header: t('decisionSignals.portfolioColumn'),
+                priority: 'tertiary',
+                align: 'right',
+                cellClassName: 'min-w-[9rem] align-top',
+                cell: (row) => {
+                  const rowKey = `${row.accountId}-${row.symbol}-${row.market}`;
+                  return <PortfolioSignalSummary item={signalByPositionKey.get(rowKey)} loading={portfolioSignalsLoading} />;
+                },
+              },
+              {
+                id: 'action',
+                header: text.action,
+                align: 'right',
+                cell: (row) => {
+                  const rowKey = `${row.accountId}-${row.symbol}-${row.market}`;
+                  const analyzing = positionAnalysisLoadingKey === rowKey;
+                  return (
+                    <Button
+                      type="button"
+                      onClick={() => void handleAnalyzePosition(row)}
+                      disabled={analyzing}
+                      variant="secondary"
+                      size="xl"
+                      isLoading={analyzing}
+                      loadingText={text.submitting}
+                      className="px-2 text-xs"
+                    >
+                      {text.analyze}
+                    </Button>
+                  );
+                },
+              },
+            ]}
+          />
         </Card>
 
         <Card padding="md">
@@ -1479,7 +1486,7 @@ const PortfolioPage: React.FC = () => {
               </ResponsiveContainer>
             </div>
           ) : (
-            <EmptyState
+            <StatePanel status="empty"
               title={text.noConcentrationTitle}
               description={text.noConcentrationDescription}
               className="border-none bg-transparent px-4 py-10 shadow-none"
@@ -1562,8 +1569,26 @@ const PortfolioPage: React.FC = () => {
         <Button type="button" variant="secondary" size="xl" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 
-      <Modal isOpen={tradeModalOpen} closeDisabled={tradeSubmitting} onClose={() => { setTradeError(null); setTradeModalOpen(false); }} title={text.manualTrade}>
-          <form onSubmit={handleTradeSubmit} aria-busy={tradeSubmitting}>
+      <Modal
+        isOpen={tradeModalOpen}
+        closeDisabled={tradeSubmitting}
+        onClose={() => { setTradeError(null); setTradeModalOpen(false); }}
+        title={text.manualTrade}
+        footer={(
+          <Button
+            type="submit"
+            form="portfolio-trade-form"
+            variant="primary"
+            size="sm"
+            disabled={!writableAccountId}
+            isLoading={tradeSubmitting}
+            loadingText={text.submitting}
+          >
+            {text.submitTrade}
+          </Button>
+        )}
+      >
+          <form id="portfolio-trade-form" onSubmit={handleTradeSubmit} aria-busy={tradeSubmitting}>
             <fieldset disabled={tradeSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <Input
               label={text.stockCode}
@@ -1609,15 +1634,30 @@ const PortfolioPage: React.FC = () => {
             {tradeError ? (
               <ApiErrorAlert error={tradeError} onDismiss={() => setTradeError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
-              {text.submitTrade}
-            </Button>
             </fieldset>
           </form>
       </Modal>
 
-      <Modal isOpen={cashModalOpen} closeDisabled={cashSubmitting} onClose={() => { setCashError(null); setCashModalOpen(false); }} title={text.manualCash}>
-          <form onSubmit={handleCashSubmit} aria-busy={cashSubmitting}>
+      <Modal
+        isOpen={cashModalOpen}
+        closeDisabled={cashSubmitting}
+        onClose={() => { setCashError(null); setCashModalOpen(false); }}
+        title={text.manualCash}
+        footer={(
+          <Button
+            type="submit"
+            form="portfolio-cash-form"
+            variant="primary"
+            size="sm"
+            disabled={!writableAccountId}
+            isLoading={cashSubmitting}
+            loadingText={text.submitting}
+          >
+            {text.submitCash}
+          </Button>
+        )}
+      >
+          <form id="portfolio-cash-form" onSubmit={handleCashSubmit} aria-busy={cashSubmitting}>
             <fieldset disabled={cashSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <DatePicker
@@ -1646,15 +1686,30 @@ const PortfolioPage: React.FC = () => {
             {cashError ? (
               <ApiErrorAlert error={cashError} onDismiss={() => setCashError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
-              {text.submitCash}
-            </Button>
             </fieldset>
           </form>
       </Modal>
 
-      <Modal isOpen={corpModalOpen} closeDisabled={corpSubmitting} onClose={() => { setCorpError(null); setCorpModalOpen(false); }} title={text.manualCorporate}>
-          <form onSubmit={handleCorporateSubmit} aria-busy={corpSubmitting}>
+      <Modal
+        isOpen={corpModalOpen}
+        closeDisabled={corpSubmitting}
+        onClose={() => { setCorpError(null); setCorpModalOpen(false); }}
+        title={text.manualCorporate}
+        footer={(
+          <Button
+            type="submit"
+            form="portfolio-corporate-form"
+            variant="primary"
+            size="sm"
+            disabled={!writableAccountId}
+            isLoading={corpSubmitting}
+            loadingText={text.submitting}
+          >
+            {text.submitCorporate}
+          </Button>
+        )}
+      >
+          <form id="portfolio-corporate-form" onSubmit={handleCorporateSubmit} aria-busy={corpSubmitting}>
             <fieldset disabled={corpSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <Input label={text.stockCode} className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockCode} value={corpForm.symbol}
               onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
@@ -1690,9 +1745,6 @@ const PortfolioPage: React.FC = () => {
             {corpError ? (
               <ApiErrorAlert error={corpError} onDismiss={() => setCorpError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
-              {text.submitCorporate}
-            </Button>
             </fieldset>
           </form>
       </Modal>
@@ -1705,6 +1757,32 @@ const PortfolioPage: React.FC = () => {
           setCsvModalOpen(false);
         }}
         title={text.csvImport}
+        footer={(
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!selectedBroker || !csvFile || csvCommitting}
+              isLoading={csvParsing}
+              loadingText={text.parsing}
+              onClick={() => void handleParseCsv()}
+            >
+              {text.parseFile}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing}
+              isLoading={csvCommitting}
+              loadingText={text.submitting}
+              onClick={() => void handleCommitCsv()}
+            >
+              {text.commitImport}
+            </Button>
+          </>
+        )}
       >
           <fieldset
             disabled={csvParsing || csvCommitting}
@@ -1732,18 +1810,28 @@ const PortfolioPage: React.FC = () => {
               />
               <div className="space-y-1">
                 <span className="block text-xs text-muted-text">{text.csvFile}</span>
-                <label className={PORTFOLIO_FILE_PICKER_CLASS}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xl"
+                  className="w-full"
+                  onClick={() => csvInputRef.current?.click()}
+                >
                   {text.chooseCsv}
-                  <input ref={csvInputRef} type="file" accept=".csv" className="hidden"
-                    onChange={(e) => {
-                      setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
+                </Button>
+                <FileInput
+                  ref={csvInputRef}
+                  aria-label={text.chooseCsv}
+                  accept=".csv"
+                  onChange={(event) => {
+                      setCsvFile(event.target.files && event.target.files[0] ? event.target.files[0] : null);
                       csvOperationRef.current = null;
                       setCsvParseResult(null);
                       setCsvCommitResult(null);
-                    }} />
-                </label>
+                  }}
+                />
                 {csvFile ? (
-                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface-1 px-2 py-1.5">
                     <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>
                     <span className="shrink-0 text-xs text-muted-text">
                       {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
@@ -1777,15 +1865,6 @@ const PortfolioPage: React.FC = () => {
               containerClassName="min-h-11 text-xs text-secondary"
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
             />
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="xl" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
-                {text.parseFile}
-              </Button>
-              <Button type="button" variant="secondary" size="xl" className="flex-1"
-                disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
-                {text.commitImport}
-              </Button>
-            </div>
             {csvError ? (
               <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
             ) : null}
@@ -1892,9 +1971,9 @@ const PortfolioPage: React.FC = () => {
                 onDismiss={() => setEventError(null)}
               />
             ) : null}
-            <div className="max-h-64 overflow-auto rounded-lg border border-white/10 p-2">
+            <div className="max-h-64 overflow-auto rounded-lg border border-border p-2">
               {eventType === 'trade' && tradeEvents.map((item) => (
-                <div key={`t-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`t-${item.id}`} className="flex items-start justify-between gap-3 border-b border-border py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {formatUiText(text.tradeRow, { date: item.tradeDate, side: formatSideLabel(item.side, language), symbol: item.symbol, quantity: item.quantity, price: item.price })}
                   </div>
@@ -1916,7 +1995,7 @@ const PortfolioPage: React.FC = () => {
                 </div>
               ))}
               {eventType === 'cash' && cashEvents.map((item) => (
-                <div key={`c-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`c-${item.id}`} className="flex items-start justify-between gap-3 border-b border-border py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {item.eventDate} {formatCashDirectionLabel(item.direction, language)} {item.amount} {item.currency}
                   </div>
@@ -1938,7 +2017,7 @@ const PortfolioPage: React.FC = () => {
                 </div>
               ))}
               {eventType === 'corporate' && corporateEvents.map((item) => (
-                <div key={`ca-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`ca-${item.id}`} className="flex items-start justify-between gap-3 border-b border-border py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {item.effectiveDate} {formatCorporateActionLabel(item.actionType, language)} {item.symbol}
                   </div>
@@ -1963,7 +2042,7 @@ const PortfolioPage: React.FC = () => {
                 && ((eventType === 'trade' && tradeEvents.length === 0)
                   || (eventType === 'cash' && cashEvents.length === 0)
                   || (eventType === 'corporate' && corporateEvents.length === 0)) ? (
-                    <EmptyState
+                    <StatePanel status="empty"
                       title={text.noLedger}
                       description={text.noLedgerDescription}
                       className="border-none bg-transparent px-3 py-6 shadow-none"
@@ -2027,7 +2106,9 @@ const PortfolioPage: React.FC = () => {
           }
         }}
       />
-    </div>
+        </>
+      )}
+    </AppPage>
   );
 };
 

@@ -289,7 +289,7 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('!min-h-9');
+    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('h-9');
     expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-9');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(

@@ -6,14 +6,14 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
-  Loader2,
+  Funnel,
   Play,
   Plus,
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, Input, ScrollArea, SearchInput, Select, StatusDot } from '../common';
-import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
+import { Badge, Button, Input, Pressable, ScrollArea, SearchInput, Select, Spinner, StatePanel, StatusDot } from '../common';
+import { DashboardPanelHeader } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
@@ -120,7 +120,7 @@ const WatchlistRowItem: React.FC<{
   const stockName = item?.stockName || row.code;
 
   return (
-    <div className="home-subpanel grid min-w-0 gap-2 px-3 py-2.5">
+    <div className="watchlist-subpanel grid min-w-0 gap-2 px-3 py-2.5">
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
@@ -128,7 +128,7 @@ const WatchlistRowItem: React.FC<{
               {truncateStockName(stockName)}
             </span>
             {row.isTodayStatusLoading ? (
-              <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-text" aria-label={t('watchlist.todayStatusLoading')} />
+              <Spinner size="sm" label={t('watchlist.todayStatusLoading')} className="shrink-0 text-muted-text" />
             ) : row.isTodayStatusUnknown ? (
               <CircleAlert className="h-3.5 w-3.5 shrink-0 text-warning" aria-label={t('watchlist.todayStatusUnavailable')} />
             ) : row.analyzedToday ? (
@@ -179,9 +179,9 @@ const TodayItem: React.FC<{ item: StockBarItem; onClick: (recordId: number) => v
   const stockName = item.stockName || item.stockCode;
 
   return (
-    <button
+    <Pressable
       type="button"
-      className="home-subpanel-button grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 text-left"
+      className="watchlist-subpanel-button grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 text-left"
       onClick={() => onClick(item.id)}
     >
       <div className="min-w-0">
@@ -193,7 +193,7 @@ const TodayItem: React.FC<{ item: StockBarItem; onClick: (recordId: number) => v
         </span>
       </div>
       <ScoreBadge item={item} />
-    </button>
+    </Pressable>
   );
 };
 
@@ -292,15 +292,19 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         aria-label={t('layout.search')}
         wrapperClassName="min-w-0 flex-1"
       />
-      <Select
-        value={activeTab}
-        options={tabs}
-        onChange={(value) => onTabChange(value as HomeWorkspaceTab)}
-        ariaLabel={t('watchlist.tabsAria')}
-        className="w-24 shrink-0"
-        triggerClassName="h-11 min-h-11 px-2 sm:h-7 sm:min-h-7"
-        menuAlign="end"
-      />
+      <div className="relative w-11 shrink-0 sm:w-7">
+        <Select
+          value={activeTab}
+          options={tabs}
+          onChange={(value) => onTabChange(value as HomeWorkspaceTab)}
+          ariaLabel={t('watchlist.tabsAria')}
+          className="w-full"
+          triggerClassName="h-11 min-h-11 px-0 sm:h-7 sm:min-h-7 [&>span]:sr-only [&>svg]:hidden"
+          menuAlign="end"
+          popupWidth="min-trigger"
+        />
+        <Funnel className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-secondary-text" aria-hidden="true" />
+      </div>
     </div>
   );
 
@@ -361,7 +365,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               <Button
                 type="button"
                 size="sm"
-                variant="home-action-ai"
+                variant="primary"
                 className="whitespace-nowrap px-2 text-xs"
                 disabled={watchlistRows.length === 0 || isBatchAnalyzing}
                 isLoading={isBatchAnalyzing}
@@ -374,7 +378,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               <Button
                 type="button"
                 size="sm"
-                variant="home-action-report"
+                variant="secondary"
                 className="whitespace-nowrap px-2 text-xs"
                 disabled={pendingWatchlistCount === 0 || isTodayStatusUnavailable || isBatchAnalyzing}
                 onClick={() => void onAnalyzeWatchlist('pending')}
@@ -443,9 +447,9 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
       <ScrollArea viewportClassName="p-4" className="min-h-0 flex-1">
         {activeTab === 'watchlist' ? (
           watchlistLoading ? (
-            <DashboardStateBlock loading compact title={t('watchlist.loading')} />
+            <StatePanel status="loading"  compact title={t('watchlist.loading')} />
           ) : watchlistLoadError ? (
-            <DashboardStateBlock
+            <StatePanel status="empty"
               compact
               title={t('chat.actionFailed')}
               action={(
@@ -455,13 +459,13 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               )}
             />
           ) : watchlistRows.length === 0 ? (
-            <DashboardStateBlock
+            <StatePanel status="empty"
               compact
               title={t('watchlist.emptyTitle')}
               description={t('watchlist.emptyDescription')}
             />
           ) : filteredWatchlistRows.length === 0 ? (
-            <DashboardStateBlock compact title={t('common.noData')} />
+            <StatePanel status="empty" compact title={t('common.noData')} />
           ) : (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-text">
@@ -479,21 +483,21 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             </div>
           )
         ) : isLoadingTodayItems ? (
-          <DashboardStateBlock loading compact title={t('watchlist.loading')} />
+          <StatePanel status="loading"  compact title={t('watchlist.loading')} />
         ) : todayLoadError ? (
-          <DashboardStateBlock
+          <StatePanel status="empty"
             compact
             title={t('watchlist.todayLoadErrorTitle')}
             description={t('watchlist.todayLoadErrorDescription')}
           />
         ) : todayItems.length === 0 ? (
-          <DashboardStateBlock
+          <StatePanel status="empty"
             compact
             title={t('watchlist.todayEmptyTitle')}
             description={t('watchlist.todayEmptyDescription')}
           />
         ) : filteredTodayItems.length === 0 ? (
-          <DashboardStateBlock compact title={t('common.noData')} />
+          <StatePanel status="empty" compact title={t('common.noData')} />
         ) : (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-muted-text">

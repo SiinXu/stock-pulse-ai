@@ -1828,7 +1828,11 @@ describe('LLMChannelEditor', () => {
     selectProvider('custom');
     expect(within(dialog).getByLabelText('协议')).toHaveAttribute('role', 'combobox');
     expect(within(dialog).getByLabelText('服务地址')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('API 密钥')).toBeInTheDocument();
+    const apiKeyInput = within(dialog).getByLabelText('API 密钥');
+    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-llm-connection-api-key');
+    expect(apiKeyInput).toHaveAttribute('autocomplete', 'new-password');
+    expect(apiKeyInput).toHaveAttribute('autocapitalize', 'none');
+    expect(apiKeyInput).toHaveAttribute('spellcheck', 'false');
   });
 
   it('derives custom protocol options from the Provider Catalog and preserves the current value', () => {

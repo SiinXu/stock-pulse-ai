@@ -2,6 +2,8 @@ import type React from 'react';
 import { ChevronDown, RefreshCw, X } from 'lucide-react';
 import { localizeParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { Button } from './Button';
+import { IconButton } from './IconButton';
 
 interface ApiErrorAlertProps {
   error: ParsedApiError;
@@ -35,14 +37,17 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
           <p className="mt-1 text-xs opacity-90">{localizedError.message}</p>
         </div>
         {onDismiss ? (
-          <button
-            type="button"
+          <IconButton
             aria-label={dismissLabel ?? t('common.close')}
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent p-0 text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
+            visualSize="sm"
+            tone="danger"
+            tooltip={false}
+            className="text-[hsl(var(--color-danger-alert-text))]"
+            visualClassName="group-hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
             onClick={onDismiss}
           >
             <X className="h-4 w-4" aria-hidden="true" />
-          </button>
+          </IconButton>
         ) : null}
       </div>
       {showDetails ? (
@@ -57,14 +62,16 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
         </details>
       ) : null}
       {actionLabel && onAction ? (
-        <button
+        <Button
           type="button"
-          className="mt-1 inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border-0 bg-transparent px-2 text-xs font-medium text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
+          variant="ghost"
+          size="sm"
+          className="mt-1 !min-h-11 !min-w-11 border-0 text-[hsl(var(--color-danger-alert-text))] hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)] hover:text-[hsl(var(--color-danger-alert-text))]"
           onClick={onAction}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
           {actionLabel}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

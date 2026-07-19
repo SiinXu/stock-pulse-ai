@@ -21,9 +21,9 @@ describe('ApiErrorAlert', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Dismiss' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toHaveClass('h-11', 'w-11');
     expect(screen.queryByText('Dismiss')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('!min-h-11', '!min-w-11');
     expect(screen.getByText(/^(?:查看详情|View details)$/)).toHaveClass('min-h-11');
   });
 });

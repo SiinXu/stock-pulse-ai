@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle, type OverlayLayer } from './overlayZ';
 
 interface PopoverRenderProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface PopoverProps {
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
   onContentKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  layer?: OverlayLayer;
 }
 
 export const Popover = ({
@@ -38,6 +40,7 @@ export const Popover = ({
   ariaLabelledBy,
   closeOnEscape = true,
   onContentKeyDown,
+  layer = 'dropdown',
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -166,9 +169,10 @@ export const Popover = ({
           role={contentRole}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
+          style={getOverlayStyle(layer)}
           onKeyDown={handleContentKeyDown}
           className={cn(
-            'absolute z-[100] overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
+            'absolute overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
             contentClassName,
           )}
         >

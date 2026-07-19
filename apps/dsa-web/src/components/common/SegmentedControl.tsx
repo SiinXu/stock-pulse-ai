@@ -28,18 +28,30 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   const generatedId = useId();
 
+  const selectOption = (index: number) => {
+    const option = options[index];
+    if (!option || option.disabled) return;
+    onChange(option.value);
+    requestAnimationFrame(() => {
+      document.getElementById(`${generatedId}-${option.value}`)?.focus();
+    });
+  };
+
   const moveSelection = (currentIndex: number, direction: 1 | -1) => {
     for (let offset = 1; offset <= options.length; offset += 1) {
       const nextIndex = (currentIndex + direction * offset + options.length) % options.length;
-      const nextOption = options[nextIndex];
-      if (!nextOption.disabled) {
-        onChange(nextOption.value);
-        requestAnimationFrame(() => {
-          document.getElementById(`${generatedId}-${nextOption.value}`)?.focus();
-        });
+      if (!options[nextIndex].disabled) {
+        selectOption(nextIndex);
         return;
       }
     }
+  };
+
+  const selectBoundaryOption = (fromStart: boolean) => {
+    const indexes = options.map((_, index) => index);
+    if (!fromStart) indexes.reverse();
+    const nextIndex = indexes.find((index) => !options[index].disabled);
+    if (nextIndex !== undefined) selectOption(nextIndex);
   };
 
   return (
@@ -79,6 +91,12 @@ export function SegmentedControl<T extends string>({
               } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
                 event.preventDefault();
                 moveSelection(index, -1);
+              } else if (event.key === 'Home') {
+                event.preventDefault();
+                selectBoundaryOption(true);
+              } else if (event.key === 'End') {
+                event.preventDefault();
+                selectBoundaryOption(false);
               }
             }}
           >

@@ -510,7 +510,7 @@ describe('ChatPage', () => {
   it('renders failed stage_done progress as a non-success state', async () => {
     mockStoreState.loading = true;
     mockStoreState.progressSteps = [
-      { type: 'stage_done', stage: 'risk', status: 'failed' },
+      { type: 'stage_done', stage: 'risk', status: 'failed', message: 'Risk analysis failed' },
     ];
     mockStoreState.messages = [
       {
@@ -518,7 +518,7 @@ describe('ChatPage', () => {
         role: 'assistant',
         content: 'Partial answer',
         thinkingSteps: [
-          { type: 'stage_done', stage: 'risk', status: 'failed' },
+          { type: 'stage_done', stage: 'risk', status: 'failed', message: 'Risk analysis failed' },
         ],
       },
     ];
@@ -529,12 +529,13 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findAllByText('risk failed')).toHaveLength(1);
+    expect(await screen.findAllByText('风险分析：失败')).toHaveLength(1);
+    expect(screen.queryByText('Risk analysis failed')).not.toBeInTheDocument();
 
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
 
-    const failedStage = screen.getAllByText('risk failed').find((node) =>
+    const failedStage = screen.getAllByText('风险分析：失败').find((node) =>
       node.closest('.chat-progress-item'),
     );
     expect(failedStage).toBeDefined();
@@ -545,7 +546,7 @@ describe('ChatPage', () => {
   it('renders pipeline budget skip progress without timeout severity', async () => {
     mockStoreState.loading = true;
     mockStoreState.progressSteps = [
-      { type: 'pipeline_budget_skipped', stage: 'decision' },
+      { type: 'pipeline_budget_skipped', stage: 'decision', message: 'Skipped decision analysis due to insufficient budget' },
     ];
     mockStoreState.messages = [
       {
@@ -553,7 +554,7 @@ describe('ChatPage', () => {
         role: 'assistant',
         content: 'Partial answer',
         thinkingSteps: [
-          { type: 'pipeline_budget_skipped', stage: 'decision' },
+          { type: 'pipeline_budget_skipped', stage: 'decision', message: 'Skipped decision analysis due to insufficient budget' },
         ],
       },
     ];
@@ -564,13 +565,14 @@ describe('ChatPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findAllByText('decision skipped: insufficient budget')).toHaveLength(1);
-    expect(screen.queryByText('decision timed out')).not.toBeInTheDocument();
+    expect(await screen.findAllByText('决策汇总 已跳过：处理预算不足')).toHaveLength(1);
+    expect(screen.queryByText('决策汇总 已超时')).not.toBeInTheDocument();
+    expect(screen.queryByText('Skipped decision analysis due to insufficient budget')).not.toBeInTheDocument();
 
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
 
-    const budgetSkipped = screen.getAllByText('decision skipped: insufficient budget').find((node) =>
+    const budgetSkipped = screen.getAllByText('决策汇总 已跳过：处理预算不足').find((node) =>
       node.closest('.chat-progress-item'),
     );
     expect(budgetSkipped).toBeDefined();
@@ -651,8 +653,8 @@ describe('ChatPage', () => {
     expect(screen.getByRole('button', { name: '收起策略选择' })).toHaveAttribute('aria-expanded', 'true');
     expect(skillPanel).not.toHaveClass('hidden');
     expect(skillPanel).toHaveClass('flex');
-    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-8');
-    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-8');
+    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-11');
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
@@ -730,7 +732,7 @@ describe('ChatPage', () => {
     expect(wave).not.toBeDisabled();
   });
 
-  it('quick questions override the current multi-skill selection', async () => {
+  it('fills the composer without sending and uses the suggested skill after confirmation', async () => {
     mockGetSkills.mockResolvedValue({
       skills: [
         { id: 'bull_trend', name: '趋势分析', description: '默认趋势' },
@@ -749,6 +751,11 @@ describe('ChatPage', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: '均线金叉' }));
     fireEvent.click(screen.getByRole('button', { name: '用缠论分析茅台' }));
 
+    const composer = screen.getByRole('textbox', { name: '消息输入框' });
+    expect(composer).toHaveValue('用缠论分析茅台');
+    expect(mockStartStream).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({

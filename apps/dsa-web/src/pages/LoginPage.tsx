@@ -10,7 +10,14 @@ import { isParsedApiError, localizeParsedApiError } from '../api/error';
 import { useAuth } from '../hooks';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { resolveLoginRedirect } from '../utils/loginRedirect';
+import { getLoginConnectionStatus } from '../utils/loginConnection';
 import { SettingsAlert } from '../components/settings';
+
+const CONNECTION_STATUS_TEXT = {
+  secure: 'login.secureConnection',
+  local: 'login.localConnection',
+  insecure: 'login.insecureConnection',
+} as const;
 
 const LoginPage: React.FC = () => {
   const { login, passwordSet, setupState } = useAuth();
@@ -32,6 +39,7 @@ const LoginPage: React.FC = () => {
   const [passwordConfirmError, setPasswordConfirmError] = useState('');
 
   const isFirstTime = setupState === 'no_password' || !passwordSet;
+  const connectionStatus = getLoginConnectionStatus(window.location.protocol, window.location.hostname);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +78,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]">
-      <div className="absolute right-4 top-4 z-30">
+      <div className="absolute right-4 top-4 z-20">
         <UiLanguageToggle />
       </div>
 
@@ -85,10 +93,10 @@ const LoginPage: React.FC = () => {
             <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--login-border-card)] bg-[var(--login-bg-main)]">
               <TrendingUp className="h-6 w-6 text-[var(--login-text-primary)]" aria-hidden="true" />
             </div>
-            <h1 className="mt-4 text-lg font-semibold tracking-tight text-[var(--login-text-primary)]">
+            <h1 className="mt-4 text-lg font-semibold text-[var(--login-text-primary)]">
               StockPulse
             </h1>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-[var(--login-text-primary)]">
+            <h2 className="mt-5 text-2xl font-semibold text-[var(--login-text-primary)]">
               {isFirstTime ? t('login.setupTitle') : t('login.adminLogin')}
             </h2>
             <p className="mt-2 text-sm text-[var(--login-text-secondary)]">
@@ -100,6 +108,7 @@ const LoginPage: React.FC = () => {
             <div className="space-y-4">
               <Input
                 id="password"
+                name="stockpulse-admin-password"
                 type="password"
                 appearance="login"
                 allowTogglePassword
@@ -121,6 +130,7 @@ const LoginPage: React.FC = () => {
               {isFirstTime && (
                 <Input
                   id="passwordConfirm"
+                  name="stockpulse-admin-password-confirmation"
                   type="password"
                   appearance="login"
                   allowTogglePassword
@@ -168,8 +178,15 @@ const LoginPage: React.FC = () => {
             </Button>
           </form>
 
-          <p className="mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-[var(--login-text-muted)]">
-            {t('login.secureConnection')}
+          <p
+            className={
+              connectionStatus === 'insecure'
+                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-warning'
+                : 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-[var(--login-text-muted)]'
+            }
+            data-connection-status={connectionStatus}
+          >
+            {t(CONNECTION_STATUS_TEXT[connectionStatus])}
           </p>
         </div>
       </motion.div>

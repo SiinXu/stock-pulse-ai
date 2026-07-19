@@ -2,7 +2,7 @@ import type React from 'react';
 import { useEffect } from 'react';
 import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/common';
+import { AppPage, Button, StatePanel } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 
 const NotFoundPage: React.FC = () => {
@@ -15,32 +15,26 @@ const NotFoundPage: React.FC = () => {
   }, [t]);
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-4 text-center">
-      {/* 404 */}
-      <div className="relative mb-8">
-        <span
-          className="text-8xl font-bold text-transparent bg-clip-text"
-          style={{
-            backgroundImage: 'linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--primary)) 100%)',
-          }}
-        >
-          404
-        </span>
-      </div>
-
-      <h1 className="text-2xl font-bold text-foreground mb-2">{t('notFound.title')}</h1>
-      <p className="text-muted-text mb-8">{t('notFound.description')}</p>
-
-      <Button
-        type="button"
-        variant="primary"
-        size="xl"
-        onClick={() => navigate('/')}
-      >
-        <Home className="h-4 w-4" />
-        {t('notFound.backHome')}
-      </Button>
-    </div>
+    <AppPage className="flex min-h-full items-center justify-center">
+      <StatePanel
+        status="empty"
+        titleAs="h1"
+        title={t('notFound.title')}
+        description={t('notFound.description')}
+        icon={<Home className="h-5 w-5" aria-hidden="true" />}
+        action={(
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={() => navigate('/')}
+          >
+            <Home className="h-4 w-4" aria-hidden="true" />
+            {t('notFound.backHome')}
+          </Button>
+        )}
+      />
+    </AppPage>
   );
 };
 

@@ -50,6 +50,7 @@ describe('StockBarItemComponent', () => {
     const deleteButton = screen.getByRole('button', { name: /删除 贵州茅台股票股份有限公司 历史记录/ });
     expect(deleteButton).toBeInTheDocument();
     expect(deleteButton).toHaveClass('h-11', 'w-11');
+    expect(deleteButton.firstElementChild).toHaveClass('h-5', 'w-5');
     expect(openButton).not.toContainElement(deleteButton);
   });
 

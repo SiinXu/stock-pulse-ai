@@ -5,7 +5,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
-import { Tooltip } from '../common';
+import { IconButton } from '../common';
 
 interface SettingsHelpButtonProps {
   fieldKey: string;
@@ -37,8 +37,10 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
   }
 
   return (
-    <Tooltip
-      content={(
+    <IconButton
+      aria-label={helpButtonLabel}
+      visualSize="sm"
+      tooltip={(
         <span className="block w-64 space-y-2 py-1 text-left">
           {purpose ? (
             <span className="block">
@@ -54,15 +56,9 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
           ) : null}
         </span>
       )}
-      contentClassName="max-w-[18rem]"
+      tooltipContentClassName="max-w-[18rem]"
     >
-      <button
-        type="button"
-        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15"
-        aria-label={helpButtonLabel}
-      >
-        <Info aria-hidden="true" className="h-4 w-4" />
-      </button>
-    </Tooltip>
+      <Info aria-hidden="true" className="h-4 w-4" />
+    </IconButton>
   );
 };

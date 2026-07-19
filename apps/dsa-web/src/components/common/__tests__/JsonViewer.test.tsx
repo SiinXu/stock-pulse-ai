@@ -37,9 +37,21 @@ describe('JsonViewer', () => {
 
     expect(screen.getByText('"status"')).toHaveClass('text-primary');
     expect(screen.getByText('true')).toHaveClass('text-secondary-text');
-    expect(screen.getByText('82')).toHaveClass('text-amber-400');
-    expect(screen.getByText('"ok"')).toHaveClass('text-emerald-400');
+    expect(screen.getByText('82')).toHaveClass('text-warning');
+    expect(screen.getByText('"ok"')).toHaveClass('text-success');
     expect(screen.getByRole('button', { name: /^(?:复制|Copy)$/ })).toHaveClass('min-h-11', 'min-w-11');
+  });
+
+  it('supports an icon-only copy action without changing its accessible name', () => {
+    render(
+      <UiLanguageProvider>
+        <JsonViewer data={{ status: 'ready' }} copyIconOnly />
+      </UiLanguageProvider>,
+    );
+
+    const copyButton = screen.getByRole('button', { name: /^(?:复制|Copy)$/ });
+    expect(copyButton).toHaveTextContent('');
+    expect(copyButton.querySelector('svg')).toBeInTheDocument();
   });
 
   it('announces clipboard failures without showing false success', async () => {

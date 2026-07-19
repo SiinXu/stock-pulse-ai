@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
-import { OVERLAY_Z } from '../common/overlayZ';
+import { IconButton } from '../common/IconButton';
+import { getOverlayStyle, OVERLAY_Z } from '../common/overlayZ';
 import { SidebarNav } from './SidebarNav';
 import { cn } from '../../utils/cn';
-import { ThemeToggle } from '../theme/ThemeToggle';
-import { UiLanguageToggle } from '../i18n/UiLanguageToggle';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { ProfileMenu } from './ProfileMenu';
 
 type ShellProps = {
   children?: React.ReactNode;
@@ -55,27 +55,31 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
   return (
     <div className="h-dvh overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex items-start justify-between px-3 lg:hidden">
-        <button
-          type="button"
+      <header
+        className="pointer-events-none fixed inset-x-0 top-3 flex items-start justify-between px-3 lg:hidden"
+        style={getOverlayStyle('pageDrawer')}
+      >
+        <IconButton
           onClick={() => setMobileOpen(true)}
-          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-sm transition-colors hover:bg-hover hover:text-foreground"
+          className="pointer-events-auto"
+          visualClassName="border border-border/70 bg-card/85 shadow-soft-card backdrop-blur-sm"
           aria-label={t('layout.openNav')}
+          tooltip={false}
         >
-          <Menu className="h-5 w-5" />
-        </button>
-        <div className="pointer-events-auto flex items-center gap-2">
-          <UiLanguageToggle />
-          <ThemeToggle />
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </IconButton>
+        <div className="pointer-events-auto">
+          <ProfileMenu variant="mobile" />
         </div>
-      </div>
+      </header>
 
       <div className="mx-auto flex h-dvh w-full overflow-hidden">
         <aside
           className={cn(
-            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
+            'sticky top-0 hidden h-dvh shrink-0 self-start overflow-visible bg-background pl-4 pr-2 py-5 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
             collapsed ? 'w-19' : 'w-57'
           )}
+          style={getOverlayStyle('pageDrawer')}
           aria-label={t('layout.desktopSidebar')}
         >
           <SidebarNav

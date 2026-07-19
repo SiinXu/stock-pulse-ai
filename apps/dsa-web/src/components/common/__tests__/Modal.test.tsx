@@ -30,6 +30,29 @@ function renderModalWithSelect() {
 }
 
 describe('Modal escape behavior', () => {
+  it('keeps an optional footer outside the scrolling body', () => {
+    render(
+      <UiLanguageProvider>
+        <Modal
+          isOpen
+          onClose={() => undefined}
+          title="Edit rule"
+          footer={<button type="button">Save rule</button>}
+        >
+          <div>Long form</div>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Edit rule' });
+    const body = dialog.querySelector('[data-modal-body="true"]');
+    const footer = dialog.querySelector('[data-modal-footer="true"]');
+    expect(body).toHaveClass('min-h-0', 'overflow-y-auto');
+    expect(footer).toHaveClass('shrink-0', 'border-t');
+    expect(body).not.toContainElement(screen.getByRole('button', { name: 'Save rule' }));
+    expect(footer).toContainElement(screen.getByRole('button', { name: 'Save rule' }));
+  });
+
   it('blocks backdrop, Escape, and close-button dismissal while closing is disabled', () => {
     const onClose = vi.fn();
     render(

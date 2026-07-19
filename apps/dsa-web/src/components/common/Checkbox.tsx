@@ -2,7 +2,7 @@ import type React from 'react';
 import { forwardRef, useId } from 'react';
 import { cn } from '../../utils/cn';
 
-interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label?: React.ReactNode;
   containerClassName?: string;
 }
@@ -24,9 +24,10 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(({
     <label
       htmlFor={checkboxId}
       className={cn(
-        'flex min-h-6 min-w-6 items-center gap-2 select-none',
+        'flex items-center gap-2 select-none',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-        containerClassName
+        containerClassName,
+        'min-h-11 min-w-11',
       )}
     >
       <span className="relative h-6 w-6 shrink-0">

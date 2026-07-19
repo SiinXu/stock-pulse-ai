@@ -198,12 +198,12 @@ export const AuthSettingsCard: React.FC = () => {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" variant="settings-primary" isLoading={isSubmitting} disabled={!isDirty}>
+          <Button type="submit" variant="primary" isLoading={isSubmitting} disabled={!isDirty}>
             {targetActionLabel}
           </Button>
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             onClick={() => {
               setDesiredEnabled(authEnabled);
               setError(null);

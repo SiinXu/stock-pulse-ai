@@ -1,15 +1,14 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, FileText, History, MessageCircle, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, InlineAlert, Popover } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, IconButton, InlineAlert, Popover, StatePanel } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
-import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
 import { ReportMarkdownDrawer } from '../components/report/ReportMarkdownDrawer';
@@ -1408,15 +1407,14 @@ const HomePage: React.FC = () => {
   const sidebarContent = useMemo(
     () => (
       <div className="flex min-h-0 h-full flex-col gap-3 overflow-hidden">
-        <div className="flex justify-end md:hidden">
-          <button
-            type="button"
+        <div className="flex justify-end xl:hidden">
+          <IconButton
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
             aria-label={t('common.closeDrawer')}
+            tooltip={false}
           >
             <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
         {/* StockPulse keeps its task-dismiss interaction (onDismiss); the home
             watchlist workspace is the upstream feature, adapted to StockPulse
@@ -1490,19 +1488,18 @@ const HomePage: React.FC = () => {
       className="flex h-[calc(100dvh-5rem)] w-full flex-col overflow-hidden md:flex-row sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full w-full">
-        <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
+        <header className="relative z-20 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 xl:hidden"
                 aria-label={t('home.historyButton')}
+                tooltip={false}
+                data-testid="home-history-trigger"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+                <History className="h-5 w-5" aria-hidden="true" />
+              </IconButton>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
                   id="home-stock-search"
@@ -1526,47 +1523,51 @@ const HomePage: React.FC = () => {
                   ariaLabelledBy="strategy-menu-button"
                   closeOnEscape={false}
                   onContentKeyDown={handleStrategyMenuKeyDown}
-                  contentClassName="right-0 top-10 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
+                  contentClassName="right-0 top-10 max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
                   trigger={({ open, toggle }) => (
-                    <button
+                    <Button
                       ref={strategyButtonRef}
                       id="strategy-menu-button"
                       type="button"
+                      variant="secondary"
+                      size="md"
                       aria-haspopup="menu"
                       aria-expanded={open}
                       aria-controls={open ? 'strategy-menu' : undefined}
                       onClick={toggle}
                       onKeyDown={handleStrategyButtonKeyDown}
                       disabled={isAnalyzing}
-                      className="home-surface-button flex h-9 max-w-[8.5rem] items-center gap-1.5 rounded-lg px-2 text-xs text-foreground disabled:cursor-not-allowed disabled:opacity-60 sm:max-w-[11rem]"
+                      className="h-9 max-w-[8.5rem] px-2 text-xs sm:max-w-[11rem]"
                     >
                       <SlidersHorizontal className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
                       <span className="truncate">{selectedStrategyDisplay?.name || t('home.strategy')}</span>
-                    </button>
+                    </Button>
                   )}
                 >
                   <>
                       {strategyOptions.map((option, index) => {
                         const selected = selectedStrategyId === option.id;
                         return (
-                          <button
+                          <Button
                             key={option.id || 'default'}
                             ref={(node) => {
                               strategyItemRefs.current[index] = node;
                             }}
                             type="button"
+                            variant="ghost"
+                            size="xl"
                             role="menuitemradio"
                             aria-checked={selected}
                             tabIndex={-1}
                             onClick={() => selectStrategy(option.id)}
-                            className="flex min-h-11 w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-hover"
+                            className="h-auto min-h-11 w-full items-start justify-start px-2.5 py-2 text-left"
                           >
                             <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${selected ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
                             <span className="min-w-0">
                               <span className="block font-medium">{option.name}</span>
                               <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-muted-text">{option.description}</span>
                             </span>
-                          </button>
+                          </Button>
                         );
                       })}
                   </>
@@ -1577,7 +1578,7 @@ const HomePage: React.FC = () => {
               <Checkbox
                 checked={notify}
                 onChange={(event) => setNotify(event.target.checked)}
-                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-surface/60 px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
+                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-surface-1/60 px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
                 label={<span className="text-xs font-normal text-secondary-text">{t('home.notify')}</span>}
               />
               <Button
@@ -1592,24 +1593,18 @@ const HomePage: React.FC = () => {
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
               </Button>
-              <button
+              <Button
                 type="button"
+                variant="primary"
+                size="md"
                 onClick={() => handleSubmitAnalysis()}
                 disabled={!query || isAnalyzing}
-                className="btn-primary flex !min-h-9 !min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap !px-3 !py-1.5 !text-xs md:flex-none md:basis-auto"
+                isLoading={isAnalyzing}
+                loadingText={t('home.analyzing')}
+                className="min-w-0 flex-1 basis-32 whitespace-nowrap px-3 text-xs md:flex-none md:basis-auto"
               >
-                {isAnalyzing ? (
-                  <>
-                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {t('home.analyzing')}
-                  </>
-                ) : (
-                  t('home.analyze')
-                )}
-              </button>
+                {t('home.analyze')}
+              </Button>
             </div>
           </div>
         </header>
@@ -1632,14 +1627,15 @@ const HomePage: React.FC = () => {
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
                   : getParsedApiError(duplicateError, uiLanguage).message}
                 action={(
-                  <button
-                    type="button"
+                  <IconButton
                     onClick={dismissDuplicateBanner}
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    tooltip={false}
+                    className="-my-1 -mr-1 opacity-70 hover:opacity-100"
+                    visualClassName="group-hover:bg-warning/15"
                   >
                     <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                  </IconButton>
                 )}
                 className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
@@ -1673,7 +1669,10 @@ const HomePage: React.FC = () => {
         ) : null}
 
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          <div className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 md:flex lg:w-72">
+          <div
+            className="hidden min-h-0 w-64 shrink-0 flex-col overflow-hidden pl-4 pb-4 xl:flex xl:w-72"
+            data-testid="home-history-rail"
+          >
             {sidebarContent}
           </div>
 
@@ -1758,7 +1757,7 @@ const HomePage: React.FC = () => {
             ) : null}
             {isLoadingReport ? (
               <div className="flex h-full flex-col items-center justify-center">
-                <DashboardStateBlock title={t('home.loadingReport')} loading />
+                <StatePanel status="loading" title={t('home.loadingReport')}  />
               </div>
             ) : selectedReport ? (
               <div className="space-y-4 pb-8">
@@ -1766,31 +1765,27 @@ const HomePage: React.FC = () => {
                   {!isMarketReviewHistoryReport ? (
                     <>
                       <Button
-                        variant="home-action-ai"
+                        variant="secondary"
                         size="sm"
                         disabled={isAnalyzing || selectedReport.meta.id === undefined}
                         onClick={handleReanalyze}
                       >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
                         {t('home.reanalyze')}
                       </Button>
                       <Button
-                        variant="home-action-ai"
+                        variant="primary"
                         size="sm"
                         disabled={selectedReport.meta.id === undefined}
                         onClick={handleAskFollowUp}
                       >
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
+                        <MessageCircle className="h-4 w-4" aria-hidden="true" />
                         {t('home.askAi')}
                       </Button>
                     </>
                   ) : (
                     <Button
-                      variant="home-action-ai"
+                      variant="primary"
                       size="sm"
                       disabled={isSubmittingMarketReview}
                       isLoading={isSubmittingMarketReview}
@@ -1802,7 +1797,7 @@ const HomePage: React.FC = () => {
                     </Button>
                   )}
                   <Button
-                    variant="home-action-ai"
+                    variant="secondary"
                     size="sm"
                     disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
                     className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
@@ -1818,14 +1813,12 @@ const HomePage: React.FC = () => {
                     {t('home.historyTrend')}
                   </Button>
                   <Button
-                    variant="home-action-ai"
+                    variant="secondary"
                     size="sm"
                     disabled={selectedReport.meta.id === undefined}
                     onClick={openMarkdownDrawer}
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                    <FileText className="h-4 w-4" aria-hidden="true" />
                     {t('home.fullReport')}
                   </Button>
                 </div>
@@ -1872,15 +1865,11 @@ const HomePage: React.FC = () => {
               </div>
             ) : !isReportLoadFailure ? (
               <div className="flex h-full items-center justify-center">
-                <EmptyState
+                <StatePanel status="empty"
                   title={t('home.startAnalysisTitle')}
                   description={t('home.startAnalysisDescription')}
-                  className="max-w-xl border-dashed"
-                  icon={(
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  )}
+                  className="max-w-xl"
+                  icon={<BarChart3 className="h-6 w-6" aria-hidden="true" />}
                 />
               </div>
             ) : null}

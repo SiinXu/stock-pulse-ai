@@ -36,6 +36,13 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-lg');
   });
 
+  it('forwards the native button ref', () => {
+    const ref = { current: null as HTMLButtonElement | null };
+    render(<Button ref={ref}>Focusable action</Button>);
+
+    expect(ref.current).toBe(screen.getByRole('button', { name: 'Focusable action' }));
+  });
+
   it('uses button type by default and exposes the selected variant', () => {
     render(<Button variant="danger">Delete</Button>);
 
@@ -79,16 +86,11 @@ describe('Button', () => {
     expect(button.className).toContain('bg-danger/10');
   });
 
-  it.each([
-    ['action-primary', '--home-action-ai-bg', '--home-action-ai-border', '--home-action-ai-text'],
-    ['action-secondary', '--home-action-report-bg', '--home-action-report-border', '--home-action-report-text'],
-  ] as const)('supports the %s variant', (variant, bgToken, borderToken, textToken) => {
-    render(<Button variant={variant}>Quick Action</Button>);
+  it('supports the semantic secondary variant', () => {
+    render(<Button variant="secondary">Secondary action</Button>);
 
-    const button = screen.getByRole('button', { name: 'Quick Action' });
-    expect(button).toHaveAttribute('data-variant', variant);
-    expect(button.className).toContain(bgToken);
-    expect(button.className).toContain(borderToken);
-    expect(button.className).toContain(textToken);
+    const button = screen.getByRole('button', { name: 'Secondary action' });
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveClass('border-border', 'bg-hover');
   });
 });

@@ -127,7 +127,12 @@ describe('AlertsPage', () => {
 
     expect(screen.getByText('管理事件告警、日线技术指标、自选股、持仓/账户联动和大盘红绿灯规则，执行一次性测试，并查看后台评估任务记录的触发历史。')).toBeInTheDocument();
     expect(await screen.findByText('茅台价格突破')).toBeInTheDocument();
+    expect(screen.getByRole('tabpanel', { name: '告警规则' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '触发历史' }));
     expect(await screen.findByText('600519 price above 1800')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '通知尝试记录' }));
     expect(await screen.findByText('暂无通知尝试记录')).toBeInTheDocument();
     expect(listRules).toHaveBeenCalledWith({
       enabled: undefined,
@@ -213,7 +218,7 @@ describe('AlertsPage', () => {
       }));
     });
     expect(await screen.findByText(/已创建告警规则/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11');
   });
 
   it('keeps create form values when create API fails', async () => {

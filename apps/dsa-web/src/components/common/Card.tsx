@@ -1,5 +1,6 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { Surface } from './Surface';
 
 interface CardProps {
   title?: string;
@@ -44,17 +45,11 @@ export const Card: React.FC<CardProps> = ({
     lg: 'p-6',
   };
 
-  const variantStyles = {
-    default: 'terminal-card',
-    bordered: 'terminal-card',
-    gradient: 'gradient-border-card',
-  };
-
-  const hoverStyles = hoverable ? 'terminal-card-hover cursor-pointer' : '';
+  const hoverStyles = hoverable ? 'cursor-pointer transition-[border-color,box-shadow] hover:border-subtle-hover hover:shadow-soft-card-strong' : '';
 
   if (variant === 'gradient') {
     return (
-      <div className={cn(variantStyles.gradient, className)} style={style}>
+      <div className={cn('gradient-border-card', className)} style={style}>
         <div className={cn('gradient-border-card-inner', paddingStyles[padding])}>
           {header}
           {children}
@@ -64,12 +59,21 @@ export const Card: React.FC<CardProps> = ({
   }
 
   return (
-    <div
+    <Surface
+      variant={variant === 'default' ? 'elevated' : 'bordered'}
+      radius="lg"
+      padding="none"
       style={style}
-      className={cn('rounded-xl', variantStyles[variant], hoverStyles, paddingStyles[padding], className)}
+      className={cn(
+        'overflow-hidden',
+        variant === 'default' && 'terminal-card',
+        hoverStyles,
+        paddingStyles[padding],
+        className,
+      )}
     >
       {header}
       {children}
-    </div>
+    </Surface>
   );
 };

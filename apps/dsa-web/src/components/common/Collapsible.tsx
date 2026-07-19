@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 interface CollapsibleProps {
@@ -41,15 +42,10 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
           {icon && <span className="text-primary">{icon}</span>}
           <span className="font-medium text-foreground">{title}</span>
         </div>
-        <svg
+        <ChevronDown
           className={cn('h-5 w-5 text-secondary-text transition-transform duration-300', isOpen && 'rotate-180')}
           aria-hidden="true"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        />
       </button>
 
       <div

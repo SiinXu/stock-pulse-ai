@@ -28,6 +28,13 @@ describe('Input', () => {
     expect(screen.getByText('Stored locally')).toBeInTheDocument();
   });
 
+  it('forwards the native input ref', () => {
+    const ref = { current: null as HTMLInputElement | null };
+    render(<Input ref={ref} aria-label="Referenced input" />);
+
+    expect(ref.current).toBe(screen.getByRole('textbox', { name: 'Referenced input' }));
+  });
+
   it('marks the input invalid and shows the error message', () => {
     render(<Input label="Code" error="Required" name="stock_code" />);
 

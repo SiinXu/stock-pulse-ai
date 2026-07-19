@@ -1,9 +1,12 @@
 import type React from 'react';
 import { Component, lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { Drawer } from '../common/Drawer';
+import { Button } from '../common/Button';
+import { Spinner } from '../common/Spinner';
 import { OVERLAY_Z } from '../common/overlayZ';
 
 interface ReportMarkdownDrawerProps {
@@ -57,7 +60,7 @@ class ReportMarkdownDrawerErrorBoundary extends Component<
 
 const ReportMarkdownLoadingState: React.FC<{ message: string }> = ({ message }) => (
   <div className="flex h-64 flex-col items-center justify-center">
-    <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
+    <Spinner size="lg" />
     <p className="mt-4 text-sm text-secondary-text">{message}</p>
   </div>
 );
@@ -69,18 +72,18 @@ const ReportMarkdownChunkErrorState: React.FC<{
 }> = ({ message, dismissText, onRequestClose }) => (
   <div className="flex h-64 flex-col items-center justify-center">
     <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-danger/10">
-      <svg className="h-6 w-6 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
+      <TriangleAlert className="h-6 w-6 text-danger" aria-hidden="true" />
     </div>
     <p className="text-sm text-danger">{message}</p>
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      size="md"
       onClick={onRequestClose}
-      className="home-surface-button mt-4 min-h-11 min-w-11 rounded-lg px-4 py-2 text-sm text-secondary-text"
+      className="mt-4 min-h-11"
     >
       {dismissText}
-    </button>
+    </Button>
   </div>
 );
 

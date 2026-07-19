@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useMemo, useId } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { Badge, StatusDot } from '../common';
+import { Badge, Pressable, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowEdge, RunFlowLane, RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -621,7 +621,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
   }, []).sort((left, right) => getEdgeFocusRank(left.focusLevel) - getEdgeFocusRank(right.focusLevel));
 
   return (
-    <div className="home-subpanel overflow-hidden p-3" data-testid="run-flow-graph">
+    <Surface variant="bordered" radius="md" padding="sm" className="overflow-hidden" data-testid="run-flow-graph">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="label-uppercase">{t('runFlow.graph.title')}</p>
@@ -745,8 +745,8 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
             const nodeStateClass = selected
               ? 'border-primary/85 bg-primary/8 shadow-lg ring-2 ring-primary/25'
               : compact
-                ? 'border-subtle/70 bg-base/70 ring-1 ring-white/5'
-                : 'border-subtle/80 bg-elevated/92 ring-1 ring-white/5';
+                ? 'border-subtle/70 bg-base/70 ring-1 ring-border/50'
+                : 'border-subtle/80 bg-elevated/92 ring-1 ring-border/50';
             const nodeDensityClass = compact
               ? 'px-2.5 py-2 shadow-none hover:shadow-soft-card'
               : 'px-3 py-2 shadow-soft-card hover:shadow-lg';
@@ -754,10 +754,10 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
               <div
                 key={node.id}
                 data-testid={`run-flow-node-${node.id}-wrapper`}
-                className="absolute z-30"
+                className="absolute z-10"
                 style={{ left: node.x, top: node.y, width: node.width, height: node.height }}
               >
-                <button
+                <Pressable
                   type="button"
                   data-testid={`run-flow-node-${node.id}`}
                   onClick={() => onSelectNode?.(node)}
@@ -792,9 +792,9 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       {t('runFlow.graph.startedAt')}: {formatDateTime(node.startedAt, language, t)}
                     </span>
                   ) : null}
-                </button>
+                </Pressable>
                 {expandable ? (
-                  <button
+                  <Pressable
                     type="button"
                     data-testid={`run-flow-node-${node.id}-toggle`}
                     aria-label={expanded ? t('runFlow.graph.collapseNode', { label: node.label }) : t('runFlow.graph.expandNode', { label: node.label })}
@@ -803,7 +803,7 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       event.stopPropagation();
                       onToggleExpanded?.(node.id);
                     }}
-                    className="absolute bottom-0 right-0 z-40 inline-flex h-11 min-w-11 items-end justify-end p-2 text-xs font-medium leading-none text-secondary-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
+                    className="absolute bottom-0 right-0 z-20 inline-flex h-11 min-w-11 items-end justify-end p-2 text-xs font-medium leading-none text-secondary-text focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/15"
                   >
                     <span
                       data-testid={`run-flow-node-${node.id}-toggle-visual`}
@@ -816,13 +816,13 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
                       )}
                       {expanded ? t('runFlow.graph.collapse') : t('runFlow.graph.expand')}
                     </span>
-                  </button>
+                  </Pressable>
                 ) : null}
               </div>
             );
           })}
         </div>
       </div>
-    </div>
+    </Surface>
   );
 };

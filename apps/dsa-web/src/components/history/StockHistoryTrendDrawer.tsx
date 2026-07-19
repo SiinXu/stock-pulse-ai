@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { BarChart3 } from 'lucide-react';
 import type { AnalysisReport, HistoryItem, StockHistoryFilters, StockHistoryRange } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import {
@@ -9,8 +10,7 @@ import {
   type DecisionActionLabelMap,
 } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { Badge, Button, Card } from '../common';
-import { DashboardStateBlock } from '../dashboard';
+import { Badge, Button, Card, DataTable, Pressable, StatePanel, Tooltip, type DataTableColumn } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 
@@ -59,7 +59,7 @@ const getPriceChangeStyle = (value?: number): React.CSSProperties | undefined =>
   if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
     return undefined;
   }
-  return { color: value > 0 ? 'var(--home-price-up)' : 'var(--home-price-down)' };
+  return { color: value > 0 ? 'var(--market-price-up)' : 'var(--market-price-down)' };
 };
 
 const formatModelName = (value: string | undefined, t: (key: UiTextKey, params?: Record<string, string | number>) => string): string => {
@@ -139,9 +139,11 @@ const MetricCard: React.FC<{ label: string; value: React.ReactNode; hint?: strin
 }) => (
   <div className="rounded-xl border border-border/70 bg-background/45 px-4 py-3">
     <p className="text-xs text-secondary-text">{label}</p>
-    <p className="mt-1 truncate text-lg font-semibold text-foreground" title={title}>
-      {value}
-    </p>
+    <Tooltip content={title} focusable className="block w-full">
+      <span className="mt-1 block truncate text-lg font-semibold text-foreground">
+        {value}
+      </span>
+    </Tooltip>
     {hint ? <p className="mt-1 text-xs text-muted-text">{hint}</p> : null}
   </div>
 );
@@ -155,7 +157,7 @@ const RangeControls: React.FC<{
   return (
     <div className="flex flex-wrap items-center gap-2">
       {RANGE_OPTIONS.map((option) => (
-        <button
+        <Pressable
           key={option.value}
           type="button"
           onClick={() => onRangeChange(option.value)}
@@ -166,7 +168,7 @@ const RangeControls: React.FC<{
           }`}
         >
           {t(option.labelKey)}
-        </button>
+        </Pressable>
       ))}
     </div>
   );
@@ -200,15 +202,119 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
     setSelectedRecordId(currentRecordId);
   }, [currentRecordId]);
 
+  const historyColumns: DataTableColumn<HistoryItem>[] = [
+    {
+      id: 'time',
+      header: t('stockTrend.time'),
+      cell: (item) => formatHistoryTime(item.createdAt, language),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'whitespace-nowrap font-mono text-sm text-secondary-text',
+    },
+    {
+      id: 'result',
+      header: t('stockTrend.result'),
+      cell: (item) => (
+        <Badge
+          variant={getDecisionActionTone(item.action, item.actionLabel, item.operationAdvice)}
+          size="sm"
+          className="shadow-none"
+        >
+          {formatAdvice(item, actionLabels)}
+        </Badge>
+      ),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'whitespace-nowrap',
+    },
+    {
+      id: 'score',
+      header: t('stockTrend.score'),
+      cell: (item) => (
+        <span style={isPresent(item.sentimentScore) ? { color: getSentimentColor(item.sentimentScore) } : undefined}>
+          {formatNumber(item.sentimentScore, 0)}
+        </span>
+      ),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'font-mono text-lg font-semibold',
+      priority: 'secondary',
+    },
+    {
+      id: 'price',
+      header: t('stockTrend.stockPrice'),
+      cell: (item) => formatNumber(item.currentPrice, 2),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'font-mono text-secondary-text',
+      priority: 'secondary',
+    },
+    {
+      id: 'change',
+      header: t('stockTrend.changePct'),
+      cell: (item) => (
+        <span style={getPriceChangeStyle(item.changePct)}>{formatChangePct(item.changePct)}</span>
+      ),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'font-mono font-semibold',
+      priority: 'secondary',
+    },
+    {
+      id: 'volume-ratio',
+      header: t('stockTrend.volumeRatio'),
+      cell: (item) => formatNumber(item.volumeRatio, 2),
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'font-mono text-secondary-text',
+      priority: 'tertiary',
+    },
+    {
+      id: 'turnover',
+      header: t('stockTrend.turnoverRate'),
+      cell: (item) => `${formatNumber(item.turnoverRate, 2)}${isPresent(item.turnoverRate) ? '%' : ''}`,
+      headerClassName: 'whitespace-nowrap',
+      cellClassName: 'font-mono text-secondary-text',
+      priority: 'tertiary',
+    },
+    {
+      id: 'model',
+      header: t('stockTrend.model'),
+      cell: (item) => (
+        <Tooltip
+          content={item.modelUsed || t('stockTrend.noModelTitle')}
+          focusable
+          className="block w-full"
+        >
+          <span className="block truncate">{formatModelName(item.modelUsed, t)}</span>
+        </Tooltip>
+      ),
+      cellClassName: 'text-secondary-text',
+      priority: 'tertiary',
+    },
+    {
+      id: 'action',
+      header: t('stockTrend.table.action'),
+      cell: (item) => (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="min-h-11 min-w-11 text-xs"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelectRecord(item.id);
+            onClose();
+          }}
+        >
+          {t('stockTrend.report')}
+        </Button>
+      ),
+      headerClassName: 'whitespace-nowrap',
+    },
+  ];
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <Card variant="gradient" padding="md" className="home-panel-card">
+      <Card variant="gradient" padding="md" className="history-panel-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 19V5m0 14h16M8 17V9m4 8V7m4 10v-5" />
-              </svg>
+              <BarChart3 className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-foreground">{t('stockTrend.title')}</h2>
@@ -224,9 +330,9 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
       </Card>
 
       {isLoading ? (
-        <DashboardStateBlock loading title={t('stockTrend.loading')} />
+        <StatePanel status="loading" title={t('stockTrend.loading')} />
       ) : error ? (
-        <DashboardStateBlock
+        <StatePanel status="empty"
           title={t('stockTrend.loadFailed')}
           description={t('common.retry')}
           action={(
@@ -236,7 +342,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           )}
         />
       ) : items.length === 0 ? (
-        <Card variant="bordered" padding="md" className="home-panel-card">
+        <Card variant="bordered" padding="md" className="history-panel-card">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-foreground">{t('stockTrend.moreEmptyTitle')}</h3>
@@ -269,7 +375,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
             />
           </div>
 
-          <Card variant="bordered" padding="md" className="home-panel-card">
+          <Card variant="bordered" padding="md" className="history-panel-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-foreground">{t('stockTrend.records')}</h3>
@@ -293,98 +399,26 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-xl border border-border/60 bg-card/30">
-              <table className="w-full table-fixed text-left text-sm">
-                <colgroup>
-                  <col className="w-[15%]" />
-                  <col className="w-[11%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[7%]" />
-                  <col className="w-[9%]" />
-                  <col className="w-[22%]" />
-                  <col className="w-[11%]" />
-                </colgroup>
-                <thead className="border-b border-border/60 bg-background/35 text-xs text-secondary-text">
-                  <tr>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.time')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.result')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.score')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.stockPrice')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.changePct')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.volumeRatio')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.turnoverRate')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.model')}</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium">{t('stockTrend.table.action')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/55">
-                  {items.map((item) => {
-                    const isSelected = item.id === selectedRecordId;
-                    const sentimentColor = isPresent(item.sentimentScore)
-                      ? getSentimentColor(item.sentimentScore)
-                      : undefined;
-                    return (
-                      <tr
-                        key={item.id}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary/35' : 'hover:bg-hover/35'
-                        }`}
-                        onClick={() => setSelectedRecordId(item.id)}
-                      >
-                        <td className="whitespace-nowrap px-3 py-3 font-mono text-sm text-secondary-text">
-                          {formatHistoryTime(item.createdAt, language)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-3">
-                          <Badge
-                            variant={getDecisionActionTone(item.action, item.actionLabel, item.operationAdvice)}
-                            size="sm"
-                            className="shadow-none"
-                          >
-                            {formatAdvice(item, actionLabels)}
-                          </Badge>
-                        </td>
-                        <td
-                          className="px-3 py-3 font-mono text-lg font-semibold"
-                          style={sentimentColor ? { color: sentimentColor } : undefined}
-                        >
-                          {formatNumber(item.sentimentScore, 0)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.currentPrice, 2)}
-                        </td>
-                        <td className="px-3 py-3 font-mono font-semibold" style={getPriceChangeStyle(item.changePct)}>
-                          {formatChangePct(item.changePct)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.volumeRatio, 2)}
-                        </td>
-                        <td className="px-3 py-3 font-mono text-secondary-text">
-                          {formatNumber(item.turnoverRate, 2)}{isPresent(item.turnoverRate) ? '%' : ''}
-                        </td>
-                        <td className="truncate px-3 py-3 text-secondary-text" title={item.modelUsed || t('stockTrend.noModelTitle')}>
-                          {formatModelName(item.modelUsed, t)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <button
-                            type="button"
-                            className="min-h-11 min-w-11 rounded-lg border border-primary/35 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/14"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onSelectRecord(item.id);
-                              onClose();
-                            }}
-                          >
-                            {t('stockTrend.report')}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              ariaLabel={t('stockTrend.records')}
+              columns={historyColumns}
+              rows={items}
+              getRowKey={(item) => item.id}
+              emptyState={null}
+              loadingLabel={t('stockTrend.loading')}
+              className="mt-4"
+              scrollClassName="rounded-xl border border-border/60 bg-card/30"
+              tableClassName="table-fixed"
+              headClassName="bg-background/35 text-secondary-text"
+              bodyClassName="divide-border/55"
+              minWidthClassName="min-w-224"
+              onRowClick={(item) => setSelectedRecordId(item.id)}
+              getRowAriaLabel={(item) => `${formatHistoryTime(item.createdAt, language)} ${formatAdvice(item, actionLabels)}`}
+              isRowSelected={(item) => item.id === selectedRecordId}
+              rowClassName={(item) => item.id === selectedRecordId
+                ? 'bg-primary/10 ring-1 ring-inset ring-primary/35'
+                : 'hover:bg-hover/35'}
+            />
           </Card>
         </>
       )}

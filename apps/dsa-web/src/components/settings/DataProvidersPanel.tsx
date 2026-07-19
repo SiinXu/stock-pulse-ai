@@ -6,7 +6,7 @@ import { Database, Search } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UiTextKey } from '../../i18n/uiText';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
-import { Badge, Modal } from '../common';
+import { Badge, Modal, Pressable } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
@@ -83,7 +83,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
                       providerItems.filter((item) => provider.configuredKeys.includes(item.key)),
                     );
                   return (
-                    <button
+                    <Pressable
                       key={provider.id}
                       type="button"
                       onClick={() => setOpenProviderId(provider.id)}
@@ -98,7 +98,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
                       <Badge variant={configured ? 'success' : 'default'} size="sm" className="shrink-0">
                         {configured ? t('settings.providerConfigured') : t('settings.providerUnconfigured')}
                       </Badge>
-                    </button>
+                    </Pressable>
                   );
                 })}
               </div>

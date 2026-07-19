@@ -45,6 +45,9 @@ const {
   useAuthMock,
   useSystemConfigMock,
   webBuildInfoMock,
+  showToast,
+  dismissToast,
+  clearToasts,
 } = vi.hoisted(() => ({
   analyzeAsync: vi.fn(),
   exportEnv: vi.fn(),
@@ -79,6 +82,9 @@ const {
   settingsPanelErrorBoundary: vi.fn(),
   useAuthMock: vi.fn(),
   useSystemConfigMock: vi.fn(),
+  showToast: vi.fn(() => 'settings-toast'),
+  dismissToast: vi.fn(),
+  clearToasts: vi.fn(),
   webBuildInfoMock: {
     version: '3.11.0',
     rawVersion: '3.11.0',
@@ -87,6 +93,14 @@ const {
     isFallbackVersion: false,
   },
 }));
+
+vi.mock('../../components/common/toastContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../components/common/toastContext')>();
+  return {
+    ...actual,
+    useToast: () => ({ showToast, dismissToast, clearToasts }),
+  };
+});
 
 const mockedAnchorClick = vi.fn();
 
@@ -203,6 +217,8 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
   ...(await import('../../components/settings/notificationChannels')),
+  ...(await import('../../components/settings/FirstRunSetupCard')),
+  ...(await import('../../components/settings/SchedulerSettingsCard')),
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
       {items.map((item) => (

@@ -7,7 +7,7 @@ import type {
 } from '../../types/analysis';
 import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
-import { Badge, Card, StatusDot } from '../common';
+import { Badge, Card, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 
 interface AnalysisContextSummaryProps {
@@ -116,7 +116,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   const limitations = quality?.limitations?.map((item) => formatLimitation(item, reportLanguage, text)) || [];
 
   return (
-    <Card variant="bordered" padding="none" className="home-panel-card">
+    <Card variant="bordered" padding="none">
       <details data-testid="analysis-context-summary" className="group">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -150,18 +150,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
               );
             })}
             {triggerSource ? (
-              <span className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+              <Badge variant="default" size="sm">
                 {text.triggerSource}: {triggerSource}
-              </span>
+              </Badge>
             ) : null}
-            <span className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+            <Badge variant="default" size="sm">
               {text.inputScope}
-            </span>
+            </Badge>
             <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
           </span>
         </summary>
 
-        <div className="home-divider border-t px-4 pb-4 pt-3">
+        <div className="border-t border-border px-4 pb-4 pt-3">
           <DashboardPanelHeader
             eyebrow={text.eyebrow}
             title={text.title}
@@ -173,18 +173,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
             actions={metadataItems.length > 0 || typeof quality?.overallScore === 'number' ? (
               <div className="hidden flex-wrap justify-end gap-2 text-xs text-muted-text md:flex">
                 {typeof quality?.overallScore === 'number' ? (
-                  <span className="home-accent-chip px-2 py-0.5">
+                  <Badge variant="default" size="sm">
                     {text.qualityScore}: {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
-                  </span>
+                  </Badge>
                 ) : null}
                 {metadataItems.map((item) => (
-                  <span key={item} className="home-accent-chip px-2 py-0.5">
+                  <Badge key={item} variant="default" size="sm">
                     {item}
-                  </span>
+                  </Badge>
                 ))}
-                <span className="home-accent-chip px-2 py-0.5">
+                <Badge variant="default" size="sm">
                   {text.inputScope}
-                </span>
+                </Badge>
               </div>
             ) : undefined}
           />
@@ -205,24 +205,24 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           ) : null}
 
           {limitations.length ? (
-            <div className="mb-3 home-subpanel p-3 text-xs leading-5 text-muted-text">
+            <Surface variant="bordered" radius="md" padding="sm" className="mb-3 text-xs leading-5 text-muted-text">
               <span className="font-medium text-foreground">{text.limitations}: </span>
               {limitations.join(', ')}
-            </div>
+            </Surface>
           ) : null}
 
           {overview.warnings?.length ? (
-            <div className="mb-3 home-subpanel p-3 text-xs leading-5 text-warning">
+            <Surface variant="bordered" radius="md" padding="sm" className="mb-3 text-xs leading-5 text-warning">
               <span className="font-medium">{text.warnings}: </span>
               {overview.warnings.join(', ')}
-            </div>
+            </Surface>
           ) : null}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {overview.blocks.map((block) => {
               const style = STATUS_STYLE[block.status] || STATUS_STYLE.missing;
               return (
-                <div key={block.key} className="home-subpanel p-3">
+                <Surface key={block.key} variant="bordered" radius="md" padding="sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{block.label}</p>
@@ -250,7 +250,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                         .join(', ')}
                     </p>
                   ) : null}
-                </div>
+                </Surface>
               );
             })}
           </div>
@@ -258,18 +258,18 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
           {metadataItems.length > 0 || typeof quality?.overallScore === 'number' ? (
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-text md:hidden">
               {typeof quality?.overallScore === 'number' ? (
-                <span className="home-accent-chip px-2 py-0.5">
+                <Badge variant="default" size="sm">
                   {text.qualityScore}: {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
-                </span>
+                </Badge>
               ) : null}
               {metadataItems.map((item) => (
-                <span key={item} className="home-accent-chip px-2 py-0.5">
+                <Badge key={item} variant="default" size="sm">
                   {item}
-                </span>
+                </Badge>
               ))}
-              <span className="home-accent-chip px-2 py-0.5">
+              <Badge variant="default" size="sm">
                 {text.inputScope}
-              </span>
+              </Badge>
             </div>
           ) : null}
         </div>

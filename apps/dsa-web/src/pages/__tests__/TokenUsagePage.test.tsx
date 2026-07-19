@@ -127,6 +127,26 @@ describe('TokenUsagePage', () => {
     expect(screen.queryByText('Token 用量监控')).not.toBeInTheDocument();
   });
 
+  it('shows one empty state without zero-value metrics or a recent-calls table', async () => {
+    get.mockResolvedValue({
+      data: makeDashboardResponse({
+        total_calls: 0,
+        total_prompt_tokens: 0,
+        total_completion_tokens: 0,
+        total_tokens: 0,
+        by_call_type: [],
+        by_model: [],
+        recent_calls: [],
+      }),
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('暂无 Token 用量记录')).toBeInTheDocument();
+    expect(screen.queryByText('总 Token')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: '最近调用' })).not.toBeInTheDocument();
+  });
+
   it('keeps the newest period data when dashboard requests resolve out of order', async () => {
     const monthRequest = createDeferred<{ data: typeof dashboardResponse }>();
     const todayRequest = createDeferred<{ data: typeof dashboardResponse }>();

@@ -248,7 +248,7 @@ describe('BacktestPage', () => {
     renderEnglishPage();
 
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('!h-9');
-    expect(screen.getByText('Evaluation window')).toBeInTheDocument();
+    expect(screen.getAllByText('Evaluation window')).toHaveLength(2);
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
 
@@ -410,9 +410,9 @@ describe('BacktestPage', () => {
     render(<BacktestPage />);
 
     await screen.findByText('600519');
-    const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveClass('h-9', 'min-w-0');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('h-9', 'min-w-0');
+    const oneDayButton = screen.getByRole('tab', { name: '1 日验证' });
+    expect(oneDayButton).toHaveClass('min-h-6');
+    expect(screen.getByText('高级选项')).toBeInTheDocument();
     const nextDayResults = createDeferred<{
       total: number;
       page: number;
@@ -424,7 +424,7 @@ describe('BacktestPage', () => {
     mockGetOverallPerformance.mockReturnValueOnce(nextDayPerformance.promise);
     fireEvent.click(oneDayButton);
 
-    expect(await screen.findByText('正在加载结果...')).toBeInTheDocument();
+    expect((await screen.findAllByText('正在加载结果...')).length).toBeGreaterThan(0);
     await waitFor(() => {
       expect(mockGetResults).toHaveBeenLastCalledWith({
         code: undefined,
@@ -458,6 +458,36 @@ describe('BacktestPage', () => {
     expect(screen.queryByText('正在加载结果...')).not.toBeInTheDocument();
     expect(screen.getByText('准确性')).toBeInTheDocument();
     expect(screen.getByText('1 日验证模式会用下一个交易日收盘表现校验 AI 预测。')).toBeInTheDocument();
+  });
+
+  it('confirms a force rerun before sending cache-bypass parameters', async () => {
+    render(<BacktestPage />);
+
+    await screen.findByText('600519');
+    fireEvent.click(screen.getByText('高级选项'));
+    fireEvent.click(screen.getByRole('checkbox', { name: '强制重跑' }));
+    fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '确认强制重跑' });
+    expect(mockRun).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: '运行回测' }));
+
+    await waitFor(() => {
+      expect(mockRun).toHaveBeenCalledWith(expect.objectContaining({
+        force: true,
+        minAgeDays: 0,
+      }));
+    });
+  });
+
+  it('shows one initial empty state when no backtest data exists', async () => {
+    mockGetOverallPerformance.mockResolvedValueOnce(null);
+
+    render(<BacktestPage />);
+
+    expect(await screen.findByText('暂无结果')).toBeInTheDocument();
+    expect(screen.queryByText('暂无指标')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
   it('restores applied filters and pagination from the URL', async () => {

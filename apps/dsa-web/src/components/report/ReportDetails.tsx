@@ -1,7 +1,8 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { ReportDetails as ReportDetailsType, ReportLanguage } from '../../types/analysis';
-import { Card, InlineAlert, useClipboard } from '../common';
+import { Badge, Button, Card, InlineAlert, useClipboard } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
@@ -71,16 +72,18 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
     return (
       <div className="relative overflow-hidden">
         <span className="absolute top-2 right-2 z-10 inline-flex">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => copyToClipboard(jsonStr, panel)}
-            className="home-accent-link inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-muted-text"
+            className="min-h-11 min-w-11 text-xs"
             aria-label={copiedPanels[panel] ? text.copied : text.copy}
           >
             {copiedPanels[panel] ? text.copied : text.copy}
-          </button>
+          </Button>
         </span>
-        <pre className="home-trace-pre home-trace-pre-content text-xs text-foreground font-mono overflow-x-auto p-3 bg-base rounded-lg max-h-80 overflow-y-auto text-left w-0 min-w-full">
+        <pre className="report-trace-pre report-trace-pre-content max-h-80 w-0 min-w-full overflow-x-auto overflow-y-auto rounded-lg bg-base p-3 text-left font-mono text-xs text-foreground">
           {jsonStr}
         </pre>
       </div>
@@ -88,7 +91,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
   };
 
   return (
-    <Card variant="bordered" padding="md" className="home-panel-card text-left">
+    <Card variant="bordered" padding="md" className="text-left">
       <DashboardPanelHeader
         eyebrow={text.transparency}
         title={text.traceability}
@@ -99,11 +102,11 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
 
       {/* Record ID */}
       {recordId && (
-        <div className="home-divider mb-3 flex items-center gap-2 border-b pb-3 text-xs text-muted-text">
+        <div className="mb-3 flex items-center gap-2 border-b border-border pb-3 text-xs text-muted-text">
           <span>{text.recordId}:</span>
-          <code className="home-accent-chip px-1.5 py-0.5 font-mono text-xs">
+          <Badge variant="default" size="sm" className="font-mono">
             {recordId}
-          </code>
+          </Badge>
         </div>
       )}
 
@@ -112,21 +115,20 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         {/* Raw analysis result */}
         {details?.rawResult && (
           <div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="xl"
               onClick={() => setShowRaw(!showRaw)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
+              className="report-trace-toggle w-full justify-between px-2.5"
+              aria-expanded={showRaw}
             >
               <span className="text-xs text-foreground">{text.rawResult}</span>
-              <svg
-                className={`w-3.5 h-3.5 text-muted-text transition-transform ${showRaw ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-muted-text transition-transform ${showRaw ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </Button>
             {showRaw && (
               <div className="mt-2 animate-fade-in min-w-0 overflow-hidden">
                 {renderJson(details.rawResult, 'raw')}
@@ -138,21 +140,20 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         {/* Analysis snapshot */}
         {details?.contextSnapshot && (
           <div>
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="xl"
               onClick={() => setShowSnapshot(!showSnapshot)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
+              className="report-trace-toggle w-full justify-between px-2.5"
+              aria-expanded={showSnapshot}
             >
               <span className="text-xs text-foreground">{text.analysisSnapshot}</span>
-              <svg
-                className={`w-3.5 h-3.5 text-muted-text transition-transform ${showSnapshot ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-muted-text transition-transform ${showSnapshot ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </Button>
             {showSnapshot && (
               <div className="mt-2 animate-fade-in min-w-0 overflow-hidden">
                 {renderJson(details.contextSnapshot, 'snapshot')}

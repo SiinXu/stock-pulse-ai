@@ -1,5 +1,6 @@
 import type React from 'react';
-import { Badge, Button } from '../common';
+import { Trash2 } from 'lucide-react';
+import { Badge, Button, IconButton } from '../common';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
 import { getSentimentColor } from '../../types/analysis';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
@@ -43,33 +44,33 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
 
   return (
     <div
-      className={`home-history-item relative flex items-stretch group/item ${
-        isViewing ? 'home-history-item-selected' : ''
+      className={`history-item relative flex items-stretch group/item ${
+        isViewing ? 'history-item-selected' : ''
       }`}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="md"
         onClick={() => onClick(item.id)}
         aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
-        className="min-w-0 flex-1 text-left p-2"
+        className="h-auto min-w-0 flex-1 justify-start border-0 p-1.5 text-left text-foreground shadow-none hover:bg-transparent hover:text-foreground"
       >
-        <div className="relative z-10 flex items-center gap-2">
-          {isMarketReview ? (
-            <div className="h-7 w-1 flex-shrink-0 rounded-full bg-warning" />
-          ) : sentimentColor ? (
+        <div className="relative z-10 flex w-full items-center gap-2">
+          {isMarketReview ? null : sentimentColor ? (
             <div
-              className="w-1 h-7 rounded-full flex-shrink-0"
+              className="h-2 w-2 flex-shrink-0 rounded-full"
               style={{
                 backgroundColor: sentimentColor,
               }}
             />
           ) : (
-            <div className="w-1 h-7 rounded-full flex-shrink-0 bg-subtle" />
+            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-subtle" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <span className="block w-full truncate text-sm font-semibold text-foreground tracking-tight">
+                <span className="block w-full truncate text-sm font-semibold text-foreground">
                   {truncateStockName(stockName)}
                 </span>
               </div>
@@ -86,7 +87,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                   <Badge
                     variant="default"
                     size="sm"
-                    className="home-history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
+                    className="history-sentiment-badge shrink-0 text-xs font-semibold leading-none shadow-none transition-opacity duration-200"
                     style={{
                       color: sentimentColor,
                       borderColor: `${sentimentColor}30`,
@@ -98,14 +99,14 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                 ) : null}
               </div>
             </div>
-            <div className="mt-1 flex items-center gap-2" data-testid="history-card-meta">
+            <div className="mt-0.5 flex min-w-0 items-center gap-1" data-testid="history-card-meta">
               {item.lastAnalysisTime && (
-                <span className="text-xs text-muted-text">
+                <span className="min-w-0 truncate text-[0.6875rem] text-muted-text">
                   {formatDateTime(item.lastAnalysisTime, language)}
                 </span>
               )}
               {item.analysisCount > 1 && (
-                <span className="text-xs text-muted-text">
+                <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-muted-text">
                   {t('history.analysisCount', { count: item.analysisCount })}
                 </span>
               )}
@@ -117,23 +118,23 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             </div>
           </div>
         </div>
-      </button>
+      </Button>
       {onDelete && (
-        <Button
-          variant="ghost"
-          size="xsm"
+        <IconButton
+          visualSize="xs"
+          tone="danger"
+          tooltip={false}
           onClick={(e) => {
             e.stopPropagation();
             onDelete(item.stockCode);
           }}
           disabled={isDeleting}
-          className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center self-center p-0 opacity-70 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100"
+          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 opacity-0 transition-opacity before:pointer-events-none before:absolute before:-inset-y-2 before:-left-8 before:right-0 before:bg-gradient-to-l before:from-elevated before:via-elevated/95 before:to-transparent before:content-[''] group-hover/item:opacity-100 focus-visible:opacity-100"
+          visualClassName="!rounded-none group-hover:!bg-transparent"
           aria-label={t('history.deleteRecord', { name: item.stockName || item.stockCode })}
         >
-          <svg className="h-3.5 w-3.5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </Button>
+          <Trash2 className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
+        </IconButton>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { Clock, Database, GitBranch, MessageSquareText, Workflow } from 'lucide-react';
-import { Badge, StatusDot } from '../common';
+import { Badge, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowSnapshot } from '../../types/runFlow';
 import { compactText, formatDateTime, formatDuration, getRunFlowStatusLabel, RUN_FLOW_STATUS_STYLE } from './utils';
@@ -44,7 +44,7 @@ export const RunFlowSummaryBar: React.FC<RunFlowSummaryBarProps> = ({ snapshot }
   ];
 
   return (
-    <div className="home-subpanel p-3" data-testid="run-flow-summary">
+    <Surface variant="bordered" radius="md" padding="sm" data-testid="run-flow-summary">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -56,28 +56,28 @@ export const RunFlowSummaryBar: React.FC<RunFlowSummaryBarProps> = ({ snapshot }
             </Badge>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-text">
-            <span className="home-accent-chip px-2 py-0.5 font-mono">
+            <Badge variant="default" className="font-mono">
               {t('runFlow.summary.task')}: {taskId || t('runFlow.valueUnavailable')}
-            </span>
+            </Badge>
             {traceId ? (
-              <span className="home-accent-chip px-2 py-0.5 font-mono">
+              <Badge variant="default" className="font-mono">
                 {t('runFlow.summary.trace')}: {traceId}
-              </span>
+              </Badge>
             ) : null}
             {snapshot.summary.model ? (
-              <span className="home-accent-chip px-2 py-0.5">
+              <Badge variant="default">
                 {t('runFlow.summary.model')}: {compactText(snapshot.summary.model, 36)}
-              </span>
+              </Badge>
             ) : null}
-            <span className="home-accent-chip px-2 py-0.5">
+            <Badge variant="default">
               {t('runFlow.summary.generatedAt')}: {formatDateTime(snapshot.generatedAt, language, t)}
-            </span>
+            </Badge>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[28rem]">
           {items.map(({ key, icon: Icon, label, value }) => (
-            <div key={key} className="rounded-lg border border-subtle bg-surface/40 px-3 py-2">
+            <div key={key} className="rounded-lg border border-subtle bg-surface-1/40 px-3 py-2">
               <div className="flex items-center gap-1.5 text-xs text-muted-text">
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{label}</span>
@@ -87,6 +87,6 @@ export const RunFlowSummaryBar: React.FC<RunFlowSummaryBarProps> = ({ snapshot }
           ))}
         </div>
       </div>
-    </div>
+    </Surface>
   );
 };

@@ -193,7 +193,12 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
 
-    expect(screen.getByLabelText('API 密钥（可选）')).toHaveValue('');
+    const apiKeyInput = screen.getByLabelText('API 密钥（可选）');
+    expect(apiKeyInput).toHaveValue('');
+    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-first-run-llm-api-key');
+    expect(apiKeyInput).toHaveAttribute('autocomplete', 'new-password');
+    expect(apiKeyInput).toHaveAttribute('autocapitalize', 'none');
+    expect(apiKeyInput).toHaveAttribute('spellcheck', 'false');
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();
   });
 

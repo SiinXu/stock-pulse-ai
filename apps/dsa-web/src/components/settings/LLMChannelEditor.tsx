@@ -7,7 +7,7 @@ import type {
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
+import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, Popover, Pressable, SearchableSelect, Select, StatePanel, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -21,6 +21,7 @@ import {
   MODEL_ACCESS_TEXT,
   MODEL_ACCESS_TROUBLESHOOTING,
   localizeModelAccessIssue,
+  type ModelAccessIssueCode,
 } from '../../locales/settingsModelAccess';
 import {
   canonicalModelRoute,
@@ -85,8 +86,8 @@ import { ModelMultiSelect } from './ModelMultiSelect';
 const FALSEY_VALUES = new Set(['0', 'false', 'no', 'off']);
 const HERMES_CHANNEL_NAME = 'hermes';
 const HERMES_DEFAULT_MODEL = 'hermes-agent';
-const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = '连接 Schema 不完整或不可用';
-const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE = '连接字段契约包含不支持的条件';
+const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE: ModelAccessIssueCode = 'schema_unavailable';
+const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE: ModelAccessIssueCode = 'contract_unknown';
 
 const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
   channel.name.trim().toLowerCase() === HERMES_CHANNEL_NAME
@@ -688,7 +689,7 @@ interface ConnectionCardProps {
   unsaved: boolean;
   busy: boolean;
   testState?: ChannelTestState;
-  issues: string[];
+  issues: ModelAccessIssueCode[];
   onTest: () => void;
   canTest: boolean;
   onEdit: () => void;
@@ -779,7 +780,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             )}
           </div>
           {selectedModels.length > 0 ? (
-            <button
+            <Pressable
               type="button"
               aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
@@ -798,9 +799,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               {selectedModels.length > 4 ? (
                 <span className="text-xs text-muted-text">+{selectedModels.length - 4}</span>
               ) : null}
-            </button>
+            </Pressable>
           ) : (
-            <button
+            <Pressable
               type="button"
               aria-label={formatUiText(text.manageModels, { name: actionName })}
               onClick={onManageModels}
@@ -808,7 +809,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               className="mt-1.5 inline-flex min-h-11 min-w-11 items-center rounded-lg text-left text-xs text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed"
             >
               {text.noModels}
-            </button>
+            </Pressable>
           )}
           {usedByTasks.length > 0 ? (
             <p className="mt-1 truncate text-xs text-muted-text">{formatUiText(text.usedBy, { tasks: usedByTasks.join(getUiListSeparator(language)) })}</p>
@@ -818,7 +819,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
         <div className="flex shrink-0 items-center gap-1.5">
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
             className="px-3 text-xs shadow-none"
             disabled={busy || !canTest || testState?.status === 'loading'}
@@ -828,7 +829,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           </Button>
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
             className="px-3 text-xs shadow-none"
             disabled={busy}
@@ -857,7 +858,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           >
             {({ close }) => (
               <>
-                <button
+                <Pressable
                   type="button"
                   role="menuitem"
                   disabled={!canToggleEnabled}
@@ -871,8 +872,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   }}
                 >
                   {channel.enabled ? text.disableConnection : text.enableConnection}
-                </button>
-                <button
+                </Pressable>
+                <Pressable
                   type="button"
                   role="menuitem"
                   disabled={!canRemove}
@@ -886,7 +887,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   }}
                 >
                   {text.deleteConnection}
-                </button>
+                </Pressable>
               </>
             )}
           </Popover>
@@ -1379,8 +1380,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const legacyDisplayNameIssues = draft
     ? getChannelDisplayNameIssues(draft, connectionFields)
     : [];
-  const nameConflict = draft && existingNames.includes(draft.name.trim().toLowerCase())
-    ? ['连接名称已存在，请更换']
+  const nameConflict: ModelAccessIssueCode[] = draft
+    && existingNames.includes(draft.name.trim().toLowerCase())
+    ? ['name_duplicate']
     : [];
   const completenessIssues = draft
     ? getChannelCompletenessIssues(
@@ -1406,15 +1408,25 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     ...nameConflict,
     ...contractBlockingIssues,
   ];
-  const nameError = [
+  const nameErrorIssue = [
     ...legacyDisplayNameIssues,
-    ...completenessIssues.filter((issue) => issue === '连接名称必填'),
+    ...completenessIssues.filter((issue) => issue === 'name_required'),
     ...nameIssues,
     ...nameConflict,
   ][0];
-  const apiKeyError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少 API 密钥') : undefined;
-  const baseUrlError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少服务地址') : undefined;
-  const modelsError = draft?.enabled ? completenessIssues.find((issue) => issue === '至少配置一个模型') : undefined;
+  const apiKeyErrorIssue = draft?.enabled
+    ? completenessIssues.find((issue) => issue === 'missing_api_key')
+    : undefined;
+  const baseUrlErrorIssue = draft?.enabled
+    ? completenessIssues.find((issue) => issue === 'missing_base_url')
+    : undefined;
+  const modelsErrorIssue = draft?.enabled
+    ? completenessIssues.find((issue) => issue === 'missing_models')
+    : undefined;
+  const nameError = nameErrorIssue ? localizeModelAccessIssue(nameErrorIssue, language) : undefined;
+  const apiKeyError = apiKeyErrorIssue ? localizeModelAccessIssue(apiKeyErrorIssue, language) : undefined;
+  const baseUrlError = baseUrlErrorIssue ? localizeModelAccessIssue(baseUrlErrorIssue, language) : undefined;
+  const modelsError = modelsErrorIssue ? localizeModelAccessIssue(modelsErrorIssue, language) : undefined;
 
   const providerRequirements = !hasConnectionSchema && draft && provider ? resolveConnectionRequirements({
     provider,
@@ -1570,8 +1582,94 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     document.getElementById(targetId)?.focus();
   }, [focusField, focusModels, focusStep, showManualModelInput, supportsDiscovery]);
 
+  const submitDraft = () => {
+    if (
+      !draft
+      || disabled
+      || !connectionContractKnown
+      || (
+        mode === 'add'
+        && !channelIdentityCanWrite(
+          draft,
+          providers,
+          emptyApiKeyHosts,
+          connectionFields,
+        )
+      )
+    ) {
+      return;
+    }
+    const finalChannels = candidateChannels.map((channel) => (
+      channel.id === draft.id ? draft : channel
+    ));
+    const finalRoutes = collectChannelRouteSet(finalChannels, true);
+    onSubmit(
+      draft,
+      stagedReplacements.filter((replacement) => !finalRoutes.has(replacement.fromRoute)),
+    );
+  };
+
   return (
-    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} className="max-w-xl">
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={mode === 'edit' ? text.editService : text.addService}
+      className="max-w-xl"
+      footer={!draft ? (
+        <>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={
+              !providerId
+              || disabled
+              || !selectableProviders.some((entry) => entry.id === providerId)
+            }
+            onClick={advanceProvider}
+          >
+            {text.next}
+          </Button>
+        </>
+      ) : (
+        <>
+          {mode === 'add' ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDraft(null);
+                setProviderId(undefined);
+                setTest(null);
+                setDiscovery(null);
+              }}
+            >
+              {text.back}
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={disabled || !connectionContractKnown || (
+              mode === 'add'
+              && !channelIdentityCanWrite(
+                draft,
+                providers,
+                emptyApiKeyHosts,
+                connectionFields,
+              )
+            ) || blockingIssues.length > 0}
+            onClick={submitDraft}
+          >
+            {mode === 'edit' ? text.saveChanges : text.addToConfig}
+          </Button>
+        </>
+      )}
+    >
       {!draft ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-text">{text.chooseProviderDescription}</p>
@@ -1579,9 +1677,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <div className="flex items-center gap-2 text-xs text-danger">
               <span>{text.catalogFailed}</span>
               {onReloadCatalog ? (
-                <button type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
+                <Pressable type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
                   {text.retry}
-                </button>
+                </Pressable>
               ) : null}
             </div>
           ) : providerOptions.length > 0 ? (
@@ -1596,22 +1694,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               disabled={disabled}
             />
           ) : null}
-          <div className="flex items-center justify-end gap-2 pt-4">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
-            <Button
-              type="button"
-              variant="settings-primary"
-              size="sm"
-              disabled={
-                !providerId
-                || disabled
-                || !selectableProviders.some((entry) => entry.id === providerId)
-              }
-              onClick={advanceProvider}
-            >
-              {text.next}
-            </Button>
-          </div>
         </div>
       ) : (
         // form wrapper (not div): password inputs outside a <form> trigger
@@ -1705,7 +1787,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 disabled={fieldIsReadOnly('base_url')}
               />
               {provider?.defaultBaseUrl ? (
-                <button
+                <Pressable
                   type="button"
                   className="settings-accent-text mt-1 inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
                   disabled={baseUrlIsReadOnly}
@@ -1718,7 +1800,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   }}
                 >
                   {text.restoreOfficialUrl}
-                </button>
+                </Pressable>
               ) : null}
             </div>
           ) : showBaseUrlSummary ? (
@@ -1728,7 +1810,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   ? text.officialUrl
                   : text.officialUrlHint}
               </span>
-              <button
+              <Pressable
                 type="button"
                 className="settings-accent-text inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center underline-offset-2 hover:underline"
                 disabled={!canRevealBaseUrl}
@@ -1739,7 +1821,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 }}
               >
                 {text.customUrl}
-              </button>
+              </Pressable>
             </div>
           ) : null}
 
@@ -1750,7 +1832,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               </label>
               <Input
                 id={apiKeyInputId}
+                name="stockpulse-llm-connection-api-key"
                 type="password"
+                autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 allowTogglePassword
                 iconType="key"
                 passwordVisible={keyVisible}
@@ -1808,7 +1895,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
-                    <button
+                    <Pressable
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
                       disabled={modelsAreReadOnly}
@@ -1816,7 +1903,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger"
                     >
                       ×
-                    </button>
+                    </Pressable>
                   </span>
                 ))}
               </div>
@@ -1846,7 +1933,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         />
                         <Button
                           type="button"
-                          variant="settings-primary"
+                          variant="primary"
                           size="sm"
                           disabled={modelsAreReadOnly || !replacementRoute}
                           onClick={() => {
@@ -1874,7 +1961,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     {onManageModels ? (
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         size="sm"
                         onClick={onManageModels}
                       >
@@ -1892,7 +1979,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   <Button
                     id={discoverButtonId}
                     type="button"
-                    variant="settings-secondary"
+                    variant="secondary"
                     size="sm"
                     className="px-3 text-xs shadow-none"
                     disabled={
@@ -1961,7 +2048,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 />
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="sm"
                   className="shrink-0 px-3 text-xs shadow-none"
                   disabled={!modelDraft.trim() || modelsAreReadOnly}
@@ -1971,7 +2058,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 </Button>
               </div>
             ) : (
-              <button
+              <Pressable
                 type="button"
                 className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
                 disabled={modelsAreReadOnly}
@@ -1982,7 +2069,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 }}
               >
                 {text.manualModel}
-              </button>
+              </Pressable>
             )}
           </div>
           ) : null}
@@ -1990,7 +2077,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           <div className="flex items-start gap-2">
             <Button
               type="button"
-              variant="settings-secondary"
+              variant="secondary"
               size="sm"
               className="shrink-0 px-3 text-xs shadow-none"
                 disabled={disabled || !connectionContractKnown || test?.status === 'loading'}
@@ -2046,65 +2133,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <p className="text-xs text-muted-text">{formatUiText(text.incompleteSavedDraft, { issues: completenessIssues.map((issue) => localizeModelAccessIssue(issue, language)).join(getUiListSeparator(language)) })}</p>
           ) : null}
 
-          <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-            {mode === 'add' ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setDraft(null);
-                  setProviderId(undefined);
-                  setTest(null);
-                  setDiscovery(null);
-                }}
-              >
-                {text.back}
-              </Button>
-            ) : null}
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
-            <Button
-              type="button"
-              variant="settings-primary"
-              size="sm"
-              disabled={disabled || !connectionContractKnown || (
-                mode === 'add'
-                && !channelIdentityCanWrite(
-                  draft,
-                  providers,
-                  emptyApiKeyHosts,
-                  connectionFields,
-                )
-              ) || blockingIssues.length > 0}
-              onClick={() => {
-                if (
-                  disabled
-                  || !connectionContractKnown
-                  || (
-                    mode === 'add'
-                    && !channelIdentityCanWrite(
-                      draft,
-                      providers,
-                      emptyApiKeyHosts,
-                      connectionFields,
-                    )
-                  )
-                ) {
-                  return;
-                }
-                const finalChannels = candidateChannels.map((channel) => (
-                  channel.id === draft.id ? draft : channel
-                ));
-                const finalRoutes = collectChannelRouteSet(finalChannels, true);
-                onSubmit(
-                  draft,
-                  stagedReplacements.filter((replacement) => !finalRoutes.has(replacement.fromRoute)),
-                );
-              }}
-            >
-              {mode === 'edit' ? text.saveChanges : text.addToConfig}
-            </Button>
-          </div>
         </form>
       )}
     </Modal>
@@ -2575,13 +2603,13 @@ function channelNamesAreSafe(channels: ChannelConfig[]): boolean {
 // Structural completeness contract (Slice 1). Name/protocol must be valid for
 // any channel; credential / base URL / models are required only when the
 // channel is enabled. Connectivity testing is intentionally NOT a gate here.
-function getChannelNameIssues(channel: ChannelConfig): string[] {
+function getChannelNameIssues(channel: ChannelConfig): ModelAccessIssueCode[] {
   const name = channel.name.trim();
   if (!name) {
-    return ['连接名称必填'];
+    return ['name_required'];
   }
   if (!/^[a-z0-9_]+$/.test(name)) {
-    return ['连接名称仅限小写字母、数字或下划线'];
+    return ['name_invalid'];
   }
   return [];
 }
@@ -2589,12 +2617,12 @@ function getChannelNameIssues(channel: ChannelConfig): string[] {
 function getChannelDisplayNameIssues(
   channel: ChannelConfig,
   connectionFields?: LlmConnectionFieldSchema[],
-): string[] {
+): ModelAccessIssueCode[] {
   // Older Catalog payloads have no dynamic schema, so preserve their display
   // name requirement. Once a schema is present, its contract is authoritative.
   return connectionFields !== undefined || channel.displayName.trim()
     ? []
-    : ['连接名称必填'];
+    : ['name_required'];
 }
 
 // Mirrors the backend `channel_allows_empty_api_key` contract: ollama never
@@ -2614,7 +2642,7 @@ function getChannelCompletenessIssues(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
-): string[] {
+): ModelAccessIssueCode[] {
   if (connectionFields !== undefined) {
     const connectionSchemaFields = connectionFields ?? [];
     const values = buildChannelContractValues(channel, providers, emptyApiKeyHosts);
@@ -2624,17 +2652,17 @@ function getChannelCompletenessIssues(
         ? CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE
         : CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
     }
-    const issueByField: Record<string, string> = {
-      connection_name: '连接名称必填',
-      display_name: '连接名称必填',
-      provider_id: '缺少模型服务商',
-      protocol: '缺少连接协议',
-      base_url: '缺少服务地址',
-      api_key: '缺少 API 密钥',
-      api_keys: '缺少 API 密钥',
-      models: '至少配置一个模型',
-      extra_headers: '附加请求头必填',
-      enabled: '缺少启用状态',
+    const issueByField: Record<string, ModelAccessIssueCode> = {
+      connection_name: 'name_required',
+      display_name: 'name_required',
+      provider_id: 'missing_provider',
+      protocol: 'missing_protocol',
+      base_url: 'missing_base_url',
+      api_key: 'missing_api_key',
+      api_keys: 'missing_api_key',
+      models: 'missing_models',
+      extra_headers: 'missing_extra_headers',
+      enabled: 'missing_enabled',
     };
     const missingFields = validateConnectionContractValues(values, connectionSchemaFields);
     if (missingFields.some((field) => !SUPPORTED_CONNECTION_SCHEMA_KEYS.has(field))) {
@@ -2648,9 +2676,9 @@ function getChannelCompletenessIssues(
 
   // Rolling-upgrade compatibility for an older Catalog payload. Requirement
   // flags still come from that payload; no Provider ID table is reconstructed.
-  const issues: string[] = [];
+  const issues: ModelAccessIssueCode[] = [];
   if (!channelAllowsEmptyApiKey(channel, emptyApiKeyHosts) && !channel.apiKey.trim()) {
-    issues.push('缺少 API 密钥');
+    issues.push('missing_api_key');
   }
   // Known providers ship a default Base URL, and ollama/local endpoints have a
   // runtime default, so only custom remote endpoints must supply one. (The
@@ -2661,10 +2689,10 @@ function getChannelCompletenessIssues(
     && channel.protocol !== 'ollama'
     && !channel.baseUrl.trim()
   ) {
-    issues.push('缺少服务地址');
+    issues.push('missing_base_url');
   }
   if (splitModels(channel.models).length === 0) {
-    issues.push('至少配置一个模型');
+    issues.push('missing_models');
   }
   return issues;
 }
@@ -2677,7 +2705,7 @@ function getChannelSaveIssues(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
-): string[] {
+): ModelAccessIssueCode[] {
   const nameIssues = getChannelNameIssues(channel);
   const displayNameIssues = getChannelDisplayNameIssues(channel, connectionFields);
   if (nameIssues.length > 0 || displayNameIssues.length > 0) {
@@ -3364,13 +3392,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-2.5 text-xs text-secondary-text">
           <span>{editorText.readonly}</span>
           {onViewDiagnostics ? (
-            <button
+            <Pressable
               type="button"
               className="settings-accent-text inline-flex min-h-11 min-w-11 items-center underline-offset-2 hover:underline"
               onClick={onViewDiagnostics}
             >
               {editorText.viewDetails}
-            </button>
+            </Pressable>
           ) : null}
         </div>
       ) : null}
@@ -3379,9 +3407,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         <div className="flex items-center gap-2 px-1 text-xs text-danger">
           <span>{editorText.catalogFailed}</span>
           {onReloadCatalog ? (
-            <button type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
+            <Pressable type="button" className="inline-flex min-h-11 min-w-11 items-center underline underline-offset-2" onClick={onReloadCatalog}>
               {editorText.retry}
-            </button>
+            </Pressable>
           ) : null}
         </div>
       ) : null}
@@ -3396,10 +3424,12 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       ) : null}
 
       {channels.length === 0 ? (
-        <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
-          <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
-          <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
-        </div>
+        <StatePanel
+          status="empty"
+          title={editorText.emptyTitle}
+          description={editorText.emptyDescription}
+          compact
+        />
       ) : (
         <div className="space-y-2">
           {channels.map((channel, index) => (
@@ -3494,13 +3524,13 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
       {onManageModels && channels.some((channel) => channel.enabled) ? (
         <div className="flex items-center justify-end px-1">
-          <button
+          <Pressable
             type="button"
             className="settings-accent-text inline-flex min-h-11 min-w-11 items-center text-xs underline-offset-2 hover:underline"
             onClick={onManageModels}
           >
             {editorText.assignModels}
-          </button>
+          </Pressable>
         </div>
       ) : null}
 

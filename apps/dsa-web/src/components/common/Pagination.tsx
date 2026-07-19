@@ -1,4 +1,5 @@
 import type React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -89,9 +90,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         onClick={() => onPageChange(currentPage - 1)}
         ariaLabel={t('common.prevPage')}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
       </PageButton>
 
       {/* Page numbers */}
@@ -111,9 +110,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         onClick={() => onPageChange(currentPage + 1)}
         ariaLabel={t('common.nextPage')}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
       </PageButton>
     </nav>
   );

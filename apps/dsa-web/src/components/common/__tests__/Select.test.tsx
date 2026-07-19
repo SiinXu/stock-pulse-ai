@@ -75,4 +75,70 @@ describe('Select', () => {
 
     expect(screen.getByRole('combobox', { name: 'Styled select' })).toHaveClass('min-h-11', 'rounded-md');
   });
+
+  it('forwards its trigger ref and matches the popup width by default', () => {
+    const ref = { current: null as HTMLButtonElement | null };
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function mockRect(this: HTMLElement) {
+      if (this.getAttribute('role') === 'combobox') {
+        return new DOMRect(24, 40, 240, 36);
+      }
+      return new DOMRect(0, 0, 320, 100);
+    });
+    render(
+      <Select
+        ref={ref}
+        width="full"
+        value="one"
+        onChange={() => {}}
+        options={[{ value: 'one', label: 'One' }]}
+        ariaLabel="Full-width select"
+      />,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: 'Full-width select' });
+    expect(ref.current).toBe(trigger);
+    expect(trigger.closest('.flex-col')).toHaveClass('w-full');
+    fireEvent.click(trigger);
+    expect(screen.getByRole('listbox')).toHaveStyle({ width: '240px' });
+    rectSpy.mockRestore();
+  });
+
+  it('supports typeahead without committing until the user confirms', () => {
+    const onChange = vi.fn();
+    render(
+      <Select
+        value="alpha"
+        onChange={onChange}
+        options={[
+          { value: 'alpha', label: 'Alpha' },
+          { value: 'beta', label: 'Beta' },
+          { value: 'gamma', label: 'Gamma' },
+        ]}
+        ariaLabel="Typeahead select"
+      />,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: 'Typeahead select' });
+    fireEvent.keyDown(trigger, { key: 'g' });
+    expect(trigger).toHaveAttribute('aria-activedescendant', expect.stringContaining('option-2'));
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(trigger, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('gamma');
+  });
+
+  it('keeps Space as the standard combobox open key', () => {
+    render(
+      <Select
+        value="one"
+        onChange={() => {}}
+        options={[{ value: 'one', label: 'One' }]}
+        ariaLabel="Space select"
+      />,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: 'Space select' });
+    fireEvent.keyDown(trigger, { key: ' ' });
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
 });

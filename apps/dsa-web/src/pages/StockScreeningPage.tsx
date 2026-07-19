@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Bookmark,
@@ -16,7 +16,6 @@ import {
   Pickaxe,
   Plane,
   Play,
-  PlusCircle,
   RefreshCw,
   Search,
   Shield,
@@ -38,7 +37,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, InlineAlert, Input, Select } from '../components/common';
+import { AppPage, Badge, Button, DataTable, InlineAlert, Input, PageHeader, ResponsiveFilterPanel, Select, StatePanel } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
@@ -480,10 +479,10 @@ const getHotspotStrength = (item: AlphaSiftHotspot, index: number, text: Screeni
   const heat = Number(item.heatScore ?? 0);
   const changePct = Number(item.changePct ?? 0);
   if (index === 0 || heat >= 90 || changePct >= 8) {
-    return { label: text.strengthLeading, className: 'bg-red-500/10 text-red-500' };
+    return { label: text.strengthLeading, className: 'bg-danger/10 text-danger' };
   }
   if (heat >= 80 || changePct >= 5) {
-    return { label: text.strengthStrong, className: 'bg-blue-500/10 text-blue-500' };
+    return { label: text.strengthStrong, className: 'bg-primary/10 text-primary' };
   }
   return { label: text.strengthFirm, className: 'bg-primary/10 text-primary' };
 };
@@ -493,18 +492,18 @@ const HOTSPOT_ICON_RULES: Array<{
   icon: React.ComponentType<{ className?: string }>;
   className: string;
 }> = [
-  { pattern: /金|银|铜|铝|铅|锌|钼|钴|镍|贵金属|矿|有色/, icon: Pickaxe, className: 'bg-orange-500/10 text-orange-500' },
-  { pattern: /黄金|珠宝/, icon: Gem, className: 'bg-amber-500/10 text-amber-500' },
-  { pattern: /油|气|能源|煤/, icon: Droplet, className: 'bg-yellow-700/10 text-yellow-700' },
-  { pattern: /金融|券商|银行|保险|资本/, icon: Landmark, className: 'bg-orange-500/10 text-orange-500' },
-  { pattern: /航空|机场|航天|运输/, icon: Plane, className: 'bg-blue-500/10 text-blue-500' },
-  { pattern: /林业|农业|种植/, icon: Trees, className: 'bg-emerald-500/10 text-emerald-500' },
-  { pattern: /医疗|诊断|卫生|医药/, icon: Stethoscope, className: 'bg-teal-500/10 text-teal-500' },
-  { pattern: /食品|餐饮|酒/, icon: Utensils, className: 'bg-violet-500/10 text-violet-500' },
-  { pattern: /工业|制造|修理|机械|设备/, icon: Wrench, className: 'bg-blue-500/10 text-blue-500' },
-  { pattern: /租赁|地产|建筑/, icon: Building2, className: 'bg-emerald-500/10 text-emerald-500' },
-  { pattern: /电|芯片|算力|AI|机器人/, icon: Factory, className: 'bg-indigo-500/10 text-indigo-500' },
-  { pattern: /保险|安全/, icon: Shield, className: 'bg-blue-500/10 text-blue-500' },
+  { pattern: /金|银|铜|铝|铅|锌|钼|钴|镍|贵金属|矿|有色/, icon: Pickaxe, className: 'bg-warning/10 text-warning' },
+  { pattern: /黄金|珠宝/, icon: Gem, className: 'bg-warning/10 text-warning' },
+  { pattern: /油|气|能源|煤/, icon: Droplet, className: 'bg-warning/10 text-warning' },
+  { pattern: /金融|券商|银行|保险|资本/, icon: Landmark, className: 'bg-primary/10 text-primary' },
+  { pattern: /航空|机场|航天|运输/, icon: Plane, className: 'bg-primary/10 text-primary' },
+  { pattern: /林业|农业|种植/, icon: Trees, className: 'bg-success/10 text-success' },
+  { pattern: /医疗|诊断|卫生|医药/, icon: Stethoscope, className: 'bg-success/10 text-success' },
+  { pattern: /食品|餐饮|酒/, icon: Utensils, className: 'bg-danger/10 text-danger' },
+  { pattern: /工业|制造|修理|机械|设备/, icon: Wrench, className: 'bg-primary/10 text-primary' },
+  { pattern: /租赁|地产|建筑/, icon: Building2, className: 'bg-success/10 text-success' },
+  { pattern: /电|芯片|算力|AI|机器人/, icon: Factory, className: 'bg-primary/10 text-primary' },
+  { pattern: /保险|安全/, icon: Shield, className: 'bg-primary/10 text-primary' },
 ];
 
 const getHotspotIcon = (topic: string) => {
@@ -945,8 +944,7 @@ const StockScreeningPage: React.FC = () => {
     setMaxResultsError('');
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = async () => {
     const parsedMaxResults = Number(maxResultsDraft);
     if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
       setMaxResultsError(text.resultCountError);
@@ -982,46 +980,50 @@ const StockScreeningPage: React.FC = () => {
   };
 
   return (
-    <AppPage className="max-w-6xl space-y-6 pb-12 pt-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-primary text-primary shadow-soft-card">
-            <PlusCircle className="h-4 w-4" />
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold tracking-normal text-foreground">{text.title}</h1>
-            <p className="mt-1 text-sm text-secondary-text">{text.description}</p>
+    <AppPage className="space-y-5">
+      <PageHeader
+        title={text.title}
+        description={text.description}
+        actions={(
+          <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-4 py-2 text-sm shadow-soft-card">
+            <span className={`h-2.5 w-2.5 rounded-full ${isScreeningEnabled ? 'bg-success' : 'bg-warning'}`} />
+            <span className="font-medium text-secondary-text">{statusText}</span>
           </div>
-        </div>
+        )}
+      />
 
-        <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-border/70 bg-card/80 px-4 py-2 text-sm shadow-soft-card">
-          <span className={`h-2.5 w-2.5 rounded-full ${isScreeningEnabled ? 'bg-success' : 'bg-warning'}`} />
-          <span className="font-medium text-secondary-text">{statusText}</span>
-        </div>
-      </div>
-
-      {!statusLoading && !enabled ? (
-        <InlineAlert
-          variant="info"
+      {statusLoading && !activeTaskId ? (
+        <StatePanel status="loading" title={text.statusLoading} />
+      ) : !statusLoading && !enabled ? (
+        <StatePanel
+          status="disabled"
           title={text.notEnabledTitle}
-          message={text.notEnabledMessage}
-          action={
+          description={(
+            <>
+              <p>{text.notEnabledMessage}</p>
+              {error ? <p className="mt-2 text-danger">{error}</p> : null}
+            </>
+          )}
+          action={(
             <Button size="sm" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
               {text.enable}
             </Button>
-          }
+          )}
         />
-      ) : null}
-
-      {!statusLoading && enabled && !available ? (
-        <InlineAlert
-          variant="warning"
+      ) : !statusLoading && !available ? (
+        <StatePanel
+          status="disabled"
           title={text.unavailableTitle}
-          message={text.unavailableMessage}
+          description={(
+            <>
+              <p>{text.unavailableMessage}</p>
+              {error ? <p className="mt-2 text-danger">{error}</p> : null}
+            </>
+          )}
         />
-      ) : null}
-
-      <InlineAlert
+      ) : (
+        <>
+        <InlineAlert
         variant="warning"
         title={text.riskTitle}
         message={text.riskMessage}
@@ -1087,7 +1089,7 @@ const StockScreeningPage: React.FC = () => {
         ) : null}
 
         {!hotspotsExpanded ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-surface/70 px-4 py-3 text-sm text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-surface-1/70 px-4 py-3 text-sm text-secondary-text sm:flex-row sm:items-center sm:justify-between">
             <span>
               {hotspots.length > 0
                 ? formatUiText(text.cachedHotspots, { count: hotspots.length })
@@ -1096,9 +1098,7 @@ const StockScreeningPage: React.FC = () => {
             <span className="text-xs">{text.liveDetailHint}</span>
           </div>
         ) : hotspots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface/70 px-4 py-6 text-sm text-secondary-text">
-            {text.refreshDescription}
-          </div>
+          <StatePanel status="empty" title={text.refreshDescription} compact />
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {hotspots.map((item, index) => {
@@ -1107,11 +1107,13 @@ const StockScreeningPage: React.FC = () => {
               const iconMeta = getHotspotIcon(item.name || item.topic);
               const Icon = iconMeta.icon;
               return (
-              <button
+              <Button
                 key={`${item.topic}-${item.rank ?? ''}`}
-                className={`group relative min-h-28 overflow-hidden rounded-lg border px-3 py-3 text-left transition-all ${
+                variant="outline"
+                size="xl"
+                className={`group relative h-auto min-h-28 w-full items-stretch justify-start overflow-hidden px-3 py-3 text-left ${
                   selected
-                    ? 'border-warning/50 bg-gradient-to-br from-warning/10 via-card to-card shadow-soft-card ring-1 ring-warning/20'
+                    ? 'border-warning/50 bg-warning/10 shadow-soft-card ring-1 ring-warning/20'
                     : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-soft-card'
                 }`}
                 type="button"
@@ -1121,7 +1123,7 @@ const StockScreeningPage: React.FC = () => {
                   <div className="flex min-w-0 items-start gap-3">
                     <span
                       className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
-                        index < 3 ? 'bg-warning/15 text-warning shadow-soft-card' : 'bg-surface text-secondary-text'
+                        index < 3 ? 'bg-warning/15 text-warning shadow-soft-card' : 'bg-surface-1 text-secondary-text'
                       }`}
                     >
                       {index + 1}
@@ -1136,7 +1138,7 @@ const StockScreeningPage: React.FC = () => {
                       </span>
                     </div>
                   </div>
-                  <span className="shrink-0 text-2xl font-black leading-none text-orange-500">
+                  <span className="shrink-0 text-2xl font-black leading-none text-warning">
                     {formatNumber(item.heatScore, 0)}
                   </span>
                 </div>
@@ -1148,14 +1150,14 @@ const StockScreeningPage: React.FC = () => {
                 <div className="absolute bottom-3 right-3 opacity-95 transition-transform group-hover:scale-105">
                   <MiniSparkline score={item.heatScore} selected={selected} />
                 </div>
-              </button>
+              </Button>
               );
             })}
           </div>
         )}
 
         {hotspotsExpanded && selectedHotspotTopic ? (
-          <div className="mt-4 rounded-xl border border-border/80 bg-surface/80 p-4">
+          <div className="mt-4 rounded-xl border border-border/80 bg-surface-1/80 p-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">
@@ -1180,7 +1182,7 @@ const StockScreeningPage: React.FC = () => {
                   </span>
                 ) : null}
                 {hotspotDetail?.stockCount != null ? (
-                  <span className="w-fit rounded-full bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-500">
+                  <span className="w-fit rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
                     {formatUiText(text.conceptStocksCount, { count: hotspotDetail.stockCount })}
                   </span>
                 ) : null}
@@ -1213,15 +1215,15 @@ const StockScreeningPage: React.FC = () => {
               <div className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
                 <div>
                   <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-secondary-text">
-                    <Clock3 className="h-3.5 w-3.5 text-orange-500" />
+                    <Clock3 className="h-3.5 w-3.5 text-warning" />
                     {text.routeTimeline}
                   </p>
                   <div className="relative space-y-0 pl-4 before:absolute before:bottom-3 before:left-[5px] before:top-2 before:w-px before:bg-border">
                     {getHotspotRouteItems(hotspotDetail).map((item, index) => (
                       <div key={`${item.title}-${index}`} className="relative pb-4 last:pb-0">
-                        <span className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border border-orange-400 bg-card" />
+                        <span className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border border-warning/70 bg-card" />
                         <div className="rounded-lg border border-border/70 bg-card/80 p-3">
-                          <p className="text-xs font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
+                          <p className="text-xs font-semibold text-warning">{getRouteTimeLabel(item, language, text)}</p>
                           <p className="mt-1 text-xs font-semibold text-foreground">{item.title}</p>
                           <p className="mt-1 text-xs leading-5 text-secondary-text">{item.description}</p>
                           {item.source ? <p className="mt-2 text-xs text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
@@ -1245,17 +1247,17 @@ const StockScreeningPage: React.FC = () => {
                               {stock.role || text.conceptStock}
                             </span>
                             {stock.code ? (
-                              <button
+                              <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs font-semibold text-primary"
+                                className="h-auto min-h-11 min-w-11 px-2 text-xs"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
-                                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 transition-colors hover:border-primary hover:bg-primary/15 hover:text-foreground">
-                                  <Play className="h-3 w-3" />
-                                  {text.analyze}
-                                </span>
-                              </button>
+                                <Play className="h-3 w-3" />
+                                {text.analyze}
+                              </Button>
                             ) : null}
                           </div>
                         </div>
@@ -1308,55 +1310,60 @@ const StockScreeningPage: React.FC = () => {
         {strategyLoadError ? <p role="alert" className="mt-2 text-xs text-danger">{strategyLoadError}</p> : null}
       </section>
 
-      <form className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card" onSubmit={(event) => void handleSubmit(event)} noValidate>
+      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           {text.parameters}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr_180px_auto] lg:items-end">
-          <Select
-            label={text.market}
-            value={market}
-            disabled={loading}
-            onChange={handleMarketChange}
-            options={markets.map((item) => ({ value: item.id, label: item.label }))}
-          />
+        <ResponsiveFilterPanel
+          filterLabel={text.parameters}
+          drawerTitle={text.parameters}
+          applyLabel={text.run}
+          onApply={() => void handleSubmit()}
+          applyDisabled={!isScreeningEnabled || loading}
+          isApplying={loading}
+          loadingLabel={text.screening}
+          activeCount={Number(maxResultsDraft !== String(maxResults))}
+          basicClassName="sm:grid-cols-2 [&>*]:min-w-0 [&>*]:!w-full"
+          advancedClassName="lg:grid-cols-[minmax(0,180px)] [&>*]:min-w-0 [&>*]:!w-full"
+          drawerAdvancedClassName="content-start [&>*]:min-w-0 [&>*]:!w-full"
+          basic={(
+            <>
+              <Select
+                label={text.market}
+                value={market}
+                disabled={loading}
+                onChange={handleMarketChange}
+                options={markets.map((item) => ({ value: item.id, label: item.label }))}
+              />
 
-          <Input
-            label={text.strategyParameter}
-            className="rounded-xl bg-surface text-sm focus:border-primary"
-            value={strategy}
-            disabled={loading}
-            onChange={(event) => handleStrategyChange(event.target.value)}
-          />
-
-          <Input
-            id="screening-max-results"
-            label={text.resultCount}
-            className="rounded-xl bg-surface text-sm focus:border-primary"
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={maxResultsDraft}
-            error={maxResultsError}
-            disabled={loading}
-            onChange={(event) => handleMaxResultsChange(event.target.value)}
-          />
-
-          <Button
-            className="h-11 min-w-40"
-            isLoading={loading}
-            loadingText={text.screening}
-            disabled={!isScreeningEnabled || loading}
-            type="submit"
-          >
-            <Play className="h-4 w-4" />
-            {text.run}
-          </Button>
-        </div>
-      </form>
+              <Input
+                label={text.strategyParameter}
+                className="rounded-xl bg-surface-1 text-sm focus:border-primary"
+                value={strategy}
+                disabled={loading}
+                onChange={(event) => handleStrategyChange(event.target.value)}
+              />
+            </>
+          )}
+          advanced={(
+            <Input
+              id="screening-max-results"
+              label={text.resultCount}
+              className="rounded-xl bg-surface-1 text-sm focus:border-primary"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={maxResultsDraft}
+              error={maxResultsError}
+              disabled={loading}
+              onChange={(event) => handleMaxResultsChange(event.target.value)}
+            />
+          )}
+        />
+      </section>
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1412,75 +1419,74 @@ const StockScreeningPage: React.FC = () => {
               {text.resultsDescription}
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 text-xs text-secondary-text">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-surface-1 px-3 py-2 text-xs text-secondary-text">
             <Search className="h-4 w-4 text-primary" />
             {formatUiText(text.candidateCount, { count: candidates.length })}
           </div>
         </div>
 
-        {candidates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface/70 px-5 py-10 text-center">
-            <p className="text-sm font-medium text-foreground">{text.noResults}</p>
-            <p className="mt-2 text-sm text-secondary-text">{text.noResultsDescription}</p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full min-w-216 border-collapse text-sm">
-              <thead className="bg-surface text-left text-xs text-secondary-text">
-                <tr>
-                  <th className="w-14 px-4 py-3 font-semibold">#</th>
-                  <th className="px-4 py-3 font-semibold">{text.code}</th>
-                  <th className="px-4 py-3 font-semibold">{text.name}</th>
-                  <th className="px-4 py-3 font-semibold">{text.industry}</th>
-                  <th className="px-4 py-3 font-semibold">{text.price}</th>
-                  <th className="px-4 py-3 font-semibold">{text.change}</th>
-                  <th className="px-4 py-3 font-semibold">{text.score}</th>
-                  <th className="px-4 py-3 font-semibold">LLM</th>
-                  <th className="px-4 py-3 font-semibold">{text.risk}</th>
-                  <th className="px-4 py-3 font-semibold">{text.details}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {candidates.map((item) => {
-                  const expanded = expandedCode === item.code;
-                  const factors = getFactorEntries(item);
-                  const llmInsightAvailable = hasLlmInsight(item);
-                  const llmFallbackText =
-                    llmDegraded && !llmInsightAvailable
-                      ? text.llmFallbackRow
-                      : text.noLlmJudgement;
-                  const dsaWarnings = item.dsaContext?.warnings || [];
-                  const dsaNews = item.dsaNews || [];
-                  return (
-                    <Fragment key={`${item.rank}-${item.code}`}>
-                      <tr className="border-t border-border align-top transition-colors hover:bg-hover/50">
-                        <td className="px-4 py-3 text-secondary-text">{item.rank}</td>
-                        <td className="px-4 py-3 font-mono font-semibold text-foreground">{item.code}</td>
-                        <td className="px-4 py-3 font-semibold text-foreground">{item.name || '-'}</td>
-                        <td className="px-4 py-3 text-secondary-text">{item.industry || '-'}</td>
-                        <td className="px-4 py-3 text-secondary-text">{formatNumber(item.price)}</td>
-                        <td className="px-4 py-3 text-secondary-text">{formatNumber(item.changePct)}%</td>
-                        <td className="px-4 py-3 font-bold text-primary">{formatScore(item.score)}</td>
-                        <td className="px-4 py-3 text-secondary-text">{llmDegraded ? text.notReranked : formatScore(item.llmScore)}</td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-lg bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-                            {item.riskLevel || text.unknown}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            className="inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-semibold text-primary transition-colors hover:text-foreground"
-                            type="button"
-                            onClick={() => setExpandedCode(expanded ? null : item.code)}
-                          >
-                            {expanded ? text.collapse : text.expand}
-                          </button>
-                        </td>
-                      </tr>
-                      {expanded ? (
-                        <tr className="border-t border-border bg-surface/45">
-                          <td colSpan={10} className="px-4 py-4">
-                            <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
+        <DataTable<AlphaSiftCandidate>
+          ariaLabel={text.results}
+          rows={candidates}
+          getRowKey={(item) => `${item.rank}-${item.code}`}
+          loadingLabel={text.running}
+          emptyState={(
+            <StatePanel
+              status="empty"
+              title={text.noResults}
+              description={text.noResultsDescription}
+              compact
+            />
+          )}
+          className="overflow-hidden rounded-xl border border-border"
+          headClassName="bg-surface-1 text-secondary-text"
+          rowClassName="align-top"
+          columns={[
+            { id: 'rank', header: '#', cell: (item) => item.rank, priority: 'secondary', cellClassName: 'text-secondary-text' },
+            { id: 'code', header: text.code, cell: (item) => item.code, cellClassName: 'font-mono font-semibold text-foreground' },
+            { id: 'name', header: text.name, cell: (item) => item.name || '-', cellClassName: 'font-semibold text-foreground' },
+            { id: 'industry', header: text.industry, cell: (item) => item.industry || '-', priority: 'tertiary', cellClassName: 'text-secondary-text' },
+            { id: 'price', header: text.price, cell: (item) => formatNumber(item.price), priority: 'secondary', cellClassName: 'text-secondary-text' },
+            { id: 'change', header: text.change, cell: (item) => `${formatNumber(item.changePct)}%`, priority: 'tertiary', cellClassName: 'text-secondary-text' },
+            { id: 'score', header: text.score, cell: (item) => formatScore(item.score), cellClassName: 'font-bold text-primary' },
+            { id: 'llm', header: 'LLM', cell: (item) => llmDegraded ? text.notReranked : formatScore(item.llmScore), priority: 'tertiary', cellClassName: 'text-secondary-text' },
+            {
+              id: 'risk',
+              header: text.risk,
+              priority: 'secondary',
+              cell: (item) => <Badge variant="default">{item.riskLevel || text.unknown}</Badge>,
+            },
+            {
+              id: 'details',
+              header: text.details,
+              cell: (item) => {
+                const expanded = expandedCode === item.code;
+                return (
+                  <Button
+                    variant="ghost"
+                    size="xl"
+                    className="h-11 min-h-11 min-w-11 px-2 text-primary shadow-none hover:text-foreground"
+                    aria-expanded={expanded}
+                    onClick={() => setExpandedCode(expanded ? null : item.code)}
+                  >
+                    {expanded ? text.collapse : text.expand}
+                  </Button>
+                );
+              },
+            },
+          ]}
+          renderAfterRow={(item) => {
+            if (expandedCode !== item.code) return null;
+            const factors = getFactorEntries(item);
+            const llmInsightAvailable = hasLlmInsight(item);
+            const llmFallbackText = llmDegraded && !llmInsightAvailable
+              ? text.llmFallbackRow
+              : text.noLlmJudgement;
+            const dsaWarnings = item.dsaContext?.warnings || [];
+            const dsaNews = item.dsaNews || [];
+            return (
+              <div className="border-t border-border bg-surface-1/45 px-4 py-4">
+                <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
                               <div className="space-y-3">
                                 <div>
                                   <p className="text-xs font-semibold text-secondary-text">{text.summary}</p>
@@ -1573,18 +1579,14 @@ const StockScreeningPage: React.FC = () => {
                                   </div>
                                 ) : null}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </div>
+              </div>
+            );
+          }}
+        />
       </section>
+        </>
+      )}
     </AppPage>
   );
 };

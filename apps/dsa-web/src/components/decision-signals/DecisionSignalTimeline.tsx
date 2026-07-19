@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { EmptyState, InlineAlert } from '../common';
+import { InlineAlert, StatePanel } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type { DecisionSignalItem, DecisionSignalStatus } from '../../types/decisionSignals';
@@ -238,7 +238,7 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
 
   if (items.length === 0) {
     return (
-      <EmptyState
+      <StatePanel status="empty"
         className="border-none bg-transparent py-6 shadow-none"
         title={t('decisionSignals.timelineEmptyTitle')}
         description={t('decisionSignals.timelineEmptyDescription')}

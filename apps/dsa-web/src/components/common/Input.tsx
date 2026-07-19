@@ -1,11 +1,14 @@
 import type React from 'react';
-import { useId, useState } from 'react';
+import { forwardRef, useId, useState } from 'react';
 import { Lock, Key } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { EyeToggleIcon } from './EyeToggleIcon';
+import { Field } from './Field';
+import { getFieldDescriptionIds } from './fieldDescription';
+import { InputPrimitive } from './InputPrimitive';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   hint?: string;
   error?: string;
@@ -22,26 +25,29 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   onPasswordVisibleChange?: (visible: boolean) => void;
 }
 
-export const Input = ({ 
-  label, 
-  hint, 
-  error, 
-  className = '', 
-  id, 
-  trailingAction, 
+export const Input = forwardRef<HTMLInputElement, InputProps>(({
+  label,
+  hint,
+  error,
+  className = '',
+  id,
+  trailingAction,
   appearance = 'default',
   allowTogglePassword,
   iconType = 'none',
   passwordVisible,
   onPasswordVisibleChange,
-  ...props 
-}: InputProps) => {
+  ...props
+}, ref) => {
   const { t } = useUiLanguage();
   const generatedId = useId();
   const inputId = id ?? props.name ?? generatedId;
-  const hintId = hint ? `${inputId}-hint` : undefined;
-  const errorId = error ? `${inputId}-error` : undefined;
-  const describedBy = [props['aria-describedby'], errorId ?? hintId].filter(Boolean).join(' ') || undefined;
+  const { hintId, errorId, describedBy } = getFieldDescriptionIds(
+    inputId,
+    hint,
+    error,
+    props['aria-describedby'],
+  );
   const ariaInvalid = props['aria-invalid'] ?? (error ? true : undefined);
 
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -113,41 +119,41 @@ export const Input = ({
   const finalTrailingAction = trailingAction || defaultTrailingAction;
 
   return (
-    <div className="flex flex-col">
-      {label ? (
-        <label
-          htmlFor={inputId}
-          className={cn(
-            'mb-1.5 text-xs font-medium',
-            isLoginAppearance ? 'text-[var(--login-label-text)]' : 'text-secondary-text'
-          )}
-        >
-          {label}
-        </label>
-      ) : null}
-      <div className="relative flex items-center">
+    <Field
+      controlId={inputId}
+      label={label}
+      hint={hint}
+      error={error}
+      hintId={hintId}
+      errorId={errorId}
+      labelClassName={isLoginAppearance ? 'text-[var(--login-label-text)]' : undefined}
+      hintClassName={isLoginAppearance ? 'text-[var(--login-hint-text)]' : undefined}
+      errorClassName={isLoginAppearance ? 'text-[var(--login-error-text)]' : undefined}
+    >
+      <div className="relative flex w-full items-center">
         {leadingIcon && (
           <div className="absolute left-3.5 z-10 pointer-events-none">
             {leadingIcon}
           </div>
         )}
-        <input
+        <InputPrimitive
+          {...props}
+          ref={ref}
           id={inputId}
           aria-describedby={describedBy}
           aria-invalid={ariaInvalid}
+          invalid={Boolean(error)}
           style={inputStyle}
           data-appearance={appearance}
           className={cn(
             isLoginAppearance
               ? 'input-surface input-focus-ring input-appearance-login h-11 w-full rounded-xl border bg-transparent px-4 text-base transition-all focus:outline-none sm:text-sm'
-              : 'h-9 w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text sm:text-xs',
+              : '',
             error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
             leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
             finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',
-            'min-h-9 min-w-9 disabled:cursor-not-allowed disabled:opacity-60',
             className,
           )}
-          {...props}
           type={effectiveType}
         />
         {finalTrailingAction ? (
@@ -156,28 +162,8 @@ export const Input = ({
           </div>
         ) : null}
       </div>
-      {error ? (
-        <p
-          id={errorId}
-          role="alert"
-          className={cn(
-            'mt-2 text-xs',
-            isLoginAppearance ? 'text-[var(--login-error-text)]' : 'text-danger'
-          )}
-        >
-          {error}
-        </p>
-      ) : hint ? (
-        <p
-          id={hintId}
-          className={cn(
-            'mt-2 text-xs',
-            isLoginAppearance ? 'text-[var(--login-hint-text)]' : 'text-secondary-text'
-          )}
-        >
-          {hint}
-        </p>
-      ) : null}
-    </div>
+    </Field>
   );
-};
+});
+
+Input.displayName = 'Input';

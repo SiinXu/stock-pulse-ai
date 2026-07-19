@@ -1,17 +1,27 @@
 import type React from 'react';
+import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
-interface ToolbarProps {
+export interface ToolbarProps extends React.HTMLAttributes<HTMLDivElement> {
   left?: React.ReactNode;
   right?: React.ReactNode;
-  className?: string;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ left, right, className = '' }) => {
+export const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(({ left, right, className, ...props }, ref) => {
   return (
-    <div className={cn('glass-panel flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between', className)}>
-      <div className="flex flex-wrap items-center gap-2">{left}</div>
-      <div className="flex flex-wrap items-center gap-2 md:justify-end">{right}</div>
+    <div
+      ref={ref}
+      role="toolbar"
+      className={cn(
+        'flex w-full min-w-0 flex-col gap-3 border-y border-border/60 py-3 sm:flex-row sm:items-center sm:justify-between',
+        className,
+      )}
+      {...props}
+    >
+      {left ? <div className="flex min-w-0 flex-wrap items-center gap-2">{left}</div> : null}
+      {right ? <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">{right}</div> : null}
     </div>
   );
-};
+});
+
+Toolbar.displayName = 'Toolbar';

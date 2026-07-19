@@ -126,7 +126,7 @@ describe('DecisionSignalTimeline helpers', () => {
     const [datum] = buildTimelineData([makeSignal({ status: 'closed' })], Date.UTC(2026, 5, 20));
 
     expect(datum.terminal).toBe(true);
-    expect(datum.fill).toBe('#8a9099');
+    expect(datum.fill).toBe('hsl(var(--muted-text))');
     expect(datum.statusDasharray).toBe('8 3');
   });
 });

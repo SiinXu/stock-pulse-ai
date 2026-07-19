@@ -73,24 +73,6 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     purpose: 'Locale-independent examples of supported stock-code formats.',
   },
   {
-    file: 'pages/AlertsPage.tsx',
-    text: 'ms',
-    context: 'jsx-expression',
-    purpose: 'SI-compatible milliseconds unit appended to a numeric latency.',
-  },
-  {
-    file: 'pages/ChatPage.tsx',
-    text: 'U',
-    context: 'jsx-expression',
-    purpose: 'Locale-independent one-letter user avatar marker.',
-  },
-  {
-    file: 'pages/ChatPage.tsx',
-    text: 'AI',
-    context: 'jsx-expression',
-    purpose: 'Established technical acronym used as the assistant avatar marker.',
-  },
-  {
     file: 'pages/ChatPage.tsx',
     text: 'AI',
     context: 'jsx-text',
@@ -113,12 +95,6 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
     text: 'desktop.log',
     context: 'jsx-text',
     purpose: 'Literal diagnostic filename users must locate on disk.',
-  },
-  {
-    file: 'pages/StockScreeningPage.tsx',
-    text: 'LLM',
-    context: 'jsx-text',
-    purpose: 'Established technical acronym in a result-column heading.',
   },
 ];
 

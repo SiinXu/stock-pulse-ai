@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert, Input, Modal, Select } from '../common';
+import { Button, InlineAlert, Input, Modal, Pressable, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
@@ -512,7 +512,47 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const stepLabel = formatUiText(text.step, { current: stepIndex + 1, total: order.length });
 
   return (
-    <Modal isOpen onClose={onClose} title={text.title}>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={text.title}
+      footer={(
+        <div className="flex w-full items-center justify-between gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+            {text.cancel}
+          </Button>
+          <div className="flex items-center gap-2">
+            {stepIndex > 0 ? (
+              <Button type="button" variant="secondary" size="sm" onClick={goBack} disabled={isSaving}>
+                {text.back}
+              </Button>
+            ) : null}
+            {step === 'review' ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => void handleSave()}
+                disabled={isSaving || (mode === 'cloud' && hasConnectionSchema && !cloudContractReady)}
+                isLoading={isSaving}
+              >
+                {text.saveApply}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={goNext}
+                disabled={!canAdvance}
+              >
+                {text.next}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    >
       <div data-testid="first-run-wizard" className="space-y-5">
         <p className="text-xs text-muted-text">{stepLabel}</p>
 
@@ -523,7 +563,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {(['cloud', 'cli'] as WizardMode[]).map((value) => (
-                <button
+                <Pressable
                   key={value}
                   type="button"
                   aria-pressed={mode === value}
@@ -542,7 +582,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       ? text.cloudDescription
                       : text.cliDescription}
                   </span>
-                </button>
+                </Pressable>
               ))}
             </div>
           </div>
@@ -594,7 +634,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 </label>
                 <Input
                   id="wizard-api-key"
+                  name="stockpulse-first-run-llm-api-key"
                   type="password"
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={apiKey}
                   onChange={(event) => handleApiKeyChange(event.target.value)}
                   placeholder={apiKeyRequired
@@ -667,7 +712,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               {supportsDiscovery ? (
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => void handleDiscover()}
                   disabled={
@@ -710,7 +755,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
-                    <button
+                    <Pressable
                       type="button"
                       aria-label={formatUiText(text.removeModel, { model })}
                       disabled={modelsAreReadOnly}
@@ -718,7 +763,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger"
                     >
                       ×
-                    </button>
+                    </Pressable>
                   </span>
                 ))}
               </div>
@@ -753,7 +798,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               />
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="secondary"
                 size="xsm"
                 className="shrink-0"
                 disabled={modelsAreReadOnly || !modelDraft.trim()}
@@ -830,7 +875,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               <div className="space-y-1.5">
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => void handleTestConnection()}
                   disabled={isTesting || (hasConnectionSchema && !cloudContractReady)}
@@ -849,40 +894,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           </div>
         ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-t border-[var(--settings-border)] pt-4">
-          <Button type="button" variant="settings-secondary" size="sm" onClick={onClose}>
-            {text.cancel}
-          </Button>
-          <div className="flex items-center gap-2">
-            {stepIndex > 0 ? (
-              <Button type="button" variant="settings-secondary" size="sm" onClick={goBack} disabled={isSaving}>
-                {text.back}
-              </Button>
-            ) : null}
-            {step === 'review' ? (
-              <Button
-                type="button"
-                variant="settings-primary"
-                size="sm"
-                onClick={() => void handleSave()}
-                disabled={isSaving || (mode === 'cloud' && hasConnectionSchema && !cloudContractReady)}
-                isLoading={isSaving}
-              >
-                {text.saveApply}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="settings-primary"
-                size="sm"
-                onClick={goNext}
-                disabled={!canAdvance}
-              >
-                {text.next}
-              </Button>
-            )}
-          </div>
-        </div>
       </div>
     </Modal>
   );

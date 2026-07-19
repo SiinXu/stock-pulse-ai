@@ -137,6 +137,8 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('MACD(12,26,9) 金叉')).toBeInTheDocument();
     expect(screen.getByText('KDJ(9,3,3) 死叉')).toBeInTheDocument();
     expect(screen.getByText('冷却中')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: '告警规则' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '参数' })).toHaveAttribute('data-column-priority', 'tertiary');
 
     chooseOption(screen.getByLabelText('启停状态'), 'enabled');
     chooseOption(screen.getByLabelText('规则类型'), 'price_cross');

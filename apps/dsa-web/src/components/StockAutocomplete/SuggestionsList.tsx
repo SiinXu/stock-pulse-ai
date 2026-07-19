@@ -5,6 +5,7 @@
 import type { CSSProperties } from 'react';
 import type { StockSuggestion } from '../../types/stockIndex';
 import { Badge } from '../common';
+import { getOverlayStyle } from '../common/overlayZ';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
@@ -36,12 +37,12 @@ export function SuggestionsList({
   return (
     <ul
       id="suggestions-list"
-      className="z-[100] max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
-      style={{
+      className="max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
+      style={getOverlayStyle('dropdown', {
         ...style,
         backgroundColor: 'hsl(var(--card))',
         borderColor: 'hsl(var(--border))',
-      }}
+      })}
       role="listbox"
     >
       {suggestions.map((suggestion, index) => (
@@ -81,11 +82,11 @@ const MARKET_BADGE_CONFIG = {
   CN: { labelKey: 'marketCN', className: 'border-danger/25 bg-danger/10 text-danger' },
   HK: { labelKey: 'marketHK', className: 'border-success/25 bg-success/10 text-success' },
   US: { labelKey: 'marketUS', className: 'border-primary/25 bg-primary/10 text-primary' },
-  JP: { labelKey: 'marketJP', className: 'border-indigo-500/25 bg-indigo-500/10 text-indigo-500' },
-  KR: { labelKey: 'marketKR', className: 'border-rose-500/25 bg-rose-500/10 text-rose-500' },
+  JP: { labelKey: 'marketJP', className: 'border-primary/25 bg-primary/10 text-primary' },
+  KR: { labelKey: 'marketKR', className: 'border-danger/25 bg-danger/10 text-danger' },
   INDEX: { labelKey: 'marketIndex', className: 'border-secondary-text/25 bg-secondary-text/10 text-secondary-text' },
   ETF: { labelKey: null, className: 'border-warning/25 bg-warning/10 text-warning' },
-  BSE: { labelKey: 'marketBSE', className: 'border-orange-500/25 bg-orange-500/10 text-orange-500' },
+  BSE: { labelKey: 'marketBSE', className: 'border-warning/25 bg-warning/10 text-warning' },
 } as const;
 
 function MarketBadge({ market }: { market: string }) {

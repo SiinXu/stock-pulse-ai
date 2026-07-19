@@ -2,6 +2,7 @@ import type React from 'react';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle } from './overlayZ';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -27,6 +28,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const isHoveredRef = useRef(false);
+  const isFocusedRef = useRef(false);
+  const isEscapeDismissedRef = useRef(false);
   const tooltipId = useId();
   const [open, setOpen] = useState(false);
   const [resolvedSide, setResolvedSide] = useState<'top' | 'bottom'>(side);
@@ -106,14 +110,37 @@ export const Tooltip: React.FC<TooltipProps> = ({
       <span
         ref={triggerRef}
         className={cn('inline-flex', className)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onMouseEnter={() => {
+          isHoveredRef.current = true;
+          if (!isEscapeDismissedRef.current) {
+            setOpen(true);
+          }
+        }}
+        onMouseLeave={() => {
+          isHoveredRef.current = false;
+          setOpen(false);
+          if (!isFocusedRef.current) {
+            isEscapeDismissedRef.current = false;
+          }
+        }}
+        onFocus={() => {
+          isFocusedRef.current = true;
+          if (!isEscapeDismissedRef.current) {
+            setOpen(true);
+          }
+        }}
+        onBlur={() => {
+          isFocusedRef.current = false;
+          setOpen(false);
+          if (!isHoveredRef.current) {
+            isEscapeDismissedRef.current = false;
+          }
+        }}
         onKeyDown={(event) => {
           if (open && event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
+            isEscapeDismissedRef.current = true;
             setOpen(false);
           }
         }}
@@ -130,13 +157,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
               ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
-              style={{
+              style={getOverlayStyle('tooltip', {
                 position: 'fixed',
                 top: style.top,
                 left: style.left,
-              }}
+              })}
               className={cn(
-                'pointer-events-none z-[120] min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
+                'pointer-events-none min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
                 resolvedSide === 'top' ? 'origin-bottom' : 'origin-top',
                 contentClassName,
               )}

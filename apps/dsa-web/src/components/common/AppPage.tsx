@@ -1,16 +1,22 @@
 import type React from 'react';
+import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
-interface AppPageProps {
+export interface AppPageProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
 }
 
-export const AppPage: React.FC<AppPageProps> = ({ children, className = '' }) => {
+export const AppPage = forwardRef<HTMLDivElement, AppPageProps>(({ children, className, ...props }, ref) => {
   return (
     // div, not main: the app shell already renders the single <main> landmark.
-    <div className={cn('mx-auto min-h-full w-full max-w-7xl px-4 pb-8 pt-4 md:px-6 lg:px-8', className)}>
+    <div
+      ref={ref}
+      className={cn('mx-auto min-h-full w-full max-w-none px-4 pb-8 pt-4 md:px-6 lg:px-8', className)}
+      {...props}
+    >
       {children}
     </div>
   );
-};
+});
+
+AppPage.displayName = 'AppPage';

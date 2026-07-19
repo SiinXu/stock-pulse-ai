@@ -1,14 +1,17 @@
 import type React from 'react';
 import { useCallback, useEffect, useState } from 'react';
+import { Check, Code2, FileText } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
-import { Tooltip } from '../common/Tooltip';
 import { ApiErrorAlert } from '../common/ApiErrorAlert';
+import { Button } from '../common/Button';
+import { IconButton } from '../common/IconButton';
 import { InlineAlert } from '../common/InlineAlert';
+import { Spinner } from '../common/Spinner';
 import { useClipboard } from '../common/useClipboard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 
@@ -84,10 +87,8 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--home-action-report-bg)] text-[var(--home-action-report-text)]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-hover text-secondary-text">
+            <FileText className="h-4 w-4" aria-hidden="true" />
           </div>
           <div>
             <h2 className="text-base font-semibold text-foreground">{stockName || stockCode}</h2>
@@ -96,49 +97,33 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <Tooltip content={text.copyMarkdownSource}>
-            <span className="inline-flex">
-              <button
+          <IconButton
                 type="button"
                 onClick={handleCopyMarkdown}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyMarkdownSource}
+                tooltip={text.copyMarkdownSource}
               >
                 {copiedType === 'markdown' ? (
-                  <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="h-6 w-6 text-success" aria-hidden="true" />
                 ) : (
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
+                  <Code2 className="h-6 w-6" aria-hidden="true" />
                 )}
-              </button>
-            </span>
-          </Tooltip>
+          </IconButton>
 
-          <Tooltip content={text.copyPlainText}>
-            <span className="inline-flex">
-              <button
+          <IconButton
                 type="button"
                 onClick={handleCopyPlainText}
                 disabled={isLoading || !content || copiedType !== null}
-                className="home-surface-button flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-50"
                 aria-label={text.copyPlainText}
+                tooltip={text.copyPlainText}
               >
                 {copiedType === 'text' ? (
-                  <svg className="h-6 w-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+                  <Check className="h-6 w-6 text-success" aria-hidden="true" />
                 ) : (
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                  <FileText className="h-6 w-6" aria-hidden="true" />
                 )}
-              </button>
-            </span>
-          </Tooltip>
+          </IconButton>
         </div>
       </div>
 
@@ -146,7 +131,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
 
       {isLoading ? (
         <div className="flex h-64 flex-col items-center justify-center">
-          <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
+          <Spinner size="lg" />
           <p className="mt-4 text-sm text-secondary-text">{text.loadingReport}</p>
         </div>
       ) : error ? (
@@ -162,14 +147,16 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
         <ReportMarkdownBody content={content} />
       )}
 
-      <div className="home-divider mt-6 flex justify-end border-t pt-4">
-        <button
+      <div className="mt-6 flex justify-end border-t border-border pt-4">
+        <Button
           type="button"
+          variant="secondary"
+          size="md"
           onClick={onRequestClose}
-          className="home-surface-button min-h-11 min-w-11 rounded-lg px-4 py-2 text-sm text-secondary-text hover:text-foreground"
+          className="min-h-11"
         >
           {text.dismiss}
-        </button>
+        </Button>
       </div>
     </>
   );

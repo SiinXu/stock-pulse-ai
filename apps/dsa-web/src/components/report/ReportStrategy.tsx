@@ -1,6 +1,6 @@
 import type React from 'react';
 import type { ReportLanguage, ReportStrategy as ReportStrategyType } from '../../types/analysis';
-import { Card } from '../common';
+import { Card, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 
@@ -20,18 +20,20 @@ const StrategyItem: React.FC<StrategyItemProps> = ({
   value,
   tone,
 }) => (
-  <div className="home-subpanel home-strategy-card p-3" style={{ ['--home-strategy-tone' as string]: `var(${tone})` }}>
+  <Surface
+    variant="bordered"
+    radius="md"
+    padding="sm"
+    className="report-strategy-card border-b-2"
+    style={{ ['--report-strategy-tone' as string]: `var(${tone})`, borderBottomColor: `var(${tone})` }}
+  >
     <div className="flex flex-col">
-      <span className="home-strategy-label mb-0.5 text-xs">{label}</span>
-      <span className="home-strategy-value text-lg font-bold font-mono" style={!value ? { color: 'var(--text-muted-text)' } : undefined}>
+      <span className="report-strategy-label mb-0.5 text-xs">{label}</span>
+      <span className="report-strategy-value text-lg font-bold font-mono" style={!value ? { color: 'var(--text-muted-text)' } : undefined}>
         {value || '—'}
       </span>
     </div>
-    <div
-      className="absolute bottom-0 left-0 right-0 h-0.5"
-      style={{ background: `linear-gradient(90deg, transparent, var(${tone}), transparent)` }}
-    />
-  </div>
+  </Surface>
 );
 
 /**
@@ -49,27 +51,27 @@ export const ReportStrategy: React.FC<ReportStrategyProps> = ({ strategy, langua
     {
       label: text.idealBuy,
       value: strategy.idealBuy,
-      tone: '--home-strategy-buy',
+      tone: '--report-strategy-buy',
     },
     {
       label: text.secondaryBuy,
       value: strategy.secondaryBuy,
-      tone: '--home-strategy-secondary',
+      tone: '--report-strategy-secondary',
     },
     {
       label: text.stopLoss,
       value: strategy.stopLoss,
-      tone: '--home-strategy-stop',
+      tone: '--report-strategy-stop',
     },
     {
       label: text.takeProfit,
       value: strategy.takeProfit,
-      tone: '--home-strategy-take',
+      tone: '--report-strategy-take',
     },
   ];
 
   return (
-    <Card variant="bordered" padding="md" className="home-panel-card">
+    <Card variant="bordered" padding="md">
       <DashboardPanelHeader
         eyebrow={text.strategyPoints}
         title={text.sniperLevels}

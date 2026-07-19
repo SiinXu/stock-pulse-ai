@@ -16,6 +16,7 @@ const isLoupeAvailable = (() => {
     return false
   }
 })()
+const shouldEnableLoupe = isLoupeAvailable && process.env.DSA_WEB_DISABLE_LOUPE !== 'true'
 
 const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8'),
@@ -115,12 +116,12 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     // When the optional Loupe package is absent, alias it to a local no-op stub
     // so dev/build resolve cleanly instead of failing on a missing module.
-    alias: isLoupeAvailable
+    alias: shouldEnableLoupe
       ? {}
       : { '@loupe/dev-annotator': path.resolve(__dirname, 'src/dev/loupeStub.ts') },
   },
   optimizeDeps: {
-    include: isLoupeAvailable ? ['@loupe/dev-annotator'] : [],
+    include: shouldEnableLoupe ? ['@loupe/dev-annotator'] : [],
   },
   plugins: [
     tailwindcss(),

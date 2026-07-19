@@ -1,9 +1,10 @@
 import type React from 'react';
 import { useState, useEffect, useCallback } from 'react';
+import { ExternalLink, Newspaper } from 'lucide-react';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Card } from '../common';
-import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
+import { ApiErrorAlert, Badge, Button, Card, Spinner, StatePanel, Surface } from '../common';
+import { DashboardPanelHeader } from '../dashboard';
 import { historyApi } from '../../api/history';
 import type { NewsIntelItem, ReportLanguage } from '../../types/analysis';
 import { REPORT_NEWS_CONTENT_TEXT } from '../../locales/reportContent';
@@ -57,26 +58,28 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
   }
 
   return (
-    <Card variant="bordered" padding="md" className="home-panel-card">
+    <Card variant="bordered" padding="md">
       <DashboardPanelHeader
         eyebrow={text.newsFeed}
         title={text.relatedNews}
         actions={(
           <div className="flex items-center gap-2">
             {isLoading ? (
-              <div className="home-spinner h-3.5 w-3.5 animate-spin border-2" aria-hidden="true" />
+              <Spinner size="sm" />
             ) : null}
-            <span className="home-accent-chip px-2 py-0.5 text-xs text-muted-text">
+            <Badge variant="default" size="sm">
               {sourceText.sourceLabel}
-            </span>
-            <button
+            </Badge>
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => void fetchNews()}
-              className="home-accent-link inline-flex min-h-11 min-w-11 items-center justify-center text-xs"
+              className="min-h-11 min-w-11 text-xs"
               aria-label={t('usage.refresh')}
             >
               {t('usage.refresh')}
-            </button>
+            </Button>
           </div>
         )}
       />
@@ -94,22 +97,19 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
       )}
 
       {isLoading && !error && (
-        <DashboardStateBlock
+        <StatePanel status="loading"
           compact
-          loading
           title={chromeText.loadingNews}
         />
       )}
 
       {!isLoading && !error && items.length === 0 && (
-        <DashboardStateBlock
+        <StatePanel status="empty"
           compact
           title={chromeText.noNews}
           description={chromeText.noNewsDescription}
           icon={(
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7-7m0 0l-7 7m7-7v18" />
-            </svg>
+            <Newspaper className="h-4 w-4" aria-hidden="true" />
           )}
         />
       )}
@@ -117,17 +117,20 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
       {!isLoading && !error && items.length > 0 && (
         <div className="space-y-3 text-left">
           {items.map((item, index) => (
-            <div
+            <Surface
               key={`${item.title}-${index}`}
-              className="home-subpanel home-news-item group p-4"
+              variant="subtle"
+              radius="md"
+              padding="md"
+              className="report-news-item group"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="home-news-title text-sm font-medium leading-6 text-foreground text-left">
+                  <p className="report-news-title text-left text-sm font-medium leading-6 text-foreground">
                     {item.title}
                   </p>
                   {item.snippet && (
-                    <p className="home-news-snippet mt-2 text-sm leading-6 text-secondary-text text-left overflow-hidden [display:-webkit-box] [-webkit-line-clamp:3] [-webkit-box-orient:vertical]">
+                    <p className="report-news-snippet mt-2 overflow-hidden text-left text-sm leading-6 text-secondary-text [display:-webkit-box] [-webkit-line-clamp:3] [-webkit-box-orient:vertical]">
                       {item.snippet}
                     </p>
                   )}
@@ -137,22 +140,15 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="home-accent-pill-link inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap px-2.5 py-1 text-xs"
+                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-border bg-hover px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-subtle-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15"
                     aria-label={chromeText.openLink}
                   >
                     {chromeText.openLink}
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M14 3h7m0 0v7m0-7L10 14"
-                      />
-                    </svg>
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </a>
                 )}
               </div>
-            </div>
+            </Surface>
           ))}
 
         </div>

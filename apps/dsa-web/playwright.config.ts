@@ -126,6 +126,7 @@ export default defineConfig({
       env: {
         ...process.env,
         DSA_WEB_DEV_API_PROXY: `http://127.0.0.1:${backendPort}`,
+        DSA_WEB_DISABLE_LOUPE: 'true',
         DSA_WEB_E2E_SERVICE_LOG: path.join(serviceLogDir, 'vite.log'),
       },
       url: `http://127.0.0.1:${frontendPort}`,

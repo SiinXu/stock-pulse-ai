@@ -101,9 +101,9 @@ describe('App routing behavior', () => {
   it('shows loading fallback while auth status is initializing', () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({ isLoading: true }));
 
-    const { container } = render(<App />);
+    render(<App />);
 
-    expect(container.querySelector('.border-t-primary')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: '正在加载' })).toBeInTheDocument();
   });
 
   it('redirects protected routes to login when auth is enabled but user is not logged in', async () => {

@@ -9,7 +9,7 @@ import type {
   TestNotificationChannelResponse,
   SystemConfigUpdateItem,
 } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select } from '../common';
+import { ApiErrorAlert, Badge, Button, InlineAlert, Input, Modal, Select, Textarea } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import { getNotificationChannelLabel } from '../../locales/settingsNotifications';
 import type { UiLanguage } from '../../i18n/uiText';
@@ -104,7 +104,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         actions={(
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
             onClick={() => setTestModalOpen(true)}
           >
@@ -120,6 +120,20 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         isOpen={testModalOpen}
         onClose={() => setTestModalOpen(false)}
         title={t('settings.notificationTest')}
+        footer={(
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => void runTest()}
+            disabled={disabled || isTesting}
+            isLoading={isTesting}
+            loadingText={t('settings.notificationTesting')}
+            className="w-full justify-center sm:w-auto"
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
+            {t('settings.notificationTestSend')}
+          </Button>
+        )}
       >
         <div className="space-y-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_120px]">
@@ -152,20 +166,18 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         />
       </div>
 
-      <label className="block">
-        <span className="mb-2 block text-sm font-normal text-foreground">{t('settings.notificationTestBody')}</span>
-        <textarea
-          value={content}
-          maxLength={1000}
-          rows={4}
-          disabled={disabled || isTesting}
-          onChange={(event) => {
-            setIsContentEdited(true);
-            setContent(event.target.value);
-          }}
-          className="min-h-28 w-full resize-y rounded-lg border border-border bg-transparent px-3 py-2 text-xs leading-6 text-foreground placeholder:text-muted-text transition-colors duration-200 outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-50"
-        />
-      </label>
+      <Textarea
+        label={t('settings.notificationTestBody')}
+        value={content}
+        maxLength={1000}
+        rows={4}
+        disabled={disabled || isTesting}
+        onChange={(event) => {
+          setIsContentEdited(true);
+          setContent(event.target.value);
+        }}
+        className="min-h-28 text-xs leading-6"
+      />
 
       {error ? <ApiErrorAlert error={error} /> : null}
 
@@ -224,18 +236,6 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         </div>
       ) : null}
 
-          <Button
-            type="button"
-            variant="settings-primary"
-            onClick={() => void runTest()}
-            disabled={disabled || isTesting}
-            isLoading={isTesting}
-            loadingText={t('settings.notificationTesting')}
-            className="w-full justify-center"
-          >
-            <Send className="h-4 w-4" />
-            {t('settings.notificationTestSend')}
-          </Button>
         </div>
       </Modal>
     </>

@@ -23,4 +23,21 @@ describe('TimePicker', () => {
     expect(await screen.findByRole('dialog', { name: '新增时间' })).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('forwards validation relationships to the trigger', () => {
+    render(
+      <TimePicker
+        value="09:20"
+        onChange={() => {}}
+        ariaLabel="执行时间"
+        aria-invalid="true"
+        aria-describedby="time-error"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: '执行时间' });
+    expect(trigger).toHaveAttribute('aria-invalid', 'true');
+    expect(trigger).toHaveAttribute('aria-describedby', 'time-error');
+    expect(trigger).toHaveClass('border-danger/40');
+  });
 });

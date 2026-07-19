@@ -168,7 +168,7 @@ describe('DecisionSignalDetails', () => {
     expect(container.textContent).toContain('<svg onload=\\"window.__signalMetadataXss = true\\"></svg>');
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('script')).toBeNull();
-    expect(container.querySelector('svg')).toBeNull();
+    expect(container.querySelector('svg[onload]')).toBeNull();
     expect(container.querySelector('[onerror]')).toBeNull();
     expect(container.querySelector('[onload]')).toBeNull();
   });

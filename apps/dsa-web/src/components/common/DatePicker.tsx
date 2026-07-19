@@ -7,6 +7,7 @@ import { formatUiText } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { getUiLocale } from '../../utils/uiLocale';
 import { Button } from './Button';
+import { getOverlayStyle } from './overlayZ';
 import { useFixedPopup } from './useFixedPopup';
 
 interface DatePickerProps {
@@ -285,8 +286,8 @@ export const DatePicker = ({
           ref={popupRef}
           role="dialog"
           aria-label={resolvedAriaLabel}
-          style={popupStyle}
-          className="fixed z-[100] w-72 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
+          style={getOverlayStyle('dropdown', popupStyle)}
+          className="fixed w-72 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

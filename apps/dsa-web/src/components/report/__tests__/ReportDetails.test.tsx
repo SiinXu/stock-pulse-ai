@@ -45,8 +45,8 @@ describe('ReportDetails', () => {
 
     const rawToggle = screen.getByRole('button', { name: '原始分析结果' });
     const snapshotToggle = screen.getByRole('button', { name: '分析快照' });
-    expect(rawToggle).toHaveClass('min-h-11');
-    expect(snapshotToggle).toHaveClass('min-h-11');
+    expect(rawToggle).toHaveClass('h-11');
+    expect(snapshotToggle).toHaveClass('h-11');
     fireEvent.click(rawToggle);
     fireEvent.click(snapshotToggle);
 

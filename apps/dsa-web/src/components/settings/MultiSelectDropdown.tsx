@@ -4,8 +4,9 @@ import type React from 'react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ListOrdered } from 'lucide-react';
-import { Checkbox, Input } from '../common';
+import { Checkbox, Input, Pressable } from '../common';
 import { useFixedPopup } from '../common/useFixedPopup';
+import { getOverlayStyle } from '../common/overlayZ';
 import { formatUiText } from '../../i18n/uiText';
 import type { UiLanguage } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
@@ -181,7 +182,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           hasError ? 'border-danger' : 'border-border',
         )}
       >
-        <button
+        <Pressable
           ref={triggerRef}
           id={id}
           type="button"
@@ -199,7 +200,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
             {formatUiText(text.selectedOptions, { selected: selected.length, total: entries.length })}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
-        </button>
+        </Pressable>
       </div>
 
       {isOpen && popupStyle && portalHost
@@ -207,8 +208,8 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
         <div
           ref={popupRef}
           data-dialog-popup="true"
-          style={popupStyle}
-          className="fixed z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+          style={getOverlayStyle('dropdown', popupStyle)}
+          className="fixed flex flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

@@ -56,6 +56,20 @@ describe('SettingsSectionNav', () => {
     expect(onSelect).toHaveBeenCalledWith('notifications');
   });
 
+  it('keeps the compact selector through tablet widths and only expands at the shell desktop breakpoint', () => {
+    const { container } = render(
+      <SettingsSectionNav
+        activeSection="ai_models"
+        onSelectSection={() => {}}
+        language="zh"
+        navLabel="设置导航"
+      />,
+    );
+
+    expect(container.querySelector('nav > div')).toHaveClass('lg:hidden');
+    expect(container.querySelector('ul')).toHaveClass('hidden', 'lg:flex', 'lg:flex-col');
+  });
+
   it('prefers the mobile-specific handler for the compact selector when provided', () => {
     const onSelect = vi.fn();
     const onMobileSelect = vi.fn();

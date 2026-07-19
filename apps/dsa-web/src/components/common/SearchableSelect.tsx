@@ -1,16 +1,20 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import React, {
+  forwardRef,
   useCallback,
   useEffect,
   useId,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronDown, X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle } from './overlayZ';
 import { useFixedPopup } from './useFixedPopup';
 
 export interface SearchableSelectOption {
@@ -27,7 +31,7 @@ export interface SearchableSelectOption {
   keywords?: string[];
 }
 
-interface SearchableSelectProps {
+export interface SearchableSelectProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
@@ -57,7 +61,7 @@ interface SearchableSelectProps {
  * options (no free-text values). A persisted value missing from the list is
  * surfaced as "unavailable" instead of being dropped.
  */
-export const SearchableSelect: React.FC<SearchableSelectProps> = ({
+export const SearchableSelect = forwardRef<HTMLButtonElement, SearchableSelectProps>(({
   id,
   value,
   onChange,
@@ -73,7 +77,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   staleValueLabel,
   staleValueText,
   clearable = false,
-}) => {
+}, forwardedRef) => {
   const { t } = useUiLanguage();
   const reactId = useId();
   const resolvedId = id ?? reactId;
@@ -129,7 +133,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     popupRef: popoverRef,
     contentVersion: popupContentVersion,
     constrainWidthToViewport: true,
+    matchTriggerWidth: true,
   });
+
+  useImperativeHandle(forwardedRef, () => triggerRef.current as HTMLButtonElement, []);
 
   const open = useCallback(() => {
     if (disabled) {
@@ -272,9 +279,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           ) : (
             <span className="truncate text-muted-text">{placeholder ?? t('common.selectPlaceholder')}</span>
           )}
-          <svg className="h-3.5 w-3.5 shrink-0 text-secondary-text" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-secondary-text" aria-hidden="true" />
         </button>
         {clearable && value && !disabled ? (
           <button
@@ -283,9 +288,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             onClick={() => onChange('')}
             className="absolute right-7 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
           >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         ) : null}
       </div>
@@ -299,8 +302,8 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           <div
             ref={popoverRef}
             data-dialog-popup="true"
-            style={popupStyle}
-            className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+            style={getOverlayStyle('dropdown', popupStyle)}
+            className="fixed flex flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">
               <input
@@ -332,7 +335,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
               {navItems.map((item, index) => (
                 <React.Fragment key={`${item.value}-${index}`}>
                   {item.showHeader ? (
-                    <li role="presentation" className="px-3 pb-0.5 pt-1.5 text-xs font-medium uppercase tracking-wide text-muted-text">
+                    <li role="presentation" className="px-3 pb-0.5 pt-1.5 text-xs font-medium text-muted-text">
                       {item.group}
                     </li>
                   ) : null}
@@ -365,4 +368,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         : null}
     </div>
   );
-};
+});
+
+SearchableSelect.displayName = 'SearchableSelect';

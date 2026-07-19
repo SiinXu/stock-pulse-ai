@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] StockPulse Web 完成共享 UI 组件与响应式体验收敛：统一页面宽度和标题、表单控件、状态、表格、筛选、叠层、图标及移动端导航，并保留 Shell 与页面级大卡片。
+- [修复] Web 告警、回测、AI 建议、持仓、设置、选股与 Token 用量统一 AppPage 全宽内容边界、响应式边距和 PageHeader 标题层级，同时保留 Shell 与页面级大卡片。
+- [改进] Web 新增 StatePanel、DataTable、ResponsiveFilterPanel、ProfileMenu 与 ToastProvider，并完成告警/用量表格、AI 建议筛选和全局语言/主题入口的首批迁移。
+- [修复] Web Tooltip 在叠层弹窗恢复焦点后可稳定由 Escape 关闭，不再因悬停与焦点事件竞态阻断外层 Modal 的关闭。
+- [改进] Web 公共 Button、IconButton、Field、Input、Textarea、Select、Switch、Checkbox、Surface、Spinner 与 Progress 补齐 ref、键盘、状态、语义和触控契约，Card 保留兼容映射。
+- [修复] Web 下拉、日期、时间、Tooltip 与 Toast 统一 overlay 层级，ModelMultiSelect 改用匹配触发器宽度的 Portal，Drawer 不再默认显示无语义的“详情视图”。
+- [修复] Web 登录页按 HTTPS、本机开发和非加密 HTTP 显示真实连接状态，模型 API Key 使用独立密码管理语义，报告动作统一以结构化 action 为准。
+- [测试] Web 新增公共组件绕过与 UI 硬编码架构守卫，并覆盖 Home、Chat 在 767、768、900、1024px 的单侧栏响应式契约。
 - [chore] Agent 各入口的终态写入 fence 统一经单一分类器 `classify_result_terminal_state`（RF-04）：单智能体 `AgentExecutor.chat`、多智能体 `AgentOrchestrator.chat` 与 SSE 端点的 `ExecutionLifecycle.finish_from_result` 现共用同一终态判定，`cancelled` 优先于 `success`，取消的对话不再可能写入成功助手消息；纯内部重构，行为逐字节不变，36 replay fixture 与 SSE 测试零改。
 - [改进] Native Agent runtime 的工具调用统一改由单一 `BoundToolSession` 门禁分发（RF-03，AR-RF-03），消除绕过会话的第二套 ToolRegistry 权威：runner 每次运行构造一个 native 兼容会话（等价放行 allowlist/policy/permission，surface 跳过声明式契约校验）并在终态关闭，保持 36 个 replay fixture 逐字节不变；运行结束后迟到的工具结果（如超时 worker）经 late-result fence 丢弃，不再重新进入模型或写入成功结果。
 - [测试] CI 新增 `pydanticai-installed` 独立作业与 `backend-gate` 的 native 隔离断言：安装 `requirements-pydanticai.txt` 后强制导入 `pydantic-ai-slim` 并执行实验运行时测试，`STOCKPULSE_REQUIRE_PYDANTIC_AI=1` 下依赖缺失或模块级跳过判为失败（不再以 skip 冒充通过，AR-RF-09）；默认 `backend-gate` 保持零 PydanticAI 依赖。

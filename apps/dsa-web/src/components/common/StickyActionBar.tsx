@@ -1,15 +1,24 @@
 import type React from 'react';
+import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
-interface StickyActionBarProps {
+export interface StickyActionBarProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
 }
 
-export const StickyActionBar: React.FC<StickyActionBarProps> = ({ children, className = '' }) => {
+export const StickyActionBar = forwardRef<HTMLDivElement, StickyActionBarProps>(({ children, className, ...props }, ref) => {
   return (
-    <div className={cn('sticky bottom-4 z-20 rounded-xl border border-subtle bg-card/85 p-3 shadow-soft-card backdrop-blur-sm', className)}>
+    <div
+      ref={ref}
+      className={cn(
+        'sticky bottom-0 border-t border-border bg-background/95 px-1 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur-sm',
+        className,
+      )}
+      {...props}
+    >
       <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
     </div>
   );
-};
+});
+
+StickyActionBar.displayName = 'StickyActionBar';

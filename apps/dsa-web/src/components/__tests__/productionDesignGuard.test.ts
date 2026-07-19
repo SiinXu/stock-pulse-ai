@@ -18,12 +18,7 @@ const productionStyles: Record<string, string> = {
   '../../index.css': fs.readFileSync('src/index.css', 'utf8'),
 };
 const productionSources = { ...productionStyles, ...productionComponents };
-const PRIMARY_CTA_VARIANTS = new Set([
-  'primary',
-  'settings-primary',
-  'action-primary',
-  'gradient',
-]);
+const PRIMARY_CTA_VARIANTS = new Set(['primary']);
 
 type DesignRule =
   | 'button-shape'

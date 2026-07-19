@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { IconButton } from './IconButton';
 import { OVERLAY_Z } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
@@ -15,7 +16,10 @@ interface ModalProps {
   title?: string;
   description?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   className?: string;
+  bodyClassName?: string;
+  footerClassName?: string;
   closeDisabled?: boolean;
   closeLabel?: string;
 }
@@ -30,7 +34,10 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   description,
   children,
+  footer,
   className = '',
+  bodyClassName,
+  footerClassName,
   closeDisabled = false,
   closeLabel,
 }) => {
@@ -57,7 +64,7 @@ export const Modal: React.FC<ModalProps> = ({
   return createPortal(
     <div
       data-overlay-root="modal"
-      className="fixed inset-0 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm max-sm:items-end max-sm:p-0"
+      className="fixed inset-0 flex items-center justify-center bg-[var(--page-drawer-overlay-bg)] p-4 backdrop-blur-sm max-sm:items-end max-sm:p-0"
       style={{ zIndex: OVERLAY_Z.modal }}
       onClick={handleClose}
       role="presentation"
@@ -80,22 +87,32 @@ export const Modal: React.FC<ModalProps> = ({
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+            <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
             {description ? (
               <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
             ) : null}
           </div>
-          <button
-            type="button"
+          <IconButton
             onClick={handleClose}
             disabled={closeDisabled}
             aria-label={closeLabel ?? t('common.close')}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-secondary-text"
+            tooltip={false}
           >
             <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        <div data-modal-body="true" className={cn('min-h-0 flex-1 overflow-y-auto p-5', bodyClassName)}>{children}</div>
+        {footer ? (
+          <footer
+            data-modal-footer="true"
+            className={cn(
+              'flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-card px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]',
+              footerClassName,
+            )}
+          >
+            {footer}
+          </footer>
+        ) : null}
       </div>
     </div>,
     document.body,

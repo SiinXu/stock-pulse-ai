@@ -256,7 +256,7 @@ async function openSeededReport(page: Page, uiLanguage: 'zh' | 'en', reportLangu
     });
   });
   await login(page, uiLanguage);
-  const historyItem = page.locator('.home-history-item').filter({ hasText: 'E2E Fixture' }).first();
+  const historyItem = page.getByRole('button').filter({ hasText: 'E2E Fixture' }).first();
   await expect(historyItem).toBeVisible({ timeout: 15_000 });
   await historyItem.click();
   await expect(page.getByText('E2E Fixture', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
@@ -1390,8 +1390,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     });
     await login(page);
     await expect(page.getByText('New Report semantic report', { exact: true })).toBeVisible();
-    const oldItem = page.locator('.home-history-item').filter({ hasText: 'Old Report' }).first();
-    const newItem = page.locator('.home-history-item').filter({ hasText: 'New Report' }).first();
+    const oldItem = page.getByRole('button').filter({ hasText: 'Old Report' }).first();
+    const newItem = page.getByRole('button').filter({ hasText: 'New Report' }).first();
     await oldItem.click();
     await oldRequestStarted.promise;
     await expect(newItem).toBeVisible();
@@ -1770,5 +1770,33 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
     await page.goto('/chat');
     await expectMinimumTouchTarget(page.getByRole('switch', { name: '上下文压缩' }));
+  });
+
+  test('42 intermediate breakpoints never show two fixed sidebars on Home or Chat', async ({ page }) => {
+    await login(page);
+    const widths = [767, 768, 900, 1024];
+    const globalSidebar = page.locator('aside[aria-label="桌面侧边导航"]');
+    const globalMenu = page.getByRole('button', { name: '打开导航菜单' });
+
+    for (const width of widths) {
+      await test.step(`Home at ${width}px`, async () => {
+        await page.setViewportSize({ width, height: 900 });
+        await page.goto('/');
+        await expect(page.getByTestId('home-dashboard')).toBeVisible();
+        await expect(page.getByTestId('home-history-rail')).toBeHidden();
+        await expect(page.getByTestId('home-history-trigger')).toBeVisible();
+        await expect(globalSidebar).toBeVisible({ visible: width >= 1024 });
+        await expect(globalMenu).toBeVisible({ visible: width < 1024 });
+      });
+
+      await test.step(`Chat at ${width}px`, async () => {
+        await page.goto('/chat');
+        await expect(page.getByTestId('chat-workspace')).toBeVisible();
+        await expect(page.getByTestId('chat-session-rail')).toBeHidden();
+        await expect(page.getByTestId('chat-session-trigger')).toBeVisible();
+        await expect(globalSidebar).toBeVisible({ visible: width >= 1024 });
+        await expect(globalMenu).toBeVisible({ visible: width < 1024 });
+      });
+    }
   });
 });

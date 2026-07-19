@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
-import { Badge, Button, Card, StatusDot, Tooltip } from '../common';
+import { Badge, Button, Card, Progress, StatusDot, Surface, Tooltip } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
@@ -50,7 +50,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const taskMessage = formatTaskMessage(task, language);
 
   return (
-    <div className="home-subpanel grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
+    <Surface variant="bordered" radius="md" padding="none" className="grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <div className="shrink-0 pt-1.5">
@@ -139,12 +139,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
 
       {!isTerminal ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
-            <div
-              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <Progress
+            value={progress}
+            label={`${statusLabel} ${progress}%`}
+            valueText={`${progress}%`}
+            className="h-1.5 min-w-0 flex-1"
+            indicatorClassName="bg-primary"
+          />
           <span className="shrink-0 text-xs text-muted-text tabular-nums">
             {progress}%
           </span>
@@ -171,7 +172,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
           </div>
         </details>
       ) : null}
-    </div>
+    </Surface>
   );
 };
 
@@ -223,7 +224,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
     <Card
       variant="bordered"
       padding="none"
-      className={`home-panel-card overflow-hidden ${className}`}
+      className={`overflow-hidden ${className}`}
     >
       <div className="border-b border-subtle px-3 py-3">
         <DashboardPanelHeader

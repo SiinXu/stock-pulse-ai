@@ -2,6 +2,7 @@ import type React from 'react';
 import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { Button } from './Button';
 import { OVERLAY_Z } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
@@ -56,7 +57,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       // Confirmations sit above drawers/modals so a confirm opened from inside a
       // drawer is never hidden (see OVERLAY_Z).
       style={{ zIndex: OVERLAY_Z.confirm }}
-      className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
+      className="fixed inset-0 flex items-center justify-center bg-[var(--page-drawer-overlay-bg)] backdrop-blur-sm transition-all"
       onClick={() => {
         if (!cancelDisabled) {
           onCancel();
@@ -84,26 +85,26 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </p>
         ) : null}
         <div className="flex justify-end gap-3">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="xl"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11"
           >
             {cancelText ?? t('common.cancel')}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant={isDanger ? 'danger' : 'primary'}
+            size="xl"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
-              isDanger
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-foreground text-background'
-            } disabled:cursor-not-allowed disabled:opacity-60`}
+            className="min-h-11"
           >
             {confirmText ?? t('common.confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

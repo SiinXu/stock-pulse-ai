@@ -33,9 +33,25 @@ interface DialogA11yOptions {
   closeOnEscape?: boolean;
 }
 
+export function isDialogFocusableElement(element: HTMLElement): boolean {
+  if (
+    element.hidden
+    || element.closest('[hidden], [inert], [aria-hidden="true"]')
+  ) {
+    return false;
+  }
+  const style = window.getComputedStyle(element);
+  if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+    return false;
+  }
+  return element.getClientRects().length > 0
+    || element.offsetParent !== null
+    || element === document.activeElement;
+}
+
 function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => el.offsetParent !== null || el === document.activeElement,
+    isDialogFocusableElement,
   );
 }
 

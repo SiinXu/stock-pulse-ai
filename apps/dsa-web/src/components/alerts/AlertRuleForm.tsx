@@ -29,7 +29,7 @@ import {
   ALERT_THRESHOLD_DIRECTION_OPTIONS,
 } from '../../locales/alerts';
 import { validateStockCode } from '../../utils/validation';
-import { Button, Checkbox, Input, Select } from '../common';
+import { Button, Checkbox, Input, Select, StickyActionBar } from '../common';
 
 const MAX_REQUESTED_DAYS = 365;
 
@@ -411,8 +411,8 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
   };
 
   return (
-    <form className="space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
-        <div className="grid gap-4 md:grid-cols-2">
+    <form className="alert-rule-form space-y-4" noValidate onSubmit={(event) => void handleSubmit(event)}>
+        <div className="alert-rule-fields grid gap-3">
           <Input
             label={text.ruleName}
             value={name}
@@ -449,7 +449,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         </div>
 
         {alertType === 'price_cross' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.direction}
               value={priceDirection}
@@ -472,7 +472,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'price_change_percent' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.direction}
               value={changeDirection}
@@ -495,21 +495,23 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'volume_spike' ? (
-          <Input
-            id="alert-volume-multiplier"
-            label={text.volumeMultiplier}
-            type="number"
-            min="0"
-            step="0.01"
-            value={multiplier}
-            error={fieldErrors['alert-volume-multiplier']}
-            onChange={(event) => setMultiplier(event.target.value)}
-            disabled={isSubmitting}
-          />
+          <div className="alert-rule-fields grid gap-3">
+            <Input
+              id="alert-volume-multiplier"
+              label={text.volumeMultiplier}
+              type="number"
+              min="0"
+              step="0.01"
+              value={multiplier}
+              error={fieldErrors['alert-volume-multiplier']}
+              onChange={(event) => setMultiplier(event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
         ) : null}
 
         {alertType === 'ma_price_cross' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.maDirection}
               value={thresholdDirection}
@@ -533,7 +535,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'rsi_threshold' ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.thresholdDirection}
               value={thresholdDirection}
@@ -569,7 +571,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'macd_cross' ? (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.crossDirection}
               value={crossDirection}
@@ -617,7 +619,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'kdj_cross' ? (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.crossDirection}
               value={crossDirection}
@@ -665,7 +667,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'cci_threshold' ? (
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="alert-rule-fields grid gap-3">
             <Select
               label={text.thresholdDirection}
               value={thresholdDirection}
@@ -699,13 +701,15 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'portfolio_stop_loss' ? (
-          <Select
-            label={text.stopLossMode}
-            value={stopLossMode}
-            options={ALERT_STOP_LOSS_MODE_OPTIONS[language]}
-            disabled={isSubmitting}
-            onChange={(value) => setStopLossMode(value as PortfolioStopLossMode)}
-          />
+          <div className="alert-rule-fields grid gap-3">
+            <Select
+              label={text.stopLossMode}
+              value={stopLossMode}
+              options={ALERT_STOP_LOSS_MODE_OPTIONS[language]}
+              disabled={isSubmitting}
+              onChange={(value) => setStopLossMode(value as PortfolioStopLossMode)}
+            />
+          </div>
         ) : null}
 
         {alertType === 'market_light_status' ? (
@@ -726,31 +730,35 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
         ) : null}
 
         {alertType === 'market_light_score_drop' ? (
-          <Input
-            id="alert-score-drop"
-            label={text.scoreDropThreshold}
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            value={minDrop}
-            error={fieldErrors['alert-score-drop']}
-            onChange={(event) => setMinDrop(event.target.value)}
-            disabled={isSubmitting}
-          />
+          <div className="alert-rule-fields grid gap-3">
+            <Input
+              id="alert-score-drop"
+              label={text.scoreDropThreshold}
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={minDrop}
+              error={fieldErrors['alert-score-drop']}
+              onChange={(event) => setMinDrop(event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
         ) : null}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Checkbox
-            label={text.enableAfterCreate}
-            checked={enabled}
-            onChange={(event) => setEnabled(event.target.checked)}
-            disabled={isSubmitting}
-          />
-          <Button type="submit" isLoading={isSubmitting} loadingText={text.creating}>
-            {text.create}
-          </Button>
-        </div>
+        <StickyActionBar>
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Checkbox
+              label={text.enableAfterCreate}
+              checked={enabled}
+              onChange={(event) => setEnabled(event.target.checked)}
+              disabled={isSubmitting}
+            />
+            <Button type="submit" isLoading={isSubmitting} loadingText={text.creating}>
+              {text.create}
+            </Button>
+          </div>
+        </StickyActionBar>
         {formError ? (
           <p role={Object.keys(fieldErrors).length === 0 ? 'alert' : undefined} className="text-sm text-danger">
             {formError}

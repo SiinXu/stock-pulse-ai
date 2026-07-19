@@ -7,7 +7,7 @@ import {
   RouterProvider,
   useLocation,
 } from 'react-router-dom';
-import { ApiErrorAlert, Shell } from './components/common';
+import { ApiErrorAlert, Button, Shell, ToastProvider } from './components/common';
 import {
   PageLoadingFallback,
   RouteOutletBoundary,
@@ -51,13 +51,14 @@ const AppLayout: React.FC = () => {
         <div className="w-full max-w-lg">
           <ApiErrorAlert error={loadError} />
         </div>
-        <button
+        <Button
           type="button"
-          className="btn-primary"
+          variant="primary"
+          size="md"
           onClick={() => void refreshStatus()}
         >
           {t('common.retry')}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -85,11 +86,7 @@ const AppLayout: React.FC = () => {
 // useBlocker to guard in-app navigation (e.g. unsaved settings drafts).
 const routes = [
   {
-    element: (
-      <AuthProvider>
-        <AppLayout />
-      </AuthProvider>
-    ),
+    element: <AppLayout />,
     children: [
       {
         path: '/login',
@@ -129,7 +126,11 @@ const App: React.FC<{ initialUiLanguage?: UiLanguage }> = ({ initialUiLanguage }
 
   return (
     <UiLanguageProvider initialLanguage={initialUiLanguage}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
+      </AuthProvider>
     </UiLanguageProvider>
   );
 };

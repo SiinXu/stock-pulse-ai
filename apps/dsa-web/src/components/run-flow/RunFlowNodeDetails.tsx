@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, ChevronRight, Info, X } from 'lucide-react';
-import { Badge, Button, StatusDot } from '../common';
+import { Badge, Button, DataTable, IconButton, StatusDot, Surface, type DataTableColumn } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { RunFlowNode, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -118,12 +118,12 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
 
   if (!node) {
     return (
-      <aside className="home-subpanel p-4 text-sm text-secondary-text" data-testid="run-flow-node-details-empty">
+      <Surface variant="bordered" radius="md" padding="md" className="text-sm text-secondary-text" data-testid="run-flow-node-details-empty">
         <div className="flex items-center gap-2">
           <Info className="h-4 w-4 text-primary" aria-hidden="true" />
           {t('runFlow.nodeDetails.empty')}
         </div>
-      </aside>
+      </Surface>
     );
   }
 
@@ -144,6 +144,46 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
   const formatDetailStatus = (status: string | undefined) => (
     isRunFlowStatus(status) ? getRunFlowStatusLabel(status, t) : status || t('runFlow.valueUnavailable')
   );
+  const attemptColumns: DataTableColumn<DetailItem>[] = [
+    {
+      id: 'name',
+      header: t('runFlow.nodeDetails.column.name'),
+      cell: (attempt) => (
+        <>
+          <span className="block font-medium text-foreground">
+            {attempt.label || attempt.provider || t('runFlow.valueUnavailable')}
+          </span>
+          {attempt.provider ? <span className="mt-0.5 block text-muted-text">{attempt.provider}</span> : null}
+        </>
+      ),
+    },
+    {
+      id: 'status',
+      header: t('runFlow.nodeDetails.column.status'),
+      cell: (attempt) => formatDetailStatus(attempt.status),
+      cellClassName: 'text-secondary-text',
+    },
+    {
+      id: 'duration',
+      header: t('runFlow.nodeDetails.column.duration'),
+      cell: (attempt) => formatDuration(attempt.durationMs, t),
+      cellClassName: 'text-secondary-text',
+    },
+    {
+      id: 'records',
+      header: t('runFlow.nodeDetails.column.records'),
+      cell: (attempt) => typeof attempt.recordCount === 'number'
+        ? attempt.recordCount
+        : t('runFlow.valueUnavailable'),
+      cellClassName: 'text-secondary-text',
+    },
+    {
+      id: 'time',
+      header: t('runFlow.nodeDetails.column.time'),
+      cell: (attempt) => formatDateTime(attempt.startedAt, language, t),
+      cellClassName: 'text-secondary-text',
+    },
+  ];
   const detailRows: DetailRow[] = [[t('runFlow.nodeDetails.kind'), getRunFlowNodeKindLabel(node.kind, t)]];
   const addProviderRow = () => {
     if (node.provider) {
@@ -201,7 +241,7 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
   }
 
   return (
-    <aside className="home-subpanel p-4" data-testid="run-flow-node-details">
+    <Surface variant="bordered" radius="md" padding="md" role="complementary" data-testid="run-flow-node-details">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="label-uppercase">{t('runFlow.nodeDetails.title')}</p>
@@ -233,15 +273,13 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
             {getRunFlowStatusLabel(node.status, t)}
           </Badge>
           {onClose ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
+            <IconButton
               onClick={onClose}
               aria-label={t('runFlow.nodeDetails.close')}
+              visualSize="sm"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
       </div>
@@ -258,35 +296,19 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
       {attempts.length > 0 ? (
         <div className="mt-4">
           <p className="label-uppercase">{t('runFlow.nodeDetails.attemptList')}</p>
-          <div className="mt-2 overflow-x-auto rounded-lg border border-subtle">
-            <table className="min-w-full divide-y divide-subtle text-left text-xs">
-              <thead className="bg-base/45 text-muted-text">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.name')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.status')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.duration')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.records')}</th>
-                  <th className="px-3 py-2 font-medium">{t('runFlow.nodeDetails.column.time')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-subtle bg-base/20">
-                {attempts.map((attempt, index) => (
-                  <tr key={attempt.id || `${attempt.label}-${index}`}>
-                    <td className="px-3 py-2 text-foreground">
-                      <span className="block font-medium">{attempt.label || attempt.provider || t('runFlow.valueUnavailable')}</span>
-                      {attempt.provider ? <span className="mt-0.5 block text-muted-text">{attempt.provider}</span> : null}
-                    </td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDetailStatus(attempt.status)}</td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDuration(attempt.durationMs, t)}</td>
-                    <td className="px-3 py-2 text-secondary-text">
-                      {typeof attempt.recordCount === 'number' ? attempt.recordCount : t('runFlow.valueUnavailable')}
-                    </td>
-                    <td className="px-3 py-2 text-secondary-text">{formatDateTime(attempt.startedAt, language, t)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            ariaLabel={t('runFlow.nodeDetails.attemptList')}
+            columns={attemptColumns}
+            rows={attempts}
+            getRowKey={(attempt, index) => attempt.id || `${attempt.label}-${index}`}
+            emptyState={null}
+            loadingLabel={t('runFlow.nodeDetails.attemptList')}
+            className="mt-2"
+            scrollClassName="rounded-lg border border-subtle"
+            tableClassName="text-xs"
+            headClassName="bg-base/45"
+            bodyClassName="divide-subtle bg-base/20"
+          />
         </div>
       ) : null}
 
@@ -374,6 +396,6 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
           </dl>
         </div>
       ) : null}
-    </aside>
+    </Surface>
   );
 };

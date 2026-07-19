@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import type React from 'react';
 import { Bell } from 'lucide-react';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
-import { Badge, Modal } from '../common';
+import { Badge, Modal, Pressable } from '../common';
 import { cn } from '../../utils/cn';
 import { SettingsField } from './SettingsField';
 import { isConfiguredChannelValue, NOTIFICATION_CHANNELS } from './notificationChannels';
@@ -56,7 +56,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           }
           const configured = isChannelConfigured(channelItems);
           return (
-            <button
+            <Pressable
               key={channel.id}
               type="button"
               onClick={() => setOpenChannelId(channel.id)}
@@ -71,7 +71,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               <Badge variant={configured ? 'success' : 'default'} size="sm" className="shrink-0">
                 {configured ? text.configured : text.unconfigured}
               </Badge>
-            </button>
+            </Pressable>
           );
         })}
       </div>

@@ -18,6 +18,8 @@ export * from './SettingsPanelErrorBoundary';
 export * from './SettingsSectionCard';
 export * from './SettingsErrorSummary';
 export * from './FirstRunWizard';
+export * from './FirstRunSetupCard';
+export * from './SchedulerSettingsCard';
 export * from './ModelFallbackEditor';
 export * from './ModelMultiSelect';
 export * from './AuthSettingsCard';

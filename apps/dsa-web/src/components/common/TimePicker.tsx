@@ -5,6 +5,7 @@ import { ChevronDown, Clock3 } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 import { Button } from './Button';
+import { getOverlayStyle } from './overlayZ';
 import { useFixedPopup } from './useFixedPopup';
 
 interface TimePickerProps {
@@ -19,6 +20,8 @@ interface TimePickerProps {
   onOpenChange?: (isOpen: boolean) => void;
   className?: string;
   triggerClassName?: string;
+  'aria-invalid'?: React.AriaAttributes['aria-invalid'];
+  'aria-describedby'?: string;
   'data-testid'?: string;
 }
 
@@ -38,6 +41,8 @@ export const TimePicker = ({
   onOpenChange,
   className,
   triggerClassName,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
   'data-testid': testId,
 }: TimePickerProps) => {
   const { t } = useUiLanguage();
@@ -158,12 +163,15 @@ export const TimePicker = ({
         data-value={value}
         disabled={disabled}
         aria-label={resolvedAriaLabel}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
           'flex h-11 min-h-11 min-w-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
+          ariaInvalid && 'border-danger/40 focus-visible:border-danger',
           triggerClassName,
         )}
       >
@@ -179,8 +187,8 @@ export const TimePicker = ({
           ref={popupRef}
           role="dialog"
           aria-label={resolvedAriaLabel}
-          style={popupStyle}
-          className="fixed z-[100] w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
+          style={getOverlayStyle('dropdown', popupStyle)}
+          className="fixed w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

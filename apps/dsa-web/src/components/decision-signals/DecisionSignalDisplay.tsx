@@ -1,6 +1,5 @@
 import type React from 'react';
-import { PanelRightOpen } from 'lucide-react';
-import { Badge, Card, JsonViewer } from '../common';
+import { Badge, Card, JsonViewer, Pressable } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type {
@@ -285,15 +284,14 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
     <div className={className}>
       {content}
       <div className="mt-4 flex justify-end">
-        <button
+        <Pressable
           type="button"
           onClick={() => onSelect?.(item)}
           className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-1.5 !px-3 !py-1.5 !text-xs"
           aria-label={t('decisionSignals.viewDetailsFor', { stock: item.stockName || item.stockCode })}
         >
-          <PanelRightOpen className="h-3.5 w-3.5" />
           {t('common.details')}
-        </button>
+        </Pressable>
       </div>
     </div>
   );
@@ -437,22 +435,22 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
           </div>
           {onFeedbackSubmit ? (
             <div className="flex flex-wrap gap-2">
-              <button
+              <Pressable
                 type="button"
                 className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
                 disabled={feedbackSaving}
                 onClick={() => onFeedbackSubmit('useful')}
               >
                 {t('decisionSignals.feedback.useful')}
-              </button>
-              <button
+              </Pressable>
+              <Pressable
                 type="button"
                 className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
                 disabled={feedbackSaving}
                 onClick={() => onFeedbackSubmit('not_useful')}
               >
                 {t('decisionSignals.feedback.not_useful')}
-              </button>
+              </Pressable>
             </div>
           ) : null}
         </div>
@@ -460,17 +458,17 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
 
       {evidenceData ? (
         <Card title={t('decisionSignals.evidence')} padding="sm" className="rounded-xl">
-          <JsonViewer data={evidenceData} maxHeight="240px" />
+          <JsonViewer data={evidenceData} maxHeight="240px" copyIconOnly />
         </Card>
       ) : null}
       {qualityData ? (
         <Card title={t('decisionSignals.dataQuality')} padding="sm" className="rounded-xl">
-          <JsonViewer data={qualityData} maxHeight="240px" />
+          <JsonViewer data={qualityData} maxHeight="240px" copyIconOnly />
         </Card>
       ) : null}
       {metadataData ? (
         <Card title={t('decisionSignals.metadata')} padding="sm" className="rounded-xl">
-          <JsonViewer data={metadataData} maxHeight="240px" />
+          <JsonViewer data={metadataData} maxHeight="240px" copyIconOnly />
         </Card>
       ) : null}
     </div>

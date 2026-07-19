@@ -11,6 +11,7 @@ interface UiLanguageToggleProps {
   variant?: UiLanguageToggleVariant;
   collapsed?: boolean;
   popover?: boolean;
+  popoverPlacement?: 'top' | 'bottom';
   wrapperClassName?: string;
   triggerClassName?: string;
   triggerActiveClassName?: string;
@@ -22,6 +23,7 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
   variant = 'default',
   collapsed = false,
   popover = false,
+  popoverPlacement = 'top',
   wrapperClassName,
   triggerClassName,
   triggerActiveClassName,
@@ -54,7 +56,7 @@ export const UiLanguageToggle: React.FC<UiLanguageToggleProps> = ({
           ariaLabel={t('language.toggle')}
           className="min-w-0 flex-1 [&>div]:w-full [&_button]:h-full [&_button]:min-h-0 [&_button]:border-0 [&_button]:bg-transparent [&_button]:px-0 [&_button]:text-sm [&_button]:font-normal [&_button:hover]:bg-transparent"
           menuAlign="start"
-          menuPlacement="top"
+          menuPlacement={popoverPlacement}
         />
       </div>
     );

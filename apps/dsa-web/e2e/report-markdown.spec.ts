@@ -30,7 +30,7 @@ test.describe('ReportMarkdown component', () => {
     await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
-    const firstHistoryItem = page.locator('.home-history-item').first();
+    const firstHistoryItem = page.getByRole('button').filter({ hasText: 'E2E Fixture' }).first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();
@@ -79,7 +79,7 @@ test.describe('ReportMarkdown component', () => {
     await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
-    const firstHistoryItem = page.locator('.home-history-item').first();
+    const firstHistoryItem = page.getByRole('button').filter({ hasText: 'E2E Fixture' }).first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();
@@ -167,7 +167,7 @@ test.describe('ReportMarkdown component', () => {
     await expect(page.getByRole('heading', { name: '个股栏' })).toBeVisible({ timeout: 10_000 });
 
     // Click on the first history item to select it
-    const firstHistoryItem = page.locator('.home-history-item').first();
+    const firstHistoryItem = page.getByRole('button').filter({ hasText: 'E2E Fixture' }).first();
     await expect(firstHistoryItem).toBeVisible({ timeout: 10_000 });
     await expect(firstHistoryItem).toContainText('E2E Fixture');
     await firstHistoryItem.click();

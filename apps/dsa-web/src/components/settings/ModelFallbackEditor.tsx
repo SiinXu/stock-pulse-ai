@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import type { SearchableSelectOption } from '../common';
+import { Pressable, type SearchableSelectOption } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
 import { ModelMultiSelect } from './ModelMultiSelect';
 import { formatUiText } from '../../i18n/uiText';
@@ -130,7 +130,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                 ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-1">
-                <button
+                <Pressable
                   type="button"
                   disabled={disabled || index === 0}
                   aria-label={formatUiText(text.moveUp, { model: labelFor(route) })}
@@ -138,8 +138,8 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↑
-                </button>
-                <button
+                </Pressable>
+                <Pressable
                   type="button"
                   disabled={disabled || index === routes.length - 1}
                   aria-label={formatUiText(text.moveDown, { model: labelFor(route) })}
@@ -147,8 +147,8 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-foreground disabled:opacity-40"
                 >
                   ↓
-                </button>
-                <button
+                </Pressable>
+                <Pressable
                   type="button"
                   disabled={disabled}
                   aria-label={formatUiText(text.removeFallback, { model: labelFor(route) })}
@@ -156,7 +156,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
                   className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text hover:text-danger"
                 >
                   ✕
-                </button>
+                </Pressable>
               </span>
             </li>
           ))}

@@ -61,7 +61,42 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '授权进入工作台' }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings', { replace: true }));
-    expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
+    const passwordInput = screen.getByLabelText('登录密码');
+    expect(passwordInput).toHaveAttribute('data-appearance', 'login');
+    expect(passwordInput).toHaveAttribute('name', 'stockpulse-admin-password');
+    expect(passwordInput).toHaveAttribute('autocomplete', 'current-password');
+  });
+
+  it('identifies first-time password fields independently from API credentials', () => {
+    useAuthMock.mockReturnValue({
+      login: vi.fn(),
+      passwordSet: false,
+      setupState: 'no_password',
+    });
+
+    render(<LoginPage />);
+
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-password');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute(
+      'name',
+      'stockpulse-admin-password-confirmation',
+    );
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
+  });
+
+  it('describes the default localhost HTTP environment without claiming TLS', () => {
+    useAuthMock.mockReturnValue({
+      login: vi.fn(),
+      passwordSet: true,
+      setupState: 'enabled',
+    });
+
+    render(<LoginPage />);
+
+    const status = screen.getByText('当前通过本机开发连接访问。');
+    expect(status).toHaveAttribute('data-connection-status', 'local');
+    expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
   });
 
   it('does not override login theme tokens inline so light mode can take effect', () => {

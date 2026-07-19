@@ -60,10 +60,10 @@ function getActionFamily(action: DecisionAction): ActionFamily {
 }
 
 function getPointColor(family: ActionFamily, terminal: boolean): string {
-  if (terminal) return '#8a9099';
-  if (family === 'bullish') return '#16a34a';
-  if (family === 'defensive') return '#dc2626';
-  return '#878980';
+  if (terminal) return 'hsl(var(--muted-text))';
+  if (family === 'bullish') return 'hsl(var(--success))';
+  if (family === 'defensive') return 'hsl(var(--danger))';
+  return 'hsl(var(--secondary-text))';
 }
 
 export function getTimelinePointStyle(item: DecisionSignalItem): TimelinePointStyle {

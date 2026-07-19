@@ -7,6 +7,26 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { Drawer } from '../Drawer';
 
 describe('Drawer overlay behavior', () => {
+  it('renders no generic eyebrow unless the caller supplies one', () => {
+    const { rerender } = render(
+      <UiLanguageProvider>
+        <Drawer isOpen onClose={() => undefined} title="History">
+          <p>Reports</p>
+        </Drawer>
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.queryByText('详情视图')).not.toBeInTheDocument();
+    rerender(
+      <UiLanguageProvider>
+        <Drawer isOpen onClose={() => undefined} title="History" eyebrow="Analysis">
+          <p>Reports</p>
+        </Drawer>
+      </UiLanguageProvider>,
+    );
+    expect(screen.getByText('Analysis')).toBeInTheDocument();
+  });
+
   it('restores pre-existing document state when an open drawer unmounts', () => {
     document.body.style.overflow = 'clip';
     const { container, unmount } = render(

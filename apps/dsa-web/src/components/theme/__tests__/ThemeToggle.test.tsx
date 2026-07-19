@@ -46,7 +46,7 @@ describe('ThemeToggle', () => {
     expect(screen.getByRole('menuitemradio', { name: '跟随系统' })).toBeInTheDocument();
   });
 
-  it('lays out the profile theme menu horizontally beside its trigger', () => {
+  it('stacks the profile theme menu vertically beside its trigger', () => {
     render(
       <ThemeProvider>
         <ThemeToggle menuLayout="horizontal" />
@@ -56,6 +56,10 @@ describe('ThemeToggle', () => {
     fireEvent.click(screen.getByRole('button', { name: '切换主题' }));
 
     const menu = screen.getByRole('menu', { name: '主题模式' });
-    expect(menu).toHaveClass('grid', 'grid-cols-3', 'bottom-0', 'left-full');
+    expect(menu).toHaveClass('flex', 'flex-col', 'bottom-0', 'left-full');
+    for (const option of screen.getAllByRole('menuitemradio')) {
+      expect(option).toHaveClass('min-h-11', 'px-2', 'py-1');
+      expect(option).not.toHaveClass('min-h-14');
+    }
   });
 });

@@ -68,8 +68,11 @@ describe('TaskPanel', () => {
     expect(screen.getByText('运行诊断')).toBeInTheDocument();
     expect(screen.getAllByText('trace-task-1')).toHaveLength(2);
     expect(screen.queryByText(/请求阶段:/)).not.toBeInTheDocument();
-    expect(container.querySelector('.home-panel-card')).toBeTruthy();
-    expect(container.querySelector('.home-subpanel')).toBeTruthy();
+    expect(container.querySelector('.home-panel-card')).toBeNull();
+    expect(container.querySelector('.home-subpanel')).toBeNull();
+    screen.getAllByTestId('task-panel-item').forEach((item) => {
+      expect(item).toHaveClass('border-border', 'bg-card');
+    });
   });
 
   it('keeps narrow sidebar task metadata in rows instead of squeezing diagnostics vertically', () => {

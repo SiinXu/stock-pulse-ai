@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { IconButton } from './IconButton';
 import { OVERLAY_Z } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
@@ -13,6 +14,7 @@ interface DrawerProps {
   title: string;
   children: React.ReactNode;
   description?: string;
+  eyebrow?: string;
   width?: string;
   zIndex?: number;
   side?: 'left' | 'right';
@@ -33,6 +35,7 @@ export const Drawer: React.FC<DrawerProps> = ({
   title,
   children,
   description,
+  eyebrow,
   width = 'max-w-2xl',
   zIndex = OVERLAY_Z.drawer,
   side = 'right',
@@ -100,21 +103,20 @@ export const Drawer: React.FC<DrawerProps> = ({
           {showHeader ? (
             <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
               <div>
-                <span className="label-uppercase">{t('common.detailView')}</span>
-                <h2 id={titleId} className="mt-1 text-lg font-semibold text-foreground">{title}</h2>
+                {eyebrow ? <span className="label-uppercase">{eyebrow}</span> : null}
+                <h2 id={titleId} className={cn('text-lg font-semibold text-foreground', eyebrow && 'mt-1')}>{title}</h2>
                 {description ? (
                   <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
                 ) : null}
               </div>
-              <button
-                type="button"
+              <IconButton
                 onClick={handleClose}
                 disabled={closeDisabled}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label={t('common.closeDrawer')}
+                tooltip={false}
               >
                 <X className="h-5 w-5" aria-hidden="true" />
-              </button>
+              </IconButton>
             </div>
           ) : (
             <>

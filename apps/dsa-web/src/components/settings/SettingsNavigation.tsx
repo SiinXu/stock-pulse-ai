@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { SegmentedControl, Select } from '../common';
+import { Pressable, SegmentedControl, Select } from '../common';
 import { cn } from '../../utils/cn';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import {
@@ -87,7 +87,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
 }) => (
   <nav aria-label={navLabel}>
     {/* Mobile: compact selector (short path, current section always visible). */}
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <Select
         id="settings-section-select"
         ariaLabel={navLabel}
@@ -106,7 +106,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
     </div>
 
     {/* Desktop: vertical sidebar with per-section status dots. */}
-    <ul className="hidden gap-1.5 md:flex md:flex-col">
+    <ul className="hidden gap-1.5 lg:flex lg:flex-col">
       {SETTINGS_SECTIONS.map((section) => {
         const isActive = section.id === activeSection;
         const status = sectionStatus?.[section.id];
@@ -114,7 +114,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
         const dotLabel = statusLabel(status, language);
         return (
           <li key={section.id}>
-            <button
+            <Pressable
               type="button"
               className={cn(
                 'flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
@@ -129,7 +129,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
               {dot ? (
                 <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} role="img" aria-label={dotLabel ?? undefined} />
               ) : null}
-            </button>
+            </Pressable>
           </li>
         );
       })}

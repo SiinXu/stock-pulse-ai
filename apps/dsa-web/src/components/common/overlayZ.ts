@@ -1,9 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import type { CSSProperties } from 'react';
 // Single source of truth for overlay stacking order. Higher sits closer to the
-// user. Components that set z-index dynamically (the shared Drawer, run-flow and
-// report drawers, ConfirmDialog) import from here; the remaining overlays use
-// matching Tailwind classes, documented below so the whole scale stays legible:
+// user. Shared overlays read this scale through OVERLAY_Z or getOverlayStyle;
+// page-owned compatibility surfaces migrate in their target Batch.
 //
 //   pageDrawer   40   Home/Chat mobile history sidebars
 //   drawer       50   shared Drawer default
@@ -14,6 +14,7 @@
 //   dropdown     100  Select / autocomplete popovers
 //   tooltip      120  Tooltip / menus
 //   settingsModal 140 Settings help modal
+//   toast        160  global transient feedback
 //   confirm      200  ConfirmDialog — always above every dismissible surface
 export const OVERLAY_Z = {
   pageDrawer: 40,
@@ -25,5 +26,15 @@ export const OVERLAY_Z = {
   dropdown: 100,
   tooltip: 120,
   settingsModal: 140,
+  toast: 160,
   confirm: 200,
 } as const;
+
+export type OverlayLayer = keyof typeof OVERLAY_Z;
+
+export function getOverlayStyle(
+  layer: OverlayLayer,
+  style?: CSSProperties,
+): CSSProperties {
+  return { ...style, zIndex: OVERLAY_Z[layer] };
+}

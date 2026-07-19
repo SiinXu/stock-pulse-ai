@@ -375,6 +375,34 @@ describe('PortfolioPage FX refresh', () => {
     expect(getRisk).toHaveBeenCalledWith({ accountId: undefined, costMethod: 'fifo', includeRealtime: false });
   });
 
+  it('shows one account setup state without zero metrics or a positions table', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([]));
+
+    render(<PortfolioPage />);
+
+    expect(await screen.findByText('还没有可用账户，请先创建账户后再录入交易或导入 CSV。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '添加账户' })).toBeInTheDocument();
+    expect(screen.queryByText('总权益')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('links the required account-name error and focuses the first invalid field', async () => {
+    getAccounts.mockResolvedValueOnce(makeAccounts([]));
+    render(<PortfolioPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加账户' }));
+    const dialog = screen.getByRole('dialog', { name: '新建账户' });
+    const nameInput = within(dialog).getByRole('textbox', { name: '账户名称' });
+    const submit = within(dialog).getByRole('button', { name: '新建账户' });
+    expect(submit).toHaveAttribute('form', 'portfolio-create-account-form');
+    fireEvent.submit(document.getElementById('portfolio-create-account-form')!);
+
+    const error = await within(dialog).findByRole('alert');
+    expect(error).toHaveTextContent('账户名称不能为空。');
+    expect(nameInput).toHaveAttribute('aria-describedby', error.id);
+    await waitFor(() => expect(nameInput).toHaveFocus());
+  });
+
   it('does not synthesize broker options when the broker catalog is empty', async () => {
     listImportBrokers.mockResolvedValueOnce({ brokers: [] });
 
@@ -1255,7 +1283,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByLabelText('选择 CSV').closest('label')).toHaveClass('h-11');
+    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveClass('h-11', 'w-full');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));

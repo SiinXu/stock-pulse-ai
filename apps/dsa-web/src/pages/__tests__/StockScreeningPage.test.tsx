@@ -179,13 +179,14 @@ describe('StockScreeningPage', () => {
     render(<StockScreeningPage />);
 
     expect(await screen.findByText('选股未开启')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /运行选股/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('选股结果')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '开启 AlphaSift' }));
 
     await waitFor(() => expect(getAlphaSiftStatus).toHaveBeenCalledTimes(2));
     expect(screen.getByText('选股未开启')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /运行选股/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /运行选股/ })).not.toBeInTheDocument();
     expect(screen.getByText(/适配层当前不可用/)).toBeInTheDocument();
     expect(screen.getByText('请求未能完成，请稍后重试。')).toBeInTheDocument();
     expect(screen.queryByText(/pip install -r requirements\.txt/)).not.toBeInTheDocument();

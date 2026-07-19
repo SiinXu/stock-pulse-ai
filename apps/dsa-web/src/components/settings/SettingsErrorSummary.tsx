@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { InlineAlert } from '../common';
+import { InlineAlert, Pressable } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
@@ -52,7 +52,7 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
         <ul className="mt-1 space-y-1.5">
           {entries.map((entry) => (
             <li key={entry.key}>
-              <button
+              <Pressable
                 type="button"
                 onClick={() => onJump(entry)}
                 aria-label={`${jumpHint}: ${entry.label}`}
@@ -60,7 +60,7 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
               >
                 <span className="text-sm font-medium underline-offset-2 group-hover:underline">{entry.label}</span>
                 <span className="text-xs opacity-80">{entry.message}</span>
-              </button>
+              </Pressable>
             </li>
           ))}
         </ul>

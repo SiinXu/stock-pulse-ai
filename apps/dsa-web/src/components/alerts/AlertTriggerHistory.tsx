@@ -1,6 +1,6 @@
 import type React from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
-import { Badge, Button, Card, EmptyState, Loading, Pagination } from '../common';
+import { Badge, Button, Card, DataTable, Pagination, StatePanel, type DataTableColumn } from '../common';
 import type { AlertTriggerItem } from '../../types/alerts';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -65,6 +65,68 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
   const text = ALERT_TRIGGER_TEXT[language];
   const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const columns: DataTableColumn<AlertTriggerItem>[] = [
+    {
+      id: 'status',
+      header: text.status,
+      cell: (trigger) => (
+        <Badge variant={statusVariant(trigger.status)}>
+          {text.statuses[trigger.status as keyof typeof text.statuses] ?? trigger.status}
+        </Badge>
+      ),
+      priority: 'primary',
+      cellClassName: 'align-top',
+    },
+    {
+      id: 'phaseQuality',
+      header: text.phaseQuality,
+      cell: (trigger) => renderPhaseQuality(trigger, language),
+      priority: 'secondary',
+      cellClassName: 'align-top',
+    },
+    {
+      id: 'target',
+      header: text.target,
+      cell: (trigger) => trigger.target,
+      priority: 'primary',
+      cellClassName: 'align-top font-mono text-secondary-text',
+    },
+    {
+      id: 'observed',
+      header: text.observed,
+      cell: (trigger) => formatNullable(trigger.observedValue),
+      priority: 'primary',
+      cellClassName: 'align-top text-secondary-text',
+    },
+    {
+      id: 'threshold',
+      header: text.threshold,
+      cell: (trigger) => formatNullable(trigger.threshold),
+      priority: 'secondary',
+      cellClassName: 'align-top text-secondary-text',
+    },
+    {
+      id: 'dataSource',
+      header: text.dataSource,
+      cell: (trigger) => formatNullable(trigger.dataSource),
+      priority: 'tertiary',
+      cellClassName: 'align-top text-secondary-text',
+    },
+    {
+      id: 'dataTime',
+      header: text.dataTime,
+      cell: (trigger) => formatUiDateTime(trigger.dataTimestamp ?? trigger.triggeredAt, language, { dateStyle: 'medium', timeStyle: 'short' }),
+      priority: 'tertiary',
+      cellClassName: 'align-top text-xs text-secondary-text',
+    },
+    {
+      id: 'reason',
+      header: text.reason,
+      cell: (trigger) => trigger.reason || trigger.diagnostics || '--',
+      priority: 'primary',
+      cellClassName: 'align-top text-secondary-text',
+    },
+  ];
   return (
     <Card title={text.title} subtitle={text.subtitle} variant="bordered" padding="md">
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
@@ -82,54 +144,23 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
           </Button>
         ) : null}
       </div>
-      {isLoading ? <Loading label={text.loading} /> : null}
-      {!isLoading && triggers.length === 0 ? (
-        <EmptyState
-          icon={<Activity className="h-6 w-6" />}
-          title={text.emptyTitle}
-          description={text.emptyDescription}
-        />
-      ) : null}
-      {!isLoading && triggers.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-216 text-left text-sm">
-            <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
-              <tr>
-                <th className="px-3 py-2 font-medium">{text.status}</th>
-                <th className="px-3 py-2 font-medium">{text.phaseQuality}</th>
-                <th className="px-3 py-2 font-medium">{text.target}</th>
-                <th className="px-3 py-2 font-medium">{text.observed}</th>
-                <th className="px-3 py-2 font-medium">{text.threshold}</th>
-                <th className="px-3 py-2 font-medium">{text.dataSource}</th>
-                <th className="px-3 py-2 font-medium">{text.dataTime}</th>
-                <th className="px-3 py-2 font-medium">{text.reason}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {triggers.map((trigger) => (
-                <tr key={trigger.id} className="align-top">
-                  <td className="px-3 py-3">
-                    <Badge variant={statusVariant(trigger.status)}>
-                      {text.statuses[trigger.status as keyof typeof text.statuses] ?? trigger.status}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-3">{renderPhaseQuality(trigger, language)}</td>
-                  <td className="px-3 py-3 font-mono text-secondary-text">{trigger.target}</td>
-                  <td className="px-3 py-3 text-secondary-text">{formatNullable(trigger.observedValue)}</td>
-                  <td className="px-3 py-3 text-secondary-text">{formatNullable(trigger.threshold)}</td>
-                  <td className="px-3 py-3 text-secondary-text">{formatNullable(trigger.dataSource)}</td>
-                  <td className="px-3 py-3 text-xs text-secondary-text">
-                    {formatUiDateTime(trigger.dataTimestamp ?? trigger.triggeredAt, language, { dateStyle: 'medium', timeStyle: 'short' })}
-                  </td>
-                  <td className="px-3 py-3 text-secondary-text">
-                    {trigger.reason || trigger.diagnostics || '--'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+      <DataTable
+        ariaLabel={text.title}
+        columns={columns}
+        rows={triggers}
+        getRowKey={(trigger) => trigger.id}
+        isLoading={isLoading}
+        loadingLabel={text.loading}
+        minWidthClassName="min-w-[36rem] lg:min-w-216"
+        rowClassName="align-top"
+        emptyState={(
+          <StatePanel status="empty"
+            icon={<Activity className="h-6 w-6" />}
+            title={text.emptyTitle}
+            description={text.emptyDescription}
+          />
+        )}
+      />
       {onPageChange ? (
         <Pagination
           currentPage={page}

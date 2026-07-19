@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, Select, Input } from '../common';
+import { Badge, Button, Select, Input, Textarea, TimePicker } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -102,7 +102,6 @@ function renderFieldControl(
   enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
-  const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
   const optionValues = (schema?.options ?? []).map((option) => (
@@ -195,14 +194,28 @@ function renderFieldControl(
 
   if (controlType === 'textarea') {
     return (
-      <textarea
+      <Textarea
         id={controlId}
         aria-invalid={hasError || undefined}
         aria-describedby={ariaDescribedBy}
-        className={cn(commonClass, 'min-h-24 resize-y py-2', hasError && 'border-danger')}
+        className="min-h-24 resize-y"
         value={value}
         disabled={disabled || !schema?.isEditable}
         onChange={(event) => onChange(event.target.value)}
+      />
+    );
+  }
+
+  if (controlType === 'time') {
+    return (
+      <TimePicker
+        id={controlId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled || !schema?.isEditable}
+        className="w-full md:ml-auto"
+        aria-invalid={hasError || undefined}
+        aria-describedby={ariaDescribedBy}
       />
     );
   }
@@ -238,7 +251,7 @@ function renderFieldControl(
               </div>
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="secondary"
                 size="lg"
                 className="px-3 text-muted-text shadow-none hover:text-danger"
                 aria-label={t('settings.fieldDelete')}
@@ -256,7 +269,7 @@ function renderFieldControl(
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="settings-secondary"
+              variant="secondary"
               size="sm"
               className="text-xs shadow-none"
               disabled={disabled || !schema?.isEditable}
@@ -286,7 +299,7 @@ function renderFieldControl(
     );
   }
 
-  const inputType = controlType === 'number' ? 'number' : controlType === 'time' ? 'time' : 'text';
+  const inputType = controlType === 'number' ? 'number' : 'text';
   const validation = (schema?.validation ?? {}) as Record<string, unknown>;
   const numberProps = controlType === 'number'
     ? {
@@ -297,39 +310,29 @@ function renderFieldControl(
     : {};
 
   const unit = schema?.unit?.trim() || null;
-  const input = (
-    <input
+  return (
+    <Input
       id={controlId}
       type={inputType}
       aria-invalid={hasError || undefined}
       aria-describedby={ariaDescribedBy}
       className={cn(
-        commonClass,
         'block h-9 md:ml-auto md:w-full',
-        inputType === 'number' && unit ? 'pr-8' : '',
-        hasError && 'border-danger',
+        inputType === 'number' && unit && 'pr-8',
       )}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
+      trailingAction={unit ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none pr-3 text-xs text-muted-text"
+        >
+          {unit}
+        </span>
+      ) : undefined}
       {...numberProps}
     />
-  );
-
-  if (!unit) {
-    return input;
-  }
-
-  return (
-    <div className="relative w-full md:ml-auto">
-      {input}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-text"
-      >
-        {unit}
-      </span>
-    </div>
   );
 }
 

@@ -5,14 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { Checkbox } from '../Checkbox';
 
 describe('Checkbox', () => {
-  it('renders the 20px visual inside the 24px associated control target', () => {
+  it('renders the 20px visual inside a 44px associated control target', () => {
     const onChange = vi.fn();
     render(<Checkbox label="Enable alerts" onChange={onChange} />);
 
     const checkbox = screen.getByRole('checkbox', { name: 'Enable alerts' });
     const hitTarget = checkbox.closest('label');
 
-    expect(hitTarget).toHaveClass('min-h-6', 'min-w-6');
+    expect(hitTarget).toHaveClass('min-h-11', 'min-w-11');
     expect(checkbox).toHaveClass('h-6', 'w-6');
     expect(checkbox.nextElementSibling).toHaveClass('inset-0.5');
 
@@ -25,8 +25,8 @@ describe('Checkbox', () => {
     render(<Checkbox aria-label="Select row" />);
 
     expect(screen.getByRole('checkbox', { name: 'Select row' }).closest('label')).toHaveClass(
-      'min-h-6',
-      'min-w-6'
+      'min-h-11',
+      'min-w-11'
     );
   });
 

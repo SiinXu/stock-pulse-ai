@@ -1,8 +1,8 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
-import { Trash2 } from 'lucide-react';
-import { Badge, Button, Checkbox, ConfirmDialog, InlineAlert, ScrollArea } from '../common';
-import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
+import { Folder, History, Trash2 } from 'lucide-react';
+import { Badge, Button, Checkbox, ConfirmDialog, InlineAlert, ScrollArea, StatePanel } from '../common';
+import { DashboardPanelHeader } from '../dashboard';
 import { StockBarItemComponent } from './StockBarItem';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -110,7 +110,7 @@ export const StockBar: React.FC<StockBarProps> = ({
     <aside className={`glass-card overflow-hidden flex flex-col ${className}`}>
       <ScrollArea
         viewportClassName="p-4"
-        testId="home-stock-bar-scroll"
+        testId="history-stock-bar-scroll"
       >
         <div className="mb-4 space-y-3">
           <DashboardPanelHeader
@@ -118,9 +118,7 @@ export const StockBar: React.FC<StockBarProps> = ({
             title={t('stockBar.title')}
             titleClassName="text-sm font-medium"
             leading={(
-              <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
+              <Folder className="h-4 w-4 text-primary" aria-hidden="true" />
             )}
             headingClassName="items-center"
             actions={
@@ -167,19 +165,16 @@ export const StockBar: React.FC<StockBarProps> = ({
         </div>
 
         {isLoading ? (
-          <DashboardStateBlock
-            loading
+          <StatePanel status="loading"
             compact
             title={t('stockBar.loading')}
           />
         ) : items.length === 0 ? (
-          <DashboardStateBlock
+          <StatePanel status="empty"
             title={t('stockBar.emptyTitle')}
             description={t('stockBar.emptyDescription')}
             icon={(
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <History className="h-5 w-5" aria-hidden="true" />
             )}
           />
         ) : (
@@ -198,7 +193,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                       onChange={() => toggleCode(code)}
                       disabled={isDeleting}
                       aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
-                      containerClassName="h-11 w-11 shrink-0 justify-center self-center"
+                      containerClassName="h-11 w-11 shrink-0 justify-start self-center"
                     />
                   )}
                   <StockBarItemComponent

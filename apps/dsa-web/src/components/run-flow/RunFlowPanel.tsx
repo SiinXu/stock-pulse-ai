@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw, Workflow } from 'lucide-react';
-import { Button, EmptyState, InlineAlert } from '../common';
+import { Button, InlineAlert, StatePanel } from '../common';
 import type { ParsedApiError } from '../../api/error';
 import { useRunFlowSnapshot } from '../../hooks/useRunFlowSnapshot';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -124,11 +124,13 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
 
   if (isLoading && !snapshot) {
     return (
-      <div className="flex min-h-[22rem] flex-col items-center justify-center text-center" data-testid="run-flow-panel-loading">
-        <div className="home-spinner h-10 w-10 animate-spin border-[3px]" aria-hidden="true" />
-        <h3 className="mt-4 text-base font-semibold text-foreground">{t('runFlow.loadingTitle')}</h3>
-        <p className="mt-2 max-w-sm text-sm text-secondary-text">{t('runFlow.loadingDescription')}</p>
-      </div>
+      <StatePanel
+        status="loading"
+        title={t('runFlow.loadingTitle')}
+        description={t('runFlow.loadingDescription')}
+        className="min-h-[22rem]"
+        data-testid="run-flow-panel-loading"
+      />
     );
   }
 
@@ -151,11 +153,10 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
 
   if (!snapshot) {
     return (
-      <EmptyState
+      <StatePanel status="empty"
         title={t('runFlow.emptyTitle')}
         description={t('runFlow.emptyDescription')}
         icon={<Workflow className="h-6 w-6" aria-hidden="true" />}
-        className="border-dashed"
       />
     );
   }
@@ -187,11 +188,10 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
       <RunFlowSummaryBar snapshot={snapshot} />
 
       {!hasDetails ? (
-        <EmptyState
+        <StatePanel status="empty"
           title={t('runFlow.emptySnapshotTitle')}
           description={t('runFlow.emptySnapshotDescription')}
           icon={<AlertCircle className="h-6 w-6" aria-hidden="true" />}
-          className="border-dashed"
         />
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_19.25rem]" data-testid="run-flow-layout">

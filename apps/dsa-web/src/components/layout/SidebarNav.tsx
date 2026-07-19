@@ -7,6 +7,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { Pressable } from '../common/Pressable';
 import { StatusDot } from '../common/StatusDot';
 import { SidebarProfile } from './SidebarProfile';
 
@@ -76,14 +77,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
               <BarChart3 className="size-4.5" />
             </div>
             {onToggleCollapse ? (
-              <button
+              <Pressable
                 type="button"
                 onClick={onToggleCollapse}
                 aria-label={t('layout.expandSidebar')}
                 className="absolute inset-0 flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-secondary-text opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <PanelRight className="size-4.5" />
-              </button>
+              </Pressable>
             ) : null}
           </div>
         </div>
@@ -92,32 +93,32 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
             <BarChart3 className="size-4.5" />
           </div>
-          <p className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-foreground">StockPulse</p>
+          <p className="min-w-0 flex-1 truncate text-xl font-bold text-foreground">StockPulse</p>
           {onToggleCollapse ? (
-            <button
+            <Pressable
               type="button"
               onClick={onToggleCollapse}
               aria-label={t('layout.collapseSidebar')}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground"
             >
               <PanelLeft className="size-4.5" />
-            </button>
+            </Pressable>
           ) : null}
         </div>
       )}
 
       {collapsed ? (
-        <button
+        <Pressable
           type="button"
           onClick={openSearch}
           aria-label={t('layout.search')}
           className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
         >
           <Search className="h-4 w-4" />
-        </button>
+        </Pressable>
       ) : (
         <>
-          <button
+          <Pressable
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
@@ -127,8 +128,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
               <Search className="h-4 w-4" />
               {t('layout.search')}
             </span>
-          </button>
-          <div className="mb-3 border-t border-dashed border-border" />
+          </Pressable>
+          <div className="mb-3 border-t border-border" />
         </>
       )}
 
@@ -175,7 +176,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
       <SidebarProfile collapsed={collapsed} />
 
       {authEnabled ? (
-        <button
+        <Pressable
           type="button"
           onClick={() => setShowLogoutConfirm(true)}
           aria-label={collapsed ? t('layout.logout') : undefined}
@@ -186,7 +187,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         >
           <LogOut className={itemIconClass} />
           {!collapsed ? <span className={itemLabelClass}>{t('layout.logout')}</span> : null}
-        </button>
+        </Pressable>
       ) : null}
 
       <ConfirmDialog
