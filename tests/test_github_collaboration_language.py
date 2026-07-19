@@ -115,6 +115,18 @@ def test_pr_review_escapes_dynamic_step_summary_paths() -> None:
     assert 'printf \'%s\\n\' "$COMPILE_OUTPUT" | escape_dynamic_text' in workflow
 
 
+def test_pr_review_python_checks_ignore_deleted_files() -> None:
+    workflow = (GITHUB_DIR / "workflows" / "pr-review.yml").read_text(encoding="utf-8")
+    changed_files_command = next(
+        line.strip()
+        for line in workflow.splitlines()
+        if line.strip().startswith("CHANGED_FILES=$(git diff")
+    )
+
+    assert "--diff-filter=ACMRT" in changed_files_command
+    assert "-- '*.py'" in changed_files_command
+
+
 def test_ai_review_falls_back_when_provider_returns_han(monkeypatch) -> None:
     ai_review = _load_ai_review_module()
     monkeypatch.setattr(ai_review, "get_pr_context", lambda: ("", ""))

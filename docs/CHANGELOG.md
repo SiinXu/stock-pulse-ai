@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] PR Review 静态检查只对仍存在的新增、修改、重命名或类型变更 Python 文件运行 Flake8，删除 Python 文件的 PR 不再因不存在路径被误判为代码质量失败；已删除文件仍保留在完整 diff 与自动审查范围内。
 - [chore] Agent Runtime 完整执行 `Native Only` 裁决：删除休眠的 PydanticAI Adapter、toolset、可选依赖、内部注入点、cross-runtime 测试与专用 CI；保留 vendor-neutral Contract、Native Adapter、BoundToolSession、生命周期、事件、sanitizer 和 36 个 replay fixture，并将 API key、带凭据 URL、Bearer token 脱敏及 300 字符诊断上限迁入 Native 异常回归。
 - [修复] DecisionSignal 新增 canonical `presentation` 视图模型，以 `action` 统一动作方向，并集中提供本地化标签、置信度、摘要、风险和时间戳；API、通知、Web 卡片/详情/时间线、主报告动作卡、历史 badge 与组合风险不再分别信任可能冲突的 `action_label`、`operation_advice` 或平铺展示字段，状态 metadata 替换会保留正式语言 provenance，旧字段继续保留用于兼容。
 - [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
