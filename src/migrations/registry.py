@@ -19,6 +19,9 @@ from src.migrations.versions.v202607190001_llm_usage_telemetry_columns import (
 from src.migrations.versions.v202607190002_decision_signal_profile_schema import (
     MIGRATION as DECISION_SIGNAL_PROFILE_MIGRATION,
 )
+from src.migrations.versions.v202607190003_portfolio_idempotency_scope_schema import (
+    MIGRATION as PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -27,6 +30,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         REGISTRY_METADATA_MIGRATION,
         LLM_USAGE_TELEMETRY_MIGRATION,
         DECISION_SIGNAL_PROFILE_MIGRATION,
+        PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     )
 )
 

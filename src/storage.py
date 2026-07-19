@@ -73,7 +73,6 @@ from src.migrations.runner import (
     preflight_existing,
 )
 from src.migrations.types import MigrationError
-from src.portfolio_idempotency import build_portfolio_idempotency_storage_id
 from src.utils.sanitize import log_safe_exception
 from src.utils.sniper_points import extract_sniper_points, parse_sniper_value
 
@@ -1280,7 +1279,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     # runner apply pending migrations inside this same transaction
                     # before the baseline is proven and committed.
                     Base.metadata.create_all(connection)
-                    self._ensure_portfolio_idempotency_scope_schema()
                     self._ensure_intelligence_item_scope_values()
                     self._ensure_intelligence_items_unique_index()
                     self._ensure_schema_migration_record(
@@ -1646,151 +1644,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 connection.execute(
                     DatabaseSchemaMigration.__table__.insert().values(**values)
                 )
-
-    def _ensure_portfolio_idempotency_scope_schema(self) -> None:
-        """Add scoped idempotency columns to existing SQLite databases."""
-
-        if not self._is_sqlite_engine:
-            return
-        table_name = PortfolioIdempotencyRecord.__tablename__
-        inspector = inspect(self._schema_bind())
-        if not inspector.has_table(table_name):
-            return
-
-        existing_columns = {
-            column["name"]
-            for column in inspector.get_columns(table_name)
-        }
-        additions = {
-            "client_operation_id": "VARCHAR(128)",
-            "scope_key": "VARCHAR(64)",
-            "scope_account_id": "INTEGER",
-            "scope_owner_id": "VARCHAR(64)",
-        }
-        for column_name, column_type in additions.items():
-            if column_name in existing_columns:
-                continue
-            try:
-                with self._schema_connection() as connection:
-                    connection.exec_driver_sql(
-                        f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
-                    )
-            except OperationalError as exc:
-                if not self._is_sqlite_duplicate_column_error(exc, column_name):
-                    raise
-
-        self._backfill_portfolio_idempotency_scopes()
-        index_name = "uix_portfolio_idempotency_scope_operation"
-        expected_columns = ["operation_type", "scope_key", "client_operation_id"]
-        with self._schema_connection() as connection:
-            connection.exec_driver_sql(
-                f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} "
-                f"ON {table_name} ({', '.join(expected_columns)})"
-            )
-
-        refreshed_inspector = inspect(self._schema_bind())
-        actual_columns = {
-            column["name"]
-            for column in refreshed_inspector.get_columns(table_name)
-        }
-        missing_columns = set(additions) - actual_columns
-        if missing_columns:
-            raise RuntimeError(
-                "Portfolio idempotency scope migration did not create columns: "
-                f"{sorted(missing_columns)}"
-            )
-        indexes = {
-            index["name"]: index
-            for index in refreshed_inspector.get_indexes(table_name)
-        }
-        actual_index = indexes.get(index_name) or {}
-        if (
-            actual_index.get("column_names") != expected_columns
-            or not actual_index.get("unique")
-        ):
-            raise RuntimeError(
-                "Portfolio idempotency scope index verification failed: "
-                f"actual={actual_index}"
-            )
-        self._ensure_portfolio_legacy_idempotency_guard_trigger()
-
-    def _backfill_portfolio_idempotency_scopes(self) -> None:
-        """Preserve raw-key legacy rows without inventing historical owner scope."""
-
-        table_name = PortfolioIdempotencyRecord.__tablename__
-        with self._schema_connection() as connection:
-            rows = connection.execute(
-                text(
-                    f"SELECT id, operation_id, operation_type, "
-                    f"client_operation_id, scope_key FROM {table_name} ORDER BY id"
-                )
-            ).mappings().all()
-            for row in rows:
-                operation_id = str(row["operation_id"])
-                client_operation_id = row["client_operation_id"]
-                scope_key = row["scope_key"]
-                if client_operation_id and scope_key and operation_id == (
-                    build_portfolio_idempotency_storage_id(
-                        operation_type=str(row["operation_type"]),
-                        scope_key=str(scope_key),
-                        client_operation_id=str(client_operation_id),
-                    )
-                ):
-                    continue
-
-                # A raw operation_id cannot prove the owner at write time because
-                # portfolio ownership is mutable and has no historical audit row.
-                # Keep the record for rollback compatibility, but leave it outside
-                # the scoped lookup contract so it can never cross owner boundaries.
-                legacy_client_operation_id = str(client_operation_id or operation_id)
-                connection.execute(
-                    text(
-                        f"UPDATE {table_name} SET "
-                        "client_operation_id = :client_operation_id, "
-                        "scope_key = NULL, "
-                        "scope_account_id = NULL, "
-                        "scope_owner_id = NULL "
-                        "WHERE id = :record_id"
-                    ),
-                    {
-                        "client_operation_id": legacy_client_operation_id,
-                        "record_id": row["id"],
-                    },
-                )
-
-    def _ensure_portfolio_legacy_idempotency_guard_trigger(self) -> None:
-        """Keep reverted runtimes from duplicating a scoped v2 mutation."""
-
-        table_name = PortfolioIdempotencyRecord.__tablename__
-        trigger_name = PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER
-        with self._schema_connection() as connection:
-            connection.exec_driver_sql(
-                f"""CREATE TRIGGER IF NOT EXISTS {trigger_name}
-                BEFORE INSERT ON {table_name}
-                FOR EACH ROW
-                WHEN NEW.client_operation_id IS NULL
-                  AND NEW.scope_key IS NULL
-                  AND EXISTS (
-                    SELECT 1 FROM {table_name}
-                    WHERE client_operation_id = NEW.operation_id
-                      AND scope_key IS NOT NULL
-                  )
-                BEGIN
-                  SELECT RAISE(ABORT, 'legacy idempotency key conflicts with scoped record');
-                END"""
-            )
-            actual_trigger = connection.execute(
-                text(
-                    "SELECT name FROM sqlite_master "
-                    "WHERE type = 'trigger' AND name = :trigger_name"
-                ),
-                {"trigger_name": trigger_name},
-            ).scalar_one_or_none()
-        if actual_trigger != trigger_name:
-            raise RuntimeError(
-                "Portfolio legacy idempotency guard trigger verification failed: "
-                f"actual={actual_trigger!r}"
-            )
 
     def _ensure_intelligence_items_unique_index(self) -> None:
         if not self._is_sqlite_engine:
