@@ -106,12 +106,12 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
   ['../../pages/PortfolioPage.tsx', [
-    ...[1145, 1158, 1170, 1774, 1777].map((line) => ({
+    ...[1198, 1213, 1225, 1237, 1847, 1850].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['flex-1'],
     })),
-    ...[1605, 1642, 1686].map((line) => ({
+    ...[1678, 1715, 1759].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['w-full'],
@@ -3115,7 +3115,7 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
-    const duplicateExactCaller = `${'\n'.repeat(1144)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    const duplicateExactCaller = `${'\n'.repeat(1197)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
     expect(findProductionDesignViolations(
       '../../pages/PortfolioPage.tsx',
       duplicateExactCaller,

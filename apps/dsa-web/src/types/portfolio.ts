@@ -29,6 +29,15 @@ export interface PortfolioAccountCreateRequest {
   ownerId?: string;
 }
 
+export interface PortfolioAccountUpdateRequest {
+  name?: string;
+  broker?: string | null;
+  market?: 'cn' | 'hk' | 'us' | 'jp' | 'kr' | 'tw';
+  baseCurrency?: string;
+  ownerId?: string | null;
+  isActive?: boolean;
+}
+
 export interface PortfolioPositionItem {
   symbol: string;
   market: string;

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [新功能] Web 持仓中心支持编辑账户：选中具体账户后打开“编辑账户”，复用账户表单的编辑模式修改名称、券商、市场与基准币，经 `PUT /api/v1/portfolio/accounts/{id}` 做真更新——保持 account ID、账本/持仓与幂等关联不变，不删除重建；成功后刷新并选中该账户。后端为 last-write-wins，无单账户 GET 与乐观并发锁，记为 Non-goal。
 - [新功能] Web 告警中心支持编辑告警规则：复用现有规则表单的 edit 模式，点击规则行“编辑”后经 `GET /api/v1/alerts/rules/{id}` 拉取最新服务端值再播种（并发变更防护），保存经 `PATCH` 部分更新；保持 rule ID、启停状态与触发/冷却历史不变，成功后按当前分页刷新列表并提示，失败（如规则已被并发删除返回 404）时明确报错且不丢弃编辑内容。后端为 last-write-wins，乐观并发锁（version/etag）记为 Non-goal。
 - [新功能] Web 新增股票行情工作区 `/stocks/:stockCode`：typed client 拉取实时行情与历史 K 线，行情与历史独立加载、独立失败与重试；支持日/周/月周期（周/月由日线数据在本地聚合）与 1–365 天可调，周期与天数写入 URL 并可刷新/前进后退恢复；股票代码统一 canonical 化避免 `00700`/`HK00700`/`00700.HK` 形成不同 URL、缓存键或自选项；提供加自选、分析、手工信号入口；K 线图配套可访问明细表与区间摘要，关键数据不只存在于图表 tooltip；行情如实标注为“最新可用行情 · 抓取时间”，在无法证明实时时不宣称实时。
 - [改进] `portfolio_idempotency_records` 的 scope 列、唯一索引、legacy 数据规范化与 legacy 冲突 guard trigger 的 startup 兼容步骤转为正式 migration `202607190003_portfolio_idempotency_scope_schema`（稳定 ID + 源码 checksum，内联冻结 v2 storage-id 哈希，仅规范化未 scoped 的 legacy 行、不发明 owner scope，索引/触发器创建后校验，幂等）；移除运行时 `_ensure_portfolio_idempotency_scope_schema` / `_backfill_portfolio_idempotency_scopes` / `_ensure_portfolio_legacy_idempotency_guard_trigger` DDL/DML。guard trigger 作为持久数据库对象保护回退 runtime 的 legacy 冲突写入，不再依赖每次启动自愈重建。

@@ -3,11 +3,43 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { portfolioApi } from '../portfolio';
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
+const { post, put } = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
 
 vi.mock('../index', () => ({
-  default: { post },
+  default: { post, put },
 }));
+
+describe('portfolioApi.updateAccount', () => {
+  beforeEach(() => {
+    put.mockReset();
+  });
+
+  it('PUTs a snake_case account payload and camelCases the response', async () => {
+    put.mockResolvedValue({
+      data: { id: 7, name: 'Renamed', broker: 'IBKR', market: 'us', base_currency: 'USD', is_active: true },
+    });
+    const updated = await portfolioApi.updateAccount(7, {
+      name: 'Renamed',
+      broker: 'IBKR',
+      market: 'us',
+      baseCurrency: 'USD',
+    });
+    expect(put).toHaveBeenCalledWith('/api/v1/portfolio/accounts/7', {
+      name: 'Renamed',
+      broker: 'IBKR',
+      market: 'us',
+      base_currency: 'USD',
+    });
+    expect(updated.baseCurrency).toBe('USD');
+    expect(updated.market).toBe('us');
+  });
+
+  it('omits fields that are not provided', async () => {
+    put.mockResolvedValue({ data: { id: 7, name: 'X', market: 'cn', base_currency: 'CNY', is_active: true } });
+    await portfolioApi.updateAccount(7, { name: 'X' });
+    expect(put).toHaveBeenCalledWith('/api/v1/portfolio/accounts/7', { name: 'X' });
+  });
+});
 
 describe('portfolioApi idempotent mutations', () => {
   beforeEach(() => {
