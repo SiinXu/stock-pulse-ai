@@ -457,60 +457,64 @@ class PortfolioIdempotencyTestCase(unittest.TestCase):
         )
         self.assertEqual(self._table_count(PortfolioIdempotencyRecord), 1)
 
-    def test_reupgrade_leaves_simulated_baseline_row_unscoped(self) -> None:
+    def test_persistent_guard_trigger_blocks_conflicting_legacy_insert(self) -> None:
         operation_id = "rollback-reupgrade-1"
         request, first = self._seed_cash_operation(operation_id)
 
         with DatabaseManager.get_instance().get_session() as session:
-            session.execute(
-                text(
-                    f"DROP TRIGGER IF EXISTS "
-                    f"{PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER}"
-                )
-            )
-            session.commit()
-
-        with self.service.repo.portfolio_write_session() as session:
             scoped_record = session.execute(
                 select(PortfolioIdempotencyRecord).where(
                     PortfolioIdempotencyRecord.client_operation_id == operation_id
                 )
             ).scalar_one()
-            duplicate = self.service.repo.add_cash_ledger_in_session(
-                session=session,
-                account_id=self.account_id,
-                event_date=date(2026, 1, 1),
-                direction="in",
-                amount=1000,
-                currency="CNY",
-                note=None,
-            )
+            operation_type = scoped_record.operation_type
+            request_hash = scoped_record.request_hash
+
+        # The migration-created guard trigger persists as a database object, so a
+        # reverted runtime that writes a raw legacy key duplicating the scoped
+        # operation is blocked at the database itself, without any self-healing
+        # startup DDL re-creating the trigger.
+        with self.assertRaises(IntegrityError):
+            with DatabaseManager.get_instance().get_session() as session:
+                session.add(
+                    PortfolioIdempotencyRecord(
+                        operation_id=operation_id,
+                        operation_type=operation_type,
+                        request_hash=request_hash,
+                        response_json=json.dumps({"id": 999}),
+                        created_at=datetime.now(),
+                    )
+                )
+                session.commit()
+
+        # A non-conflicting raw legacy key is accepted and stays unscoped.
+        with DatabaseManager.get_instance().get_session() as session:
             session.add(
                 PortfolioIdempotencyRecord(
-                    operation_id=operation_id,
-                    operation_type=scoped_record.operation_type,
-                    request_hash=scoped_record.request_hash,
-                    response_json=json.dumps({"id": int(duplicate.id)}),
+                    operation_id="unrelated-legacy-key",
+                    operation_type=operation_type,
+                    request_hash=request_hash,
+                    response_json=json.dumps({"id": 1}),
                     created_at=datetime.now(),
                 )
             )
+            session.commit()
 
-        DatabaseManager.reset_instance()
-        Config.reset_instance()
-        upgraded_service = PortfolioService()
-
-        replay = upgraded_service.record_cash_ledger(**request)
+        # Idempotency replay still returns the original response.
+        replay = self.service.record_cash_ledger(**request)
         self.assertEqual(replay, first)
-        self.assertEqual(
-            upgraded_service.list_cash_ledger_events(account_id=self.account_id)["total"],
-            2,
-        )
+
         with DatabaseManager.get_instance().get_session() as session:
-            records = session.execute(
-                select(PortfolioIdempotencyRecord).order_by(
-                    PortfolioIdempotencyRecord.id.asc()
+            scoped = session.execute(
+                select(PortfolioIdempotencyRecord).where(
+                    PortfolioIdempotencyRecord.client_operation_id == operation_id
                 )
-            ).scalars().all()
+            ).scalar_one()
+            raw = session.execute(
+                select(PortfolioIdempotencyRecord).where(
+                    PortfolioIdempotencyRecord.operation_id == "unrelated-legacy-key"
+                )
+            ).scalar_one()
             trigger_name = session.execute(
                 text(
                     "SELECT name FROM sqlite_master "
@@ -519,24 +523,11 @@ class PortfolioIdempotencyTestCase(unittest.TestCase):
                 {"trigger_name": PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER},
             ).scalar_one_or_none()
 
-        scoped_record = next(
-            record
-            for record in records
-            if record.operation_id != operation_id
-            and record.client_operation_id == operation_id
-        )
-        raw_record = next(
-            record for record in records if record.operation_id == operation_id
-        )
-        self.assertIsNotNone(scoped_record.scope_key)
-        self.assertEqual(raw_record.client_operation_id, operation_id)
-        self.assertIsNone(raw_record.scope_key)
-        self.assertIsNone(raw_record.scope_account_id)
-        self.assertIsNone(raw_record.scope_owner_id)
-        self.assertEqual(
-            trigger_name,
-            PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER,
-        )
+        self.assertIsNotNone(scoped.scope_key)
+        self.assertIsNone(raw.scope_key)
+        self.assertIsNone(raw.scope_account_id)
+        self.assertIsNone(raw.scope_owner_id)
+        self.assertEqual(trigger_name, PORTFOLIO_LEGACY_IDEMPOTENCY_GUARD_TRIGGER)
 
     def test_lazy_cleanup_preserves_ledger_events_and_snapshots(self) -> None:
         self.service.record_trade(
