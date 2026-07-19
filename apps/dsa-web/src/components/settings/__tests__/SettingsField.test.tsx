@@ -436,10 +436,15 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getAllByRole('button', { name: '显示内容' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
-    const firstInput = screen.getByDisplayValue('secret-a');
-    const secondInput = screen.getByDisplayValue('secret-b');
+    const fieldTitle = getFieldTitleZh('OPENAI_API_KEYS', '');
+    const firstRowLabel = `${fieldTitle} 1`;
+    const secondRowLabel = `${fieldTitle} 2`;
+    expect(screen.getByRole('button', { name: `显示内容：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${secondRowLabel}` })).toBeInTheDocument();
+    const firstInput = screen.getByLabelText(firstRowLabel);
+    const secondInput = screen.getByLabelText(secondRowLabel);
     expect(firstInput).toHaveAttribute(
       'name',
       'stockpulse-config-openai-api-keys-1',
@@ -451,6 +456,9 @@ describe('SettingsField', () => {
     expect(firstInput).toHaveAttribute('readonly');
     expect(secondInput).toHaveAttribute('readonly');
 
+    fireEvent.click(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` }));
+    expect(screen.getByRole('textbox', { name: secondRowLabel })).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: `隐藏内容：${secondRowLabel}` })).toBeInTheDocument();
     fireEvent.focus(secondInput);
 
     expect(firstInput).not.toHaveAttribute('readonly');
