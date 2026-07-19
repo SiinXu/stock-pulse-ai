@@ -14,6 +14,7 @@ export * from './Toolbar';
 export * from './ToastViewport';
 export * from './PageHeader';
 export { Input } from './Input';
+export * from './CredentialInput';
 export * from './DatePicker';
 export * from './TimePicker';
 export * from './EyeToggleIcon';

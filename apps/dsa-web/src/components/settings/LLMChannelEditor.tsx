@@ -7,7 +7,7 @@ import type {
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Badge, Button, ConfirmDialog, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
+import { Badge, Button, ConfirmDialog, CredentialInput, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -1748,9 +1748,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <label htmlFor={apiKeyInputId} className="mb-2 block text-sm font-medium text-foreground">
                 {apiKeyLabel}
               </label>
-              <Input
+              <CredentialInput
                 id={apiKeyInputId}
-                type="password"
+                purpose="provider-secret"
                 allowTogglePassword
                 iconType="key"
                 passwordVisible={keyVisible}

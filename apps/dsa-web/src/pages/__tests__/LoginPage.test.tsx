@@ -51,7 +51,11 @@ describe('LoginPage', () => {
     expect(await screen.findByText('两次输入的密码不一致')).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
     expect(screen.getByLabelText('管理员密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-new-password');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('autocomplete', 'new-password');
     expect(screen.getByLabelText('确认密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('name', 'stockpulse-admin-new-password-confirmation');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
   });
 
   it('navigates to redirect after a successful login', async () => {
@@ -68,6 +72,8 @@ describe('LoginPage', () => {
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings', { replace: true }));
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('name', 'stockpulse-admin-current-password');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('autocomplete', 'current-password');
   });
 
   it('does not override login theme tokens inline so light mode can take effect', () => {

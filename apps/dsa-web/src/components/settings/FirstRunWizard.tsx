@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert, Input, Modal, Select } from '../common';
+import { Button, CredentialInput, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
@@ -592,9 +592,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     ? text.apiKey
                     : text.apiKeyOptional}
                 </label>
-                <Input
+                <CredentialInput
                   id="wizard-api-key"
-                  type="password"
+                  purpose="provider-secret"
                   value={apiKey}
                   onChange={(event) => handleApiKeyChange(event.target.value)}
                   placeholder={apiKeyRequired

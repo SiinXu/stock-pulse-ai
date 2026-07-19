@@ -395,6 +395,9 @@ describe('SettingsField', () => {
     const input = screen.getByLabelText('OpenAI API Key');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', issue.id);
+    expect(input).toHaveAttribute('name', 'stockpulse-config-openai-api-key');
+    expect(input).toHaveAttribute('autocomplete', 'off');
+    expect(input).toHaveAttribute('data-credential-purpose', 'configuration-secret');
     fireEvent.focus(input);
     fireEvent.change(input, {
       target: { value: 'updated-secret' },
@@ -433,6 +436,14 @@ describe('SettingsField', () => {
 
     expect(screen.getAllByRole('button', { name: '显示内容' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
+    expect(screen.getByDisplayValue('secret-a')).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-1',
+    );
+    expect(screen.getByDisplayValue('secret-b')).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-2',
+    );
   });
 
   it('allows optional select fields to be cleared when schema provides an empty option', () => {

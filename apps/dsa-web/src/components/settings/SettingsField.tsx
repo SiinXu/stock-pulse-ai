@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, Select, Input } from '../common';
+import { Badge, Button, CredentialInput, Select } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -218,8 +218,9 @@ function renderFieldControl(
           {values.map((entry, index) => (
             <div className="flex items-center gap-2" key={`${item.key}-${index}`}>
               <div className="flex-1">
-                <Input
-                  type="password"
+                <CredentialInput
+                  purpose="configuration-secret"
+                  credentialId={`${item.key}-${index + 1}`}
                   allowTogglePassword
                   iconType={iconType}
                   id={index === 0 ? controlId : `${controlId}-${index}`}
@@ -270,8 +271,9 @@ function renderFieldControl(
     }
 
     return (
-      <Input
-        type="password"
+      <CredentialInput
+        purpose="configuration-secret"
+        credentialId={item.key}
         allowTogglePassword
         iconType={iconType}
         id={controlId}
