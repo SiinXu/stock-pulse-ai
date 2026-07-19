@@ -295,7 +295,7 @@ class TestStorage(unittest.TestCase):
             Config.reset_instance()
             temp_dir.cleanup()
 
-    def test_decision_signal_profile_migration_adds_column_indexes_and_closed_stats(self):
+    def test_decision_signal_profile_migration_adds_column_indexes_and_backfills(self):
         DatabaseManager.reset_instance()
         temp_dir = tempfile.TemporaryDirectory()
         db_path = os.path.join(temp_dir.name, "legacy_decision_profile.db")
@@ -342,8 +342,7 @@ class TestStorage(unittest.TestCase):
                     ],
                 )
 
-            with self.assertLogs("src.storage", level="INFO") as logs:
-                DatabaseManager(db_url=f"sqlite:///{db_path}")
+            DatabaseManager(db_url=f"sqlite:///{db_path}")
 
             with sqlite3.connect(db_path) as conn:
                 columns = {row[1] for row in conn.execute("PRAGMA table_info(decision_signals)").fetchall()}
@@ -352,6 +351,9 @@ class TestStorage(unittest.TestCase):
                 ).fetchall()
 
             self.assertIn("decision_profile", columns)
+            # Only the single valid profile is backfilled; every adversarial
+            # metadata variant (blank, invalid JSON, non-object, unknown label,
+            # deeply nested) is safely left NULL without raising.
             self.assertEqual(rows[0], (1, "balanced"))
             self.assertTrue(all(profile is None for _, profile in rows[1:]))
 
@@ -387,30 +389,15 @@ class TestStorage(unittest.TestCase):
                 ],
             )
 
-            log_text = "\n".join(logs.output)
-            self.assertIn("candidate_count=16", log_text)
-            self.assertIn("backfilled_count=1", log_text)
-            self.assertIn("guard_skipped_count=0", log_text)
-            self.assertIn("missing_metadata_count=1", log_text)
-            self.assertIn("missing_profile_count=4", log_text)
-            self.assertIn("invalid_json_count=5", log_text)
-            self.assertIn("non_object_count=4", log_text)
-            self.assertIn("invalid_profile_count=1", log_text)
-            self.assertIn("skipped_existing_profile_count=0", log_text)
-
+            # A second initialization re-runs the registered migration as a
+            # no-op and leaves the backfilled data unchanged.
             DatabaseManager.reset_instance()
-            with self.assertLogs("src.storage", level="INFO") as second_logs:
-                DatabaseManager(db_url=f"sqlite:///{db_path}")
-            second_log_text = "\n".join(second_logs.output)
-            self.assertIn("candidate_count=15", second_log_text)
-            self.assertIn("backfilled_count=0", second_log_text)
-            self.assertIn("guard_skipped_count=0", second_log_text)
-            self.assertIn("missing_metadata_count=1", second_log_text)
-            self.assertIn("missing_profile_count=4", second_log_text)
-            self.assertIn("invalid_json_count=5", second_log_text)
-            self.assertIn("non_object_count=4", second_log_text)
-            self.assertIn("invalid_profile_count=1", second_log_text)
-            self.assertIn("skipped_existing_profile_count=1", second_log_text)
+            DatabaseManager(db_url=f"sqlite:///{db_path}")
+            with sqlite3.connect(db_path) as conn:
+                second_rows = conn.execute(
+                    "SELECT id, decision_profile FROM decision_signals ORDER BY id"
+                ).fetchall()
+            self.assertEqual(second_rows, rows)
         finally:
             DatabaseManager.reset_instance()
             Config.reset_instance()
@@ -446,60 +433,24 @@ class TestStorage(unittest.TestCase):
                     ],
                 )
 
-            with self.assertLogs("src.storage", level="INFO") as logs:
-                DatabaseManager(db_url=f"sqlite:///{db_path}")
+            DatabaseManager(db_url=f"sqlite:///{db_path}")
 
             with sqlite3.connect(db_path) as conn:
                 profiles = conn.execute(
                     "SELECT decision_profile FROM decision_signals ORDER BY id"
                 ).fetchall()
 
+            # Rows that already carry a profile (including a blank, non-NULL
+            # value) are never overwritten; only the NULL row with a valid
+            # metadata profile is backfilled.
             self.assertEqual(
                 profiles,
                 [("aggressive",), (None,), ("conservative",), ("",)],
             )
-            log_text = "\n".join(logs.output)
-            self.assertIn("candidate_count=2", log_text)
-            self.assertIn("backfilled_count=1", log_text)
-            self.assertIn("missing_metadata_count=1", log_text)
-            self.assertIn("skipped_existing_profile_count=2", log_text)
         finally:
             DatabaseManager.reset_instance()
             Config.reset_instance()
             temp_dir.cleanup()
-
-    def test_decision_signal_profile_migration_fails_when_column_inspection_fails(self):
-        canary = "STORAGE_SCHEMA_INSPECTION_CANARY"
-        private_url = "https://admin:password@db.internal.example/data?token=private"
-
-        class BrokenInspector:
-            def has_table(self, _table_name: str) -> bool:
-                return True
-
-            def get_columns(self, _table_name: str):
-                raise RuntimeError(
-                    f"inspection failed api_key={canary} endpoint={private_url}"
-                )
-
-        DatabaseManager.reset_instance()
-        try:
-            with patch("src.storage.inspect", return_value=BrokenInspector()):
-                with self.assertLogs("src.storage", level="ERROR") as logs:
-                    with self.assertRaises(RuntimeError):
-                        DatabaseManager(db_url="sqlite:///:memory:")
-
-            log_text = "\n".join(logs.output)
-            self.assertIn("profile migration cannot continue safely", log_text)
-            self.assertIn(
-                "error_code=storage_decision_signal_profile_schema_inspection_failed",
-                log_text,
-            )
-            self.assertIn("exception_type=RuntimeError", log_text)
-            self.assertNotIn(canary, log_text)
-            self.assertNotIn(private_url, log_text)
-        finally:
-            DatabaseManager.reset_instance()
-            Config.reset_instance()
 
     def test_schema_migration_record_handles_concurrent_initialization(self):
         DatabaseManager.reset_instance()

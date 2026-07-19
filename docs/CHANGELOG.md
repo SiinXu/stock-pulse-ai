@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] `decision_signals` 的 `decision_profile` 列、profile 感知索引与从 `metadata_json` 的 legacy 回填的 startup 兼容步骤转为正式 migration `202607190002_decision_signal_profile_schema`（稳定 ID + 源码 checksum，冻结的 profile 归一化，仅回填合法 profile 且不覆盖既有值，对无效/非对象/超深 JSON 安全跳过，幂等）；移除运行时 `_ensure_decision_signal_profile_schema` / `_ensure_decision_signal_profile_indexes` / `_backfill_decision_signal_profile_from_metadata` DDL/DML。
 - [改进] `llm_usage` 遥测列的 startup 兼容 DDL 转为正式 migration `202607190001_llm_usage_telemetry_columns`（稳定 ID + 源码 checksum，legacy 缺列时幂等补列、fresh 库 no-op）；startup 改为在初始化写锁与同一事务内、baseline 证明之前有序应用 pending migration，使 create_all、兼容修复、迁移 DDL 与 baseline 校验保持原子且整体回滚，并移除运行时 `_ensure_llm_usage_telemetry_columns` DDL；`apply_pending` engine 入口仍供独立诊断按 migration 单独取锁提交。
 - [改进] Web 新增权威 `Surface`、`Section`、`StatePanel` 与 `Alert` 契约，以 L0/L1/L2/Overlay 语义层级替代默认卡片边界；组件统一拥有 live-region / busy 语义与 compact/default Alert 密度，现有 Card、空态、加载态和 API 错误通过兼容适配器收敛，Token Usage 在加载、无数据与错误时只显示一个主状态、隐藏零值指标墙，并在跨周期请求失败时不再把旧周期数据标为当前结果；AST 守卫阻止页面重新叠加背景、边框、圆角和阴影。
 - [修复] Agent Runtime 历史证据治理改为精确 fixture ID：不再按 timeout/cancelrace profile 自动扩大 conformance 例外，删除缺少双环境快照的依赖包数量结论，并将仅覆盖离线子集的 AR-PY-05 状态校准为 `Historical / Partial`；同时明确 provider-error 脱敏不能代表 prompt、reasoning、tool result、日志和其它异常失败面已完成扫描。
