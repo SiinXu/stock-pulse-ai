@@ -879,13 +879,20 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const rowTwo = page.getByRole('row').filter({ hasText: 'Rule Two' });
     await rowOne.getByRole('button', { name: '停用' }).click();
     await rowTwo.getByRole('button', { name: '停用' }).click();
-    await expect(rowOne.getByRole('button', { name: '停用中' })).toBeDisabled();
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toBeDisabled();
+    const firstToggle = rowOne.getByRole('button', { name: '停用' });
+    const secondToggle = rowTwo.getByRole('button', { name: '停用' });
+    await expect(firstToggle).toBeDisabled();
+    await expect(firstToggle).toHaveAttribute('aria-busy', 'true');
+    await expect(firstToggle).toContainText('停用中');
+    await expect(secondToggle).toBeDisabled();
+    await expect(secondToggle).toHaveAttribute('aria-busy', 'true');
+    await expect(secondToggle).toContainText('停用中');
     first.resolve();
-    await expect(rowOne.getByRole('button', { name: '停用中' })).toHaveCount(0);
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toBeDisabled();
+    await expect(rowOne.locator('button[aria-busy="true"]')).toHaveCount(0);
+    await expect(secondToggle).toBeDisabled();
+    await expect(secondToggle).toHaveAttribute('aria-busy', 'true');
     second.resolve();
-    await expect(rowTwo.getByRole('button', { name: '停用中' })).toHaveCount(0);
+    await expect(rowTwo.locator('button[aria-busy="true"]')).toHaveCount(0);
   });
 
   test('17 Portfolio timeout-after-commit retry reuses the operation ID and creates only one ledger row', async ({ page }) => {
@@ -1351,7 +1358,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(task.getByText('已完成', { exact: true })).toBeVisible({ timeout: 10_000 });
     expect(statusCalls).toBeGreaterThan(0);
     const runFlowButton = task.getByRole('button', { name: /查看.*运行流/ });
-    await expectMinimumTouchTarget(runFlowButton);
+    await expect(runFlowButton).toHaveAttribute('data-control', 'icon-button');
+    await expect(runFlowButton).toHaveAttribute('data-size', 'default');
     await runFlowButton.click();
     await expectMinimumTouchTarget(
       page.getByTestId('run-flow-node-topology_data_realtime_quote-toggle'),

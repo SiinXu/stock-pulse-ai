@@ -178,6 +178,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
           </div>
         )}
         <input
+          {...props}
           ref={setInputRef}
           id={inputId}
           aria-describedby={describedBy}
@@ -197,7 +198,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
             'disabled:cursor-not-allowed disabled:opacity-60',
             className,
           )}
-          {...props}
           type={effectiveType}
         />
         {finalTrailingAction ? (

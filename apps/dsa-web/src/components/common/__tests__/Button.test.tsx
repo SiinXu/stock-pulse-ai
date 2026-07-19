@@ -71,13 +71,14 @@ describe('Button', () => {
     expect(button).toHaveAttribute('data-variant', 'danger');
   });
 
-  it('disables the button when loading and shows loading text', () => {
+  it('keeps the action name stable while exposing busy state and loading text', () => {
     render(<Button variant="primary" isLoading loadingText="Saving">Save</Button>);
 
-    const button = screen.getByRole('button', { name: /saving/i });
+    const button = screen.getByRole('button', { name: 'Save' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByText('Saving')).toBeInTheDocument();
+    expect(button).toHaveAccessibleName('Save');
+    expect(screen.getByText('Saving')).toBeVisible();
   });
 
   it('supports the danger-subtle variant', () => {

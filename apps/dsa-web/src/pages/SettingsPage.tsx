@@ -957,7 +957,6 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                         variant="danger"
                         size="default"
                         aria-label={t('settings.schedulerRemoveTime')}
-                        title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
                         onClick={() => {
                           updateScheduleTimes(scheduleTimes.filter((_, currentIndex) => currentIndex !== index));

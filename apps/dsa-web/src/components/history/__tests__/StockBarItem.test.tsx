@@ -51,6 +51,7 @@ describe('StockBarItemComponent', () => {
     expect(deleteButton).toBeInTheDocument();
     expect(deleteButton).toHaveAttribute('data-variant', 'danger');
     expect(deleteButton).toHaveAttribute('data-size', 'default');
+    expect(deleteButton.closest('[data-testid="history-delete-target"]')).toBeInTheDocument();
     expect(openButton).not.toContainElement(deleteButton);
   });
 

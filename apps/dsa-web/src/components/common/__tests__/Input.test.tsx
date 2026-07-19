@@ -25,6 +25,22 @@ describe('Input', () => {
     );
   });
 
+  it('keeps caller data attributes from replacing its semantic contract', () => {
+    render(
+      <Input
+        aria-label="Search"
+        data-control="caller-control"
+        data-size="caller-size"
+        data-appearance="caller-appearance"
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: 'Search' });
+    expect(input).toHaveAttribute('data-control', 'input');
+    expect(input).toHaveAttribute('data-size', 'comfortable');
+    expect(input).toHaveAttribute('data-appearance', 'default');
+  });
+
   it('focuses the native control from its coarse-pointer target frame', () => {
     render(<Input aria-label="Search" />);
 

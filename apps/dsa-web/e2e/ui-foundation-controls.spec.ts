@@ -27,6 +27,9 @@ const inputHeights: Record<string, number> = {
   primary: 40,
 };
 
+const minimumCoarseTarget = 44;
+const pixelRoundingTolerance = 0.01;
+
 async function expectNoHorizontalOverflow(page: Page, label: string): Promise<void> {
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
@@ -81,8 +84,10 @@ async function expectCoarseHitTarget(locator: Locator, label: string): Promise<v
       height: Number.parseFloat(pseudo.height),
     };
   });
-  expect(target.width, `${label} coarse-pointer width`).toBeGreaterThanOrEqual(44);
-  expect(target.height, `${label} coarse-pointer height`).toBeGreaterThanOrEqual(44);
+  expect(target.width, `${label} coarse-pointer width`)
+    .toBeGreaterThanOrEqual(minimumCoarseTarget - pixelRoundingTolerance);
+  expect(target.height, `${label} coarse-pointer height`)
+    .toBeGreaterThanOrEqual(minimumCoarseTarget - pixelRoundingTolerance);
 }
 
 test.describe('coarse-pointer foundation controls', () => {
@@ -97,18 +102,100 @@ test.describe('coarse-pointer foundation controls', () => {
 
     const password = page.locator('#password');
     await expectVisibleHeights(password, inputHeights);
-    expect(await password.locator('..').evaluate((element) => element.getBoundingClientRect().height))
-      .toBeGreaterThanOrEqual(44);
+    const passwordFrame = password.locator('..');
+    expect(await passwordFrame.evaluate((element) => element.getBoundingClientRect().height))
+      .toBeGreaterThanOrEqual(minimumCoarseTarget - pixelRoundingTolerance);
 
-    const passwordToggle = page.getByRole('button', { name: '显示内容' }).first();
+    const passwordToggle = passwordFrame.getByRole('button');
+    await expect(passwordToggle).toHaveAccessibleName('显示内容');
     await expectVisibleHeights(passwordToggle, iconButtonHeights);
     await expectCoarseHitTarget(passwordToggle, 'password visibility action');
+
+    const passwordBox = await password.boundingBox();
+    const passwordFrameBox = await passwordFrame.boundingBox();
+    expect(passwordBox).not.toBeNull();
+    expect(passwordFrameBox).not.toBeNull();
+    await passwordToggle.focus();
+    const topFrameGap = passwordBox!.y - passwordFrameBox!.y;
+    const bottomFrameGap = passwordFrameBox!.y + passwordFrameBox!.height
+      - passwordBox!.y - passwordBox!.height;
+    expect(Math.max(topFrameGap, bottomFrameGap)).toBeGreaterThan(0);
+    const frameHitPoint = {
+      x: passwordBox!.x + passwordBox!.width / 2,
+      y: topFrameGap > bottomFrameGap
+        ? passwordFrameBox!.y + topFrameGap / 2
+        : passwordBox!.y + passwordBox!.height + bottomFrameGap / 2,
+    };
+    expect(await page.evaluate(({ x, y }) => {
+      const input = document.querySelector('#password');
+      return document.elementFromPoint(x, y) === input?.parentElement;
+    }, frameHitPoint)).toBe(true);
+    await page.touchscreen.tap(frameHitPoint.x, frameHitPoint.y);
+    await expect(password).toBeFocused();
+
+    const passwordToggleBox = await passwordToggle.boundingBox();
+    expect(passwordToggleBox).not.toBeNull();
+    await page.touchscreen.tap(
+      passwordToggleBox!.x + passwordToggleBox!.width / 2,
+      passwordToggleBox!.y - 2,
+    );
+    await expect(password).toHaveAttribute('type', 'text');
+    await passwordToggle.click();
+    await expect(password).toHaveAttribute('type', 'password');
 
     const submit = page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ });
     await expectVisibleHeights(submit, buttonHeights);
     await expectCoarseHitTarget(submit, 'login submit');
 
     await loginAsE2eAdmin(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const historyDelete = page.getByRole('button', { name: /删除 .*历史记录/ }).first();
+    await expect(historyDelete).toBeVisible();
+    await expectVisibleHeights(historyDelete, iconButtonHeights);
+    await expectCoarseHitTarget(historyDelete, 'history delete action');
+
+    const historyDeleteSlot = historyDelete.locator(
+      'xpath=ancestor::*[@data-testid="history-delete-target"]',
+    );
+    const historyItem = historyDeleteSlot.locator('..');
+    const historyOpen = historyItem.locator(':scope > button');
+    const historyDeleteBox = await historyDelete.boundingBox();
+    const historyDeleteSlotBox = await historyDeleteSlot.boundingBox();
+    const historyItemBox = await historyItem.boundingBox();
+    const historyOpenBox = await historyOpen.boundingBox();
+    expect(historyDeleteBox).not.toBeNull();
+    expect(historyDeleteSlotBox).not.toBeNull();
+    expect(historyItemBox).not.toBeNull();
+    expect(historyOpenBox).not.toBeNull();
+    expect(historyDeleteSlotBox!.width).toBeCloseTo(minimumCoarseTarget, 1);
+    expect(historyDeleteSlotBox!.height).toBeCloseTo(minimumCoarseTarget, 1);
+
+    const historyDeleteHitLeft = historyDeleteBox!.x + historyDeleteBox!.width / 2
+      - minimumCoarseTarget / 2;
+    const historyDeleteHitRight = historyDeleteHitLeft + minimumCoarseTarget;
+    expect(historyDeleteHitLeft).toBeGreaterThanOrEqual(
+      historyDeleteSlotBox!.x - pixelRoundingTolerance,
+    );
+    expect(historyDeleteHitRight).toBeLessThanOrEqual(
+      historyDeleteSlotBox!.x + historyDeleteSlotBox!.width + pixelRoundingTolerance,
+    );
+    expect(historyDeleteHitLeft).toBeGreaterThanOrEqual(
+      historyOpenBox!.x + historyOpenBox!.width - pixelRoundingTolerance,
+    );
+    expect(historyDeleteHitRight).toBeLessThanOrEqual(
+      historyItemBox!.x + historyItemBox!.width + pixelRoundingTolerance,
+    );
+
+    await page.touchscreen.tap(
+      historyDeleteHitLeft + 2,
+      historyDeleteBox!.y + historyDeleteBox!.height / 2,
+    );
+    const deleteDialog = page.getByRole('dialog', { name: '删除历史记录' });
+    await expect(deleteDialog).toBeVisible();
+    await deleteDialog.getByRole('button', { name: '取消' }).click();
+    await expect(deleteDialog).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/backtest');
     await expect(page.locator('[data-control="input"]:visible').first()).toBeVisible();
     await expectVisibleHeights(page.locator('[data-control="input"]:visible'), inputHeights);
