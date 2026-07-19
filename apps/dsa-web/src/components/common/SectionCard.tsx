@@ -1,7 +1,8 @@
 import type React from 'react';
-import { Card } from './Card';
+import { forwardRef } from 'react';
+import { Section } from './Section';
 
-interface SectionCardProps {
+interface SectionCardProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
@@ -9,23 +10,28 @@ interface SectionCardProps {
   className?: string;
 }
 
-export const SectionCard: React.FC<SectionCardProps> = ({
+export const SectionCard = forwardRef<HTMLElement, SectionCardProps>(({
   title,
   subtitle,
   actions,
   children,
   className = '',
-}) => {
+  ...props
+}, ref) => {
   return (
-    <Card className={className} padding="md" variant="bordered">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          {subtitle ? <span className="label-uppercase">{subtitle}</span> : null}
-          <h2 className="mt-1 text-lg font-semibold text-foreground">{title}</h2>
-        </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-      </div>
+    <Section
+      {...props}
+      ref={ref}
+      title={title}
+      eyebrow={subtitle}
+      actions={actions}
+      level="section"
+      padding="md"
+      className={className}
+    >
       {children}
-    </Card>
+    </Section>
   );
-};
+});
+
+SectionCard.displayName = 'SectionCard';

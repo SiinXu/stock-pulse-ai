@@ -2586,7 +2586,6 @@ const SettingsPage: React.FC = () => {
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
-      className="settings-surface-panel settings-border-strong border-none bg-transparent shadow-none"
     />
   );
   const activeSaveGroup = activeCategory;

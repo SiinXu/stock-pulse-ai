@@ -1825,6 +1825,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             {pendingModelRemoval ? (
               <InlineAlert
                 variant="warning"
+                size="compact"
                 title={text.cannotDeleteModel}
                 message={(
                   <div className="space-y-2">
@@ -1884,7 +1885,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     ) : null}
                   </div>
                 )}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {supportsDiscovery ? (
@@ -2032,6 +2032,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           {blockingIssues.length > 0 ? (
             <InlineAlert
               variant="warning"
+              size="compact"
               title={draft.enabled ? text.missingBeforeEnable : text.fixName}
               message={(
                 <ul className="ml-4 list-disc space-y-0.5">
@@ -2040,7 +2041,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   ))}
                 </ul>
               )}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ) : null}
           {!draft.enabled && completenessIssues.length > 0 ? (
@@ -3390,9 +3390,9 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       {schemaUnavailable ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={editorText.schemaUnavailableTitle}
           message={editorText.schemaUnavailableMessage}
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 
@@ -3473,6 +3473,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       {!draftValid ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={editorText.invalidTitle}
           message={(
             <>
@@ -3489,7 +3490,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
               </ul>
             </>
           )}
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 

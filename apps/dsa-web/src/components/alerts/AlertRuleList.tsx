@@ -90,7 +90,6 @@ interface AlertRuleListProps {
   total: number;
   page: number;
   pageSize: number;
-  className?: string;
   isLoading?: boolean;
   enabledFilter: AlertRuleEnabledFilter;
   alertTypeFilter: AlertTypeFilter;
@@ -108,7 +107,6 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   total,
   page,
   pageSize,
-  className,
   isLoading = false,
   enabledFilter,
   alertTypeFilter,
@@ -135,7 +133,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       subtitle={formatUiText(text.subtitle, { total })}
       variant="bordered"
       padding="md"
-      className={className}
+      className="flex flex-col"
     >
       <div className="mb-4 grid gap-3 md:grid-cols-2">
         <Select
