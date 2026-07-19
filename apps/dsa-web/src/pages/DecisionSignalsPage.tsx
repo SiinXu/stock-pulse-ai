@@ -1636,7 +1636,7 @@ const DecisionSignalsPage: React.FC = () => {
             </div>
           ) : (
             <EmptyState
-              className="border-none bg-transparent py-6 shadow-none"
+              compact
               title={t('decisionSignals.noReviewedStatsTitle')}
               description={t('decisionSignals.noReviewedStatsDescription')}
               icon={<BarChart3 className="h-6 w-6" />}
@@ -1654,7 +1654,7 @@ const DecisionSignalsPage: React.FC = () => {
         >
           {!activeStockContext ? (
             <EmptyState
-              className="border-none bg-transparent py-6 shadow-none"
+              compact
               title={t('decisionSignals.stockContextGuideTitle')}
               description={t('decisionSignals.stockContextGuideDescription')}
               icon={<Activity className="h-6 w-6" />}
@@ -1663,7 +1663,8 @@ const DecisionSignalsPage: React.FC = () => {
           {latestError ? <ApiErrorAlert className="mt-3" error={latestError} /> : null}
           {latestSearched && !latestLoading && !latestError && latestItems.length === 0 ? (
             <EmptyState
-              className="mt-4 border-none bg-transparent py-6 shadow-none"
+              compact
+              className="mt-4"
               title={t('decisionSignals.noLatestTitle')}
               description={t('decisionSignals.noLatestDescription')}
               icon={<Activity className="h-6 w-6" />}
@@ -1756,7 +1757,7 @@ const DecisionSignalsPage: React.FC = () => {
           <div className="mt-4">
             {!timelineSearched ? (
               <EmptyState
-                className="border-none bg-transparent py-6 shadow-none"
+                compact
                 title={activeStockContext ? t('decisionSignals.timelineGuideTitle') : t('decisionSignals.stockContextGuideTitle')}
                 description={activeStockContext ? t('decisionSignals.timelineGuideDescription') : t('decisionSignals.stockContextGuideDescription')}
                 icon={<Activity className="h-6 w-6" />}

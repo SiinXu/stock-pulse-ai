@@ -1,27 +1,36 @@
 import type React from 'react';
-import { cn } from '../../utils/cn';
+import { forwardRef } from 'react';
+import { StatePanel } from './StatePanel';
 
-interface EmptyStateProps {
+export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   title: string;
   description?: string;
   icon?: React.ReactNode;
   action?: React.ReactNode;
-  className?: string;
+  compact?: boolean;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({
+export const EmptyState = forwardRef<HTMLElement, EmptyStateProps>(({
   title,
   description,
   icon,
   action,
   className = '',
-}) => {
-  return (
-    <div className={cn('rounded-xl border border-dashed border-border/60 bg-card/50 px-6 py-10 text-center shadow-soft-card', className)}>
-      {icon ? <div className="mb-4 flex justify-center text-primary">{icon}</div> : null}
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
-      {description ? <p className="mx-auto mt-2 max-w-md text-sm text-secondary-text">{description}</p> : null}
-      {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
-    </div>
-  );
-};
+  compact = false,
+  ...props
+}, ref) => (
+  <StatePanel
+    {...props}
+    ref={ref}
+    state="empty"
+    title={title}
+    titleAs="h3"
+    description={description}
+    icon={icon}
+    action={action}
+    size={compact ? 'compact' : 'default'}
+    className={className}
+  />
+));
+
+EmptyState.displayName = 'EmptyState';
