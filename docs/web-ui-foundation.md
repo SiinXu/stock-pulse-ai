@@ -46,10 +46,11 @@ come from the existing i18n resources.
 
 Pages must not add background, border, radius, ring, or shadow utilities to
 `Surface`, `Section`, `StatePanel`, `Alert`, `EmptyState`, or
-`DashboardStateBlock`. Layout-only classes such as grid placement and maximum
-width remain valid. A normal page should expose no more than two visible
-surface boundaries; headings, rows, whitespace, and dividers group content
-inside a section.
+`DashboardStateBlock`. This includes arbitrary-property utilities and inline
+`background`, `border`, `borderRadius`, or `boxShadow` styles. Layout-only
+classes such as grid placement and maximum width remain valid. A normal page
+should expose no more than two visible surface boundaries; headings, rows,
+whitespace, and dividers group content inside a section.
 
 `Card` remains a compatibility adapter while domain pages migrate. Its
 `default` variant maps to the borderless `section` level; `bordered` and
@@ -137,9 +138,11 @@ The AST-backed production design guard checks:
 - Primary CTA gradient/shimmer rules already enforced by the repository.
 - The complete `Surface` level style map, including borderless L0/L1,
   border-only L2, and shared-shadow Overlay invariants.
-- Direct, aliased, and namespaced state-surface callers, rejecting caller-owned
-  backgrounds, borders, radii, rings, shadows, named card classes, and dynamic
-  visual overrides.
+- Direct, aliased, and namespaced state-surface callers and compatibility
+  adapter internals, rejecting caller-owned backgrounds, borders, radii, rings,
+  shadows, named card classes, inline visual styles, arbitrary-property
+  utilities, and dynamic visual overrides. Required adapter forwarding uses
+  exact call-site exceptions with a deletion work item.
 
 Temporary override exceptions record both exact tokens and their removal work
 item:

@@ -159,6 +159,10 @@ describe('legacy surface and state adapters', () => {
     expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'interactive');
     expect(screen.getByTestId('card')).not.toHaveClass('terminal-card', 'gradient-border-card');
 
+    rerender(<Card data-testid="card" hoverable>Card content</Card>);
+    expect(screen.getByTestId('card')).toHaveClass('cursor-pointer');
+    expect(screen.getByTestId('card')).not.toHaveClass('terminal-card-hover');
+
     rerender(<EmptyState title="Nothing here" />);
     expect(screen.getByText('Nothing here').closest('[data-state-panel]')).toHaveAttribute('data-state-panel', 'empty');
 
