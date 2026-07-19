@@ -43,24 +43,26 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
       ) : null}
     </>
   );
-  const alertProps = {
-    tone: 'danger',
-    urgent: true,
-    title: localizedError.title,
-    className,
-    action,
-  } as const;
-
   return onDismiss ? (
     <Alert
-      {...alertProps}
+      tone="danger"
+      urgent
+      title={localizedError.title}
+      className={className}
+      action={action}
       dismissLabel={dismissLabel ?? t('common.close')}
       onDismiss={onDismiss}
     >
       {content}
     </Alert>
   ) : (
-    <Alert {...alertProps}>
+    <Alert
+      tone="danger"
+      urgent
+      title={localizedError.title}
+      className={className}
+      action={action}
+    >
       {content}
     </Alert>
   );

@@ -1017,20 +1017,6 @@ a {
   color: inherit;
 }
 
-.terminal-card-hover {
-  --terminal-card-border-hover: var(--border-hover);
-  --terminal-card-shadow-hover: var(--shadow-soft-card-strong);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.terminal-card-hover:hover {
-  border-color: var(--terminal-card-border-hover);
-  box-shadow: var(--terminal-card-shadow-hover);
-}
-
 .glass-card {
   position: relative;
   overflow: hidden;
@@ -1038,11 +1024,6 @@ a {
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
   box-shadow: var(--shadow-soft-card);
-}
-
-.home-panel-card {
-  --terminal-card-border-hover: var(--home-panel-border-hover);
-  --terminal-card-shadow-hover: var(--home-panel-shadow-hover);
 }
 
 .dashboard-card {
