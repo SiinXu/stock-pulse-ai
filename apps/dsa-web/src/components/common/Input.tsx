@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { Lock, Key } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { getUiColon } from '../../utils/uiLocale';
 import { EyeToggleIcon } from './EyeToggleIcon';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -20,6 +21,8 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   passwordVisible?: boolean;
   /** Notifies the parent when visibility changes in controlled mode. */
   onPasswordVisibleChange?: (visible: boolean) => void;
+  /** Adds field or row context to the password visibility action. */
+  passwordToggleLabel?: string;
 }
 
 export const Input = ({ 
@@ -34,9 +37,10 @@ export const Input = ({
   iconType = 'none',
   passwordVisible,
   onPasswordVisibleChange,
+  passwordToggleLabel,
   ...props 
 }: InputProps) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const generatedId = useId();
   const inputId = id ?? props.name ?? generatedId;
   const hintId = hint ? `${inputId}-hint` : undefined;
@@ -83,6 +87,10 @@ export const Input = ({
       ['--input-surface-focus-ring' as string]: '0 0 0 4px hsla(var(--destructive), 0.1)',
     }
     : props.style;
+  const passwordToggleAction = visible ? t('common.hideContent') : t('common.showContent');
+  const passwordToggleAriaLabel = passwordToggleLabel
+    ? `${passwordToggleAction}${getUiColon(language)}${passwordToggleLabel}`
+    : passwordToggleAction;
 
   const defaultTrailingAction = isPasswordInput && allowTogglePassword ? (
     <button
@@ -104,7 +112,7 @@ export const Input = ({
         }
         onPasswordVisibleChange?.(nextVisible);
       }}
-      aria-label={visible ? t('common.hideContent') : t('common.showContent')}
+      aria-label={passwordToggleAriaLabel}
     >
       <EyeToggleIcon visible={visible} />
     </button>

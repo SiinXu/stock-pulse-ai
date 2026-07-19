@@ -4,7 +4,7 @@ import type { ParsedApiError } from '../../api/error';
 import { isParsedApiError } from '../../api/error';
 import { useAuth } from '../../hooks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { Button, Input } from '../common';
+import { Button, CredentialInput } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
@@ -66,9 +66,9 @@ export const ChangePasswordCard: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
-            <Input
+            <CredentialInput
               id="change-pass-current"
-              type="password"
+              purpose="admin-current-password"
               allowTogglePassword
               iconType="password"
               label={t('settings.changePasswordCurrent')}
@@ -76,14 +76,13 @@ export const ChangePasswordCard: React.FC = () => {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               disabled={isSubmitting}
-              autoComplete="current-password"
             />
           </div>
 
           <div className="space-y-3">
-            <Input
+            <CredentialInput
               id="change-pass-new"
-              type="password"
+              purpose="admin-new-password"
               allowTogglePassword
               iconType="password"
               label={t('settings.changePasswordNew')}
@@ -92,15 +91,14 @@ export const ChangePasswordCard: React.FC = () => {
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               disabled={isSubmitting}
-              autoComplete="new-password"
             />
           </div>
         </div>
 
         <div className="space-y-3 md:max-w-md">
-          <Input
+          <CredentialInput
             id="change-pass-confirm"
-            type="password"
+            purpose="admin-new-password-confirmation"
             allowTogglePassword
             iconType="password"
             label={t('settings.changePasswordConfirm')}
@@ -108,7 +106,6 @@ export const ChangePasswordCard: React.FC = () => {
             value={newPasswordConfirm}
             onChange={(e) => setNewPasswordConfirm(e.target.value)}
             disabled={isSubmitting}
-            autoComplete="new-password"
           />
         </div>
 

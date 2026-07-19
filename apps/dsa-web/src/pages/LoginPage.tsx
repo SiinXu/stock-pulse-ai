@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import { motion } from "motion/react";
 import { TrendingUp } from "lucide-react";
-import { Button, Input } from '../components/common';
+import { Button, CredentialInput } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
@@ -107,9 +107,9 @@ const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="space-y-4">
-              <Input
+              <CredentialInput
                 id="password"
-                type="password"
+                purpose={isFirstTime ? 'admin-new-password' : 'admin-current-password'}
                 appearance="login"
                 allowTogglePassword
                 iconType="password"
@@ -124,13 +124,12 @@ const LoginPage: React.FC = () => {
                 disabled={isSubmitting}
                 required
                 autoFocus
-                autoComplete={isFirstTime ? 'new-password' : 'current-password'}
               />
 
               {isFirstTime && (
-                <Input
+                <CredentialInput
                   id="passwordConfirm"
-                  type="password"
+                  purpose="admin-new-password-confirmation"
                   appearance="login"
                   allowTogglePassword
                   iconType="password"
@@ -144,7 +143,6 @@ const LoginPage: React.FC = () => {
                   error={passwordConfirmError}
                   disabled={isSubmitting}
                   required
-                  autoComplete="new-password"
                 />
               )}
             </div>
