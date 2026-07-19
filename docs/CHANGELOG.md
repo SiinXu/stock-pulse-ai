@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
 - [修复] 诊断脱敏 `sanitize_diagnostic_text` / `sanitize_sensitive_text` 现同时脱敏非 HTTP 连接串（postgresql/mysql/redis/mongodb/amqp 等）userinfo 中的凭据，此前仅覆盖 http(s)，SQLAlchemy 等连接错误可能把数据库密码泄漏进 Agent 诊断与日志；host 保留以维持诊断可读性。
 - [改进] 实验性 PydanticAI 运行时的 Single RUN 模型桥补全（RF-05，AR-RF-04/05/06/10/11）：模型桥从 PydanticAI `model_request_parameters` 下发真实工具 schema（不再固定空数组），ToolCall/ToolReturn/reasoning/provider trace 跨轮无损往返，复用 `AgentExecutor.build_run_messages` 的 system/skill/dashboard prompt 权威，usage 每次调用经单一 recorder 记录并修正为 `prompt_tokens/completion_tokens`，execution deadline 与协作取消在每次调用前 fence，CHAT/RESEARCH 显式返回 `unsupported_capability`（RF-06 裁决前冻结）；仍为默认关闭、可整体删除的实验路径，Native 默认路径零 PydanticAI 依赖不变，36 replay fixture 零改。
 - [改进] Agent 运行时契约改为运行中控制柄（RF-02，AR-RF-01/02）：`AgentRuntime.start()` 返回可查询状态、消费事件、请求取消并等待终态的运行中 `ExecutionHandle`（原 `execute()` 保留为启动后等待终态的兼容 helper），`ExecutionContext` 深层冻结为只读快照，调用方后续修改嵌套 dict/list/set 不再影响执行；terminal first-wins 与 36 replay fixture 逐字节不变。
