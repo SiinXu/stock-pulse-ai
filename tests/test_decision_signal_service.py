@@ -128,12 +128,48 @@ def test_service_normalizes_fields_and_partial_plan_quality(isolated_db) -> None
     assert item["action"] == "buy"
     assert item["action_label"] == "买入"
     assert item["confidence"] == 0.72
+    assert item["presentation"] == {
+        "action": "buy",
+        "label": "买入",
+        "confidence": 0.72,
+        "summary": "放量突破",
+        "risk": None,
+        "timestamp": item["created_at"],
+    }
     assert item["score"] == 83
     assert item["entry_low"] == 1680.5
     assert item["stop_loss"] == 1600.0
     assert item["plan_quality"] == "partial"
     assert item["decision_profile"] == "balanced"
     assert item["metadata"]["decision_profile"] == "balanced"
+
+
+def test_service_presentation_uses_action_and_explicit_report_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+
+    item = service.create_signal(
+        _payload(
+            source_report_id=102,
+            trace_id="trace-conflicting-label",
+            action="buy",
+            action_label="Sell",
+            report_language="en",
+            confidence=0.91,
+            reason="Momentum confirmed",
+            risk_summary="Gap risk",
+        )
+    )["item"]
+
+    assert item["action_label"] == "Sell"
+    assert item["metadata"]["report_language"] == "en"
+    assert item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Momentum confirmed",
+        "risk": "Gap risk",
+        "timestamp": item["created_at"],
+    }
 
 
 def test_service_canonicalizes_decision_profile_and_rejects_non_object_metadata(isolated_db) -> None:
@@ -1266,6 +1302,33 @@ def test_service_status_metadata_preserves_null_contract_and_profile_identity(is
     assert legacy_updated["metadata"] == {"closed_by": "tester"}
 
 
+@pytest.mark.parametrize("legacy_metadata_json", ("{invalid", '["legacy"]'))
+def test_status_metadata_replacement_repairs_unreadable_legacy_metadata(
+    isolated_db,
+    legacy_metadata_json,
+) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    signal = service.create_signal(
+        _payload(source_report_id=367, trace_id="trace-status-repair")
+    )["item"]
+    with isolated_db.get_session() as session:
+        row = session.get(DecisionSignalRecord, signal["id"])
+        assert row is not None
+        row.metadata_json = legacy_metadata_json
+        session.commit()
+
+    updated = service.update_status(
+        signal["id"],
+        status="closed",
+        metadata={"repaired": True},
+        replace_metadata=True,
+    )
+
+    assert updated["metadata"] == {"decision_profile": "balanced", "repaired": True}
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "买入"
+
+
 def test_service_invalidates_opposing_active_signals(isolated_db) -> None:
     service = DecisionSignalService(db_manager=isolated_db)
     old_buy = service.create_signal(
@@ -1420,6 +1483,65 @@ def test_service_expired_refresh_invalidates_later_opposing_active_signal(isolat
     assert sell_after["metadata"]["invalidated_by_signal_id"] == old_buy["id"]
     latest = service.get_latest_active(stock_code="600519", limit=5)
     assert [item["id"] for item in latest["items"]] == [old_buy["id"]]
+
+
+def test_service_expired_refresh_preserves_formal_presentation_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    identity = {
+        "source_report_id": 378,
+        "trace_id": "trace-refresh-formal-language",
+    }
+    original = service.create_signal(
+        _payload(
+            **identity,
+            action_label="Sell",
+            report_language="en",
+        )
+    )["item"]
+    service.update_status(original["id"], status="expired")
+
+    refreshed = service.create_signal(
+        _payload(
+            **identity,
+            reason="Refreshed reason",
+            expires_at=(utc_naive_now() + timedelta(days=1)).isoformat(),
+        )
+    )["item"]
+
+    assert refreshed["id"] == original["id"]
+    assert refreshed["reason"] == "Refreshed reason"
+    assert refreshed["metadata"]["report_language"] == "en"
+    assert refreshed["presentation"]["label"] == "Buy"
+
+
+def test_service_expired_refresh_preserves_legacy_inferred_presentation_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    identity = {
+        "source_report_id": 379,
+        "trace_id": "trace-refresh-legacy-language",
+    }
+    original = service.create_signal(
+        _payload(
+            **identity,
+            action_label="Buy",
+        )
+    )["item"]
+    assert "report_language" not in original["metadata"]
+    assert original["presentation"]["label"] == "Buy"
+    service.update_status(original["id"], status="expired")
+
+    refreshed = service.create_signal(
+        _payload(
+            **identity,
+            reason="Refreshed legacy reason",
+            expires_at=(utc_naive_now() + timedelta(days=1)).isoformat(),
+        )
+    )["item"]
+
+    assert refreshed["id"] == original["id"]
+    assert refreshed["reason"] == "Refreshed legacy reason"
+    assert "report_language" not in refreshed["metadata"]
+    assert refreshed["presentation"]["label"] == "Buy"
 
 
 def test_service_does_not_invalidate_neutral_or_terminal_signals(isolated_db) -> None:

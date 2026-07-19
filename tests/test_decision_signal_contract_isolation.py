@@ -44,6 +44,7 @@ FORBIDDEN_PRIMARY_CONTRACT_SIGNAL_FIELDS = {
     "status",
     "confidence",
     "score",
+    "presentation",
     "entry_low",
     "entry_high",
     "target_price",

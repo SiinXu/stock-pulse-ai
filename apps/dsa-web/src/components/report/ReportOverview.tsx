@@ -5,6 +5,7 @@ import type {
   ReportSummary as ReportSummaryType,
 } from '../../types/analysis';
 import { Badge, Button, Card, ScoreGauge } from '../common';
+import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { normalizeBoardType } from '../../utils/reportDomain';
@@ -157,6 +158,10 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   const { language, t } = useUiLanguage();
   const reportLanguage = normalizeReportLanguage(meta.reportLanguage);
   const text = getReportText(reportLanguage);
+  const actionLabels = buildDecisionActionLabelMap(t);
+  const operationAdvice = summary.action
+    ? getDecisionActionLabel(summary.action, null, null, text.noAdvice, actionLabels)
+    : summary.operationAdvice?.trim() || summary.actionLabel?.trim() || text.noAdvice;
   const marketPhaseLabel = getMarketPhaseSummaryLabel(meta.marketPhaseSummary, reportLanguage);
   const partialBarLabel = meta.marketPhaseSummary?.isPartialBar === true
     ? getPartialBarLabel(reportLanguage)
@@ -306,7 +311,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                 <div className="space-y-1.5">
                   <h4 className="home-insight-title text-xs font-medium uppercase tracking-[0.16em]">{text.actionAdvice}</h4>
                   <p className="home-insight-body text-sm leading-6">
-                    {summary.operationAdvice || text.noAdvice}
+                    {operationAdvice}
                   </p>
                 </div>
               </div>

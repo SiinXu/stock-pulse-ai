@@ -11,6 +11,7 @@ from src.report_language import (
     get_sentiment_label,
     get_signal_level,
     infer_decision_type_from_advice,
+    is_supported_report_language_value,
     localize_operation_advice,
     localize_trend_prediction,
     localize_bias_status,
@@ -19,6 +20,15 @@ from src.report_language import (
 
 
 class ReportLanguageTestCase(unittest.TestCase):
+    def test_supported_language_predicate_rejects_integer(self) -> None:
+        self.assertFalse(is_supported_report_language_value(123))
+
+    def test_supported_language_predicate_rejects_list(self) -> None:
+        self.assertFalse(is_supported_report_language_value(["en"]))
+
+    def test_supported_language_predicate_rejects_object(self) -> None:
+        self.assertFalse(is_supported_report_language_value({"language": "en"}))
+
     def test_get_signal_level_handles_compound_sell_advice(self) -> None:
         signal_text, emoji, signal_tag = get_signal_level("卖出/观望", 60, "zh")
 

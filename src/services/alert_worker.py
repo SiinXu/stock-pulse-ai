@@ -31,6 +31,7 @@ from src.market_phase_summary import (
     format_public_phase_pack_excerpt,
     render_market_phase_summary,
 )
+from src.report_language import normalize_report_language
 from src.services.alert_service import AlertService
 from src.services.decision_signal_service import DecisionSignalService
 from src.services.decision_signal_summary import (
@@ -141,6 +142,7 @@ class AlertWorker:
             logger.debug("[AlertWorker] Event monitor disabled; skipping")
             return stats
 
+        report_language = normalize_report_language(getattr(config, "report_language", None))
         self._prune_fingerprints()
         runtime_rules = self._load_runtime_rules(config)
         stats["loaded"] = len(runtime_rules)
@@ -170,7 +172,11 @@ class AlertWorker:
 
             record_status = result.get("record_status")
             if record_status == "triggered":
-                self._attach_decision_signal_summary_safely(runtime_rule, result)
+                self._attach_decision_signal_summary_safely(
+                    runtime_rule,
+                    result,
+                    report_language=report_language,
+                )
             if record_status in WRITABLE_TRIGGER_STATUSES:
                 trigger_write = self._record_trigger_safely(runtime_rule, result, record_status)
                 trigger_id = trigger_write.trigger_id
@@ -189,7 +195,11 @@ class AlertWorker:
                         stats["cooldown_suppressed"] += 1
                         stats["notification_attempts"] += 1
                         continue
-                    dispatch = self._send_notification_safely(runtime_rule, result)
+                    dispatch = self._send_notification_safely(
+                        runtime_rule,
+                        result,
+                        report_language=report_language,
+                    )
                     stats["notification_attempts"] += self._record_notification_attempts_safely(trigger_id, dispatch)
                     if self._dispatch_has_real_channel_success(dispatch):
                         self._upsert_db_cooldown_safely(runtime_rule, result)
@@ -200,7 +210,11 @@ class AlertWorker:
                             )
                         stats["notified"] += 1
                 elif self._should_notify(runtime_rule.key):
-                    dispatch = self._send_notification_safely(runtime_rule, result)
+                    dispatch = self._send_notification_safely(
+                        runtime_rule,
+                        result,
+                        report_language=report_language,
+                    )
                     stats["notification_attempts"] += self._record_notification_attempts_safely(trigger_id, dispatch)
                     if bool(dispatch.success):
                         self._mark_notified(runtime_rule.key)
@@ -407,9 +421,15 @@ class AlertWorker:
         self,
         runtime_rule: RuntimeAlertRule,
         result: Dict[str, Any],
+        *,
+        report_language: str = "zh",
     ) -> None:
         try:
-            summary = self._resolve_decision_signal_summary(runtime_rule, result)
+            summary = self._resolve_decision_signal_summary(
+                runtime_rule,
+                result,
+                report_language=report_language,
+            )
             if not summary:
                 return
             payload = self._diagnostics_payload(result.get("diagnostics"))
@@ -429,6 +449,8 @@ class AlertWorker:
         self,
         runtime_rule: RuntimeAlertRule,
         result: Dict[str, Any],
+        *,
+        report_language: str,
     ) -> Optional[Dict[str, Any]]:
         identity = self._symbol_identity_for_decision_signal(runtime_rule)
         if identity is None:
@@ -441,7 +463,7 @@ class AlertWorker:
         )
         items = latest.get("items") if isinstance(latest, dict) else None
         if items:
-            return summarize_decision_signal(items[0])
+            return summarize_decision_signal(items[0], report_language=report_language)
 
         created = self.decision_signal_service.create_signal(
             self._alert_decision_signal_payload(
@@ -449,10 +471,11 @@ class AlertWorker:
                 result,
                 stock_code=stock_code,
                 market=market,
+                report_language=report_language,
             )
         )
         item = created.get("item") if isinstance(created, dict) else None
-        return summarize_decision_signal(item)
+        return summarize_decision_signal(item, report_language=report_language)
 
     def _symbol_identity_for_decision_signal(self, runtime_rule: RuntimeAlertRule) -> Optional[Tuple[str, str]]:
         rule = getattr(runtime_rule, "rule", runtime_rule)
@@ -489,6 +512,7 @@ class AlertWorker:
         *,
         stock_code: str,
         market: str,
+        report_language: str,
     ) -> Dict[str, Any]:
         rule = getattr(runtime_rule, "rule", runtime_rule)
         metadata = getattr(rule, "metadata", None)
@@ -505,6 +529,7 @@ class AlertWorker:
             "trace_id": f"alert-rule-{key_hash[:32]}",
             "trigger_source": "alert",
             "action": "alert",
+            "report_language": report_language,
             "reason": result.get("reason") or result.get("message") or getattr(rule, "description", None),
             "watch_conditions": self._alert_watch_conditions(runtime_rule, result, alert_type),
             "risk_summary": self._alert_risk_summary(runtime_rule, result),
@@ -681,7 +706,13 @@ class AlertWorker:
     def _db_cooldown_fallback_key(rule_key: str) -> str:
         return f"db_cooldown:{rule_key}"
 
-    def _send_notification(self, runtime_rule: RuntimeAlertRule, result: Dict[str, Any]) -> "NotificationDispatchResult":
+    def _send_notification(
+        self,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+        *,
+        report_language: str,
+    ) -> "NotificationDispatchResult":
         from src.notification import NotificationBuilder, NotificationService
 
         notification_service = self.notifier or NotificationService()
@@ -698,16 +729,29 @@ class AlertWorker:
         )
         if excerpt:
             content = f"{content}\n\n{excerpt}"
-        signal_excerpt = format_decision_signal_excerpt(diagnostics.get("decision_signal_summary"))
+        signal_excerpt = format_decision_signal_excerpt(
+            diagnostics.get("decision_signal_summary"),
+            report_language=report_language,
+        )
         if signal_excerpt:
             content = f"{content}\n\n{signal_excerpt}"
         alert_text = NotificationBuilder.build_simple_alert(title=title, content=content, alert_type="warning")
 
         return notification_service.send_with_results(alert_text, route_type="alert")
 
-    def _send_notification_safely(self, runtime_rule: RuntimeAlertRule, result: Dict[str, Any]) -> "NotificationDispatchResult":
+    def _send_notification_safely(
+        self,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+        *,
+        report_language: str,
+    ) -> "NotificationDispatchResult":
         try:
-            return self._send_notification(runtime_rule, result)
+            return self._send_notification(
+                runtime_rule,
+                result,
+                report_language=report_language,
+            )
         except Exception as exc:
             from src.notification import ChannelAttemptResult, NotificationDispatchResult
 

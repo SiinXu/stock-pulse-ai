@@ -179,6 +179,14 @@ def test_create_duplicate_list_detail_latest_and_status_update(client_and_db) ->
     assert created["item"]["plan_quality"] == "partial"
     assert created["item"]["decision_profile"] == "balanced"
     assert created["item"]["metadata"]["decision_profile"] == "balanced"
+    assert created["item"]["presentation"] == {
+        "action": "buy",
+        "label": "买入",
+        "confidence": 0.75,
+        "summary": "突破平台",
+        "risk": None,
+        "timestamp": created["item"]["created_at"],
+    }
     assert created["item"]["expires_at"] is not None
 
     duplicate_resp = client.post(
@@ -253,6 +261,200 @@ def test_create_duplicate_list_detail_latest_and_status_update(client_and_db) ->
 
     missing_resp = client.get("/api/v1/decision-signals/999999")
     assert missing_resp.status_code == 404
+
+
+def test_api_json_export_contract_prefers_canonical_presentation(client_and_db) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4001,
+            trace_id="trace-export-4001",
+            action="buy",
+            action_label="Sell",
+            confidence=0.91,
+            reason="Canonical export summary",
+            risk_summary="Canonical export risk",
+            report_language="en",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    created_item = create_resp.json()["item"]
+    signal_id = created_item["id"]
+
+    detail_resp = client.get(f"/api/v1/decision-signals/{signal_id}")
+    list_resp = client.get("/api/v1/decision-signals", params={"source_report_id": 4001})
+    latest_resp = client.get("/api/v1/decision-signals/latest/600519", params={"limit": 1})
+    assert detail_resp.status_code == 200, detail_resp.text
+    assert list_resp.status_code == 200, list_resp.text
+    assert latest_resp.status_code == 200, latest_resp.text
+    detail_item = detail_resp.json()
+    list_item = list_resp.json()["items"][0]
+    latest_item = latest_resp.json()["items"][0]
+
+    assert created_item["action"] == "buy"
+    assert created_item["action_label"] == "Sell"
+    assert created_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": created_item["created_at"],
+    }
+    assert detail_item["action"] == "buy"
+    assert detail_item["action_label"] == "Sell"
+    assert detail_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": detail_item["created_at"],
+    }
+    assert list_item["action"] == "buy"
+    assert list_item["action_label"] == "Sell"
+    assert list_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": list_item["created_at"],
+    }
+    assert latest_item["action"] == "buy"
+    assert latest_item["action_label"] == "Sell"
+    assert latest_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": latest_item["created_at"],
+    }
+
+
+@pytest.mark.parametrize(
+    "invalid_report_language",
+    [123, ["en"], {"language": "en"}],
+    ids=("integer", "list", "object"),
+)
+def test_api_json_export_ignores_non_string_metadata_report_language(
+    client_and_db,
+    invalid_report_language,
+) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4004,
+            trace_id="trace-export-invalid-language-4004",
+            action="buy",
+            action_label="买入",
+            metadata={
+                "report_language": invalid_report_language,
+                "source_marker": "preserved",
+            },
+        ),
+    )
+
+    assert create_resp.status_code == 200, create_resp.text
+    created = create_resp.json()["item"]
+    signal_id = created["id"]
+    assert created["metadata"]["report_language"] == invalid_report_language
+    assert created["metadata"]["source_marker"] == "preserved"
+    assert created["presentation"]["label"] == "买入"
+
+    detail_resp = client.get(f"/api/v1/decision-signals/{signal_id}")
+    list_resp = client.get(
+        "/api/v1/decision-signals",
+        params={"source_report_id": 4004},
+    )
+    assert detail_resp.status_code == 200, detail_resp.text
+    assert list_resp.status_code == 200, list_resp.text
+    assert detail_resp.json()["presentation"]["label"] == "买入"
+    assert list_resp.json()["items"][0]["presentation"]["label"] == "买入"
+
+
+@pytest.mark.parametrize(
+    ("replacement_metadata", "expected_metadata"),
+    [
+        ({}, {"decision_profile": "balanced", "report_language": "en"}),
+        (
+            {"closed_by": "review", "report_language": "ko"},
+            {
+                "closed_by": "review",
+                "decision_profile": "balanced",
+                "report_language": "en",
+            },
+        ),
+        (None, {"report_language": "en"}),
+    ],
+    ids=("object-replacement", "conflicting-language-replacement", "null-replacement"),
+)
+def test_status_metadata_replacement_preserves_presentation_language(
+    client_and_db,
+    replacement_metadata,
+    expected_metadata,
+) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4002,
+            trace_id="trace-presentation-language-4002",
+            action="buy",
+            action_label="Sell",
+            report_language="en",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    signal_id = create_resp.json()["item"]["id"]
+
+    patch_resp = client.patch(
+        f"/api/v1/decision-signals/{signal_id}/status",
+        json={"status": "closed", "metadata": replacement_metadata},
+    )
+
+    assert patch_resp.status_code == 200, patch_resp.text
+    updated = patch_resp.json()
+    assert updated["action"] == "buy"
+    assert updated["action_label"] == "Sell"
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "Buy"
+    assert updated["metadata"] == expected_metadata
+    assert client.get(f"/api/v1/decision-signals/{signal_id}").json()["presentation"] == updated["presentation"]
+
+
+def test_status_metadata_replacement_cannot_promote_presentation_language(client_and_db) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4003,
+            trace_id="trace-presentation-language-4003",
+            action="buy",
+        ),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    signal_id = create_resp.json()["item"]["id"]
+
+    patch_resp = client.patch(
+        f"/api/v1/decision-signals/{signal_id}/status",
+        json={
+            "status": "closed",
+            "metadata": {"closed_by": "review", "report_language": "en"},
+        },
+    )
+
+    assert patch_resp.status_code == 200, patch_resp.text
+    updated = patch_resp.json()
+    assert updated["metadata"] == {
+        "closed_by": "review",
+        "decision_profile": "balanced",
+    }
+    assert updated["presentation"]["action"] == "buy"
+    assert updated["presentation"]["label"] == "买入"
 
 
 def test_create_rejects_explicit_null_decision_profile_and_accepts_null_metadata(client_and_db) -> None:

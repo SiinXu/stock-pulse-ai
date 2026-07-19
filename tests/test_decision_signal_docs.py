@@ -39,6 +39,7 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     for schema_name in (
         "DecisionSignalCreateRequest",
         "DecisionSignalItem",
+        "DecisionSignalPresentation",
         "DecisionSignalReassessRequest",
         "DecisionSignalReassessResponse",
         "DecisionSignalOutcomeItem",
@@ -55,6 +56,17 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "guardrail_blocked" in topic
     assert "MIN_ACTIONABLE_CONFIDENCE = 0.5" in topic
     assert "source_agent=decision_profile_reassess" in topic
+    assert "src/schemas/decision_signal_presentation.py" in topic
+    assert "`action`、`label`、`confidence`、`summary`、`risk`、`timestamp`" in topic
+    assert "顶层 `action` 是唯一方向权威" in topic
+    assert "`presentation.action` 只是由它派生的只读镜像" in topic
+    assert "非字符串或不支持的值仍作为普通 caller metadata 保留" in topic
+    assert "Web 报告动作卡与历史 badge 复用同一 taxonomy 标签工具" in topic
+    assert "没有正式语言键的 legacy 行继续使用原始 label 推断语言" in topic
+    assert "canonical `presentation`" in full_guide_en
+    assert "Top-level `action` is the sole direction authority" in full_guide_en
+    assert "non-string or unsupported caller metadata remains round-trippable" in full_guide_en
+    assert "The Web report action card and history badges share the same taxonomy-label helper" in full_guide_en
     assert "trigger_source=web:decision_profile_reassess" in topic
     assert "scoring_breakdown" in topic
     assert "persist_status=created" in topic
@@ -73,8 +85,12 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "top-level explicit `null`, empty value, or invalid value is rejected" in full_guide_en
     assert "metadata 省略或显式 `null` 均按无 metadata 处理" in full_guide
     assert "Omitted or explicit `null` metadata is treated as absent" in full_guide_en
-    assert "显式 `null` 时清空为 SQL `NULL`" in full_guide
-    assert "explicit `null` clears it to SQL `NULL`" in full_guide_en
+    assert "显式 `null` 时清空调用方 metadata" in full_guide
+    assert "null replacement retains that one metadata key instead of writing SQL `NULL`" in full_guide_en
+    assert "object/null 替换都会保留这一 presentation provenance" in full_guide
+    assert "object and null replacements preserve that formal presentation provenance" in full_guide_en
+    assert "没有正式 `report_language` provenance 时，`null` 才写入 SQL `NULL`" in topic
+    assert "显式 `null` 时清空为 SQL `NULL`" not in topic
     assert "正式字段为 legacy `NULL` 时会移除请求 object 中的 profile key" in full_guide
     assert "for a legacy formal `NULL`, the profile key is removed" in full_guide_en
     assert "API 响应 schema 不变" not in full_guide
@@ -100,6 +116,7 @@ def test_decision_signal_topic_source_anchors_exist() -> None:
         "api/v1/schemas/decision_signals.py",
         "api/v1/endpoints/decision_signals.py",
         "src/services/decision_signal_service.py",
+        "src/schemas/decision_signal_presentation.py",
         "src/utils/sanitize.py",
     ):
         assert source_path in topic

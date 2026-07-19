@@ -1413,7 +1413,7 @@
           "DecisionSignals"
         ],
         "summary": "更新决策信号状态",
-        "description": "只更新合法状态和可选 metadata；省略 metadata 时保留原值，null 时清空，object 时按整包替换并保持正式 decision_profile 身份。expired/invalidated/closed/archived 等 terminal 状态不能直接 PATCH 回 active。",
+        "description": "只更新合法状态和可选 metadata；省略 metadata 时保留原值，null 时清空调用方 metadata，object 时按整包替换调用方 metadata；两种替换都保持正式 decision_profile 身份和已持久化的 presentation report_language provenance，且不会从替换 metadata 提升正式值。expired/invalidated/closed/archived 等 terminal 状态不能直接 PATCH 回 active。",
         "operationId": "updateDecisionSignalStatus",
         "security": [
           {
@@ -4428,7 +4428,7 @@
               }
             ],
             "title": "Metadata",
-            "description": "Optional replacement metadata. Omit to preserve the stored value; null clears it; an object replaces it while preserving the formal decision_profile identity."
+            "description": "Optional replacement metadata. Omit to preserve the stored value; null clears caller metadata; an object replaces caller metadata. Both replacement forms preserve any formal decision_profile identity and persisted presentation report_language provenance without promoting either value from replacement metadata."
           }
         },
         "type": "object",
@@ -4744,6 +4744,9 @@
               }
             ],
             "title": "Metadata"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/DecisionSignalPresentation"
           }
         },
         "type": "object",
@@ -4755,9 +4758,83 @@
           "trigger_source",
           "action",
           "plan_quality",
-          "status"
+          "status",
+          "presentation"
         ],
         "title": "DecisionSignalItem"
+      },
+      "DecisionSignalPresentation": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "add",
+              "hold",
+              "reduce",
+              "sell",
+              "watch",
+              "avoid",
+              "alert"
+            ],
+            "title": "Action"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "label"
+        ],
+        "title": "DecisionSignalPresentation",
+        "description": "Renderer-ready fields whose action mirrors the top-level signal action."
       },
       "DecisionSignalMutationResponse": {
         "properties": {

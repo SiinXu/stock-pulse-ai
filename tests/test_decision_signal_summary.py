@@ -17,6 +17,7 @@ def test_summarize_decision_signal_keeps_only_low_sensitive_fields() -> None:
         "market": "cn",
         "action": "sell",
         "action_label": "卖出",
+        "confidence": 0.84,
         "horizon": "3d",
         "status": "active",
         "source_type": "alert",
@@ -40,6 +41,7 @@ def test_summarize_decision_signal_keeps_only_low_sensitive_fields() -> None:
         "market",
         "action",
         "action_label",
+        "confidence",
         "horizon",
         "status",
         "source_type",
@@ -49,10 +51,19 @@ def test_summarize_decision_signal_keeps_only_low_sensitive_fields() -> None:
         "risk_summary",
         "created_at",
         "expires_at",
+        "presentation",
     }
     assert summary["reason"] == "token=[REDACTED] 触发止损"
     assert summary["watch_conditions"] == ["观察量能", "password=[REDACTED]"]
     assert summary["risk_summary"] == {"drawdown": "webhook=[REDACTED_URL]"}
+    assert summary["presentation"] == {
+        "action": "sell",
+        "label": "卖出",
+        "confidence": 0.84,
+        "summary": "token=[REDACTED] 触发止损",
+        "risk": "drawdown: webhook=[REDACTED_URL]",
+        "timestamp": "2026-06-18T10:00:00+08:00",
+    }
 
 
 def test_summarize_decision_signal_rejects_non_dict_and_empty_payload() -> None:
@@ -82,6 +93,8 @@ def test_format_decision_signal_excerpt_formats_chinese_list_and_dict_fields() -
 def test_format_decision_signal_excerpt_formats_english_and_redacts_text() -> None:
     excerpt = format_decision_signal_excerpt({
         "action": "alert",
+        "confidence": 0.875,
+        "created_at": "2026-07-19T01:02:03Z",
         "horizon": "5d",
         "reason": "authorization: Bearer raw-token",
         "watch_conditions": "Check price",
@@ -89,10 +102,93 @@ def test_format_decision_signal_excerpt_formats_english_and_redacts_text() -> No
     }, report_language="en")
 
     assert excerpt.startswith("**AI decision signal**")
-    assert "Action: alert | Horizon: 5d" in excerpt
+    assert "Action: Alert | Confidence: 88% | Time: 2026-07-19T01:02:03Z | Horizon: 5d" in excerpt
     assert "- Reason: authorization: [REDACTED]" in excerpt
     assert "- Watch: Check price" in excerpt
     assert "- Risk: token=[REDACTED]" in excerpt
+
+
+def test_format_decision_signal_excerpt_formats_korean_canonical_fields() -> None:
+    excerpt = format_decision_signal_excerpt({
+        "action": "buy",
+        "action_label": "Sell",
+        "confidence": 0.91,
+        "created_at": "2026-07-19T01:02:03Z",
+        "horizon": "3d",
+        "reason": "상승 모멘텀 확인",
+        "watch_conditions": "거래량 확인",
+        "risk_summary": "갭 위험",
+        "source_report_id": 88,
+    }, report_language="ko")
+
+    assert excerpt.startswith("**AI 의사결정 신호**")
+    assert "조치: 매수" in excerpt
+    assert "신뢰도: 91%" in excerpt
+    assert "생성일: 2026-07-19T01:02:03Z" in excerpt
+    assert "투자 기간: 3d" in excerpt
+    assert "출처 보고서: #88" in excerpt
+    assert "- 이유: 상승 모멘텀 확인" in excerpt
+    assert "- 감시 조건: 거래량 확인" in excerpt
+    assert "- 위험: 갭 위험" in excerpt
+    assert "Sell" not in excerpt
+
+
+def test_format_decision_signal_excerpt_uses_top_level_action_when_presentation_conflicts() -> None:
+    summary = summarize_decision_signal({
+        "action": "buy",
+        "action_label": "Sell",
+        "confidence": 0.91,
+        "reason": "Momentum confirmed",
+        "risk_summary": "Gap risk",
+        "created_at": "2026-07-19T00:00:00",
+        "presentation": {
+            "action": "sell",
+            "label": "Sell",
+            "confidence": 0.75,
+            "summary": "Canonical momentum confirmed",
+            "risk": "Canonical gap risk",
+            "timestamp": "2026-07-19T01:02:03Z",
+        },
+    }, report_language="en")
+
+    excerpt = format_decision_signal_excerpt(summary, report_language="en")
+
+    assert summary is not None
+    assert summary["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.75,
+        "summary": "Canonical momentum confirmed",
+        "risk": "Canonical gap risk",
+        "timestamp": "2026-07-19T01:02:03Z",
+    }
+    assert "Action: Buy" in excerpt
+    assert "Action: Sell" not in excerpt
+
+
+def test_summarize_decision_signal_preserves_canonical_presentation_on_reentry() -> None:
+    first = summarize_decision_signal({
+        "action": "buy",
+        "action_label": "Sell",
+        "confidence": 0.75,
+        "reason": "Momentum confirmed",
+        "risk_summary": "Gap risk",
+        "created_at": "2026-07-19T00:00:00",
+    }, report_language="en")
+
+    second = summarize_decision_signal(first)
+
+    assert first is not None
+    assert second is not None
+    assert first["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.75,
+        "summary": "Momentum confirmed",
+        "risk": "Gap risk",
+        "timestamp": "2026-07-19T00:00:00",
+    }
+    assert second["presentation"] == first["presentation"]
 
 
 def test_format_decision_signal_excerpt_preserves_complete_sanitized_reason() -> None:
