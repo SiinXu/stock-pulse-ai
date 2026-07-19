@@ -1309,7 +1309,7 @@ const DecisionSignalsPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="primary"
-                  size="lg"
+                  size="primary"
                   onClick={() => setReassessPersistConfirm(true)}
                   disabled={reassessLoading || reassessPersisting}
                   isLoading={reassessPersisting}
@@ -1533,7 +1533,7 @@ const DecisionSignalsPage: React.FC = () => {
                 ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
               ]}
             />
-            <Button type="submit" variant="primary" size="md" className="text-xs">
+            <Button type="submit" variant="primary" size="comfortable" className="text-xs">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
             </Button>

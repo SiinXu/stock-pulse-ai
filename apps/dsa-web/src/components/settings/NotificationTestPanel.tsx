@@ -105,7 +105,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
           <Button
             type="button"
             variant="secondary"
-            size="sm"
+            size="default"
             onClick={() => setTestModalOpen(true)}
           >
             <Settings className="h-4 w-4" />

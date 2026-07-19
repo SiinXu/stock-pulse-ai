@@ -1191,7 +1191,7 @@ const PortfolioPage: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
+                size="default"
                 onClick={() => {
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
@@ -1548,7 +1548,7 @@ const PortfolioPage: React.FC = () => {
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
-        <Button type="button" variant="secondary" size="md" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
+        <Button type="button" variant="secondary" size="comfortable" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 

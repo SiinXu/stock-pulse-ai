@@ -268,7 +268,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
               {recordId !== undefined && onOpenRunFlow ? (
                 <Button
                   variant="ghost"
-                  size="xsm"
+                  size="compact"
                   onClick={() => onOpenRunFlow(recordId)}
                   aria-label={formatUiText(runFlowText['runFlow.openHistoryAria'], { recordId })}
                 >
@@ -278,7 +278,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
               ) : null}
               <Button
                 variant="ghost"
-                size="xsm"
+                size="compact"
                 disabled={!hasCopyText}
                 onClick={() => void copyDiagnostics()}
                 aria-label={copied ? text.copied : text.copyDiagnostics}

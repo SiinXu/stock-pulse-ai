@@ -358,7 +358,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <Button
                 type="button"
-                size="sm"
+                size="default"
                 variant="secondary"
                 className="whitespace-nowrap text-xs"
                 disabled={watchlistRows.length === 0 || isBatchAnalyzing}
@@ -371,7 +371,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               </Button>
               <Button
                 type="button"
-                size="sm"
+                size="default"
                 variant="secondary"
                 className="whitespace-nowrap text-xs"
                 disabled={pendingWatchlistCount === 0 || isTodayStatusUnavailable || isBatchAnalyzing}
@@ -446,7 +446,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               compact
               title={t('chat.actionFailed')}
               action={(
-                <Button type="button" size="sm" variant="secondary" onClick={() => void onRefreshWatchlist()}>
+                <Button type="button" size="default" variant="secondary" onClick={() => void onRefreshWatchlist()}>
                   {t('common.retry')}
                 </Button>
               )}
@@ -508,7 +508,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         <div className="border-t border-subtle px-4 py-3">
           <Button
             type="button"
-            size="sm"
+            size="default"
             variant="ghost"
             disabled={watchlistLoading}
             onClick={() => void onRefreshWatchlist()}

@@ -1583,7 +1583,7 @@ const HomePage: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
-                size="md"
+                size="comfortable"
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
@@ -1661,7 +1661,7 @@ const HomePage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="sm"
+                  size="default"
                   onClick={() => navigate('/settings')}
                 >
                   {t('home.goSettings')}
@@ -1767,7 +1767,7 @@ const HomePage: React.FC = () => {
                     <>
                       <Button
                         variant="secondary"
-                        size="sm"
+                        size="default"
                         disabled={isAnalyzing || selectedReport.meta.id === undefined}
                         onClick={handleReanalyze}
                       >
@@ -1778,7 +1778,7 @@ const HomePage: React.FC = () => {
                       </Button>
                       <Button
                         variant="secondary"
-                        size="sm"
+                        size="default"
                         disabled={selectedReport.meta.id === undefined}
                         onClick={handleAskFollowUp}
                       >
@@ -1791,7 +1791,7 @@ const HomePage: React.FC = () => {
                   ) : (
                     <Button
                       variant="secondary"
-                      size="sm"
+                      size="default"
                       disabled={isSubmittingMarketReview}
                       isLoading={isSubmittingMarketReview}
                       loadingText={t('home.submitMarketReview')}
@@ -1803,7 +1803,7 @@ const HomePage: React.FC = () => {
                   )}
                   <Button
                     variant="secondary"
-                    size="sm"
+                    size="default"
                     disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
                     className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
                     onClick={() => {
@@ -1819,7 +1819,7 @@ const HomePage: React.FC = () => {
                   </Button>
                   <Button
                     variant="secondary"
-                    size="sm"
+                    size="default"
                     disabled={selectedReport.meta.id === undefined}
                     onClick={openMarkdownDrawer}
                   >

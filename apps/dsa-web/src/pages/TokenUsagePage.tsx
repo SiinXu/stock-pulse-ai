@@ -158,7 +158,7 @@ const TokenUsagePage: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
+                size="default"
                 onClick={() => void loadDashboard()}
                 disabled={loading}
                 isLoading={loading}

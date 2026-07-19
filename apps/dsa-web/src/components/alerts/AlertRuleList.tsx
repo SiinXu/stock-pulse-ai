@@ -215,7 +215,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
                       <Button
-                        size="xsm"
+                        size="compact"
                         variant="outline"
                         onClick={() => onTest(rule)}
                         isLoading={isRuleActionBusy(rule, 'test')}
@@ -225,7 +225,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         {text.test}
                       </Button>
                       <Button
-                        size="xsm"
+                        size="compact"
                         variant={rule.enabled ? 'secondary' : 'primary'}
                         onClick={() => onToggleEnabled(rule)}
                         isLoading={isRuleActionBusy(rule, 'toggle')}
@@ -235,7 +235,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                         {rule.enabled ? text.disable : text.enable}
                       </Button>
                       <Button
-                        size="xsm"
+                        size="compact"
                         variant="danger-subtle"
                         aria-label={formatUiText(text.deleteAria, { name: rule.name })}
                         onClick={() => setPendingDelete(rule)}

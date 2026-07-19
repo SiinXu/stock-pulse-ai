@@ -84,7 +84,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             <Button
               type="button"
               variant="primary"
-              size="sm"
+              size="default"
               onClick={() => window.location.reload()}
             >
               {this.props.text.reload}
@@ -92,7 +92,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
             <Button
               type="button"
               variant="secondary"
-              size="sm"
+              size="default"
               onClick={() => window.location.assign('/')}
             >
               {this.props.text.backHome}

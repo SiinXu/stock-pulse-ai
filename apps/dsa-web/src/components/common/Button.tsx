@@ -4,7 +4,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-subtle';
-export type ButtonSize = 'compact' | 'default' | 'comfortable' | 'primary' | 'xsm' | 'sm' | 'md' | 'lg' | 'xl';
+export type ButtonSize = 'compact' | 'default' | 'comfortable' | 'primary' | 'xl';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant: ButtonVariant;
@@ -20,10 +20,6 @@ const BUTTON_SIZE_STYLES = {
   default: 'h-8 min-w-8 rounded-lg px-3 text-xs',
   comfortable: 'h-9 min-w-9 rounded-lg px-3.5 text-sm',
   primary: 'h-10 min-w-10 rounded-lg px-4 text-sm',
-  xsm: 'h-7 min-w-7 rounded-lg px-2.5 text-xs',
-  sm: 'h-8 min-w-8 rounded-lg px-3 text-xs',
-  md: 'h-9 min-w-9 rounded-lg px-3.5 text-sm',
-  lg: 'h-10 min-w-10 rounded-lg px-4 text-sm',
   xl: 'h-10 min-w-10 rounded-lg px-5 text-sm',
 } as const;
 

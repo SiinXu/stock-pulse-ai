@@ -820,7 +820,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           <Button
             type="button"
             variant="secondary"
-            size="sm"
+            size="default"
             className="text-xs shadow-none"
             disabled={busy || !canTest || testState?.status === 'loading'}
             onClick={onTest}
@@ -830,7 +830,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           <Button
             type="button"
             variant="secondary"
-            size="sm"
+            size="default"
             className="text-xs shadow-none"
             disabled={busy}
             onClick={onEdit}
@@ -1598,11 +1598,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             />
           ) : null}
           <div className="flex items-center justify-end gap-2 pt-4">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
+            <Button type="button" variant="ghost" size="default" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"
               variant="primary"
-              size="sm"
+              size="default"
               disabled={
                 !providerId
                 || disabled
@@ -1848,7 +1848,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         <Button
                           type="button"
                           variant="primary"
-                          size="sm"
+                          size="default"
                           disabled={modelsAreReadOnly || !replacementRoute}
                           onClick={() => {
                             if (modelsAreReadOnly) {
@@ -1876,7 +1876,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       <Button
                         type="button"
                         variant="secondary"
-                        size="sm"
+                        size="default"
                         onClick={onManageModels}
                       >
                         {text.goTaskRouting}
@@ -1894,7 +1894,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     id={discoverButtonId}
                     type="button"
                     variant="secondary"
-                    size="sm"
+                    size="default"
                     className="text-xs shadow-none"
                     disabled={
                       discovery?.status === 'loading'
@@ -1963,7 +1963,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 <Button
                   type="button"
                   variant="secondary"
-                  size="sm"
+                  size="default"
                   className="shrink-0 text-xs shadow-none"
                   disabled={!modelDraft.trim() || modelsAreReadOnly}
                   onClick={() => addModelToken(modelDraft)}
@@ -1992,7 +1992,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <Button
               type="button"
               variant="secondary"
-              size="sm"
+              size="default"
               className="shrink-0 text-xs shadow-none"
                 disabled={disabled || !connectionContractKnown || test?.status === 'loading'}
               onClick={() => void handleTest()}
@@ -2052,7 +2052,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="default"
                 onClick={() => {
                   setDraft(null);
                   setProviderId(undefined);
@@ -2063,11 +2063,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 {text.back}
               </Button>
             ) : null}
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
+            <Button type="button" variant="ghost" size="default" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"
               variant="primary"
-              size="sm"
+              size="default"
               disabled={disabled || !connectionContractKnown || (
                 mode === 'add'
                 && !channelIdentityCanWrite(

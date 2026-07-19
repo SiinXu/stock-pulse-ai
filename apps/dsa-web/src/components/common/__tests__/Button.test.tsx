@@ -15,9 +15,9 @@ describe('Button', () => {
     >();
   });
 
-  it('reserves icon-only actions for IconButton', () => {
+  it('exposes only semantic sizes plus the exact xl compatibility tier', () => {
     expectTypeOf<ButtonSize>().toEqualTypeOf<
-      'compact' | 'default' | 'comfortable' | 'primary' | 'xsm' | 'sm' | 'md' | 'lg' | 'xl'
+      'compact' | 'default' | 'comfortable' | 'primary' | 'xl'
     >();
   });
 
@@ -39,10 +39,9 @@ describe('Button', () => {
 
   it.each([
     'compact',
-    'xsm',
-    'sm',
-    'md',
-    'lg',
+    'default',
+    'comfortable',
+    'primary',
     'xl',
   ] as const)(
     'exposes the selected %s size without changing its accessible name',

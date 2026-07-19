@@ -265,7 +265,7 @@ function renderFieldControl(
             <Button
               type="button"
               variant="secondary"
-              size="sm"
+              size="default"
               className="text-xs shadow-none"
               disabled={disabled || !schema?.isEditable}
               onClick={() => onChange(serializeMultiValues([...values, '']))}

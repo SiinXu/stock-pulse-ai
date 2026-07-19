@@ -217,7 +217,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
               </p>
             </div>
           </div>
-          <Button variant="secondary" size="sm" onClick={onClose}>
+          <Button variant="secondary" size="default" onClick={onClose}>
             {t('stockTrend.backToCurrentReport')}
           </Button>
         </div>
@@ -230,7 +230,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           title={t('stockTrend.loadFailed')}
           description={t('common.retry')}
           action={(
-            <Button variant="secondary" size="sm" onClick={onRetry}>
+            <Button variant="secondary" size="default" onClick={onRetry}>
               {t('stockTrend.reload')}
             </Button>
           )}
@@ -282,7 +282,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
                 {hasMore ? (
                   <Button
                     variant="secondary"
-                    size="sm"
+                    size="default"
                     onClick={onLoadMore}
                     isLoading={isLoadingMore}
                     loadingText={t('stockTrend.loadingMore')}

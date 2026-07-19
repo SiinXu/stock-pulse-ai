@@ -130,7 +130,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
               />
               <Button
                 variant="danger-subtle"
-                size="xsm"
+                size="compact"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeleting}
                 isLoading={isDeleting}
