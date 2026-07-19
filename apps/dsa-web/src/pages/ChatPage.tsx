@@ -182,6 +182,7 @@ const ChatPage: React.FC = () => {
   );
   const [input, setInput] = useState('');
   const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [isSkillsLoading, setIsSkillsLoading] = useState(true);
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
   const [mobileSkillPickerOpen, setMobileSkillPickerOpen] = useState(false);
@@ -444,8 +445,13 @@ const ChatPage: React.FC = () => {
   }, [hasInitialLoad, searchParams, sessionId, setSessionInUrl, switchSession]);
 
   useEffect(() => {
-    agentApi.getSkills()
+    let active = true;
+
+    void agentApi.getSkills()
       .then((res) => {
+        if (!active) {
+          return;
+        }
         setSkills(res.skills);
         const defaultId =
           res.default_skill_id ||
@@ -454,8 +460,19 @@ const ChatPage: React.FC = () => {
         setSelectedSkillIds(defaultId ? [defaultId] : []);
       })
       .catch((error) => {
-        console.error('Failed to load chat skills:', error);
+        if (active) {
+          console.error('Failed to load chat skills:', error);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setIsSkillsLoading(false);
+        }
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -669,7 +686,7 @@ const ChatPage: React.FC = () => {
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
-      if (!msgText || loading || sessionLoading || isFollowUpContextLoading) return;
+      if (!msgText || loading || sessionLoading || isFollowUpContextLoading || isSkillsLoading) return;
       const usedSkillIds = normalizeSelectedSkillIds(overrideSkillIds ?? selectedSkillIds);
       const usedSkillNames = usedSkillIds.length > 0 ? getSkillNames(usedSkillIds) : [t('chat.general')];
 
@@ -705,7 +722,7 @@ const ChatPage: React.FC = () => {
         skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
-    [getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, isSkillsLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1250,7 +1267,9 @@ const ChatPage: React.FC = () => {
                       {quickQuestions.map((q, i) => (
                         <button
                           key={i}
+                          type="button"
                           onClick={() => handleQuickQuestion(q)}
+                          disabled={isSkillsLoading || loading || sessionLoading}
                           className="quick-question-btn"
                         >
                           {q.label}
@@ -1590,7 +1609,7 @@ const ChatPage: React.FC = () => {
                   <Button
                     variant="primary"
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isFollowUpContextLoading || sessionLoading}
+                    disabled={!input.trim() || isFollowUpContextLoading || isSkillsLoading || sessionLoading}
                     className="btn-primary flex-shrink-0"
                   >
                     {t('chat.send')}

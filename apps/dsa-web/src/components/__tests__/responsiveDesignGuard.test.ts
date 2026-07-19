@@ -59,7 +59,11 @@ describe('responsive design guard', () => {
 
   it('keeps quick-question buttons at least 44px tall', () => {
     const quickQuestionRule = indexCssSource.match(/\.quick-question-btn\s*\{[^}]+\}/)?.[0];
+    const disabledRule = indexCssSource.match(/\.quick-question-btn:disabled\s*\{[^}]+\}/)?.[0];
     expect(quickQuestionRule).toContain('min-height: 2.75rem;');
+    expect(indexCssSource).toContain('.quick-question-btn:not(:disabled):hover');
+    expect(disabledRule).toContain('cursor: not-allowed;');
+    expect(disabledRule).toContain('opacity: 0.5;');
   });
 
   it('expands compact control hit targets whenever any pointer is coarse', () => {

@@ -2380,10 +2380,15 @@ a {
   transition: all 0.2s ease;
 }
 
-.quick-question-btn:hover {
+.quick-question-btn:not(:disabled):hover {
   color: hsl(var(--foreground));
   border-color: hsl(var(--primary) / 0.4);
   background: hsl(var(--primary) / 0.05);
+}
+
+.quick-question-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* Skill description tooltip */
