@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../alerts';
 
-const { get, post, deleteRequest } = vi.hoisted(() => ({
+const { get, post, patch, deleteRequest } = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  patch: vi.fn(),
   deleteRequest: vi.fn(),
 }));
 
@@ -11,6 +12,7 @@ vi.mock('../index', () => ({
   default: {
     get,
     post,
+    patch,
     delete: deleteRequest,
   },
 }));
@@ -19,7 +21,42 @@ describe('alertsApi', () => {
   beforeEach(() => {
     get.mockReset();
     post.mockReset();
+    patch.mockReset();
     deleteRequest.mockReset();
+  });
+
+  it('gets a single rule and camelCases the response', async () => {
+    get.mockResolvedValueOnce({
+      data: { id: 7, name: 'r', target_scope: 'single_symbol', target: '600519', alert_type: 'price_cross', parameters: { direction: 'above', price: 1800 }, severity: 'warning', enabled: true, source: 'api' },
+    });
+    const rule = await alertsApi.getRule(7);
+    expect(get).toHaveBeenCalledWith('/api/v1/alerts/rules/7');
+    expect(rule.alertType).toBe('price_cross');
+    expect(rule.parameters.price).toBe(1800);
+  });
+
+  it('updates a rule via PATCH with snake_case payload', async () => {
+    patch.mockResolvedValueOnce({
+      data: { id: 7, name: 'renamed', target_scope: 'single_symbol', target: '600519', alert_type: 'price_cross', parameters: { direction: 'below', price: 1750 }, severity: 'critical', enabled: false, source: 'api' },
+    });
+    const updated = await alertsApi.updateRule(7, {
+      name: 'renamed',
+      targetScope: 'single_symbol',
+      target: '600519',
+      alertType: 'price_cross',
+      parameters: { direction: 'below', price: 1750 },
+      severity: 'critical',
+      enabled: false,
+    });
+    expect(patch).toHaveBeenCalledWith('/api/v1/alerts/rules/7', expect.objectContaining({
+      name: 'renamed',
+      alert_type: 'price_cross',
+      enabled: false,
+      severity: 'critical',
+      parameters: expect.objectContaining({ direction: 'below', price: 1750 }),
+    }));
+    expect(updated.enabled).toBe(false);
+    expect(updated.severity).toBe('critical');
   });
 
   it('lists rules with snake_case query params and camelCase response fields', async () => {

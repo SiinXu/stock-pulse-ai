@@ -133,6 +133,12 @@ const AlertsPage: React.FC = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [editRule, setEditRule] = useState<AlertRuleItem | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editOpening, setEditOpening] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<ParsedApiError | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
   const [busyRules, setBusyRules] = useState<AlertRuleBusyMap>({});
   const [testResult, setTestResult] = useState<{
     ruleId: number;
@@ -142,6 +148,7 @@ const AlertsPage: React.FC = () => {
   const rulesRequestIdRef = useRef(0);
   const triggersRequestIdRef = useRef(0);
   const notificationsRequestIdRef = useRef(0);
+  const editRequestIdRef = useRef(0);
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
   const mountedRef = useRef(true);
 
@@ -280,6 +287,48 @@ const AlertsPage: React.FC = () => {
     }
   };
 
+  const handleEditOpen = async (rule: AlertRuleItem) => {
+    const requestId = editRequestIdRef.current + 1;
+    editRequestIdRef.current = requestId;
+    setEditError(null);
+    setEditRule(null);
+    setEditModalOpen(true);
+    setEditOpening(true);
+    try {
+      // Load the current server state so the edit starts from the latest
+      // values rather than a possibly stale list row (concurrent-change guard).
+      const fresh = await alertsApi.getRule(rule.id);
+      // Latest-request-wins: opening edit on B after A must not let A's slower
+      // response seed the form with the wrong rule.
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
+      setEditRule(fresh);
+    } catch (error) {
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
+      setEditError(getParsedApiError(error));
+    } finally {
+      if (mountedRef.current && editRequestIdRef.current === requestId) setEditOpening(false);
+    }
+  };
+
+  const handleUpdateRule = async (payload: AlertRuleCreateRequest) => {
+    if (!editRule) return false;
+    setEditLoading(true);
+    setEditError(null);
+    setUpdateSuccess(null);
+    try {
+      const updated = await alertsApi.updateRule(editRule.id, payload);
+      if (!mountedRef.current) return false;
+      setUpdateSuccess(formatUiText(text.updated, { name: updated.name }));
+      await loadRules(rulesPage);
+      return true;
+    } catch (error) {
+      if (mountedRef.current) setEditError(getParsedApiError(error));
+      return false;
+    } finally {
+      if (mountedRef.current) setEditLoading(false);
+    }
+  };
+
   const handleToggleEnabled = async (rule: AlertRuleItem) => {
     if (!beginRuleOperation(rule.id, 'toggle')) return;
     try {
@@ -357,6 +406,18 @@ const AlertsPage: React.FC = () => {
           )}
         />
       ) : null}
+      {updateSuccess ? (
+        <InlineAlert
+          title={text.updateSuccess}
+          message={updateSuccess}
+          variant="success"
+          action={(
+            <button type="button" className="min-h-11 min-w-11 text-sm underline" onClick={() => setUpdateSuccess(null)}>
+              {t('common.close')}
+            </button>
+          )}
+        />
+      ) : null}
       {rulesError ? <ApiErrorAlert error={rulesError} onDismiss={() => setRulesError(null)} /> : null}
 
       <Modal
@@ -379,6 +440,38 @@ const AlertsPage: React.FC = () => {
         />
       </Modal>
 
+      <Modal
+        isOpen={editModalOpen}
+        onClose={() => {
+          if (!editLoading) {
+            setEditModalOpen(false);
+            setEditRule(null);
+            setEditError(null);
+          }
+        }}
+        title={text.editRule}
+      >
+        {editError ? <ApiErrorAlert error={editError} onDismiss={() => setEditError(null)} className="mb-4" /> : null}
+        {editOpening && !editRule ? (
+          <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
+        ) : editRule ? (
+          <AlertRuleForm
+            key={editRule.id}
+            mode="edit"
+            initialRule={editRule}
+            onSubmit={async (payload) => {
+              const ok = await handleUpdateRule(payload);
+              if (ok) {
+                setEditModalOpen(false);
+                setEditRule(null);
+              }
+              return ok;
+            }}
+            isSubmitting={editLoading}
+          />
+        ) : null}
+      </Modal>
+
       <div className="flex h-full min-h-0 flex-col gap-4">
           <AlertRuleList
             rules={rules}
@@ -399,6 +492,7 @@ const AlertsPage: React.FC = () => {
             onPageChange={setRulesPage}
             onToggleEnabled={(rule) => void handleToggleEnabled(rule)}
             onDelete={(rule) => void handleDeleteRule(rule)}
+            onEdit={(rule) => void handleEditOpen(rule)}
             onTest={(rule) => void handleTestRule(rule)}
             busyRules={busyRules}
           />

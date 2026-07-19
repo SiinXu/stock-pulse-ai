@@ -98,6 +98,7 @@ interface AlertRuleListProps {
   onPageChange: (page: number) => void;
   onToggleEnabled: (rule: AlertRuleItem) => void;
   onDelete: (rule: AlertRuleItem) => void;
+  onEdit: (rule: AlertRuleItem) => void;
   onTest: (rule: AlertRuleItem) => void;
   busyRules?: AlertRuleBusyMap;
 }
@@ -115,6 +116,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   onPageChange,
   onToggleEnabled,
   onDelete,
+  onEdit,
   onTest,
   busyRules = {},
 }) => {
@@ -212,6 +214,15 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
                   <td className="px-3 py-3 text-xs text-secondary-text">{formatUiDateTime(rule.updatedAt ?? rule.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        size="compact"
+                        variant="outline"
+                        aria-label={formatUiText(text.editAria, { name: rule.name })}
+                        onClick={() => onEdit(rule)}
+                        disabled={isLoading || isRuleBusy(rule)}
+                      >
+                        {text.edit}
+                      </Button>
                       <Button
                         size="compact"
                         variant="outline"

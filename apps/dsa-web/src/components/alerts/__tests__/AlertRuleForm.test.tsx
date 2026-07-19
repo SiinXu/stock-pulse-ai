@@ -56,6 +56,39 @@ describe('AlertRuleForm', () => {
     );
   }
 
+  it('seeds fields from an existing rule and submits an updated payload in edit mode', async () => {
+    const rule = {
+      id: 7,
+      name: '旧名称',
+      targetScope: 'single_symbol',
+      target: '600519',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 1800 },
+      severity: 'warning',
+      enabled: true,
+      source: 'api',
+    } as const;
+
+    render(<AlertRuleForm mode="edit" initialRule={rule} onSubmit={onSubmit} />);
+
+    expect((screen.getByLabelText('规则名称') as HTMLInputElement).value).toBe('旧名称');
+    expect((screen.getByLabelText('标的代码') as HTMLInputElement).value).toBe('600519');
+    expect((screen.getByLabelText('价格阈值') as HTMLInputElement).value).toBe('1800');
+
+    fireEvent.change(screen.getByLabelText('价格阈值'), { target: { value: '1900' } });
+    fireEvent.click(screen.getByRole('button', { name: '更新规则' }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        targetScope: 'single_symbol',
+        target: '600519',
+        alertType: 'price_cross',
+        parameters: { direction: 'above', price: 1900 },
+        enabled: true,
+      }));
+    });
+  });
+
   it('submits a price_cross rule payload', async () => {
     render(<AlertRuleForm onSubmit={onSubmit} />);
 
