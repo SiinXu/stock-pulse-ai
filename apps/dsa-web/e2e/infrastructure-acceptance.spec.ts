@@ -1631,10 +1631,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(details.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
     await expect(details.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
 
-    for (const viewport of [
-      { width: 390, height: 844 },
-      { width: 320, height: 720 },
-    ]) {
+    await test.step('390px details keep canonical content within the viewport', async () => {
+      const viewport = { width: 390, height: 844 };
       await page.setViewportSize(viewport);
       const box = await details.boundingBox();
       expect(box).not.toBeNull();
@@ -1642,7 +1640,17 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
       await expect(details.getByText('Canonical momentum confirmed', { exact: true })).toBeVisible();
-    }
+    });
+    await test.step('320px details keep canonical content within the viewport', async () => {
+      const viewport = { width: 320, height: 720 };
+      await page.setViewportSize(viewport);
+      const box = await details.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(-1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+      await expect(details.getByText('Canonical momentum confirmed', { exact: true })).toBeVisible();
+    });
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
 

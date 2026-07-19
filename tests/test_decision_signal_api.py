@@ -279,25 +279,59 @@ def test_api_json_export_contract_prefers_canonical_presentation(client_and_db) 
         ),
     )
     assert create_resp.status_code == 200, create_resp.text
-    signal_id = create_resp.json()["item"]["id"]
+    created_item = create_resp.json()["item"]
+    signal_id = created_item["id"]
 
-    responses = (
-        create_resp.json()["item"],
-        client.get(f"/api/v1/decision-signals/{signal_id}").json(),
-        client.get("/api/v1/decision-signals", params={"source_report_id": 4001}).json()["items"][0],
-        client.get("/api/v1/decision-signals/latest/600519", params={"limit": 1}).json()["items"][0],
-    )
-    for item in responses:
-        assert item["action"] == "buy"
-        assert item["action_label"] == "Sell"
-        assert item["presentation"] == {
-            "action": "buy",
-            "label": "Buy",
-            "confidence": 0.91,
-            "summary": "Canonical export summary",
-            "risk": "Canonical export risk",
-            "timestamp": item["created_at"],
-        }
+    detail_resp = client.get(f"/api/v1/decision-signals/{signal_id}")
+    list_resp = client.get("/api/v1/decision-signals", params={"source_report_id": 4001})
+    latest_resp = client.get("/api/v1/decision-signals/latest/600519", params={"limit": 1})
+    assert detail_resp.status_code == 200, detail_resp.text
+    assert list_resp.status_code == 200, list_resp.text
+    assert latest_resp.status_code == 200, latest_resp.text
+    detail_item = detail_resp.json()
+    list_item = list_resp.json()["items"][0]
+    latest_item = latest_resp.json()["items"][0]
+
+    assert created_item["action"] == "buy"
+    assert created_item["action_label"] == "Sell"
+    assert created_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": created_item["created_at"],
+    }
+    assert detail_item["action"] == "buy"
+    assert detail_item["action_label"] == "Sell"
+    assert detail_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": detail_item["created_at"],
+    }
+    assert list_item["action"] == "buy"
+    assert list_item["action_label"] == "Sell"
+    assert list_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": list_item["created_at"],
+    }
+    assert latest_item["action"] == "buy"
+    assert latest_item["action_label"] == "Sell"
+    assert latest_item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Canonical export summary",
+        "risk": "Canonical export risk",
+        "timestamp": latest_item["created_at"],
+    }
 
 
 @pytest.mark.parametrize(
