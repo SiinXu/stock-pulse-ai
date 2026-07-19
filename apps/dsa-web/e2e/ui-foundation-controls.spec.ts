@@ -98,6 +98,9 @@ test.describe('coarse-pointer foundation controls', () => {
     await page.goto('/login');
     await setTheme(page, 'light');
     await expect(page.getByRole('heading', { name: 'StockPulse', exact: true })).toBeVisible();
+    await page.evaluate(() => Promise.all(
+      document.getAnimations().map((animation) => animation.finished),
+    ));
     expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
 
     const password = page.locator('#password');
