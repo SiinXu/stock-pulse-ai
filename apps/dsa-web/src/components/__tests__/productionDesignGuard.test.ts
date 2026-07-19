@@ -20,13 +20,15 @@ const productionStyles: Record<string, string> = {
 const productionSources = { ...productionStyles, ...productionComponents };
 const PRIMARY_CTA_VARIANTS = new Set([
   'primary',
-  'settings-primary',
-  'action-primary',
-  'gradient',
 ]);
 
 type DesignRule =
   | 'button-shape'
+  | 'button-size-contract'
+  | 'button-xl-allowlist'
+  | 'button-visual-override'
+  | 'button-icon-only'
+  | 'control-visual-override'
   | 'hardcoded-hex'
   | 'hardcoded-color'
   | 'legacy-chromatic-token'
@@ -51,6 +53,54 @@ const PRIMARY_CTA_SHIMMER_PATTERN = /(?<![a-zA-Z0-9_-])(?:animate-\[[^\]\r\n]*sh
 const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(|var\(--[\w-]*gradient[\w-]*\))/i;
 const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
 const PILL_RADIUS_CLASS_PATTERN = /\brounded-(?:[trblse]{1,2}-)?full\b/g;
+const BUTTON_RADIUS_CLASS_PATTERN = /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?$/;
+const BUTTON_CANONICAL_SIZE_HEIGHTS = {
+  compact: 'h-7',
+  default: 'h-8',
+  comfortable: 'h-9',
+  primary: 'h-10',
+} as const;
+const BUTTON_ALLOWED_HEIGHT_CLASSES = new Set<string>(Object.values(BUTTON_CANONICAL_SIZE_HEIGHTS));
+const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
+type ExactButtonAllowance = {
+  line: number;
+  removeBy: string;
+  tokens: readonly string[];
+};
+const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../../pages/NotFoundPage.tsx', [{
+    line: 34,
+    removeBy: 'UI-QA01',
+    tokens: ['size="xl"'],
+  }]],
+]);
+const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
+const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
+const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
+const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../../pages/DecisionSignalsPage.tsx', [{
+    line: 1448,
+    removeBy: 'UI-D01',
+    tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
+  }]],
+  ['../../pages/PortfolioPage.tsx', [
+    ...[1145, 1158, 1170, 1770, 1773].map((line) => ({
+      line,
+      removeBy: 'UI-P01',
+      tokens: ['flex-1'],
+    })),
+    ...[1601, 1638, 1682].map((line) => ({
+      line,
+      removeBy: 'UI-P01',
+      tokens: ['w-full'],
+    })),
+  ]],
+  ['../../pages/StockScreeningPage.tsx', [{
+    line: 1375,
+    removeBy: 'UI-SCR01',
+    tokens: ['min-w-40'],
+  }]],
+]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
 const MAGIC_PIXEL_SIZE_PATTERN = /\b(?:text|size|[wh]|min-[wh]|max-[wh]|basis)-\[[^\]\r\n]*\d(?:\.\d+)?px[^\]\r\n]*\]/g;
@@ -184,6 +234,7 @@ type SharedButtonBindings = {
 type PrimaryCtaScan = {
   matchedButtons: number;
   matchedSharedStyles: number;
+  allowlistHits: string[];
   violations: DesignViolation[];
 };
 
@@ -228,8 +279,9 @@ function expressionMayResolveToPrimaryCta(expression: ts.Expression): boolean {
   return true;
 }
 
-function isSharedButtonModuleSpecifier(specifier: string): boolean {
-  return /(?:^|\/)(?:components\/)?common(?:\/Button)?$/.test(specifier);
+function isSharedButtonModuleSpecifier(specifier: string, componentName = 'Button'): boolean {
+  return /(?:^|\/)(?:components\/)?common$/.test(specifier)
+    || specifier.endsWith(`/common/${componentName}`);
 }
 
 function importDeclarationFor(node: ts.Node): ts.ImportDeclaration | undefined {
@@ -257,6 +309,7 @@ function isSharedButtonNamespaceExpression(
   expression: ts.Expression,
   bindings: SharedButtonBindings,
   resolving: Set<ts.Symbol>,
+  componentName = 'Button',
 ): boolean {
   const current = unwrapExpression(expression);
   if (!ts.isIdentifier(current)) {
@@ -275,7 +328,7 @@ function isSharedButtonNamespaceExpression(
     return Boolean(
       importDeclaration
       && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-      && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+      && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
     );
   }
   if (
@@ -285,7 +338,12 @@ function isSharedButtonNamespaceExpression(
   ) {
     const nextResolving = new Set(resolving);
     nextResolving.add(symbol);
-    return isSharedButtonNamespaceExpression(declaration.initializer, bindings, nextResolving);
+    return isSharedButtonNamespaceExpression(
+      declaration.initializer,
+      bindings,
+      nextResolving,
+      componentName,
+    );
   }
   return false;
 }
@@ -377,13 +435,14 @@ function isSharedButtonExpression(
   expression: ts.Expression,
   bindings: SharedButtonBindings,
   resolving: Set<ts.Symbol>,
+  componentName = 'Button',
 ): boolean {
   const current = unwrapExpression(expression);
   if (ts.isIdentifier(current)) {
     const symbol = bindings.checker.getSymbolAtLocation(current);
     if (!symbol) {
       // Self-test snippets intentionally omit imports for the shared Button shorthand.
-      return current.text === 'Button';
+      return current.text === componentName;
     }
     if (resolving.has(symbol)) {
       return false;
@@ -394,11 +453,11 @@ function isSharedButtonExpression(
     }
     if (ts.isImportSpecifier(declaration)) {
       const importDeclaration = importDeclarationFor(declaration);
-      return (declaration.propertyName ?? declaration.name).text === 'Button'
+      return (declaration.propertyName ?? declaration.name).text === componentName
         && Boolean(
           importDeclaration
           && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-          && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+          && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
         );
     }
     if (ts.isImportClause(declaration)) {
@@ -406,8 +465,8 @@ function isSharedButtonExpression(
       return Boolean(
         importDeclaration
         && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-        && /(?:^|\/)Button$/.test(importDeclaration.moduleSpecifier.text)
-        && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+        && importDeclaration.moduleSpecifier.text.endsWith(`/common/${componentName}`)
+        && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
       );
     }
     const nextResolving = new Set(resolving);
@@ -417,7 +476,12 @@ function isSharedButtonExpression(
       && isConstVariableDeclaration(declaration)
       && declaration.initializer
     ) {
-      return isSharedButtonExpression(declaration.initializer, bindings, nextResolving);
+      return isSharedButtonExpression(
+        declaration.initializer,
+        bindings,
+        nextResolving,
+        componentName,
+      );
     }
     if (
       ts.isBindingElement(declaration)
@@ -426,7 +490,7 @@ function isSharedButtonExpression(
         declaration,
         bindings,
         nextResolving,
-      ).includes('Button')
+      ).includes(componentName)
       && ts.isObjectBindingPattern(declaration.parent)
       && ts.isVariableDeclaration(declaration.parent.parent)
       && declaration.parent.parent.initializer
@@ -435,22 +499,33 @@ function isSharedButtonExpression(
         declaration.parent.parent.initializer,
         bindings,
         nextResolving,
+        componentName,
       );
     }
     return false;
   }
   if (
     ts.isPropertyAccessExpression(current)
-    && current.name.text === 'Button'
+    && current.name.text === componentName
   ) {
-    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+    return isSharedButtonNamespaceExpression(
+      current.expression,
+      bindings,
+      resolving,
+      componentName,
+    );
   }
   if (
     ts.isElementAccessExpression(current)
     && current.argumentExpression
-    && staticStringCandidates(current.argumentExpression, bindings, resolving).includes('Button')
+    && staticStringCandidates(current.argumentExpression, bindings, resolving).includes(componentName)
   ) {
-    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+    return isSharedButtonNamespaceExpression(
+      current.expression,
+      bindings,
+      resolving,
+      componentName,
+    );
   }
   return false;
 }
@@ -458,14 +533,181 @@ function isSharedButtonExpression(
 function isSharedButtonOpening(
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
+  componentName = 'Button',
 ): boolean {
   const { tagName } = opening;
   if (ts.isIdentifier(tagName)) {
-    return isSharedButtonExpression(tagName, bindings, new Set());
+    return isSharedButtonExpression(tagName, bindings, new Set(), componentName);
   }
   return ts.isPropertyAccessExpression(tagName)
-    && tagName.name.text === 'Button'
-    && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set());
+    && tagName.name.text === componentName
+    && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set(), componentName);
+}
+
+const VISIBLE_BUTTON_TEXT_PATTERN = /[\p{L}\p{N}]/u;
+
+function jsxAttributeText(attribute: ts.JsxAttribute): string | null {
+  if (!attribute.initializer) return '';
+  if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text;
+  if (
+    ts.isJsxExpression(attribute.initializer)
+    && attribute.initializer.expression
+    && (
+      ts.isStringLiteral(attribute.initializer.expression)
+      || ts.isNoSubstitutionTemplateLiteral(attribute.initializer.expression)
+    )
+  ) {
+    return attribute.initializer.expression.text;
+  }
+  return null;
+}
+
+function jsxOpeningHidesVisibleText(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+): boolean {
+  for (const property of opening.attributes.properties) {
+    if (!ts.isJsxAttribute(property)) continue;
+    const name = property.name.getText();
+    if (name === 'hidden') return true;
+    if (name === 'className') {
+      const value = jsxAttributeText(property);
+      if (value?.split(/\s+/).includes('sr-only')) return true;
+    }
+    if (name === 'aria-hidden') {
+      const value = jsxAttributeText(property);
+      if (value === 'true') return true;
+      if (
+        property.initializer
+        && ts.isJsxExpression(property.initializer)
+        && property.initializer.expression?.kind === ts.SyntaxKind.TrueKeyword
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function jsxExpressionMayRenderVisibleText(
+  expression: ts.Expression,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
+): boolean {
+  const current = unwrapExpression(expression);
+  if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+    return VISIBLE_BUTTON_TEXT_PATTERN.test(current.text);
+  }
+  if (ts.isTemplateExpression(current)) {
+    return VISIBLE_BUTTON_TEXT_PATTERN.test(current.head.text) || current.templateSpans.length > 0;
+  }
+  if (ts.isNumericLiteral(current)) return true;
+  if (
+    current.kind === ts.SyntaxKind.FalseKeyword
+    || current.kind === ts.SyntaxKind.TrueKeyword
+    || current.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return false;
+  }
+  if (ts.isIdentifier(current)) {
+    if (resolving.has(current.text) || !initializers.has(current.text)) return true;
+    const initializer = initializers.get(current.text);
+    if (!initializer) return true;
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return jsxExpressionMayRenderVisibleText(initializer, initializers, nextResolving);
+  }
+  if (ts.isJsxElement(current)) {
+    return jsxElementMayRenderVisibleText(current, initializers, resolving);
+  }
+  if (ts.isJsxSelfClosingElement(current)) {
+    return false;
+  }
+  if (ts.isJsxFragment(current)) {
+    return current.children.some((child) => (
+      jsxChildMayRenderVisibleText(child, initializers, resolving)
+    ));
+  }
+  if (ts.isConditionalExpression(current)) {
+    return jsxExpressionMayRenderVisibleText(current.whenTrue, initializers, resolving)
+      || jsxExpressionMayRenderVisibleText(current.whenFalse, initializers, resolving);
+  }
+  if (ts.isBinaryExpression(current)) {
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      || current.operatorToken.kind === ts.SyntaxKind.CommaToken
+    ) {
+      return jsxExpressionMayRenderVisibleText(current.right, initializers, resolving);
+    }
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      || current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      || current.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      return jsxExpressionMayRenderVisibleText(current.left, initializers, resolving)
+        || jsxExpressionMayRenderVisibleText(current.right, initializers, resolving);
+    }
+  }
+  if (ts.isArrayLiteralExpression(current)) {
+    return current.elements.some((element) => (
+      !ts.isSpreadElement(element)
+      && jsxExpressionMayRenderVisibleText(element, initializers, resolving)
+    ));
+  }
+
+  // Calls and data expressions can render localized or runtime-owned text.
+  return true;
+}
+
+function jsxElementMayRenderVisibleText(
+  element: ts.JsxElement,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
+): boolean {
+  if (jsxOpeningHidesVisibleText(element.openingElement)) return false;
+  return element.children.some((child) => (
+    jsxChildMayRenderVisibleText(child, initializers, resolving)
+  ));
+}
+
+function jsxChildMayRenderVisibleText(
+  child: ts.JsxChild,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
+): boolean {
+  if (ts.isJsxText(child)) return VISIBLE_BUTTON_TEXT_PATTERN.test(child.text);
+  if (ts.isJsxExpression(child)) {
+    return Boolean(
+      child.expression
+      && jsxExpressionMayRenderVisibleText(child.expression, initializers, resolving),
+    );
+  }
+  if (ts.isJsxElement(child)) {
+    return jsxElementMayRenderVisibleText(child, initializers, resolving);
+  }
+  if (ts.isJsxSelfClosingElement(child)) return false;
+  return child.children.some((nestedChild) => (
+    jsxChildMayRenderVisibleText(nestedChild, initializers, resolving)
+  ));
+}
+
+function appendButtonIconOnlyViolation(
+  filename: string,
+  source: string,
+  element: ts.JsxElement,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(element.openingElement, bindings)) return;
+  if (element.children.some((child) => (
+    jsxChildMayRenderVisibleText(child, initializers)
+  ))) return;
+  violations.push({
+    file: filename,
+    line: lineNumberAt(source, element.openingElement.getStart(element.getSourceFile())),
+    rule: 'button-icon-only',
+    token: 'icon-or-symbol-only',
+  });
 }
 
 function isPrimaryButtonOpening(
@@ -495,6 +737,236 @@ function isPrimaryButtonOpening(
     }
   }
   return mayResolveToPrimary;
+}
+
+function spreadMayOverrideButtonSize(
+  expression: ts.Expression,
+  bindings: SharedButtonBindings,
+  resolving = new Set<ts.Symbol>(),
+): boolean {
+  const current = unwrapExpression(expression);
+  if (ts.isIdentifier(current)) {
+    const symbol = bindings.checker.getSymbolAtLocation(current);
+    if (!symbol || resolving.has(symbol)) return true;
+    const declaration = symbolDeclaration(symbol);
+    if (
+      !declaration
+      || !ts.isVariableDeclaration(declaration)
+      || !isConstVariableDeclaration(declaration)
+      || !declaration.initializer
+    ) {
+      return true;
+    }
+    const nextResolving = new Set(resolving);
+    nextResolving.add(symbol);
+    return spreadMayOverrideButtonSize(declaration.initializer, bindings, nextResolving);
+  }
+  if (!ts.isObjectLiteralExpression(current)) return true;
+  for (const property of current.properties) {
+    if (ts.isSpreadAssignment(property)) {
+      if (spreadMayOverrideButtonSize(property.expression, bindings, resolving)) return true;
+      continue;
+    }
+    if (!('name' in property) || !property.name) return true;
+    const names = staticPropertyNameCandidates(property.name, bindings, resolving);
+    if (names.length === 0 || names.includes('size')) return true;
+  }
+  return false;
+}
+
+function appendButtonXlViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  bindings: SharedButtonBindings,
+  allowlistHits: string[],
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(opening, bindings)) return;
+  let candidates: string[] = [];
+  let unresolved: ts.Node | null = null;
+  for (const property of opening.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(property)) {
+      if (spreadMayOverrideButtonSize(property.expression, bindings)) {
+        candidates = [];
+        unresolved = property;
+      }
+      continue;
+    }
+    if (property.name.getText() !== 'size') continue;
+    candidates = !property.initializer
+      ? []
+      : ts.isStringLiteral(property.initializer)
+        ? [property.initializer.text]
+        : ts.isJsxExpression(property.initializer) && property.initializer.expression
+          ? staticStringCandidates(property.initializer.expression, bindings, new Set())
+          : [];
+    unresolved = candidates.length === 0 ? property : null;
+  }
+  if (unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.getStart(opening.getSourceFile())),
+      rule: 'button-xl-allowlist',
+      token: 'size={dynamic}',
+    });
+  }
+  if (!candidates.includes('xl')) return;
+  const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
+  if (consumeExactButtonAllowance(
+    'button-xl-allowlist',
+    BUTTON_XL_ALLOWLIST,
+    filename,
+    openingLine,
+    'size="xl"',
+    allowlistHits,
+  )) return;
+  violations.push({
+    file: filename,
+    line: openingLine,
+    rule: 'button-xl-allowlist',
+    token: 'size="xl"',
+  });
+}
+
+function exactButtonAllowanceKey(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  filename: string,
+  line: number,
+  token: string,
+): string {
+  return `${rule}:${filename}:${line}:${token}`;
+}
+
+function consumeExactButtonAllowance(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  allowlist: Map<string, readonly ExactButtonAllowance[]>,
+  filename: string,
+  line: number,
+  token: string,
+  hits: string[],
+): boolean {
+  const allowance = allowlist.get(filename)?.find((entry) => (
+    entry.line === line && entry.tokens.includes(token)
+  ));
+  if (!allowance) return false;
+  const key = exactButtonAllowanceKey(rule, filename, line, token);
+  if (hits.includes(key)) return false;
+  hits.push(key);
+  return true;
+}
+
+function exactButtonAllowanceKeys(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  allowlist: Map<string, readonly ExactButtonAllowance[]>,
+): string[] {
+  return Array.from(allowlist.entries()).flatMap(([filename, allowances]) => (
+    allowances.flatMap(({ line, tokens }) => tokens.map((token) => (
+      exactButtonAllowanceKey(rule, filename, line, token)
+    )))
+  ));
+}
+
+function buttonUtilityName(token: string): string {
+  let utilityStart = 0;
+  let squareDepth = 0;
+  let roundDepth = 0;
+  let curlyDepth = 0;
+  for (let index = 0; index < token.length; index += 1) {
+    const character = token[index];
+    if (character === '\\') {
+      index += 1;
+      continue;
+    }
+    if (character === '[') squareDepth += 1;
+    else if (character === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (character === '(') roundDepth += 1;
+    else if (character === ')') roundDepth = Math.max(0, roundDepth - 1);
+    else if (character === '{') curlyDepth += 1;
+    else if (character === '}') curlyDepth = Math.max(0, curlyDepth - 1);
+    else if (
+      character === ':'
+      && squareDepth === 0
+      && roundDepth === 0
+      && curlyDepth === 0
+    ) {
+      utilityStart = index + 1;
+    }
+  }
+  return token.slice(utilityStart).replace(/^!/, '');
+}
+
+function appendButtonVisualOverrideViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  allowlistHits: string[],
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(opening, bindings)) return;
+  const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
+  const scan = classNameFragments(opening, sourceFile, initializers);
+  for (const fragment of scan.fragments) {
+    for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
+      if (!BUTTON_VISUAL_OVERRIDE_PATTERN.test(buttonUtilityName(token))) continue;
+      if (consumeExactButtonAllowance(
+        'button-visual-override',
+        BUTTON_VISUAL_OVERRIDE_ALLOWLIST,
+        filename,
+        openingLine,
+        token,
+        allowlistHits,
+      )) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
+        rule: 'button-visual-override',
+        token,
+      });
+    }
+  }
+  for (const unresolved of scan.unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.index),
+      rule: 'button-visual-override',
+      token: `dynamic:${unresolved.text}`,
+    });
+  }
+}
+
+function appendNonButtonControlVisualOverrideViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  const controlName = NON_BUTTON_CONTROL_NAMES.find((name) => (
+    isSharedButtonOpening(opening, bindings, name)
+  ));
+  if (!controlName) return;
+
+  const overridePattern = controlName === 'IconButton'
+    ? BUTTON_VISUAL_OVERRIDE_PATTERN
+    : FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN;
+  const scan = classNameFragments(opening, sourceFile, initializers);
+  for (const fragment of scan.fragments) {
+    for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
+      if (!overridePattern.test(buttonUtilityName(token))) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
+        rule: 'control-visual-override',
+        token: `${controlName}:${token}`,
+      });
+    }
+  }
 }
 
 function bindingIdentifiers(name: ts.BindingName): ts.Identifier[] {
@@ -1123,6 +1595,66 @@ function appendPrimaryClassViolations(
   }
 }
 
+type ButtonSizeStyleEntry = {
+  index: number;
+  fragments: StaticClassFragment[];
+};
+
+function buttonHeightClasses(fragments: StaticClassFragment[]): string[] {
+  return Array.from(new Set(
+    fragments.flatMap(({ text }) => text.split(/\s+/).filter((token) => BUTTON_HEIGHT_CLASS_PATTERN.test(token))),
+  ));
+}
+
+function buttonRadiusClasses(fragments: StaticClassFragment[]): string[] {
+  return Array.from(new Set(
+    fragments.flatMap(({ text }) => text.split(/\s+/).filter((token) => BUTTON_RADIUS_CLASS_PATTERN.test(token))),
+  ));
+}
+
+function appendButtonSizeContractViolations(
+  filename: string,
+  source: string,
+  declarationIndex: number,
+  entries: Map<string, ButtonSizeStyleEntry>,
+  violations: DesignViolation[],
+): void {
+  for (const entry of entries.values()) {
+    const radii = buttonRadiusClasses(entry.fragments);
+    if (radii.length === 1 && radii[0] === 'rounded-lg') continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry.index),
+      rule: 'button-shape',
+      token: radii.join('|') || 'rounded:missing',
+    });
+  }
+
+  for (const [size, expectedHeight] of Object.entries(BUTTON_CANONICAL_SIZE_HEIGHTS)) {
+    const entry = entries.get(size);
+    const heights = entry ? buttonHeightClasses(entry.fragments) : [];
+    if (heights.length === 1 && heights[0] === expectedHeight) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry?.index ?? declarationIndex),
+      rule: 'button-size-contract',
+      token: `${size}:${heights.join('|') || 'missing'}`,
+    });
+  }
+
+  for (const [size, entry] of entries) {
+    if (size in BUTTON_CANONICAL_SIZE_HEIGHTS) continue;
+    const heights = buttonHeightClasses(entry.fragments);
+    if (heights.length === 1 && BUTTON_ALLOWED_HEIGHT_CLASSES.has(heights[0])) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry.index),
+      rule: 'button-size-contract',
+      token: `${size}:${heights.join('|') || 'missing'}`,
+    });
+  }
+}
+
 function appendPrimaryStyleViolations(
   filename: string,
   source: string,
@@ -1300,7 +1832,12 @@ function scanPrimaryCtasInBoundSource(
 ): PrimaryCtaScan {
   const initializers = collectStaticInitializers(sourceFile);
   const buttonBindings: SharedButtonBindings = { checker };
-  const result: PrimaryCtaScan = { matchedButtons: 0, matchedSharedStyles: 0, violations: [] };
+  const result: PrimaryCtaScan = {
+    matchedButtons: 0,
+    matchedSharedStyles: 0,
+    allowlistHits: [],
+    violations: [],
+  };
   const appendEffects = (effects: PrimaryCtaEffectScan): void => {
     appendPrimaryClassViolations(
       filename,
@@ -1322,12 +1859,78 @@ function scanPrimaryCtasInBoundSource(
     );
   };
   const visit = (node: ts.Node): void => {
-    if (ts.isJsxElement(node) && isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
-      result.matchedButtons += 1;
-      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
-    } else if (ts.isJsxSelfClosingElement(node) && isPrimaryButtonOpening(node, buttonBindings)) {
-      result.matchedButtons += 1;
-      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+    if (ts.isJsxElement(node)) {
+      appendButtonXlViolations(
+        filename,
+        source,
+        node.openingElement,
+        buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
+      appendButtonVisualOverrideViolations(
+        filename,
+        source,
+        node.openingElement,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
+      appendNonButtonControlVisualOverrideViolations(
+        filename,
+        source,
+        node.openingElement,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      appendButtonIconOnlyViolation(
+        filename,
+        source,
+        node,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      if (isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
+        result.matchedButtons += 1;
+        appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+      }
+    } else if (ts.isJsxSelfClosingElement(node)) {
+      appendButtonXlViolations(
+        filename,
+        source,
+        node,
+        buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
+      appendButtonVisualOverrideViolations(
+        filename,
+        source,
+        node,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
+      appendNonButtonControlVisualOverrideViolations(
+        filename,
+        source,
+        node,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      if (isPrimaryButtonOpening(node, buttonBindings)) {
+        result.matchedButtons += 1;
+        appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+      }
     }
 
     if (
@@ -1370,6 +1973,41 @@ function scanPrimaryCtasInBoundSource(
             sourceFile,
             'BUTTON_VARIANT_STYLES',
           ).unresolved[0]],
+          result.violations,
+        );
+      }
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'BUTTON_SIZE_STYLES'
+      && node.initializer
+    ) {
+      const initializer = unwrapExpression(node.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) {
+        const entries = new Map<string, ButtonSizeStyleEntry>();
+        for (const property of initializer.properties) {
+          if (!ts.isPropertyAssignment(property)) continue;
+          const scan = scanStaticClassExpression(
+            property.initializer,
+            sourceFile,
+            initializers,
+            new Set(),
+            'BUTTON_SIZE_STYLES',
+          );
+          const names = propertyNameValues(property.name, initializers);
+          if (names?.length === 1) {
+            entries.set(names[0], {
+              index: property.getStart(sourceFile),
+              fragments: scan.fragments,
+            });
+          }
+        }
+        appendButtonSizeContractViolations(
+          filename,
+          source,
+          node.getStart(sourceFile),
+          entries,
           result.violations,
         );
       }
@@ -1592,6 +2230,235 @@ describe('production design guard', () => {
       productionDesignGuardFixtures.mappedPillCssButton,
       new Set(['session-item']),
     )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 50%' })]);
+  });
+
+  it('self-test inspects the shared Button size style map', () => {
+    const source = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-7 rounded-full px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-shape', token: 'rounded-full' }),
+    ]);
+  });
+
+  it('self-test enforces canonical Button tiers and rejects out-of-contract heights', () => {
+    const source = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-8 rounded-lg px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+        xsm: 'h-6 rounded-lg px-2',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-8' }),
+      expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:h-6' }),
+    ]);
+  });
+
+  it('self-test rejects non-soft radii in the shared Button size map', () => {
+    const source = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-7 rounded-2xl px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toContainEqual(
+      expect.objectContaining({ rule: 'button-shape', token: 'rounded-2xl' }),
+    );
+  });
+
+  it('self-test rejects xl Button usage outside the exact migration allowlist', () => {
+    const source = `
+      import { Button } from '../common';
+      export const Example = () => <Button variant="primary" size="xl">Continue</Button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toContainEqual(
+      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
+    );
+    expect(findProductionDesignViolations('../../pages/NotFoundPage.tsx', source)).toContainEqual(
+      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
+    );
+  });
+
+  it('fails closed for dynamic Button sizes and respects final JSX prop order', () => {
+    const sizeViolations = (source: string) => findProductionDesignViolations('fixture.tsx', source)
+      .filter(({ rule }) => rule === 'button-xl-allowlist');
+
+    expect(sizeViolations(
+      'declare const props: ButtonProps; <Button variant="secondary" size="default" {...props}>Continue</Button>',
+    )).toEqual([
+      expect.objectContaining({ token: 'size={dynamic}' }),
+    ]);
+    expect(sizeViolations(
+      'declare const size: ButtonSize; <Button variant="secondary" size={size}>Continue</Button>',
+    )).toEqual([
+      expect.objectContaining({ token: 'size={dynamic}' }),
+    ]);
+    expect(sizeViolations(
+      'declare const props: ButtonProps; <Button variant="secondary" {...props} size="default">Continue</Button>',
+    )).toEqual([]);
+    expect(sizeViolations(
+      '<Button variant="secondary" size={dense ? "default" : "xl"}>Continue</Button>',
+    )).toEqual([
+      expect.objectContaining({ token: 'size="xl"' }),
+    ]);
+  });
+
+  it('self-test rejects caller-side Button visual overrides', () => {
+    const source = `
+      import { Button } from '../common';
+      export const Example = () => (
+        <Button variant="secondary" className="md:h-12 w-full text-xs">Refresh</Button>
+      );
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'md:h-12' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'w-full' }),
+    ]);
+
+    const directionalSource = `
+      import { Button } from '../common';
+      export const Example = () => (
+        <Button variant="secondary" className="md:pl-4 grow flex-auto flex-none text-xs">Refresh</Button>
+      );
+    `;
+    expect(findProductionDesignViolations('fixture.tsx', directionalSource)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'md:pl-4' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'grow' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-auto' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-none' }),
+    ]);
+
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.buttonSizeOverride,
+    )).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'size-12' }),
+    ]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.buttonArbitraryGeometryOverride,
+    )).toEqual([
+      expect.objectContaining({
+        rule: 'button-visual-override',
+        token: 'supports-[display:grid]:[height:3rem]',
+      }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[width:3rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[padding-inline:1rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[border-radius:1rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[flex-basis:10rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[flex-shrink:0]' }),
+    ]);
+  });
+
+  it('rejects shared Button callers whose children are only icons or symbols', () => {
+    const iconOnlyViolations = (source: string) => findProductionDesignViolations(
+      'fixture.tsx',
+      source,
+    ).filter(({ rule }) => rule === 'button-icon-only');
+
+    expect(iconOnlyViolations(productionDesignGuardFixtures.iconOnlyButton)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+    expect(iconOnlyViolations(productionDesignGuardFixtures.symbolOnlyButton)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      <Button variant="ghost" aria-label="Delete">
+        <Trash2 aria-hidden="true" />
+        <span className="sr-only">Delete</span>
+      </Button>
+    `)).toHaveLength(1);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      declare const label: string;
+      <Button variant="ghost"><Trash2 aria-hidden="true" />Delete</Button>
+      <Button variant="ghost"><Trash2 aria-hidden="true" />{label}</Button>
+      <Button variant="ghost"><Trash2 aria-hidden="true" />{t('delete')}</Button>
+    `)).toEqual([]);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      const icon = <Trash2 aria-hidden="true" />;
+      <Button variant="ghost" aria-label="Delete">{icon}</Button>
+    `)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+  });
+
+  it('rejects shared field and IconButton geometry overrides without blocking layout width', () => {
+    const source = `
+      <Input className="h-11 w-24 rounded-full px-4 text-center" />
+      <IconButton aria-label="Delete" className="size-12 text-danger"><span>X</span></IconButton>
+      <Textarea className="min-h-40 rounded-xl" />
+    `;
+    const violations = findProductionDesignViolations('fixture.tsx', source);
+
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:rounded-full' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:px-4' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'IconButton:size-12' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:min-h-40' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:rounded-xl' }),
+    ]));
+    expect(violations).not.toContainEqual(
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:w-24' }),
+    );
+    expect(findProductionDesignViolations('fixture.tsx', `
+      import { Input as SharedInput } from '../common';
+      <SharedInput className="h-11" />
+    `)).toContainEqual(
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
+    );
+  });
+
+  it('keeps Button visual-override exceptions exact, consumable, and expiring', () => {
+    const source = `
+      import { Button } from '../components/common';
+      export const Example = () => (
+        <Button variant="secondary" className="flex-1 px-2">Refresh</Button>
+      );
+    `;
+
+    expect(findProductionDesignViolations('../../pages/PortfolioPage.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
+    ]);
+    const duplicateExactCaller = `${'\n'.repeat(1144)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    expect(findProductionDesignViolations(
+      '../../pages/PortfolioPage.tsx',
+      duplicateExactCaller,
+    ).filter(({ rule }) => rule === 'button-visual-override')).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
+    ]);
+    for (const allowances of [
+      ...BUTTON_XL_ALLOWLIST.values(),
+      ...BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values(),
+    ]) {
+      for (const { line, removeBy, tokens } of allowances) {
+        expect(line).toBeGreaterThan(0);
+        expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
+        expect(tokens.length).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('self-test detects a hardcoded hex colour', () => {
@@ -1826,11 +2693,19 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicVariantClass,
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
-    expect(findProductionDesignViolations(
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
+    const nonPrimaryViolations = findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryEnumerableNonPrimaryVariant,
-    )).toEqual([]);
+    );
+    expect(nonPrimaryViolations).toContainEqual(expect.objectContaining({
+      rule: 'button-visual-override',
+    }));
+    expect(nonPrimaryViolations).not.toContainEqual(expect.objectContaining({
+      rule: 'primary-cta-gradient',
+    }));
   });
 
   it('joins fully static class expressions before checking primary effects', () => {
@@ -1872,11 +2747,15 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       "const cn = (...values: string[]) => values.join(' '); <Button className={cn('bg-card')}>Run</Button>",
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       "function cn(value: string) { return value; } <Button className={cn('bg-card')}>Run</Button>",
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
   });
 
   it('keeps class composer shadowing inside its lexical scope', () => {
@@ -1898,10 +2777,10 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryShadowedDynamicClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'className',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryUniqueSafeConstClass,
@@ -1938,7 +2817,7 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       '<Button variant="primary" {...props} className="bg-card" style={{ background: \'var(--background)\' }}>Run</Button>',
-    )).toEqual([]);
+    ).filter(({ rule }) => rule !== 'button-xl-allowlist')).toEqual([]);
   });
 
   it('resolves direct const class expressions for primary callsites and shared styles', () => {
@@ -1970,10 +2849,10 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       '<Button variant="primary" className={ctaClasses}>Run</Button>',
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'className',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       'const BUTTON_VARIANT_STYLES = { primary: getPrimaryStyles(), \'settings-primary\': \'bg-foreground\', \'action-primary\': \'bg-foreground\', gradient: \'bg-foreground\' };',
@@ -2027,17 +2906,17 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicCnClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'dynamicClasses',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicTemplateClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'dynamicClasses',
-    })]);
+    })]));
   });
 
   it('accepts fully enumerable primary class expressions', () => {
@@ -2137,6 +3016,16 @@ describe('production design guard', () => {
       0,
     );
     const primaryScans = scanPrimaryCtaSources(productionTsxSources);
+    const allowlistHits = Array.from(primaryScans.values())
+      .flatMap((scan) => scan.allowlistHits)
+      .sort();
+    const expectedAllowlistHits = [
+      ...exactButtonAllowanceKeys('button-xl-allowlist', BUTTON_XL_ALLOWLIST),
+      ...exactButtonAllowanceKeys(
+        'button-visual-override',
+        BUTTON_VISUAL_OVERRIDE_ALLOWLIST,
+      ),
+    ].sort();
     const totalMatchedPrimaryButtons = Array.from(primaryScans.values()).reduce(
       (total, scan) => total + scan.matchedButtons,
       0,
@@ -2160,6 +3049,7 @@ describe('production design guard', () => {
     expect(totalMatchedButtonTags).toBeGreaterThan(0);
     expect(totalMatchedPrimaryButtons).toBeGreaterThan(0);
     expect(totalMatchedSharedPrimaryStyles).toBe(PRIMARY_CTA_VARIANTS.size);
+    expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);
   });

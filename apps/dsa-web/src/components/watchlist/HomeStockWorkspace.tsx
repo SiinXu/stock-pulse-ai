@@ -12,7 +12,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
+import { Badge, Button, IconButton, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -149,16 +149,16 @@ const WatchlistRowItem: React.FC<{
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <ScoreBadge item={item} />
-          <Button
+          <IconButton
             type="button"
-            variant="ghost"
-            size="icon"
+            variant="danger"
+            size="default"
             disabled={disabled}
             aria-label={t('watchlist.removeAria', { code: row.code })}
             onClick={() => void onRemove(row.code)}
           >
             <Trash2 className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
-          </Button>
+          </IconButton>
         </div>
       </div>
       {row.activeTask ? (
@@ -359,8 +359,8 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               <Button
                 type="button"
                 size="sm"
-                variant="home-action-ai"
-                className="whitespace-nowrap px-2 text-xs"
+                variant="secondary"
+                className="whitespace-nowrap text-xs"
                 disabled={watchlistRows.length === 0 || isBatchAnalyzing}
                 isLoading={isBatchAnalyzing}
                 loadingText={t('watchlist.submitting')}
@@ -372,8 +372,8 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               <Button
                 type="button"
                 size="sm"
-                variant="home-action-report"
-                className="whitespace-nowrap px-2 text-xs"
+                variant="secondary"
+                className="whitespace-nowrap text-xs"
                 disabled={pendingWatchlistCount === 0 || isTodayStatusUnavailable || isBatchAnalyzing}
                 onClick={() => void onAnalyzeWatchlist('pending')}
               >
@@ -386,20 +386,20 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 value={draftCode}
                 onChange={(event) => setDraftCode(event.target.value)}
                 placeholder={t('watchlist.addPlaceholder')}
-                className="h-11 px-3 text-xs"
+                className="text-xs"
                 disabled={watchlistActioning}
                 aria-label={t('watchlist.addPlaceholder')}
               />
-              <Button
+              <IconButton
                 type="submit"
-                size="icon"
-                variant="secondary"
+                size="comfortable"
+                variant="outline"
                 disabled={!draftCode.trim() || watchlistActioning}
                 isLoading={watchlistActioning}
                 aria-label={t('watchlist.add')}
               >
                 <Plus className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              </IconButton>
             </form>
             {batchStatus ? (
               <div className={`rounded-xl border px-3 py-2 text-xs ${statusClassName}`}>
@@ -510,7 +510,6 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             type="button"
             size="sm"
             variant="ghost"
-            className="w-full"
             disabled={watchlistLoading}
             onClick={() => void onRefreshWatchlist()}
           >

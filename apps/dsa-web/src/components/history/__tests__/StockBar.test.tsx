@@ -28,5 +28,6 @@ describe('StockBar', () => {
 
     expect(screen.getByRole('checkbox', { name: '全选当前个股' }).closest('label')).toHaveClass('min-h-11');
     expect(screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' }).closest('label')).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '删除' })).toHaveAttribute('data-control', 'icon-button');
   });
 });

@@ -50,8 +50,8 @@ describe('RouteOutletBoundary', () => {
 
       expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();
       expect(await screen.findByRole('heading', { name: '页面加载失败' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '重新加载页面' })).toHaveClass('h-8', 'rounded-full');
-      expect(screen.getByRole('button', { name: '返回首页' })).toHaveClass('h-8', 'rounded-full');
+      expect(screen.getByRole('button', { name: '重新加载页面' })).toHaveAttribute('data-variant', 'primary');
+      expect(screen.getByRole('button', { name: '返回首页' })).toHaveAttribute('data-variant', 'secondary');
 
       fireEvent.click(screen.getByRole('link', { name: '持仓' }));
 

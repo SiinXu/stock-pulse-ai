@@ -280,12 +280,14 @@ describe('AlertRuleList', () => {
     expect(onToggleEnabled).toHaveBeenCalledWith(rules[0]);
   });
 
-  it('shows loading text only for the active rule operation', () => {
+  it('keeps the action name stable and shows loading text only for the active rule operation', () => {
     renderList({ busyRules: { 1: 'toggle' } });
 
     expect(screen.getAllByRole('button', { name: '测试' })[0]).toBeDisabled();
-    expect(screen.getByRole('button', { name: '停用中' })).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByRole('button', { name: '测试中' })).not.toBeInTheDocument();
+    const busyToggle = screen.getAllByRole('button', { name: '停用' })[0];
+    expect(busyToggle).toHaveAttribute('aria-busy', 'true');
+    expect(busyToggle).toHaveTextContent('停用中');
+    expect(screen.queryByText('测试中')).not.toBeInTheDocument();
   });
 
   it('confirms deletion before calling onDelete', async () => {

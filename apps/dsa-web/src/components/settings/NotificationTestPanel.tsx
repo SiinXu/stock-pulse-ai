@@ -104,7 +104,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         actions={(
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
             onClick={() => setTestModalOpen(true)}
           >
@@ -226,12 +226,12 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
 
           <Button
             type="button"
-            variant="settings-primary"
+            variant="primary"
             onClick={() => void runTest()}
             disabled={disabled || isTesting}
             isLoading={isTesting}
             loadingText={t('settings.notificationTesting')}
-            className="w-full justify-center"
+            className="justify-center"
           >
             <Send className="h-4 w-4" />
             {t('settings.notificationTestSend')}

@@ -441,8 +441,8 @@ describe('SettingsField', () => {
     const secondRowLabel = `${fieldTitle} 2`;
     expect(screen.getByRole('button', { name: `显示内容：${firstRowLabel}` })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: `删除：${firstRowLabel}` })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: `删除：${secondRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${firstRowLabel}` })).toHaveAttribute('data-control', 'icon-button');
+    expect(screen.getByRole('button', { name: `删除：${secondRowLabel}` })).toHaveAttribute('data-control', 'icon-button');
     const firstInput = screen.getByLabelText(firstRowLabel);
     const secondInput = screen.getByLabelText(secondRowLabel);
     expect(firstInput).toHaveAttribute(

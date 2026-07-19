@@ -6,7 +6,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { getUiLocale } from '../../utils/uiLocale';
-import { Button } from './Button';
+import { IconButton } from './IconButton';
 import { useFixedPopup } from './useFixedPopup';
 
 interface DatePickerProps {
@@ -295,23 +295,23 @@ export const DatePicker = ({
           }}
         >
           <div className="mb-2 flex h-9 items-center justify-between gap-2">
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
+              size="default"
               aria-label={t('common.prevPage')}
               onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            </IconButton>
             <p className="text-sm font-semibold text-foreground">{monthFormatter.format(visibleMonth)}</p>
-            <Button
+            <IconButton
               variant="ghost"
-              size="icon"
+              size="default"
               aria-label={t('common.nextPage')}
               onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
             >
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            </IconButton>
           </div>
           <div className="grid grid-cols-7" aria-hidden="true">
             {weekdays.map((weekday, index) => (

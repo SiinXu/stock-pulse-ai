@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, Checkbox, ConfirmDialog, InlineAlert, ScrollArea } from '../common';
+import { Badge, Checkbox, ConfirmDialog, IconButton, InlineAlert, ScrollArea } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBarItemComponent } from './StockBarItem';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
@@ -146,18 +146,17 @@ export const StockBar: React.FC<StockBarProps> = ({
                 containerClassName="min-h-11 flex-1 rounded-lg py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
-              <Button
-                variant="danger-subtle"
-                size="xsm"
+              <IconButton
+                variant="danger"
+                size="compact"
                 onClick={requestDeleteSelected}
                 disabled={selectedCount === 0 || isDeleting}
                 isLoading={isDeleting}
-                loadingText=""
                 aria-label={t('common.delete')}
                 className="disabled:!border-transparent disabled:!bg-transparent"
               >
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
-              </Button>
+              </IconButton>
             </div>
           )}
 

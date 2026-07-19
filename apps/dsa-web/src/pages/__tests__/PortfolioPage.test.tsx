@@ -396,7 +396,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(await screen.findByText('过期')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveAttribute('data-size', 'comfortable');
   });
 
   it('shows aggregate partial valuation limitations near summary totals', async () => {
@@ -990,7 +990,7 @@ describe('PortfolioPage FX refresh', () => {
     const row = screen.getByText('HK00700').closest('tr');
     expect(row).not.toBeNull();
     const analyzeButton = within(row as HTMLTableRowElement).getByRole('button', { name: '分析' });
-    expect(analyzeButton).toHaveClass('h-11', 'min-w-11');
+    expect(analyzeButton).toHaveAttribute('data-size', 'comfortable');
     fireEvent.click(analyzeButton);
 
     await waitFor(() => {
@@ -1147,7 +1147,10 @@ describe('PortfolioPage FX refresh', () => {
     await waitForPortfolioLoad();
 
     fireEvent.click(screen.getByRole('button', { name: '刷新汇率' }));
-    expect(await screen.findByRole('button', { name: '刷新中...' })).toBeDisabled();
+    const refreshButton = await screen.findByRole('button', { name: '刷新汇率' });
+    expect(refreshButton).toBeDisabled();
+    expect(refreshButton).toHaveAttribute('aria-busy', 'true');
+    expect(refreshButton).toHaveTextContent('刷新中...');
 
     chooseOption(accountSelect, '2');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 2, costMethod: 'fifo', includeRealtime: false }));
@@ -1191,7 +1194,10 @@ describe('PortfolioPage FX refresh', () => {
     const costMethodSelect = screen.getAllByRole('combobox')[1];
 
     fireEvent.click(screen.getByRole('button', { name: '刷新汇率' }));
-    expect(await screen.findByRole('button', { name: '刷新中...' })).toBeDisabled();
+    const refreshButton = await screen.findByRole('button', { name: '刷新汇率' });
+    expect(refreshButton).toBeDisabled();
+    expect(refreshButton).toHaveAttribute('aria-busy', 'true');
+    expect(refreshButton).toHaveTextContent('刷新中...');
 
     chooseOption(costMethodSelect, 'avg');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: undefined, costMethod: 'avg', includeRealtime: false }));
@@ -1292,10 +1298,9 @@ describe('PortfolioPage FX refresh', () => {
     chooseOption(screen.getAllByRole('combobox')[0], '1');
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '录入交易' }));
-    expect(screen.getByLabelText('股票代码')).toHaveClass('h-11');
-    expect(screen.getByLabelText('交易日期').parentElement).toHaveClass('h-11');
-    expect(screen.getByLabelText('数量')).toHaveClass('h-11');
-    expect(screen.getByLabelText('成交价')).toHaveClass('h-11');
+    expect(screen.getByLabelText('股票代码')).toHaveAttribute('data-size', 'comfortable');
+    expect(screen.getByLabelText('数量')).toHaveAttribute('data-size', 'comfortable');
+    expect(screen.getByLabelText('成交价')).toHaveAttribute('data-size', 'comfortable');
     fireEvent.change(screen.getByLabelText('股票代码'), { target: { value: 'AAPL' } });
     fireEvent.change(screen.getByLabelText('数量'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('成交价'), { target: { value: '210' } });
@@ -1304,7 +1309,10 @@ describe('PortfolioPage FX refresh', () => {
     const dialog = screen.getByRole('dialog', { name: '手工录入：交易' });
     expect(screen.getByLabelText('股票代码')).toBeDisabled();
     expect(screen.getByLabelText('数量')).toBeDisabled();
-    expect(screen.getByRole('button', { name: '提交中' })).toBeDisabled();
+    const submitButton = screen.getByRole('button', { name: '提交交易' });
+    expect(submitButton).toBeDisabled();
+    expect(submitButton).toHaveAttribute('aria-busy', 'true');
+    expect(submitButton).toHaveTextContent('提交中');
     expect(screen.getByLabelText('交易日期').closest('.grid')).toHaveClass('grid-cols-1', 'sm:grid-cols-2');
     expect(within(dialog).getByRole('button', { name: '关闭' })).toBeDisabled();
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭' }));

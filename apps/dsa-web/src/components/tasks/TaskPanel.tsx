@@ -1,6 +1,6 @@
 import type React from 'react';
 import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
-import { Badge, Button, Card, StatusDot, Tooltip } from '../common';
+import { Badge, Card, IconButton, StatusDot } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
 import { getRequestedPhaseLabel } from '../../utils/marketPhase';
@@ -77,25 +77,21 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
 
         <div className="relative z-10 flex shrink-0 items-center gap-1.5">
           {onOpenRunFlow ? (
-            <Tooltip content={t('taskPanel.openRunFlow')}>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 min-w-11"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onOpenRunFlow(task);
-                  }}
-                  aria-label={t('taskPanel.openRunFlowAria', {
-                    stock: task.stockName || task.stockCode,
-                  })}
-                >
-                  <Workflow className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </span>
-            </Tooltip>
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="default"
+              tooltip={t('taskPanel.openRunFlow')}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenRunFlow(task);
+              }}
+              aria-label={t('taskPanel.openRunFlowAria', {
+                stock: task.stockName || task.stockCode,
+              })}
+            >
+              <Workflow className="h-4 w-4" aria-hidden="true" />
+            </IconButton>
           ) : null}
           <Badge
             variant={statusVariant}
@@ -106,11 +102,10 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
             <span className="min-w-0 truncate">{statusLabel}</span>
           </Badge>
           {onDismiss && isTerminal ? (
-            <Button
+            <IconButton
               type="button"
               variant="ghost"
-              size="icon"
-              className="h-11 w-11 min-w-11"
+              size="default"
               onClick={(event) => {
                 event.stopPropagation();
                 onDismiss(task.taskId);
@@ -118,7 +113,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               aria-label={t('taskPanel.dismissAria', { stock: task.stockName || task.stockCode })}
             >
               <X className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            </IconButton>
           ) : null}
         </div>
       </div>

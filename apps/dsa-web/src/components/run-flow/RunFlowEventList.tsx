@@ -88,10 +88,10 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
                 key={item}
                 type="button"
                 variant={filter === item ? 'outline' : 'ghost'}
-                size="xsm"
+                size="compact"
                 onClick={() => setFilter(item)}
                 aria-pressed={filter === item}
-                className="h-7 px-2 text-xs"
+                className="text-xs"
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                 {t(`runFlow.events.filter.${item}` as UiTextKey)}

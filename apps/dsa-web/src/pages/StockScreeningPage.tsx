@@ -1006,7 +1006,7 @@ const StockScreeningPage: React.FC = () => {
           title={text.notEnabledTitle}
           message={text.notEnabledMessage}
           action={
-            <Button size="sm" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
+            <Button variant="primary" size="sm" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
               {text.enable}
             </Button>
           }
@@ -1352,7 +1352,7 @@ const StockScreeningPage: React.FC = () => {
 
           <Input
             label={text.strategyParameter}
-            className="rounded-xl bg-surface text-sm focus:border-primary"
+            className="bg-surface text-sm focus:border-primary"
             value={strategy}
             disabled={loading}
             onChange={(event) => handleStrategyChange(event.target.value)}
@@ -1361,7 +1361,7 @@ const StockScreeningPage: React.FC = () => {
           <Input
             id="screening-max-results"
             label={text.resultCount}
-            className="rounded-xl bg-surface text-sm focus:border-primary"
+            className="bg-surface text-sm focus:border-primary"
             type="number"
             min={1}
             max={100}
@@ -1373,7 +1373,9 @@ const StockScreeningPage: React.FC = () => {
           />
 
           <Button
-            className="h-11 min-w-40"
+            className="min-w-40"
+            variant="primary"
+            size="primary"
             isLoading={loading}
             loadingText={text.screening}
             disabled={!isScreeningEnabled || loading}

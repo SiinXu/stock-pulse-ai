@@ -369,7 +369,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   size="sm"
                   isLoading={watchlist.isActioning}
                   onClick={() => watchlist.onToggle(meta.stockCode)}
-                  className="w-full text-xs"
+                  className="text-xs"
                 >
                   {watchlist.isInWatchlist(meta.stockCode) ? t('report.removeFromWatchlist') : t('report.addToWatchlist')}
                 </Button>

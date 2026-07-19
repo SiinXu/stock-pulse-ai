@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, CredentialInput, Select } from '../common';
+import { Badge, Button, CredentialInput, IconButton, Select } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -243,11 +243,11 @@ function renderFieldControl(
                     }}
                   />
                 </div>
-                <Button
+                <IconButton
                   type="button"
-                  variant="settings-secondary"
-                  size="lg"
-                  className="px-3 text-muted-text shadow-none hover:text-danger"
+                  variant="danger"
+                  size="comfortable"
+                  className="text-muted-text shadow-none hover:text-danger"
                   aria-label={`${t('settings.fieldDelete')}${getUiColon(language)}${rowLabel}`}
                   disabled={disabled || !schema?.isEditable || values.length <= 1}
                   onClick={() => {
@@ -256,7 +256,7 @@ function renderFieldControl(
                   }}
                 >
                   <Trash2 aria-hidden="true" className="h-4 w-4" />
-                </Button>
+                </IconButton>
               </div>
             );
           })}
@@ -264,7 +264,7 @@ function renderFieldControl(
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="settings-secondary"
+              variant="secondary"
               size="sm"
               className="text-xs shadow-none"
               disabled={disabled || !schema?.isEditable}

@@ -251,19 +251,25 @@ describe('AlertsPage', () => {
     const secondRow = screen.getByText('苹果价格突破').closest('tr') as HTMLElement;
     fireEvent.click(within(firstRow).getByRole('button', { name: '停用' }));
     fireEvent.click(within(secondRow).getByRole('button', { name: '测试' }));
-    expect(within(firstRow).getByRole('button', { name: '停用中' })).toBeDisabled();
-    expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
+    const firstToggle = within(firstRow).getByRole('button', { name: '停用' });
+    const secondTest = within(secondRow).getByRole('button', { name: '测试' });
+    expect(firstToggle).toBeDisabled();
+    expect(firstToggle).toHaveAttribute('aria-busy', 'true');
+    expect(firstToggle).toHaveTextContent('停用中');
+    expect(secondTest).toBeDisabled();
+    expect(secondTest).toHaveAttribute('aria-busy', 'true');
+    expect(secondTest).toHaveTextContent('测试中');
 
     await act(async () => {
       disableRequest.resolve({ ...rule, enabled: false });
     });
-    await waitFor(() => expect(within(firstRow).queryByRole('button', { name: '停用中' })).not.toBeInTheDocument());
-    expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
+    await waitFor(() => expect(within(firstRow).getByRole('button', { name: '停用' })).not.toHaveAttribute('aria-busy'));
+    expect(within(secondRow).getByRole('button', { name: '测试' })).toHaveAttribute('aria-busy', 'true');
 
     await act(async () => {
       testRequest.resolve({ ruleId: 2, status: 'not_triggered', triggered: false, message: 'not triggered' });
     });
-    await waitFor(() => expect(within(secondRow).queryByRole('button', { name: '测试中' })).not.toBeInTheDocument());
+    await waitFor(() => expect(within(secondRow).getByRole('button', { name: '测试' })).not.toHaveAttribute('aria-busy'));
   });
 
   it('clamps rules pagination when a mutation leaves the current page empty', async () => {

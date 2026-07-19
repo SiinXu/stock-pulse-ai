@@ -128,13 +128,17 @@ describe('BacktestPage', () => {
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
+    const startDateInput = screen.getByLabelText('分析开始日期');
+    const endDateInput = screen.getByLabelText('分析结束日期');
 
-    expect(filterInput).toHaveClass('!h-9');
-    expect(filterInput).toHaveClass('rounded-sm');
-    expect(windowInput).toHaveClass('!h-9');
-    expect(windowInput).toHaveClass('rounded-sm');
-    expect(screen.getByLabelText('分析开始日期').parentElement).toHaveClass('h-9', '!rounded-xl');
-    expect(screen.getByLabelText('分析结束日期').parentElement).toHaveClass('h-9', '!rounded-xl');
+    expect(filterInput).toHaveAttribute('data-control', 'input');
+    expect(filterInput).toHaveAttribute('data-size', 'comfortable');
+    expect(windowInput).toHaveAttribute('data-control', 'input');
+    expect(windowInput).toHaveAttribute('data-size', 'comfortable');
+    expect(startDateInput).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(startDateInput).toHaveAttribute('aria-expanded', 'false');
+    expect(endDateInput).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(endDateInput).toHaveAttribute('aria-expanded', 'false');
 
     expect(await screen.findByText('盈利')).toBeInTheDocument();
     expect(screen.getByText('已完成')).toBeInTheDocument();
@@ -247,7 +251,8 @@ describe('BacktestPage', () => {
     mockGetResults.mockReturnValueOnce(delayedResults);
     renderEnglishPage();
 
-    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveClass('!h-9');
+    expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)'))
+      .toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByText('Evaluation window')).toBeInTheDocument();
     expect(screen.getByLabelText('Result filters · Phase')).toHaveTextContent('All phases');
     expect(screen.getByRole('button', { name: 'Run backtest' })).toBeInTheDocument();
@@ -411,8 +416,8 @@ describe('BacktestPage', () => {
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
-    expect(oneDayButton).toHaveClass('h-9', 'min-w-0');
-    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveClass('h-9', 'min-w-0');
+    expect(oneDayButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '强制重跑' })).toHaveAttribute('aria-pressed', 'false');
     const nextDayResults = createDeferred<{
       total: number;
       page: number;
