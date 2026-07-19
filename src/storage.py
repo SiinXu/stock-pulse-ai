@@ -68,7 +68,10 @@ from src.migrations.legacy_profiles import (
     sqlite_type_affinity,
 )
 from src.migrations.registry import LEGACY_BASELINE_MIGRATION
-from src.migrations.runner import apply_pending, preflight_existing
+from src.migrations.runner import (
+    apply_pending_within_transaction,
+    preflight_existing,
+)
 from src.migrations.types import MigrationError
 from src.portfolio_idempotency import build_portfolio_idempotency_storage_id
 from src.schemas.decision_profile import extract_legacy_decision_profile
@@ -1273,25 +1276,25 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                             CURRENT_SCHEMA_VERSION,
                         )
 
-                    # Keep the established compatibility sequence, but serialize
-                    # it across processes before the ordered runner takes over.
+                    # Serialize create_all and the remaining not-yet-migrated
+                    # compatibility repairs across processes, then let the ordered
+                    # runner apply pending migrations inside this same transaction
+                    # before the baseline is proven and committed.
                     Base.metadata.create_all(connection)
-                    self._ensure_llm_usage_telemetry_columns()
                     self._ensure_decision_signal_profile_schema()
                     self._ensure_portfolio_idempotency_scope_schema()
                     self._ensure_intelligence_item_scope_values()
                     self._ensure_intelligence_items_unique_index()
-                    if not baseline_already_applied:
-                        self._verify_create_all_baseline(connection)
                     self._ensure_schema_migration_record(
                         allow_insert=can_stamp_baseline,
                     )
+                    migration_result = apply_pending_within_transaction(connection)
+                    if not migration_result.success:
+                        raise MigrationError.from_state(migration_result)
+                    if not baseline_already_applied:
+                        self._verify_create_all_baseline(connection)
                 finally:
                     self._schema_initialization_connection = None
-
-            migration_result = apply_pending(self._engine)
-            if not migration_result.success:
-                raise MigrationError.from_state(migration_result)
 
             self._enable_sqlite_wal_mode()
 
@@ -2090,57 +2093,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     index_columns.append(column_name)
                 unique_indexes.append(index_columns)
             return unique_indexes
-
-    def _ensure_llm_usage_telemetry_columns(self) -> None:
-        """Add nullable P0a usage telemetry columns to existing SQLite DBs."""
-        if not self._is_sqlite_engine:
-            return
-        try:
-            existing = {
-                column["name"]
-                for column in inspect(self._schema_bind()).get_columns(LLMUsage.__tablename__)
-            }
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "LLM usage telemetry schema inspection failed; backfill skipped",
-                exc,
-                error_code="storage_llm_usage_schema_inspection_failed",
-                level=logging.WARNING,
-            )
-            return
-
-        max_retries = self._sqlite_write_retry_max
-        for column, column_type in _LLM_USAGE_TELEMETRY_COLUMN_SQL.items():
-            if column in existing:
-                continue
-            for attempt in range(max_retries + 1):
-                try:
-                    with self._schema_connection() as connection:
-                        connection.exec_driver_sql(
-                            f"ALTER TABLE {LLMUsage.__tablename__} "
-                            f"ADD COLUMN {column} {column_type}"
-                        )
-                    existing.add(column)
-                    break
-                except OperationalError as exc:
-                    if self._is_sqlite_duplicate_column_error(exc, column):
-                        existing.add(column)
-                        break
-                    if self._is_sqlite_locked_error(exc) and attempt < max_retries:
-                        delay = self._sqlite_write_retry_base_delay * (2 ** attempt)
-                        logger.warning(
-                            "[LLM usage] SQLite telemetry column backfill locked, "
-                            "retrying: %s (%s/%s, %.2fs)",
-                            column,
-                            attempt + 1,
-                            max_retries,
-                            delay,
-                        )
-                        if delay > 0:
-                            time.sleep(delay)
-                        continue
-                    raise
 
     def _ensure_intelligence_item_scope_values(self) -> None:
         """Backfill nullable intelligence item scopes so SQLite unique keys work."""
