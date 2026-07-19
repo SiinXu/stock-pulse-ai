@@ -1,39 +1,66 @@
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { Button } from '../Button';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from '../Button';
 
 describe('Button', () => {
+  it('requires callers to declare an explicit intent', () => {
+    type HasRequiredVariant = ButtonProps extends { variant: ButtonVariant } ? true : false;
+    expectTypeOf<HasRequiredVariant>().toEqualTypeOf<true>();
+  });
+
+  it('keeps primitive variants free of page and module names', () => {
+    expectTypeOf<ButtonVariant>().toEqualTypeOf<
+      'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-subtle'
+    >();
+  });
+
+  it('reserves icon-only actions for IconButton', () => {
+    expectTypeOf<ButtonSize>().toEqualTypeOf<
+      'compact' | 'default' | 'comfortable' | 'primary' | 'xsm' | 'sm' | 'md' | 'lg' | 'xl'
+    >();
+  });
+
+  it('forwards its native ref and exposes the selected semantic contract', () => {
+    const ref = createRef<HTMLButtonElement>();
+
+    render(
+      <Button ref={ref} variant="secondary" size="compact">
+        Review
+      </Button>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Review' });
+    expect(ref.current).toBe(button);
+    expect(button).toHaveAttribute('data-control', 'button');
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'compact');
+  });
+
   it.each([
-    ['xsm', 'h-6', 'min-w-6'],
-    ['sm', 'h-8', 'min-w-8'],
-    ['md', 'h-9', 'min-w-9'],
-    ['lg', 'h-10', 'min-w-10'],
-    ['xl', 'h-11', 'min-w-11'],
+    'compact',
+    'xsm',
+    'sm',
+    'md',
+    'lg',
+    'xl',
   ] as const)(
-    'uses the compact shared dimensions for the %s variant',
-    (size, heightClass, widthClass) => {
-      render(<Button size={size}>Action</Button>);
+    'exposes the selected %s size without changing its accessible name',
+    (size) => {
+      render(<Button variant="secondary" size={size}>Action</Button>);
 
       const button = screen.getByRole('button', { name: 'Action' });
-      expect(button).toHaveClass(heightClass, widthClass);
+      expect(button).toHaveAttribute('data-size', size);
     },
   );
 
-  it('provides a stable compact square size for icon-only actions', () => {
-    render(<Button size="icon" aria-label="Open details">+</Button>);
+  it('renders children under the requested intent', () => {
+    render(<Button variant="secondary">Click me</Button>);
 
-    expect(screen.getByRole('button', { name: 'Open details' })).toHaveClass(
-      'h-9',
-      'w-9',
-      'min-w-9',
-      'p-0',
+    expect(screen.getByRole('button', { name: 'Click me' })).toHaveAttribute(
+      'data-variant',
+      'secondary',
     );
-  });
-
-  it('renders children', () => {
-    render(<Button>Click me</Button>);
-
-    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-full');
   });
 
   it('uses button type by default and exposes the selected variant', () => {
@@ -42,11 +69,10 @@ describe('Button', () => {
     const button = screen.getByRole('button', { name: 'Delete' });
     expect(button).toHaveAttribute('type', 'button');
     expect(button).toHaveAttribute('data-variant', 'danger');
-    expect(button.className).toContain('bg-danger');
   });
 
   it('disables the button when loading and shows loading text', () => {
-    render(<Button isLoading loadingText="Saving">Save</Button>);
+    render(<Button variant="primary" isLoading loadingText="Saving">Save</Button>);
 
     const button = screen.getByRole('button', { name: /saving/i });
     expect(button).toBeDisabled();
@@ -54,41 +80,10 @@ describe('Button', () => {
     expect(screen.getByText('Saving')).toBeInTheDocument();
   });
 
-  it('keeps icon loading states spinner-only without losing accessibility metadata', () => {
-    render(
-      <Button size="icon" isLoading loadingText="Saving" aria-label="Save item">
-        Save
-      </Button>,
-    );
-
-    const button = screen.getByRole('button', { name: 'Save item' });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(button.textContent).toBe('');
-    expect(button.querySelector('svg.animate-spin')).toBeInTheDocument();
-    expect(button.querySelector('svg.animate-spin')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.queryByText('Saving')).not.toBeInTheDocument();
-  });
-
   it('supports the danger-subtle variant', () => {
     render(<Button variant="danger-subtle">Bulk Delete</Button>);
 
     const button = screen.getByRole('button', { name: 'Bulk Delete' });
     expect(button).toHaveAttribute('data-variant', 'danger-subtle');
-    expect(button.className).toContain('border-danger/50');
-    expect(button.className).toContain('bg-danger/10');
-  });
-
-  it.each([
-    ['action-primary', '--home-action-ai-bg', '--home-action-ai-border', '--home-action-ai-text'],
-    ['action-secondary', '--home-action-report-bg', '--home-action-report-border', '--home-action-report-text'],
-  ] as const)('supports the %s variant', (variant, bgToken, borderToken, textToken) => {
-    render(<Button variant={variant}>Quick Action</Button>);
-
-    const button = screen.getByRole('button', { name: 'Quick Action' });
-    expect(button).toHaveAttribute('data-variant', variant);
-    expect(button.className).toContain(bgToken);
-    expect(button.className).toContain(borderToken);
-    expect(button.className).toContain(textToken);
   });
 });

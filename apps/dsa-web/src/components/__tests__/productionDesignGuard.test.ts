@@ -20,13 +20,13 @@ const productionStyles: Record<string, string> = {
 const productionSources = { ...productionStyles, ...productionComponents };
 const PRIMARY_CTA_VARIANTS = new Set([
   'primary',
-  'settings-primary',
-  'action-primary',
-  'gradient',
 ]);
 
 type DesignRule =
   | 'button-shape'
+  | 'button-size-contract'
+  | 'button-xl-allowlist'
+  | 'button-visual-override'
   | 'hardcoded-hex'
   | 'hardcoded-color'
   | 'legacy-chromatic-token'
@@ -51,6 +51,32 @@ const PRIMARY_CTA_SHIMMER_PATTERN = /(?<![a-zA-Z0-9_-])(?:animate-\[[^\]\r\n]*sh
 const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(|var\(--[\w-]*gradient[\w-]*\))/i;
 const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
 const PILL_RADIUS_CLASS_PATTERN = /\brounded-(?:[trblse]{1,2}-)?full\b/g;
+const BUTTON_CANONICAL_SIZE_HEIGHTS = {
+  compact: 'h-7',
+  default: 'h-8',
+  comfortable: 'h-9',
+  primary: 'h-10',
+} as const;
+const BUTTON_ALLOWED_HEIGHT_CLASSES = new Set<string>(Object.values(BUTTON_CANONICAL_SIZE_HEIGHTS));
+const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
+const BUTTON_XL_ALLOWLIST = new Map([
+  ['../../pages/NotFoundPage.tsx', 'UI-QA01'],
+]);
+const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:h-|min-h-|max-h-|p-|px-|py-|rounded(?:-|$)|basis-|flex-1$|w-|min-w-|max-w-)/;
+const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map([
+  ['../../pages/DecisionSignalsPage.tsx', {
+    removeBy: 'UI-D01',
+    tokens: new Set(['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5']),
+  }],
+  ['../../pages/PortfolioPage.tsx', {
+    removeBy: 'UI-P01',
+    tokens: new Set(['flex-1', 'w-full']),
+  }],
+  ['../../pages/StockScreeningPage.tsx', {
+    removeBy: 'UI-SCR01',
+    tokens: new Set(['min-w-40']),
+  }],
+]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
 const MAGIC_PIXEL_SIZE_PATTERN = /\b(?:text|size|[wh]|min-[wh]|max-[wh]|basis)-\[[^\]\r\n]*\d(?:\.\d+)?px[^\]\r\n]*\]/g;
@@ -495,6 +521,70 @@ function isPrimaryButtonOpening(
     }
   }
   return mayResolveToPrimary;
+}
+
+function appendButtonXlViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(opening, bindings)) return;
+  for (const property of opening.attributes.properties) {
+    if (!ts.isJsxAttribute(property) || property.name.getText() !== 'size') continue;
+    const candidates = !property.initializer
+      ? []
+      : ts.isStringLiteral(property.initializer)
+        ? [property.initializer.text]
+        : ts.isJsxExpression(property.initializer) && property.initializer.expression
+          ? staticStringCandidates(property.initializer.expression, bindings, new Set())
+          : [];
+    if (!candidates.includes('xl') || BUTTON_XL_ALLOWLIST.has(filename)) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, property.getStart(opening.getSourceFile())),
+      rule: 'button-xl-allowlist',
+      token: 'size="xl"',
+    });
+  }
+}
+
+function buttonUtilityName(token: string): string {
+  return token.split(':').at(-1)?.replace(/^!/, '') ?? token;
+}
+
+function appendButtonVisualOverrideViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(opening, bindings)) return;
+  const scan = classNameFragments(opening, sourceFile, initializers);
+  for (const fragment of scan.fragments) {
+    for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
+      if (!BUTTON_VISUAL_OVERRIDE_PATTERN.test(buttonUtilityName(token))) continue;
+      if (BUTTON_VISUAL_OVERRIDE_ALLOWLIST.get(filename)?.tokens.has(token)) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
+        rule: 'button-visual-override',
+        token,
+      });
+    }
+  }
+  for (const unresolved of scan.unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.index),
+      rule: 'button-visual-override',
+      token: `dynamic:${unresolved.text}`,
+    });
+  }
 }
 
 function bindingIdentifiers(name: ts.BindingName): ts.Identifier[] {
@@ -1123,6 +1213,67 @@ function appendPrimaryClassViolations(
   }
 }
 
+function appendButtonShapeViolations(
+  filename: string,
+  source: string,
+  fragments: StaticClassFragment[],
+  violations: DesignViolation[],
+): void {
+  for (const fragment of fragments) {
+    for (const match of fragment.text.matchAll(PILL_RADIUS_CLASS_PATTERN)) {
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + (match.index ?? 0)),
+        rule: 'button-shape',
+        token: match[0],
+      });
+    }
+  }
+}
+
+type ButtonSizeStyleEntry = {
+  index: number;
+  fragments: StaticClassFragment[];
+};
+
+function buttonHeightClasses(fragments: StaticClassFragment[]): string[] {
+  return Array.from(new Set(
+    fragments.flatMap(({ text }) => text.split(/\s+/).filter((token) => BUTTON_HEIGHT_CLASS_PATTERN.test(token))),
+  ));
+}
+
+function appendButtonSizeContractViolations(
+  filename: string,
+  source: string,
+  declarationIndex: number,
+  entries: Map<string, ButtonSizeStyleEntry>,
+  violations: DesignViolation[],
+): void {
+  for (const [size, expectedHeight] of Object.entries(BUTTON_CANONICAL_SIZE_HEIGHTS)) {
+    const entry = entries.get(size);
+    const heights = entry ? buttonHeightClasses(entry.fragments) : [];
+    if (heights.length === 1 && heights[0] === expectedHeight) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry?.index ?? declarationIndex),
+      rule: 'button-size-contract',
+      token: `${size}:${heights.join('|') || 'missing'}`,
+    });
+  }
+
+  for (const [size, entry] of entries) {
+    if (size in BUTTON_CANONICAL_SIZE_HEIGHTS) continue;
+    const heights = buttonHeightClasses(entry.fragments);
+    if (heights.length === 1 && BUTTON_ALLOWED_HEIGHT_CLASSES.has(heights[0])) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry.index),
+      rule: 'button-size-contract',
+      token: `${size}:${heights.join('|') || 'missing'}`,
+    });
+  }
+}
+
 function appendPrimaryStyleViolations(
   filename: string,
   source: string,
@@ -1322,12 +1473,42 @@ function scanPrimaryCtasInBoundSource(
     );
   };
   const visit = (node: ts.Node): void => {
-    if (ts.isJsxElement(node) && isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
-      result.matchedButtons += 1;
-      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
-    } else if (ts.isJsxSelfClosingElement(node) && isPrimaryButtonOpening(node, buttonBindings)) {
-      result.matchedButtons += 1;
-      appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+    if (ts.isJsxElement(node)) {
+      appendButtonXlViolations(
+        filename,
+        source,
+        node.openingElement,
+        buttonBindings,
+        result.violations,
+      );
+      appendButtonVisualOverrideViolations(
+        filename,
+        source,
+        node.openingElement,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      if (isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
+        result.matchedButtons += 1;
+        appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+      }
+    } else if (ts.isJsxSelfClosingElement(node)) {
+      appendButtonXlViolations(filename, source, node, buttonBindings, result.violations);
+      appendButtonVisualOverrideViolations(
+        filename,
+        source,
+        node,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      if (isPrimaryButtonOpening(node, buttonBindings)) {
+        result.matchedButtons += 1;
+        appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
+      }
     }
 
     if (
@@ -1370,6 +1551,42 @@ function scanPrimaryCtasInBoundSource(
             sourceFile,
             'BUTTON_VARIANT_STYLES',
           ).unresolved[0]],
+          result.violations,
+        );
+      }
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'BUTTON_SIZE_STYLES'
+      && node.initializer
+    ) {
+      const initializer = unwrapExpression(node.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) {
+        const entries = new Map<string, ButtonSizeStyleEntry>();
+        for (const property of initializer.properties) {
+          if (!ts.isPropertyAssignment(property)) continue;
+          const scan = scanStaticClassExpression(
+            property.initializer,
+            sourceFile,
+            initializers,
+            new Set(),
+            'BUTTON_SIZE_STYLES',
+          );
+          appendButtonShapeViolations(filename, source, scan.fragments, result.violations);
+          const names = propertyNameValues(property.name, initializers);
+          if (names?.length === 1) {
+            entries.set(names[0], {
+              index: property.getStart(sourceFile),
+              fragments: scan.fragments,
+            });
+          }
+        }
+        appendButtonSizeContractViolations(
+          filename,
+          source,
+          node.getStart(sourceFile),
+          entries,
           result.violations,
         );
       }
@@ -1592,6 +1809,82 @@ describe('production design guard', () => {
       productionDesignGuardFixtures.mappedPillCssButton,
       new Set(['session-item']),
     )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 50%' })]);
+  });
+
+  it('self-test inspects the shared Button size style map', () => {
+    const source = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-7 rounded-full px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-shape', token: 'rounded-full' }),
+    ]);
+  });
+
+  it('self-test enforces canonical Button tiers and rejects out-of-contract heights', () => {
+    const source = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-8 rounded-lg px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+        xsm: 'h-6 rounded-lg px-2',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-8' }),
+      expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:h-6' }),
+    ]);
+  });
+
+  it('self-test rejects xl Button usage outside the exact migration allowlist', () => {
+    const source = `
+      import { Button } from '../common';
+      export const Example = () => <Button variant="primary" size="xl">Continue</Button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toContainEqual(
+      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
+    );
+  });
+
+  it('self-test rejects caller-side Button visual overrides', () => {
+    const source = `
+      import { Button } from '../common';
+      export const Example = () => (
+        <Button variant="secondary" className="md:h-12 w-full text-xs">Refresh</Button>
+      );
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'md:h-12' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'w-full' }),
+    ]);
+  });
+
+  it('keeps Button visual-override exceptions token-scoped and expiring', () => {
+    const source = `
+      import { Button } from '../components/common';
+      export const Example = () => (
+        <Button variant="secondary" className="flex-1 px-2">Refresh</Button>
+      );
+    `;
+
+    expect(findProductionDesignViolations('../../pages/PortfolioPage.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
+    ]);
+    for (const { removeBy, tokens } of BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values()) {
+      expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
+      expect(tokens.size).toBeGreaterThan(0);
+    }
   });
 
   it('self-test detects a hardcoded hex colour', () => {
@@ -1826,11 +2119,19 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicVariantClass,
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
-    expect(findProductionDesignViolations(
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
+    const nonPrimaryViolations = findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryEnumerableNonPrimaryVariant,
-    )).toEqual([]);
+    );
+    expect(nonPrimaryViolations).toContainEqual(expect.objectContaining({
+      rule: 'button-visual-override',
+    }));
+    expect(nonPrimaryViolations).not.toContainEqual(expect.objectContaining({
+      rule: 'primary-cta-gradient',
+    }));
   });
 
   it('joins fully static class expressions before checking primary effects', () => {
@@ -1872,11 +2173,15 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       "const cn = (...values: string[]) => values.join(' '); <Button className={cn('bg-card')}>Run</Button>",
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       "function cn(value: string) { return value; } <Button className={cn('bg-card')}>Run</Button>",
-    )).toEqual([expect.objectContaining({ rule: 'primary-cta-unresolved-class' })]);
+    )).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'primary-cta-unresolved-class' }),
+    ]));
   });
 
   it('keeps class composer shadowing inside its lexical scope', () => {
@@ -1898,10 +2203,10 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryShadowedDynamicClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'className',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryUniqueSafeConstClass,
@@ -1970,10 +2275,10 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       '<Button variant="primary" className={ctaClasses}>Run</Button>',
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'className',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       'const BUTTON_VARIANT_STYLES = { primary: getPrimaryStyles(), \'settings-primary\': \'bg-foreground\', \'action-primary\': \'bg-foreground\', gradient: \'bg-foreground\' };',
@@ -2027,17 +2332,17 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicCnClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'dynamicClasses',
-    })]);
+    })]));
     expect(findProductionDesignViolations(
       'fixture.tsx',
       productionDesignGuardFixtures.primaryDynamicTemplateClass,
-    )).toEqual([expect.objectContaining({
+    )).toEqual(expect.arrayContaining([expect.objectContaining({
       rule: 'primary-cta-unresolved-class',
       token: 'dynamicClasses',
-    })]);
+    })]));
   });
 
   it('accepts fully enumerable primary class expressions', () => {

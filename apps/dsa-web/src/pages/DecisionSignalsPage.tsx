@@ -1182,7 +1182,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               onClick={() => void handleReassess()}
               disabled={!reassessSourceReportId || reassessLoading || reassessPersisting}
               isLoading={reassessLoading}
@@ -1353,7 +1353,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               onClick={() => {
                 void loadSignals();
                 void loadOutcomeStats();
@@ -1372,7 +1372,7 @@ const DecisionSignalsPage: React.FC = () => {
           <Button
             type="button"
             variant="secondary"
-            size="xl"
+            size="comfortable"
             onClick={() => setStockContextModalOpen(true)}
           >
             <Search className="h-4 w-4" />
@@ -1408,7 +1408,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="submit"
               variant="primary"
-              size="xl"
+              size="comfortable"
               disabled={!stockDraft.trim()}
             >
               <Search className="h-4 w-4" />
@@ -1417,7 +1417,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               onClick={handleClearStockContext}
               disabled={!activeStockContext && !stockDraft}
             >
@@ -1446,7 +1446,7 @@ const DecisionSignalsPage: React.FC = () => {
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
                     variant="outline"
-                    size="xl"
+                    size="comfortable"
                     className="h-auto min-h-11 whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
@@ -1478,7 +1478,6 @@ const DecisionSignalsPage: React.FC = () => {
             />
             <Input
               label={t('decisionSignals.stockCode')}
-              className="!h-9 !min-h-9 rounded-sm"
               value={filters.stockCode}
               onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
               placeholder={t('decisionSignals.stockCode')}
@@ -1513,7 +1512,6 @@ const DecisionSignalsPage: React.FC = () => {
             />
             <Input
               label={t('decisionSignals.sourceReportId')}
-              className="!h-9 !min-h-9 rounded-sm"
               value={filters.sourceReportId}
               onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
               placeholder={t('decisionSignals.sourceReportId')}
@@ -1532,7 +1530,7 @@ const DecisionSignalsPage: React.FC = () => {
                 ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
               ]}
             />
-            <Button type="submit" variant="primary" size="md" className="min-w-0 text-xs">
+            <Button type="submit" variant="primary" size="md" className="text-xs">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
             </Button>
@@ -1693,7 +1691,7 @@ const DecisionSignalsPage: React.FC = () => {
             <Button
               type="submit"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               disabled={timelineLoading || !activeStockContext?.code}
               isLoading={timelineLoading}
               loadingText={t('decisionSignals.timelineSearch')}
@@ -1799,8 +1797,8 @@ const DecisionSignalsPage: React.FC = () => {
                   key={status}
                   type="button"
                   variant="secondary"
-                  size="xl"
-                  className="px-3 text-xs"
+                  size="comfortable"
+                  className="text-xs"
                   onClick={() => {
                     setStatusError(null);
                     setPendingStatus({

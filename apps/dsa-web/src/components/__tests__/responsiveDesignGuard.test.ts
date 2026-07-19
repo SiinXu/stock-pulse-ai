@@ -61,4 +61,24 @@ describe('responsive design guard', () => {
     const quickQuestionRule = indexCssSource.match(/\.quick-question-btn\s*\{[^}]+\}/)?.[0];
     expect(quickQuestionRule).toContain('min-height: 2.75rem;');
   });
+
+  it('expands compact control hit targets only for coarse pointers', () => {
+    const coarsePointerStart = indexCssSource.indexOf('@media (pointer: coarse)');
+    const hitTargetRule = indexCssSource
+      .slice(coarsePointerStart)
+      .match(/\.control-hit-target::after\s*\{[^}]+\}/)?.[0];
+
+    expect(coarsePointerStart).toBeGreaterThanOrEqual(0);
+    expect(hitTargetRule).toContain('min-width: 2.75rem;');
+    expect(hitTargetRule).toContain('min-height: 2.75rem;');
+  });
+
+  it('gives text-control frames a 44px coarse-pointer target height', () => {
+    const coarsePointerStart = indexCssSource.indexOf('@media (pointer: coarse)');
+    const inputTargetRule = indexCssSource
+      .slice(coarsePointerStart)
+      .match(/\.control-input-target\s*\{[^}]+\}/)?.[0];
+
+    expect(inputTargetRule).toContain('min-height: 2.75rem;');
+  });
 });

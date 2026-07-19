@@ -83,6 +83,7 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button
               type="button"
+              variant="primary"
               size="sm"
               onClick={() => window.location.reload()}
             >

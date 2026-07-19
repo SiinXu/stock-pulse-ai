@@ -1112,7 +1112,7 @@ const ChatPage: React.FC = () => {
                 <Tooltip content={t('chat.exportSession')}>
                   <span className="inline-flex">
                     <Button
-                      variant="action-primary"
+                      variant="secondary"
                       size="sm"
                       onClick={() => downloadSession(messages, language)}
                       aria-label={t('chat.exportSession')}
@@ -1137,7 +1137,7 @@ const ChatPage: React.FC = () => {
                 <Tooltip content={t('chat.notify')}>
                   <span className="inline-flex">
                     <Button
-                      variant="action-primary"
+                      variant="secondary"
                       size="sm"
                       disabled={sending}
                       onClick={async () => {

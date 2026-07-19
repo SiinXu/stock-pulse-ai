@@ -396,7 +396,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(await screen.findByText('过期')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveAttribute('data-size', 'comfortable');
   });
 
   it('shows aggregate partial valuation limitations near summary totals', async () => {
@@ -907,7 +907,7 @@ describe('PortfolioPage FX refresh', () => {
     const row = screen.getByText('HK00700').closest('tr');
     expect(row).not.toBeNull();
     const analyzeButton = within(row as HTMLTableRowElement).getByRole('button', { name: '分析' });
-    expect(analyzeButton).toHaveClass('h-11', 'min-w-11');
+    expect(analyzeButton).toHaveAttribute('data-size', 'comfortable');
     fireEvent.click(analyzeButton);
 
     await waitFor(() => {

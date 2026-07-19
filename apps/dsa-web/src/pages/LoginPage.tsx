@@ -162,17 +162,19 @@ const LoginPage: React.FC = () => {
               </motion.div>
             )}
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="h-12 w-full font-medium"
-              disabled={isSubmitting}
-              isLoading={isSubmitting}
-              loadingText={isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}
-            >
-              <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
-            </Button>
+            <div className="grid">
+              <Button
+                type="submit"
+                variant="primary"
+                size="primary"
+                className="font-medium"
+                disabled={isSubmitting}
+                isLoading={isSubmitting}
+                loadingText={isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}
+              >
+                <span>{isFirstTime ? t('login.setupSubmit') : t('login.loginSubmit')}</span>
+              </Button>
+            </div>
           </form>
 
           <p

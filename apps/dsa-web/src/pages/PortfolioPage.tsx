@@ -6,7 +6,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, InlineAlert, Input, Modal, Select } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -1152,7 +1152,7 @@ const PortfolioPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xl"
+                  size="comfortable"
                   className="flex-1"
                   onClick={() => {
                     setShowCreateAccount(true);
@@ -1167,7 +1167,7 @@ const PortfolioPage: React.FC = () => {
                   onClick={() => void handleRefresh()}
                   disabled={isLoading || fxRefreshing}
                   variant="secondary"
-                  size="xl"
+                  size="comfortable"
                   isLoading={isLoading}
                   loadingText={text.refreshing}
                   className="flex-1"
@@ -1179,7 +1179,7 @@ const PortfolioPage: React.FC = () => {
                   onClick={openAccountDeleteDialog}
                   disabled={!canDeleteSelectedAccount}
                   variant="danger-subtle"
-                  size="xl"
+                  size="comfortable"
                   isLoading={accountDeleteLoading}
                   loadingText={text.deletingAccount}
                   className="flex-1"
@@ -1297,7 +1297,7 @@ const PortfolioPage: React.FC = () => {
             <Button
               type="submit"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               className="md:col-span-2"
               isLoading={accountCreating}
               loadingText={text.creatingAccount}
@@ -1335,7 +1335,7 @@ const PortfolioPage: React.FC = () => {
             <Button
               type="button"
               variant="secondary"
-              size="xl"
+              size="comfortable"
               className="shrink-0 text-xs"
               onClick={() => void handleRefreshFx()}
               disabled={!hasAccounts || isLoading || fxRefreshing}
@@ -1443,10 +1443,10 @@ const PortfolioPage: React.FC = () => {
                           onClick={() => void handleAnalyzePosition(row)}
                           disabled={analyzing}
                           variant="secondary"
-                          size="xl"
+                          size="comfortable"
                           isLoading={analyzing}
                           loadingText={text.submitting}
-                          className="px-2 text-xs"
+                          className="text-xs"
                         >
                           {text.analyze}
                         </Button>
@@ -1555,11 +1555,11 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" size="xl" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
         <Button type="button" variant="secondary" size="md" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
-        <Button type="button" variant="secondary" size="xl" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
+        <Button type="button" variant="secondary" size="comfortable" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 
       <Modal isOpen={tradeModalOpen} closeDisabled={tradeSubmitting} onClose={() => { setTradeError(null); setTradeModalOpen(false); }} title={text.manualTrade}>
@@ -1609,7 +1609,7 @@ const PortfolioPage: React.FC = () => {
             {tradeError ? (
               <ApiErrorAlert error={tradeError} onDismiss={() => setTradeError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
               {text.submitTrade}
             </Button>
             </fieldset>
@@ -1646,7 +1646,7 @@ const PortfolioPage: React.FC = () => {
             {cashError ? (
               <ApiErrorAlert error={cashError} onDismiss={() => setCashError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
               {text.submitCash}
             </Button>
             </fieldset>
@@ -1690,7 +1690,7 @@ const PortfolioPage: React.FC = () => {
             {corpError ? (
               <ApiErrorAlert error={corpError} onDismiss={() => setCorpError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
+            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
               {text.submitCorporate}
             </Button>
             </fieldset>
@@ -1748,10 +1748,10 @@ const PortfolioPage: React.FC = () => {
                     <span className="shrink-0 text-xs text-muted-text">
                       {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
                     </span>
-                    <Button
+                    <IconButton
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size="default"
                       aria-label={fileText.clear}
                       onClick={() => {
                         setCsvFile(null);
@@ -1762,7 +1762,7 @@ const PortfolioPage: React.FC = () => {
                       }}
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                    </IconButton>
                   </div>
                 ) : null}
               </div>
@@ -1778,10 +1778,10 @@ const PortfolioPage: React.FC = () => {
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
             />
             <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="xl" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
+              <Button type="button" variant="secondary" size="comfortable" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
                 {text.parseFile}
               </Button>
-              <Button type="button" variant="secondary" size="xl" className="flex-1"
+              <Button type="button" variant="secondary" size="comfortable" className="flex-1"
                 disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
                 {text.commitImport}
               </Button>
@@ -1821,7 +1821,7 @@ const PortfolioPage: React.FC = () => {
                   { value: 'corporate', label: text.corporateAction },
                 ]}
               />
-              <Button type="button" variant="secondary" size="xl" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
+              <Button type="button" variant="secondary" size="comfortable" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
                 {text.refreshLedger}
               </Button>
             </div>
@@ -1902,7 +1902,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
@@ -1924,7 +1924,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
@@ -1946,7 +1946,7 @@ const PortfolioPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="danger-subtle"
-                      size="xl"
+                      size="comfortable"
                       className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
@@ -1973,11 +1973,11 @@ const PortfolioPage: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-secondary">
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
-                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage <= 1}
+                <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage <= 1}
                   onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
                   {text.prevPage}
                 </Button>
-                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage >= totalEventPages}
+                <Button type="button" variant="secondary" size="comfortable" className="text-xs" disabled={eventPage >= totalEventPages}
                   onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
                   {text.nextPage}
                 </Button>

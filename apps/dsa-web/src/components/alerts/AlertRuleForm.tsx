@@ -747,7 +747,7 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
             onChange={(event) => setEnabled(event.target.checked)}
             disabled={isSubmitting}
           />
-          <Button type="submit" isLoading={isSubmitting} loadingText={text.creating}>
+          <Button variant="primary" type="submit" isLoading={isSubmitting} loadingText={text.creating}>
             {text.create}
           </Button>
         </div>

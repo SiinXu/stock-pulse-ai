@@ -1,22 +1,37 @@
+import { createRef } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Input } from '../Input';
 
 describe('Input', () => {
-  it('keeps the default input target at least 44px tall and wide', () => {
+  it('forwards its native ref and exposes the selected semantic size', () => {
+    const ref = createRef<HTMLInputElement>();
+
+    render(<Input ref={ref} aria-label="Search" size="default" />);
+
+    const input = screen.getByRole('textbox', { name: 'Search' });
+    expect(ref.current).toBe(input);
+    expect(input).toHaveAttribute('data-control', 'input');
+    expect(input).toHaveAttribute('data-size', 'default');
+    expect(input).not.toHaveAttribute('size');
+  });
+
+  it('uses the comfortable semantic size by default', () => {
     render(<Input aria-label="Search" />);
 
-    expect(screen.getByRole('textbox', { name: 'Search' })).toHaveClass(
-      'h-11',
-      'min-h-11',
-      'min-w-11'
+    expect(screen.getByRole('textbox', { name: 'Search' })).toHaveAttribute(
+      'data-size',
+      'comfortable',
     );
   });
 
-  it('retains the minimum target size when a caller requests compact visual height', () => {
-    render(<Input aria-label="Compact search" className="h-9" />);
+  it('focuses the native control from its coarse-pointer target frame', () => {
+    render(<Input aria-label="Search" />);
 
-    expect(screen.getByRole('textbox', { name: 'Compact search' })).toHaveClass('h-9', 'min-h-11');
+    const input = screen.getByRole('textbox', { name: 'Search' });
+    fireEvent.pointerDown(input.parentElement as HTMLElement);
+
+    expect(input).toHaveFocus();
   });
 
   it('wires label and hint text to the input', () => {
@@ -26,6 +41,41 @@ describe('Input', () => {
     expect(input).toHaveAttribute('id', 'api_key');
     expect(input).toHaveAttribute('aria-describedby', 'api_key-hint');
     expect(screen.getByText('Stored locally')).toBeInTheDocument();
+  });
+
+  it('preserves caller descriptions while appending the active field message', () => {
+    render(
+      <>
+        <p id="shared-context">Shared context</p>
+        <Input
+          label="API Key"
+          error="Required"
+          name="api_key"
+          aria-describedby="shared-context"
+        />
+      </>,
+    );
+
+    expect(screen.getByLabelText('API Key')).toHaveAttribute(
+      'aria-describedby',
+      'shared-context api_key-error',
+    );
+  });
+
+  it('preserves caller styles alongside the error focus variables', () => {
+    render(
+      <Input
+        aria-label="Code"
+        error="Required"
+        style={{ opacity: 0.75 }}
+      />,
+    );
+
+    const input = screen.getByRole('textbox', { name: 'Code' });
+    expect(input).toHaveStyle({ opacity: '0.75' });
+    expect(input.style.getPropertyValue('--input-surface-border-focus')).toBe(
+      'hsla(var(--destructive), 0.4)',
+    );
   });
 
   it('marks the input invalid and shows the error message', () => {
@@ -62,8 +112,9 @@ describe('Input', () => {
     const input = screen.getByLabelText('密码');
     const toggle = screen.getByRole('button', { name: '显示内容' });
     expect(input).toHaveAttribute('type', 'password');
-    expect(input).toHaveClass('h-11');
-    expect(toggle).toHaveClass('h-11', 'w-11');
+    expect(input).toHaveAttribute('data-size', 'comfortable');
+    expect(toggle).toHaveAttribute('data-size', 'default');
+    expect(toggle).toHaveAttribute('data-variant', 'ghost');
 
     fireEvent.click(toggle);
     expect(input).toHaveAttribute('type', 'text');
@@ -108,6 +159,7 @@ describe('Input', () => {
 
     const input = screen.getByLabelText('登录密码');
     expect(input).toHaveAttribute('data-appearance', 'login');
+    expect(input).toHaveAttribute('data-size', 'primary');
     expect(input).toHaveClass('input-appearance-login');
     expect(input).toHaveAttribute('type', 'password');
 

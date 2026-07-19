@@ -818,9 +818,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
         <div className="flex shrink-0 items-center gap-1.5">
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
-            className="px-3 text-xs shadow-none"
+            className="text-xs shadow-none"
             disabled={busy || !canTest || testState?.status === 'loading'}
             onClick={onTest}
           >
@@ -828,9 +828,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           </Button>
           <Button
             type="button"
-            variant="settings-secondary"
+            variant="secondary"
             size="sm"
-            className="px-3 text-xs shadow-none"
+            className="text-xs shadow-none"
             disabled={busy}
             onClick={onEdit}
           >
@@ -844,7 +844,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-8 px-2 text-xs text-muted-text"
+                className="text-xs text-muted-text"
                 disabled={busy}
                 aria-label={formatUiText(text.moreActions, { name: actionName })}
                 aria-haspopup="menu"
@@ -1600,7 +1600,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"
-              variant="settings-primary"
+              variant="primary"
               size="sm"
               disabled={
                 !providerId
@@ -1846,7 +1846,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         />
                         <Button
                           type="button"
-                          variant="settings-primary"
+                          variant="primary"
                           size="sm"
                           disabled={modelsAreReadOnly || !replacementRoute}
                           onClick={() => {
@@ -1874,7 +1874,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                     {onManageModels ? (
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         size="sm"
                         onClick={onManageModels}
                       >
@@ -1892,9 +1892,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                   <Button
                     id={discoverButtonId}
                     type="button"
-                    variant="settings-secondary"
+                    variant="secondary"
                     size="sm"
-                    className="px-3 text-xs shadow-none"
+                    className="text-xs shadow-none"
                     disabled={
                       discovery?.status === 'loading'
                       || !discoveryEnabledByContract
@@ -1961,9 +1961,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 />
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="sm"
-                  className="shrink-0 px-3 text-xs shadow-none"
+                  className="shrink-0 text-xs shadow-none"
                   disabled={!modelDraft.trim() || modelsAreReadOnly}
                   onClick={() => addModelToken(modelDraft)}
                 >
@@ -1990,9 +1990,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           <div className="flex items-start gap-2">
             <Button
               type="button"
-              variant="settings-secondary"
+              variant="secondary"
               size="sm"
-              className="shrink-0 px-3 text-xs shadow-none"
+              className="shrink-0 text-xs shadow-none"
                 disabled={disabled || !connectionContractKnown || test?.status === 'loading'}
               onClick={() => void handleTest()}
             >
@@ -2065,7 +2065,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>{text.cancel}</Button>
             <Button
               type="button"
-              variant="settings-primary"
+              variant="primary"
               size="sm"
               disabled={disabled || !connectionContractKnown || (
                 mode === 'add'

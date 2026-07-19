@@ -7,7 +7,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, InlineAlert, Popover } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Popover } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
@@ -1587,7 +1587,7 @@ const HomePage: React.FC = () => {
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
-                className="h-9 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
+                className="whitespace-nowrap"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
@@ -1725,15 +1725,15 @@ const HomePage: React.FC = () => {
                   title={homeUrlIssueTitle}
                   message={homeUrlIssueMessage}
                   action={(
-                    <Button
+                    <IconButton
                       type="button"
                       variant="ghost"
-                      size="icon"
+                      size="default"
                       aria-label={t('common.close')}
                       onClick={homeUrlState.dismissUrlIssue}
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                    </IconButton>
                   )}
                 />
               </div>
@@ -1766,7 +1766,7 @@ const HomePage: React.FC = () => {
                   {!isMarketReviewHistoryReport ? (
                     <>
                       <Button
-                        variant="home-action-ai"
+                        variant="secondary"
                         size="sm"
                         disabled={isAnalyzing || selectedReport.meta.id === undefined}
                         onClick={handleReanalyze}
@@ -1777,7 +1777,7 @@ const HomePage: React.FC = () => {
                         {t('home.reanalyze')}
                       </Button>
                       <Button
-                        variant="home-action-ai"
+                        variant="secondary"
                         size="sm"
                         disabled={selectedReport.meta.id === undefined}
                         onClick={handleAskFollowUp}
@@ -1790,7 +1790,7 @@ const HomePage: React.FC = () => {
                     </>
                   ) : (
                     <Button
-                      variant="home-action-ai"
+                      variant="secondary"
                       size="sm"
                       disabled={isSubmittingMarketReview}
                       isLoading={isSubmittingMarketReview}
@@ -1802,7 +1802,7 @@ const HomePage: React.FC = () => {
                     </Button>
                   )}
                   <Button
-                    variant="home-action-ai"
+                    variant="secondary"
                     size="sm"
                     disabled={selectedReport.meta.id === undefined || isHistoryTrendUnavailable}
                     className={isHistoryTrendOpen ? 'border-primary/70 bg-primary/15 text-primary shadow-soft-card' : undefined}
@@ -1818,7 +1818,7 @@ const HomePage: React.FC = () => {
                     {t('home.historyTrend')}
                   </Button>
                   <Button
-                    variant="home-action-ai"
+                    variant="secondary"
                     size="sm"
                     disabled={selectedReport.meta.id === undefined}
                     onClick={openMarkdownDrawer}

@@ -333,6 +333,7 @@ const AlertsPage: React.FC = () => {
         actions={(
           <Button
             type="button"
+            variant="primary"
             size="sm"
             onClick={() => {
               setCreateError(null);

@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -630,7 +630,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             <p className="text-sm font-semibold text-foreground">{t('settings.setupGuideHiddenTitle')}</p>
             <p className="mt-1 text-xs leading-5 text-muted-text">{t('settings.setupGuideHiddenDescription')}</p>
           </div>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsHidden(false)}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => setIsHidden(false)}>
             {t('settings.setupGuideOpen')}
           </Button>
         </div>
@@ -657,7 +657,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               type="button"
-              variant="settings-secondary"
+              variant="secondary"
               size="sm"
               disabled={isLoading}
               isLoading={isLoading}
@@ -667,7 +667,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
               {t('settings.setupGuideRefresh')}
             </Button>
-            <Button type="button" variant="settings-secondary" size="sm" onClick={() => setIsHidden(true)}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setIsHidden(true)}>
               {t('settings.setupGuideHide')}
             </Button>
           </div>
@@ -707,18 +707,18 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('ai_model')}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('ai_model')}>
             {t('settings.setupGuideConfigureLlm')}
           </Button>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('base')}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('base')}>
             {t('settings.setupGuideAddStocks')}
           </Button>
-          <Button type="button" variant="settings-secondary" size="sm" onClick={() => onSelectCategory('notification')}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('notification')}>
             {t('settings.setupGuideConfigureNotification')}
           </Button>
           <Button
             type="button"
-            variant="settings-primary"
+            variant="primary"
             size="sm"
             disabled={!canRunSmoke || isSaving || isRunningSmoke}
             isLoading={isRunningSmoke}
@@ -952,10 +952,10 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                       }}
                     />
                     {scheduleTimes.length > 1 ? (
-                      <Button
+                      <IconButton
                         type="button"
-                        variant="settings-secondary"
-                        size="icon"
+                        variant="danger"
+                        size="default"
                         aria-label={t('settings.schedulerRemoveTime')}
                         title={t('settings.schedulerRemoveTime')}
                         disabled={disabled}
@@ -964,7 +964,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                         }}
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </Button>
+                      </IconButton>
                     ) : null}
                   </div>
                 ))}
@@ -994,9 +994,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {timeTargetKey === 'SCHEDULE_TIMES' && !isAddingTime ? (
                   <Button
                     type="button"
-                    variant="settings-secondary"
+                    variant="secondary"
                     size="sm"
-                    className="h-9 shrink-0"
+                    className="shrink-0"
                     data-testid="scheduler-add-time-button"
                     disabled={disabled}
                     onClick={() => setIsAddingTime(true)}
@@ -1047,7 +1047,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="secondary"
                 size="sm"
                 data-testid="scheduler-refresh-status-button"
                 disabled={disabled || isRefreshingStatus}
@@ -1060,7 +1060,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               </Button>
               <Button
                 type="button"
-                variant="settings-primary"
+                variant="primary"
                 size="sm"
                 data-testid="scheduler-run-now-button"
                 disabled={disabled || isRunningNow}
@@ -1656,7 +1656,7 @@ const SettingsPage: React.FC = () => {
       <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
       <Button
         type="button"
-        variant="settings-secondary"
+        variant="secondary"
         size="sm"
         className="text-xs shadow-none"
         onClick={() => selectSectionView('notifications', 'channels')}
@@ -2645,9 +2645,8 @@ const SettingsPage: React.FC = () => {
             {activeGroupDirtyCount > 0 ? (
               <Button
                 type="button"
-                variant="settings-secondary"
+                variant="secondary"
                 size="sm"
-                className="px-2.5"
                 onClick={() => setShowResetConfirm(true)}
                 disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
               >
@@ -2686,7 +2685,7 @@ const SettingsPage: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => resolveAllSettingsConflicts('server')}
                 >
@@ -2694,7 +2693,7 @@ const SettingsPage: React.FC = () => {
                 </Button>
                 <Button
                   type="button"
-                  variant="settings-secondary"
+                  variant="secondary"
                   size="xsm"
                   onClick={() => resolveAllSettingsConflicts('local')}
                 >
@@ -2720,7 +2719,7 @@ const SettingsPage: React.FC = () => {
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         size="xsm"
                         onClick={() => resolveSettingsConflict(field.key, 'server')}
                       >
@@ -2728,7 +2727,7 @@ const SettingsPage: React.FC = () => {
                       </Button>
                       <Button
                         type="button"
-                        variant="settings-primary"
+                        variant="primary"
                         size="xsm"
                         onClick={() => resolveSettingsConflict(field.key, 'local')}
                       >
@@ -2813,7 +2812,7 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <Button
                   type="button"
-                  variant="settings-primary"
+                  variant="primary"
                   size="sm"
                   className="shrink-0"
                   disabled={isProviderCatalogLoading || providerCatalog.length === 0}
@@ -2863,14 +2862,14 @@ const SettingsPage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
-                      variant="settings-secondary"
+                      variant="secondary"
                       onClick={() => selectSectionView('data_sources', 'providers')}
                     >
                       {t('settings.viewConfigItems')}
                     </Button>
                     <Button
                       type="button"
-                      variant={alphasiftEnabled ? 'settings-secondary' : 'settings-primary'}
+                      variant={alphasiftEnabled ? 'secondary' : 'primary'}
                       onClick={() => void updateAlphaSiftEnabled(!alphasiftEnabled)}
                       disabled={isSaving || isLoading || isUpdatingAlphaSift}
                       isLoading={isUpdatingAlphaSift}
@@ -2963,7 +2962,7 @@ const SettingsPage: React.FC = () => {
                       </div>
                       <Button
                         type="button"
-                        variant="settings-secondary"
+                        variant="secondary"
                         onClick={() => void handleDesktopUpdateCheck()}
                         disabled={isCheckingDesktopUpdate}
                         isLoading={isCheckingDesktopUpdate}
@@ -3014,7 +3013,7 @@ const SettingsPage: React.FC = () => {
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
                       type="button"
-                      variant="settings-secondary"
+                      variant="secondary"
                       onClick={() => void downloadEnvBackup()}
                       disabled={envBackupActionDisabled}
                       isLoading={isExportingEnv}
@@ -3024,7 +3023,7 @@ const SettingsPage: React.FC = () => {
                     </Button>
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       onClick={beginEnvBackupImport}
                       disabled={envBackupActionDisabled}
                       isLoading={isImportingEnv}
@@ -3137,7 +3136,7 @@ const SettingsPage: React.FC = () => {
                     </p>
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       size="sm"
                       className="mt-3"
                       onClick={goToModelAccessFromTaskRouting}
@@ -3341,13 +3340,13 @@ const SettingsPage: React.FC = () => {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {searchParams.get('from') === 'task_routing' ? (
-                      <Button type="button" variant="settings-secondary" onClick={returnToTaskRouting}>
+                      <Button type="button" variant="secondary" onClick={returnToTaskRouting}>
                         {settingsText.returnTaskRouting}
                       </Button>
                     ) : null}
                     <Button
                       type="button"
-                      variant="settings-primary"
+                      variant="primary"
                       disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || providerConnectionSchemaUnavailable || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
                       onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
                     >
