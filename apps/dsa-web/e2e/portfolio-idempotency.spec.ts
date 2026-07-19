@@ -71,7 +71,10 @@ test.describe('portfolio idempotent mobile mutations', () => {
 
     await expect(dialog.getByLabel('股票代码')).toBeDisabled();
     await expect(dialog.getByLabel('数量')).toBeDisabled();
-    await expect(dialog.getByRole('button', { name: '提交中' })).toBeDisabled();
+    const submitButton = dialog.getByRole('button', { name: '提交交易' });
+    await expect(submitButton).toBeDisabled();
+    await expect(submitButton).toHaveAttribute('aria-busy', 'true');
+    await expect(submitButton).toContainText('提交中');
     await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeDisabled();
     await expect(dialog).toBeVisible();
 
