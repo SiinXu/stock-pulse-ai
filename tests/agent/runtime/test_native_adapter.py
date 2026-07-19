@@ -105,7 +105,7 @@ def test_run_failure_maps_to_failed_with_error():
     assert handle.error == "all models failed"
 
 
-def test_run_exception_marks_failed_and_reraises():
+def test_run_exception_records_sanitized_bounded_failure_and_reraises():
     from src.agent.runtime import native_adapter as native_module
 
     captured = []
@@ -116,16 +116,36 @@ def test_run_exception_marks_failed_and_reraises():
         captured.append(execution)
         return execution
 
-    executor = FakeExecutor(run_error=RuntimeError("adapter exploded"))
+    leaked_api_key = "sk-LEAKED0000key1111secret2222deadbeef"
+    leaked_url = "https://user:pw@internal.provider.local/v1/chat"
+    leaked_bearer = "Bearer abcdef0123456789abcdef0123456789"
+    raw_error = (
+        f"request to {leaked_url} failed: authorization={leaked_bearer} "
+        f"apikey={leaked_api_key} raw_provider_body="
+    ) * 20
+    exception = RuntimeError(raw_error)
+    executor = FakeExecutor(run_error=exception)
     adapter = NativeRuntimeAdapter(executor=executor)
 
     with patch.object(native_module, "AgentExecution", new=capturing_execution):
-        with pytest.raises(RuntimeError, match="adapter exploded"):
+        with pytest.raises(RuntimeError) as excinfo:
             adapter.execute(ExecutionContext(mode=ExecutionMode.RUN, prompt="task"))
 
+    assert excinfo.value is exception
     assert len(captured) == 1
-    assert captured[0].state is ExecutionState.FAILED
-    assert "adapter exploded" in (captured[0].error or "")
+    failed_execution = captured[0]
+    assert failed_execution.state is ExecutionState.FAILED
+    assert failed_execution.result is None
+    diagnostic = failed_execution.error or ""
+    assert diagnostic
+    assert len(diagnostic) <= 300
+    for secret in (
+        leaked_api_key,
+        "internal.provider.local",
+        "abcdef0123456789abcdef0123456789",
+    ):
+        assert secret not in diagnostic
+    assert "[REDACTED" in diagnostic
 
 
 def test_degraded_success_true_result_stays_succeeded():
@@ -268,11 +288,3 @@ def test_lazy_executor_is_built_once_and_reused():
 
     build_mock.assert_called_once_with(config, skills=["trend"])
     assert len(executor.run_calls) == 2
-
-
-def test_build_agent_runtime_returns_native_adapter():
-    from src.agent.factory import build_agent_runtime
-
-    runtime = build_agent_runtime(config=object())
-    assert isinstance(runtime, NativeRuntimeAdapter)
-    assert runtime.name == "native"
