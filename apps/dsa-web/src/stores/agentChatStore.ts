@@ -130,6 +130,9 @@ interface AgentChatState {
   sessionId: string;
   sessions: ChatSessionItem[];
   sessionsLoading: boolean;
+  sessionsError: ParsedApiError | null;
+  sessionLoading: boolean;
+  sessionError: ParsedApiError | null;
   chatError: ParsedApiError | null;
   currentRoute: string;
   completionBadge: boolean;
@@ -143,7 +146,7 @@ interface AgentChatActions {
   clearCompletionBadge: () => void;
   loadSessions: () => Promise<void>;
   loadInitialSession: (preferredSessionId?: string) => Promise<void>;
-  switchSession: (targetSessionId: string) => Promise<void>;
+  switchSession: (targetSessionId: string) => Promise<boolean>;
   startNewChat: () => string;
   startStream: (payload: ChatStreamRequest, meta?: StreamMeta, options?: StartStreamOptions) => Promise<void>;
   retryLastStream: () => Promise<void>;
@@ -156,6 +159,7 @@ const getInitialSessionId = (): string =>
     : generateUUID();
 
 let sessionHistoryGeneration = 0;
+let sessionListGeneration = 0;
 
 export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set, get) => ({
   messages: [],
@@ -164,6 +168,9 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   sessionId: getInitialSessionId(),
   sessions: [],
   sessionsLoading: false,
+  sessionsError: null,
+  sessionLoading: false,
+  sessionError: null,
   chatError: null,
   currentRoute: '',
   completionBadge: false,
@@ -176,14 +183,21 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
   clearCompletionBadge: () => set({ completionBadge: false }),
 
   loadSessions: async () => {
-    set({ sessionsLoading: true });
+    const generation = ++sessionListGeneration;
+    set({ sessionsLoading: true, sessionsError: null });
     try {
       const sessions = await agentApi.getChatSessions();
-      set({ sessions });
-    } catch {
-      // Ignore load errors
+      if (generation === sessionListGeneration) {
+        set({ sessions });
+      }
+    } catch (error) {
+      if (generation === sessionListGeneration) {
+        set({ sessionsError: getParsedApiError(error) });
+      }
     } finally {
-      set({ sessionsLoading: false });
+      if (generation === sessionListGeneration) {
+        set({ sessionsLoading: false });
+      }
     }
   },
 
@@ -198,6 +212,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
     set({
       hasInitialLoad: true,
       sessionsLoading: true,
+      sessionsError: null,
+      sessionError: null,
       ...(preferred ? { sessionId: preferred } : {}),
     });
 
@@ -236,8 +252,14 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       set({
         messages: msgs.map(fromSessionMessage),
       });
-    } catch {
-      // Ignore
+    } catch (error) {
+      if (generation === sessionHistoryGeneration) {
+        const parsedError = getParsedApiError(error);
+        set({
+          sessionsError: parsedError,
+          ...(preferred ? { sessionError: parsedError } : {}),
+        });
+      }
     } finally {
       if (generation === sessionHistoryGeneration) {
         set({ sessionsLoading: false });
@@ -247,35 +269,41 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
 
   switchSession: async (targetSessionId) => {
     const { sessionId, messages, abortController } = get();
-    if (targetSessionId === sessionId && messages.length > 0) return;
+    if (targetSessionId === sessionId && messages.length > 0) return true;
 
     const generation = ++sessionHistoryGeneration;
     abortController?.abort();
     set({
-      messages: [],
-      sessionId: targetSessionId,
       loading: false,
-      sessionsLoading: false,
+      sessionLoading: true,
+      sessionError: null,
       progressSteps: [],
       chatError: null,
       abortController: null,
       lastFailedRequest: null,
     });
-    localStorage.setItem(STORAGE_KEY_SESSION, targetSessionId);
 
     try {
       const msgs = await agentApi.getChatSessionMessages(targetSessionId);
-      if (
-        generation !== sessionHistoryGeneration
-        || get().sessionId !== targetSessionId
-      ) {
-        return;
+      if (generation !== sessionHistoryGeneration) {
+        return false;
       }
       set({
+        sessionId: targetSessionId,
         messages: msgs.map(fromSessionMessage),
+        sessionError: null,
       });
-    } catch {
-      // Ignore
+      localStorage.setItem(STORAGE_KEY_SESSION, targetSessionId);
+      return true;
+    } catch (error) {
+      if (generation === sessionHistoryGeneration) {
+        set({ sessionError: getParsedApiError(error) });
+      }
+      return false;
+    } finally {
+      if (generation === sessionHistoryGeneration) {
+        set({ sessionLoading: false });
+      }
     }
   },
 
@@ -299,6 +327,8 @@ export const useAgentChatStore = create<AgentChatState & AgentChatActions>((set,
       messages: [],
       loading: false,
       sessionsLoading: false,
+      sessionLoading: false,
+      sessionError: null,
       progressSteps: [],
       chatError: null,
       abortController: null,

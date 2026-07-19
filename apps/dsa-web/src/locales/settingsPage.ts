@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -54,6 +57,7 @@ const zh = {
   diagnosticsDescription: '模型配置生效来源、执行后端健康状态与冒烟测试。日常配置无需展开。',
   modelAccess: '模型接入',
   modelAccessDescription: '连接模型服务，并管理可用于报告、Agent 和视觉任务的模型。',
+  connectionSchemaUnavailable: '连接 Schema 不完整或不可用',
   returnTaskRouting: '返回任务路由',
   addModelService: '＋ 添加模型服务',
   eventMonitor: '事件监控',
@@ -122,6 +126,7 @@ const en: Record<keyof typeof zh, string> = {
   diagnosticsDescription: 'Effective model source, execution backend health, and smoke tests. Normal configuration does not require this.',
   modelAccess: 'Model access',
   modelAccessDescription: 'Connect model services and manage models for reports, Agent, and vision tasks.',
+  connectionSchemaUnavailable: 'Connection Schema is incomplete or unavailable',
   returnTaskRouting: 'Return to task routing',
   addModelService: '+ Add model service',
   eventMonitor: 'Event Monitor',
@@ -136,14 +141,14 @@ const en: Record<keyof typeof zh, string> = {
   taskVisionModel: 'Vision model',
 };
 
-export const SETTINGS_PAGE_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_PAGE_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_PAGE_TEXT", { zh, en });
 
-export const SETTINGS_TASK_ROUTE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_TASK_ROUTE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_TASK_ROUTE_LABELS", {
   zh: { LITELLM_MODEL: zh.taskReportModel, MARKET_REVIEW_MODEL: zh.taskMarketReviewModel, AGENT_LITELLM_MODEL: zh.taskAgentModel, VISION_MODEL: zh.taskVisionModel },
   en: { LITELLM_MODEL: en.taskReportModel, MARKET_REVIEW_MODEL: en.taskMarketReviewModel, AGENT_LITELLM_MODEL: en.taskAgentModel, VISION_MODEL: en.taskVisionModel },
-};
+});
 
-export const SETTINGS_TASK_REFERENCE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_TASK_REFERENCE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_TASK_REFERENCE_LABELS", {
   zh: { LITELLM_MODEL: zh.routeReport, MARKET_REVIEW_MODEL: zh.routeMarketReview, AGENT_LITELLM_MODEL: zh.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: '备用' },
   en: { LITELLM_MODEL: en.routeReport, MARKET_REVIEW_MODEL: en.routeMarketReview, AGENT_LITELLM_MODEL: en.routeAgent, VISION_MODEL: 'Vision', LITELLM_FALLBACK_MODELS: 'Fallback' },
-};
+});

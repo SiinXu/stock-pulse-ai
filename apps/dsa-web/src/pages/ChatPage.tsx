@@ -6,7 +6,7 @@ import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Tooltip } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Switch, Tooltip, useClipboard } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -31,7 +31,7 @@ import { extractStockCodesFromMessage } from '../utils/chatStockCode';
 import { findMatchingStockCode, includesStockCode, normalizeStockCode } from '../utils/stockCode';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiTextKey } from '../i18n/uiText';
-import { formatUiDateTime } from '../utils/uiLocale';
+import { formatUiDateTime, getUiListSeparator } from '../utils/uiLocale';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 import { getChatMessageDisplayContent } from '../utils/chatMessage';
 
@@ -187,6 +187,8 @@ const ChatPage: React.FC = () => {
   const [mobileSkillPickerOpen, setMobileSkillPickerOpen] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const [sending, setSending] = useState(false);
@@ -202,12 +204,14 @@ const ChatPage: React.FC = () => {
   const [contextCompressionMaskToken, setContextCompressionMaskToken] = useState('******');
   const [contextCompressionError, setContextCompressionError] = useState<string | null>(null);
   const [copiedMessages, setCopiedMessages] = useState<Set<string>>(new Set());
+  const { copyText } = useClipboard();
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [watchlistCodes, setWatchlistCodes] = useState<string[]>([]);
   const [isWatchlistActioning, setIsWatchlistActioning] = useState(false);
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
+  const activeStockContextRef = useRef<ActiveStockContext | null>(null);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
   const messagesViewportRef = useRef<HTMLDivElement>(null);
@@ -327,6 +331,9 @@ const ChatPage: React.FC = () => {
     sessionId,
     sessions,
     sessionsLoading,
+    sessionsError,
+    sessionLoading,
+    sessionError,
     hasInitialLoad,
     chatError,
     lastFailedRequest,
@@ -348,6 +355,7 @@ const ChatPage: React.FC = () => {
       return;
     }
     setActiveStockContext(restoredContext);
+    activeStockContextRef.current = restoredContext;
     setActiveStockCode(restoredContext.stock_code);
   }, [activeStockContext, messages, sessionId]);
 
@@ -562,6 +570,7 @@ const ChatPage: React.FC = () => {
 
   const handleStartNewChat = useCallback(() => {
     followUpContextRef.current = null;
+    activeStockContextRef.current = null;
     setActiveStockContext(null);
     setActiveStockCode(null);
     requestScrollToBottom('auto');
@@ -570,34 +579,40 @@ const ChatPage: React.FC = () => {
     setSidebarOpen(false);
   }, [requestScrollToBottom, setSessionInUrl]);
 
-  const handleSwitchSession = useCallback((targetSessionId: string) => {
+  const handleSwitchSession = useCallback(async (targetSessionId: string) => {
     if (targetSessionId === sessionId) {
       setSidebarOpen(false);
       return;
     }
-    followUpContextRef.current = null;
-    setActiveStockContext(null);
-    setActiveStockCode(null);
-    requestScrollToBottom('auto');
-    setSessionInUrl(targetSessionId);
-    void switchSession(targetSessionId);
-    setSidebarOpen(false);
+    const switched = await switchSession(targetSessionId);
+    if (switched !== false) {
+      followUpContextRef.current = null;
+      activeStockContextRef.current = null;
+      setActiveStockContext(null);
+      setActiveStockCode(null);
+      requestScrollToBottom('auto');
+      setSessionInUrl(targetSessionId);
+      setSidebarOpen(false);
+    }
   }, [requestScrollToBottom, sessionId, setSessionInUrl, switchSession]);
 
-  const confirmDelete = useCallback(() => {
-    if (!deleteConfirmId) return;
-    agentApi.deleteChatSession(deleteConfirmId)
-      .then(() => {
-        loadSessions();
-        if (deleteConfirmId === sessionId) {
-          handleStartNewChat();
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to delete chat session:', error);
-      });
-    setDeleteConfirmId(null);
-  }, [deleteConfirmId, sessionId, loadSessions, handleStartNewChat]);
+  const confirmDelete = useCallback(async () => {
+    if (!deleteConfirmId || deleteLoading) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await agentApi.deleteChatSession(deleteConfirmId);
+      await loadSessions();
+      if (deleteConfirmId === sessionId) {
+        handleStartNewChat();
+      }
+      setDeleteConfirmId(null);
+    } catch (error) {
+      setDeleteError(getParsedApiError(error, language).message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }, [deleteConfirmId, deleteLoading, handleStartNewChat, language, loadSessions, sessionId]);
 
   // Handle follow-up from report page: ?stock=600519&name=贵州茅台&recordId=xxx
   useEffect(() => {
@@ -612,10 +627,12 @@ const ChatPage: React.FC = () => {
     const hydrationToken = ++followUpHydrationTokenRef.current;
     setInput(buildFollowUpPrompt(stock, name));
     setActiveStockCode(stock);
-    setActiveStockContext({
+    const stockContext = {
       stock_code: stock,
       stock_name: name,
-    });
+    };
+    activeStockContextRef.current = stockContext;
+    setActiveStockContext(stockContext);
     followUpContextRef.current = {
       stock_code: stock,
       stock_name: name,
@@ -652,16 +669,17 @@ const ChatPage: React.FC = () => {
   const handleSend = useCallback(
     async (overrideMessage?: string, overrideSkillIds?: string[]) => {
       const msgText = (overrideMessage ?? input).trim();
-      if (!msgText || loading || isFollowUpContextLoading) return;
+      if (!msgText || loading || sessionLoading || isFollowUpContextLoading) return;
       const usedSkillIds = normalizeSelectedSkillIds(overrideSkillIds ?? selectedSkillIds);
       const usedSkillNames = usedSkillIds.length > 0 ? getSkillNames(usedSkillIds) : [t('chat.general')];
 
-      let nextActiveStockContext = activeStockContext;
+      let nextActiveStockContext = activeStockContextRef.current;
       let useActiveContextForThisSend = false;
-      const stockResolution = resolveActiveStockContextFromMessage(msgText, activeStockContext);
+      const stockResolution = resolveActiveStockContextFromMessage(msgText, activeStockContextRef.current);
       if (stockResolution) {
         nextActiveStockContext = stockResolution.context;
         useActiveContextForThisSend = stockResolution.useForCurrentSend;
+        activeStockContextRef.current = nextActiveStockContext;
         setActiveStockContext(nextActiveStockContext);
         setActiveStockCode(nextActiveStockContext.stock_code);
       }
@@ -684,10 +702,10 @@ const ChatPage: React.FC = () => {
       requestScrollToBottom('smooth');
       await startStream(payload, {
         skillNames: usedSkillNames,
-        skillName: usedSkillNames.join(language === 'en' ? ', ' : '、'),
+        skillName: usedSkillNames.join(getUiListSeparator(language)),
       });
     },
-    [activeStockContext, getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, startStream, t],
+    [getSkillNames, input, isFollowUpContextLoading, language, loading, normalizeSelectedSkillIds, requestScrollToBottom, selectedSkillIds, sessionId, sessionLoading, startStream, t],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -728,8 +746,7 @@ const ChatPage: React.FC = () => {
   };
 
   const copyMessageToClipboard = async (msgId: string, content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
+    if (await copyText(content)) {
       setCopiedMessages((prev) => new Set(prev).add(msgId));
       const existingTimer = copyResetTimerRef.current[msgId];
       if (existingTimer !== undefined) {
@@ -743,8 +760,8 @@ const ChatPage: React.FC = () => {
         });
         delete copyResetTimerRef.current[msgId];
       }, 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
+    } else {
+      showSendFeedback({ type: 'error', message: t('common.copyFailed') }, 5000);
     }
   };
 
@@ -891,7 +908,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -911,7 +928,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
             aria-label={t('common.closeDrawer')}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -926,6 +943,13 @@ const ChatPage: React.FC = () => {
             title={t('chat.loadingSessions')}
             className="rounded-2xl border border-dashed border-border/50 bg-surface/30"
           />
+        ) : sessionsError ? (
+          <ApiErrorAlert
+            error={sessionsError}
+            className="rounded-2xl"
+            actionLabel={t('common.retry')}
+            onAction={() => void loadSessions()}
+          />
         ) : sessions.length === 0 ? (
           <DashboardStateBlock
             compact
@@ -939,7 +963,8 @@ const ChatPage: React.FC = () => {
               <div key={s.session_id} className="session-item-row">
                 <button
                   type="button"
-                  onClick={() => handleSwitchSession(s.session_id)}
+                  onClick={() => void handleSwitchSession(s.session_id)}
+                  disabled={sessionLoading}
                   className={`session-item ${s.session_id === sessionId ? 'active' : ''}`}
                   aria-label={t('chat.switchSession', { title: s.title })}
                   aria-current={s.session_id === sessionId ? 'page' : undefined}
@@ -967,7 +992,9 @@ const ChatPage: React.FC = () => {
                   className="delete-btn"
                   onClick={() => {
                     setDeleteConfirmId(s.session_id);
+                    setDeleteError(null);
                   }}
+                  disabled={sessionLoading}
                   aria-label={t('chat.deleteSession', { title: s.title })}
                 >
                   <svg
@@ -993,7 +1020,7 @@ const ChatPage: React.FC = () => {
   );
 
   const selectedSkillSummary = selectedSkillIds.length > 0
-    ? getSkillNames(selectedSkillIds).join(language === 'en' ? ', ' : '、')
+    ? getSkillNames(selectedSkillIds).join(getUiListSeparator(language))
     : t('chat.generalAnalysis');
 
   return (
@@ -1030,8 +1057,14 @@ const ChatPage: React.FC = () => {
         confirmText={t('common.delete')}
         cancelText={t('common.cancel')}
         isDanger
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirmId(null)}
+        confirmDisabled={deleteLoading}
+        cancelDisabled={deleteLoading}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          setDeleteConfirmId(null);
+          setDeleteError(null);
+        }}
       />
 
       {/* Main chat area */}
@@ -1042,7 +1075,7 @@ const ChatPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-full text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+                className="-ml-1 inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
                 aria-label={t('chat.history')}
               >
                 <svg
@@ -1373,6 +1406,17 @@ const ChatPage: React.FC = () => {
           {/* Input area */}
           <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
             <div className="space-y-3">
+              {sessionError ? (
+                <ApiErrorAlert error={sessionError} />
+              ) : null}
+              {sessionLoading ? (
+                <InlineAlert
+                  variant="info"
+                  title={t('chat.loadingSessions')}
+                  message={t('common.loading')}
+                  className="rounded-xl px-3 py-2 text-xs shadow-none"
+                />
+              ) : null}
               {chatError ? (
                 <ApiErrorAlert
                   error={chatError}
@@ -1397,36 +1441,13 @@ const ChatPage: React.FC = () => {
                   {contextCompressionSaving ? (
                     <span className="text-xs text-muted-text">{t('chat.saving')}</span>
                   ) : null}
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={contextCompressionEnabled}
+                  <Switch
+                    checked={contextCompressionEnabled}
+                    onCheckedChange={(next) => void updateContextCompressionEnabled(next)}
                     aria-label={t('chat.contextCompression')}
                     disabled={!contextCompressionLoaded || contextCompressionSaving}
-                    onClick={() => void updateContextCompressionEnabled(!contextCompressionEnabled)}
-                    className={cn(
-                      'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
-                      !contextCompressionLoaded || contextCompressionSaving
-                        ? 'cursor-not-allowed opacity-60'
-                        : 'cursor-pointer',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
-                        contextCompressionEnabled ? 'border-transparent bg-primary' : 'border-border bg-muted',
-                      )}
-                      data-testid="context-compression-switch-visual"
-                      aria-hidden="true"
-                    >
-                      <span
-                        className={cn(
-                          'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-                          contextCompressionEnabled ? 'translate-x-4' : 'translate-x-0.5',
-                        )}
-                      />
-                    </span>
-                  </button>
+                    visualTestId="context-compression-switch-visual"
+                  />
                 </div>
               </div>
               {contextCompressionError ? (
@@ -1441,7 +1462,7 @@ const ChatPage: React.FC = () => {
                 <div className="relative space-y-2" ref={skillPickerRef}>
                   <button
                     type="button"
-                    className="home-surface-button flex h-11 w-full items-center justify-between gap-3 rounded-full px-3 text-left text-sm text-foreground"
+                    className="home-surface-button flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-xs text-foreground"
                     aria-label={mobileSkillPickerOpen ? t('chat.collapseStrategies') : t('chat.expandStrategies')}
                     aria-expanded={mobileSkillPickerOpen}
                     aria-controls="chat-skill-picker-panel"
@@ -1468,53 +1489,53 @@ const ChatPage: React.FC = () => {
                       'absolute bottom-full left-0 right-0 z-20 mb-2 max-h-60 flex-col gap-y-2 overflow-y-auto rounded-xl border border-border bg-card px-3 py-2.5 shadow-soft-card',
                     )}
                   >
-                    <label className="flex min-h-11 items-center gap-1.5 text-sm cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        name="general-analysis"
-                        value=""
-                        checked={selectedSkillIds.length === 0}
-                        onChange={() => setSelectedSkillIds([])}
-                        className="chat-skill-checkbox"
-                      />
-                      <span
-                        className={`transition-colors text-sm ${selectedSkillIds.length === 0 ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
-                      >
-                        {t('chat.generalAnalysis')}
-                      </span>
-                    </label>
+                    <Checkbox
+                      name="general-analysis"
+                      value=""
+                      checked={selectedSkillIds.length === 0}
+                      onChange={() => setSelectedSkillIds([])}
+                      containerClassName="group min-h-8 gap-1.5 text-sm"
+                      label={(
+                        <span
+                          className={`text-sm transition-colors ${selectedSkillIds.length === 0 ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
+                        >
+                          {t('chat.generalAnalysis')}
+                        </span>
+                      )}
+                    />
                     {skills.map((s) => {
                       const checked = selectedSkillIdSet.has(s.id);
                       const disabled = !checked && skillLimitReached;
                       const display = getStrategyDisplay(s, language);
                       return (
-                        <label
+                        <div
                           key={s.id}
-                          className={`flex min-h-11 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          className={`flex min-h-8 items-center gap-1.5 cursor-pointer group relative ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                           onMouseEnter={() => setShowSkillDesc(s.id)}
                           onMouseLeave={() => setShowSkillDesc(null)}
                         >
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             name="skills"
                             value={s.id}
                             checked={checked}
                             disabled={disabled}
                             onChange={() => toggleSkillSelection(s.id)}
-                            className="chat-skill-checkbox"
+                            containerClassName="min-h-8 gap-1.5"
+                            label={(
+                              <span
+                                className={`text-sm transition-colors ${checked ? 'font-medium text-foreground' : 'font-normal text-secondary-text group-hover:text-foreground'}`}
+                              >
+                                {display.name}
+                              </span>
+                            )}
                           />
-                          <span
-                            className={`transition-colors text-sm ${checked ? 'text-foreground font-medium' : 'text-secondary-text group-hover:text-foreground'}`}
-                          >
-                            {display.name}
-                          </span>
                           {showSkillDesc === s.id && s.description && (
                             <div className="skill-desc-tooltip">
                               <p className="skill-title">{display.name}</p>
                               <p>{display.description}</p>
                             </div>
                           )}
-                        </label>
+                        </div>
                       );
                     })}
                   </div>
@@ -1546,9 +1567,9 @@ const ChatPage: React.FC = () => {
                   onKeyDown={handleKeyDown}
                   aria-label={t('chat.messageInput')}
                   placeholder={t('chat.inputPlaceholder')}
-                  disabled={loading}
+                  disabled={loading || sessionLoading}
                   rows={1}
-                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex-1 min-h-11 max-h-50 rounded-sm border border-border bg-transparent px-3 py-2 text-base placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text resize-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
                   style={{ height: 'auto' }}
                   onInput={(e) => {
                     const t = e.target as HTMLTextAreaElement;
@@ -1569,7 +1590,7 @@ const ChatPage: React.FC = () => {
                   <Button
                     variant="primary"
                     onClick={() => handleSend()}
-                    disabled={!input.trim() || isFollowUpContextLoading}
+                    disabled={!input.trim() || isFollowUpContextLoading || sessionLoading}
                     className="btn-primary flex-shrink-0"
                   >
                     {t('chat.send')}

@@ -15,7 +15,7 @@ from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,12 @@ _fetcher_manager_singleton = None
 _fetcher_manager_lock = Lock()
 _DAILY_HISTORY_DEFAULT_DAYS = 60
 _DAILY_HISTORY_MAX_DAYS = 365
+_FUNDAMENTAL_DATA_UNAVAILABLE = "Fundamental data is unavailable."
+_PORTFOLIO_MODULE_UNAVAILABLE = "Portfolio module is unavailable."
+_PORTFOLIO_RISK_UNAVAILABLE = "Portfolio risk snapshot is unavailable."
+_PORTFOLIO_SNAPSHOT_UNAVAILABLE = "Portfolio snapshot is unavailable."
+_CAPITAL_FLOW_UNAVAILABLE = "Capital flow data is unavailable."
+_CAPITAL_FLOW_PROVIDER_ERROR = "capital_flow_provider_error"
 
 
 def _get_fetcher_manager():
@@ -344,6 +350,7 @@ def _handle_get_daily_history(stock_code: str, days: int = 60) -> dict:
                 error_code="agent_daily_history_persistence_failed",
                 level=logging.WARNING,
                 context={"stock_code": normalized_code},
+                exception_redaction_values=exception_chain_redaction_values(exc),
             )
 
     # Convert DataFrame to list of dicts (last N records)
@@ -498,8 +505,12 @@ def _handle_get_stock_info(stock_code: str) -> dict:
             error_code="agent_stock_info_lookup_failed",
             level=logging.WARNING,
             context={"stock_code": stock_code},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
-        fundamental_context = manager.build_failed_fundamental_context(stock_code, str(exc))
+        fundamental_context = manager.build_failed_fundamental_context(
+            stock_code,
+            _FUNDAMENTAL_DATA_UNAVAILABLE,
+        )
 
     compact_context = _compact_fundamental_context(fundamental_context)
     valuation = compact_context.get("valuation", {}).get("data", {})
@@ -580,8 +591,9 @@ def _handle_get_portfolio_snapshot(
             error_code="agent_portfolio_snapshot_unavailable",
             level=logging.WARNING,
             context={"account_id": account_id},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
-        return {"status": "not_supported", "error": f"portfolio module unavailable: {exc}"}
+        return {"status": "not_supported", "error": _PORTFOLIO_MODULE_UNAVAILABLE}
 
     try:
         portfolio_service = PortfolioService()
@@ -611,8 +623,9 @@ def _handle_get_portfolio_snapshot(
                     error_code="agent_portfolio_risk_snapshot_failed",
                     level=logging.WARNING,
                     context={"account_id": account_id},
+                    exception_redaction_values=exception_chain_redaction_values(risk_exc),
                 )
-                result["risk"] = {"status": "failed", "error": str(risk_exc)}
+                result["risk"] = {"status": "failed", "error": _PORTFOLIO_RISK_UNAVAILABLE}
         return result
     except Exception as exc:
         log_safe_exception(
@@ -622,8 +635,9 @@ def _handle_get_portfolio_snapshot(
             error_code="agent_portfolio_snapshot_failed",
             level=logging.WARNING,
             context={"account_id": account_id},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
-        return {"status": "failed", "error": f"failed to fetch portfolio snapshot: {exc}"}
+        return {"status": "failed", "error": _PORTFOLIO_SNAPSHOT_UNAVAILABLE}
 
 
 get_portfolio_snapshot_tool = ToolDefinition(
@@ -706,11 +720,12 @@ def _handle_get_capital_flow(stock_code: str) -> dict:
             error_code="agent_capital_flow_lookup_failed",
             level=logging.WARNING,
             context={"stock_code": stock_code},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         return {
             "stock_code": stock_code,
             "status": "error",
-            "error": f"capital flow fetch failed: {exc}",
+            "error": _CAPITAL_FLOW_UNAVAILABLE,
         }
 
     status = ctx.get("status", "not_supported")
@@ -724,7 +739,7 @@ def _handle_get_capital_flow(stock_code: str) -> dict:
     data = ctx.get("data", {})
     stock_flow = data.get("stock_flow") or {}
     sector_rankings = data.get("sector_rankings") or {}
-    errors = ctx.get("errors") or []
+    errors = [_CAPITAL_FLOW_PROVIDER_ERROR] if ctx.get("errors") else []
 
     return {
         "stock_code": stock_code,

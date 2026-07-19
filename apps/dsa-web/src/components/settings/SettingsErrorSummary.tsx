@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { InlineAlert } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
@@ -54,7 +56,7 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
                 type="button"
                 onClick={() => onJump(entry)}
                 aria-label={`${jumpHint}: ${entry.label}`}
-                className="flex w-full flex-col rounded-full px-2 py-1 text-left transition-colors hover:bg-[hsl(var(--color-danger-alert-text)/0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-[hsl(var(--color-danger-alert-text)/0.08)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               >
                 <span className="text-sm font-medium underline-offset-2 group-hover:underline">{entry.label}</span>
                 <span className="text-xs opacity-80">{entry.message}</span>

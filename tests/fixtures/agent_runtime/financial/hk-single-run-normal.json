@@ -1,0 +1,150 @@
+{
+  "id": "hk-single-run-normal",
+  "notes": "HK single-agent dashboard run on the happy path: two tool round-trips then a fenced dashboard JSON.",
+  "input": {
+    "task": "分析腾讯控股的投资价值",
+    "context": {
+      "stock_code": "hk00700",
+      "stock_name": "腾讯控股"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_h1",
+          "name": "get_realtime_quote",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 32,
+        "total_tokens": 552
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_h2",
+          "name": "analyze_trend",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 610,
+        "completion_tokens": 28,
+        "total_tokens": 638
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_run",
+      "content": "基于港股行情与趋势数据，输出决策仪表盘：\n```json\n{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 60,\n  \"trend_prediction\": \"短期震荡上行\",\n  \"operation_advice\": \"持有\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"港股多头结构完好，回踩MA5可低吸\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"回踩MA5企稳后轻仓介入\",\n        \"has_position\": \"继续持有，跌破MA10减仓\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"港股收盘后基于最近收盘数据分析\",\n      \"action_window\": \"次一交易日开盘后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"放量突破105或缩量回踩98\",\n      \"next_check_time\": \"次日开盘\",\n      \"confidence_reason\": \"行情与趋势数据完整\",\n      \"data_limitations\": \"无\"\n    }\n  },\n  \"analysis_summary\": \"均线多头排列，量能正常，短期以持有为主。\",\n  \"key_points\": \"MA5>MA10>MA20；量能正常\",\n  \"risk_warning\": \"港股波动较大，跌破MA20需止损\"\n}\n```",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 720,
+        "completion_tokens": 236,
+        "total_tokens": 956
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "single_run",
+      "single_run",
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "get_realtime_quote",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 127,
+        "cached": false
+      },
+      {
+        "step": 2,
+        "tool": "analyze_trend",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 180,
+        "cached": false
+      }
+    ],
+    "total_steps": 3,
+    "total_tokens": 2146,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "腾讯控股",
+      "sentiment_score": 60,
+      "trend_prediction": "短期震荡上行",
+      "operation_advice": "持有",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "港股多头结构完好，回踩MA5可低吸",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "回踩MA5企稳后轻仓介入",
+            "has_position": "继续持有，跌破MA10减仓"
+          }
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0
+        },
+        "phase_decision": {
+          "phase_context": "港股收盘后基于最近收盘数据分析",
+          "action_window": "次一交易日开盘后",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "放量突破105或缩量回踩98",
+          "next_check_time": "次日开盘",
+          "confidence_reason": "行情与趋势数据完整",
+          "data_limitations": "无"
+        }
+      },
+      "analysis_summary": "均线多头排列，量能正常，短期以持有为主。",
+      "key_points": "MA5>MA10>MA20；量能正常",
+      "risk_warning": "港股波动较大，跌破MA20需止损"
+    },
+    "content": "基于港股行情与趋势数据，输出决策仪表盘：\n```json\n{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 60,\n  \"trend_prediction\": \"短期震荡上行\",\n  \"operation_advice\": \"持有\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"港股多头结构完好，回踩MA5可低吸\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"回踩MA5企稳后轻仓介入\",\n        \"has_position\": \"继续持有，跌破MA10减仓\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"港股收盘后基于最近收盘数据分析\",\n      \"action_window\": \"次一交易日开盘后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"放量突破105或缩量回踩98\",\n      \"next_check_time\": \"次日开盘\",\n      \"confidence_reason\": \"行情与趋势数据完整\",\n      \"data_limitations\": \"无\"\n    }\n  },\n  \"analysis_summary\": \"均线多头排列，量能正常，短期以持有为主。\",\n  \"key_points\": \"MA5>MA10>MA20；量能正常\",\n  \"risk_warning\": \"港股波动较大，跌破MA20需止损\"\n}\n```",
+    "error": null
+  }
+}

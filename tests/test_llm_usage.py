@@ -46,6 +46,13 @@ from src.storage import (
     _LLM_USAGE_TELEMETRY_COLUMN_SQL,
 )
 
+MIGRATION_FIXTURE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "schema_migrations"
+    / "v3_26_3.sql"
+)
+
 
 def _fresh_db() -> DatabaseManager:
     """Return a DatabaseManager backed by a fresh in-memory SQLite database."""
@@ -1775,6 +1782,8 @@ class TestLLMUsageMigration(unittest.TestCase):
             for column in telemetry_columns
         )
         with sqlite3.connect(db_path) as conn:
+            conn.executescript(MIGRATION_FIXTURE.read_text(encoding="utf-8"))
+            conn.execute("DROP TABLE llm_usage")
             conn.execute(
                 f"""
                 CREATE TABLE llm_usage (
@@ -1865,11 +1874,14 @@ class TestLLMUsageMigration(unittest.TestCase):
                     and self._is_add_column_statement(statement, "provider_usage_json")
                 ):
                     race_fired["value"] = True
-                    with sqlite3.connect(db_path) as conn:
-                        conn.execute(
-                            "ALTER TABLE llm_usage ADD COLUMN provider_usage_json TEXT"
-                        )
-                        conn.commit()
+                    # Startup now holds BEGIN IMMEDIATE across compatibility
+                    # repairs, so a second connection cannot win this race. Keep
+                    # the duplicate-column recovery branch covered by forming
+                    # the observed schema state on the locked connection.
+                    original_exec_driver_sql(
+                        connection,
+                        "ALTER TABLE llm_usage ADD COLUMN provider_usage_json TEXT",
+                    )
                     raise OperationalError(
                         statement,
                         {},

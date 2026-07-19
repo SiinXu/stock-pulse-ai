@@ -6,11 +6,12 @@ import { useAuth, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { getUiListSeparator, getUiLocale } from '../utils/uiLocale';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, SearchableSelect, TimePicker, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -45,11 +46,20 @@ import {
   type ModelReferenceReplacement,
 } from '../components/settings';
 import {
+  CONNECTION_SCHEMA_KEY_BY_SUFFIX,
   parseModelAccessFieldKey,
   type ModelAccessFieldFocusRequest,
 } from '../components/settings/modelAccessFieldKey';
-import { getProviderDisplayLabel } from '../components/settings/llmConnectionContract';
+import {
+  buildConnectionContractValues,
+  evaluateConnectionSchemaAuthority,
+  getProviderDisplayLabel,
+  isConnectionSchemaFieldWritable,
+  validateConnectionContractValues,
+  type ConnectionCredentialField,
+} from '../components/settings/llmConnectionContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
+import { SettingsSwitch } from '../components/settings/SettingsSwitch';
 import { AiOverviewMatrix } from '../components/settings/AiOverviewMatrix';
 import {
   SETTINGS_SECTIONS,
@@ -76,6 +86,8 @@ import {
 import type {
   ConfigValidationIssue,
   LLMConfigModeStatus,
+  LlmConnectionFieldSchema,
+  LlmProviderCatalogEntry,
   SchedulerStatusResponse,
   SetupStatusCheck,
   SetupStatusResponse,
@@ -85,6 +97,8 @@ import type {
 } from '../types/systemConfig';
 import { formatUiText, type UiLanguage, type UiTextKey } from '../i18n/uiText';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS, SETTINGS_TASK_ROUTE_LABELS } from '../locales/settingsPage';
+import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
+import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 
 type DesktopWindow = Window & {
   dsaDesktop?: {
@@ -105,6 +119,156 @@ interface SettingsGroupSaveState {
 }
 
 const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
+
+// Routing fields whose options must be limited to channels the user has
+// actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
+const CHANNEL_ROUTING_FIELD_KEYS = new Set([
+  'NOTIFICATION_REPORT_CHANNELS',
+  'NOTIFICATION_ALERT_CHANNELS',
+  'NOTIFICATION_SYSTEM_ERROR_CHANNELS',
+]);
+
+function connectionItemsRespectSchema(
+  items: Array<{ key: string; value: string }>,
+  currentValues: Record<string, string>,
+  currentRawValueKeys: Set<string>,
+  providers: LlmProviderCatalogEntry[],
+  connectionFields: LlmConnectionFieldSchema[] | undefined,
+  emptyApiKeyHosts: string[],
+): boolean {
+  if (connectionFields === undefined) {
+    return true;
+  }
+  const parsedItems = items.flatMap((item) => {
+    const parsed = parseModelAccessFieldKey(item.key);
+    return parsed ? [{ item, parsed }] : [];
+  });
+  const channelsItem = items.find(
+    (item) => item.key.trim().toUpperCase() === 'LLM_CHANNELS',
+  );
+  if (parsedItems.length === 0 && !channelsItem) {
+    return true;
+  }
+
+  const valuesBefore = new Map(
+    Object.entries(currentValues).map(([key, value]) => [key.toUpperCase(), value]),
+  );
+  const presentBefore = new Set(
+    Array.from(currentRawValueKeys, (key) => key.toUpperCase()),
+  );
+  const valuesAfter = new Map(valuesBefore);
+  const presentAfter = new Set(presentBefore);
+  for (const item of items) {
+    const key = item.key.toUpperCase();
+    valuesAfter.set(key, item.value);
+    presentAfter.add(key);
+  }
+
+  const connectionNames = (values: Map<string, string>) => (values.get('LLM_CHANNELS') ?? '')
+    .split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean);
+  const beforeNames = new Set(connectionNames(valuesBefore));
+  const afterNames = new Set(connectionNames(valuesAfter));
+
+  const buildAuthority = (
+    connectionName: string,
+    values: Map<string, string>,
+    presentKeys: Set<string>,
+    requireCatalogIdentity: boolean,
+  ) => {
+    const prefix = `LLM_${connectionName.toUpperCase()}_`;
+    const value = (suffix: string) => {
+      const key = `${prefix}${suffix}`;
+      return presentKeys.has(key) ? (values.get(key) ?? '') : '';
+    };
+    const providerId = value('PROVIDER').trim();
+    const provider = providers.find((candidate) => candidate.id === providerId);
+    if (requireCatalogIdentity && !provider) {
+      return null;
+    }
+    const apiKeys = value('API_KEYS');
+    const credentialField: ConnectionCredentialField = apiKeys.trim()
+      ? 'api_keys'
+      : 'api_key';
+    const rawEnabled = value('ENABLED').trim();
+    const enabled = !['0', 'false', 'no', 'off'].includes(rawEnabled.toLowerCase());
+    const authorityValues = buildConnectionContractValues({
+      connectionName,
+      displayName: value('DISPLAY_NAME'),
+      providerId,
+      provider,
+      protocol: value('PROTOCOL'),
+      baseUrl: value('BASE_URL'),
+      apiKey: credentialField === 'api_keys' ? apiKeys : value('API_KEY'),
+      credentialField,
+      models: value('MODELS'),
+      extraHeaders: value('EXTRA_HEADERS'),
+      enabled,
+      emptyApiKeyHosts,
+    });
+    // The shared builder accepts a boolean, so restore absence after building.
+    authorityValues.enabled = rawEnabled ? authorityValues.enabled : '';
+    return {
+      authority: evaluateConnectionSchemaAuthority(authorityValues, connectionFields),
+      values: authorityValues,
+    };
+  };
+
+  const finalAuthorities = new Map<string, ReturnType<typeof buildAuthority>>();
+  for (const connectionName of afterNames) {
+    const result = buildAuthority(
+      connectionName,
+      valuesAfter,
+      presentAfter,
+      true,
+    );
+    if (
+      !result
+      || !result.authority.usable
+      || validateConnectionContractValues(result.values, connectionFields).length > 0
+    ) {
+      return false;
+    }
+    finalAuthorities.set(connectionName, result);
+  }
+
+  for (const { parsed } of parsedItems) {
+    const isActive = afterNames.has(parsed.connectionName);
+    if (!isActive && !beforeNames.has(parsed.connectionName)) {
+      return false;
+    }
+    const result = isActive
+      ? finalAuthorities.get(parsed.connectionName)
+      : buildAuthority(parsed.connectionName, valuesBefore, presentBefore, false);
+    if (
+      !result?.authority.usable
+      || !isConnectionSchemaFieldWritable(
+        result.authority,
+        CONNECTION_SCHEMA_KEY_BY_SUFFIX[parsed.suffix],
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (channelsItem) {
+    const affectedNames = new Set([...beforeNames, ...afterNames]);
+    for (const connectionName of affectedNames) {
+      const result = afterNames.has(connectionName)
+        ? finalAuthorities.get(connectionName)
+        : buildAuthority(connectionName, valuesBefore, presentBefore, false);
+      if (
+        !result?.authority.usable
+        || !isConnectionSchemaFieldWritable(result.authority, 'connection_name')
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
 
 type DesktopUpdateState = {
   status?: string;
@@ -366,7 +530,6 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
 }
 
 const SCHEDULE_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const SCHEDULER_DEFAULT_TIME = '18:00';
 const SCHEDULER_SETTING_KEYS = new Set([
   'SCHEDULE_ENABLED',
   'SCHEDULE_TIME',
@@ -582,18 +745,23 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
   );
 };
 
-function parseScheduleTimes(scheduleTimesValue?: string, fallbackValue?: string) {
+function parseScheduleTimes(scheduleTimesValue?: string, fallbackValue?: string, defaultValue?: string | null) {
   const values = String(scheduleTimesValue ?? '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
 
   if (values.length > 0) {
-    return values;
+    return [...new Set(values)];
   }
 
   const fallback = String(fallbackValue ?? '').trim();
-  return fallback ? [fallback] : [SCHEDULER_DEFAULT_TIME];
+  if (fallback) {
+    return [fallback];
+  }
+
+  const schemaDefault = String(defaultValue ?? '').trim();
+  return schemaDefault ? [schemaDefault] : [];
 }
 
 function serializeScheduleTimes(times: string[]) {
@@ -610,7 +778,7 @@ function formatSchedulerTimestamp(value: string | null | undefined, language: Ui
     return value;
   }
 
-  return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'zh-CN', {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -654,6 +822,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
+  const [isAddingTime, setIsAddingTime] = useState(false);
 
   const refreshSchedulerStatus = useCallback(async () => {
     setStatusError(null);
@@ -695,6 +864,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const scheduleTimes = parseScheduleTimes(
     String(scheduleTimesItem?.value ?? ''),
     String(scheduleTimeItem?.value ?? ''),
+    scheduleTimeItem?.schema?.defaultValue,
   );
   const timeTargetKey = scheduleTimesItem ? 'SCHEDULE_TIMES' : 'SCHEDULE_TIME';
   const statusEnabled = status?.enabled ?? scheduleEnabled;
@@ -738,26 +908,24 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
           <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
-                <label className="flex min-h-11 items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-border text-foreground focus:ring-foreground/20"
-                    checked={displayedScheduleEnabled}
-                    data-testid="scheduler-enabled-checkbox"
-                    disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
-                    onChange={(event) => {
-                      const nextEnabled = Boolean(event.target.checked);
-                      setScheduleEnabledOverride(nextEnabled);
-                      onChange('SCHEDULE_ENABLED', nextEnabled ? 'true' : 'false');
-                    }}
-                  />
-              <span>
-                <span className="block text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</span>
-                <span className="block text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</span>
-              </span>
-            </label>
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
+                <p className="text-xs leading-6 text-muted-text">{t('settings.schedulerEnableDescription')}</p>
+              </div>
+              <SettingsSwitch
+                checked={displayedScheduleEnabled}
+                disabled={disabled || !scheduleEnabledItem?.schema?.isEditable}
+                onCheckedChange={(nextEnabled) => {
+                  setScheduleEnabledOverride(nextEnabled);
+                  onChange('SCHEDULE_ENABLED', nextEnabled ? 'true' : 'false');
+                }}
+                testId="scheduler-enabled-switch"
+                aria-label={t('settings.schedulerEnable')}
+              />
+            </div>
 
-            <div className="space-y-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Clock className="h-4 w-4" aria-hidden="true" />
                 {t('settings.schedulerTimes')}
@@ -766,20 +934,21 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {scheduleTimes.map((time, index) => (
                   <div
                     key={index}
-                    className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl border settings-border bg-card/90 px-1 shadow-inner"
+                    className="inline-flex shrink-0 items-center gap-1"
                   >
-                    <input
+                    <TimePicker
                       data-testid={`scheduler-time-input-${index}`}
-                      type="time"
                       value={SCHEDULE_TIME_PATTERN.test(time) ? time : ''}
-                      aria-label={t('settings.schedulerTimeInputAria', { index: index + 1 })}
-                      className="h-11 w-36 rounded-lg border-none bg-transparent px-2 text-sm font-medium text-foreground outline-none transition focus:bg-background/60 focus:ring-2 focus:ring-foreground/20"
+                      ariaLabel={t('settings.schedulerTimeInputAria', { index: index + 1 })}
+                      className="w-32"
+                      triggerClassName="h-9 min-h-9 text-sm font-medium"
                       disabled={disabled}
-                      onChange={(event) => {
-                        const nextTimes = scheduleTimes.map((currentTime, currentIndex) => (
-                          currentIndex === index ? event.target.value : currentTime
-                        ));
-                        updateScheduleTimes(nextTimes);
+                      onChange={(nextValue) => {
+                        if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
+                          updateScheduleTimes(scheduleTimes.map((currentTime, currentIndex) => (
+                            currentIndex === index ? nextValue : currentTime
+                          )));
+                        }
                       }}
                     />
                     {scheduleTimes.length > 1 ? (
@@ -799,18 +968,43 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     ) : null}
                   </div>
                 ))}
-                <Button
-                  type="button"
-                  variant="settings-secondary"
-                  size="sm"
-                  className="h-11 shrink-0"
-                  data-testid="scheduler-add-time-button"
-                  disabled={disabled}
-                  onClick={() => updateScheduleTimes([...scheduleTimes, SCHEDULER_DEFAULT_TIME])}
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  {t('settings.schedulerAddTime')}
-                </Button>
+                {isAddingTime ? (
+                  <TimePicker
+                    data-testid="scheduler-new-time-input"
+                    value=""
+                    ariaLabel={t('settings.schedulerTimeInputAria', { index: scheduleTimes.length + 1 })}
+                    placeholder={t('settings.schedulerTimePlaceholder')}
+                    className="w-32"
+                    triggerClassName="h-9 min-h-9 text-sm font-medium"
+                    disabled={disabled}
+                    autoOpen
+                    onOpenChange={(open) => {
+                      if (!open) setIsAddingTime(false);
+                    }}
+                    onChange={(nextValue) => {
+                      if (SCHEDULE_TIME_PATTERN.test(nextValue) && !scheduleTimes.includes(nextValue)) {
+                        updateScheduleTimes([...scheduleTimes, nextValue]);
+                      }
+                      if (SCHEDULE_TIME_PATTERN.test(nextValue)) {
+                        setIsAddingTime(false);
+                      }
+                    }}
+                  />
+                ) : null}
+                {timeTargetKey === 'SCHEDULE_TIMES' && !isAddingTime ? (
+                  <Button
+                    type="button"
+                    variant="settings-secondary"
+                    size="sm"
+                    className="h-9 shrink-0"
+                    data-testid="scheduler-add-time-button"
+                    disabled={disabled}
+                    onClick={() => setIsAddingTime(true)}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    {t('settings.schedulerAddTime')}
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -992,17 +1186,23 @@ const SettingsPage: React.FC = () => {
     refreshAfterExternalSave,
     configVersion,
     maskToken,
+    configuredNotificationChannels,
   } = useSystemConfig(initialTab);
   // Authoritative provider catalog (single source of truth) for the wizard and
   // the model-access page.
   const {
     providers: providerCatalog,
     connectionFields: providerConnectionFields,
+    connectionSchemaDefinition: providerConnectionSchemaDefinition,
     emptyApiKeyHosts: providerEmptyApiKeyHosts,
     isLoading: isProviderCatalogLoading,
     error: providerCatalogError,
     reload: reloadProviderCatalog,
   } = useProviderCatalog();
+  const providerConnectionSchemaUnavailable = providerConnectionSchemaDefinition.mode === 'schema'
+    && !providerConnectionSchemaDefinition.usable;
+  const providerConnectionSchemaAllowsInspection = providerConnectionSchemaDefinition.reason
+    === 'unknown_condition';
   // Available model routes (authoritative) refetched when the saved config changes.
   const {
     models: availableModels,
@@ -1278,6 +1478,8 @@ const SettingsPage: React.FC = () => {
     void refreshSetupStatus();
   }, [refreshSetupStatus]);
 
+  const [isToastPaused, setIsToastPaused] = useState(false);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -1287,7 +1489,7 @@ const SettingsPage: React.FC = () => {
   }, [refreshSetupStatus]);
 
   useEffect(() => {
-    if (!toast) {
+    if (!toast || toast.type !== 'success' || isToastPaused) {
       return;
     }
 
@@ -1298,7 +1500,7 @@ const SettingsPage: React.FC = () => {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [clearToast, toast]);
+  }, [clearToast, isToastPaused, toast]);
 
   useEffect(() => {
     if (!canCheckDesktopUpdate) {
@@ -1424,6 +1626,45 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const rawValueKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const categoryItems of Object.values(itemsByCategory)) {
+      for (const item of categoryItems) {
+        if (item.rawValueExists !== false) {
+          keys.add(item.key.toUpperCase());
+        }
+      }
+    }
+    return keys;
+  }, [itemsByCategory]);
+  // Channel routing fields only offer channels the backend confirms are
+  // configured. A null status means an older backend omitted the authority
+  // field during a rolling upgrade; in that case leave the catalog unfiltered
+  // instead of misrepresenting "unknown" as "none configured".
+  const hasConfiguredNotificationChannelStatus = configuredNotificationChannels !== null;
+  const configuredRoutingValues = useMemo(
+    () => new Set(configuredNotificationChannels ?? []),
+    [configuredNotificationChannels],
+  );
+  const channelRoutingOptionFilter = useCallback(
+    (optionValue: string) => configuredRoutingValues.has(optionValue),
+    [configuredRoutingValues],
+  );
+  const notificationText = SETTINGS_NOTIFICATION_TEXT[uiLanguage];
+  const channelRoutingEmptyState = (
+    <div className="space-y-2 rounded-lg border border-border bg-background/35 p-3">
+      <p className="text-xs text-muted-text">{notificationText.noRoutableChannels}</p>
+      <Button
+        type="button"
+        variant="settings-secondary"
+        size="sm"
+        className="text-xs shadow-none"
+        onClick={() => selectSectionView('notifications', 'channels')}
+      >
+        {notificationText.goConfigureChannels}
+      </Button>
+    </div>
+  );
   const hasUnsafeModelAccessSchema = rawActiveItems.some((item) => (
     (
       getUnsafeAiPlacement(item, activeCategory) !== null
@@ -1452,6 +1693,10 @@ const SettingsPage: React.FC = () => {
     }
     return map;
   }, [itemsByCategory]);
+  const configItemByKey = useMemo(
+    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key, item])),
+    [itemsByCategory],
+  );
   // Page-level validation summary: every errored field, routed to its owning
   // section/view via the placement map so errors on a non-open section are
   // still reachable in one click (SR-19).
@@ -1465,16 +1710,23 @@ const SettingsPage: React.FC = () => {
       const target = parseModelAccessFieldKey(key)
         ? { section: 'ai_models', view: 'connections' }
         : placementForKey(categoryByKey[key] ?? '', key);
+      const item = configItemByKey.get(key);
+      const fallbackTitle = item?.schema?.title ?? key;
       entries.push({
         key,
-        label: uiLanguage === 'en' ? key : getFieldTitleZh(key, key),
+        label: resolveSettingsFieldTitle({
+          itemKey: item?.key ?? key,
+          schemaKey: item?.schema?.key,
+          fallbackTitle,
+          language: uiLanguage,
+        }),
         message: firstError.message,
         section: target.section,
         view: target.view,
       });
     }
     return entries;
-  }, [issueByKey, categoryByKey, uiLanguage]);
+  }, [issueByKey, categoryByKey, configItemByKey, uiLanguage]);
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
     if (parseModelAccessFieldKey(entry.key)) {
@@ -1512,18 +1764,11 @@ const SettingsPage: React.FC = () => {
   const isAiOverview = activeSection === 'ai_models' && activeView === 'overview';
   // Task Routing view: the single place to edit which model each task uses.
   const isAiTaskRouting = activeSection === 'ai_models' && activeView === 'task_routing';
-  const aiModelItemByKey = useMemo(
-    // Placement, not the legacy category, owns these dedicated model views.
-    // This includes inferred keys such as VISION_MODEL that may arrive in a
-    // different backend category while still declaring task_routing ownership.
-    () => new Map(Object.values(itemsByCategory).flat().map((item) => [item.key, item])),
-    [itemsByCategory],
-  );
   const pickAiModelItems = useCallback(
     (keys: string[]) => keys
-      .map((key) => aiModelItemByKey.get(key))
+      .map((key) => configItemByKey.get(key))
       .filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    [aiModelItemByKey],
+    [configItemByKey],
   );
   // Task Routing is the single canonical editor for per-task models and the
   // generation temperature. Fallback order is edited under Reliability only, so
@@ -1533,7 +1778,7 @@ const SettingsPage: React.FC = () => {
       .filter((item) => item.schema?.uiPlacement === 'task_routing'),
     [pickAiModelItems],
   );
-  const fallbackRoutingItem = aiModelItemByKey.get('LITELLM_FALLBACK_MODELS');
+  const fallbackRoutingItem = configItemByKey.get('LITELLM_FALLBACK_MODELS');
   const hasSafeFallbackPlacement = fallbackRoutingItem?.schema?.uiPlacement === 'task_routing';
   // Config keys whose value is a single model route (rendered via the selector).
   const TASK_MODEL_KEYS = useMemo(() => new Set(['LITELLM_MODEL', 'AGENT_LITELLM_MODEL', 'VISION_MODEL']), []);
@@ -1914,7 +2159,29 @@ const SettingsPage: React.FC = () => {
       setGroupSaveState(group, { status: 'scheduled', fingerprint });
       return;
     }
+    if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
+      setGroupSaveState(group, { status: 'failed', fingerprint });
+      return;
+    }
     if (group === 'ai_model' && !llmChannelDraftValid) {
+      setGroupSaveState(group, { status: 'failed', fingerprint });
+      return;
+    }
+    const changesConnection = group === 'ai_model' && items.some((item) => (
+      item.key.toUpperCase() === 'LLM_CHANNELS'
+      || parseModelAccessFieldKey(item.key) !== null
+    ));
+    if (
+      changesConnection
+      && !connectionItemsRespectSchema(
+        items,
+        allValuesByKey,
+        rawValueKeys,
+        providerCatalog,
+        providerConnectionFields,
+        providerEmptyApiKeyHosts,
+      )
+    ) {
       setGroupSaveState(group, { status: 'failed', fingerprint });
       return;
     }
@@ -1935,7 +2202,19 @@ const SettingsPage: React.FC = () => {
     } finally {
       autosaveInFlightRef.current = null;
     }
-  }, [isProviderCatalogLoading, llmChannelDraftValid, persistConfigGroup, providerCatalogError, setGroupSaveState]);
+  }, [
+    allValuesByKey,
+    isProviderCatalogLoading,
+    llmChannelDraftValid,
+    persistConfigGroup,
+    providerCatalog,
+    providerCatalogError,
+    providerConnectionFields,
+    providerConnectionSchemaUnavailable,
+    providerEmptyApiKeyHosts,
+    rawValueKeys,
+    setGroupSaveState,
+  ]);
 
   useEffect(() => {
     if (autosaveTimerRef.current !== null) {
@@ -1952,6 +2231,10 @@ const SettingsPage: React.FC = () => {
       const fingerprint = JSON.stringify(items);
       if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
         setGroupSaveState(group, { status: 'scheduled', fingerprint });
+        continue;
+      }
+      if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
+        setGroupSaveState(group, { status: 'failed', fingerprint });
         continue;
       }
       const previous = groupSaveStatesRef.current[group];
@@ -1990,6 +2273,7 @@ const SettingsPage: React.FC = () => {
     pendingGroupsFingerprint,
     runGroupAutosave,
     providerCatalogError,
+    providerConnectionSchemaUnavailable,
     setGroupSaveState,
   ]);
 
@@ -2018,6 +2302,26 @@ const SettingsPage: React.FC = () => {
   // persisted atomically and the normal post-save effects run. The result is
   // returned so the wizard can surface backend validation errors in place.
   const handleWizardComplete = async (items: WizardDraftItem[]): Promise<WizardCompleteResult> => {
+    const changesConnection = items.some((item) => (
+      item.key.toUpperCase() === 'LLM_CHANNELS'
+      || parseModelAccessFieldKey(item.key) !== null
+    ));
+    if (
+      changesConnection
+      && (
+        providerConnectionSchemaUnavailable
+        || !connectionItemsRespectSchema(
+          items,
+          allValuesByKey,
+          rawValueKeys,
+          providerCatalog,
+          providerConnectionFields,
+          providerEmptyApiKeyHosts,
+        )
+      )
+    ) {
+      return { success: false, error: settingsText.connectionSchemaUnavailable };
+    }
     const result = await save(items);
     if (!result.success) {
       const error = result.issues && result.issues.length > 0
@@ -2193,7 +2497,10 @@ const SettingsPage: React.FC = () => {
             return (
               <div key={group.id} className="space-y-2">
                 <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                <form
+                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
+                  onSubmit={(event) => event.preventDefault()}
+                >
                   {groupItems.map((item) => (
                     <SettingsField
                       key={item.key}
@@ -2205,15 +2512,28 @@ const SettingsPage: React.FC = () => {
                       requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
                       dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
                       readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
+                      enumOptionFilter={
+                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
+                          ? channelRoutingOptionFilter
+                          : undefined
+                      }
+                      enumEmptyState={
+                        CHANNEL_ROUTING_FIELD_KEYS.has(item.key) && hasConfiguredNotificationChannelStatus
+                          ? channelRoutingEmptyState
+                          : undefined
+                      }
                     />
                   ))}
-                </div>
+                </form>
               </div>
             );
           })}
         </div>
       ) : subFilteredItems.length ? (
-        <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+        <form
+          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
+          onSubmit={(event) => event.preventDefault()}
+        >
           {subFilteredItems.map((item) => (
             <SettingsField
               key={item.key}
@@ -2227,7 +2547,7 @@ const SettingsPage: React.FC = () => {
               readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
             />
           ))}
-        </div>
+        </form>
       ) : null}
       {activeSubPromptCacheItems.length ? (
         <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
@@ -2242,7 +2562,10 @@ const SettingsPage: React.FC = () => {
             </div>
             <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
           </summary>
-          <div className="border-t border-[var(--settings-border-soft)]">
+          <form
+            className="border-t border-[var(--settings-border-soft)]"
+            onSubmit={(event) => event.preventDefault()}
+          >
             {activeSubPromptCacheItems.map((item) => (
               <SettingsField
                 key={item.key}
@@ -2256,7 +2579,7 @@ const SettingsPage: React.FC = () => {
                 readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
               />
             ))}
-          </div>
+          </form>
         </details>
       ) : null}
     </SettingsSectionCard>
@@ -2385,7 +2708,13 @@ const SettingsPage: React.FC = () => {
                 <div key={field.key} className="rounded-lg border border-[var(--settings-border)] bg-background/70 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-medium text-foreground">{field.title || field.key}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {resolveSettingsFieldTitle({
+                          itemKey: field.key,
+                          fallbackTitle: field.title || field.key,
+                          language: uiLanguage,
+                        })}
+                      </p>
                       <p className="text-xs text-muted-text">{field.key}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -2510,7 +2839,7 @@ const SettingsPage: React.FC = () => {
                   selectSectionView(target.section, target.view);
                 }}
                 onRunSmoke={handleRunSetupSmoke}
-                listSeparator={uiLanguage === 'en' ? ', ' : '、'}
+                listSeparator={getUiListSeparator(uiLanguage)}
                 t={t}
               />
             ) : null}
@@ -2904,7 +3233,7 @@ const SettingsPage: React.FC = () => {
                       ? allValuesByKey.LITELLM_FALLBACK_MODELS
                         .split(',')
                         .map((entry) => formatConfiguredModel(entry.trim()))
-                        .join(uiLanguage === 'en' ? ', ' : '、')
+                        .join(getUiListSeparator(uiLanguage))
                       : settingsText.noneSet}
                   </span>
                   {hasSafeFallbackPlacement ? (
@@ -2961,7 +3290,10 @@ const SettingsPage: React.FC = () => {
                   </summary>
                   <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
                     {advancedSectionItems.length > 0 ? (
-                      <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                      <form
+                        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                        onSubmit={(event) => event.preventDefault()}
+                      >
                         {advancedSectionItems.map((item) => (
                           <SettingsField
                             key={item.key}
@@ -2975,7 +3307,7 @@ const SettingsPage: React.FC = () => {
                             readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
                           />
                         ))}
-                      </div>
+                      </form>
                     ) : null}
                     <LLMConfigModeBanner
                       status={llmModeStatus}
@@ -3016,7 +3348,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="settings-primary"
-                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
+                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || providerConnectionSchemaUnavailable || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
                       onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
                     >
                       {settingsText.addModelService}
@@ -3039,7 +3371,7 @@ const SettingsPage: React.FC = () => {
                   resetSignal={llmChannelResetSignal}
                   addSignal={llmChannelAddSignal}
                   focusFieldRequest={llmFocusFieldRequest}
-                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || hasUnsafeModelAccessSchema}
+                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
                   catalogUnavailable={Boolean(providerCatalogError)}
                   onReloadCatalog={() => reloadProviderCatalog()}
                   overriddenByMode={channelsOverriddenByMode}
@@ -3080,7 +3412,10 @@ const SettingsPage: React.FC = () => {
                 title={settingsText.eventMonitor}
                 description={settingsText.eventMonitorDescription}
               >
-                <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+                <form
+                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                  onSubmit={(event) => event.preventDefault()}
+                >
                   {eventMonitorItems.map((item) => (
                     <SettingsField
                       key={item.key}
@@ -3094,7 +3429,7 @@ const SettingsPage: React.FC = () => {
                       readOnlyDiagnostic={readOnlyDiagnosticForItem(item, 'agent')}
                     />
                   ))}
-                </div>
+                </form>
               </SettingsSectionCard>
             ) : null}
           </section>
@@ -3102,7 +3437,17 @@ const SettingsPage: React.FC = () => {
       )}
 
       {toast ? (
-        <div className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]">
+        <div
+          className="fixed bottom-5 right-5 z-50 w-80 max-w-[calc(100vw-1.5rem)]"
+          onMouseEnter={() => setIsToastPaused(true)}
+          onMouseLeave={() => setIsToastPaused(false)}
+          onFocusCapture={() => setIsToastPaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setIsToastPaused(false);
+            }
+          }}
+        >
           {toast.type === 'success'
             ? (
                 <SettingsAlert

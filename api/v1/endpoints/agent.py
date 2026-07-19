@@ -26,6 +26,12 @@ from src.agent.public_contract import (
     sanitize_agent_diagnostic,
     sanitize_stream_event,
 )
+from src.agent.runtime import (
+    ExecutionContext,
+    ExecutionLifecycle,
+    ExecutionMode,
+    to_public_sse_event,
+)
 from src.config import get_config
 from src.services.agent_model_service import list_agent_model_deployments
 
@@ -466,24 +472,47 @@ async def agent_chat_stream(request: ChatRequest):
     if skills is not None:
         stream_ctx["skills"] = skills
 
+    # Bind this stream to one runtime execution: it owns the versioned
+    # event stream (with its late-write fence) and the cancellation intent
+    # consumed cooperatively by the native loop when the client disconnects.
+    lifecycle = ExecutionLifecycle(
+        ExecutionContext(
+            mode=ExecutionMode.CHAT,
+            prompt=request.message,
+            session_id=session_id,
+            request_context=stream_ctx,
+        )
+    )
+
     def progress_callback(event: dict):
         # Enrich tool events with display names
         if event.get("type") in ("tool_start", "tool_done"):
             tool = event.get("tool", "")
             event["display_name"] = TOOL_DISPLAY_NAMES.get(tool, tool)
-        public_event = sanitize_stream_event(event, trace_id=session_id)
+        # Uplift the legacy progress dict to a typed runtime event. A None
+        # return means the late-write fence dropped it after the terminal
+        # state; such events must never reach the wire.
+        runtime_event = lifecycle.ingest_progress_event(event)
+        if runtime_event is None:
+            return
+        public_event = sanitize_stream_event(
+            to_public_sse_event(runtime_event), trace_id=session_id
+        )
         asyncio.run_coroutine_threadsafe(queue.put(public_event), loop)
 
     def run_sync():
         try:
+            lifecycle.start()
             executor = _build_executor(config, skills or None)
             result = executor.chat(
                 message=request.message,
                 session_id=session_id,
                 progress_callback=progress_callback,
                 context=stream_ctx,
+                cancelled_check=lifecycle.cancelled_check,
             )
-            if not result.success:
+            lifecycle.finish_from_result(result)
+            if not result.success and not getattr(result, "cancelled", False):
                 logger.error(
                     "Agent stream chat failed: session_id=%s diagnostic=%s",
                     session_id,
@@ -505,6 +534,7 @@ async def agent_chat_stream(request: ChatRequest):
                 loop,
             )
         except Exception as exc:
+            lifecycle.fail(sanitize_agent_diagnostic(exc))
             logger.error(
                 "Agent stream error: session_id=%s exception_type=%s diagnostic=%s",
                 session_id,
@@ -544,6 +574,11 @@ async def agent_chat_stream(request: ChatRequest):
                 if event.get("type") in ("done", "error"):
                     break
         finally:
+            # If the client disconnected (or the stream ended) before the
+            # execution terminated, signal cooperative cancellation so the
+            # native loop stops at its next checkpoint instead of burning a
+            # full LLM/tool cycle no one is listening to.
+            lifecycle.request_cancel()
             try:
                 await asyncio.wait_for(fut, timeout=5.0)
             except asyncio.CancelledError:

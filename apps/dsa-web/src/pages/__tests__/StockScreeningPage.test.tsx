@@ -18,12 +18,12 @@ const {
   getScreenTask,
   navigate,
   resetLastScreenResult,
+  resetTaskMocks,
   screenStocks,
   startScreenTask,
 } = vi.hoisted(() => {
   let lastScreenResult: unknown = null;
-  const screenStocks = vi.fn();
-  const startScreenTask = vi.fn(async (payload: unknown) => {
+  const defaultStartScreenTask = async (payload: unknown) => {
     lastScreenResult = await screenStocks(payload);
     return {
       taskId: 'screen-task-1',
@@ -34,8 +34,8 @@ const {
       market: 'cn',
       maxResults: 3,
     };
-  });
-  const getScreenTask = vi.fn(async (taskId: string) => {
+  };
+  const defaultGetScreenTask = async (taskId: string) => {
     void taskId;
     return {
       taskId: 'screen-task-1',
@@ -45,7 +45,10 @@ const {
       message: '任务执行完成',
       result: lastScreenResult,
     };
-  });
+  };
+  const screenStocks = vi.fn();
+  const startScreenTask = vi.fn(defaultStartScreenTask);
+  const getScreenTask = vi.fn(defaultGetScreenTask);
   return {
     enableAlphaSift: vi.fn(),
     getAlphaSiftStatus: vi.fn(),
@@ -56,6 +59,12 @@ const {
     navigate: vi.fn(),
     resetLastScreenResult: () => {
       lastScreenResult = null;
+    },
+    resetTaskMocks: () => {
+      startScreenTask.mockReset();
+      startScreenTask.mockImplementation(defaultStartScreenTask);
+      getScreenTask.mockReset();
+      getScreenTask.mockImplementation(defaultGetScreenTask);
     },
     screenStocks,
     startScreenTask,
@@ -117,11 +126,10 @@ describe('StockScreeningPage', () => {
     getHotspotDetail.mockReset();
     getHotspots.mockReset();
     getStrategies.mockReset();
-    getScreenTask.mockClear();
     navigate.mockReset();
     resetLastScreenResult();
+    resetTaskMocks();
     screenStocks.mockReset();
-    startScreenTask.mockClear();
     getStrategies.mockResolvedValue(mockStrategiesResponse);
     getHotspotDetail.mockResolvedValue({
       enabled: true,
@@ -952,7 +960,10 @@ describe('StockScreeningPage', () => {
     expect(await screen.findByText('选股已开启')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
-    expect(await screen.findByText('选股运行中')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(getScreenTask).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('选股运行中')).toBeInTheDocument();
+    });
     expect(window.sessionStorage.getItem('dsa.alphasift.activeScreenTask.v1')).toContain('screen-task-1');
 
     firstRender.unmount();
@@ -975,16 +986,23 @@ describe('StockScreeningPage', () => {
       strategy: 'dual_low',
       maxResults: 3,
     }));
-    getScreenTask.mockRejectedValueOnce(Object.assign(new Error('timeout of 30000ms exceeded'), {
+    const statusPoll = createDeferred<never>();
+    getScreenTask.mockReturnValueOnce(statusPoll.promise);
+    const timeoutError = Object.assign(new Error('timeout of 30000ms exceeded'), {
       code: 'ECONNABORTED',
-    }));
+    });
 
     render(<StockScreeningPage />);
 
-    expect(await screen.findByText('选股任务运行中')).toBeInTheDocument();
-    await waitFor(() => expect(getScreenTask).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('选股运行中')).toBeInTheDocument();
-    expect(screen.getByText('选股任务仍在后台运行，状态轮询暂时超时，将自动重试。')).toBeInTheDocument();
+    expect(screen.getByText('选股任务运行中')).toBeInTheDocument();
+    await act(async () => {
+      statusPoll.reject(timeoutError);
+    });
+    await waitFor(() => {
+      expect(getScreenTask).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('选股运行中')).toBeInTheDocument();
+      expect(screen.getByText('选股任务仍在后台运行，状态轮询暂时超时，将自动重试。')).toBeInTheDocument();
+    });
     expect(screen.queryByText(/连接上游服务超时/)).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem('dsa.alphasift.activeScreenTask.v1')).toContain('screen-task-1');
   });
@@ -1126,8 +1144,8 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     const efinanceWarning = await screen.findByText('数据源降级：efinance（网络连接中断）');
-    const alert = efinanceWarning.closest('[role="alert"]');
-    expect(alert).toHaveClass('max-w-full');
+    const status = efinanceWarning.closest('[role="status"]');
+    expect(status).toHaveClass('max-w-full');
     expect(efinanceWarning).toBeInTheDocument();
     expect(screen.getByText('数据源降级：akshare_em（网络连接中断）')).toBeInTheDocument();
     expect(screen.queryByText(/HTTPConnectionPool/)).not.toBeInTheDocument();

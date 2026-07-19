@@ -8,8 +8,9 @@ interface AppPageProps {
 
 export const AppPage: React.FC<AppPageProps> = ({ children, className = '' }) => {
   return (
-    <main className={cn('mx-auto min-h-full w-full max-w-7xl px-4 pb-8 pt-4 md:px-6 lg:px-8', className)}>
+    // div, not main: the app shell already renders the single <main> landmark.
+    <div className={cn('mx-auto min-h-full w-full max-w-7xl px-4 pb-8 pt-4 md:px-6 lg:px-8', className)}>
       {children}
-    </main>
+    </div>
   );
 };

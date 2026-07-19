@@ -1655,7 +1655,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         ]
         captured = {}
 
-        def fake_execute(ctx, parse_dashboard=False, progress_callback=None):
+        def fake_execute(ctx, parse_dashboard=False, progress_callback=None, cancelled_check=None):
             captured["history"] = ctx.meta.get("conversation_history")
             return OrchestratorResult(success=True, content="assistant reply")
 
@@ -1688,7 +1688,7 @@ class TestOrchestratorExecution(unittest.TestCase):
         orch = self._make_orchestrator()
         captured = {}
 
-        def fake_execute(ctx, parse_dashboard=False, progress_callback=None):
+        def fake_execute(ctx, parse_dashboard=False, progress_callback=None, cancelled_check=None):
             captured["ctx"] = ctx
             return OrchestratorResult(success=True, content="assistant reply")
 

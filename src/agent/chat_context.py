@@ -6,7 +6,11 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from src.agent.llm_adapter import LLMToolAdapter
+    from src.config import Config
 
 from src.config import (
     get_agent_context_compression_preset,
@@ -22,8 +26,8 @@ from src.agent.provider_trace import (
     strip_trace_metadata,
     trace_model_matches,
 )
-from src.llm.usage import should_persist_usage_telemetry
-from src.storage import get_db, persist_llm_usage
+from src.agent.runtime.lifecycle import get_default_usage_recorder
+from src.storage import get_db
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -82,7 +86,7 @@ def build_summary_message(summary_text: str) -> Dict[str, str]:
     }
 
 
-def estimate_text_tokens(text: str, config: Any) -> int:
+def estimate_text_tokens(text: str, config: Config) -> int:
     """Estimate tokens deterministically enough for compression decisions."""
     normalized_text = text or ""
     try:
@@ -102,7 +106,7 @@ def estimate_text_tokens(text: str, config: Any) -> int:
         return int(math.ceil(len(normalized_text) / 3))
 
 
-def estimate_messages_tokens(messages: Sequence[Dict[str, Any]], config: Any) -> int:
+def estimate_messages_tokens(messages: Sequence[Dict[str, Any]], config: Config) -> int:
     """Estimate tokens for a list of role/content messages."""
     return estimate_text_tokens(_render_messages(messages), config)
 
@@ -126,8 +130,8 @@ def build_summary_messages(
 
 def build_visible_chat_history(
     session_id: str,
-    llm_adapter: Any,
-    config: Any,
+    llm_adapter: LLMToolAdapter,
+    config: Config,
 ) -> List[Dict[str, str]]:
     """Return visible chat history according to the compression state table."""
     state = _build_visible_history_state(session_id, llm_adapter, config)
@@ -136,8 +140,8 @@ def build_visible_chat_history(
 
 def build_agent_chat_context_bundle(
     session_id: str,
-    llm_adapter: Any,
-    config: Any,
+    llm_adapter: LLMToolAdapter,
+    config: Config,
 ) -> AgentChatContextBundle:
     """Return id-spliced visible history plus provider trace messages.
 
@@ -227,8 +231,8 @@ def build_agent_chat_context_bundle(
 
 def _build_visible_history_state(
     session_id: str,
-    llm_adapter: Any,
-    config: Any,
+    llm_adapter: LLMToolAdapter,
+    config: Config,
 ) -> VisibleHistoryState:
     """Return visible history with private ``_message_id`` anchors."""
     db = get_db()
@@ -330,12 +334,11 @@ def _build_visible_history_state(
             estimated_tokens=estimated_tokens,
         )
         usage = getattr(response, "usage", {}) or {}
-        if should_persist_usage_telemetry(usage):
-            persist_llm_usage(
-                usage,
-                getattr(response, "model", "") or get_effective_agent_primary_model(config) or "unknown",
-                call_type="agent",
-            )
+        get_default_usage_recorder().record(
+            usage,
+            getattr(response, "model", "") or get_effective_agent_primary_model(config) or "unknown",
+            call_type="agent",
+        )
         messages = [build_summary_message(summary_text)] + _to_chat_messages(protected_tail, include_ids=True)
         return VisibleHistoryState(
             messages=messages,
@@ -403,8 +406,8 @@ def _split_protected_tail(messages: Sequence[VisibleMessage], protected_turns: i
 
 def _generate_summary(
     *,
-    llm_adapter: Any,
-    config: Any,
+    llm_adapter: LLMToolAdapter,
+    config: Config,
     previous_summary: str,
     to_summarize: Sequence[VisibleMessage],
     max_tokens: int,
@@ -473,7 +476,7 @@ def _restore_trace_metadata(
 
 def _build_trace_match_targets(
     models: Sequence[str],
-    config: Any,
+    config: Config,
 ) -> List[Tuple[str, str]]:
     model_list = getattr(config, "llm_model_list", []) or []
     targets: List[Tuple[str, str]] = []

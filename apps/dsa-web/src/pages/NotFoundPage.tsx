@@ -1,6 +1,8 @@
 import type React from 'react';
 import { useEffect } from 'react';
+import { Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 
 const NotFoundPage: React.FC = () => {
@@ -13,7 +15,7 @@ const NotFoundPage: React.FC = () => {
   }, [t]);
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center text-center px-4">
+    <div className="flex min-h-full flex-col items-center justify-center px-4 text-center">
       {/* 404 */}
       <div className="relative mb-8">
         <span
@@ -29,16 +31,15 @@ const NotFoundPage: React.FC = () => {
       <h1 className="text-2xl font-bold text-foreground mb-2">{t('notFound.title')}</h1>
       <p className="text-muted-text mb-8">{t('notFound.description')}</p>
 
-      <button 
+      <Button
         type="button"
-        className="btn-primary flex items-center gap-2"
+        variant="primary"
+        size="xl"
         onClick={() => navigate('/')}
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
+        <Home className="h-4 w-4" />
         {t('notFound.backHome')}
-      </button>
+      </Button>
     </div>
   );
 };

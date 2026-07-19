@@ -19,6 +19,7 @@ import {
 } from '../../utils/decisionAction';
 import { cn } from '../../utils/cn';
 import { parseDecisionSignalDate } from '../../utils/decisionSignalTime';
+import { getUiLocale } from '../../utils/uiLocale';
 import { getDecisionSignalProfileLabel } from '../../utils/decisionSignalProfile';
 import {
   getDecisionSignalHorizonLabel,
@@ -58,15 +59,10 @@ const OUTCOME_VARIANTS: Record<DecisionSignalOutcomeValue, BadgeVariant> = {
   neutral: 'warning',
 };
 
-const LOCALE_BY_LANGUAGE: Record<UiLanguage, string> = {
-  zh: 'zh-CN',
-  en: 'en-US',
-};
-
 function formatDateTime(value: string | null | undefined, language: UiLanguage): string {
   const date = parseDecisionSignalDate(value);
   if (!date) return '-';
-  return new Intl.DateTimeFormat(LOCALE_BY_LANGUAGE[language], {
+  return new Intl.DateTimeFormat(getUiLocale(language), {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',

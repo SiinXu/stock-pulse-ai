@@ -1,4 +1,7 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { getUiListSeparator } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
 import { resolveAiTaskMatrix, type AiTaskStatus, type UiLang } from './aiTaskMatrix';
 import { SETTINGS_MISC_TEXT, SETTINGS_OVERVIEW_STATUS } from '../../locales/settingsMisc';
@@ -29,7 +32,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
   formatModel = (modelRef) => modelRef,
 }) => {
   const rows = resolveAiTaskMatrix(getValue, { availableRoutes });
-  const tx = (entry: { zh: string; en: string }) => entry[language];
+  const tx = (entry: Record<UiLang, string>) => entry[language];
   const text = SETTINGS_MISC_TEXT[language];
 
   return (
@@ -42,7 +45,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
         {onEditRouting ? (
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-full border border-[var(--settings-border)] px-3 py-1.5 text-xs text-secondary-text transition-colors hover:border-foreground hover:text-foreground"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap rounded-lg border border-[var(--settings-border)] px-3 py-1.5 text-xs text-secondary-text transition-colors hover:border-foreground hover:text-foreground"
             onClick={onEditRouting}
           >
             {text.editRouting}
@@ -86,7 +89,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
                 <td className="px-3 py-2.5 text-secondary-text">
                   {row.fallbackModels.length > 0 ? (
                     <span className="break-all">
-                      {row.fallbackModels.map(formatModel).join(language === 'en' ? ', ' : '、')}
+                      {row.fallbackModels.map(formatModel).join(getUiListSeparator(language))}
                     </span>
                   ) : (
                     <span className="text-muted-text">—</span>

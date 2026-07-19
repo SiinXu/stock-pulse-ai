@@ -1,3 +1,5 @@
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Guards for English-only GitHub collaboration assets."""
 
 from __future__ import annotations

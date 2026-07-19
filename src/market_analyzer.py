@@ -29,12 +29,13 @@ from src.llm.backend_registry import (
     resolve_generation_backend_id,
     resolve_generation_fallback_backend_id,
 )
-from src.llm.generation_backend import GenerationError
+from src.llm.generation_backend import GenerationError, GenerationErrorCode
 from src.schemas.market_light import MARKET_LIGHT_REGIONS, MarketLightSnapshot
 from src.services.run_diagnostics import record_llm_run, record_llm_run_started
 from src.services.intelligence_service import IntelligenceService
 from src.utils.sanitize import (
     exception_chain_redaction_values,
+    has_matching_exception_snapshot,
     log_safe_exception,
     sanitize_diagnostic_text,
 )
@@ -176,13 +177,38 @@ class MarketAnalyzer:
             return exception_chain_redaction_values(error)
         try:
             model = str(getattr(self.config, "litellm_model", "") or "")
-            return set(method(model, fallback_error=error) or ())
+            values = method(model, fallback_error=error)
+            static_values = values if isinstance(values, set) else set(values or ())
         except Exception:
             return exception_chain_redaction_values(error)
+        if has_matching_exception_snapshot(error, static_values):
+            return static_values
+        exception_values = exception_chain_redaction_values(error)
+        exception_values.update(static_values)
+        return exception_values
 
-    def _sanitize_generation_diagnostic(self, error: Any) -> str:
+    def _sanitize_generation_diagnostic(
+        self,
+        error: Any,
+        *,
+        redaction_values: Optional[set[str]] = None,
+    ) -> str:
         """Sanitize an analyzer failure before persistence or user diagnostics."""
-        redaction_values = self._generation_log_redaction_values(error)
+        if redaction_values is None:
+            redaction_values = self._generation_log_redaction_values(error)
+        if isinstance(error, GenerationError):
+            error_code = (
+                error.error_code.value
+                if isinstance(error.error_code, GenerationErrorCode)
+                else GenerationErrorCode.UNKNOWN_BACKEND_ERROR.value
+            )
+            return f"GenerationError: {error_code}"
+        if has_matching_exception_snapshot(error, redaction_values):
+            return sanitize_diagnostic_text(
+                error,
+                max_length=500,
+                redaction_values=redaction_values,
+            )
         analyzer = getattr(self, "analyzer", None)
         static_method = (
             getattr_static(analyzer, "sanitize_generation_diagnostic", None)
@@ -762,7 +788,10 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 context={"region": self.region},
                 redaction_values=redaction_values,
             )
-            safe_backend_error = self._sanitize_generation_diagnostic(backend_error)
+            safe_backend_error = self._sanitize_generation_diagnostic(
+                backend_error,
+                redaction_values=redaction_values,
+            )
             record_llm_run(
                 success=False,
                 provider="litellm",

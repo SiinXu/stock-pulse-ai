@@ -3,25 +3,29 @@ import { describe, expect, it } from 'vitest';
 import { Button } from '../Button';
 
 describe('Button', () => {
-  it.each(['xsm', 'sm', 'md', 'lg', 'xl'] as const)(
-    'keeps the %s variant at least 44px in both dimensions at every breakpoint',
-    (size) => {
+  it.each([
+    ['xsm', 'h-6', 'min-w-6'],
+    ['sm', 'h-8', 'min-w-8'],
+    ['md', 'h-9', 'min-w-9'],
+    ['lg', 'h-10', 'min-w-10'],
+    ['xl', 'h-11', 'min-w-11'],
+  ] as const)(
+    'uses the compact shared dimensions for the %s variant',
+    (size, heightClass, widthClass) => {
       render(<Button size={size}>Action</Button>);
 
       const button = screen.getByRole('button', { name: 'Action' });
-      expect(button).toHaveClass('min-h-11', 'min-w-11');
-      expect(button).not.toHaveClass('sm:min-h-0');
+      expect(button).toHaveClass(heightClass, widthClass);
     },
   );
 
-  it('provides a stable 44px square size for icon-only actions', () => {
+  it('provides a stable compact square size for icon-only actions', () => {
     render(<Button size="icon" aria-label="Open details">+</Button>);
 
     expect(screen.getByRole('button', { name: 'Open details' })).toHaveClass(
-      'h-11',
-      'min-h-11',
-      'w-11',
-      'min-w-11',
+      'h-9',
+      'w-9',
+      'min-w-9',
       'p-0',
     );
   });
@@ -29,7 +33,7 @@ describe('Button', () => {
   it('renders children', () => {
     render(<Button>Click me</Button>);
 
-    expect(screen.getByRole('button', { name: 'Click me' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-full');
   });
 
   it('uses button type by default and exposes the selected variant', () => {

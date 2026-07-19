@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -28,6 +31,15 @@ const zh = {
   sourceLegacy: 'Legacy Provider',
   configModeIssue: '请求的配置来源 {mode} 尚未配置。',
   unknownConfigIssue: '模型配置来源存在需要处理的问题。',
+  selectOptions: '选择选项',
+  selectedOptions: '已选 {selected} / {total}',
+  removeOption: '移除 {option}',
+  searchOptions: '搜索选项',
+  searchOptionsPlaceholder: '搜索…',
+  availableOptions: '可选项',
+  noMatchingOptions: '无匹配选项',
+  orderedHint: '按选择顺序决定优先级，取消后重新勾选可调整顺序',
+  priorityPosition: '优先级 {position}',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -58,11 +70,20 @@ const en: Record<keyof typeof zh, string> = {
   sourceLegacy: 'Legacy provider keys',
   configModeIssue: 'The requested {mode} configuration source is not configured.',
   unknownConfigIssue: 'The model configuration source needs attention.',
+  selectOptions: 'Select options',
+  selectedOptions: '{selected} of {total} selected',
+  removeOption: 'Remove {option}',
+  searchOptions: 'Search options',
+  searchOptionsPlaceholder: 'Search…',
+  availableOptions: 'Available options',
+  noMatchingOptions: 'No matching options',
+  orderedHint: 'Selection order sets priority; deselect and reselect to reorder',
+  priorityPosition: 'Priority {position}',
 };
 
-export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_CONTROLS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsControls.SETTINGS_CONTROLS_TEXT", { zh, en });
 
-export const SETTINGS_SOURCE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const SETTINGS_SOURCE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsControls.SETTINGS_SOURCE_LABELS", {
   zh: { auto: zh.sourceAuto, channels: zh.sourceChannels, yaml: 'YAML', legacy: zh.sourceLegacy },
   en: { auto: en.sourceAuto, channels: en.sourceChannels, yaml: 'YAML', legacy: en.sourceLegacy },
-};
+});

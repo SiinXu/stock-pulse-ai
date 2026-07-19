@@ -8,16 +8,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
+- [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
+- [修复] 诊断脱敏 `sanitize_diagnostic_text` / `sanitize_sensitive_text` 现同时脱敏非 HTTP 连接串（postgresql/mysql/redis/mongodb/amqp 等）userinfo 中的凭据，此前仅覆盖 http(s)，SQLAlchemy 等连接错误可能把数据库密码泄漏进 Agent 诊断与日志；host 保留以维持诊断可读性。
+- [改进] 实验性 PydanticAI 运行时的 Single RUN 模型桥补全（RF-05，AR-RF-04/05/06/10/11）：模型桥从 PydanticAI `model_request_parameters` 下发真实工具 schema（不再固定空数组），ToolCall/ToolReturn/reasoning/provider trace 跨轮无损往返，复用 `AgentExecutor.build_run_messages` 的 system/skill/dashboard prompt 权威，usage 每次调用经单一 recorder 记录并修正为 `prompt_tokens/completion_tokens`，execution deadline 与协作取消在每次调用前 fence，CHAT/RESEARCH 显式返回 `unsupported_capability`（RF-06 裁决前冻结）；仍为默认关闭、可整体删除的实验路径，Native 默认路径零 PydanticAI 依赖不变，36 replay fixture 零改。
+- [改进] Agent 运行时契约改为运行中控制柄（RF-02，AR-RF-01/02）：`AgentRuntime.start()` 返回可查询状态、消费事件、请求取消并等待终态的运行中 `ExecutionHandle`（原 `execute()` 保留为启动后等待终态的兼容 helper），`ExecutionContext` 深层冻结为只读快照，调用方后续修改嵌套 dict/list/set 不再影响执行；terminal first-wins 与 36 replay fixture 逐字节不变。
+- [文档] 新增《多语言金融术语指导》（`docs/financial-terminology-guide.md`）作为十语言 UI 金融术语的单一治理源：约 100 个来自真实产品的概念，含语义边界（UI/report language/用户内容/契约值）、`en`/`zh`/`zh-TW` 权威列与八语言产品译文基线、已知译文漂移清单、风险表达禁止项、格式化与审查流程；同步 `web-i18n.md`/`web-i18n_EN.md` 与 `INDEX.md` 入口。docs-only，不改运行时资源。
+- [chore] Agent 各入口的终态写入 fence 统一经单一分类器 `classify_result_terminal_state`（RF-04）：单智能体 `AgentExecutor.chat`、多智能体 `AgentOrchestrator.chat` 与 SSE 端点的 `ExecutionLifecycle.finish_from_result` 现共用同一终态判定，`cancelled` 优先于 `success`，取消的对话不再可能写入成功助手消息；纯内部重构，行为逐字节不变，36 replay fixture 与 SSE 测试零改。
+- [改进] Native Agent runtime 的工具调用统一改由单一 `BoundToolSession` 门禁分发（RF-03，AR-RF-03），消除绕过会话的第二套 ToolRegistry 权威：runner 每次运行构造一个 native 兼容会话（等价放行 allowlist/policy/permission，surface 跳过声明式契约校验）并在终态关闭，保持 36 个 replay fixture 逐字节不变；运行结束后迟到的工具结果（如超时 worker）经 late-result fence 丢弃，不再重新进入模型或写入成功结果。
+- [测试] CI 新增 `pydanticai-installed` 独立作业与 `backend-gate` 的 native 隔离断言：安装 `requirements-pydanticai.txt` 后强制导入 `pydantic-ai-slim` 并执行实验运行时测试，`STOCKPULSE_REQUIRE_PYDANTIC_AI=1` 下依赖缺失或模块级跳过判为失败（不再以 skip 冒充通过，AR-RF-09）；默认 `backend-gate` 保持零 PydanticAI 依赖。
+- [文档] 项目改为双许可证：上游原始代码保持 MIT License，StockPulse 新增与大幅修改的代码采用 AGPL-3.0；同步更新 LICENSE 与三语 README（含 badge、fork 说明与 License 章节）。
+- [改进] Agent 流式对话（`/api/v1/agent/chat/stream`）在客户端断连或流提前结束时协作取消后端执行：Agent 循环在每步开始、每次 LLM 调用后与流水线各阶段边界处检查取消意图并及时停止，取消结果记为 cancelled 而非失败，不再写入"分析失败"占位助手消息，也不残留部分 provider trace；SSE 事件线经单一降级点保持逐字节不变。
+- [修复] 修正新增界面语言的设置字段标题、金融告警方向、LLM 未配置提示及 Markdown/AlphaSift 产品术语翻译，并将设置导航翻译键改为稳定语义键。
+- [改进] Web 共享 Button、SegmentedControl、Checkbox、Search、Badge、Notification 与侧栏 Profile 按统一 Figma 规格收敛；设置和首页标签切换、全站 checkbox、侧栏语言/主题入口、精简配置提示及路由错误页改用共享组件。
+- [改进] Web 页面菜单、选择器、按钮和输入框进一步收敛到共享 Popover、Select、Button 与 Input；设置单位和调度默认值改由后端 schema 提供，持仓 CSV 导入不再伪造内置券商目录。
+- [修复] Web Chat、持仓、决策信号、回测与告警页面的局部控件尺寸和空态卡片高度，避免筛选行、操作按钮和规则列表在桌面视口中过度撑大。
+- [改进] Web 登录页改为极简居中卡片视觉：圆形品牌徽章、黑白反色主按钮、与工作台一致的纯色背景，移除 3D 倾斜、巨型背景图形、网格与渐变品牌字；密码认证流程、可访问性标签与 i18n 文案不变。
+- [改进] 全局按钮形状从胶囊形（rounded-full）统一为软圆角（rounded-lg），设计守卫同步反转校验规则；装饰性圆点改用 --radius-dot 语义 token。
+- [修复] 修复 Web 前端登录状态竞态：过期的 auth status 响应晚到时不再覆盖较新的登录状态，避免登录成功后偶发被弹回登录页。
+- [修复] Web 设置多选下拉改用视口定位并在空间不足时向上展开，避免被设置分组或弹窗的 `overflow` 边界裁切；弹层在窄屏中保留 8px 安全边距。
+- [修复] Web 通知路由严格按运行时完整凭据组判断可用渠道，辅助字段或半套 Telegram、邮件、飞书、Discord、Slack、Pushover、ntfy、Gotify 等配置不再误显示为可路由。
+- [修复] System Config API 从当前 live `Config` 快照复用通知运行时权威计算已配置渠道，未重载的 `.env` 修改不再被误报为已生效；ntfy / Gotify 畸形 authority、userinfo、端口和 NFKC URL 关闭式判为未配置且不泄漏原值。
+- [修复] Web 设置页统一保护加载、保存、冲突恢复和外部编辑刷新产生的配置快照，晚到的旧响应不再覆盖新版本，已被新快照取代的刷新失败也不再误报已提交的保存失败；滚动升级遇到旧后端缺少渠道状态时保留完整通知渠道目录和已有选择，后端明确返回空列表时仍保持关闭式过滤。
+- [修复] Web 登录 `redirect` 在解析前拒绝 ASCII 控制字符、空格、DEL 与任意反斜杠，并在固定同源基准上二次校验，防止 URL 规范化绕过或登录后跳转失败。
+- [修复] Web 侧栏搜索框移除误导性的 `/` 快捷键提示（此前并无全局 `/` 监听），避免暗示不存在的键盘快捷键。
+- [修复] Web 登录深链不再丢失：已登录用户访问带 `?redirect=` 的 `/login`、或登录成功后，都会按 `?redirect=` 返回原页面而非首页；redirect 仅接受同源绝对路径，外部 URL、协议相对与反斜杠变体一律回退首页。
+- [改进] Web 剩余按钮观感控件统一为胶囊形（设置帮助弹窗文档链接、持仓 CSV 文件选择、首页通知勾选 chip），与全站按钮形状规范一致。
+- [修复] Web 页面容器与回测页不再在应用外壳的 `main` 地标内嵌套第二个 `main`，回测页补充屏幕阅读器可见的 h1 标题，页面地标语义唯一。
+- [修复] Web 设置页文本/路径类输入框改为填满 240px 控件列，数值输入保持紧凑宽度，日志目录等长值不再被裁切到约 170px。
+- [修复] Web 设置页定时任务启用改为统一开关控件，定时时间改用共享时间选择器；“添加时间”直接展开小时/分钟面板、确认后才保存，并在展示层去重已有时间。新增共享日期选择器并替换回测、持仓页的原生日期控件，统一月历弹层、键盘输入和表单行为。
+- [修复] Web 设置页与模型渠道编辑器的密码类输入框统一包裹在 `form` 中，消除浏览器关于表单外密码框的告警。
+- [修复] 首页侧栏「历史/自选/今日」标签栏统一到共享容器中，切换视图时标签栏不再位移；标签栏改为标准 tablist/tab 语义并支持方向键与 Home/End 键切换。
+- [改进] Web 设置页多选类字段（大盘复盘市场、通知路由渠道等）从平铺 checkbox 改为下拉多选控件，支持搜索、已选摘要与未知存量值保留。
+- [改进] Web 通知路由（报告/告警/系统错误渠道）下拉选项只展示已配置成功的通知渠道；未配置任何渠道时展示空态引导并可一键跳转渠道配置。
+- [改进] `REALTIME_SOURCE_PRIORITY` 改为保序多选下拉：按选择顺序决定数据源优先级，后端 Schema 提供候选项但不强制 allowed_values，历史别名与自定义源继续兼容。
+- [测试] 新增 Agent Runtime characterization 回放数据集与兼容性门禁：36 个 fixture（24 个 A/HK/US 财务场景 + 12 个 ModelRef/fallback/工具范围/超时/取消竞态/畸形输出契约场景）经严格 transcript 回放冻结当前 Native runtime 行为，`tests/test_agent_runtime_compatibility.py` 校验回放期望、manifest 覆盖矩阵与工厂契约（模型路由不可变、数值回退、ToolRegistry 共享、SkillManager 克隆与失效、`build_executor` 别名、Risk(Intel) 输入契约）。
+- [新功能] Web 界面新增繁体中文、日语、韩语、德语、西班牙语、马来语、法语和印尼语完整翻译资源与十语言选择器，并同步浏览器语言识别、持久化、HTML language、Intl 格式化及全语言完整性校验。
+- [新功能] 增加有序数据库 Migration Runner，以稳定 ID、SHA-256 checksum、单迁移事务和 SQLite 写锁统一 Fresh/历史数据库升级，并补齐 Desktop、Docker 与 Actions 的资源发现和导入校验。
+- [修复] Migration Runner 以固定 v3.0.0/v3.4.0/v3.20.0 release profile 兼容无 registry 历史数据库并保留数据；`status`/`verify` 改为 SQLite 强制只读诊断，不再在检查前修改 Schema 或应用 pending migration。
+- [改进] Migration Runner 只向 upgrade 提供受限且仅在同步调用期间有效的 SQL execution capability；返回或抛错时先拒绝新调用和排队调用，等待已进入 driver path 的语句在同一事务内完成并物化结果后再撤销连接租约；语句失败与禁用能力请求使用不可清除 latch，migration 捕获异常也不能提交；`execute` 只接受精确 `sqlalchemy.text()` 的单次 SQL 快照，`exec_driver_sql` 只接受内建字符串，任意 executable、实例覆写回调和并发 statement mutation 都不能获得真实 Connection；事务控制 SQL（含注释、空语句或 BOM 前缀）在进入 Connection 前 fail closed，调用方 SQLite authorizer 保持不变，DDL/DML 与 applied row 仍由 runner 独占同一事务，source guard、随机 savepoint 与 transaction 状态检查保留为纵深防御而非 Python 安全沙箱。
+- [修复] Migration Runner 递归拒绝 coroutine/generator/async-generator、context-manager wrapper 和循环 upgrade callable，并要求运行时严格返回 `None`；非法返回会关闭可同步关闭的 coroutine/generator 并回滚 DDL/DML，避免未完整执行的 migration 被错误记录为 applied 或产生未 await warning。
+- [测试] Docker CI 将受支持的 legacy SQLite fixture 作为 `/app/data` volume 启动真实 `DatabaseManager`，校验业务 canary、migration checksum 和 target version，并复用同一 volume 二次启动验证幂等。
+- [修复] Web 可搜索选择器在移动端底部弹窗中会根据可用空间向上展开并限制在视口内，避免模型服务选择列表超出屏幕后无法操作。
 - [改进] Web 共享控件、导航、设置、任务、自选股、Chat、报告、Run Flow、告警、决策信号、回测、持仓、选股与 Token Usage 的交互目标统一提供至少 44px 触控命中区，页面高度改用动态视口单位，报告二级标题统一使用 28px 设计 token，提升移动端可达性与版式一致性。
 - [修复] Agent runtime 对被多个 Connection 共享的 legacy 裸模型路由改为 fail-closed，并返回 `ambiguous_legacy_model_route` 要求显式选择 Connection-aware ModelRef，避免把其它 Connection 的部署来源误判为当前路由可用。
-- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息。
+- [修复] Agent 与 Bot 失败边界不再向用户或会话历史返回 Provider 原始错误；新失败持久化稳定 sentinel，历史 API 以安全 `content` 和 `error + params` 返回并兼容旧 `[分析失败]` 记录，Web 按当前界面语言统一渲染、复制和导出失败消息；Native Tool handler 与未知工具失败使用稳定错误码，内置 Agent 工具的 Portfolio、基本面、资金流与搜索下游失败使用稳定状态、诊断码或公开文案，模型、Single provider trace 与日志均不再包含原始异常详情；SearchService provider 失败日志只保留 provider、HTTP status、error count 与稳定 error code 等有界字段，不再输出 response body、response keys、私有 endpoint 或 API Key 前缀，Tavily / SerpAPI SDK error payload 在成功记账前转为稳定失败。
 - [修复] Web 异步分析仅在 409 envelope 的 `error` 为 `duplicate_task` 时构造重复任务错误，其它分析冲突与大盘复盘 409 统一走共享错误解析，并完整保留 `params`、`details` 和 `trace_id` 诊断元数据。
 - [修复] Web 用户可见文案与通知测试默认文案中的旧 DSA 品牌统一为 StockPulse；环境变量、API 字段、协议标识、内部模块名和历史载荷中的兼容标识保持不变。
 - [测试] ReportMarkdown 四种 UI/report language 组合改用可控延迟请求验证 loading→content 转换，正文与复制控件断言等待真实加载完成信号，避免 CI 资源压力下把已挂载的 disabled 按钮误当成正文就绪。
 - [修复] System Config GET 默认遮罩所有 Schema 敏感字段；模型 Connection 的 `API_KEY` / `API_KEYS` / `EXTRA_HEADERS` 遮罩或省略复用增加身份作用域校验，只有 Connection 名称、Provider、协议和 Base URL 未改变时才保留原凭据，动态附加请求头必须是 JSON 对象，切换身份或端点时必须重新输入或明确清空。
-- [修复] API、Agent、Bot、System Config、Backtest、图片提取与 AlphaSift 的异常日志统一通过共享安全入口记录：保留 trace ID、稳定错误码和异常类型，同时递归移除凭据、Authorization/Cookie、URL query token 与私有端点，限制诊断长度且不再附带原始 traceback；未知下游异常仍返回安全的结构化 500，预期校验错误保留明确的 4xx 语义。
+- [修复] API、Agent、Bot、System Config、Backtest、图片提取与 AlphaSift 的异常日志统一通过共享安全入口记录：保留 trace ID、稳定错误码和异常类型，同时递归移除凭据、Authorization/Cookie、URL query token 与私有端点，限制诊断长度且不再附带原始 traceback；静态守卫在原始日志 sink 对无注解或异常类参数执行 fail-closed 校验，覆盖同步/异步函数、方法、闭包、别名与提前渲染路径，只有可信 sanitizer 处理后的诊断文本和已证明为普通结构化值的参数可进入日志；未知下游异常仍返回安全的结构化 500，预期校验错误保留明确的 4xx 语义。
 - [修复] 全局 422 请求校验 envelope 删除 Pydantic `input` 与异常上下文，只保留安全的字段位置、类型和通用文案，避免登录或配置请求中的 password/API key 被响应与浏览器 trace 复制。
-- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求，浏览器 trace 只接触专用 canary/mask token；含 canary 的 E2E 运行关闭 screenshot、video、trace screenshot 和媒体附件，并在受扫描目录输出 JSON 结果，JSON reporter 显式关闭 commit 与 PR diff 元数据采集，避免把源码差异复制进可上传产物。CI 严格扫描文本、日志、JSON、HAR、trace/ZIP 条目与原始二进制 canary，拒绝 PNG/JPEG/WebM 扩展名或媒体签名且不使用 OCR；只有扫描成功才上传同一运行目录，测试失败但扫描通过时仍保留安全诊断。
+- [测试] 语义 Playwright 的敏感配置播种改用测试进程直接请求；credential-bearing CI 关闭 screenshot、video 和 trace，只保留文本 service logs 与 JSON reporter，并显式关闭 commit 与 PR diff 元数据采集。仓库 smoke 入口拒绝 UI/替代 config，global setup 在 CLI/project 合并后逐 project 校验最终 trace，静态 preflight 覆盖相对 import、`test.use` option 后赋值、`Object.fromEntries` 与 BrowserContext tracing 常见入口；本地无凭据调试仍可显式 opt in 无媒体 trace。CI 先严格扫描原始文本、日志、HAR、意外 trace/ZIP 条目与原始二进制 canary，再以专用脚本校验 JSON、递归文本日志、符号链接、allowlist 和 archive/media magic，生成 SHA-256 manifest 后二次扫描 staging；只有 raw scan、staging 与 staged scan 全部成功才上传安全 JSON/文本诊断。新增独立真实登录故意失败 harness，验证非零退出、JSON failure、服务日志、无 trace/media 及双重扫描，临时 spec 不进入正式 suite。
 - [改进] Web 配置备份入口从普通“系统与安全”页移入“高级”，保留原有 `.env` 导入导出、鉴权和冲突保护契约，避免普通设置路径暴露内部部署细节。
 - [修复] Portfolio 交易、资金流水、公司行为和 CSV 提交的持久化 operation ID 按操作类型、账户、owner 与客户端 key 隔离；默认 7 天 replay window 内同 payload 回放首次响应、异 payload 稳定冲突，窗口外记录在既有写事务中原子惰性清理且不影响 ledger 数据；旧 SQLite 表采用 additive migration，无法证明历史 owner 的 raw-key 行保持 unscoped，legacy 写入保护 trigger 在代码回滚期间阻止 v2 key 重复入账，并保证再次升级不发生索引冲突。Web 重试继续复用 ID、提交中锁定表单与关闭行为，并将 320px 表单改为单列。
 - [改进] Provider Catalog 补充获取凭据、控制台、模型列表与官方文档地址，Web 模型接入和首次向导统一消费后端元数据；快捷链接仅接受不含内嵌用户名或密码的 HTTPS URL，并在规范化后去重，删除按 Provider ID 维护的前端业务外链表。
@@ -37,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 登录页品牌标题统一为可访问的 `StockPulse`，隔离 Playwright 登录 smoke 不再依赖旧 `DAILY STOCK / Analysis Engine` 文案。
 - [修复] 模型连接新增显式 `LLM_<CONNECTION>_PROVIDER` 身份契约，Provider 与可重命名的 Connection 名称分离；同一 Provider 多连接、重命名连接、Available Models 的 Provider/Connection 元数据、旧配置精确匹配兼容与 GitHub Actions 变量透传保持一致，不再按 `openai2` 等名称前缀猜测。
 - [修复] 删除仍被报告、Agent、Vision 或 fallback 引用的单个模型时，Web 模型管理弹窗列出全部引用并支持在统一草稿中选择替代模型，后端以结构化 `model_in_use/details.referenced_by` 阻止 API 绕过；替换引用与删除可在同一事务原子成功，历史失效值仍保留并标记不可用。
-- [改进] Provider Catalog 成为 Provider 身份、双语标签、默认端点、协议、发现能力与本地/自定义属性的唯一元数据来源；同一 API 返回的 `connection_fields` Schema 成为动态 Connection required/visible/enabled 与可写字段集合的唯一权威来源。该属性存在时（包括显式 `[]`）不读取 Catalog 的 legacy requirement flags，仅在旧后端完全省略属性时启用隔离的 rolling-upgrade fallback；AND 中任一未知 operator 优先于更早的未满足条件，字段保持可见、只读、诊断并阻止保存。显式空 `display_name` 由前后端一致拒绝，仅兼容完全省略该字段的旧配置；内置 Provider 提供 `label_zh`/`label_en`，旧 `label`/`is_required` 仅为 deprecated 兼容输出；Ollama 使用 `/api/tags` 空 Key 发现，模型多选收起为可搜索 listbox。
+- [改进] Provider Catalog 成为 Provider 身份、双语标签、默认端点、协议、发现能力与本地/自定义属性的唯一元数据来源；同一 API 返回的 `connection_fields` Schema 成为动态 Connection required/visible/enabled 与可写字段集合的唯一权威来源。该属性存在时（包括显式 `[]`）不读取 Catalog 的 legacy requirement flags，仅在旧后端完全省略属性时启用隔离的 rolling-upgrade fallback；只有完整包含 `connection_name`/`display_name`/`provider_id`/`protocol`/`base_url`/`api_key`/`api_keys`/`models`/`extra_headers`/`enabled` 的 Schema 才可启用写入，identity-only/partial Schema 与未知且当前可见必填的字段统一进入只读保护并阻断测试、草稿、自动保存与保存；AND 中任一未知 operator 优先于更早的未满足条件，字段保持可见、只读、诊断并阻止保存。显式空 `display_name` 由前后端一致拒绝，仅兼容完全省略该字段的旧配置；内置 Provider 提供 `label_zh`/`label_en`，旧 `label`/`is_required` 仅为 deprecated 兼容输出；Ollama 使用 `/api/tags` 空 Key 发现，模型多选收起为可搜索 listbox。
 - [测试] Playwright 使用隔离 `.env`、SQLite、密码哈希与 session secret，启动时确定性播种 Markdown 报告，结束后清理 runtime，并保留后端/Vite/fake-provider 服务日志；登录 smoke 按当前 StockPulse 首次设密/登录流程执行，不再依赖开发者状态或整套 skip。
 - [文档] 中英文贡献指南、模型配置指南、Provider 指南、设置帮助与 `.env.example` 同步 Provider/Connection/Model/Task Assignment、多连接、发现、stale 值保留和 E2E 隔离语义；设置路径统一为「AI 与模型 → 模型接入」。
 - [改进] Web 设置页任务模型（报告/Agent/Vision）与备用模型添加控件改为严格列表选择器（`SearchableSelect`，listbox 语义、支持搜索/键盘/读屏）：仅可从后端可用模型目录选择，删除自由输入组件 `CreatableCombobox`；目录外已存值标注「当前配置不可用」，空值显示占位提示而非误报不可用。
@@ -45,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 设置页普通路径术语与设计收敛：运行时注入密钥的提示不再引用 `.env`/内部变量名，模型备用顺序说明去除内部实现名词；设置面与基础控件清理魔法字号/圆角（`text-[11px]`→`text-xs`、`rounded-[10px]`→`rounded-lg`、`rounded-[6px]`→`rounded-md`）。
 - [改进] Web 的 Modal、Drawer、ConfirmDialog、Settings Help 与移动历史面板统一使用 Overlay stack：只允许顶层响应 Escape/Tab，背景 inert、引用计数滚动锁定、打开聚焦和关闭焦点恢复行为一致，Confirm 层级高于 Drawer/Modal，Home/Chat/Help 不再保留自制 Overlay 状态机。
 - [改进] Home 以 query 参数作为报告与 Run Flow 对象真源：`recordId`、task/history flow 深链支持刷新、分享与 Back/Forward 恢复，关闭 Drawer 只移除对应 flow 参数；非法/失效参数使用 replace 规范化，快速切换采用 latest-request-wins 且保留无关参数。
-- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`；含凭据 canary 的运行只保留扫描通过的文本日志、JSON 结果与无媒体 trace/ZIP 诊断 7 天，PR 页面截图改由不含凭据的独立证据提供。
+- [chore] CI `web-gate` 阻断执行 lint、i18n、Vitest 与 build，关联 API/配置/服务改动同时触发 `web-e2e`；Playwright 使用隔离的真实后端、Vite、fake provider 与确定性数据，Python 按祖先 `.venv`→`python3`→`python` 查找并打印诊断，固定 `retries: 0`；含凭据 canary 的运行禁用 trace，只保留扫描通过的文本日志与 JSON 结果 7 天，PR 页面截图改由不含凭据的独立证据提供。
 - [文档] 补充前端开发代理变量 `DSA_WEB_DEV_API_PROXY` 到 `.env.example` 与贡献指南；修正本段中「模型供应商面板/高级视图」删除与保留的矛盾描述，统一为最终四视图状态；LLM 配置指南（中英）的旧术语统一为「设置 → AI 与模型 → 模型接入」。
 - [改进] Web 设置页「AI 与模型」收敛为 总览/模型接入/任务路由/可靠性 四个视图：删除「高级」二级视图与遗留「模型供应商」子页映射，legacy Provider 凭据键保持后端（env/YAML）兼容但不再形成 Web 第二编辑入口；模型接入页只展示紧凑连接卡片，内部配置来源、生成后端、CLI 与冒烟测试统一移入顶层「高级 → 开发者诊断」并默认折叠。
 - [改进] Web 设置页模型输入全面改为选择器交互：新增 `ModelMultiSelect` 多选组件，连接编辑器「发现的模型」改为搜索并勾选启用；手动添加模型改为每次回车/点击添加一项，粘贴逗号/空白分隔列表自动拆分去重；模型下拉搜索同时匹配显示名/模型路由/所属连接/服务商；可靠性页备用模型列表支持上移/下移排序，目录外的已配置路由保留并标注「当前配置不可用」而不静默清除。
@@ -54,7 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 设置页多值枚举字段（`NOTIFICATION_REPORT_CHANNELS`/`NOTIFICATION_ALERT_CHANNELS`/`NOTIFICATION_SYSTEM_ERROR_CHANNELS`、`MARKET_REVIEW_REGION`）渲染为勾选组，不再要求手输逗号分隔字符串；目录外的已存值保持可见、可取消，保存不静默丢弃；未显式设置的字段回填后端默认值展示（密码控件除外）；后端注册表为上述字段标注 `multi_value` 并修正英文描述措辞。
 - [改进] 后端配置保存校验补齐 Vision 模型引用保护：当本次更新触及渠道结构（删除/停用连接、修改 `LLM_CHANNELS` 或渠道键）导致 `VISION_MODEL` 指向已启用连接中不存在的模型时，保存被拒绝（`unknown_model`），与主模型/备用模型引用保护一致；历史失效的 Vision 引用仍不阻断无关配置保存。
 - [新功能] 大盘复盘报告页接入市场结构上下文卡片：持久化报告包含市场结构字段时，在复盘报告视图渲染题材主线与个股位置（`MarketStructureCard`），旧报告无该字段时静默跳过。
-- [改进] Web 设计守卫扫描全部生产 CSS/TSX，阻断非胶囊按钮覆盖、组件内 hardcoded hex/颜色函数、魔法像素字号/尺寸/圆角和原始 `100vh`；独立 fixture 覆盖每类规则，原生按钮由全局胶囊基线兜底，且不牺牲 44px 触控目标或可访问 focus ring。后端本轮触及的开发日志同步改为英文。
+- [改进] Web 设计守卫扫描全部生产 CSS/TSX，阻断非胶囊按钮覆盖、`primary`/`settings-primary`/`action-primary`/`gradient` CTA 经共享样式、别名、静态拼接、JSX spread 或内联样式引入的渐变/shimmer，以及组件内 hardcoded hex/颜色函数、魔法像素字号/尺寸/圆角和原始 `100vh`；独立 fixture 覆盖每类规则，Login 与 Settings 主操作统一复用共享黑白反色 solid primary 样式，原生按钮由全局胶囊基线兜底，且不牺牲 44px 触控目标或可访问 focus ring。`ParticleBackground` 通过单个实时 `CSSStyleDeclaration` 在 Light/Dark 切换后读取当前 Canvas token，`ScoreGauge` 保留既有类型与三层 SVG 结构并将 glow 样式归零。后端本轮触及的开发日志同步改为英文。
 - [文档] 修正模型接入相关文档与帮助文案的矛盾与过时描述：UI 路径统一为「设置 → AI 与模型 → 模型接入」（FAQ、LLM 配置指南、设置帮助、文档索引，中英文同步）；历史失效模型引用明确保留并标记不可用，删除在用模型由 `model_in_use` 阻断；market-support 中 `MARKET_REVIEW_REGION` 的「文本框输入逗号分隔」描述更新为勾选组现状。
 - [改进] 后端 Provider Catalog（`src/llm/provider_catalog.py`）不再写死具体模型 ID：移除 `placeholder_models` 字段，保留 provider id/label/protocol/默认端点/发现能力/capabilities/本地或自定义属性；`requires_api_key`/`requires_base_url` 仅作为旧后端 compatibility fallback，不在 `connection_fields` 存在时参与字段规则。新建连接不再用示例模型预填，也不会把示例模型写入运行时/fallback/任务模型；模型改由“获取模型”发现或逐项手动添加，没有模型时连接保持“未完成”。首次配置向导的模型输入同步改为 token-list（发现多选 + 手动逐项添加），不再是逗号输入框；旧的逗号模型配置读取时解析为 token。
 - [修复] 修复全量测试在本地开发 `.env` 存在时的模型与认证状态污染：`litellm` 在 import 时 `load_dotenv()` 会把开发者 `.env` 的 `LITELLM_FALLBACK_MODELS` 等 LLM 变量注入 `os.environ`，导致 System Config 校验测试仅在整套运行时因环境泄漏而失败（单文件运行通过）。新增 `tests/_llm_env_isolation.py`，在 `SystemConfigServiceTestCase`/`SystemConfigApiTestCase` 的 `setUp` 隔离 ambient LLM 环境变量并在 `tearDown` 还原；Auth API 与 ConfigManager 测试恢复原 `ENV_FILE`/`DATABASE_PATH`，Intelligence/Usage API 测试显式隔离认证状态，避免开发配置 `ADMIN_AUTH_ENABLED=true` 造成无关 401（不弱化断言、不跳过、不固定顺序）；新增 `tests/test_provider_catalog.py` 覆盖“无具体模型硬编码 / 返回数据不可被调用方污染 / catalog 使用后不影响后续配置校验”回归。仅剩 3 个与模型接入无关、单独运行也失败的既有 `test_decision_signal_service` 时序相关基线用例。
@@ -111,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] 通知推送与完整 Markdown/微信报告不再重复附加“AI 决策信号”摘要，DecisionSignal 的存储、告警和 Web AI 建议页保持不变。
 - [改进] TickFlow 新增基于申万一级行业池的行业涨跌排行 fallback，并将基本面/市场结构单能力默认超时由 3 秒调整为 8 秒，降低正常慢响应被提前降级的概率。
 - [文档] 补充 macOS 未签名、未公证 DMG 被 Gatekeeper 拦截时的架构选择、安全排查与官方安装包临时放行步骤。
+- [新功能] Web AI 建议页支持确认保存基于历史报告快照重算的决策风格信号，以 created/existing/refreshed 区分新建、原样复用和既有记录续期或维度补齐，复用 profile-aware 去重与失效语义，将历史信号的创建时间、有效期和相反信号失效顺序锚定来源报告时间，并提供可审计 guardrail 提示与阻断。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

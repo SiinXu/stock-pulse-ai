@@ -272,7 +272,7 @@ def refresh_remote_stock_index_cache(settings: RemoteStockIndexSettings) -> Remo
                 "failure_count": failures,
                 "max_failures": DEFAULT_STOCK_INDEX_REMOTE_MAX_FAILURES,
             },
-            redaction_values=exception_chain_redaction_values(exc),
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         if is_valid_remote_stock_index_file(cache_path):
             return RemoteStockIndexResult(cache_path=cache_path, error=message)

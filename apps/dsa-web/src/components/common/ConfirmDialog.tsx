@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   cancelText?: string;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
+  error?: string | null;
   isDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -30,6 +31,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelText,
   confirmDisabled = false,
   cancelDisabled = false,
+  error = null,
   isDanger = false,
   onConfirm,
   onCancel,
@@ -76,12 +78,17 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <p id={messageId} className="text-sm text-secondary-text mb-6 leading-relaxed">
           {message}
         </p>
+        {error ? (
+          <p className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-left text-xs text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
         <div className="flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="min-h-11 rounded-full border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelText ?? t('common.cancel')}
           </button>
@@ -89,7 +96,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
+            className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
               isDanger
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-foreground text-background'

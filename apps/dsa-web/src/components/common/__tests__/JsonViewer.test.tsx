@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { JsonViewer } from '../JsonViewer';
 
@@ -40,5 +40,26 @@ describe('JsonViewer', () => {
     expect(screen.getByText('82')).toHaveClass('text-amber-400');
     expect(screen.getByText('"ok"')).toHaveClass('text-emerald-400');
     expect(screen.getByRole('button', { name: /^(?:复制|Copy)$/ })).toHaveClass('min-h-11', 'min-w-11');
+  });
+
+  it('announces clipboard failures without showing false success', async () => {
+    const originalClipboard = navigator.clipboard;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    });
+
+    renderJsonViewer({ status: 'ready' });
+    fireEvent.click(screen.getByRole('button', { name: /^(?:复制|Copy)$/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/复制失败，请重试|Copy failed\. Try again\./);
+    expect(screen.queryByText(/已复制!|Copied!/)).not.toBeInTheDocument();
+
+    consoleError.mockRestore();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    });
   });
 });

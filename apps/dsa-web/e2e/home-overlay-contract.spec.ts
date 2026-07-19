@@ -1,9 +1,12 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 const UI_LANGUAGE_STORAGE_KEY = 'dsa.uiLanguage';
 const REPORT_A_SUMMARY = 'Contract report A';
 const REPORT_B_SUMMARY = 'Contract report B';
+const REPORT_C_SUMMARY = 'Contract report C';
 
 const HISTORY_ITEMS = [
   {
@@ -27,6 +30,13 @@ const HISTORY_ITEMS = [
     created_at: '2026-07-15T08:00:00Z',
   },
 ];
+
+const COMPLETED_TASK_ITEM = {
+  ...HISTORY_ITEMS[0],
+  id: 3,
+  query_id: 'contract-query-3',
+  created_at: '2026-07-16T08:00:00Z',
+};
 
 const REPORTS: Record<number, Record<string, unknown>> = {
   1: {
@@ -61,6 +71,23 @@ const REPORTS: Record<number, Record<string, unknown>> = {
       operation_advice: 'Hold',
       trend_prediction: 'Upward',
       sentiment_score: 72,
+    },
+  },
+  3: {
+    meta: {
+      id: 3,
+      query_id: 'contract-query-3',
+      stock_code: '600519',
+      stock_name: 'Moutai',
+      report_type: 'detailed',
+      report_language: 'en',
+      created_at: '2026-07-16T08:00:00Z',
+    },
+    summary: {
+      analysis_summary: REPORT_C_SUMMARY,
+      operation_advice: 'Watch',
+      trend_prediction: 'Upward',
+      sentiment_score: 81,
     },
   },
 };
@@ -105,6 +132,7 @@ function deferred() {
 
 type HomeApiOptions = {
   delayFirstRecord?: boolean;
+  deferCompletedTask?: boolean;
   recordFailure?: {
     recordId: number;
     status: 401 | 403;
@@ -115,8 +143,12 @@ type HomeApiOptions = {
 
 async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
   const delayedRecord = deferred();
+  const completedTask = deferred();
   let shouldDelayFirstRecord = Boolean(options.delayFirstRecord);
+  let taskEventDelivered = false;
+  let fixtureHistoryItems = [...HISTORY_ITEMS];
   const detailRequests: number[] = [];
+  const historyRequests: string[] = [];
   const taskFlowRequests: string[] = [];
   const historyFlowRequests: number[] = [];
 
@@ -134,6 +166,35 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
   }));
   await page.route('**/api/v1/analysis/tasks**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    if (pathname === '/api/v1/analysis/tasks/stream' && options.deferCompletedTask) {
+      if (!taskEventDelivered) {
+        await completedTask.promise;
+        taskEventDelivered = true;
+        fixtureHistoryItems = [COMPLETED_TASK_ITEM, ...fixtureHistoryItems];
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/event-stream',
+          body: [
+            'event: task_completed',
+            `data: ${JSON.stringify({
+              task_id: 'task-completed-3',
+              stock_code: '600519',
+              stock_name: 'Moutai',
+              status: 'completed',
+              progress: 100,
+              report_type: 'detailed',
+              created_at: '2026-07-16T08:00:00Z',
+              completed_at: '2026-07-16T08:01:00Z',
+            })}`,
+            '',
+            '',
+          ].join('\n'),
+        });
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: 'event: connected\ndata: {}\n\n' });
+      return;
+    }
     const flowMatch = pathname.match(/^\/api\/v1\/analysis\/tasks\/([^/]+)\/flow$/);
     if (flowMatch) {
       const taskId = decodeURIComponent(flowMatch[1]);
@@ -152,11 +213,12 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     const { pathname } = url;
 
     if (pathname === '/api/v1/history') {
+      historyRequests.push(url.search);
       const reportType = url.searchParams.get('report_type');
       const stockCode = url.searchParams.get('stock_code');
       const items = reportType === 'market_review'
         ? []
-        : HISTORY_ITEMS.filter((item) => !stockCode || item.stock_code === stockCode);
+        : fixtureHistoryItems.filter((item) => !stockCode || item.stock_code === stockCode);
       await fulfillJson(route, {
         total: items.length,
         page: Number(url.searchParams.get('page') || 1),
@@ -168,8 +230,8 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
 
     if (pathname === '/api/v1/history/stocks') {
       await fulfillJson(route, {
-        total: HISTORY_ITEMS.length,
-        items: HISTORY_ITEMS.map((item) => ({
+        total: fixtureHistoryItems.length,
+        items: fixtureHistoryItems.map((item) => ({
           ...item,
           analysis_count: 1,
           last_analysis_time: item.created_at,
@@ -178,11 +240,20 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
       return;
     }
 
+    const deleteByCodeMatch = pathname.match(/^\/api\/v1\/history\/by-code\/([^/]+)$/);
+    if (route.request().method() === 'DELETE' && deleteByCodeMatch) {
+      const stockCode = decodeURIComponent(deleteByCodeMatch[1]);
+      const previousLength = fixtureHistoryItems.length;
+      fixtureHistoryItems = fixtureHistoryItems.filter((item) => item.stock_code !== stockCode);
+      await fulfillJson(route, { deleted: previousLength - fixtureHistoryItems.length });
+      return;
+    }
+
     const flowMatch = pathname.match(/^\/api\/v1\/history\/(\d+)\/flow$/);
     if (flowMatch) {
       const recordId = Number(flowMatch[1]);
       historyFlowRequests.push(recordId);
-      const item = HISTORY_ITEMS.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
+      const item = fixtureHistoryItems.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
       await fulfillJson(
         route,
         runFlowSnapshot(`history-${recordId}`, item.stock_code, item.stock_name),
@@ -193,7 +264,7 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
     const diagnosticsMatch = pathname.match(/^\/api\/v1\/history\/(\d+)\/diagnostics$/);
     if (diagnosticsMatch) {
       const recordId = Number(diagnosticsMatch[1]);
-      const item = HISTORY_ITEMS.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
+      const item = fixtureHistoryItems.find((candidate) => candidate.id === recordId) ?? HISTORY_ITEMS[0];
       await fulfillJson(route, {
         trace_id: `trace-record-${recordId}`,
         task_id: `task-record-${recordId}`,
@@ -251,9 +322,11 @@ async function installHomeApiFixture(page: Page, options: HomeApiOptions = {}) {
 
   return {
     detailRequests,
+    historyRequests,
     taskFlowRequests,
     historyFlowRequests,
     releaseFirstRecord: delayedRecord.resolve,
+    releaseCompletedTask: completedTask.resolve,
   };
 }
 
@@ -307,8 +380,8 @@ async function expectOverlayIsolated(overlay: Locator, isolated: boolean) {
   }
 }
 
-test.describe('Settings Help shared overlay contract', () => {
-  test('320px Help stays in bounds, traps focus, and restores page state', async ({ page }) => {
+test.describe('Settings Help shared tooltip contract', () => {
+  test('320px Help stays in bounds without isolating the page', async ({ page }) => {
     await openOverlayFixture(page, 320);
     await page.evaluate(() => {
       document.body.style.overflow = 'clip';
@@ -319,26 +392,19 @@ test.describe('Settings Help shared overlay contract', () => {
     expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
 
     await trigger.click();
-    const dialog = page.getByRole('dialog', { name: 'Watchlist' });
-    const close = dialog.getByRole('button', { name: 'Close configuration help' });
-    await expect(dialog).toBeVisible();
-    await expect(page.locator('#root')).toHaveAttribute('inert', '');
-    await expect(page.locator('#root')).toHaveAttribute('aria-hidden', 'true');
-    await expectBodyOverflow(page, 'hidden');
-    await expectFocusWithin(dialog);
-    const dialogBox = await dialog.boundingBox();
-    expect(dialogBox).not.toBeNull();
-    expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
-    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(320);
-    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-    const closeBox = await close.boundingBox();
-    expect(closeBox?.width).toBeGreaterThanOrEqual(44);
-    expect(closeBox?.height).toBeGreaterThanOrEqual(44);
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
+    await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden', 'true');
+    await expectBodyOverflow(page, 'clip');
+    const tooltipBox = await tooltip.boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox!.x).toBeGreaterThanOrEqual(0);
+    expect(tooltipBox!.x + tooltipBox!.width).toBeLessThanOrEqual(320);
+    expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 
-    await page.keyboard.press('Tab');
-    await expectFocusWithin(dialog);
-    await close.click();
-    await expect(dialog).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(tooltip).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(page.locator('#root')).not.toHaveAttribute('inert', '');
     await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden', 'true');
@@ -351,18 +417,17 @@ test.describe('Settings Help shared overlay contract', () => {
     await trigger.focus();
     await trigger.click();
 
-    const dialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expect(dialog).toBeVisible();
-    await expectFocusWithin(dialog);
-    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await page.keyboard.press('Escape');
 
-    await expect(dialog).toHaveCount(0);
+    await expect(tooltip).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expectBodyOverflow(page, '');
   });
 
-  test('Help over Modal closes topmost-first and keeps the lower modal isolated', async ({ page }) => {
+  test('Help over Modal closes without closing or isolating the modal', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
     await opener.click();
@@ -371,12 +436,13 @@ test.describe('Settings Help shared overlay contract', () => {
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
     await helpTrigger.click();
 
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expectOverlayIsolated(outerOverlay, true);
+    const helpTooltip = page.getByRole('tooltip');
+    await expect(helpTooltip).toBeVisible();
+    await expectOverlayIsolated(outerOverlay, false);
     await expectBodyOverflow(page, 'hidden');
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(helpTooltip).toHaveCount(0);
     await expect(outerDialog).toBeVisible();
     await expectOverlayIsolated(outerOverlay, false);
     await expect(helpTrigger).toBeFocused();
@@ -389,7 +455,7 @@ test.describe('Settings Help shared overlay contract', () => {
     await expectBodyOverflow(page, '');
   });
 
-  test('Help over Drawer closes topmost-first and restores the Drawer trigger', async ({ page }) => {
+  test('Help over Drawer closes without closing or isolating the drawer', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-drawer');
     await opener.click();
@@ -398,11 +464,12 @@ test.describe('Settings Help shared overlay contract', () => {
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Drawer help configuration help' });
     await helpTrigger.click();
 
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    await expectOverlayIsolated(outerOverlay, true);
+    const helpTooltip = page.getByRole('tooltip');
+    await expect(helpTooltip).toBeVisible();
+    await expectOverlayIsolated(outerOverlay, false);
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(helpTooltip).toHaveCount(0);
     await expect(outerDialog).toBeVisible();
     await expectOverlayIsolated(outerOverlay, false);
     await expect(helpTrigger).toBeFocused();
@@ -414,31 +481,38 @@ test.describe('Settings Help shared overlay contract', () => {
     await expectBodyOverflow(page, '');
   });
 
-  test('ConfirmDialog above Help is the only Escape target and restores Help focus', async ({ page }) => {
+  test('ConfirmDialog above Help remains the only Escape target and restores Help focus', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
     await opener.click();
     const outerDialog = page.getByRole('dialog', { name: 'Outer modal' });
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
-    await helpTrigger.click();
-    const helpDialog = page.getByRole('dialog', { name: 'Watchlist' });
-    const helpOverlay = page.locator('[data-overlay-root="modal"]').filter({ hasText: 'Watchlist' });
+    const helpPopupTrigger = helpTrigger.locator('xpath=..');
+    // Keep this focus-restoration scenario keyboard-only. A pointer left over
+    // the trigger can legitimately reopen the hover tooltip after an overlay
+    // is removed, adding another topmost Escape target on some browsers.
+    await helpTrigger.focus();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await expect(helpPopupTrigger).toHaveAttribute('data-dialog-popup', 'true');
 
     await page.getByTestId('open-confirm').evaluate((element: HTMLElement) => element.click());
     const confirmDialog = page.getByRole('dialog', { name: 'Confirm contract action' });
     await expect(confirmDialog).toBeVisible();
-    await expectOverlayIsolated(helpOverlay, true);
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
     await expectFocusWithin(confirmDialog);
     await page.keyboard.press('Escape');
 
     await expect(confirmDialog).toHaveCount(0);
-    await expect(helpDialog).toBeVisible();
-    await expectOverlayIsolated(helpOverlay, false);
-    await expectFocusWithin(helpDialog);
+    await expect(outerDialog).toBeVisible();
+    await expect(helpTrigger).toBeFocused();
+    const restoredTooltip = page.getByRole('tooltip');
+    await expect(restoredTooltip).toBeVisible();
+    await expect(helpPopupTrigger).toHaveAttribute('data-dialog-popup', 'true');
     await expectBodyOverflow(page, 'hidden');
     await page.keyboard.press('Escape');
 
-    await expect(helpDialog).toHaveCount(0);
+    await expect(restoredTooltip).toHaveCount(0);
+    await expect(helpPopupTrigger).not.toHaveAttribute('data-dialog-popup', 'true');
     await expect(outerDialog).toBeVisible();
     await expect(helpTrigger).toBeFocused();
     await expectBodyOverflow(page, 'hidden');
@@ -463,13 +537,17 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
 
+    const backDetailRequestIndex = fixture.detailRequests.length;
     await page.goBack();
     await expectSearchParams(page, { keep: 'yes', recordId: '2' });
+    await expect.poll(() => fixture.detailRequests.slice(backDetailRequestIndex)).toEqual([2]);
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
 
+    const forwardDetailRequestIndex = fixture.detailRequests.length;
     await page.goForward();
-    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
     await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    await expect.poll(() => fixture.detailRequests.slice(forwardDetailRequestIndex)).toEqual([1]);
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
   });
 
   test('a slow report response cannot replace the newer URL selection', async ({ page }) => {
@@ -488,6 +566,57 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
     await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
     await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toHaveCount(0);
     await expectSearchParams(page, { recordId: '2' });
+  });
+
+  test('task completion replaces the Home URL and opens the completed report', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', { deferCompletedTask: true });
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    const historyLength = await page.evaluate(() => window.history.length);
+    const completionRequestIndex = fixture.detailRequests.length;
+
+    fixture.releaseCompletedTask();
+
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '3' });
+    expect(fixture.detailRequests.slice(completionRequestIndex)).toEqual([3]);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
+  });
+
+  test('task completion preserves an explicit report deep link while it is still loading', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1', {
+      delayFirstRecord: true,
+      deferCompletedTask: true,
+    });
+    await expect.poll(() => fixture.detailRequests).toEqual([1]);
+    const historyRequestCount = fixture.historyRequests.length;
+
+    fixture.releaseCompletedTask();
+
+    await expect.poll(() => fixture.historyRequests.length).toBeGreaterThan(historyRequestCount);
+    await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    expect(fixture.detailRequests).toEqual([1]);
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
+
+    fixture.releaseFirstRecord();
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '1' });
+    await expect(page.getByText(REPORT_C_SUMMARY, { exact: true })).toHaveCount(0);
+  });
+
+  test('deleting the current report replaces it once without refetching the deleted id', async ({ page }) => {
+    const fixture = await openFixtureHome(page, '/?keep=yes&recordId=1');
+    await expect(page.getByText(REPORT_A_SUMMARY, { exact: true })).toBeVisible();
+    const historyLength = await page.evaluate(() => window.history.length);
+    const deleteRequestIndex = fixture.detailRequests.length;
+
+    await page.getByRole('button', { name: 'Delete Moutai history record' }).click();
+    const confirmDialog = page.getByRole('dialog', { name: 'Delete History' });
+    await confirmDialog.getByRole('button', { name: 'Delete', exact: true }).click();
+
+    await expect(page.getByText(REPORT_B_SUMMARY, { exact: true })).toBeVisible();
+    await expectSearchParams(page, { keep: 'yes', recordId: '2' });
+    expect(fixture.detailRequests.slice(deleteRequestIndex)).toEqual([2]);
+    expect(await page.evaluate(() => window.history.length)).toBe(historyLength);
   });
 
   test('a 401 report deep link keeps its localized error and removes only recordId', async ({ page }) => {

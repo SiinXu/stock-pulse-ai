@@ -17,7 +17,7 @@ from src.market_phase_summary import extract_market_phase_summary, normalize_ana
 from src.repositories.backtest_repo import BacktestRepository
 from src.repositories.stock_repo import StockRepository
 from src.schemas.decision_action import build_action_fields
-from src.storage import BacktestResult, BacktestSummary, DatabaseManager
+from src.storage import AnalysisHistory, BacktestResult, BacktestSummary, DatabaseManager
 from src.utils.data_processing import parse_json_field
 from src.services.stock_code_utils import normalize_code as normalize_backtest_code
 from src.utils.sanitize import log_safe_exception
@@ -949,7 +949,7 @@ class BacktestService:
             phase_breakdown[bucket] = phase_breakdown.get(bucket, 0) + 1
         return {"phase_breakdown": phase_breakdown, "raw_phase_counts": raw_phase_counts}
 
-    def _resolve_analysis_date(self, analysis) -> Optional[date]:
+    def _resolve_analysis_date(self, analysis: AnalysisHistory) -> Optional[date]:
         parsed = self.repo.parse_analysis_date_from_snapshot(analysis.context_snapshot)
         if parsed:
             return parsed

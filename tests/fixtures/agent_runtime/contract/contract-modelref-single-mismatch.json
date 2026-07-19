@@ -1,0 +1,87 @@
+{
+  "id": "contract-modelref-single-mismatch",
+  "notes": "ModelRef/routing anomaly (single-agent): the configured model is openai/gpt-4o-mini (BASE_CONFIG_FIELDS litellm_model) but the provider response reports anthropic/claude-3-5-haiku. Characterizes that the runtime records the response-side provider/model verbatim and never validates it against the configured ModelRef.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": "```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 55,\n  \"trend_prediction\": \"短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势不明朗，观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势确认\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"未调用工具，仅凭上下文\",\n      \"data_limitations\": \"无工具数据\"\n    }\n  },\n  \"analysis_summary\": \"缺乏增量数据，维持观望。\",\n  \"key_points\": \"观望\",\n  \"risk_warning\": \"数据有限\"\n}\n```",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 210,
+        "total_tokens": 730
+      },
+      "provider": "anthropic",
+      "model": "claude-3-5-haiku"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [],
+    "total_steps": 1,
+    "total_tokens": 730,
+    "provider": "anthropic",
+    "model": "claude-3-5-haiku",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "贵州茅台",
+      "sentiment_score": 55,
+      "trend_prediction": "短期中性",
+      "operation_advice": "观望",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "趋势不明朗，观望为主",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "暂不介入",
+            "has_position": "持有观察"
+          }
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0
+        },
+        "phase_decision": {
+          "phase_context": "基于最近收盘数据",
+          "action_window": "次一交易日",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "趋势确认",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "未调用工具，仅凭上下文",
+          "data_limitations": "无工具数据"
+        }
+      },
+      "analysis_summary": "缺乏增量数据，维持观望。",
+      "key_points": "观望",
+      "risk_warning": "数据有限"
+    },
+    "content": "```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 55,\n  \"trend_prediction\": \"短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势不明朗，观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"趋势确认\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"未调用工具，仅凭上下文\",\n      \"data_limitations\": \"无工具数据\"\n    }\n  },\n  \"analysis_summary\": \"缺乏增量数据，维持观望。\",\n  \"key_points\": \"观望\",\n  \"risk_warning\": \"数据有限\"\n}\n```",
+    "error": null
+  }
+}

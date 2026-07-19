@@ -6,6 +6,7 @@
 
 - React UI（Vite 构建）由本地 FastAPI 服务托管
 - Electron 启动时自动拉起后端服务，等待 `/api/health` 就绪后加载 UI
+- Python 后端首次初始化 `DatabaseManager` 时同步完成有序数据库 migration，Electron 不复制 Schema 升级逻辑；通用 `/api/health` 不是数据库 readiness probe
 - Windows 便携/安装模式下，用户配置文件 `.env` 和数据库放在 exe 同级目录；macOS 打包版使用 Electron 用户数据目录保存运行时配置
 - 桌面端会自动从本机 `8000-8100` 选择可用端口，并把实际选择的端口同步给内置后端；桌面端不依赖 `.env` 里的 `WEBUI_PORT` 来决定窗口连接地址，避免用户改端口后 Electron 仍等待旧端口导致启动超时
 
@@ -220,7 +221,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-backend.ps1
 bash scripts/build-backend-macos.sh
 ```
 
-该脚本会在安装依赖后执行 `--collect-all alphasift` 和 `--collect-data akshare`。构建完成后会校验 `alphasift.dsa_adapter` 可导入，并确认 AkShare 的 `file_fold/calendar.json` 已进入冻结产物，避免发行包在热点题材或日线增强路径中因缺少 package data 降级。
+该脚本会在安装依赖后执行 `--collect-all alphasift` 和 `--collect-data akshare`，并显式收集 `src.migrations`、registry、versions package 及 source-bound checksum 所需的 version `.py` 源码。构建完成后会校验 `alphasift.dsa_adapter` 和 `src.migrations.registry` 可导入，并确认 migration 源码与 AkShare 的 `file_fold/calendar.json` 已进入冻结产物，避免发行包在启动 migration、热点题材或日线增强路径中因缺少模块/package data 失败。
 
 3) 打包 Electron 桌面应用
 
@@ -277,6 +278,15 @@ win-unpacked/
 
 > 建议：从旧版本升级的 macOS 用户仍可在升级前执行一次 `导出 .env` 作为保险；如果旧 `.app` 已经被整体替换，包内旧文件无法凭空恢复，只能通过备份导入。
 
+### 数据库迁移与恢复
+
+- Fresh DB 和从旧版 Desktop 保留的 DB 都在 Python 后端首次初始化 `DatabaseManager` 时执行同一 migration registry；数据库依赖路径会等待其完整成功或失败。
+- 升级前完全退出 Desktop，再备份整个 `data/` 目录；不要在应用运行时只复制 `.db` 主文件。
+- 迁移失败不会记录 applied row，且当前数据库依赖路径失败。停止竞争进程、修复磁盘/权限/数据前置条件后使用匹配版本向前重试，不删除 registry row，也不做 downgrade。
+- `python -m src.migrations.cli status` 和 `verify` 使用 SQLite `mode=ro` 与 `PRAGMA query_only=ON` 只读检查 Desktop 数据库，不会创建数据库、补列、写 registry 或应用 pending migration；`status` 对 pending 返回 exit 0，`verify` 返回 `pending_migrations` 和非零 exit。应用后端首次进入 `DatabaseManager` 时仍会同步应用 pending migration。备份前必须完全退出 Desktop；开发 smoke 必须使用已显式初始化的临时 `DATABASE_PATH`，不得指向 Desktop 用户数据库。
+
+完整的 ID、checksum、锁、Fresh/历史数据库和备份边界见 [数据库迁移](database-migrations.md)。
+
 ### 设置页版本信息
 
 - `系统设置 -> 版本信息` 中的“桌面端版本”由 Electron 主进程的 `app.getVersion()` 提供，并通过 preload bridge 暴露给前端
@@ -311,7 +321,7 @@ win-unpacked/
 
 ### 后端启动报 ModuleNotFoundError
 
-PyInstaller 打包时缺少模块，需要在 Windows 与 macOS 后端构建脚本中同步增加 `--hidden-import`，并对冻结产物执行运行时导入校验。当前脚本会显式安装、冻结并探测 LiteLLM 运行路径需要的 `orjson`；若日志包含 `No module named 'orjson'`，请升级到修复版本并重新构建，不能只在已发布目录中手工安装依赖。
+PyInstaller 打包时缺少模块，需要在 Windows 与 macOS 后端构建脚本中同步增加 `--hidden-import`，并对冻结产物执行运行时导入校验。当前脚本会显式安装、冻结并探测 LiteLLM 运行路径需要的 `orjson` 以及启动必需的 `src.migrations.registry`；若日志包含 `No module named 'orjson'` 或 `No module named 'src.migrations'`，请升级到修复版本并重新构建，不能只在已发布目录中手工安装依赖。
 
 如果日志提示缺少 `akshare/file_fold/calendar.json`，说明后端冻结产物没有完整收集 AkShare package data。请使用仓库当前的 `scripts/build-backend.ps1` 或 `scripts/build-backend-macos.sh` 重新构建；脚本会在生成桌面包前检查该文件，缺失时直接终止构建。
 

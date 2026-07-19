@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BellRing } from 'lucide-react';
+import { BellRing, RefreshCw } from 'lucide-react';
 import { alertsApi } from '../api/alerts';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
@@ -13,7 +13,7 @@ import {
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../components/alerts/AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Card, EmptyState, InlineAlert, Loading, Modal, PageHeader } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, Card, EmptyState, InlineAlert, Loading, Modal, PageHeader, Pagination } from '../components/common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -27,7 +27,9 @@ import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
   ALERT_NOTIFICATION_CHANNEL_LABELS,
   ALERT_NOTIFICATION_STATUS_LABELS,
+  ALERT_HISTORY_CONTROLS_TEXT,
   ALERT_PAGE_TEXT,
+  ALERT_TRIGGER_TEXT,
 } from '../locales/alerts';
 import { formatUiDateTime } from '../utils/uiLocale';
 
@@ -50,13 +52,15 @@ function testVariant(result: AlertRuleTestResponse): 'success' | 'warning' | 'da
 
 function renderTestResultMessage(result: AlertRuleTestResponse, language: UiLanguage): React.ReactNode {
   const text = ALERT_PAGE_TEXT[language];
+  const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
+  const triggerText = ALERT_TRIGGER_TEXT[language];
   const targetResults = result.targetResults ?? [];
   return (
     <div className="space-y-2">
       <div>
         {result.message}
         {` · ${text.status}: `}
-        {result.status}
+        {controlsText.testStatuses[result.status] ?? result.status}
         {` · ${text.triggered}: `}
         {result.triggered ? text.yes : text.no}
         {` · ${text.observed}: `}
@@ -73,8 +77,8 @@ function renderTestResultMessage(result: AlertRuleTestResponse, language: UiLang
             <div key={`${item.target}-${item.status}`} className="flex flex-wrap justify-between gap-2">
               <span>{item.displayTarget ?? item.target}</span>
               <span>
-                {item.status}
-                {item.recordStatus ? ` / ${item.recordStatus}` : ''}
+                {controlsText.testStatuses[item.status] ?? item.status}
+                {item.recordStatus ? ` / ${triggerText.statuses[item.recordStatus] ?? item.recordStatus}` : ''}
               </span>
             </div>
           ))}
@@ -97,6 +101,7 @@ function formatNotificationStatus(notification: AlertNotificationItem, language:
 const AlertsPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const text = ALERT_PAGE_TEXT[language];
+  const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
@@ -112,10 +117,16 @@ const AlertsPage: React.FC = () => {
   const [rulesLoaded, setRulesLoaded] = useState(false);
 
   const [triggers, setTriggers] = useState<AlertTriggerItem[]>([]);
+  const [triggersPage, setTriggersPage] = useState(1);
+  const [triggersTotal, setTriggersTotal] = useState(0);
+  const [triggersLastUpdated, setTriggersLastUpdated] = useState<string | null>(null);
   const [triggersLoading, setTriggersLoading] = useState(false);
   const [triggersError, setTriggersError] = useState<ParsedApiError | null>(null);
 
   const [notifications, setNotifications] = useState<AlertNotificationItem[]>([]);
+  const [notificationsPage, setNotificationsPage] = useState(1);
+  const [notificationsTotal, setNotificationsTotal] = useState(0);
+  const [notificationsLastUpdated, setNotificationsLastUpdated] = useState<string | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<ParsedApiError | null>(null);
 
@@ -123,7 +134,11 @@ const AlertsPage: React.FC = () => {
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const [busyRules, setBusyRules] = useState<AlertRuleBusyMap>({});
-  const [testResult, setTestResult] = useState<AlertRuleTestResponse | null>(null);
+  const [testResult, setTestResult] = useState<{
+    ruleId: number;
+    ruleName: string;
+    response: AlertRuleTestResponse;
+  } | null>(null);
   const rulesRequestIdRef = useRef(0);
   const triggersRequestIdRef = useRef(0);
   const notificationsRequestIdRef = useRef(0);
@@ -181,16 +196,19 @@ const AlertsPage: React.FC = () => {
     }
   }, [alertTypeFilter, enabledFilter, rulesPage]);
 
-  const loadTriggers = useCallback(async () => {
+  const loadTriggers = useCallback(async (page = 1) => {
     const requestId = triggersRequestIdRef.current + 1;
     triggersRequestIdRef.current = requestId;
     const isLatestRequest = () => triggersRequestIdRef.current === requestId;
     setTriggersLoading(true);
     setTriggersError(null);
     try {
-      const response = await alertsApi.listTriggers({ page: 1, pageSize: PAGE_SIZE });
+      const response = await alertsApi.listTriggers({ page, pageSize: PAGE_SIZE });
       if (!isLatestRequest()) return;
       setTriggers(response.items);
+      setTriggersTotal(response.total);
+      setTriggersPage(response.page);
+      setTriggersLastUpdated(new Date().toISOString());
     } catch (error) {
       if (!isLatestRequest()) return;
       setTriggersError(getParsedApiError(error));
@@ -199,16 +217,19 @@ const AlertsPage: React.FC = () => {
     }
   }, []);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (page = 1) => {
     const requestId = notificationsRequestIdRef.current + 1;
     notificationsRequestIdRef.current = requestId;
     const isLatestRequest = () => notificationsRequestIdRef.current === requestId;
     setNotificationsLoading(true);
     setNotificationsError(null);
     try {
-      const response = await alertsApi.listNotifications({ page: 1, pageSize: PAGE_SIZE });
+      const response = await alertsApi.listNotifications({ page, pageSize: PAGE_SIZE });
       if (!isLatestRequest()) return;
       setNotifications(response.items);
+      setNotificationsTotal(response.total);
+      setNotificationsPage(response.page);
+      setNotificationsLastUpdated(new Date().toISOString());
     } catch (error) {
       if (!isLatestRequest()) return;
       setNotificationsError(getParsedApiError(error));
@@ -233,9 +254,13 @@ const AlertsPage: React.FC = () => {
 
   useEffect(() => {
     if (!rulesLoaded) return;
-    void loadTriggers();
-    void loadNotifications();
-  }, [loadNotifications, loadTriggers, rulesLoaded]);
+    void loadTriggers(triggersPage);
+  }, [loadTriggers, rulesLoaded, triggersPage]);
+
+  useEffect(() => {
+    if (!rulesLoaded) return;
+    void loadNotifications(notificationsPage);
+  }, [loadNotifications, notificationsPage, rulesLoaded]);
 
   const handleCreateRule = async (payload: AlertRuleCreateRequest) => {
     setCreateLoading(true);
@@ -288,7 +313,10 @@ const AlertsPage: React.FC = () => {
     setTestResult(null);
     try {
       const result = await alertsApi.testRule(rule.id);
-      if (mountedRef.current) setTestResult(result);
+      if (mountedRef.current) {
+        setTestResult({ ruleId: rule.id, ruleName: rule.name, response: result });
+        void loadTriggers(1);
+      }
     } catch (error) {
       if (mountedRef.current) setRulesError(getParsedApiError(error));
     } finally {
@@ -303,16 +331,16 @@ const AlertsPage: React.FC = () => {
         title={text.title}
         description={text.description}
         actions={(
-          <button
+          <Button
             type="button"
-            className="btn-primary inline-flex items-center gap-2"
+            size="sm"
             onClick={() => {
               setCreateError(null);
               setCreateRuleModalOpen(true);
             }}
           >
             {text.createRule}
-          </button>
+          </Button>
         )}
       />
 
@@ -352,7 +380,7 @@ const AlertsPage: React.FC = () => {
 
       <div className="flex h-full min-h-0 flex-col gap-4">
           <AlertRuleList
-            className="flex h-full min-h-0 flex-col"
+            className="flex flex-col"
             rules={rules}
             total={rulesTotal}
             page={rulesPage}
@@ -377,17 +405,51 @@ const AlertsPage: React.FC = () => {
           {testResult ? (
             <InlineAlert
               title={text.testResult}
-              variant={testVariant(testResult)}
-              message={renderTestResultMessage(testResult, language)}
+              variant={testVariant(testResult.response)}
+              message={(
+                <div className="space-y-2">
+                  <div className="font-medium">{formatUiText(controlsText.testRule, { name: testResult.ruleName })}</div>
+                  {renderTestResultMessage(testResult.response, language)}
+                </div>
+              )}
             />
           ) : null}
         </div>
 
       {triggersError ? <ApiErrorAlert error={triggersError} onDismiss={() => setTriggersError(null)} /> : null}
-      <AlertTriggerHistory triggers={triggers} isLoading={triggersLoading} />
+      <AlertTriggerHistory
+        triggers={triggers}
+        isLoading={triggersLoading}
+        page={triggersPage}
+        pageSize={PAGE_SIZE}
+        total={triggersTotal}
+        lastUpdated={triggersLastUpdated}
+        onPageChange={setTriggersPage}
+        onRefresh={() => void loadTriggers(triggersPage)}
+      />
 
       {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
       <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
+        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          {notificationsLastUpdated ? (
+            <span className="text-xs text-muted-text">
+              {formatUiText(controlsText.lastUpdated, {
+                time: formatUiDateTime(notificationsLastUpdated, language, { dateStyle: 'medium', timeStyle: 'short' }),
+              })}
+            </span>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => void loadNotifications(notificationsPage)}
+            isLoading={notificationsLoading}
+            loadingText={text.loadingNotifications}
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {controlsText.refresh}
+          </Button>
+        </div>
         {notificationsLoading ? <Loading label={text.loadingNotifications} /> : null}
         {!notificationsLoading && notifications.length === 0 ? (
           <EmptyState
@@ -424,6 +486,12 @@ const AlertsPage: React.FC = () => {
             </table>
           </div>
         ) : null}
+        <Pagination
+          currentPage={notificationsPage}
+          totalPages={Math.max(1, Math.ceil(notificationsTotal / PAGE_SIZE))}
+          onPageChange={setNotificationsPage}
+          className="mt-4"
+        />
       </Card>
     </AppPage>
   );

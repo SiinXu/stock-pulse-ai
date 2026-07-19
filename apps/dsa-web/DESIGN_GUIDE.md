@@ -4,8 +4,9 @@
 > 权威。[UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 的 HITL-H1～H8
 > 已于 2026-07-17 由维护者批准（结论见其 §18.1），自此是导航、页面归属、URL、状态与交互
 > 契约的已批准目标；实施仍须按其 §17 顺序、tracker 登记与各 slice 门禁推进，不得越序启动
-> UI-02～UI-07 父任务。Coinstax/Figma 仅是
-> 外部模式参考，不是项目需求、token、组件 API、页面 IA 或像素级验收来源。
+> UI-02～UI-07 父任务。Coinstax/Figma 仅是外部模式参考；只有根目录 `DESIGN.md` 明确批准并
+> 完成 StockPulse 语义映射的颜色变量值可作为目标 token，外部变量名、raw fill、产品需求、
+> 组件 API、页面 IA 和像素细节均不是权威。
 
 ## 0. 铁律
 
@@ -38,7 +39,7 @@
 - **中性极简**：米白/近黑双主题，大量留白，极浅边框分层，轻投影。
 - **禁止**：cyan/purple 辉光（glow）、pulse-glow 动画、彩色渐变发光、玻璃拟态强模糊。
 - **字体**：Geist。标题通过字号、SemiBold 字重和层级建立差异，`letter-spacing: 0`。
-- **形状**：按钮一律胶囊形 `rounded-full`；卡片保留大圆角（`--radius` 体系不变）。
+- **形状**：按钮一律软圆角 `rounded-lg`（`var(--radius)`），禁止胶囊形 `rounded-full`；装饰性圆点用 `--radius-dot`；卡片保留大圆角（`--radius` 体系不变）。
 
 ## 2. 颜色 Token（当前项目定义）
 
@@ -102,7 +103,7 @@
 
 ### 4.1 Button（外部参考 `1051:20280`）
 
-- 形状：所有尺寸 `rounded-full`。
+- 形状：所有尺寸 `rounded-lg`，禁止 `rounded-full` 胶囊按钮。
 - **primary（主 CTA）= 反色**：亮色主题黑底白字，暗色主题白底黑字，
   即 `bg-foreground text-background`，投影复用项目 semantic shadow，不复制外部 raw shadow。
 - secondary/outline：透明或卡片底 + `--border` 描边 + `--foreground` 文字。
@@ -162,7 +163,7 @@
 
 - [ ] `npm run lint && npm run build` 通过（build 输出到根 `static/`）
 - [ ] 明暗两主题背景/文字/边框符合 §2.1
-- [ ] 主按钮胶囊 + 黑白反色；焦点环为绿
+- [ ] 主按钮软圆角（`rounded-lg`）+ 黑白反色；焦点环为绿
 - [ ] 涨跌红绿未被改动
 - [ ] `grep -rn 'cyan\|purple\|glow' src/` 无非白名单残留
 - [ ] `productionDesignGuard.test.ts` 的生产 `TSX` / CSS guard 通过；在 `UI01-P2-06` 扩展
@@ -177,7 +178,8 @@
 - Coinstax/Figma 可用于评估中性基底、紧凑侧栏、数据密度、Dashboard、Portfolio、
   Empty State 和 light/dark 对称等模式。
 - 不复制钱包、转账、兑换、交易等未批准 Web3 能力。
-- 不从外部文件或截图复制/猜测 raw color、shadow、spacing、token 名或组件 API。
+- 除根目录 `DESIGN.md` 已批准并映射的颜色变量值外，不从外部文件或截图复制/猜测 raw
+  color、shadow、spacing、token 名或组件 API。
 - 先复用 `components/common`、`components/layout` 和现有领域组件；确有语义缺口时，
   先提出规则与公共组件扩展，由对应 UI slice 负责。
 - 保留中国市场红涨绿跌；外部品牌绿不能替代涨跌语义。

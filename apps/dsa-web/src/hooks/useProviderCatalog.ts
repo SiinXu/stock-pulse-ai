@@ -1,10 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
+import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { MODEL_ACCESS_TEXT } from '../locales/settingsModelAccess';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../types/systemConfig';
+import {
+  inspectConnectionSchemaDefinition,
+  type ConnectionSchemaDefinition,
+} from '../utils/connectionSchemaAuthority';
 
 interface ProviderCatalogState {
   providers: LlmProviderCatalogEntry[];
   connectionFields?: LlmConnectionFieldSchema[];
+  connectionSchemaDefinition: ConnectionSchemaDefinition;
   emptyApiKeyHosts: string[];
   isLoading: boolean;
   error: string | null;
@@ -17,6 +26,7 @@ interface ProviderCatalogState {
  * field requirements come from connectionFields when that property is present.
  */
 export function useProviderCatalog(): ProviderCatalogState {
+  const { language } = useUiLanguage();
   const [providers, setProviders] = useState<LlmProviderCatalogEntry[]>([]);
   const [connectionFields, setConnectionFields] = useState<LlmConnectionFieldSchema[] | undefined>();
   const [emptyApiKeyHosts, setEmptyApiKeyHosts] = useState<string[]>([]);
@@ -50,7 +60,7 @@ export function useProviderCatalog(): ProviderCatalogState {
         if (!isLatestRequest()) {
           return;
         }
-        setError(err instanceof Error ? err.message : 'Failed to load provider catalog');
+        setError(err instanceof Error ? err.message : MODEL_ACCESS_TEXT[language].catalogFailed);
         setIsLoading(false);
       });
     return () => {
@@ -58,7 +68,20 @@ export function useProviderCatalog(): ProviderCatalogState {
         requestGenerationRef.current += 1;
       }
     };
-  }, [reloadToken]);
+  }, [language, reloadToken]);
 
-  return { providers, connectionFields, emptyApiKeyHosts, isLoading, error, reload };
+  const connectionSchemaDefinition = useMemo(
+    () => inspectConnectionSchemaDefinition(connectionFields),
+    [connectionFields],
+  );
+
+  return {
+    providers,
+    connectionFields,
+    connectionSchemaDefinition,
+    emptyApiKeyHosts,
+    isLoading,
+    error,
+    reload,
+  };
 }

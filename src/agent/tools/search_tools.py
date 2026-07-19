@@ -10,9 +10,11 @@ Tools:
 import logging
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
+
+_SEARCH_REQUEST_FAILED = "Search request failed."
 
 _NEWS_READ_POLICY = ToolPolicy.declared(
     read_only=True,
@@ -81,6 +83,7 @@ def _persist_news_response(
             error_code="agent_news_persistence_failed",
             level=logging.WARNING,
             context={"stock_code": code, "dimension": dimension},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
 
 
@@ -97,7 +100,7 @@ def _handle_search_stock_news(stock_code: str, stock_name: str) -> dict:
         return {
             "query": response.query,
             "success": False,
-            "error": response.error_message,
+            "error": _SEARCH_REQUEST_FAILED,
         }
 
     _persist_news_response(

@@ -61,6 +61,11 @@ if (-not (Test-PythonCode -Python $pythonBin -Code "import orjson")) {
   throw 'orjson is not importable after installing requirements.'
 }
 
+Write-Host 'Checking migration registry availability...'
+if (-not (Test-PythonCode -Python $pythonBin -Code "from src.migrations.registry import TARGET_VERSION, get_migrations; migration_ids = [migration.id for migration in get_migrations()]; assert migration_ids and migration_ids[-1] == TARGET_VERSION")) {
+  throw 'The migration registry is not importable or does not expose the expected target version.'
+}
+
 if (Test-Path 'dist\backend') {
   Remove-Item -Recurse -Force 'dist\backend'
 }
@@ -107,6 +112,9 @@ $hiddenImports = @(
   'src.services.analysis_service',
   'src.services.history_service',
   'src.services.alphasift_service',
+  'src.migrations',
+  'src.migrations.registry',
+  'src.migrations.versions',
   'uvicorn.logging',
   'uvicorn.loops',
   'uvicorn.loops.auto',
@@ -128,6 +136,7 @@ $pyInstallerArgs = @(
   '--noconsole',
   '--add-data', 'static;static',
   '--add-data', 'strategies;strategies',
+  '--add-data', 'src/migrations/versions/*.py;src/migrations/versions',
   '--collect-data', 'litellm',
   '--collect-data', 'tiktoken',
   '--collect-data', 'akshare',
@@ -155,7 +164,7 @@ if (-not (Test-Path $packagedEntry)) {
 }
 $previousProbe = $env:DSA_PACKAGED_IMPORT_PROBE
 try {
-  foreach ($module in @('alphasift.dsa_adapter', 'orjson')) {
+  foreach ($module in @('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry')) {
     $env:DSA_PACKAGED_IMPORT_PROBE = $module
     $probeProcess = Start-Process -FilePath $packagedEntry -Wait -PassThru
     if ($probeProcess.ExitCode -ne 0) {
@@ -168,6 +177,15 @@ try {
   } else {
     $env:DSA_PACKAGED_IMPORT_PROBE = $previousProbe
   }
+}
+
+Write-Host 'Verifying packaged migration source...'
+$packagedMigrationSourceDir = Join-Path 'dist\backend\stock_analysis' '_internal\src\migrations\versions'
+if (-not (Test-Path $packagedMigrationSourceDir -PathType Container)) {
+  $packagedMigrationSourceDir = Join-Path 'dist\backend\stock_analysis' 'src\migrations\versions'
+}
+if (-not (Test-Path $packagedMigrationSourceDir -PathType Container) -or -not (Get-ChildItem -Path $packagedMigrationSourceDir -Filter 'v*.py' -File | Select-Object -First 1)) {
+  throw 'Packaged migration source not found under dist\backend\stock_analysis.'
 }
 
 Write-Host 'Verifying packaged AkShare calendar data...'

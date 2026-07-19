@@ -19,12 +19,13 @@ import json
 import logging
 import re
 import time
+import uuid
 import contextvars
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional
 
-from src.agent.llm_adapter import LLMToolAdapter
+from src.agent.llm_adapter import LLMToolAdapter, ToolCall
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -34,13 +35,13 @@ from src.agent.tools.execution import (
     _is_stock_scoped_tool,
     _normalize_guard_stock_code,
     _normalize_tool_stock_code,
-    execute_runner_tool_call,
+    execute_runner_tool_call_via_session,
     serialize_tool_result,
 )
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import StockScope
-from src.llm.usage import should_persist_usage_telemetry
+from src.agent.runtime.lifecycle import UsageRecorder, get_default_usage_recorder
 from src.utils.data_processing import normalize_report_signal_attribution
-from src.storage import persist_llm_usage as _persist_usage
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,8 @@ class RunLoopResult:
     error: Optional[str] = None
     # Raw messages list at the end of the loop (callers may want to persist)
     messages: List[Dict[str, Any]] = field(default_factory=list)
+    cancelled: bool = False
+    timed_out: bool = False
 
     @property
     def model(self) -> str:
@@ -278,6 +281,30 @@ def _build_timeout_result(
         models_used=models_used,
         error=f"Agent timed out after {elapsed:.2f}s (limit: {max_wall_clock_seconds:.2f}s)",
         messages=messages,
+        timed_out=True,
+    )
+
+
+def _build_cancelled_result(
+    *,
+    step: int,
+    tool_calls_log: List[Dict[str, Any]],
+    total_tokens: int,
+    provider_used: str,
+    models_used: List[str],
+    messages: List[Dict[str, Any]],
+) -> RunLoopResult:
+    return RunLoopResult(
+        success=False,
+        content="",
+        tool_calls_log=tool_calls_log,
+        total_steps=step,
+        total_tokens=total_tokens,
+        provider=provider_used,
+        models_used=models_used,
+        error="Agent execution cancelled",
+        messages=messages,
+        cancelled=True,
     )
 
 
@@ -326,6 +353,8 @@ def run_agent_loop(
     tool_call_timeout_seconds: Optional[float] = None,
     stock_scope: Optional[StockScope] = None,
     emit_stage_events: bool = True,
+    cancelled_check: Optional[Callable[[], bool]] = None,
+    usage_recorder: Optional[UsageRecorder] = None,
 ) -> RunLoopResult:
     """Execute the ReAct LLM ↔ tool loop.
 
@@ -346,6 +375,12 @@ def run_agent_loop(
         emit_stage_events: Whether to emit the synthetic ``agent_loop``
             stage lifecycle. Orchestrated business stages disable this so
             ``stage_start`` / ``stage_done`` only describe real stages.
+        cancelled_check: Optional cooperative-cancellation probe. Checked at
+            the top of every step and right after each LLM call; when it
+            returns True the loop stops with ``cancelled=True`` before
+            dispatching further tools or LLM calls.
+        usage_recorder: Optional usage-telemetry sink; defaults to the
+            process-wide recorder from the runtime lifecycle layer.
 
     Returns:
         A :class:`RunLoopResult` with the final content, stats, and the
@@ -353,10 +388,26 @@ def run_agent_loop(
     """
     labels = thinking_labels or _THINKING_TOOL_LABELS
     tool_decls = tool_registry.to_openai_tools()
+    recorder = usage_recorder if usage_recorder is not None else get_default_usage_recorder()
 
     start_time = time.time()
     tool_calls_log: List[Dict[str, Any]] = []
-    non_retriable_tool_results: Dict[str, str] = {}
+    # Single tool authority for the whole run: every tool call in every step is
+    # dispatched through this bound session. Native runs it in
+    # ``enforce_access_policy=False`` compatibility mode so the replay-frozen
+    # behaviour is preserved byte-for-byte while the direct ToolRegistry path is
+    # retired. The session's internal non-retriable memo replaces the previous
+    # ad-hoc per-run cache dict.
+    tool_session = BoundToolSession(
+        tool_registry,
+        execution_id=str(uuid.uuid4()),
+        allowed_tools=tool_registry.list_names(),
+        stock_scope=stock_scope,
+        cancelled_check=cancelled_check,
+        backend="native",
+        principal="native-runtime",
+        enforce_access_policy=False,
+    )
     total_tokens = 0
     provider_used = ""
     models_used: List[str] = []
@@ -369,6 +420,10 @@ def run_agent_loop(
     _MIN_STEP_BUDGET_S = 8.0
 
     def _finish(result: RunLoopResult) -> RunLoopResult:
+        # Terminal: close the tool session so any tool result still in flight
+        # (e.g. a timed-out worker) is dropped behind the late-result fence and
+        # can never re-enter the loop or a persisted success.
+        tool_session.close()
         if progress_callback and emit_stage_events:
             progress_callback(
                 stream_event(
@@ -390,6 +445,17 @@ def run_agent_loop(
         )
 
     for step in range(max_steps):
+        if cancelled_check is not None and cancelled_check():
+            logger.info("Agent loop cancelled before step %d", step + 1)
+            return _finish(_build_cancelled_result(
+                step=step,
+                tool_calls_log=tool_calls_log,
+                total_tokens=total_tokens,
+                provider_used=provider_used,
+                models_used=models_used,
+                messages=messages,
+            ))
+
         remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
         timeout_exhausted = remaining_timeout is not None and remaining_timeout <= 0
         budget_guard_triggered = (
@@ -455,8 +521,19 @@ def run_agent_loop(
         if m and m != "error":
             models_used.append(m)
         model_for_usage = m or response.provider
-        if model_for_usage and model_for_usage != "error" and should_persist_usage_telemetry(response.usage):
-            _persist_usage(response.usage, model_for_usage, call_type="agent")
+        if model_for_usage and model_for_usage != "error":
+            recorder.record(response.usage, model_for_usage, call_type="agent")
+
+        if cancelled_check is not None and cancelled_check():
+            logger.info("Agent loop cancelled after LLM call at step %d", step + 1)
+            return _finish(_build_cancelled_result(
+                step=step + 1,
+                tool_calls_log=tool_calls_log,
+                total_tokens=total_tokens,
+                provider_used=provider_used,
+                models_used=models_used,
+                messages=messages,
+            ))
 
         remaining_timeout = _remaining_timeout_seconds(start_time, max_wall_clock_seconds)
         if remaining_timeout is not None and remaining_timeout <= 0:
@@ -474,10 +551,16 @@ def run_agent_loop(
 
         if response.tool_calls:
             # ---- tool execution branch ----
+            tool_calls = [
+                tool_call
+                if type(tool_call.name) is str
+                else replace(tool_call, name="")
+                for tool_call in response.tool_calls
+            ]
             logger.info(
                 "Agent requesting %d tool call(s): %s",
-                len(response.tool_calls),
-                [tc.name for tc in response.tool_calls],
+                len(tool_calls),
+                [tc.name for tc in tool_calls],
             )
 
             # Append assistant message (with tool_calls) to history
@@ -494,7 +577,7 @@ def run_agent_loop(
                         **({"provider_specific_fields": tc.provider_specific_fields} if tc.provider_specific_fields else {}),
                         **({"thought_signature": tc.thought_signature} if tc.thought_signature is not None else {}),
                     }
-                    for tc in response.tool_calls
+                    for tc in tool_calls
                 ],
             }
             if response.reasoning_content is not None:
@@ -511,18 +594,16 @@ def run_agent_loop(
                     tool_call_timeout_seconds if tool_call_timeout_seconds and tool_call_timeout_seconds > 0 else remaining_timeout,
                 )
             tool_results = _execute_tools(
-                response.tool_calls,
-                tool_registry,
+                tool_calls,
+                tool_session,
                 step + 1,
                 progress_callback,
                 tool_calls_log,
-                non_retriable_tool_results,
                 tool_wait_timeout_seconds=effective_tool_timeout,
-                stock_scope=stock_scope,
             )
 
             # Append tool results preserving original call order
-            tc_order = {tc.id: i for i, tc in enumerate(response.tool_calls)}
+            tc_order = {tc.id: i for i, tc in enumerate(tool_calls)}
             tool_results.sort(key=lambda x: tc_order.get(x["tc"].id, 0))
             for tr in tool_results:
                 messages.append(
@@ -594,27 +675,22 @@ def run_agent_loop(
 # ============================================================
 
 def _execute_tools(
-    tool_calls,
-    tool_registry: ToolRegistry,
+    tool_calls: List[ToolCall],
+    tool_session: BoundToolSession,
     step: int,
     progress_callback: Optional[Callable],
     tool_calls_log: List[Dict[str, Any]],
-    non_retriable_tool_results: Optional[Dict[str, str]] = None,
     tool_wait_timeout_seconds: Optional[float] = None,
-    stock_scope: Optional[StockScope] = None,
 ) -> List[Dict[str, Any]]:
     """Execute one or more tool calls, returning ordered result dicts.
 
-    Single tools run inline; multiple tools run in parallel threads.
+    Single tools run inline; multiple tools run in parallel threads. Every
+    dispatch flows through the bound ``tool_session`` — the single tool
+    authority — via the migration mapper.
     """
 
     def _exec_single(tc_item):
-        return execute_runner_tool_call(
-            tool_call=tc_item,
-            tool_registry=tool_registry,
-            stock_scope=stock_scope,
-            non_retriable_tool_results=non_retriable_tool_results,
-        )
+        return execute_runner_tool_call_via_session(tc_item, tool_session)
 
     results: List[Dict[str, Any]] = []
 

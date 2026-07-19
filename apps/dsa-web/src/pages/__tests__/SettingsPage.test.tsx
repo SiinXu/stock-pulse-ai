@@ -1,10 +1,13 @@
-import type React from 'react';
+import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveWebBuildInfo } from '../../utils/constants';
-import type { SetupStatusResponse } from '../../types/systemConfig';
+import type { LlmConnectionFieldSchema, SetupStatusResponse } from '../../types/systemConfig';
 import { getDefaultSubCategory } from '../../components/settings/settingsSubCategories';
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
+import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { loadUiLanguageTranslations } from '../../i18n/translations';
+import { getFieldTitle } from '../../utils/systemConfigI18n';
 import SettingsPage from '../SettingsPage';
 
 const {
@@ -87,6 +90,43 @@ const {
 
 const mockedAnchorClick = vi.fn();
 
+const TEST_CONNECTION_NAME_FIELD: LlmConnectionFieldSchema = {
+  key: 'connection_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' },
+};
+const TEST_PROVIDER_ID_FIELD: LlmConnectionFieldSchema = {
+  key: 'provider_id', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' },
+};
+const TEST_MODELS_FIELD: LlmConnectionFieldSchema = {
+  key: 'models', dataType: 'array', isSensitive: false, isRequired: false, contract: { requirement: 'optional' },
+};
+
+const TEST_HIDDEN_INHERITED_CONTRACT: LlmConnectionFieldSchema['contract'] = {
+  requirement: 'inherited',
+  visibleWhen: [{ key: '__test_hidden', operator: 'equals', value: 'true' }],
+};
+
+const TEST_CONNECTION_CORE_FIELDS: LlmConnectionFieldSchema[] = [
+  TEST_CONNECTION_NAME_FIELD,
+  { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  TEST_PROVIDER_ID_FIELD,
+  { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'base_url', dataType: 'string', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_key', dataType: 'string', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'api_keys', dataType: 'array', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  TEST_MODELS_FIELD,
+  { key: 'extra_headers', dataType: 'json', isSensitive: true, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+  { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: false, contract: TEST_HIDDEN_INHERITED_CONTRACT },
+];
+
+function withTestConnectionCoreFields(
+  fields: LlmConnectionFieldSchema[],
+): LlmConnectionFieldSchema[] {
+  const byKey = new Map(
+    [...TEST_CONNECTION_CORE_FIELDS, ...fields].map((field) => [field.key, field]),
+  );
+  return Array.from(byKey.values());
+}
+
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
   useSystemConfig: () => useSystemConfigMock(),
@@ -162,7 +202,7 @@ vi.mock('../../components/settings', async () => ({
   ...(await import('../../components/settings/notificationFieldGroups')),
   ...(await import('../../components/settings/categoryFieldGroups')),
   ...(await import('../../components/settings/settingsSubCategories')),
-  isNotificationChannelKey: (await import('../../components/settings/notificationChannels')).isNotificationChannelKey,
+  ...(await import('../../components/settings/notificationChannels')),
   NotificationChannelsPanel: ({ items }: { items: Array<{ key: string }> }) => (
     <div>
       {items.map((item) => (
@@ -206,8 +246,11 @@ vi.mock('../../components/settings', async () => ({
     focusFieldRequest?: { requestId: number; key: string } | null;
     disabled?: boolean;
     catalogUnavailable?: boolean;
-  }) => (
-    <div>
+  }) => {
+    const [inspectionOpen, setInspectionOpen] = React.useState(false);
+    React.useEffect(() => () => onValidityChange?.(true), [onValidityChange]);
+    return (
+      <div>
       <div
         data-testid="llm-channel-editor-items"
         data-disabled={disabled ? 'true' : 'false'}
@@ -216,6 +259,14 @@ vi.mock('../../components/settings', async () => ({
         {items.map((item) => item.key).join(',')}
       </div>
       <div data-testid="llm-channel-focus-request">{focusFieldRequest?.key ?? ''}</div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setInspectionOpen(true)}
+      >
+        inspect existing connection
+      </button>
+      {inspectionOpen ? <div role="dialog" aria-label="existing connection inspection" /> : null}
       <button
         type="button"
         onClick={() => onDraftItemsChange?.([
@@ -234,6 +285,15 @@ vi.mock('../../components/settings', async () => ({
         ])}
       >
         emit connection draft
+      </button>
+      <button
+        type="button"
+        onClick={() => onDraftItemsChange?.([
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+        ])}
+      >
+        emit schema-valid connection draft
       </button>
       <button type="button" onClick={() => onValidityChange?.(false)}>
         mark llm draft invalid
@@ -258,8 +318,9 @@ vi.mock('../../components/settings', async () => ({
       >
         replace bare Agent reference
       </button>
-    </div>
-  ),
+      </div>
+    );
+  },
   GenerationBackendStatusPanel: ({ items }: { items: Array<{ key: string; value: string }> }) => (
     <div data-testid="generation-backend-status-items">
       {items.map((item) => `${item.key}=${item.value}`).join('|')}
@@ -297,9 +358,12 @@ vi.mock('../../components/settings', async () => ({
   ),
   SettingsField: ({
     item,
+    value,
     disabled,
     dependencyLocked,
     readOnlyDiagnostic,
+    enumOptionFilter,
+    enumEmptyState,
   }: {
     item: {
       key: string;
@@ -308,24 +372,40 @@ vi.mock('../../components/settings', async () => ({
         options?: Array<string | { label: string; value: string }>;
       };
     };
+    value?: string;
     disabled?: boolean;
     dependencyLocked?: boolean;
     readOnlyDiagnostic?: string;
-  }) => (
-    <div
-      data-testid={`settings-field-${item.key}`}
-      data-readonly={disabled || dependencyLocked || Boolean(readOnlyDiagnostic) ? 'true' : 'false'}
-    >
-      <div>{item.key}</div>
-      {readOnlyDiagnostic ? <p>{readOnlyDiagnostic}</p> : null}
-      {item.schema?.description ? <p>{item.schema.description}</p> : null}
-      {item.schema?.options?.map((option) => {
-        const label = typeof option === 'string' ? option : option.label;
-        const value = typeof option === 'string' ? option : option.value;
-        return <span key={`${item.key}-${value}`}>{label}</span>;
-      })}
-    </div>
-  ),
+    enumOptionFilter?: (optionValue: string) => boolean;
+    enumEmptyState?: React.ReactNode;
+  }) => {
+    // Mirror the real component's option filtering just enough to assert the
+    // page-level wiring: filtered options hide, already-selected values stay,
+    // and a fully-filtered field falls back to the empty state.
+    const selectedValues = (value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean);
+    const visibleOptions = (item.schema?.options ?? []).filter((option) => {
+      const optionValue = typeof option === 'string' ? option : option.value;
+      return !enumOptionFilter || enumOptionFilter(optionValue) || selectedValues.includes(optionValue);
+    });
+    if (enumEmptyState && enumOptionFilter && visibleOptions.length === 0 && selectedValues.length === 0) {
+      return <div data-testid={`settings-field-${item.key}`}>{enumEmptyState}</div>;
+    }
+    return (
+      <div
+        data-testid={`settings-field-${item.key}`}
+        data-readonly={disabled || dependencyLocked || Boolean(readOnlyDiagnostic) ? 'true' : 'false'}
+      >
+        <div>{item.key}</div>
+        {readOnlyDiagnostic ? <p>{readOnlyDiagnostic}</p> : null}
+        {item.schema?.description ? <p>{item.schema.description}</p> : null}
+        {visibleOptions.map((option) => {
+          const label = typeof option === 'string' ? option : option.label;
+          const optionValue = typeof option === 'string' ? option : option.value;
+          return <span key={`${item.key}-${optionValue}`}>{label}</span>;
+        })}
+      </div>
+    );
+  },
   SettingsLoading: () => <div>loading</div>,
   SettingsPanelErrorBoundary: ({
     title,
@@ -375,6 +455,28 @@ vi.mock('../../components/settings', async () => ({
         ])}
       >
         wizard apply
+      </button>
+      <button
+        type="button"
+        onClick={() => onComplete([
+          { key: 'LLM_CHANNELS', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+          { key: 'LLM_DEEPSEEK_BASE_URL', value: 'https://injected.example/v1' },
+        ])}
+      >
+        wizard inject read-only field
+      </button>
+      <button
+        type="button"
+        onClick={() => onComplete([
+          { key: 'LLM_CHANNELS', value: 'unknown' },
+          { key: 'LLM_UNKNOWN_DISPLAY_NAME', value: 'Unknown Provider' },
+          { key: 'LLM_UNKNOWN_PROVIDER', value: 'unknown-provider' },
+          { key: 'LLM_UNKNOWN_PROTOCOL', value: 'openai' },
+          { key: 'LLM_UNKNOWN_ENABLED', value: 'true' },
+        ])}
+      >
+        wizard apply unknown provider
       </button>
       <button type="button" onClick={onClose}>wizard close</button>
     </div>
@@ -442,6 +544,20 @@ type ConfigState = {
   loadError: null;
   saveError: null;
   retryAction: null;
+  conflictState?: {
+    fields: Array<{
+      key: string;
+      base: string;
+      server: string;
+      local: string;
+      isSensitive: boolean;
+      title?: string;
+      category?: string;
+    }>;
+    serverVersion: string;
+  } | null;
+  resolveConflictField?: ReturnType<typeof vi.fn>;
+  resolveAllConflicts?: ReturnType<typeof vi.fn>;
   load: typeof load;
   retry: ReturnType<typeof vi.fn>;
   save: typeof save;
@@ -452,6 +568,7 @@ type ConfigState = {
   refreshAfterExternalSave: typeof refreshAfterExternalSave;
   configVersion: string;
   maskToken: string;
+  configuredNotificationChannels: string[] | null;
 };
 
 type ConfigOverride = Partial<ConfigState>;
@@ -598,6 +715,7 @@ function buildSystemConfigState(overrides: ConfigOverride = {}) {
     refreshAfterExternalSave,
     configVersion: 'v1',
     maskToken: '******',
+    configuredNotificationChannels: [],
     ...overrides,
   };
 }
@@ -617,6 +735,29 @@ function createDeferred<T>() {
     reject = promiseReject;
   });
   return { promise, resolve, reject };
+}
+
+async function expectConnectionDraftAutosaveBlockedBySchema(
+  connectionFields: LlmConnectionFieldSchema[],
+): Promise<void> {
+  getLlmProviderCatalog.mockResolvedValueOnce({
+    providers: [
+      { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+    ],
+    connectionFields,
+  });
+  save.mockResolvedValue({ success: true });
+  useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+  render(<SettingsPage />);
+  await waitFor(() => expect(screen.getByTestId('llm-channel-editor-items'))
+    .toHaveAttribute('data-disabled', 'true'));
+  fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+  await act(async () => {
+    await new Promise((resolve) => window.setTimeout(resolve, 850));
+  });
+  expect(save).not.toHaveBeenCalled();
 }
 
 describe('SettingsPage', () => {
@@ -685,6 +826,10 @@ describe('SettingsPage', () => {
         },
       ],
     });
+    // clearAllMocks keeps queued mockResolvedValueOnce implementations. A test
+    // that unmounts before fetching the Catalog must not leak that response into
+    // the next Schema-authority scenario.
+    getLlmProviderCatalog.mockReset();
     getLlmProviderCatalog.mockResolvedValue({
       providers: [
         { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
@@ -1416,6 +1561,226 @@ describe('SettingsPage', () => {
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2500 });
   });
 
+  it('does not autosave a Connection draft under a present empty schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([]);
+  });
+
+  it('does not autosave a Connection draft under a models-only schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([TEST_MODELS_FIELD]);
+  });
+
+  it('does not autosave a Connection draft when connection_name is missing', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([
+      TEST_PROVIDER_ID_FIELD,
+      TEST_MODELS_FIELD,
+    ]);
+  });
+
+  it('does not autosave a Connection draft when provider_id is missing', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema([
+      TEST_CONNECTION_NAME_FIELD,
+      TEST_MODELS_FIELD,
+    ]);
+  });
+
+  it('does not autosave a Connection draft under a read-only identity schema', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema(withTestConnectionCoreFields([
+      TEST_CONNECTION_NAME_FIELD,
+      {
+        ...TEST_PROVIDER_ID_FIELD,
+        isRequired: false,
+        contract: { requirement: 'inherited' },
+      },
+      TEST_MODELS_FIELD,
+    ]));
+  });
+
+  it('does not autosave a Connection draft with an unknown visible required field', async () => {
+    await expectConnectionDraftAutosaveBlockedBySchema(withTestConnectionCoreFields([{
+      key: 'future_token',
+      dataType: 'string',
+      isSensitive: false,
+      isRequired: true,
+      contract: { requirement: 'required' },
+    }]));
+  });
+
+  it('does not autosave when an unknown required field becomes visible for the draft provider', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_token',
+        dataType: 'string',
+        isSensitive: true,
+        isRequired: true,
+        contract: {
+          requirement: 'required',
+          visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'deepseek' }],
+        },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('autosaves when an unknown required field stays hidden for the draft provider', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_token',
+        dataType: 'string',
+        isSensitive: true,
+        isRequired: true,
+        contract: {
+          requirement: 'required',
+          visibleWhen: [{ key: 'provider_id', operator: 'equals', value: 'openai' }],
+        },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  });
+
+  it('autosaves when an unknown visible field is optional', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([{
+        key: 'future_hint',
+        dataType: 'string',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1), { timeout: 2000 });
+  });
+
+  it('revalidates the retained Connection payload when an unmounted editor resets child validity', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+      ]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    const { rerender } = render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'mark llm draft invalid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+
+    expect(await screen.findByText(/自动保存失败/, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'raw_config' });
+    rerender(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('autosaves a payload that satisfies the present Schema and authoritative Catalog', async () => {
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+      ]),
+    });
+    save.mockResolvedValue({ success: true });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'emit schema-valid connection draft' }));
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith([
+      { key: 'LLM_CHANNELS', value: 'deepseek' },
+      { key: 'LLM_DEEPSEEK_PROVIDER', value: 'deepseek' },
+    ], { silent: true }), { timeout: 2000 });
+  });
+
+  it('keeps existing Connections inspectable but blocks mutations for an unknown schema condition', async () => {
+    const connectionFields = withTestConnectionCoreFields([
+      TEST_CONNECTION_NAME_FIELD,
+      TEST_PROVIDER_ID_FIELD,
+      {
+        ...TEST_MODELS_FIELD,
+        contract: {
+          requirement: 'optional' as const,
+          enabledWhen: [{ key: 'provider_id', operator: 'futureOperator' as never, value: 'deepseek' }],
+        },
+      },
+    ]);
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields,
+    });
+    save.mockResolvedValue({ success: true });
+    const configState = buildSystemConfigState({ activeCategory: 'ai_model' });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'ai_model',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        ai_model: configState.itemsByCategory.ai_model.map((item) => ({
+          ...item,
+          schema: {
+            ...(item.schema as Record<string, unknown>),
+            uiPlacement: 'model_access',
+          },
+        })),
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    const inspect = await screen.findByRole('button', { name: 'inspect existing connection' });
+    await waitFor(() => expect(inspect).toBeEnabled());
+    expect(screen.getByRole('button', { name: /添加模型服务/ })).toBeDisabled();
+    fireEvent.click(inspect);
+    expect(screen.getByRole('dialog', { name: 'existing connection inspection' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'emit connection draft' }));
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    });
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it('keeps AI autosave and the editor blocked after a Catalog failure', async () => {
     getLlmProviderCatalog.mockRejectedValueOnce(new Error('catalog failed'));
     save.mockResolvedValue({ success: true });
@@ -1487,31 +1852,37 @@ describe('SettingsPage', () => {
   });
 
   it('debounces a group autosave and reports saving then saved', async () => {
-    const pendingSave = createDeferred<{ success: boolean }>();
-    save.mockReturnValueOnce(pendingSave.promise);
-    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
-      activeCategory: 'system',
-      hasDirty: true,
-      dirtyCount: 1,
-      getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
-    }));
+    vi.useFakeTimers();
+    try {
+      const pendingSave = createDeferred<{ success: boolean }>();
+      save.mockReturnValueOnce(pendingSave.promise);
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'system',
+        hasDirty: true,
+        dirtyCount: 1,
+        getChangedItems: () => [{ key: 'WEBUI_PORT', value: '9000' }],
+      }));
 
-    render(<SettingsPage />);
+      render(<SettingsPage />);
 
-    expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
-    expect(await screen.findByText(/等待自动保存/)).toBeInTheDocument();
-    expect(save).not.toHaveBeenCalled();
-    await waitFor(
-      () => expect(screen.getByText(/自动保存中/)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
-    expect(save).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
+      expect(screen.getByText(/等待自动保存/)).toBeInTheDocument();
+      expect(save).not.toHaveBeenCalled();
 
-    await act(async () => {
-      pendingSave.resolve({ success: true });
-      await pendingSave.promise;
-    });
-    expect(await screen.findByText(/已自动保存/)).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(700);
+      });
+      expect(screen.getByText(/自动保存中/)).toBeInTheDocument();
+      expect(save).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        pendingSave.resolve({ success: true });
+        await pendingSave.promise;
+      });
+      expect(screen.getByText(/已自动保存/)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps a failed autosave draft and retries the same group', async () => {
@@ -1554,6 +1925,46 @@ describe('SettingsPage', () => {
     fireEvent.click(restoreButton);
     expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
   });
+
+  it.each([
+    { language: 'de', expectedTitle: 'Liste ausgewählter Aktien', backendTitleVisible: false },
+    { language: 'en', expectedTitle: 'Server Watchlist Title', backendTitleVisible: true },
+  ] as const)(
+    'uses the $language field-title contract in the 409 conflict panel',
+    async ({ language, expectedTitle, backendTitleVisible }) => {
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'base',
+        conflictState: {
+          fields: [{
+            key: 'STOCK_LIST',
+            base: 'AAPL',
+            server: 'MSFT',
+            local: 'NVDA',
+            isSensitive: false,
+            title: 'Server Watchlist Title',
+            category: 'base',
+          }],
+          serverVersion: 'v2',
+        },
+        resolveConflictField: vi.fn(),
+        resolveAllConflicts: vi.fn(),
+      }));
+      await loadUiLanguageTranslations(language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsPage />
+        </UiLanguageProvider>,
+      );
+
+      expect(screen.getByText(expectedTitle)).toBeInTheDocument();
+      if (backendTitleVisible) {
+        expect(screen.getByText('Server Watchlist Title')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Server Watchlist Title')).not.toBeInTheDocument();
+      }
+    },
+  );
 
   it('runs the unified post-save effects after a legacy migration applies', async () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'ai_model' }));
@@ -2089,6 +2500,177 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
   });
 
+  it('limits channel routing options to configured channels and guides setup when none exist', () => {
+    const routingItem = (options: string[]) => ({
+      key: 'NOTIFICATION_ALERT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_ALERT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: options.map((option) => ({ label: option, value: option })),
+        validation: { allowed_values: options, multi_value: true, delimiter: ',' },
+        displayOrder: 1,
+      },
+    });
+    const channelItem = (key: string, value: string) => ({
+      key,
+      value,
+      rawValueExists: value !== '',
+      isMasked: false,
+      schema: {
+        key,
+        category: 'notification',
+        dataType: 'string',
+        uiControl: 'text',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: ['wechat'],
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem(['wechat', 'feishu', 'custom']),
+          channelItem('WECHAT_WEBHOOK_URL', 'https://wx.example/hook'),
+          channelItem('CUSTOM_WEBHOOK_URLS', ''),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+
+    // Only channels with a configured key stay selectable.
+    const { rerender, unmount } = render(<SettingsPage />);
+    const field = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(field).getByText('wechat')).toBeInTheDocument();
+    expect(within(field).queryByText('feishu')).not.toBeInTheDocument();
+    expect(within(field).queryByText('custom')).not.toBeInTheDocument();
+
+    // With no configured channel at all, the field shows guidance that jumps
+    // to the notification channels setup view.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: [],
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem(['wechat', 'feishu', 'custom']),
+          channelItem('WECHAT_WEBHOOK_URL', ''),
+        ],
+      },
+    }));
+    // buildSystemConfigState resets the router params; restore the alerts view.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    const emptyField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(emptyField).getByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).toBeInTheDocument();
+    fireEvent.click(within(emptyField).getByRole('button', { name: '去配置通知渠道' }));
+    const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
+    expect(nextParams?.get('section')).toBe('notifications');
+    expect(nextParams?.get('view')).toBe('channels');
+
+    // During a rolling upgrade an old backend omits the authoritative channel
+    // status. Keep the catalog and stored selection usable instead of treating
+    // unknown as a confirmed empty set.
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: null,
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          { ...routingItem(['wechat', 'feishu', 'custom']), value: 'feishu' },
+          channelItem('WECHAT_WEBHOOK_URL', '******'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+    rerender(<SettingsPage />);
+    const unknownField = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(unknownField).getByText('feishu')).toBeInTheDocument();
+    expect(within(unknownField).queryByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).not.toBeInTheDocument();
+    expect(within(unknownField).getByText('wechat')).toBeInTheDocument();
+    expect(within(unknownField).getByText('custom')).toBeInTheDocument();
+    unmount();
+  });
+
+  it('keeps masked ntfy and Gotify channels available from the backend routing status', () => {
+    const routingItem = {
+      key: 'NOTIFICATION_ALERT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_ALERT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: ['ntfy', 'gotify', 'wechat'].map((option) => ({ label: option, value: option })),
+        validation: {
+          allowed_values: ['ntfy', 'gotify', 'wechat'],
+          multi_value: true,
+          delimiter: ',',
+        },
+        displayOrder: 1,
+      },
+    };
+    const maskedChannelItem = (key: string) => ({
+      key,
+      value: '******',
+      rawValueExists: true,
+      isMasked: true,
+      schema: {
+        key,
+        category: 'notification',
+        dataType: 'string',
+        uiControl: 'password',
+        isSensitive: true,
+        isRequired: false,
+        isEditable: true,
+        options: [],
+        validation: {},
+        displayOrder: 2,
+      },
+    });
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'notification',
+      configuredNotificationChannels: ['ntfy', 'gotify'],
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        notification: [
+          routingItem,
+          maskedChannelItem('NTFY_URL'),
+          maskedChannelItem('GOTIFY_URL'),
+          maskedChannelItem('GOTIFY_TOKEN'),
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'alerts', view: 'rules' });
+
+    render(<SettingsPage />);
+
+    const field = screen.getByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS');
+    expect(within(field).getByText('ntfy')).toBeInTheDocument();
+    expect(within(field).getByText('gotify')).toBeInTheDocument();
+    expect(within(field).queryByText('wechat')).not.toBeInTheDocument();
+  });
+
   it('lists validation errors and jumps to the errored field section from any section', () => {
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -2112,6 +2694,64 @@ describe('SettingsPage', () => {
     expect(nextParams?.get('section')).toBe('notifications');
     expect(nextParams?.get('view')).toBe('channels');
   });
+
+  it.each(['de', 'ja', 'zh-TW'] as const)(
+    'uses the per-field %s title for a known field without a help key in the validation error summary',
+    async (language) => {
+      const configState = buildSystemConfigState();
+      useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+        activeCategory: 'system',
+        itemsByCategory: {
+          ...configState.itemsByCategory,
+          ai_model: [
+            ...configState.itemsByCategory.ai_model,
+            {
+              key: 'OPENAI_VISION_MODEL',
+              value: 'gpt-4o',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'OPENAI_VISION_MODEL',
+                title: 'OpenAI Vision Model',
+                category: 'ai_model',
+                dataType: 'string',
+                uiControl: 'text',
+                isSensitive: false,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 2,
+              },
+            },
+          ],
+        },
+        issueByKey: {
+          OPENAI_VISION_MODEL: [
+            {
+              key: 'OPENAI_VISION_MODEL',
+              code: 'invalid',
+              message: 'Unsupported backend',
+              severity: 'error',
+            },
+          ],
+        },
+      }));
+      routerSearchParamsMock.params = new URLSearchParams({ section: 'system_security', view: 'runtime' });
+      await loadUiLanguageTranslations(language);
+      const expectedTitle = getFieldTitle('OPENAI_VISION_MODEL', undefined, language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsPage />
+        </UiLanguageProvider>,
+      );
+
+      expect(expectedTitle).not.toBe('OpenAI Vision Model');
+      expect(screen.getByRole('button', { name: `前往修正: ${expectedTitle}` })).toBeInTheDocument();
+      expect(screen.queryByText('OpenAI Vision Model')).not.toBeInTheDocument();
+    },
+  );
 
   it('routes a dynamic connection error to Model Access and sends an explicit field-focus request', async () => {
     const configState = buildSystemConfigState();
@@ -2276,6 +2916,99 @@ describe('SettingsPage', () => {
     // The wizard closes once the save succeeds.
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'first-run-wizard' })).not.toBeInTheDocument());
+  });
+
+  it('rejects a Wizard Connection payload at the page adapter under a partial schema', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: [{
+        key: 'models',
+        dataType: 'array',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }],
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard apply' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+  });
+
+  it('rejects a Wizard field that a complete schema marks read-only', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        TEST_PROVIDER_ID_FIELD,
+        {
+          key: 'base_url',
+          dataType: 'string',
+          isSensitive: false,
+          isRequired: false,
+          contract: { requirement: 'inherited' },
+        },
+      ]),
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard inject read-only field' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
+  });
+
+  it('rejects a Wizard provider identity that is absent from the authoritative Catalog', async () => {
+    getSetupStatus.mockResolvedValue({
+      isComplete: false,
+      readyForSmoke: false,
+      requiredMissingKeys: ['LITELLM_MODEL'],
+      checks: [],
+    });
+    getLlmProviderCatalog.mockResolvedValueOnce({
+      providers: [
+        { id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek', defaultBaseUrl: 'https://api.deepseek.com', capabilities: [], requiresApiKey: true, requiresBaseUrl: false, supportsDiscovery: true, isLocal: false, isCustom: false },
+      ],
+      connectionFields: withTestConnectionCoreFields([
+        TEST_CONNECTION_NAME_FIELD,
+        { key: 'display_name', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        TEST_PROVIDER_ID_FIELD,
+        { key: 'protocol', dataType: 'string', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+        { key: 'enabled', dataType: 'boolean', isSensitive: false, isRequired: true, contract: { requirement: 'required' } },
+      ]),
+    });
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({ activeCategory: 'base' }));
+
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByRole('button', { name: '启动向导' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '启动向导' }));
+    fireEvent.click(screen.getByRole('button', { name: 'wizard apply unknown provider' }));
+
+    await waitFor(() => expect(save).not.toHaveBeenCalled());
+    expect(screen.getByRole('dialog', { name: 'first-run-wizard' })).toBeInTheDocument();
   });
 
   it('hides the first-run wizard entry once setup is complete', async () => {
@@ -2769,19 +3502,95 @@ describe('SettingsPage', () => {
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIMES')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_RUN_IMMEDIATELY')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-LOG_LEVEL')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-11', 'w-11');
-    expect(screen.getByTestId('scheduler-enabled-checkbox').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByTestId('scheduler-time-input-0')).toHaveClass('h-11');
+    expect(screen.getAllByRole('button', { name: '删除时间' })[0]).toHaveClass('h-9', 'w-9');
+    const enabledSwitch = screen.getByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toHaveAttribute('role', 'switch');
+    expect(enabledSwitch).toHaveClass('h-11', 'w-11');
+    expect(enabledSwitch.firstElementChild).toHaveClass('h-6', 'w-10');
+    const timeInput = screen.getByTestId('scheduler-time-input-0');
+    expect(timeInput).toHaveClass('h-9', 'min-h-9');
+    expect(timeInput).toHaveAttribute('type', 'button');
 
-    fireEvent.change(screen.getByTestId('scheduler-time-input-0'), {
-      target: { value: '10:30' },
-    });
+    fireEvent.click(timeInput);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="10"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="30"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_TIMES', '10:30,15:10');
+
+    const callCountBeforeAdd = setDraftValue.mock.calls.length;
+    fireEvent.click(screen.getByTestId('scheduler-add-time-button'));
+    const newTimeInput = screen.getByTestId('scheduler-new-time-input');
+    expect(setDraftValue).toHaveBeenCalledTimes(callCountBeforeAdd);
+    await waitFor(() => expect(newTimeInput).toHaveAttribute('aria-expanded', 'true'));
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="18"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="30"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(setDraftValue).toHaveBeenLastCalledWith('SCHEDULE_TIMES', '09:20,15:10,18:30');
 
     fireEvent.click(screen.getByTestId('scheduler-run-now-button'));
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
+  });
+
+  it('commits valid values from the shared schedule time picker', async () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        system: [
+          ...configState.itemsByCategory.system,
+          {
+            key: 'SCHEDULE_ENABLED',
+            value: 'true',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'SCHEDULE_ENABLED',
+              category: 'system',
+              dataType: 'boolean',
+              uiControl: 'switch',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 8,
+            },
+          },
+          {
+            key: 'SCHEDULE_TIMES',
+            value: '18:00,15:10',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'SCHEDULE_TIMES',
+              category: 'system',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 11,
+            },
+          },
+        ],
+      },
+    }));
+
+    render(<SettingsPage />);
+
+    const timeInput = await screen.findByTestId('scheduler-time-input-0');
+
+    expect(timeInput).toHaveAttribute('type', 'button');
+    fireEvent.click(timeInput);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-hour="09"]')!);
+    fireEvent.click(document.querySelector<HTMLButtonElement>('[data-time-minute="05"]')!);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_TIMES', '09:05,15:10');
   });
 
   it('shows an error when run-now is rejected because analysis is already running', async () => {
@@ -2962,13 +3771,13 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    expect(enabledCheckbox).toBeChecked();
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toBeChecked();
 
-    fireEvent.click(enabledCheckbox);
+    fireEvent.click(enabledSwitch);
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_ENABLED', 'false');
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
   });
 
   it('keeps local scheduler toggle edits when runtime and saved states are initially consistent', async () => {
@@ -3020,17 +3829,17 @@ describe('SettingsPage', () => {
     }));
     render(<SettingsPage />);
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    expect(enabledCheckbox).toBeChecked();
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    expect(enabledSwitch).toBeChecked();
 
-    fireEvent.click(enabledCheckbox);
+    fireEvent.click(enabledSwitch);
 
     expect(setDraftValue).toHaveBeenCalledWith('SCHEDULE_ENABLED', 'false');
-    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-checkbox')).not.toBeChecked());
+    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-switch')).not.toBeChecked());
 
     const refreshButton = screen.getByTestId('scheduler-refresh-status-button');
     fireEvent.click(refreshButton);
-    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-checkbox')).not.toBeChecked());
+    await waitFor(() => expect(screen.getByTestId('scheduler-enabled-switch')).not.toBeChecked());
   });
 
   it('can reconcile runtime scheduler state when runtime is enabled but saved value is disabled', async () => {
@@ -3098,11 +3907,11 @@ describe('SettingsPage', () => {
 
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    await waitFor(() => expect(enabledCheckbox).toBeChecked());
-    fireEvent.click(enabledCheckbox);
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
+    fireEvent.click(enabledSwitch);
 
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
     await waitFor(() => expect(save).toHaveBeenCalledWith(
       [{ key: 'SCHEDULE_ENABLED', value: 'false' }],
       { silent: true },
@@ -3174,11 +3983,11 @@ describe('SettingsPage', () => {
 
     expect(screen.queryByRole('button', { name: /保存配置/ })).not.toBeInTheDocument();
 
-    const enabledCheckbox = await screen.findByTestId('scheduler-enabled-checkbox');
-    await waitFor(() => expect(enabledCheckbox).not.toBeChecked());
-    fireEvent.click(enabledCheckbox);
+    const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
+    await waitFor(() => expect(enabledSwitch).not.toBeChecked());
+    fireEvent.click(enabledSwitch);
 
-    await waitFor(() => expect(enabledCheckbox).toBeChecked());
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
     await waitFor(() => expect(save).toHaveBeenCalledWith(
       [{ key: 'SCHEDULE_ENABLED', value: 'true' }],
       { silent: true },

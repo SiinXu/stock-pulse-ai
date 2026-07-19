@@ -87,7 +87,7 @@ docs: update the README deployment guide
 | web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
 
-`web-e2e` 只使用专用 canary credential，并将单次运行限定在 `test-results/ci-secret-bearing/`。该运行关闭 screenshot、video、trace screenshot 与媒体附件，同时在同一目录写入机器可读取的 `playwright-results.json`。无论 E2E 成功或失败，CI 都先扫描文本、日志、JSON、HAR、原始二进制 canary 与 trace/ZIP 条目，并按扩展名或文件签名拒绝无法可靠检查的 PNG/JPEG/WebM；扫描器不使用 OCR，也不回显匹配值。只有扫描成功才上传同一运行目录，因此测试失败时可保留通过扫描的文本/JSON/无媒体 trace 诊断，扫描失败时不会上传对应 artifact。
+`web-e2e` 只使用专用 canary credential，并将单次运行限定在 `test-results/ci-secret-bearing/`。该 credential-bearing 运行关闭 screenshot、video 和 trace；仓库 `test:smoke` 入口拒绝 UI 模式和替代 Playwright config，global setup 在 Playwright 合并 CLI/project 配置后逐 project 再确认最终 trace 为 `off`。无论 E2E 成功或失败，CI 都先扫描原始运行目录中的文本、日志、JSON、HAR、原始二进制 canary，以及意外出现的 trace/ZIP 条目；扫描器仍按扩展名或文件签名拒绝无法可靠检查的 PNG/JPEG/WebM，不使用 OCR，也不回显匹配值。原始扫描成功后，专用 staging 脚本严格解析 `playwright-results.json`，递归保留 `service-logs/` 中的 UTF-8 `.log`/`.txt` 及目录结构，拒绝符号链接、非 allowlist 文件、伪装 archive 和媒体签名，并生成带大小与 SHA-256 的 `manifest.json`；CI 再扫描 staging 目录，只有两次扫描与 staging 全部成功才上传。原始目录、trace、媒体和 archive 不进入 artifact。
 
 **本地运行检查：**
 
@@ -107,6 +107,8 @@ npm run build
 
 # 前端 e2e（可选；自动启动真实后端、Vite 与本地 fake 模型端点）
 DSA_WEB_E2E_RUN_ID=local-secret-bearing \
+DSA_WEB_E2E_CREDENTIAL_BEARING=true \
+DSA_WEB_E2E_TRACE=off \
 DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
 DSA_WEB_E2E_ALPHA_API_KEY=stockpulse-local-canary-change-me \
   npm run test:smoke
@@ -115,11 +117,14 @@ DSA_WEB_E2E_ALPHA_API_KEY=stockpulse-local-canary-change-me \
 cd ../..
 DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
   python scripts/scan_playwright_artifacts.py apps/dsa-web/test-results/local-secret-bearing
+
+# 真实登录后故意失败的安全诊断验收；临时 spec 与默认结果会自动清理
+python scripts/check_playwright_failure_diagnostics.py
 ```
 
 Web 界面文案、语言边界、领域字典和错误码约定见 [Web 国际化开发约定](web-i18n.md)。新增页面或语言时必须按领域扩展 `src/locales/`，不得在 JSX 中硬编码可见文案。
 
-Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/<run-id>/runtime/`；场景需要的报告、任务、账户和配置必须由 fixture 或场景本身确定性播种，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端 Python 按祖先目录 `.venv`、`python3`、`python` 的顺序查找并在启动前打印选择；确定性场景固定 `retries: 0`。后端、Vite 与 fake provider 日志保存在 `test-results/<run-id>/service-logs/`，机器可读取结果写入同目录的 `playwright-results.json`；CI 仅上传扫描通过的文本日志、JSON 与无媒体 trace/ZIP，不上传 screenshot 或 video。PR 所需页面截图应来自不含凭据的独立人工验收会话并直接附在 PR 描述或评论中。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
+Playwright 默认使用一次性密码，并把 `.env`、SQLite 数据库、密码哈希与 session secret 全部隔离到 `test-results/<run-id>/runtime/`；场景需要的报告、任务、账户和配置必须由 fixture 或场景本身确定性播种，结束后清理 runtime，不读取或改写开发者 `.env`、数据库或认证文件。后端 Python 按祖先目录 `.venv`、`python3`、`python` 的顺序查找并在启动前打印选择；确定性场景固定 `retries: 0`。后端、Vite 与 fake provider 日志保存在 `test-results/<run-id>/service-logs/`，机器可读取结果写入同目录的 `playwright-results.json`；credential-bearing CI 的 repository config 将 trace 设为 `off`，扫描原始目录后仅从经过内容校验和二次扫描的 staging 目录上传文本日志、JSON 与 manifest，也不上传 screenshot、video 或 archive。仅在不含真实或可关联凭据的本地调试会话中，才可设置 `DSA_WEB_E2E_TRACE=retain-on-failure` 显式保留无媒体 trace；已知测试凭据环境变量会自动进入 credential-bearing 模式，不能与 `false` 标记或 trace opt-in 共存。credential-bearing 入口同时拒绝 `--trace` 强制模式、`--ui`/`--ui-host`/`--ui-port` 和替代 `--config`。Web preflight 使用 TypeScript AST 守卫追踪相对 import 图、`test.use`/`test.extend` 的本地 option 对象、别名、后赋值和静态 `Object.fromEntries`，并检查可识别 BrowserContext 上的直接/解构/`Reflect.get` tracing 访问；Playwright config 还锁定唯一由运行时策略控制的 `trace` 属性。任意动态属性名、由任意函数或外部 package 运行时构造的 test option，以及代码生成不属于静态模型；最终 project 配置由 global setup 再校验，原始 scanner 与 strict staging 是上传边界。PR 所需页面截图应来自不含凭据的独立人工验收会话并直接附在 PR 描述或评论中。如端口冲突，可通过 `DSA_WEB_SMOKE_BACKEND_PORT`、`DSA_WEB_SMOKE_FRONTEND_PORT`、`DSA_WEB_SMOKE_PROVIDER_PORT` 覆盖测试端口。
 
 契约回归不能用 mock 数量、循环条目或注释编号代替语义覆盖。模型路由测试必须覆盖两条 Connection 的同名模型并断言具体 `ModelRef`；Portfolio 交易、资金流水、公司行为和 CSV commit 测试必须复用同一 operation ID 验证 timeout-after-commit 不重复入账，并验证同 ID 异 payload 冲突；Overlay 测试必须覆盖叠层仅顶层响应 Escape、焦点限制与恢复、背景 inert 和滚动锁定。每个 Playwright 验收场景使用独立可读 test 名称与关键断言。
 

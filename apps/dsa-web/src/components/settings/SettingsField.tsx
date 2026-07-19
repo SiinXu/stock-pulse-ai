@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import type React from 'react';
-import { Info, Trash2 } from 'lucide-react';
-import { Badge, Button, Select, Input, Tooltip } from '../common';
+import { Trash2 } from 'lucide-react';
+import { Badge, Button, CredentialInput, Select } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
-import { getFieldDescriptionZh, getFieldOptionLabel, getFieldTitleZh } from '../../utils/systemConfigI18n';
+import { resolveSettingsFieldTitle } from '../../locales/settingsFieldTitle';
+import { getFieldDescriptionZh, getFieldOptionLabel } from '../../utils/systemConfigI18n';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
+import { formatUiNumber, getUiColon } from '../../utils/uiLocale';
 import { SettingsHelpButton } from './SettingsHelpButton';
+import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { SettingsSwitch } from './SettingsSwitch';
 
 function normalizeSelectOptions(key: string, options: SystemConfigFieldSchema['options'] = [], locale: UiLanguage) {
   return options.map((option) => {
@@ -77,10 +81,15 @@ interface SettingsFieldProps {
   dependencyLocked?: boolean;
   /** Fail-safe schema diagnostic that forces a field into read-only mode. */
   readOnlyDiagnostic?: string;
+  /** Restricts multi-enum options to those passing the filter (already-selected values always stay visible). */
+  enumOptionFilter?: (value: string) => boolean;
+  /** Rendered instead of the multi-enum control when the filter leaves no option and nothing is selected. */
+  enumEmptyState?: React.ReactNode;
 }
 
 function renderFieldControl(
   item: SystemConfigItem,
+  fieldTitle: string,
   value: string,
   disabled: boolean,
   onChange: (nextValue: string) => void,
@@ -91,70 +100,77 @@ function renderFieldControl(
   ariaDescribedBy: string | undefined,
   language: UiLanguage,
   t: (key: UiTextKey) => string,
+  enumOptionFilter?: (optionValue: string) => boolean,
+  enumEmptyState?: React.ReactNode,
 ) {
   const schema = item.schema;
   const commonClass = 'w-full rounded-lg border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
   const controlType = schema?.uiControl ?? 'text';
   const isMultiValue = isMultiValueField(item);
+  const optionValues = (schema?.options ?? []).map((option) => (
+    typeof option === 'string' ? option : option.value
+  ));
+  const isBooleanControl = controlType === 'switch'
+    || schema?.dataType === 'boolean'
+    || (
+      optionValues.length === 2
+      && optionValues.some((option) => option.toLowerCase() === 'true')
+      && optionValues.some((option) => option.toLowerCase() === 'false')
+    );
 
   // Multi-value enums (finite options + multi_value validation) render as a
-  // checkbox group so users pick from the catalog instead of typing a
-  // comma-separated string. Stored values outside the catalog stay visible and
-  // deselectable so saving never silently drops them.
+  // collapsed multi-select dropdown so users pick from the catalog instead of
+  // typing a comma-separated string. Stored values outside the catalog stay
+  // visible and deselectable so saving never silently drops them.
   if (schema?.options?.length && isMultiValue) {
     const normalizedOptions = normalizeSelectOptions(item.key, schema.options, language);
     const selectedValues = value.split(',').map((entry) => entry.trim()).filter(Boolean);
-    const knownValues = new Set(normalizedOptions.map((option) => option.value));
-    const unknownValues = selectedValues.filter((entry) => !knownValues.has(entry));
-    const isDisabled = disabled || !schema.isEditable;
+    const visibleOptions = enumOptionFilter
+      ? normalizedOptions.filter(
+          (option) => enumOptionFilter(option.value) || selectedValues.includes(option.value),
+        )
+      : normalizedOptions;
+    const validation = (schema.validation ?? {}) as Record<string, unknown>;
+    const isOrdered = Boolean(validation.ordered);
 
-    const toggleValue = (target: string) => {
-      const selected = new Set(selectedValues);
-      if (selected.has(target)) {
-        selected.delete(target);
-      } else {
-        selected.add(target);
-      }
-      const orderedKnown = normalizedOptions
-        .map((option) => option.value)
-        .filter((candidate) => selected.has(candidate));
-      const keptUnknown = unknownValues.filter((entry) => selected.has(entry));
-      onChange([...orderedKnown, ...keptUnknown].join(','));
-    };
+    if (enumEmptyState && visibleOptions.length === 0 && selectedValues.length === 0) {
+      return (
+        <div data-testid={`multi-enum-empty-${item.key}`}>
+          {enumEmptyState}
+        </div>
+      );
+    }
 
     return (
-      <div
-        role="group"
-        aria-invalid={hasError || undefined}
-        aria-describedby={ariaDescribedBy}
-        className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border p-3"
-        data-testid={`multi-enum-${item.key}`}
-      >
-        {normalizedOptions.map((option, index) => (
-          <label key={option.value} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
-            <input
-              id={index === 0 ? controlId : undefined}
-              type="checkbox"
-              checked={selectedValues.includes(option.value)}
-              disabled={isDisabled}
-              onChange={() => toggleValue(option.value)}
-              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-            />
-            <span className="min-w-0 truncate">{option.label}</span>
-          </label>
-        ))}
-        {unknownValues.map((entry) => (
-          <label key={`unknown-${entry}`} className="flex min-h-11 items-center gap-2 text-xs text-secondary-text">
-            <input
-              type="checkbox"
-              checked
-              disabled={isDisabled}
-              onChange={() => toggleValue(entry)}
-              className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-            />
-            <span className="min-w-0 truncate">{entry}</span>
-          </label>
-        ))}
+      <MultiSelectDropdown
+        id={controlId}
+        testId={`multi-enum-${item.key}`}
+        options={visibleOptions}
+        selected={selectedValues}
+        onChange={(next) => onChange(next.join(','))}
+        ordered={isOrdered}
+        disabled={disabled || !schema.isEditable}
+        hasError={hasError}
+        ariaDescribedBy={ariaDescribedBy}
+        language={language}
+      />
+    );
+  }
+
+  if (isBooleanControl) {
+    const checked = value.trim().toLowerCase() === 'true';
+    const isDisabled = disabled || !schema?.isEditable;
+    return (
+      <div className="flex items-center gap-2 md:w-full md:justify-end">
+        <SettingsSwitch
+          id={controlId}
+          checked={checked}
+          disabled={isDisabled}
+          onCheckedChange={(next) => onChange(next ? 'true' : 'false')}
+          visualTestId={`${controlId}-switch-visual`}
+          aria-invalid={hasError}
+          aria-describedby={ariaDescribedBy}
+        />
       </div>
     );
   }
@@ -173,7 +189,7 @@ function renderFieldControl(
           placeholder={t('common.selectPlaceholder')}
           error={hasError}
           ariaDescribedBy={ariaDescribedBy}
-          className="md:ml-auto"
+          className="w-full md:ml-auto"
           menuAlign="end"
         />
       );
@@ -193,45 +209,6 @@ function renderFieldControl(
     );
   }
 
-  if (controlType === 'switch') {
-    const checked = value.trim().toLowerCase() === 'true';
-    const isDisabled = disabled || !schema?.isEditable;
-    return (
-      <div className="flex items-center gap-2 md:w-full md:justify-end">
-        <button
-          id={controlId}
-          type="button"
-          role="switch"
-          aria-checked={checked}
-          aria-invalid={hasError || undefined}
-          aria-describedby={ariaDescribedBy}
-          disabled={isDisabled}
-          onClick={() => onChange(checked ? 'false' : 'true')}
-          className={cn(
-            'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors',
-            isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
-          )}
-        >
-          <span
-            className={cn(
-              'relative inline-flex h-5 w-8 shrink-0 items-center rounded-full transition-colors',
-              checked ? 'bg-foreground' : 'bg-border',
-            )}
-            data-testid={`${controlId}-switch-visual`}
-            aria-hidden="true"
-          >
-            <span
-              className={cn(
-                'inline-block h-4 w-4 rounded-full bg-background shadow-sm transition-transform',
-                checked ? 'translate-x-3' : 'translate-x-0.5',
-              )}
-            />
-          </span>
-        </button>
-      </div>
-    );
-  }
-
   if (controlType === 'password') {
     const iconType = inferPasswordIconType(item.key);
 
@@ -240,43 +217,49 @@ function renderFieldControl(
 
       return (
         <div className="space-y-2">
-          {values.map((entry, index) => (
-            <div className="flex items-center gap-2" key={`${item.key}-${index}`}>
-              <div className="flex-1">
-                <Input
-                  type="password"
-                  allowTogglePassword
-                  iconType={iconType}
-                  id={index === 0 ? controlId : `${controlId}-${index}`}
-                  aria-invalid={hasError || undefined}
-                  aria-describedby={ariaDescribedBy}
-                  readOnly={!isPasswordEditable}
-                  onFocus={onPasswordFocus}
-                  value={entry}
-                  disabled={disabled || !schema?.isEditable}
-                  onChange={(event) => {
-                    const nextValues = [...values];
-                    nextValues[index] = event.target.value;
-                    onChange(serializeMultiValues(nextValues));
+          {values.map((entry, index) => {
+            const rowLabel = `${fieldTitle} ${formatUiNumber(index + 1, language)}`;
+            return (
+              <div className="flex items-center gap-2" key={`${item.key}-${index}`}>
+                <div className="flex-1">
+                  <CredentialInput
+                    purpose="configuration-secret"
+                    credentialId={`${item.key}-${index + 1}`}
+                    allowTogglePassword
+                    passwordToggleLabel={rowLabel}
+                    iconType={iconType}
+                    id={index === 0 ? controlId : `${controlId}-${index}`}
+                    aria-label={rowLabel}
+                    aria-invalid={hasError || undefined}
+                    aria-describedby={ariaDescribedBy}
+                    readOnly={!isPasswordEditable}
+                    onFocus={onPasswordFocus}
+                    value={entry}
+                    disabled={disabled || !schema?.isEditable}
+                    onChange={(event) => {
+                      const nextValues = [...values];
+                      nextValues[index] = event.target.value;
+                      onChange(serializeMultiValues(nextValues));
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="settings-secondary"
+                  size="lg"
+                  className="px-3 text-muted-text shadow-none hover:text-danger"
+                  aria-label={`${t('settings.fieldDelete')}${getUiColon(language)}${rowLabel}`}
+                  disabled={disabled || !schema?.isEditable || values.length <= 1}
+                  onClick={() => {
+                    const nextValues = values.filter((_, rowIndex) => rowIndex !== index);
+                    onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
                   }}
-                />
+                >
+                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="settings-secondary"
-                size="lg"
-                className="px-3 text-muted-text shadow-none hover:text-danger"
-                aria-label={t('settings.fieldDelete')}
-                disabled={disabled || !schema?.isEditable || values.length <= 1}
-                onClick={() => {
-                  const nextValues = values.filter((_, rowIndex) => rowIndex !== index);
-                  onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
-                }}
-              >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+            );
+          })}
 
           <div className="flex items-center gap-2">
             <Button
@@ -295,8 +278,9 @@ function renderFieldControl(
     }
 
     return (
-      <Input
-        type="password"
+      <CredentialInput
+        purpose="configuration-secret"
+        credentialId={item.key}
         allowTogglePassword
         iconType={iconType}
         id={controlId}
@@ -321,18 +305,42 @@ function renderFieldControl(
       }
     : {};
 
-  return (
+  const unit = schema?.unit?.trim() || null;
+  const input = (
     <input
       id={controlId}
       type={inputType}
       aria-invalid={hasError || undefined}
       aria-describedby={ariaDescribedBy}
-      className={cn(commonClass, 'block h-11 md:ml-auto md:w-44', hasError && 'border-danger')}
+      className={cn(
+        commonClass,
+        'block h-9 md:ml-auto',
+        // Numbers stay compact; text/path fields fill the 240px control column
+        // so long values (e.g. directory paths) are not clipped to ~170px.
+        inputType === 'number' ? (unit ? 'pr-8 md:w-full' : 'md:w-44') : 'md:w-full',
+        hasError && 'border-danger',
+      )}
       value={value}
       disabled={disabled || !schema?.isEditable}
       onChange={(event) => onChange(event.target.value)}
       {...numberProps}
     />
+  );
+
+  if (!unit) {
+    return input;
+  }
+
+  return (
+    <div className="relative md:ml-auto md:w-44">
+      {input}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-text"
+      >
+        {unit}
+      </span>
+    </div>
   );
 }
 
@@ -345,19 +353,25 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   requirement = null,
   dependencyLocked = false,
   readOnlyDiagnostic,
+  enumOptionFilter,
+  enumEmptyState,
 }) => {
   const { language, t } = useUiLanguage();
   const schema = item.schema;
-  const isTextarea = schema?.uiControl === 'textarea';
+  const isMultiEnum = Boolean(schema?.options?.length && isMultiValueField(item));
+  const isTextarea = schema?.uiControl === 'textarea' && !isMultiEnum;
   const helpContent = getSettingsHelpContent(schema?.helpKey, schema?.description, language);
   const localizationKey = schema?.key ?? item.key;
   const fallbackTitle = schema?.title ?? item.key;
-  const title = language === 'zh'
-    ? getFieldTitleZh(localizationKey, getFieldTitleZh(item.key, fallbackTitle))
-    : fallbackTitle;
-  const description = language === 'en'
-    ? helpContent?.summary ?? schema?.description ?? ''
-    : getFieldDescriptionZh(localizationKey, getFieldDescriptionZh(item.key, schema?.description));
+  const title = resolveSettingsFieldTitle({
+    itemKey: item.key,
+    schemaKey: schema?.key,
+    fallbackTitle,
+    language,
+  });
+  const description = language === 'zh'
+    ? getFieldDescriptionZh(localizationKey, getFieldDescriptionZh(item.key, schema?.description))
+    : helpContent?.summary ?? schema?.description ?? '';
   const hasError = issues.some((issue) => issue.severity === 'error');
   const [isPasswordEditable, setIsPasswordEditable] = useState(false);
   const controlId = `setting-${item.key}`;
@@ -368,23 +382,16 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
   return (
     <div
       className={cn(
-        'grid gap-3 px-3 py-2.5 transition-colors duration-200',
-        isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:gap-6',
+        'grid gap-2 px-2 py-1.5 transition-colors duration-200',
+        isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:items-center md:gap-4',
         hasError ? 'bg-danger/5' : '',
       )}
     >
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-sm font-normal text-foreground" htmlFor={controlId}>
             {title}
           </label>
-          {description ? (
-            <Tooltip content={description}>
-              <span className="inline-flex cursor-help text-muted-text">
-                <Info aria-hidden="true" className="h-3.5 w-3.5" />
-              </span>
-            </Tooltip>
-          ) : null}
           <SettingsHelpButton
             fieldKey={localizationKey}
             title={title}
@@ -411,9 +418,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
             <Badge variant="default" size="sm">{t('settings.fieldRestartRequired')}</Badge>
           ) : null}
         </div>
-        {/* External docs links and raw KEY=value examples are intentionally not
-            shown inline on everyday fields — they live in the field's help
-            dialog instead, so the everyday path stays free of config jargon. */}
+        {/* External docs links and raw KEY=value examples stay out of everyday fields. */}
         {readOnlyDiagnostic ? (
           <p className="text-xs text-warning" data-testid={`settings-schema-diagnostic-${item.key}`}>
             {readOnlyDiagnostic}
@@ -424,6 +429,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
       <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>
         {renderFieldControl(
           item,
+          title,
           displayValue,
           disabled || dependencyLocked || Boolean(readOnlyDiagnostic),
           (nextValue) => onChange(item.key, nextValue),
@@ -434,6 +440,8 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
           ariaDescribedBy,
           language,
           t,
+          enumOptionFilter,
+          enumEmptyState,
         )}
 
         {issues.length ? (

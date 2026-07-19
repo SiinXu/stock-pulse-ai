@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
+import type { SystemConfigItem } from '../../../types/systemConfig';
 import { UiLanguageProvider, useUiLanguage } from '../../../contexts/UiLanguageContext';
-import { getFieldDescriptionZh, getFieldTitleZh } from '../../../utils/systemConfigI18n';
+import { loadUiLanguageTranslations } from '../../../i18n/translations';
+import { getFieldDescriptionZh, getFieldTitle, getFieldTitleZh } from '../../../utils/systemConfigI18n';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { SettingsField } from '../SettingsField';
 
@@ -14,6 +16,12 @@ if (!HTMLElement.prototype.scrollIntoView) {
 function openListbox(trigger: HTMLElement) {
   fireEvent.click(trigger);
   return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+
+function openHelpTooltip(title: string | RegExp) {
+  const trigger = screen.getByRole('button', { name: title });
+  fireEvent.mouseEnter(trigger.parentElement!);
+  return screen.getByRole('tooltip');
 }
 
 describe('SettingsField', () => {
@@ -83,6 +91,144 @@ describe('SettingsField', () => {
     expect(screen.queryByLabelText('Stock List')).not.toBeInTheDocument();
   });
 
+  it.each(['de', 'ja', 'zh-TW'] as const)(
+    'keeps distinct per-field %s titles when fields share one help key',
+    async (language) => {
+      await loadUiLanguageTranslations(language);
+      const senderTitle = getFieldTitle('EMAIL_SENDER', undefined, language);
+      const passwordTitle = getFieldTitle('EMAIL_PASSWORD', undefined, language);
+
+      render(
+        <UiLanguageProvider initialLanguage={language}>
+          <SettingsField
+            item={{
+              key: 'EMAIL_SENDER',
+              value: 'sender@example.com',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'EMAIL_SENDER',
+                title: 'Email Sender',
+                category: 'notification',
+                dataType: 'string',
+                uiControl: 'text',
+                isSensitive: false,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 1,
+                helpKey: 'settings.notification.email',
+              },
+            }}
+            value="sender@example.com"
+            onChange={vi.fn()}
+          />
+          <SettingsField
+            item={{
+              key: 'EMAIL_PASSWORD',
+              value: 'secret',
+              rawValueExists: true,
+              isMasked: false,
+              schema: {
+                key: 'EMAIL_PASSWORD',
+                title: 'Email Password',
+                category: 'notification',
+                dataType: 'string',
+                uiControl: 'password',
+                isSensitive: true,
+                isRequired: false,
+                isEditable: true,
+                options: [],
+                validation: {},
+                displayOrder: 2,
+                helpKey: 'settings.notification.email',
+              },
+            }}
+            value="secret"
+            onChange={vi.fn()}
+          />
+        </UiLanguageProvider>,
+      );
+
+      expect(senderTitle).not.toBe(passwordTitle);
+      expect(senderTitle).not.toBe('Email Sender');
+      expect(passwordTitle).not.toBe('Email Password');
+      expect(screen.getByLabelText(senderTitle)).toBeInTheDocument();
+      expect(screen.getByLabelText(passwordTitle)).toBeInTheDocument();
+    },
+  );
+
+  it('localizes a known field without a help key in an additional UI language', async () => {
+    const language = 'de';
+    await loadUiLanguageTranslations(language);
+    const expectedTitle = getFieldTitle('OPENAI_VISION_MODEL', undefined, language);
+
+    render(
+      <UiLanguageProvider initialLanguage={language}>
+        <SettingsField
+          item={{
+            key: 'OPENAI_VISION_MODEL',
+            value: 'gpt-4o',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'OPENAI_VISION_MODEL',
+              title: 'OpenAI Vision Model',
+              category: 'ai_model',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          }}
+          value="gpt-4o"
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(expectedTitle).not.toBe('OpenAI Vision Model');
+    expect(screen.getByLabelText(expectedTitle)).toBeInTheDocument();
+  });
+
+  it('preserves the live backend schema title for English', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <SettingsField
+          item={{
+            key: 'STOCK_LIST',
+            value: 'AAPL',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'STOCK_LIST',
+              title: 'Backend-owned watchlist title',
+              category: 'base',
+              dataType: 'string',
+              uiControl: 'text',
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          }}
+          value="AAPL"
+          onChange={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByLabelText('Backend-owned watchlist title')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stock List')).not.toBeInTheDocument();
+  });
+
   it('flags a field that only takes effect after a restart', () => {
     const { rerender } = render(
       <SettingsField
@@ -141,7 +287,7 @@ describe('SettingsField', () => {
   });
 
   it('localizes TickFlow field descriptions instead of falling back to backend English schema', () => {
-    const { container } = render(
+    render(
       <SettingsField
         item={{
           key: 'TICKFLOW_PRIORITY',
@@ -170,12 +316,11 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText('TickFlow 日 K 优先级')).toBeInTheDocument();
-    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
-    expect(screen.getByText(/控制 TickFlow 在 A 股日 K 数据源回退链中的尝试顺序/)).toBeInTheDocument();
+    expect(openHelpTooltip(/TickFlow 日 K 优先级/)).toHaveTextContent(/控制 TickFlow 在 A 股日 K 数据源回退链中的尝试顺序/);
     expect(screen.queryByText(/Priority for TickFlow daily K-line fetcher/)).not.toBeInTheDocument();
   });
   it('uses schema key for TickFlow localization when the runtime item key differs', () => {
-    const { container } = render(
+    render(
       <SettingsField
         item={{
           key: 'runtime.tickflow.priority',
@@ -204,8 +349,7 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText(getFieldTitleZh('TICKFLOW_PRIORITY', ''))).toBeInTheDocument();
-    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
-    expect(screen.getByText(getFieldDescriptionZh('TICKFLOW_PRIORITY', ''))).toBeInTheDocument();
+    expect(openHelpTooltip(/TickFlow 日 K 优先级/)).toHaveTextContent(getFieldDescriptionZh('TICKFLOW_PRIORITY', ''));
     expect(screen.queryByLabelText('TickFlow Priority')).not.toBeInTheDocument();
     expect(screen.queryByText(/Priority for TickFlow daily K-line fetcher/)).not.toBeInTheDocument();
   });
@@ -251,7 +395,12 @@ describe('SettingsField', () => {
     const input = screen.getByLabelText('OpenAI API Key');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', issue.id);
+    expect(input).toHaveAttribute('name', 'stockpulse-config-openai-api-key');
+    expect(input).toHaveAttribute('autocomplete', 'off');
+    expect(input).toHaveAttribute('data-credential-purpose', 'configuration-secret');
+    expect(input).toHaveAttribute('readonly');
     fireEvent.focus(input);
+    expect(input).not.toHaveAttribute('readonly');
     fireEvent.change(input, {
       target: { value: 'updated-secret' },
     });
@@ -287,8 +436,35 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getAllByRole('button', { name: '显示内容' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
+    const fieldTitle = getFieldTitleZh('OPENAI_API_KEYS', '');
+    const firstRowLabel = `${fieldTitle} 1`;
+    const secondRowLabel = `${fieldTitle} 2`;
+    expect(screen.getByRole('button', { name: `显示内容：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${secondRowLabel}` })).toBeInTheDocument();
+    const firstInput = screen.getByLabelText(firstRowLabel);
+    const secondInput = screen.getByLabelText(secondRowLabel);
+    expect(firstInput).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-1',
+    );
+    expect(secondInput).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-2',
+    );
+    expect(firstInput).toHaveAttribute('readonly');
+    expect(secondInput).toHaveAttribute('readonly');
+
+    fireEvent.click(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` }));
+    expect(screen.getByRole('textbox', { name: secondRowLabel })).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: `隐藏内容：${secondRowLabel}` })).toBeInTheDocument();
+    fireEvent.focus(secondInput);
+
+    expect(firstInput).not.toHaveAttribute('readonly');
+    expect(secondInput).not.toHaveAttribute('readonly');
+    fireEvent.change(secondInput, { target: { value: 'secret-c' } });
+    expect(onChange).toHaveBeenCalledWith('OPENAI_API_KEYS', 'secret-a,secret-c');
   });
 
   it('allows optional select fields to be cleared when schema provides an empty option', () => {
@@ -334,6 +510,41 @@ describe('SettingsField', () => {
     fireEvent.click(within(listbox).getByRole('option', { name: '未设置' }));
 
     expect(onChange).toHaveBeenCalledWith('NOTIFICATION_MIN_SEVERITY', '');
+  });
+
+  it('renders true/false option sets as a switch instead of a select', () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsField
+        item={{
+          key: 'BOOLISH_FIELD',
+          value: 'true',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'BOOLISH_FIELD',
+            title: 'Boolean field',
+            category: 'system',
+            dataType: 'string',
+            uiControl: 'select',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: ['true', 'false'],
+            validation: { enum: ['true', 'false'] },
+            displayOrder: 1,
+          },
+        }}
+        value="true"
+        onChange={onChange}
+      />,
+    );
+
+    const toggle = screen.getByRole('switch', { name: 'Boolean field' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith('BOOLISH_FIELD', 'false');
   });
 
   it('shows the schema default for select fields when no explicit env value exists', () => {
@@ -470,18 +681,25 @@ describe('SettingsField', () => {
     // free-text input.
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     const group = screen.getByTestId('multi-enum-MARKET_REVIEW_REGION');
-    const checkboxes = within(group).getAllByRole('checkbox');
+
+    // Collapsed by default: catalog options stay behind the dropdown trigger.
+    expect(within(group).queryAllByRole('checkbox')).toHaveLength(0);
+
+    // The field label stays associated with the dropdown trigger.
+    const trigger = screen.getByLabelText('大盘复盘市场');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+    expect(trigger).toHaveTextContent('已选 2 / 6');
+
+    fireEvent.click(trigger);
+    const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
       expect(checkbox.closest('label')).toHaveClass('min-h-11');
-      expect(checkbox).toHaveClass('h-4', 'w-4');
+      expect(checkbox).toHaveClass('h-6', 'w-6');
     }
     expect(checkboxes[0]).toBeChecked(); // cn
     expect(checkboxes[3]).toBeChecked(); // jp
     expect(checkboxes[1]).not.toBeChecked(); // hk
-
-    // The field label stays associated with the first checkbox.
-    expect(screen.getByLabelText('大盘复盘市场')).toBe(checkboxes[0]);
 
     // Selecting kr serializes in catalog order, not click order.
     fireEvent.click(checkboxes[4]);
@@ -520,10 +738,18 @@ describe('SettingsField', () => {
     );
 
     const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
-    const checkboxes = within(group).getAllByRole('checkbox');
+    expect(group.parentElement?.parentElement).toHaveClass('md:grid-cols-[minmax(0,1fr)_240px]');
+
+    // The unknown stored value counts toward the collapsed summary without
+    // expanding the trigger into selected chips.
+    const trigger = within(group).getByText(/已选/).closest('button')!;
+    expect(trigger).toHaveTextContent('已选 2 / 3');
+    expect(within(group).queryByText('legacy_channel')).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const checkboxes = screen.getAllByRole('checkbox');
     // 2 catalog options + 1 unknown stored value that must stay visible.
     expect(checkboxes).toHaveLength(3);
-    expect(within(group).getByText('legacy_channel')).toBeInTheDocument();
     expect(checkboxes[2]).toBeChecked();
 
     // Enabling feishu keeps the unknown stored value at the tail.
@@ -533,6 +759,102 @@ describe('SettingsField', () => {
     // Deselecting the unknown value drops it explicitly (never silently).
     fireEvent.click(checkboxes[2]);
     expect(onChange).toHaveBeenCalledWith('NOTIFICATION_REPORT_CHANNELS', 'email');
+  });
+
+  it('filters multi-enum options and falls back to the empty state guidance', () => {
+    const buildItem = (): SystemConfigItem => ({
+      key: 'NOTIFICATION_REPORT_CHANNELS',
+      value: '',
+      rawValueExists: false,
+      isMasked: false,
+      schema: {
+        key: 'NOTIFICATION_REPORT_CHANNELS',
+        category: 'notification',
+        dataType: 'array',
+        uiControl: 'textarea',
+        isSensitive: false,
+        isRequired: false,
+        isEditable: true,
+        options: [
+          { label: 'email', value: 'email' },
+          { label: 'feishu', value: 'feishu' },
+        ],
+        validation: { allowed_values: ['email', 'feishu'], multi_value: true, delimiter: ',' },
+        displayOrder: 62,
+      },
+    });
+
+    // Filtered-out options disappear, but an already-selected value must stay
+    // visible so the stored config never silently loses entries.
+    const { rerender } = render(
+      <SettingsField
+        item={buildItem()}
+        value="email"
+        onChange={vi.fn()}
+        enumOptionFilter={(optionValue) => optionValue === 'feishu'}
+        enumEmptyState={<p>去配置通知渠道</p>}
+      />
+    );
+    const group = screen.getByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS');
+    fireEvent.click(within(group).getByText(/已选/).closest('button')!);
+    const labels = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(labels).toEqual(['email', 'feishu']);
+
+    // No selectable option and nothing selected → guidance replaces the control.
+    rerender(
+      <SettingsField
+        item={buildItem()}
+        value=""
+        onChange={vi.fn()}
+        enumOptionFilter={() => false}
+        enumEmptyState={<p>去配置通知渠道</p>}
+      />
+    );
+    expect(screen.queryByTestId('multi-enum-NOTIFICATION_REPORT_CHANNELS')).not.toBeInTheDocument();
+    const emptyState = screen.getByTestId('multi-enum-empty-NOTIFICATION_REPORT_CHANNELS');
+    expect(within(emptyState).getByText('去配置通知渠道')).toBeInTheDocument();
+  });
+
+  it('serializes ordered multi-enums in selection order instead of catalog order', () => {
+    const onChange = vi.fn();
+
+    render(
+      <SettingsField
+        item={{
+          key: 'REALTIME_SOURCE_PRIORITY',
+          value: 'efinance,tencent',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'REALTIME_SOURCE_PRIORITY',
+            category: 'data_source',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            defaultValue: 'tencent,akshare_sina,efinance,akshare_em',
+            options: [
+              { label: 'tencent', value: 'tencent' },
+              { label: 'akshare_sina', value: 'akshare_sina' },
+              { label: 'efinance', value: 'efinance' },
+            ],
+            validation: { multi_value: true, delimiter: ',', ordered: true },
+            displayOrder: 20,
+          },
+        }}
+        value="efinance,tencent"
+        onChange={onChange}
+      />
+    );
+
+    const group = screen.getByTestId('multi-enum-REALTIME_SOURCE_PRIORITY');
+    fireEvent.click(within(group).getByText(/已选/).closest('button')!);
+    const checkboxes = screen.getAllByRole('checkbox');
+    // Picking akshare_sina appends to the priority tail; catalog order would
+    // have produced tencent,akshare_sina,efinance instead.
+    fireEvent.click(checkboxes[1]);
+    expect(onChange).toHaveBeenCalledWith('REALTIME_SOURCE_PRIORITY', 'efinance,tencent,akshare_sina');
   });
 
   it('applies min/max/step from schema validation to number inputs', () => {
@@ -562,7 +884,7 @@ describe('SettingsField', () => {
     );
 
     const integerInput = screen.getByLabelText('TickFlow 日 K 优先级');
-    expect(integerInput).toHaveClass('h-11');
+    expect(integerInput).toHaveClass('h-9');
     expect(integerInput).toHaveAttribute('min', '0');
     expect(integerInput).toHaveAttribute('max', '99');
     expect(integerInput).toHaveAttribute('step', '1');
@@ -596,6 +918,38 @@ describe('SettingsField', () => {
     expect(floatInput).toHaveAttribute('min', '0');
     expect(floatInput).toHaveAttribute('max', '2');
     expect(floatInput).toHaveAttribute('step', '0.1');
+  });
+
+  it('shows seconds as a trailing unit for the orchestrator timeout', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'AGENT_ORCHESTRATOR_TIMEOUT_S',
+          value: '600',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'AGENT_ORCHESTRATOR_TIMEOUT_S',
+            category: 'agent',
+            dataType: 'integer',
+            uiControl: 'number',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            unit: 's',
+            options: [],
+            validation: { min: 0 },
+            displayOrder: 1,
+          },
+        }}
+        value="600"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByRole('spinbutton', { name: 'Agent 超时（秒）' });
+    expect(input).toHaveClass('pr-8');
+    expect(input.parentElement).toHaveTextContent('s');
   });
 
   it('backfills the schema default for unset non-select controls', () => {
@@ -655,7 +1009,7 @@ describe('SettingsField', () => {
     const toggle = screen.getByRole('switch');
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(toggle).toHaveClass('h-11', 'w-11');
-    expect(screen.getByTestId('setting-ENABLE_MARKET_REVIEW-switch-visual')).toHaveClass('h-5', 'w-8');
+    expect(screen.getByTestId('setting-ENABLE_MARKET_REVIEW-switch-visual')).toHaveClass('h-6', 'w-10');
   });
 
   it('never backfills defaults into password controls', () => {
@@ -733,7 +1087,7 @@ describe('SettingsField', () => {
   it('renders blank-value preset guidance for context compression numeric fields', () => {
     const onChange = vi.fn();
 
-    const { container } = render(
+    render(
       <>
         <SettingsField
           item={{
@@ -785,18 +1139,21 @@ describe('SettingsField', () => {
     expect(screen.getByLabelText('压缩触发阈值（tokens）')).toBeInTheDocument();
     expect(screen.getByLabelText('原文保护轮次')).toBeInTheDocument();
 
-    const infoIcons = container.querySelectorAll('.cursor-help');
-    expect(infoIcons).toHaveLength(2);
-    fireEvent.mouseEnter(infoIcons[0].parentElement!);
-    expect(screen.getByText(/估算历史 token 超过该值时触发摘要/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
-    fireEvent.mouseEnter(infoIcons[1].parentElement!);
-    expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
+    const helpButtons = screen.getAllByRole('button', { name: /配置说明/ });
+    expect(helpButtons).toHaveLength(2);
+    fireEvent.mouseEnter(helpButtons[0].parentElement!);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/估算历史 token 超过该值时触发摘要/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
+    fireEvent.mouseLeave(helpButtons[0].parentElement!);
+    fireEvent.mouseEnter(helpButtons[1].parentElement!);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/压缩时最近 N 个用户轮次及其后的回复保持原文/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
   it('renders localized custom webhook body template guidance', () => {
     const onChange = vi.fn();
 
-    const { container } = render(
+    render(
       <SettingsField
         item={{
           key: 'CUSTOM_WEBHOOK_BODY_TEMPLATE',
@@ -822,12 +1179,12 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByLabelText('自定义 Webhook Body 模板')).toBeInTheDocument();
-    fireEvent.mouseEnter(container.querySelector('.cursor-help')!.parentElement!);
-    expect(screen.getByText(/会先于 Bark、Slack、Discord 等自动 payload 生效/)).toBeInTheDocument();
-    expect(screen.getByText(/裸 \$content \/ \$title 不做 JSON 转义/)).toBeInTheDocument();
+    const tooltip = openHelpTooltip(/自定义 Webhook Body 模板/);
+    expect(tooltip).toHaveTextContent(/会先于 Bark、Slack、Discord 等自动 payload 生效/);
+    expect(tooltip).toHaveTextContent(/裸 \$content \/ \$title 不做 JSON 转义/);
   });
 
-  it('opens detailed field help when help metadata is available', () => {
+  it('shows concise field help without examples, docs, or value-source metadata', () => {
     render(
       <SettingsField
         item={{
@@ -862,111 +1219,17 @@ describe('SettingsField', () => {
       />
     );
 
-    // The field itself now renders the doc link + examples inline, so scope
-    // the help-dialog assertions to the dialog to avoid ambiguity.
     const helpTrigger = screen.getByRole('button', { name: '查看 自选股列表 配置说明' });
     expect(helpTrigger).toHaveClass('h-11', 'w-11');
-    fireEvent.click(helpTrigger);
+    fireEvent.mouseEnter(helpTrigger.parentElement!);
 
-    const helpDialog = screen.getByRole('dialog', { name: '自选股列表' });
-    expect(helpDialog).toBeInTheDocument();
-    expect(within(helpDialog).getByText('STOCK_LIST=600519,300750,002594')).toBeInTheDocument();
-    const docLink = within(helpDialog).getByRole('link', { name: /完整指南/ });
-    expect(docLink).toHaveAttribute('href', 'https://example.com/full-guide');
-    expect(docLink).toHaveClass('min-h-11', 'min-w-11');
-
-    const closeButton = within(helpDialog).getByRole('button', { name: '关闭配置说明' });
-    expect(closeButton).toHaveClass('h-11', 'w-11');
-
-    // jsdom has no layout, so expose the visibly rendered link to the shared
-    // focus trap's offsetParent visibility check.
-    Object.defineProperties(docLink, {
-      offsetParent: { configurable: true, value: helpDialog },
-    });
-    Object.defineProperties(closeButton, {
-      offsetParent: { configurable: true, value: helpDialog },
-    });
-    closeButton.focus();
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-    expect(docLink).toHaveFocus();
-
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(closeButton).toHaveFocus();
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: '自选股列表' })).not.toBeInTheDocument();
-  });
-
-  it('shows the value source as explicitly set in the help dialog', () => {
-    render(
-      <SettingsField
-        item={{
-          key: 'STOCK_LIST',
-          value: '600519',
-          rawValueExists: true,
-          isMasked: false,
-          schema: {
-            key: 'STOCK_LIST',
-            category: 'base',
-            dataType: 'array',
-            uiControl: 'textarea',
-            isSensitive: false,
-            isRequired: false,
-            isEditable: true,
-            options: [],
-            validation: {},
-            displayOrder: 1,
-            defaultValue: 'AAPL',
-            helpKey: 'settings.base.STOCK_LIST',
-            warningCodes: [],
-          },
-        }}
-        value="600519"
-        onChange={() => undefined}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
-    const dialog = screen.getByRole('dialog', { name: '自选股列表' });
-    expect(within(dialog).getByText('当前取值来源')).toBeInTheDocument();
-    expect(within(dialog).getByText('已显式设置')).toBeInTheDocument();
-    // An explicitly-set field must not advertise the built-in default value.
-    expect(within(dialog).queryByText('AAPL')).not.toBeInTheDocument();
-  });
-
-  it('shows the value source as the built-in default with the default value', () => {
-    render(
-      <SettingsField
-        item={{
-          key: 'STOCK_LIST',
-          value: '',
-          rawValueExists: false,
-          isMasked: false,
-          schema: {
-            key: 'STOCK_LIST',
-            category: 'base',
-            dataType: 'array',
-            uiControl: 'textarea',
-            isSensitive: false,
-            isRequired: false,
-            isEditable: true,
-            options: [],
-            validation: {},
-            displayOrder: 1,
-            defaultValue: 'AAPL',
-            helpKey: 'settings.base.STOCK_LIST',
-            warningCodes: [],
-          },
-        }}
-        value=""
-        onChange={() => undefined}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '查看 自选股列表 配置说明' }));
-    const dialog = screen.getByRole('dialog', { name: '自选股列表' });
-    expect(within(dialog).getByText('未显式设置，使用内置默认值')).toBeInTheDocument();
-    expect(within(dialog).getByText('AAPL')).toBeInTheDocument();
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('推荐使用英文逗号分隔股票代码');
+    expect(tooltip).toHaveTextContent('保存后的 STOCK_LIST 会统一写成英文逗号分隔');
+    expect(tooltip).not.toHaveTextContent('STOCK_LIST=600519,300750,002594');
+    expect(tooltip).not.toHaveTextContent('当前取值来源');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /完整指南/ })).not.toBeInTheDocument();
   });
 
   it('does not render inline external doc links or KEY=value examples on the field body', () => {
@@ -999,8 +1262,7 @@ describe('SettingsField', () => {
       />,
     );
 
-    // Everyday fields no longer surface external "config guide" links or raw
-    // KEY=value examples inline — those live in the help dialog instead.
+    // Everyday fields do not surface external links or raw KEY=value examples.
     expect(screen.queryByRole('link', { name: '获取 API Key' })).not.toBeInTheDocument();
     expect(screen.queryByText(/sk-example-token/)).not.toBeInTheDocument();
   });
@@ -1065,17 +1327,12 @@ describe('SettingsField', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 分析生成方式 配置说明' }));
-
-    const dialog = screen.getByRole('dialog', { name: '分析生成方式' });
-    expect(dialog).toHaveTextContent('决定系统用哪种方式生成');
-    expect(dialog).not.toHaveTextContent('GENERATION_BACKEND');
-    expect(dialog).not.toHaveTextContent('配置样例');
-    expect(dialog).not.toHaveTextContent('Phase 1');
-    expect(dialog).toHaveTextContent('本机已安装并登录对应 CLI');
-    expect(dialog).toHaveTextContent('默认模型配置会继续使用现有 API Key');
-    expect(dialog).not.toHaveTextContent('高级说明');
-    expect(dialog).not.toHaveTextContent('LiteLLM');
+    const tooltip = openHelpTooltip('查看 分析生成方式 配置说明');
+    expect(tooltip).toHaveTextContent('用于个股分析、大盘复盘和普通文本生成');
+    expect(tooltip).toHaveTextContent('想恢复默认行为，选择“默认模型配置”并保存配置');
+    expect(tooltip).not.toHaveTextContent('GENERATION_BACKEND=litellm');
+    expect(tooltip).not.toHaveTextContent('配置样例');
+    expect(tooltip).not.toHaveTextContent('Phase 1');
   });
 
   it('describes agent auto generation without exposing implementation labels as the primary UI copy', () => {
@@ -1111,15 +1368,11 @@ describe('SettingsField', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 问股生成方式 配置说明' }));
-
-    const dialog = screen.getByRole('dialog', { name: '问股生成方式' });
-    expect(dialog).toHaveTextContent('系统会选择当前可用的方式');
-    expect(dialog).toHaveTextContent('如果不确定，选择“自动”即可');
-    expect(dialog).toHaveTextContent('这项设置只影响问股助手');
-    expect(dialog).not.toHaveTextContent('高级说明');
-    expect(dialog).not.toHaveTextContent('LiteLLM');
-    expect(dialog).not.toHaveTextContent('优先选择当前可用');
+    const tooltip = openHelpTooltip('查看 问股生成方式 配置说明');
+    expect(tooltip).toHaveTextContent('通常保持“自动”');
+    expect(tooltip).toHaveTextContent('想恢复默认行为，选择“自动”并保存配置');
+    expect(tooltip).not.toHaveTextContent('高级说明');
+    expect(tooltip).not.toHaveTextContent('LiteLLM');
   });
 
   it('uses per-field schema titles even when helpKey is shared by multiple fields', () => {

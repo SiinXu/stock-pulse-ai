@@ -258,8 +258,7 @@ class TestAnspireSearchProvider(unittest.TestCase):
         self.assertFalse(response.success)
         self.assertEqual(response.provider, "Anspire")
         self.assertEqual(len(response.results), 0)
-        # 错误消息可能因实现而异，这里做宽松检查
-        self.assertTrue("API" in response.error_message or "KEY" in response.error_message or "无效" in response.error_message)
+        self.assertEqual(response.error_message, "Search request failed (HTTP 401).")
     
     @patch('src.search_service.requests')
     def test_search_timeout_error(self, mock_requests):

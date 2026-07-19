@@ -109,6 +109,38 @@ describe('systemConfigApi', () => {
     });
   });
 
+  it('maps configured notification channels beside masked config items', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        config_version: 'v2',
+        mask_token: '******',
+        configured_notification_channels: ['ntfy', 'gotify'],
+        items: [
+          {
+            key: 'NTFY_URL',
+            value: '******',
+            raw_value_exists: true,
+            is_masked: true,
+          },
+          {
+            key: 'GOTIFY_URL',
+            value: '******',
+            raw_value_exists: true,
+            is_masked: true,
+          },
+        ],
+      },
+    });
+
+    const result = await systemConfigApi.getConfig(true);
+
+    expect(result.configuredNotificationChannels).toEqual(['ntfy', 'gotify']);
+    expect(result.items).toEqual([
+      expect.objectContaining({ key: 'NTFY_URL', value: '******', isMasked: true }),
+      expect.objectContaining({ key: 'GOTIFY_URL', value: '******', isMasked: true }),
+    ]);
+  });
+
   it('maps Provider Catalog labels, quick links, and Connection contracts to camelCase', async () => {
     get.mockResolvedValueOnce({
       data: {
@@ -132,14 +164,16 @@ describe('systemConfigApi', () => {
         }],
         connection_fields: [{
           key: 'api_key',
-          env_suffix: 'API_KEY',
+          env_suffix: null,
           data_type: 'string',
           is_sensitive: true,
           is_required: false,
           contract: {
             requirement: 'optional',
             required_when: [{ key: 'enabled', operator: 'equals', value: 'true' }],
-            requires_connection_test: true,
+            visible_when: null,
+            enabled_when: null,
+            requires_connection_test: null,
           },
         }],
         empty_api_key_hosts: [],
@@ -158,13 +192,15 @@ describe('systemConfigApi', () => {
     });
     expect(result.connectionFields?.[0]).toMatchObject({
       key: 'api_key',
-      envSuffix: 'API_KEY',
+      envSuffix: null,
       dataType: 'string',
       isSensitive: true,
       isRequired: false,
       contract: {
         requiredWhen: [{ key: 'enabled', operator: 'equals', value: 'true' }],
-        requiresConnectionTest: true,
+        visibleWhen: null,
+        enabledWhen: null,
+        requiresConnectionTest: null,
       },
     });
   });

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test } from '@playwright/test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
@@ -73,7 +75,7 @@ test.describe('portfolio idempotent mobile mutations', () => {
     await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeDisabled();
     await expect(dialog).toBeVisible();
 
-    const dateBox = await dialog.getByLabel('交易日期').boundingBox();
+    const dateBox = await dialog.getByRole('textbox', { name: '交易日期', exact: true }).boundingBox();
     const sideBox = await dialog.getByRole('combobox', { name: '买卖方向' }).boundingBox();
     expect(dateBox).not.toBeNull();
     expect(sideBox).not.toBeNull();

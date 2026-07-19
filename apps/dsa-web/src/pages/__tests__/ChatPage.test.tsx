@@ -212,6 +212,7 @@ beforeEach(() => {
   mockDownloadSession.mockImplementation(() => {});
   mockFormatSessionAsMarkdown.mockReturnValue('# exported session');
   mockStartNewChat.mockReturnValue('session-new');
+  mockSwitchSession.mockResolvedValue(true);
 });
 
 describe('ChatPage', () => {
@@ -314,7 +315,7 @@ describe('ChatPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '切换到对话 旧会话' }));
 
     expect(mockSwitchSession).toHaveBeenCalledWith('session-2');
-    expect(router.state.location.search).toBe('?session=session-2');
+    await waitFor(() => expect(router.state.location.search).toBe('?session=session-2'));
   });
 
   it('loads and saves the global context compression setting from the chat input area', async () => {
@@ -331,7 +332,7 @@ describe('ChatPage', () => {
     });
 
     expect(compressionToggle).toHaveClass('h-11', 'w-11');
-    expect(screen.getByTestId('context-compression-switch-visual')).toHaveClass('h-5', 'w-9');
+    expect(screen.getByTestId('context-compression-switch-visual')).toHaveClass('h-6', 'w-10');
     expect(compressionToggle).not.toBeChecked();
 
     fireEvent.click(compressionToggle);
@@ -640,7 +641,7 @@ describe('ChatPage', () => {
 
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
-    expect(mobileToggle).toHaveClass('h-11');
+    expect(mobileToggle).toHaveClass('h-9');
     expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
@@ -650,8 +651,8 @@ describe('ChatPage', () => {
     expect(screen.getByRole('button', { name: '收起策略选择' })).toHaveAttribute('aria-expanded', 'true');
     expect(skillPanel).not.toHaveClass('hidden');
     expect(skillPanel).toHaveClass('flex');
-    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-8');
+    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-8');
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
@@ -1454,6 +1455,7 @@ describe('ChatPage', () => {
     expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '切换到对话 旧会话' }));
     expect(mockSwitchSession).toHaveBeenCalledWith('session-2');
+    await waitFor(() => expect(screen.queryByText('600519')).not.toBeInTheDocument());
 
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
       target: { value: '继续看成交量' },

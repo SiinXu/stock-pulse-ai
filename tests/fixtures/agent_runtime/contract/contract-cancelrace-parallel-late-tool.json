@@ -1,0 +1,82 @@
+{
+  "id": "contract-cancelrace-parallel-late-tool",
+  "notes": "Cancel race (parallel batch path): one fast tool (echo) and one slow tool (slow_tool seconds=3) are requested in the same LLM turn while agent_orchestrator_timeout_s=1 caps the batch wait. Characterizes that the fast result is kept, the still-pending slow future is cancelled and replaced by a synthetic timeout tool result (timeout: true), tool results are re-ordered to the original call order, and the loop then fails with the volatile 'Agent timed out after ...' error (frozen as error_prefix).",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "config": {
+    "agent_orchestrator_timeout_s": 1
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_cp1",
+          "name": "echo",
+          "arguments": {
+            "message": "fast tool finishes before the batch deadline"
+          }
+        },
+        {
+          "id": "call_cp2",
+          "name": "slow_tool",
+          "arguments": {
+            "seconds": 3
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 540,
+        "completion_tokens": 40,
+        "total_tokens": 580
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": false,
+    "signal": null,
+    "stage_sequence": [
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "echo",
+        "arguments": {
+          "message": "fast tool finishes before the batch deadline"
+        },
+        "success": true,
+        "result_length": 56,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "slow_tool",
+        "arguments": {
+          "seconds": 3
+        },
+        "success": false,
+        "result_length": 66,
+        "cached": false,
+        "timeout": true
+      }
+    ],
+    "total_steps": 1,
+    "total_tokens": 580,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "",
+    "error_prefix": "Agent timed out after"
+  }
+}

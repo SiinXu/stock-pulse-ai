@@ -10,7 +10,7 @@ import type {
   RunDiagnosticStatus,
   RunDiagnosticSummary,
 } from '../../types/analysis';
-import { Badge, Button, Card, StatusDot } from '../common';
+import { Badge, Button, Card, InlineAlert, StatusDot, useClipboard } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 
@@ -87,6 +87,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
     failed: false,
   });
   const [copied, setCopied] = useState(false);
+  const { copyText, copyError } = useClipboard();
   const resetCopiedTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -192,8 +193,7 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
       return;
     }
 
-    try {
-      await navigator.clipboard.writeText(visibleSummary.copyText);
+    if (await copyText(visibleSummary.copyText)) {
       setCopied(true);
       if (resetCopiedTimerRef.current !== null) {
         window.clearTimeout(resetCopiedTimerRef.current);
@@ -202,8 +202,6 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
         setCopied(false);
         resetCopiedTimerRef.current = null;
       }, 2000);
-    } catch (err) {
-      console.error('Copy diagnostics failed:', err);
     }
   };
 
@@ -291,6 +289,8 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
               </Button>
             </div>
           </div>
+
+          {copyError ? <InlineAlert variant="danger" message={copyError} /> : null}
 
           <div>
             <span className="label-uppercase">{text.components}</span>

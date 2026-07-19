@@ -29,7 +29,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
-from src.config import AGENT_MAX_STEPS_DEFAULT
+from src.config import AGENT_MAX_STEPS_DEFAULT, Config
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -75,9 +75,8 @@ def _coerce_config_int(raw_value: object, default: int, *, field_name: str | Non
     except (TypeError, ValueError, OverflowError):
         if field_name:
             logger.warning(
-                "[AgentFactory] Invalid value for %s: %r, fallback to default %s",
+                "[AgentFactory] Invalid value for %s; fallback to default %s",
                 field_name,
-                raw_value,
                 default,
             )
         return default
@@ -196,7 +195,7 @@ def get_tool_registry():
     return _TOOL_REGISTRY
 
 
-def get_skill_manager(config=None):
+def get_skill_manager(config: Optional[Config] = None):
     """Return a deepcopy-clone of the cached SkillManager prototype.
 
     The prototype is initialised from disk on first call; subsequent calls
@@ -244,7 +243,10 @@ def get_skill_manager(config=None):
     return copy.deepcopy(_SKILL_MANAGER_PROTOTYPE)
 
 
-def resolve_skill_prompt_state(config=None, skills: Optional[List[str]] = None) -> SkillPromptState:
+def resolve_skill_prompt_state(
+    config: Optional[Config] = None,
+    skills: Optional[List[str]] = None,
+) -> SkillPromptState:
     """Resolve active skills and prompt fragments for analyzer / agent entrypoints."""
     if config is None:
         from src.config import get_config
@@ -301,7 +303,10 @@ def resolve_skill_prompt_state(config=None, skills: Optional[List[str]] = None) 
     )
 
 
-def build_agent_executor(config=None, skills: Optional[List[str]] = None):
+def build_agent_executor(
+    config: Optional[Config] = None,
+    skills: Optional[List[str]] = None,
+):
     """Build and return a configured AgentExecutor (or future orchestrator).
 
     When ``AGENT_ARCH=multi``, this returns an orchestrator that manages
@@ -372,7 +377,29 @@ def build_agent_executor(config=None, skills: Optional[List[str]] = None):
     )
 
 
-def _build_orchestrator(config, registry, llm_adapter, skill_manager, *, technical_skill_policy: str = ""):
+def build_agent_runtime(
+    config: Optional[Config] = None,
+    skills: Optional[List[str]] = None,
+):
+    """Return the default runtime adapter behind the vendor-neutral contract.
+
+    Thin assembly seam (AR-PY-01): always returns the native adapter and
+    does not change any default execution behaviour. Existing callers of
+    ``build_agent_executor`` are unaffected.
+    """
+    from src.agent.runtime.native_adapter import NativeRuntimeAdapter
+
+    return NativeRuntimeAdapter(config=config, skills=skills)
+
+
+def _build_orchestrator(
+    config: Config,
+    registry,
+    llm_adapter,
+    skill_manager,
+    *,
+    technical_skill_policy: str = "",
+):
     """Build and return an :class:`AgentOrchestrator` (multi-agent mode).
 
     The orchestrator presents the same ``run()`` / ``chat()`` interface as

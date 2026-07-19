@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiError, createParsedApiError } from '../../api/error';
 import { AuthProvider, useAuth } from '../AuthContext';
@@ -77,6 +77,46 @@ describe('AuthContext', () => {
 
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('logged-in'));
     expect(screen.getByTestId('password-set')).toHaveTextContent('set');
+  });
+
+  it('ignores a stale status response that resolves after a newer one', async () => {
+    let resolveInitialStatus: (value: unknown) => void = () => {};
+    const initialStatus = new Promise((resolve) => {
+      resolveInitialStatus = resolve;
+    });
+    getStatus.mockReturnValueOnce(initialStatus).mockResolvedValueOnce({
+      authEnabled: true,
+      loggedIn: true,
+      passwordSet: true,
+      passwordChangeable: true,
+      setupState: 'enabled',
+    });
+    login.mockResolvedValue(undefined);
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+
+    await screen.findByTestId('status');
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-login' }));
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('logged-in'));
+
+    await act(async () => {
+      resolveInitialStatus({
+        authEnabled: true,
+        loggedIn: false,
+        passwordSet: false,
+        passwordChangeable: true,
+        setupState: 'no_password',
+      });
+      await initialStatus;
+    });
+
+    expect(screen.getByTestId('status')).toHaveTextContent('logged-in');
+    expect(screen.getByTestId('password-set')).toHaveTextContent('set');
+    expect(resetDashboardState).not.toHaveBeenCalled();
   });
 
   it('refreshes auth state after logout', async () => {

@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { useMemo, useState } from 'react';
 import type React from 'react';
 import { Database, Search } from 'lucide-react';
@@ -86,7 +88,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
                       type="button"
                       onClick={() => setOpenProviderId(provider.id)}
                       className={cn(
-                        'flex items-center justify-between gap-2 rounded-full border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
+                        'flex items-center justify-between gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
                       )}
                     >
                       <span className="flex min-w-0 items-center gap-2">
@@ -111,7 +113,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
         title={openProvider ? openProvider.label : undefined}
         className="max-w-2xl"
       >
-        <div className="divide-y divide-transparent">
+        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
           {openProviderItems.map((item) => (
             <SettingsField
               key={item.key}
@@ -122,7 +124,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
               issues={issueByKey[item.key] || []}
             />
           ))}
-        </div>
+        </form>
       </Modal>
     </>
   );

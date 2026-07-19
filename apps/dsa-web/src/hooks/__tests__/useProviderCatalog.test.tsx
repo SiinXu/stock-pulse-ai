@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useProviderCatalog } from '../useProviderCatalog';
@@ -16,7 +18,13 @@ describe('useProviderCatalog', () => {
   it('loads the provider catalog from the backend', async () => {
     getLlmProviderCatalog.mockResolvedValue({
       providers: [{ id: 'deepseek', label: 'DeepSeek', protocol: 'deepseek' }],
-      connectionFields: [{ key: 'provider_id', contract: { requirement: 'required' } }],
+      connectionFields: [{
+        key: 'provider_id',
+        dataType: 'string',
+        isSensitive: false,
+        isRequired: true,
+        contract: { requirement: 'required' },
+      }],
     });
     const { result } = renderHook(() => useProviderCatalog());
     expect(result.current.isLoading).toBe(true);
@@ -33,6 +41,7 @@ describe('useProviderCatalog', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.connectionFields).toBeUndefined();
+    expect(result.current.connectionSchemaDefinition).toMatchObject({ mode: 'legacy', usable: true });
   });
 
   it('preserves an explicitly empty authoritative schema', async () => {
@@ -41,6 +50,32 @@ describe('useProviderCatalog', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.connectionFields).toEqual([]);
+    expect(result.current.connectionSchemaDefinition).toMatchObject({
+      mode: 'schema',
+      usable: false,
+      reason: 'empty',
+    });
+  });
+
+  it('surfaces a present partial schema as unavailable instead of legacy compatibility', async () => {
+    getLlmProviderCatalog.mockResolvedValue({
+      providers: [],
+      connectionFields: [{
+        key: 'models',
+        dataType: 'array',
+        isSensitive: false,
+        isRequired: false,
+        contract: { requirement: 'optional' },
+      }],
+    });
+    const { result } = renderHook(() => useProviderCatalog());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.connectionSchemaDefinition).toMatchObject({
+      mode: 'schema',
+      usable: false,
+      reason: 'missing_identity',
+    });
   });
 
   it('surfaces an error without throwing when the catalog request fails', async () => {

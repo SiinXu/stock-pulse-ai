@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page } from '@playwright/test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { loginAsE2eAdmin } from './auth-fixture';
@@ -61,7 +63,15 @@ const MODEL_KEYS_TO_RESET = [
 ];
 
 async function selectTheme(page: Page, theme: '浅色' | '深色') {
-  await page.getByRole('button', { name: '切换主题' }).first().click();
+  let themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await themeTrigger.isVisible().catch(() => false)) {
+    const profileTrigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+    if (await profileTrigger.getAttribute('aria-expanded') !== 'true') {
+      await profileTrigger.click();
+    }
+    themeTrigger = page.getByRole('button', { name: '切换主题' }).first();
+  }
+  await themeTrigger.click();
   await page.getByRole('menuitemradio', { name: theme, exact: true }).click();
   if (theme === '深色') {
     await expect(page.locator('html')).toHaveClass(/dark/);
@@ -807,7 +817,7 @@ test.describe('model access product convergence', () => {
     await page.getByRole('button', { name: '管理模型 e2e' }).click();
     const dialog = page.getByRole('dialog', { name: '编辑模型服务' });
     await dialog.getByRole('button', { name: '移除模型 fake-report-model' }).click();
-    const conflict = dialog.getByRole('alert').filter({ hasText: '无法直接删除模型' });
+    const conflict = dialog.getByRole('status').filter({ hasText: '无法直接删除模型' });
     await expect(dialog.getByText('无法直接删除模型')).toBeVisible();
     for (const task of ['报告', 'Agent', 'Vision', '备用']) {
       await expect(conflict.getByText(task, { exact: true })).toBeVisible();

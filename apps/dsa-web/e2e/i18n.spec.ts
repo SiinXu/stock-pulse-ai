@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page } from '@playwright/test';
 import { UI_TEXT } from '../src/i18n/uiText';
 import { ALERT_PAGE_TEXT } from '../src/locales/alerts';
@@ -5,6 +7,7 @@ import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
 import { SCREENING_TEXT } from '../src/locales/screening';
 import { loginAsE2eAdmin, getE2eAuthStatus } from './auth-fixture';
+import { UI_LANGUAGE_METADATA, type UiLanguage } from '../src/i18n/uiLanguages';
 
 const fakeProviderPort = Number(process.env.DSA_WEB_SMOKE_PROVIDER_PORT || 18101);
 const BUILT_IN_PROVIDER_LABELS = {
@@ -14,12 +17,78 @@ const BUILT_IN_PROVIDER_LABELS = {
   custom: { zh: '自定义兼容服务', en: 'Custom compatible service' },
 } as const;
 const CHINESE_SCRIPT = /[\u3400-\u9fff]/;
+const HOME_NAV_LABELS: Record<UiLanguage, string> = {
+  zh: '首页',
+  'zh-TW': '首頁',
+  en: 'Home',
+  ja: 'ホーム',
+  ko: '홈',
+  de: 'Startseite',
+  es: 'Inicio',
+  ms: 'Laman Utama',
+  fr: 'Accueil',
+  id: 'Beranda',
+};
+const STOCK_LIST_FIELD_LABELS: Record<Exclude<UiLanguage, 'zh' | 'en'>, string> = {
+  'zh-TW': '自選股列表',
+  ja: '選択銘柄リスト',
+  ko: '선정된 종목 목록',
+  de: 'Liste ausgewählter Aktien',
+  es: 'Lista de acciones seleccionadas',
+  ms: 'Senarai saham terpilih',
+  fr: 'Liste des actions sélectionnées',
+  id: 'Daftar saham pilihan',
+};
+
+const uiLanguageSelector = (page: Page) =>
+  page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+
+async function openProfileMenu(page: Page) {
+  const trigger = page.getByRole('button', { name: 'StockPulse', exact: true }).last();
+  await expect(trigger).toBeVisible();
+  if (await trigger.getAttribute('aria-expanded') !== 'true') {
+    await trigger.click();
+  }
+}
+
+async function selectUiLanguage(page: Page, language: UiLanguage) {
+  let selector = uiLanguageSelector(page);
+  if (!await selector.isVisible().catch(() => false)) {
+    await openProfileMenu(page);
+    selector = uiLanguageSelector(page);
+  }
+  await expect(selector).toBeVisible();
+  await selector.click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
 
 async function switchToEnglish(page: Page) {
-  const toggle = page.getByRole('button', { name: '切换界面语言' });
-  await expect(toggle).toBeVisible();
-  await toggle.click();
+  await selectUiLanguage(page, 'en');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+}
+
+async function assertUiLanguage(page: Page, language: UiLanguage) {
+  await selectUiLanguage(page, language);
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe(language);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  if (!await uiLanguageSelector(page).isVisible().catch(() => false)) {
+    await openProfileMenu(page);
+  }
+  await expect(uiLanguageSelector(page)).toHaveAttribute('data-value', language);
+  await expect(page.getByRole('link', { name: HOME_NAV_LABELS[language], exact: true }).first()).toBeVisible();
+}
+
+async function assertLocalizedStockListField(
+  page: Page,
+  language: keyof typeof STOCK_LIST_FIELD_LABELS,
+) {
+  await page.goto('/settings?section=overview&view=readiness');
+  await expect(page.locator('html')).toHaveAttribute('lang', UI_LANGUAGE_METADATA[language].htmlLang);
+  await expect(page.getByLabel(STOCK_LIST_FIELD_LABELS[language], { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Stock List', { exact: true })).toHaveCount(0);
 }
 
 async function loginInEnglish(page: Page) {
@@ -34,7 +103,7 @@ test.describe('complete UI i18n acceptance', () => {
     await switchToEnglish(page); // 2
     await expect(page.getByRole('link', { name: 'Home' })).toBeVisible(); // 3
     await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible(); // 4
-    await expect(page.getByRole('button', { name: 'Switch UI language' })).toBeVisible(); // 5
+    await expect(uiLanguageSelector(page)).toBeVisible(); // 5
     expect(await page.evaluate(() => localStorage.getItem('dsa.uiLanguage'))).toBe('en'); // 6
 
     await page.reload();
@@ -53,12 +122,63 @@ test.describe('complete UI i18n acceptance', () => {
     await mobileBacktestLink.click();
 
     const themeToggle = page.getByRole('button', { name: 'Toggle theme' }).first();
+    if (!await themeToggle.isVisible().catch(() => false)) {
+      await openProfileMenu(page);
+    }
     await themeToggle.click();
     await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
     await expect(page.locator('html')).toHaveClass(/dark/); // 11
 
-    await page.getByRole('button', { name: 'Switch UI language' }).click();
+    await selectUiLanguage(page, 'zh');
     await expect(page.locator('html')).toHaveAttribute('lang', 'zh-CN'); // 12
+  });
+
+  test('Traditional Chinese selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'zh-TW');
+    await assertLocalizedStockListField(page, 'zh-TW');
+  });
+
+  test('Japanese selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ja');
+    await assertLocalizedStockListField(page, 'ja');
+  });
+
+  test('Korean selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ko');
+    await assertLocalizedStockListField(page, 'ko');
+  });
+
+  test('German selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'de');
+    await assertLocalizedStockListField(page, 'de');
+  });
+
+  test('Spanish selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'es');
+    await assertLocalizedStockListField(page, 'es');
+  });
+
+  test('Malay selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'ms');
+    await assertLocalizedStockListField(page, 'ms');
+  });
+
+  test('French selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'fr');
+    await assertLocalizedStockListField(page, 'fr');
+  });
+
+  test('Indonesian selection persists with localized navigation and Settings field titles', async ({ page }) => {
+    await loginAsE2eAdmin(page);
+    await assertUiLanguage(page, 'id');
+    await assertLocalizedStockListField(page, 'id');
   });
 
   test('login supports English for both first setup and returning admin states', async ({ page }) => {
@@ -142,30 +262,21 @@ test.describe('complete UI i18n acceptance', () => {
     }
   });
 
-  test('an open Connection Modal updates immediately after switching UI language', async ({ page }) => {
+  test('Connection Modal opens in the language selected from Profile', async ({ page }) => {
     await loginAsE2eAdmin(page);
     await page.goto('/settings?section=ai_models&view=connections');
-    await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('button', { name: /添加模型服务/ }).first().click();
-    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
-    const providerSelect = dialog.getByLabel('选择模型服务商');
-    await providerSelect.click();
-    await dialog.locator('[role="option"][data-value="openai"]').click();
-    await expect(providerSelect).toHaveAttribute('data-value', 'openai');
-    await dialog.evaluate((element) => element.setAttribute('data-language-switch-modal', 'same'));
-
-    await page.locator('button[aria-label="切换界面语言"]').first().evaluate(
-      (button: HTMLButtonElement) => button.click(),
-    );
-
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    const sameDialog = page.locator('[data-language-switch-modal="same"]');
-    await expect(sameDialog).toContainText('Add model service');
-    const localizedSelect = sameDialog.getByLabel('Choose model provider');
+    await expect(page.getByRole('heading', { name: 'Model access' })).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('button', { name: /Add model service/ }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add model service' });
+    const localizedSelect = dialog.getByLabel('Choose model provider');
+    await localizedSelect.click();
+    await dialog.locator('[role="option"][data-value="openai"]').click();
     await expect(localizedSelect).toHaveAttribute('data-value', 'openai');
     await expect(localizedSelect).toContainText('OpenAI Official');
     await localizedSelect.click();
-    const openAiOption = sameDialog.locator('[role="option"][data-value="openai"]');
+    const openAiOption = dialog.locator('[role="option"][data-value="openai"]');
     await expect(openAiOption).toContainText('OpenAI Official');
     expect(await openAiOption.innerText()).not.toMatch(CHINESE_SCRIPT);
   });

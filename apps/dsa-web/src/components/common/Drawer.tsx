@@ -110,7 +110,7 @@ export const Drawer: React.FC<DrawerProps> = ({
                 type="button"
                 onClick={handleClose}
                 disabled={closeDisabled}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label={t('common.closeDrawer')}
               >
                 <X className="h-5 w-5" aria-hidden="true" />

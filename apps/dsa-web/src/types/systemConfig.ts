@@ -41,16 +41,16 @@ export type ConfigConditionOperator = 'equals' | 'notEquals' | 'in' | 'notEmpty'
 export interface ConfigCondition {
   key: string;
   operator: ConfigConditionOperator;
-  value?: string | string[];
+  value?: string | string[] | null;
 }
 
 export interface ConfigFieldContract {
   requirement?: 'required' | 'optional' | 'inherited';
-  requiredWhen?: ConfigCondition[];
-  visibleWhen?: ConfigCondition[];
-  enabledWhen?: ConfigCondition[];
-  requiresConnectionTest?: boolean;
-  restartRequired?: boolean;
+  requiredWhen?: ConfigCondition[] | null;
+  visibleWhen?: ConfigCondition[] | null;
+  enabledWhen?: ConfigCondition[] | null;
+  requiresConnectionTest?: boolean | null;
+  restartRequired?: boolean | null;
 }
 
 /**
@@ -82,6 +82,7 @@ export interface SystemConfigFieldSchema {
   isRequired: boolean;
   isEditable: boolean;
   defaultValue?: string | null;
+  unit?: string | null;
   options: Array<string | SystemConfigOption>;
   validation: Record<string, unknown>;
   displayOrder: number;
@@ -118,6 +119,8 @@ export interface SystemConfigResponse {
   configVersion: string;
   maskToken: string;
   items: SystemConfigItem[];
+  /** Omitted by older backends; useSystemConfig exposes that absence as null (unknown). */
+  configuredNotificationChannels?: string[];
   updatedAt?: string;
 }
 

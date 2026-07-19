@@ -50,6 +50,9 @@ log "Checking AlphaSift adapter availability..."
 log "Checking orjson availability..."
 "${PYTHON_BIN}" -c "import orjson"
 
+log "Checking migration registry availability..."
+"${PYTHON_BIN}" -c "from src.migrations.registry import TARGET_VERSION, get_migrations; migration_ids = [migration.id for migration in get_migrations()]; assert migration_ids and migration_ids[-1] == TARGET_VERSION"
+
 if [[ -d "${ROOT_DIR}/dist/backend" ]]; then
   rm -rf "${ROOT_DIR}/dist/backend"
 fi
@@ -93,6 +96,9 @@ hidden_imports=(
   "src.services.analysis_service"
   "src.services.history_service"
   "src.services.alphasift_service"
+  "src.migrations"
+  "src.migrations.registry"
+  "src.migrations.versions"
   "alphasift"
   "alphasift.dsa_adapter"
   "orjson"
@@ -114,7 +120,7 @@ for module in "${hidden_imports[@]}"; do
 done
 
 pushd "${ROOT_DIR}" >/dev/null
-cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --add-data "static:static" --add-data "strategies:strategies" --collect-data litellm --collect-data tiktoken --collect-data akshare)
+cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --add-data "static:static" --add-data "strategies:strategies" --add-data "src/migrations/versions/*.py:src/migrations/versions" --collect-data litellm --collect-data tiktoken --collect-data akshare)
 cmd+=("--collect-all" "alphasift")
 cmd+=("${hidden_import_args[@]}" "main.py")
 
@@ -140,7 +146,7 @@ if ! "${packaged_entry}" --help >/tmp/alphasift-packaged-help.log 2>&1; then
   exit 1
 fi
 
-for module in alphasift.dsa_adapter orjson; do
+for module in alphasift.dsa_adapter orjson src.migrations.registry; do
   if DSA_PACKAGED_IMPORT_PROBE="${module}" "${packaged_entry}" >/tmp/dsa-packaged-import.log 2>&1; then
     cat /tmp/dsa-packaged-import.log
   else
@@ -149,6 +155,16 @@ for module in alphasift.dsa_adapter orjson; do
     exit 1
   fi
 done
+
+log "Verifying packaged migration source..."
+packaged_migration_source_dir="${packaged_root}/_internal/src/migrations/versions"
+if [[ ! -d "${packaged_migration_source_dir}" ]]; then
+  packaged_migration_source_dir="${packaged_root}/src/migrations/versions"
+fi
+if [[ ! -d "${packaged_migration_source_dir}" ]] || ! find "${packaged_migration_source_dir}" -maxdepth 1 -type f -name 'v*.py' -print -quit | grep -q .; then
+  echo "ERROR: packaged migration source not found under ${packaged_root}."
+  exit 1
+fi
 
 log "Verifying packaged AkShare calendar data..."
 packaged_akshare_calendar="${packaged_root}/_internal/akshare/file_fold/calendar.json"

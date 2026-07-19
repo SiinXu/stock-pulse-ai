@@ -31,7 +31,7 @@ from src.services.run_diagnostics import record_provider_run, record_provider_ru
 from src.utils.sanitize import log_safe_exception
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
-from .realtime_types import CircuitBreaker
+from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -2185,7 +2185,13 @@ class DataFetcherManager:
             )
         return None
 
-    def _supplement_quote(self, stock_code: str, primary_quote, fetcher_name: str, **kw):
+    def _supplement_quote(
+        self,
+        stock_code: str,
+        primary_quote: Optional[UnifiedRealtimeQuote],
+        fetcher_name: str,
+        **kw: str,
+    ) -> Optional[UnifiedRealtimeQuote]:
         """Supplement *primary_quote* with data from *fetcher_name*.
 
         If *primary_quote* is None, try *fetcher_name* as the sole source.
@@ -2216,7 +2222,11 @@ class DataFetcherManager:
             logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 获取成功 (独立数据源)")
         return q
 
-    def _supplement_from_longbridge(self, stock_code: str, primary_quote):
+    def _supplement_from_longbridge(
+        self,
+        stock_code: str,
+        primary_quote: Optional[UnifiedRealtimeQuote],
+    ) -> Optional[UnifiedRealtimeQuote]:
         """Shortcut kept for backward-compat with A-share general loop."""
         return self._supplement_quote(stock_code, primary_quote, "LongbridgeFetcher")
 

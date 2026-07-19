@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -10,10 +13,12 @@ const en: Record<keyof typeof zh, string> = {
   apiKeyOptional: 'API key (optional)',
 };
 
-export const MODEL_ACCESS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const MODEL_ACCESS_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_TEXT", { zh, en });
 
 const editorZh = {
   testing: '测试中…',
+  schemaUnavailableTitle: '连接 Schema 不完整或不可用',
+  schemaUnavailableMessage: '模型服务连接已进入只读保护；请更新后端或恢复完整的连接 Schema 后重试。',
   readonly: '当前模型配置由外部配置管理，网页暂时只读。',
   viewDetails: '查看详情',
   catalogFailed: '模型服务列表加载失败',
@@ -42,6 +47,8 @@ const editorZh = {
 
 const editorEn: Record<keyof typeof editorZh, string> = {
   testing: 'Testing…',
+  schemaUnavailableTitle: 'Connection Schema is incomplete or unavailable',
+  schemaUnavailableMessage: 'Model-service connections are read-only until the backend provides a complete Connection Schema.',
   readonly: 'Model configuration is managed externally. This page is read-only.',
   viewDetails: 'View details',
   catalogFailed: 'Could not load model providers',
@@ -68,39 +75,39 @@ const editorEn: Record<keyof typeof editorZh, string> = {
   discoveryEmptyHint: 'The /models endpoint returned no usable model IDs. Check the base URL or add the model list manually.',
 };
 
-export const MODEL_ACCESS_EDITOR_TEXT: Record<UiLanguage, Record<keyof typeof editorZh, string>> = {
+export const MODEL_ACCESS_EDITOR_TEXT: Record<UiLanguage, Record<keyof typeof editorZh, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_EDITOR_TEXT", {
   zh: editorZh,
   en: editorEn,
-};
+});
 
-export const MODEL_ACCESS_STAGE_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const MODEL_ACCESS_STAGE_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_STAGE_LABELS", {
   zh: { model_discovery: '模型发现', chat_completion: '聊天调用', response_parse: '响应解析', capability_json: 'JSON 能力', capability_tools: 'Tools 能力', capability_stream: 'Stream 能力', capability_vision: 'Vision 能力' },
   en: { model_discovery: 'Model discovery', chat_completion: 'Chat completion', response_parse: 'Response parsing', capability_json: 'JSON capability', capability_tools: 'Tools capability', capability_stream: 'Streaming capability', capability_vision: 'Vision capability' },
-};
+});
 
-export const MODEL_ACCESS_ERROR_LABELS: Record<UiLanguage, Record<string, string>> = {
+export const MODEL_ACCESS_ERROR_LABELS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS", {
   zh: { auth: '鉴权失败', timeout: '请求超时', quota: '额度或限流', model_not_found: '模型不可用', request_blocked: '请求被拦截', empty_response: '空响应', format_error: '格式异常', network_error: '网络异常', invalid_config: '配置无效', unsupported_protocol: '协议暂不支持', capability_unsupported: '能力不支持', skipped: '已跳过' },
   en: { auth: 'Authentication failed', timeout: 'Request timed out', quota: 'Quota or rate limit', model_not_found: 'Model unavailable', request_blocked: 'Request blocked', empty_response: 'Empty response', format_error: 'Invalid response format', network_error: 'Network error', invalid_config: 'Invalid configuration', unsupported_protocol: 'Unsupported protocol', capability_unsupported: 'Capability unsupported', skipped: 'Skipped' },
-};
+});
 
-export const MODEL_ACCESS_TROUBLESHOOTING: Record<UiLanguage, Record<string, string>> = {
+export const MODEL_ACCESS_TROUBLESHOOTING: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING", {
   zh: { auth: '请检查 API 密钥是否正确、是否有多余空格，以及当前连接是否需要额外组织/项目权限。', timeout: '可重试；若持续超时，请检查服务地址、网络代理、服务商可用区或本地防火墙。', quota: '请检查余额、套餐额度、RPM/TPM 限流或并发设置，必要时稍后重试。', model_not_found: '请确认模型名与连接协议匹配，并先用“获取模型”核对该连接实际可用模型列表。', empty_response: '连接已连通但未返回正文；可尝试切换兼容模型、关闭额外响应模式后再测试。', network_error: '请检查服务地址、代理、TLS/证书、中转网关或本地网络策略，并可稍后重试。', invalid_config: '先补齐协议、服务地址、API 密钥和模型配置，再执行一键测试。', unsupported_protocol: '当前连接不支持自动模型发现，请改为手动维护模型列表。' },
   en: { auth: 'Check the API key, surrounding whitespace, and any required organization or project access.', timeout: 'Try again. If timeouts continue, check the base URL, proxy, provider region, and local firewall.', quota: 'Check account balance, plan limits, RPM/TPM limits, and concurrency before retrying.', model_not_found: 'Confirm that the model ID matches this connection, then compare it with the discovered model list.', empty_response: 'The connection succeeded but returned no content. Try a compatible model or disable extra response modes.', network_error: 'Check the base URL, proxy, TLS certificate, gateway, and local network policy, then retry.', invalid_config: 'Complete the protocol, base URL, API key, and model configuration before testing.', unsupported_protocol: 'This connection does not support automatic model discovery. Maintain the model list manually.' },
-};
+});
 
-export const MODEL_ACCESS_REASON_HINTS: Record<UiLanguage, Record<string, string>> = {
+export const MODEL_ACCESS_REASON_HINTS: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS", {
   zh: { missing_api_key: 'API 密钥为空，或逗号分隔后没有任何可用密钥；请填入至少一个有效密钥后再测试。', api_key_rejected: '服务商拒绝了当前 API 密钥；请检查密钥、组织/项目权限、区域和账号状态。', rate_limit: '服务商触发 RPM/TPM 或并发限流；请降低请求频率或稍后重试。', insufficient_balance: '服务商返回余额、账单或额度不足；请检查账户余额和套餐状态。', quota_exceeded: '服务商返回配额已耗尽；请确认账号套餐、余量和项目额度。', provider_blocked: '请求被服务商或中转网关拦截；请检查账号风控、地域限制、模型权限、网关策略、内容安全策略或请求来源限制。', dns_error: '域名解析失败；请检查服务地址域名、网络代理和 DNS 配置。', tls_error: 'TLS/证书握手失败；请检查 HTTPS 证书、中转网关或公司代理策略。', connection_refused: '目标服务拒绝连接；请确认服务地址端口、服务进程和防火墙配置。', model_access_denied: '当前账号无法使用该模型；请确认模型是否已开通、账号是否可见，或模型是否已被禁用。', provider_prefix_mismatch: '模型 provider 前缀与当前连接不匹配；请确认模型名是否应使用该连接的兼容路由。', capability_unsupported: '当前模型或兼容层不支持该能力；这不影响基础文本连接，可换模型或关闭该能力依赖。' },
   en: { missing_api_key: 'Enter at least one valid API key before testing.', api_key_rejected: 'The provider rejected this API key. Check the key, project access, region, and account status.', rate_limit: 'The provider rate-limited the request. Reduce request frequency or retry later.', insufficient_balance: 'The provider reported insufficient balance or billing credit. Check the account and plan.', quota_exceeded: 'The provider quota is exhausted. Check the plan and project limits.', provider_blocked: 'The provider or gateway blocked the request. Check account, region, model access, gateway, and content policies.', dns_error: 'DNS resolution failed. Check the base URL, proxy, and DNS configuration.', tls_error: 'TLS negotiation failed. Check the HTTPS certificate, gateway, and corporate proxy.', connection_refused: 'The service refused the connection. Check the port, service process, and firewall.', model_access_denied: 'This account cannot access the model. Confirm model access and account visibility.', provider_prefix_mismatch: 'The model provider prefix does not match this connection. Check the compatible route.', capability_unsupported: 'The model or compatibility layer does not support this capability. Basic text access may still work.' },
-};
+});
 
-export const MODEL_ACCESS_ISSUES: Record<UiLanguage, Record<string, string>> = {
-  zh: { name_required: '连接名称必填', name_invalid: '连接名称仅限小写字母、数字或下划线', missing_provider: '缺少模型服务商', missing_protocol: '缺少连接协议', missing_api_key: '缺少 API 密钥', missing_base_url: '缺少服务地址', missing_models: '至少配置一个模型', contract_unknown: '连接字段契约包含不支持的条件' },
-  en: { name_required: 'Connection name is required', name_invalid: 'Use lowercase letters, numbers, or underscores', missing_provider: 'Model provider is required', missing_protocol: 'Connection protocol is required', missing_api_key: 'API key is required', missing_base_url: 'Base URL is required', missing_models: 'Add at least one model', contract_unknown: 'The Connection field contract contains an unsupported condition' },
-};
+export const MODEL_ACCESS_ISSUES: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_ISSUES", {
+  zh: { name_required: '连接名称必填', name_invalid: '连接名称仅限小写字母、数字或下划线', missing_provider: '缺少模型服务商', missing_protocol: '缺少连接协议', missing_api_key: '缺少 API 密钥', missing_base_url: '缺少服务地址', missing_models: '至少配置一个模型', missing_extra_headers: '附加请求头必填', contract_unknown: '连接字段契约包含不支持的条件', schema_unavailable: '连接 Schema 不完整或不可用' },
+  en: { name_required: 'Connection name is required', name_invalid: 'Use lowercase letters, numbers, or underscores', missing_provider: 'Model provider is required', missing_protocol: 'Connection protocol is required', missing_api_key: 'API key is required', missing_base_url: 'Base URL is required', missing_models: 'Add at least one model', missing_extra_headers: 'Extra headers are required', contract_unknown: 'The Connection field contract contains an unsupported condition', schema_unavailable: 'Connection Schema is incomplete or unavailable' },
+});
 
 export function localizeModelAccessIssue(issue: string, language: UiLanguage): string {
   const codeByZh: Record<string, keyof typeof MODEL_ACCESS_ISSUES.zh> = {
-    '连接名称必填': 'name_required', '连接名称仅限小写字母、数字或下划线': 'name_invalid', '缺少模型服务商': 'missing_provider', '缺少连接协议': 'missing_protocol', '缺少 API 密钥': 'missing_api_key', '缺少服务地址': 'missing_base_url', '至少配置一个模型': 'missing_models', '连接字段契约包含不支持的条件': 'contract_unknown',
+    '连接名称必填': 'name_required', '连接名称仅限小写字母、数字或下划线': 'name_invalid', '缺少模型服务商': 'missing_provider', '缺少连接协议': 'missing_protocol', '缺少 API 密钥': 'missing_api_key', '缺少服务地址': 'missing_base_url', '至少配置一个模型': 'missing_models', '附加请求头必填': 'missing_extra_headers', '连接字段契约包含不支持的条件': 'contract_unknown', '连接 Schema 不完整或不可用': 'schema_unavailable',
   };
   const code = codeByZh[issue];
   return code ? MODEL_ACCESS_ISSUES[language][code] : issue;

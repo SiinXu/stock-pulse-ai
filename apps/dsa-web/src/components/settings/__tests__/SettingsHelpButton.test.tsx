@@ -1,72 +1,42 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { useState } from 'react';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
-import { Modal } from '../../common/Modal';
 import { SettingsHelpButton } from '../SettingsHelpButton';
 
-function HelpHarness({ stacked = false }: { stacked?: boolean }) {
-  const [outerOpen, setOuterOpen] = useState(stacked);
-
-  const helpButton = (
-    <SettingsHelpButton
-      fieldKey="STOCK_LIST"
-      title="Watchlist"
-      helpKey="settings.base.STOCK_LIST"
-    />
-  );
-
-  return (
+function renderHelpButton() {
+  render(
     <UiLanguageProvider>
-      {stacked ? (
-        <Modal isOpen={outerOpen} onClose={() => setOuterOpen(false)} title="Outer settings dialog">
-          {helpButton}
-        </Modal>
-      ) : (
-        helpButton
-      )}
-    </UiLanguageProvider>
+      <SettingsHelpButton
+        fieldKey="STOCK_LIST"
+        title="Watchlist"
+        helpKey="settings.base.STOCK_LIST"
+      />
+    </UiLanguageProvider>,
   );
+  return screen.getByRole('button', { name: /Watchlist/ });
 }
 
-describe('SettingsHelpButton overlay contract', () => {
-  it('uses the shared modal root, isolates the page, and restores trigger focus', () => {
-    const { container } = render(<HelpHarness />);
-    const trigger = screen.getByRole('button', { name: /Watchlist/ });
-    trigger.focus();
-    fireEvent.click(trigger);
+describe('SettingsHelpButton tooltip contract', () => {
+  it('shows only the field purpose and recommendation in the shared tooltip', () => {
+    const trigger = renderHelpButton();
 
-    const helpDialog = screen.getByRole('dialog', { name: 'Watchlist' });
-    expect(helpDialog.closest('[data-overlay-root="modal"]')).toBeInTheDocument();
-    expect(container).toHaveAttribute('inert');
-    expect(document.body).toHaveStyle({ overflow: 'hidden' });
-    expect(helpDialog).toContainElement(document.activeElement as HTMLElement);
+    fireEvent.mouseEnter(trigger.parentElement!);
 
-    fireEvent.click(within(helpDialog).getByRole('button', { name: /Close/ }));
-
-    expect(screen.queryByRole('dialog', { name: 'Watchlist' })).not.toBeInTheDocument();
-    expect(container).not.toHaveAttribute('inert');
-    expect(document.body).not.toHaveStyle({ overflow: 'hidden' });
-    expect(trigger).toHaveFocus();
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Defines the stock codes used by analysis jobs and notification reports.');
+    expect(tooltip).toHaveTextContent('Saved STOCK_LIST values are written with English commas.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('closes only Help on Escape while the underlying modal stays isolated and locked', () => {
-    render(<HelpHarness stacked />);
-    const outerDialog = screen.getByRole('dialog', { name: 'Outer settings dialog' });
-    const trigger = within(outerDialog).getByRole('button', { name: /Watchlist/ });
-    trigger.focus();
-    fireEvent.click(trigger);
+  it('supports keyboard focus and closes the tooltip on Escape', () => {
+    const trigger = renderHelpButton();
 
-    const helpDialog = screen.getByRole('dialog', { name: 'Watchlist' });
-    expect(outerDialog.closest('[data-overlay-root]')).toHaveAttribute('inert');
-    expect(outerDialog.closest('[data-overlay-root]')).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
-    fireEvent.keyDown(helpDialog, { key: 'Escape' });
-
-    expect(screen.queryByRole('dialog', { name: 'Watchlist' })).not.toBeInTheDocument();
-    const remainingDialog = screen.getByRole('dialog', { name: 'Outer settings dialog' });
-    expect(remainingDialog.closest('[data-overlay-root]')).not.toHaveAttribute('inert');
-    expect(document.body).toHaveStyle({ overflow: 'hidden' });
-    expect(trigger).toHaveFocus();
+    fireEvent.keyDown(trigger.parentElement!, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

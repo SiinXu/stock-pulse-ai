@@ -74,7 +74,8 @@ describe('HistoryList', () => {
     expect(onItemClick).toHaveBeenCalledWith(1);
 
     const itemCheckbox = screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' });
-    expect(itemCheckbox.parentElement).toHaveClass('h-11', 'w-11');
+    expect(itemCheckbox.closest('label')).toHaveClass('h-11', 'w-11');
+    expect(itemCheckbox.parentElement).toHaveClass('h-6', 'w-6');
     fireEvent.click(itemCheckbox);
     expect(onToggleItemSelection).toHaveBeenCalledWith(1);
   });
@@ -300,15 +301,15 @@ describe('HistoryList', () => {
   });
 
   it('generates unique select-all ids across multiple instances', () => {
-    const { container } = render(
+    render(
       <>
         <HistoryList {...baseProps} items={items} />
         <HistoryList {...baseProps} items={items} />
       </>,
     );
 
-    const labels = container.querySelectorAll('label[for]');
-    const ids = Array.from(labels).map((label) => label.getAttribute('for'));
+    const selectAllInputs = screen.getAllByRole('checkbox', { name: '全选当前已加载历史记录' });
+    const ids = selectAllInputs.map((input) => input.id);
 
     expect(ids).toHaveLength(2);
     expect(new Set(ids).size).toBe(ids.length);

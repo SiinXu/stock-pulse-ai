@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Stable public failure values for Agent API and persisted chat history."""
 
 from __future__ import annotations

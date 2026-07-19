@@ -1,0 +1,81 @@
+{
+  "format_version": 1,
+  "generation": {
+    "database_config": "DATABASE_PATH pointing to an isolated temporary file",
+    "export": "sqlite3.Connection.iterdump() after inserting fixed sanitized canaries",
+    "python": "3.12.13",
+    "source_checkout": "git archive of each fixed commit",
+    "sqlalchemy": "2.0.51",
+    "sqlite": "3.53.3"
+  },
+  "profile_digest_algorithm": "SHA-256 of canonical tables, ordered columns, affinity, PK, NOT NULL, defaults, unique keys/collations, foreign keys, and table options",
+  "schema_digest_algorithm": "SHA-256 of canonical sqlite_master rows ordered by type and name",
+  "fixtures": [
+    {
+      "canaries": [
+        "stock_daily",
+        "analysis_history"
+      ],
+      "file": "v3_0_0.sql",
+      "profile_id": "stockpulse_v3_0_0",
+      "profile_digest": "dc374be346f7c821deb25f72844ebaaad3eca9eea6c6186f8a9893240680ccf0",
+      "schema_digest": "ec853a3e7ad482efbcfdd0a31a5f0affce1031725950bbae8006d7d300ade1c0",
+      "source_commit": "52917baa02210fb7911491fcf48ecbf3f70e5812",
+      "source_tag": "v3.0.0"
+    },
+    {
+      "canaries": [
+        "stock_daily",
+        "analysis_history"
+      ],
+      "file": "v3_4_0.sql",
+      "profile_id": "stockpulse_v3_4_0",
+      "profile_digest": "86a9c06247e0ef4f3cf20eebe091a261ce05fa4e5eba8dc729c0c42cc312d93a",
+      "schema_digest": "1dec14940883b5571ae43e88f93c31974a9d403defc9ccc835ca2e53a3055a4f",
+      "source_commit": "0154992e18f6a5a09199a151ee75661e78b9c12f",
+      "source_tag": "v3.4.0"
+    },
+    {
+      "canaries": [
+        "stock_daily",
+        "analysis_history",
+        "portfolio_accounts",
+        "portfolio_trades"
+      ],
+      "file": "v3_20_0.sql",
+      "profile_id": "stockpulse_v3_20_0",
+      "profile_digest": "ce59784e3a49e140d6586a5e49235df875829031dd0c8ca36243f73405f350c6",
+      "schema_digest": "476b2e179a2506344fc10c0289017e0ba00307505f8cd9bb5842724cbffd156f",
+      "source_commit": "d22ff1c42d37d1b1d7d955c6dfb00daf1f62e69d",
+      "source_tag": "v3.20.0"
+    },
+    {
+      "canaries": [
+        "stock_daily",
+        "analysis_history",
+        "portfolio_accounts",
+        "portfolio_trades"
+      ],
+      "file": "v3_21_0.sql",
+      "profile_id": "stockpulse_v3_21_0",
+      "profile_digest": "9be806240d4fc8ef6b08c5336091997b8d2d9e175f5458c7acae2049e0f8fc24",
+      "schema_digest": "17dc06c9e75a4439a2d8bf9fe06c9e52c691f23d2c2383a45974e6150a196733",
+      "source_commit": "40c5c75b2ecfafafd5bbc6bbae9696c5b7d9a43d",
+      "source_tag": "v3.21.0"
+    },
+    {
+      "canaries": [
+        "stock_daily",
+        "analysis_history",
+        "portfolio_accounts",
+        "portfolio_trades"
+      ],
+      "file": "v3_26_3.sql",
+      "profile_id": "stockpulse_v3_26_3",
+      "profile_digest": "a49b23489547463ccb7875affbef89ba67ab4dbac9575b9776fd548240077a47",
+      "schema_digest": "15da1080271e9d187bcca9b06972e5b61e392e42bd2e57d694d33ba6f2fac4ec",
+      "source_commit": "88f2eeef57a7c99ed484f3be5e8cfa7a54a9ece2",
+      "source_tag": "v3.26.3"
+    }
+  ]
+}

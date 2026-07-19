@@ -1,7 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Modal } from '../Modal';
 import { SearchableSelect, type SearchableSelectOption } from '../SearchableSelect';
+import { FIXED_POPUP_VIEWPORT_MARGIN_PX } from '../useFixedPopup';
 
 const options: SearchableSelectOption[] = [
   {
@@ -143,6 +146,93 @@ describe('SearchableSelect', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '主要模型' }));
     expect(within(dialog).getByRole('listbox')).toBeInTheDocument();
     expect(within(dialog).getByRole('combobox')).toHaveFocus();
+  });
+
+  it('opens above a bottom-anchored trigger so the popup stays in the viewport', async () => {
+    const triggerRect = new DOMRect(21, 706, 348, 44);
+    const popupRect = new DOMRect(21, 754, 348, 299);
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.getAttribute('aria-label') === '主要模型') {
+          return triggerRect;
+        }
+        if (this.getAttribute('data-dialog-popup') === 'true') {
+          return popupRect;
+        }
+        return new DOMRect();
+      });
+    vi.stubGlobal('innerHeight', 844);
+    vi.stubGlobal('innerWidth', 390);
+
+    try {
+      render(
+        <Modal isOpen title="配置连接" onClose={() => {}}>
+          <SearchableSelect value="" onChange={() => {}} options={options} ariaLabel="主要模型" />
+        </Modal>,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '主要模型' }));
+      const popup = screen.getByRole('listbox', { name: '主要模型' }).parentElement;
+      expect(popup).not.toBeNull();
+
+      await waitFor(() => {
+        expect(popup?.style.maxWidth).toBe(
+          `calc(100vw - ${FIXED_POPUP_VIEWPORT_MARGIN_PX * 2}px)`,
+        );
+        const popupTop = Number.parseFloat(popup?.style.top ?? '');
+        expect(popupTop).toBeLessThan(triggerRect.top);
+        expect(popupTop + popupRect.height).toBeLessThanOrEqual(
+          window.innerHeight - FIXED_POPUP_VIEWPORT_MARGIN_PX,
+        );
+      });
+    } finally {
+      rectSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('portals to document.body and remeasures the trigger after a window resize', async () => {
+    let triggerTop = 100;
+    const triggerWidth = 240;
+    const triggerHeight = 44;
+    const popupHeight = 180;
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function getBoundingClientRect(this: HTMLElement) {
+        if (this.getAttribute('aria-label') === '主要模型') {
+          return new DOMRect(80, triggerTop, triggerWidth, triggerHeight);
+        }
+        if (this.getAttribute('data-dialog-popup') === 'true') {
+          return new DOMRect(80, 0, triggerWidth, popupHeight);
+        }
+        return new DOMRect();
+      });
+    vi.stubGlobal('innerWidth', 1024);
+    vi.stubGlobal('innerHeight', 844);
+
+    try {
+      render(
+        <SearchableSelect value="" onChange={() => {}} options={options} ariaLabel="主要模型" />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: '主要模型' }));
+      const popup = screen.getByRole('listbox', { name: '主要模型' }).parentElement;
+      expect(popup).not.toBeNull();
+      expect(popup?.parentElement).toBe(document.body);
+
+      let initialTop = Number.NaN;
+      await waitFor(() => {
+        initialTop = Number.parseFloat(popup?.style.top ?? '');
+        expect(initialTop).toBeGreaterThan(triggerTop + triggerHeight);
+      });
+
+      triggerTop = 360;
+      fireEvent.resize(window);
+
+      await waitFor(() => {
+        expect(Number.parseFloat(popup?.style.top ?? '')).toBeGreaterThan(initialTop);
+      });
+    } finally {
+      rectSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('lets Escape close the popup without dismissing its parent modal', () => {

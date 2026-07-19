@@ -8,7 +8,7 @@ interface StickyActionBarProps {
 
 export const StickyActionBar: React.FC<StickyActionBarProps> = ({ children, className = '' }) => {
   return (
-    <div className={cn('sticky bottom-4 z-20 rounded-2xl border border-subtle bg-card/85 p-3 shadow-soft-card backdrop-blur-sm', className)}>
+    <div className={cn('sticky bottom-4 z-20 rounded-xl border border-subtle bg-card/85 p-3 shadow-soft-card backdrop-blur-sm', className)}>
       <div className="flex flex-wrap items-center justify-end gap-2">{children}</div>
     </div>
   );

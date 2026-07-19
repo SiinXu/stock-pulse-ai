@@ -13,6 +13,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from src.agent.tools.data_tools import _handle_get_capital_flow
 
 
+CAPITAL_FLOW_CANARY = "CAPITAL_FLOW_PROVIDER_DIAGNOSTIC_CANARY"
+CAPITAL_FLOW_PATH = "/Users/private-user/.config/stockpulse/capital-flow.json"
+
+
 class _DummyManagerOk:
     """Returns a well-formed capital flow context."""
 
@@ -45,7 +49,17 @@ class _DummyManagerRaises:
     """Simulates a fetch failure."""
 
     def get_capital_flow_context(self, _stock_code: str):
-        raise RuntimeError("network timeout")
+        raise OSError(5, f"capital flow provider failed: {CAPITAL_FLOW_CANARY}", CAPITAL_FLOW_PATH)
+
+
+class _DummyManagerRawErrors(_DummyManagerOk):
+    """Returns provider diagnostics that must not cross the Agent tool boundary."""
+
+    def get_capital_flow_context(self, stock_code: str):
+        context = super().get_capital_flow_context(stock_code)
+        context["status"] = "partial"
+        context["errors"] = [f"provider rejected request: {CAPITAL_FLOW_CANARY} at {CAPITAL_FLOW_PATH}"]
+        return context
 
 
 class TestGetCapitalFlowContract(unittest.TestCase):
@@ -87,13 +101,28 @@ class TestGetCapitalFlowContract(unittest.TestCase):
         with patch(
             "src.agent.tools.data_tools._get_fetcher_manager",
             return_value=_DummyManagerRaises(),
-        ):
+        ), self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
             result = _handle_get_capital_flow("600519")
 
         self.assertEqual(result["stock_code"], "600519")
         self.assertEqual(result["status"], "error")
-        self.assertIn("capital flow fetch failed", result["error"])
-        self.assertIn("network timeout", result["error"])
+        self.assertEqual(result["error"], "Capital flow data is unavailable.")
+        visible = str(result) + "\n" + "\n".join(logs.output)
+        self.assertNotIn(CAPITAL_FLOW_CANARY, visible)
+        self.assertNotIn(CAPITAL_FLOW_PATH, visible)
+        self.assertNotIn("capital flow provider failed", visible)
+
+    def test_provider_errors_are_replaced_with_stable_public_code(self) -> None:
+        with patch(
+            "src.agent.tools.data_tools._get_fetcher_manager",
+            return_value=_DummyManagerRawErrors(),
+        ):
+            result = _handle_get_capital_flow("600519")
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["errors"], ["capital_flow_provider_error"])
+        self.assertNotIn(CAPITAL_FLOW_CANARY, str(result))
+        self.assertNotIn(CAPITAL_FLOW_PATH, str(result))
 
 
 if __name__ == "__main__":

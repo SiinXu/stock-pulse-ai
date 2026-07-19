@@ -37,6 +37,9 @@ from src.agent.executor import (
 from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.runner import parse_dashboard_json, run_agent_loop, serialize_tool_result
 from src.agent.stock_scope import StockScope, resolve_stock_scope
+from src.agent.tools.data_tools import get_capital_flow_tool
+from src.agent.tools.execution import execute_runner_tool_call_via_session
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolRegistry, ToolDefinition, ToolParameter
 from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
 from src.config import Config
@@ -231,7 +234,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -348,7 +351,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -390,7 +393,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content="assistant reply")
@@ -422,7 +425,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["stock_scope"] = stock_scope
             return AgentResult(success=True, content=json.dumps(SAMPLE_DASHBOARD, ensure_ascii=False))
 
@@ -461,7 +464,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -487,7 +490,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -511,7 +514,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -536,7 +539,7 @@ class TestAgentExecutor(unittest.TestCase):
             model="openai/gpt-test",
         )
 
-        with patch("src.agent.runner._persist_usage") as persist_usage:
+        with patch("src.agent.runtime.lifecycle.persist_llm_usage") as persist_usage:
             result = run_agent_loop(
                 messages=[{"role": "user", "content": "Analyze"}],
                 tool_registry=registry,
@@ -1016,7 +1019,15 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(result.tool_calls_log[0]["tool"], "default_api:search_stock_news")
         tool_messages = [msg for msg in result.messages if msg.get("role") == "tool"]
         self.assertEqual(len(tool_messages), 1)
-        self.assertIn("not found in registry", tool_messages[0]["content"])
+        self.assertEqual(
+            json.loads(tool_messages[0]["content"]),
+            {
+                "error": "Tool name must exactly match a registered StockPulse tool.",
+                "code": "invalid_tool_name",
+                "retriable": False,
+            },
+        )
+        self.assertNotIn("Available", tool_messages[0]["content"])
 
     def test_parallel_tool_batch_guards_only_conflicting_stock_calls(self):
         executed_calls = []
@@ -1067,7 +1078,7 @@ class TestAgentExecutor(unittest.TestCase):
         executor = AgentExecutor(registry, adapter, max_steps=2)
         captured = {}
 
-        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None):
+        def fake_run_loop(messages, tool_decls, parse_dashboard, progress_callback=None, stock_scope=None, cancelled_check=None):
             captured["messages"] = messages
             return AgentResult(success=True, content="assistant reply")
 
@@ -1326,6 +1337,101 @@ class TestAgentExecutor(unittest.TestCase):
         DatabaseManager.reset_instance()
         Config.reset_instance()
 
+    def test_native_chat_caught_tool_failure_is_safe_in_model_log_and_single_trace(self):
+        canary = "NATIVE_CAPITAL_FLOW_DIAGNOSTIC_CANARY"
+        raw_path = "/Users/private-user/.config/stockpulse/native-capital-flow.json"
+
+        class _FailingCapitalFlowManager:
+            def get_capital_flow_context(self, _stock_code):
+                raise OSError(5, f"capital flow provider failed: {canary}", raw_path)
+
+        DatabaseManager.reset_instance()
+        Config.reset_instance()
+        db = DatabaseManager(db_url="sqlite:///:memory:")
+        registry = ToolRegistry()
+        registry.register(get_capital_flow_tool)
+        adapter = _make_mock_adapter()
+        adapter._config = SimpleNamespace(
+            agent_context_compression_enabled=False,
+            agent_context_compression_profile="balanced",
+            agent_context_compression_trigger_tokens=999999,
+            agent_context_protected_turns=1,
+            llm_model_list=[],
+            agent_litellm_model="deepseek/deepseek-chat",
+            litellm_model="deepseek/deepseek-chat",
+            litellm_fallback_models=[],
+        )
+        adapter.call_with_tools.side_effect = [
+            LLMResponse(
+                content="Checking capital flow.",
+                tool_calls=[
+                    ToolCall(
+                        id="capital_1",
+                        name="get_capital_flow",
+                        arguments={"stock_code": "600519"},
+                    )
+                ],
+                reasoning_content="provider reasoning",
+                usage={"total_tokens": 10},
+                provider="deepseek",
+                model="deepseek/deepseek-chat",
+            ),
+            LLMResponse(
+                content="safe final",
+                tool_calls=[],
+                usage={"total_tokens": 5},
+                provider="deepseek",
+                model="deepseek/deepseek-chat",
+            ),
+        ]
+        executor = AgentExecutor(registry, adapter, max_steps=3)
+
+        try:
+            with patch(
+                "src.agent.tools.data_tools._get_fetcher_manager",
+                return_value=_FailingCapitalFlowManager(),
+            ), self.assertLogs("src.agent.tools.data_tools", level="WARNING") as logs:
+                result = executor.chat(
+                    "Analyze capital flow",
+                    "native-safe-trace",
+                    context={"stock_code": "600519", "stock_name": "贵州茅台"},
+                )
+
+            self.assertTrue(result.success)
+            second_model_input = adapter.call_with_tools.call_args_list[1].args[0]
+            tool_messages = [
+                message for message in second_model_input if message.get("role") == "tool"
+            ]
+            self.assertEqual(len(tool_messages), 1)
+            self.assertEqual(
+                json.loads(tool_messages[0]["content"]),
+                {
+                    "stock_code": "600519",
+                    "status": "error",
+                    "error": "Capital flow data is unavailable.",
+                },
+            )
+            trace_rows = db.get_agent_provider_turns("native-safe-trace")
+            self.assertEqual(len(trace_rows), 1)
+
+            visible = json.dumps(
+                {
+                    "model_input": second_model_input,
+                    "result_messages": result.messages,
+                    "tool_calls_log": result.tool_calls_log,
+                    "provider_trace": trace_rows,
+                    "logs": logs.output,
+                },
+                ensure_ascii=False,
+                default=str,
+            )
+            self.assertNotIn(canary, visible)
+            self.assertNotIn(raw_path, visible)
+            self.assertNotIn("capital flow provider failed", visible)
+        finally:
+            DatabaseManager.reset_instance()
+            Config.reset_instance()
+
     def test_persist_provider_trace_logs_save_failure_without_failing_chat(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
@@ -1418,10 +1524,13 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertIn("max steps", result.error.lower())
         self.assertEqual(result.total_steps, 3)
 
-    def test_tool_execution_error(self):
-        """Tool raises exception — should be logged and error sent to LLM."""
+    def test_tool_execution_error_is_stable_and_does_not_expose_handler_details(self):
+        """Tool errors sent back to the model must not include handler diagnostics."""
+        raw_secret = "sk-test-secret-1234567890"
+        raw_path = "/Users/private-user/.config/stockpulse/provider.json"
+
         def _always_fail():
-            raise RuntimeError("db down")
+            raise RuntimeError(f"provider failed with {raw_secret} at {raw_path}")
 
         registry = ToolRegistry()
         tool = ToolDefinition(
@@ -1450,13 +1559,38 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Test error handling")
+        with self.assertLogs("src.agent.tool_surface", level="WARNING") as captured_logs:
+            result = executor.run("Test error handling")
 
         # Should still succeed overall (agent handles tool errors gracefully)
         self.assertTrue(result.success)
         # The failing tool call should be logged as failure
         self.assertEqual(len(result.tool_calls_log), 1)
         self.assertFalse(result.tool_calls_log[0]["success"])
+        safe_log = "\n".join(captured_logs.output)
+        self.assertIn("Agent tool execution failed", safe_log)
+        self.assertIn("error_code=agent_tool_execution_failed", safe_log)
+        self.assertNotIn(raw_secret, safe_log)
+        self.assertNotIn(raw_path, safe_log)
+        self.assertNotIn("provider failed", safe_log)
+        second_model_input = adapter.call_with_tools.call_args_list[1].args[0]
+        tool_messages = [message for message in second_model_input if message.get("role") == "tool"]
+        self.assertEqual(len(tool_messages), 1)
+        self.assertEqual(
+            json.loads(tool_messages[0]["content"]),
+            {
+                "error": "Tool handler failed.",
+                "code": "handler_error",
+                "retriable": False,
+            },
+        )
+        self.assertNotIn(raw_secret, tool_messages[0]["content"])
+        self.assertNotIn(raw_path, tool_messages[0]["content"])
+        self.assertNotIn("provider failed", tool_messages[0]["content"])
+        tool_log = json.dumps(result.tool_calls_log, ensure_ascii=False)
+        self.assertNotIn(raw_secret, tool_log)
+        self.assertNotIn(raw_path, tool_log)
+        self.assertNotIn("provider failed", tool_log)
 
     def test_unknown_tool_called(self):
         """LLM requests a tool not in the registry — should handle gracefully."""
@@ -1486,6 +1620,133 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(len(result.tool_calls_log), 1)
         self.assertFalse(result.tool_calls_log[0]["success"])
         self.assertFalse(result.tool_calls_log[0]["cached"])
+        tool_messages = [message for message in result.messages if message.get("role") == "tool"]
+        self.assertEqual(len(tool_messages), 1)
+        self.assertEqual(
+            json.loads(tool_messages[0]["content"]),
+            {
+                "error": "Tool not found.",
+                "code": "tool_not_found",
+                "retriable": False,
+            },
+        )
+        self.assertNotIn("Available", tool_messages[0]["content"])
+
+    def test_malformed_tool_names_return_stable_error(self):
+        registry = ToolRegistry()
+        session = BoundToolSession(
+            registry,
+            execution_id="malformed-test",
+            allowed_tools=registry.list_names(),
+            enforce_access_policy=False,
+        )
+
+        for malformed_name in (None, 7, ["echo"]):
+            with self.subTest(malformed_name=malformed_name):
+                tool_call = ToolCall(id="bad", name=malformed_name, arguments={})
+                _, result_text, success, _, cached, guard_result = execute_runner_tool_call_via_session(
+                    tool_call,
+                    session,
+                )
+
+                self.assertFalse(success)
+                self.assertFalse(cached)
+                self.assertIsNone(guard_result)
+                self.assertEqual(
+                    json.loads(result_text),
+                    {
+                        "error": "Tool name must exactly match a registered StockPulse tool.",
+                        "code": "invalid_tool_name",
+                        "retriable": False,
+                    },
+                )
+
+    def test_run_agent_loop_normalizes_malformed_tool_names_before_all_surfaces(self):
+        canary = "NON_STRING_TOOL_NAME_CANARY_SECRET"
+
+        class _SensitiveToolName:
+            def __str__(self):
+                return canary
+
+        for malformed_names in (
+            [_SensitiveToolName()],
+            [_SensitiveToolName(), [canary]],
+        ):
+            with self.subTest(call_count=len(malformed_names)):
+                adapter = _make_mock_adapter()
+                malformed_response = LLMResponse(
+                    content="",
+                    tool_calls=[
+                        ToolCall(
+                            id=f"bad-{index}",
+                            name=name,
+                            arguments={},
+                        )
+                        for index, name in enumerate(malformed_names)
+                    ],
+                    usage={"total_tokens": 10},
+                    provider="openai",
+                )
+                adapter.call_with_tools.side_effect = [
+                    malformed_response,
+                    LLMResponse(
+                        content=json.dumps(SAMPLE_DASHBOARD),
+                        tool_calls=[],
+                        usage={"total_tokens": 10},
+                        provider="openai",
+                    ),
+                ]
+                progress_events = []
+
+                with self.assertLogs("src.agent.runner", level="INFO") as captured_logs:
+                    result = run_agent_loop(
+                        messages=[{"role": "user", "content": "Run malformed tools"}],
+                        tool_registry=ToolRegistry(),
+                        llm_adapter=adapter,
+                        max_steps=3,
+                        progress_callback=progress_events.append,
+                    )
+
+                self.assertTrue(result.success)
+                self.assertEqual(len(result.tool_calls_log), len(malformed_names))
+                self.assertTrue(
+                    all(
+                        tool_call.name is original_name
+                        for tool_call, original_name in zip(
+                            malformed_response.tool_calls,
+                            malformed_names,
+                        )
+                    )
+                )
+                visible = json.dumps(
+                    {
+                        "messages": result.messages,
+                        "tool_calls_log": result.tool_calls_log,
+                        "progress_events": progress_events,
+                        "logs": captured_logs.output,
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+                self.assertNotIn(canary, visible)
+                self.assertTrue(all(entry["tool"] == "" for entry in result.tool_calls_log))
+                assistant_tool_calls = next(
+                    message["tool_calls"]
+                    for message in result.messages
+                    if message.get("role") == "assistant" and message.get("tool_calls")
+                )
+                self.assertTrue(all(call["name"] == "" for call in assistant_tool_calls))
+                tool_messages = [
+                    message for message in result.messages if message.get("role") == "tool"
+                ]
+                self.assertTrue(all(message["name"] == "" for message in tool_messages))
+                self.assertTrue(
+                    all(
+                        event.get("tool", "") == ""
+                        for event in progress_events
+                        if event.get("type") in {"tool_start", "tool_done"}
+                    )
+                )
 
     def test_non_retriable_tool_failure_is_cached_across_hk_variants(self):
         """Equivalent HK code variants should not re-execute a non-retriable failing tool."""

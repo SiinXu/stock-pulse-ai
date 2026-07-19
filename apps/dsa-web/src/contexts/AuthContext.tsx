@@ -1,5 +1,5 @@
 import type React from 'react';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { authApi } from '../api/auth';
 import { useStockPoolStore } from '../stores';
@@ -37,11 +37,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
 
+  // Guard against out-of-order status responses: a stale in-flight request
+  // (e.g. the initial mount fetch) must not overwrite the state written by a
+  // newer one (e.g. the post-login refresh), or the route guard bounces a
+  // freshly logged-in user back to /login.
+  const statusRequestSeq = useRef(0);
+
   const fetchStatus = useCallback(async () => {
+    const requestId = ++statusRequestSeq.current;
     setIsLoading(true);
     setLoadError(null);
     try {
       const status = await authApi.getStatus();
+      if (requestId !== statusRequestSeq.current) {
+        return;
+      }
       setAuthEnabled(status.authEnabled);
       setLoggedIn(status.loggedIn);
       setPasswordSet(status.passwordSet ?? false);
@@ -51,6 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         useStockPoolStore.getState().resetDashboardState();
       }
     } catch (err) {
+      if (requestId !== statusRequestSeq.current) {
+        return;
+      }
       setLoadError(getParsedApiError(err));
       setAuthEnabled(false);
       setLoggedIn(false);
@@ -59,7 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSetupState('no_password');
       useStockPoolStore.getState().resetDashboardState();
     } finally {
-      setIsLoading(false);
+      if (requestId === statusRequestSeq.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

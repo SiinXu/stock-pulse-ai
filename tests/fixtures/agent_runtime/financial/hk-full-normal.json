@@ -1,0 +1,258 @@
+{
+  "id": "hk-full-normal",
+  "notes": "HK multi-agent full pipeline (technical -> intel -> risk -> decision) on the happy path; risk reports medium risk without veto, decision keeps hold.",
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "full"
+  },
+  "input": {
+    "task": "分析腾讯控股的投资价值",
+    "context": {
+      "stock_code": "hk00700",
+      "stock_name": "腾讯控股"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_ht1",
+          "name": "analyze_trend",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 26,
+        "total_tokens": 666
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"buy\", \"confidence\": 0.68, \"reasoning\": \"港股均线多头排列，趋势延续。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 78, \"ma_alignment\": \"bullish\", \"volume_status\": \"normal\", \"pattern\": \"ascending_channel\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 712,
+        "completion_tokens": 90,
+        "total_tokens": 802
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_hi1",
+          "name": "get_capital_flow",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 24,
+        "total_tokens": 544
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": "{\"signal\": \"hold\", \"confidence\": 0.58, \"reasoning\": \"资金净流入但监管消息面存在不确定性。\", \"risk_alerts\": [\"行业监管政策存在不确定性\"], \"positive_catalysts\": [\"主力资金净流入\"], \"sentiment_label\": \"neutral\", \"capital_flow_signal\": \"inflow\", \"key_news\": [{\"title\": \"行业监管动态跟踪\", \"impact\": \"neutral\"}]}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 604,
+        "completion_tokens": 96,
+        "total_tokens": 700
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "risk",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_hr1",
+          "name": "search_stock_news",
+          "arguments": {
+            "stock_code": "hk00700"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 500,
+        "completion_tokens": 22,
+        "total_tokens": 522
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "risk",
+      "content": "{\"risk_level\": \"medium\", \"risk_score\": 45, \"flags\": [{\"category\": \"policy\", \"severity\": \"medium\", \"description\": \"行业监管政策不确定性\", \"source\": \"news\"}], \"veto_buy\": false, \"reasoning\": \"监管不确定性构成中等风险，但未见实质利空落地。\", \"signal_adjustment\": \"downgrade\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 588,
+        "completion_tokens": 84,
+        "total_tokens": 672
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "decision",
+      "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"持有观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势偏多但监管风险压制，持有观望\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"等待监管风险明朗后再介入\",\n        \"has_position\": \"持有，跌破95减仓\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"监管消息落地或缩量回踩98\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"三阶段数据完整，但风险面存在压制\",\n      \"data_limitations\": \"无\"\n    }\n  },\n  \"analysis_summary\": \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\",\n  \"key_points\": \"MA5>MA10>MA20；监管不确定性；风险评分45\",\n  \"risk_warning\": \"监管政策落地前波动可能加大\"\n}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 1180,
+        "completion_tokens": 252,
+        "total_tokens": 1432
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "technical",
+      "technical",
+      "intel",
+      "intel",
+      "risk",
+      "risk",
+      "decision"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "analyze_trend",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 180,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "get_capital_flow",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 48,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "search_stock_news",
+        "arguments": {
+          "stock_code": "hk00700"
+        },
+        "success": true,
+        "result_length": 187,
+        "cached": false
+      }
+    ],
+    "total_steps": 4,
+    "total_tokens": 5338,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "腾讯控股",
+      "sentiment_score": 58,
+      "trend_prediction": "震荡整理",
+      "operation_advice": "持有观望",
+      "decision_type": "hold",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "趋势偏多但监管风险压制，持有观望",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "等待监管风险明朗后再介入",
+            "has_position": "持有，跌破95减仓"
+          },
+          "time_sensitivity": "本周内"
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0,
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "控制仓位",
+            "entry_plan": "等待监管风险明朗后再介入",
+            "risk_control": "止损参考 95.0"
+          }
+        },
+        "phase_decision": {
+          "phase_context": "基于最近收盘数据",
+          "action_window": "次一交易日",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "监管消息落地或缩量回踩98",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "三阶段数据完整，但风险面存在压制",
+          "data_limitations": "无"
+        },
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "bullish",
+            "trend_score": 78,
+            "is_bullish": true
+          }
+        },
+        "intelligence": {
+          "risk_alerts": [
+            "行业监管政策存在不确定性",
+            "行业监管政策不确定性"
+          ],
+          "positive_catalysts": [
+            "主力资金净流入"
+          ]
+        }
+      },
+      "analysis_summary": "技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。",
+      "key_points": [
+        "港股均线多头排列，趋势延续。",
+        "资金净流入但监管消息面存在不确定性。",
+        "监管不确定性构成中等风险，但未见实质利空落地。",
+        "技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。"
+      ],
+      "risk_warning": "监管政策落地前波动可能加大"
+    },
+    "content": "{\n  \"stock_name\": \"腾讯控股\",\n  \"sentiment_score\": 58,\n  \"trend_prediction\": \"震荡整理\",\n  \"operation_advice\": \"持有观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"趋势偏多但监管风险压制，持有观望\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"等待监管风险明朗后再介入\",\n        \"has_position\": \"持有，跌破95减仓\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"控制仓位\",\n        \"entry_plan\": \"等待监管风险明朗后再介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"监管消息落地或缩量回踩98\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"三阶段数据完整，但风险面存在压制\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [\n        \"行业监管政策存在不确定性\",\n        \"行业监管政策不确定性\"\n      ],\n      \"positive_catalysts\": [\n        \"主力资金净流入\"\n      ]\n    }\n  },\n  \"analysis_summary\": \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\",\n  \"key_points\": [\n    \"港股均线多头排列，趋势延续。\",\n    \"资金净流入但监管消息面存在不确定性。\",\n    \"监管不确定性构成中等风险，但未见实质利空落地。\",\n    \"技术面偏多，但监管不确定性构成中等风险，综合给出持有观望。\"\n  ],\n  \"risk_warning\": \"监管政策落地前波动可能加大\"\n}",
+    "error": null
+  }
+}

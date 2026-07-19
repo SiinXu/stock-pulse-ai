@@ -1,18 +1,23 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, BarChart3, RefreshCw, Search, ShieldCheck } from 'lucide-react';
-import { decisionSignalsApi } from '../api/decisionSignals';
+import {
+  decisionSignalsApi,
+  getDecisionSignalReassessBlockedError,
+} from '../api/decisionSignals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { historyApi } from '../api/history';
 import {
   ApiErrorAlert,
   AppPage,
   Badge,
+  Button,
   Card,
   ConfirmDialog,
   Drawer,
   EmptyState,
   InlineAlert,
+  Input,
   Modal,
   PageHeader,
   Pagination,
@@ -37,19 +42,22 @@ import type {
   DecisionSignalOutcomeItem,
   DecisionSignalOutcomeStatsResponse,
   DecisionSignalReassessResponse,
+  DecisionSignalReassessBlockedError,
   DecisionSignalSourceType,
   DecisionSignalStatus,
   DecisionProfile,
   DecisionProfileDisplay,
 } from '../types/decisionSignals';
 import type { Market, StockIndexItem } from '../types/stockIndex';
-import { cn } from '../utils/cn';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 import {
   getDecisionSignalMarketLabel,
   getDecisionSignalMarketPhaseLabel,
   getDecisionSignalSourceTypeLabel,
 } from '../utils/decisionSignalLabels';
+import { getDecisionProfile } from '../utils/decisionSignalProfile';
+import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
+import { areStockCodesEquivalent } from '../utils/stockCode';
 
 const PAGE_SIZE = 20;
 const TIMELINE_PAGE_SIZE = 100;
@@ -106,7 +114,7 @@ type PendingStatusChange = {
 
 type SelectedSignal = {
   item: DecisionSignalItem;
-  source: 'list' | 'latest' | 'timeline';
+  source: 'list' | 'latest' | 'timeline' | 'persisted';
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -381,6 +389,39 @@ function toTimelineParams(filters: TimelineFilters, stockCode: string): Decision
   };
 }
 
+function upsertDecisionSignal(
+  current: DecisionSignalItem[],
+  item: DecisionSignalItem,
+  limit?: number,
+): DecisionSignalItem[] {
+  const next = [item, ...current.filter((candidate) => candidate.id !== item.id)];
+  next.sort((left, right) => {
+    const leftTime = parseDecisionSignalDate(left.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
+    const rightTime = parseDecisionSignalDate(right.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
+    return rightTime - leftTime || right.id - left.id;
+  });
+  return limit ? next.slice(0, limit) : next;
+}
+
+function itemMatchesStockContext(item: DecisionSignalItem, context: StockContext): boolean {
+  return areStockCodesEquivalent(item.stockCode, context.code)
+    && (!context.market || item.market === context.market);
+}
+
+function itemMatchesAppliedTimeline(
+  item: DecisionSignalItem,
+  context: AppliedTimelineContext,
+  now = Date.now(),
+): boolean {
+  if (!areStockCodesEquivalent(item.stockCode, context.stockCode)) return false;
+  if (context.market && item.market !== context.market) return false;
+  if (context.status === 'active' && item.status !== 'active') return false;
+  if (context.decisionProfile && getDecisionProfile(item) !== context.decisionProfile) return false;
+  const createdAt = parseDecisionSignalDate(item.createdAt)?.getTime();
+  if (createdAt === undefined) return false;
+  return createdAt >= now - TIMELINE_RANGE_DAYS[context.range] * DAY_MS && createdAt <= now;
+}
+
 function isSameStockContext(
   previousContext: StockContext | null,
   nextContext: StockContext,
@@ -442,6 +483,7 @@ const DecisionSignalsPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [selected, setSelected] = useState<SelectedSignal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<PendingStatusChange | null>(null);
   const [statusUpdating, setStatusUpdating] = useState(false);
@@ -474,6 +516,9 @@ const DecisionSignalsPage: React.FC = () => {
   const [reassessProfile, setReassessProfile] = useState<DecisionProfile>('balanced');
   const [reassessResponse, setReassessResponse] = useState<DecisionSignalReassessResponse | null>(null);
   const [reassessLoading, setReassessLoading] = useState(false);
+  const [reassessPersisting, setReassessPersisting] = useState(false);
+  const [reassessPersistConfirm, setReassessPersistConfirm] = useState(false);
+  const [reassessPersistBlocked, setReassessPersistBlocked] = useState<DecisionSignalReassessBlockedError | null>(null);
   const [reassessError, setReassessError] = useState<ParsedApiError | null>(null);
   const requestIdRef = useRef(0);
   const statsRequestIdRef = useRef(0);
@@ -507,6 +552,7 @@ const DecisionSignalsPage: React.FC = () => {
 
   const handleCloseSignal = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
+    setStatusError(null);
     setSelected(null);
     updateDecisionSignalSearchParams({ signal: null });
   }, []);
@@ -715,7 +761,6 @@ const DecisionSignalsPage: React.FC = () => {
   const selectedSourceReportId = selected?.item.sourceReportId ?? undefined;
   const reassessSourceReportId = selected ? selectedSourceReportId : appliedSourceReportId;
   const reassessContextKey = [
-    selected ? `selected:${selected.item.id}` : 'source',
     reassessSourceReportId ?? '',
     reassessProfile,
   ].join(':');
@@ -725,6 +770,9 @@ const DecisionSignalsPage: React.FC = () => {
     setReassessResponse(null);
     setReassessError(null);
     setReassessLoading(false);
+    setReassessPersisting(false);
+    setReassessPersistConfirm(false);
+    setReassessPersistBlocked(null);
   }, [reassessContextKey]);
 
   const handleReassess = useCallback(async () => {
@@ -733,6 +781,7 @@ const DecisionSignalsPage: React.FC = () => {
     reassessRequestIdRef.current = requestId;
     setReassessLoading(true);
     setReassessError(null);
+    setReassessPersistBlocked(null);
     try {
       const response = await decisionSignalsApi.reassess({
         sourceReportId: reassessSourceReportId,
@@ -853,6 +902,89 @@ const DecisionSignalsPage: React.FC = () => {
     }
   }, [takePendingSelection]);
 
+  const handlePersistReassess = useCallback(async () => {
+    const preview = reassessResponse?.preview;
+    const guardrail = preview && isRecord(preview.metadata.guardrail_result)
+      ? preview.metadata.guardrail_result
+      : null;
+    if (!reassessSourceReportId || !preview || guardrail?.passed !== true) return;
+
+    const requestId = reassessRequestIdRef.current + 1;
+    reassessRequestIdRef.current = requestId;
+    setReassessPersistConfirm(false);
+    setReassessPersisting(true);
+    setReassessError(null);
+    setReassessPersistBlocked(null);
+    try {
+      const response = await decisionSignalsApi.reassess({
+        sourceReportId: reassessSourceReportId,
+        decisionProfile: reassessProfile,
+        persist: true,
+      });
+      if (reassessRequestIdRef.current !== requestId) return;
+      if (!response.item || !response.persistStatus) {
+        throw new Error('DecisionSignal reassess persist response item and persist_status are required');
+      }
+      const authoritativeItem = response.item;
+      const shouldOptimisticallyUpsert = response.persistStatus !== 'existing';
+      setReassessResponse(response);
+      setSelected((current) => (
+        current
+          ? { source: 'persisted', item: authoritativeItem }
+          : null
+      ));
+      if (
+        shouldOptimisticallyUpsert
+        &&
+        activeStockContext
+        && authoritativeItem.status === 'active'
+        && itemMatchesStockContext(authoritativeItem, activeStockContext)
+      ) {
+        setLatestItems((current) => upsertDecisionSignal(current, authoritativeItem, 5));
+        void loadLatestForContext(activeStockContext);
+      }
+      if (
+        shouldOptimisticallyUpsert
+        &&
+        appliedTimelineContext
+        && itemMatchesAppliedTimeline(authoritativeItem, appliedTimelineContext)
+      ) {
+        setTimelineItems((current) => upsertDecisionSignal(current, authoritativeItem));
+        void loadTimelineForContext(
+          {
+            code: appliedTimelineContext.stockCode,
+            market: appliedTimelineContext.market || undefined,
+          },
+          appliedTimelineContext,
+        );
+      }
+      void loadSignalsForPage(page);
+    } catch (err) {
+      if (reassessRequestIdRef.current !== requestId) return;
+      const blocked = getDecisionSignalReassessBlockedError(err);
+      if (blocked) {
+        setReassessPersistBlocked(blocked);
+        setReassessError(null);
+      } else {
+        setReassessError(getParsedApiError(err));
+      }
+    } finally {
+      if (reassessRequestIdRef.current === requestId) {
+        setReassessPersisting(false);
+      }
+    }
+  }, [
+    activeStockContext,
+    appliedTimelineContext,
+    loadLatestForContext,
+    loadSignalsForPage,
+    loadTimelineForContext,
+    page,
+    reassessProfile,
+    reassessResponse,
+    reassessSourceReportId,
+  ]);
+
   const applyStockContext = useCallback((nextContext: StockContext) => {
     const nextTimeline = buildNextTimelineFilters(
       timelineFilters,
@@ -929,12 +1061,14 @@ const DecisionSignalsPage: React.FC = () => {
     if (!pendingStatus || statusUpdateInFlightRef.current) return;
     statusUpdateInFlightRef.current = true;
     setStatusUpdating(true);
+    setStatusError(null);
     try {
       const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
         status: pendingStatus.status,
       });
       if (!mountedRef.current) return;
       setPendingStatus(null);
+      setStatusError(null);
       setLatestItems((current) => current.flatMap((item) => {
         if (item.id !== updated.id) return [item];
         return updated.status === 'active' ? [updated] : [];
@@ -953,16 +1087,17 @@ const DecisionSignalsPage: React.FC = () => {
             ? null
             : { source: 'timeline', item: updated };
         }
+        if (current.source === 'persisted') {
+          return { source: 'persisted', item: updated };
+        }
         if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
         return { source: 'list', item: updated };
       });
-      setError(null);
       await loadSignalsForPage(page);
       await loadOutcomeStats();
     } catch (err) {
       if (mountedRef.current) {
-        setError(getParsedApiError(err));
-        setPendingStatus(null);
+        setStatusError(getParsedApiError(err));
       }
     } finally {
       if (mountedRef.current) setStatusUpdating(false);
@@ -992,6 +1127,28 @@ const DecisionSignalsPage: React.FC = () => {
 
   const renderReassessPanel = () => {
     const preview = reassessResponse?.preview ?? null;
+    const persistedItem = reassessResponse?.item ?? null;
+    const persistStatus = reassessResponse?.persistStatus ?? null;
+    const terminalExisting = persistStatus === 'existing' && persistedItem?.status !== 'active';
+    const persistedAlertVariant = terminalExisting
+      ? 'warning'
+      : persistStatus === 'existing'
+        ? 'info'
+        : 'success';
+    const persistedTitleKey: UiTextKey = terminalExisting
+      ? 'decisionSignals.reassessPersistedTerminalTitle'
+      : persistStatus === 'existing'
+        ? 'decisionSignals.reassessPersistedExistingTitle'
+        : persistStatus === 'refreshed'
+          ? 'decisionSignals.reassessPersistedRefreshedTitle'
+          : 'decisionSignals.reassessPersistedCreatedTitle';
+    const persistedMessageKey: UiTextKey = terminalExisting
+      ? 'decisionSignals.reassessPersistedTerminalExisting'
+      : persistStatus === 'existing'
+        ? 'decisionSignals.reassessPersistedExisting'
+        : persistStatus === 'refreshed'
+          ? 'decisionSignals.reassessPersistedRefreshed'
+          : 'decisionSignals.reassessPersistedCreated';
     const metadata = preview?.metadata ?? {};
     const guardrail = isRecord(metadata.guardrail_result) ? metadata.guardrail_result : null;
     const rawAction = typeof guardrail?.raw_action === 'string' ? guardrail.raw_action : null;
@@ -1016,21 +1173,24 @@ const DecisionSignalsPage: React.FC = () => {
               value={reassessProfile}
               onChange={(value) => setReassessProfile(value as DecisionProfile)}
               ariaLabel={t('decisionSignals.reassessProfile')}
-              disabled={!reassessSourceReportId || reassessLoading}
+              disabled={!reassessSourceReportId || reassessLoading || reassessPersisting}
               options={REASSESS_PROFILES.map((profile) => ({
                 value: profile,
                 label: t(`decisionSignals.profile.${profile}` as UiTextKey),
               }))}
             />
-            <button
+            <Button
               type="button"
-              className="btn-secondary inline-flex min-h-11 min-w-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={() => void handleReassess()}
-              disabled={!reassessSourceReportId || reassessLoading}
+              disabled={!reassessSourceReportId || reassessLoading || reassessPersisting}
+              isLoading={reassessLoading}
+              loadingText={t('decisionSignals.reassessPreview')}
             >
-              <RefreshCw className={cn('h-4 w-4', reassessLoading ? 'animate-spin' : '')} />
+              <RefreshCw className="h-4 w-4" />
               {t('decisionSignals.reassessPreview')}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1043,6 +1203,36 @@ const DecisionSignalsPage: React.FC = () => {
           />
         ) : null}
         {reassessError ? <ApiErrorAlert className="mt-3" error={reassessError} /> : null}
+        {reassessPersistBlocked ? (
+          <div className="mt-3 space-y-2">
+            <InlineAlert
+              variant="danger"
+              title={t('decisionSignals.reassessPersistBlockedTitle')}
+              message={reassessPersistBlocked.blockedReason}
+            />
+            {reassessPersistBlocked.warnings.length ? (
+              <ul className="list-disc space-y-1 pl-5 text-sm text-secondary-text">
+                {reassessPersistBlocked.warnings.map((warning, index) => (
+                  <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        {persistedItem ? (
+          <InlineAlert
+            className="mt-3"
+            variant={persistedAlertVariant}
+            title={t(persistedTitleKey)}
+            message={t(
+              persistedMessageKey,
+              {
+                id: persistedItem.id,
+                status: t(STATUS_LABEL_KEYS[persistedItem.status]),
+              },
+            )}
+          />
+        ) : null}
         {preview ? (
           <div className="mt-4 space-y-3">
             {reassessResponse?.blockedReason ? (
@@ -1111,6 +1301,32 @@ const DecisionSignalsPage: React.FC = () => {
                 </ul>
               </div>
             ) : null}
+            {passed === true ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="lg"
+                  onClick={() => setReassessPersistConfirm(true)}
+                  disabled={reassessLoading || reassessPersisting}
+                  isLoading={reassessPersisting}
+                  loadingText={t('decisionSignals.reassessPersisting')}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {t('decisionSignals.reassessPersist')}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {persistedItem && reassessResponse?.warnings.length ? (
+          <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-warning">{t('decisionSignals.reassessWarnings')}</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-secondary-text">
+              {reassessResponse.warnings.map((warning, index) => (
+                <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
       </div>
@@ -1134,32 +1350,36 @@ const DecisionSignalsPage: React.FC = () => {
           title={t('decisionSignals.title')}
           description={t('decisionSignals.description')}
           actions={(
-            <button
+            <Button
               type="button"
-              className="btn-secondary inline-flex items-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={() => {
                 void loadSignals();
                 void loadOutcomeStats();
               }}
               disabled={loading}
+              isLoading={loading}
+              loadingText={t('decisionSignals.refresh')}
             >
-              <RefreshCw className={cn('h-4 w-4', loading ? 'animate-spin' : '')} />
+              <RefreshCw className="h-4 w-4" />
               {t('decisionSignals.refresh')}
-            </button>
+            </Button>
           )}
         />
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
+          <Button
             type="button"
-            className="btn-secondary inline-flex items-center gap-2"
+            variant="secondary"
+            size="xl"
             onClick={() => setStockContextModalOpen(true)}
           >
             <Search className="h-4 w-4" />
             {activeStockLabel
               ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
               : t('decisionSignals.stockContextTitle')}
-          </button>
+          </Button>
         </div>
 
         <Modal
@@ -1185,22 +1405,24 @@ const DecisionSignalsPage: React.FC = () => {
                 ariaLabel={t('decisionSignals.stockContextInput')}
               />
             </div>
-            <button
+            <Button
               type="submit"
-              className="btn-primary inline-flex h-11 items-center justify-center gap-2"
+              variant="primary"
+              size="xl"
               disabled={!stockDraft.trim()}
             >
               <Search className="h-4 w-4" />
               {t('decisionSignals.stockContextApply')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-secondary inline-flex h-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               onClick={handleClearStockContext}
               disabled={!activeStockContext && !stockDraft}
             >
               {t('decisionSignals.stockContextClear')}
-            </button>
+            </Button>
           </form>
 
           {activeStockLabel ? (
@@ -1220,10 +1442,12 @@ const DecisionSignalsPage: React.FC = () => {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {stockCandidates.map((candidate) => (
-                  <button
+                  <Button
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
                     type="button"
-                    className="min-h-11 min-w-11 rounded-full border border-border/70 bg-elevated/40 px-3 py-1.5 text-sm text-foreground transition-colors hover:border-primary/60 hover:text-primary"
+                    variant="outline"
+                    size="xl"
+                    className="h-auto min-h-11 whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);
@@ -1232,7 +1456,7 @@ const DecisionSignalsPage: React.FC = () => {
                     <span className="font-mono">{candidate.displayCode ?? candidate.code}</span>
                     {candidate.name ? <span className="ml-1 text-secondary-text">{candidate.name}</span> : null}
                     {candidate.market ? <span className="ml-1 text-muted-text">/ {candidate.market}</span> : null}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -1242,7 +1466,7 @@ const DecisionSignalsPage: React.FC = () => {
         </Modal>
 
         <Card padding="md">
-          <form className="grid items-end gap-3 md:grid-cols-3 xl:grid-cols-8 [&>*]:min-w-0" onSubmit={handleApplyFilters}>
+          <form className="grid items-end gap-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 [&>*]:min-w-0 [&>*]:!w-full [&_[role=combobox]]:min-h-9 [&_input]:h-9" onSubmit={handleApplyFilters}>
             <Select
               label={t('decisionSignals.market')}
               value={filters.market}
@@ -1252,16 +1476,14 @@ const DecisionSignalsPage: React.FC = () => {
                 ...MARKET_OPTIONS.map((market) => ({ value: market, label: getDecisionSignalMarketLabel(market, t) })),
               ]}
             />
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.stockCode')}</span>
-              <input
-                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
-                value={filters.stockCode}
-                onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
-                placeholder={t('decisionSignals.stockCode')}
-                aria-label={t('decisionSignals.stockCode')}
-              />
-            </label>
+            <Input
+              label={t('decisionSignals.stockCode')}
+              className="!h-9 !min-h-9 rounded-sm"
+              value={filters.stockCode}
+              onChange={(event) => setFilters((current) => ({ ...current, stockCode: event.target.value }))}
+              placeholder={t('decisionSignals.stockCode')}
+              aria-label={t('decisionSignals.stockCode')}
+            />
             <Select
               label={t('decisionSignals.action')}
               value={filters.action}
@@ -1289,20 +1511,18 @@ const DecisionSignalsPage: React.FC = () => {
                 ...SOURCE_OPTIONS.map((source) => ({ value: source, label: getDecisionSignalSourceTypeLabel(source, t) })),
               ]}
             />
-            <label className="grid gap-1">
-              <span className="text-xs text-muted-text">{t('decisionSignals.sourceReportId')}</span>
-              <input
-                className="h-11 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text"
-                value={filters.sourceReportId}
-                onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
-                placeholder={t('decisionSignals.sourceReportId')}
-                aria-label={t('decisionSignals.sourceReportId')}
-                inputMode="numeric"
-                min={1}
-                step={1}
-                type="number"
-              />
-            </label>
+            <Input
+              label={t('decisionSignals.sourceReportId')}
+              className="!h-9 !min-h-9 rounded-sm"
+              value={filters.sourceReportId}
+              onChange={(event) => setFilters((current) => ({ ...current, sourceReportId: event.target.value }))}
+              placeholder={t('decisionSignals.sourceReportId')}
+              aria-label={t('decisionSignals.sourceReportId')}
+              inputMode="numeric"
+              min={1}
+              step={1}
+              type="number"
+            />
             <Select
               label={t('decisionSignals.status')}
               value={filters.status}
@@ -1312,10 +1532,10 @@ const DecisionSignalsPage: React.FC = () => {
                 ...STATUS_OPTIONS.map((status) => ({ value: status, label: t(STATUS_LABEL_KEYS[status]) })),
               ]}
             />
-            <button type="submit" className="btn-primary inline-flex h-11 items-center justify-center gap-2">
+            <Button type="submit" variant="primary" size="md" className="min-w-0 text-xs">
               <Search className="h-4 w-4" />
               {t('decisionSignals.filter')}
-            </button>
+            </Button>
           </form>
         </Card>
 
@@ -1470,14 +1690,17 @@ const DecisionSignalsPage: React.FC = () => {
                 { value: 'unknown', label: t('decisionSignals.profile.unknown') },
               ]}
             />
-            <button
+            <Button
               type="submit"
-              className="btn-secondary inline-flex h-11 items-center justify-center gap-2"
+              variant="secondary"
+              size="xl"
               disabled={timelineLoading || !activeStockContext?.code}
+              isLoading={timelineLoading}
+              loadingText={t('decisionSignals.timelineSearch')}
             >
               <Search className="h-4 w-4" />
               {t('decisionSignals.timelineSearch')}
-            </button>
+            </Button>
           </form>
           <div className="mt-4">
             {!timelineSearched ? (
@@ -1557,6 +1780,9 @@ const DecisionSignalsPage: React.FC = () => {
       >
         {selected ? (
           <div className="space-y-4">
+            {statusError ? (
+              <ApiErrorAlert error={statusError} onDismiss={() => setStatusError(null)} />
+            ) : null}
             {renderReassessPanel()}
             <DecisionSignalDetails
               item={selected.item}
@@ -1569,19 +1795,24 @@ const DecisionSignalsPage: React.FC = () => {
               feedbackError={selectedFeedbackError?.message ?? null}
               onFeedbackSubmit={handleFeedbackSubmit}
               actions={STATUS_ACTIONS.map((status) => (
-                <button
+                <Button
                   key={status}
                   type="button"
-                  className="btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs"
-                  onClick={() => setPendingStatus({
-                    item: selected.item,
-                    status,
-                    message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
-                  })}
+                  variant="secondary"
+                  size="xl"
+                  className="px-3 text-xs"
+                  onClick={() => {
+                    setStatusError(null);
+                    setPendingStatus({
+                      item: selected.item,
+                      status,
+                      message: t(STATUS_ACTION_CONFIRM_KEYS[status]),
+                    });
+                  }}
                   disabled={statusUpdating || selected.item.status === status}
                 >
                   {t(STATUS_ACTION_LABEL_KEYS[status])}
-                </button>
+                </Button>
               ))}
             />
           </div>
@@ -1598,14 +1829,29 @@ const DecisionSignalsPage: React.FC = () => {
       ) : null}
 
       <ConfirmDialog
+        isOpen={reassessPersistConfirm}
+        title={t('decisionSignals.reassessPersistConfirmTitle')}
+        message={t('decisionSignals.reassessPersistConfirmMessage')}
+        confirmText={t('decisionSignals.reassessPersist')}
+        confirmDisabled={reassessPersisting}
+        cancelDisabled={reassessPersisting}
+        onConfirm={() => void handlePersistReassess()}
+        onCancel={() => setReassessPersistConfirm(false)}
+      />
+
+      <ConfirmDialog
         isOpen={Boolean(pendingStatus)}
         title={t('decisionSignals.confirmStatusTitle')}
         message={pendingStatus?.message ?? ''}
         confirmText={t('common.confirm')}
         confirmDisabled={statusUpdating}
         cancelDisabled={statusUpdating}
+        error={statusError?.message}
         onConfirm={() => void handleStatusUpdate()}
-        onCancel={() => setPendingStatus(null)}
+        onCancel={() => {
+          setPendingStatus(null);
+          setStatusError(null);
+        }}
       />
     </AppPage>
   );

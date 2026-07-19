@@ -1,0 +1,120 @@
+{
+  "id": "contract-toolscope-unknown-tool",
+  "notes": "Tool scope rejection (single-agent): the model calls 'get_fundamental_report', a tool that is not registered anywhere (expect_unregistered bypasses the harness schema assertion). Characterizes how the runner reports an unknown-tool call back to the model and logs it, and that the run still completes when the model recovers with a dashboard.",
+  "input": {
+    "task": "分析贵州茅台的投资价值",
+    "context": {
+      "stock_code": "600519",
+      "stock_name": "贵州茅台"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_run",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_uk1",
+          "name": "get_fundamental_report",
+          "arguments": {
+            "stock_code": "600519"
+          },
+          "expect_unregistered": true
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 28,
+        "total_tokens": 548
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_run",
+      "content": "该工具不可用，改用现有数据输出保守仪表盘：\n```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 52,\n  \"trend_prediction\": \"短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"低\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"基本面工具不可用，暂以观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"部分工具不可用\",\n      \"action_window\": \"工具恢复后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"基本面数据可用后复核\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"缺少基本面数据\",\n      \"data_limitations\": \"get_fundamental_report 工具不可用\"\n    }\n  },\n  \"analysis_summary\": \"基本面工具不可用，仅凭有限数据维持观望。\",\n  \"key_points\": \"工具缺失；观望\",\n  \"risk_warning\": \"数据不完整，结论可靠性低\"\n}\n```",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 230,
+        "total_tokens": 870
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "hold",
+    "stage_sequence": [
+      "single_run",
+      "single_run"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "get_fundamental_report",
+        "arguments": {
+          "stock_code": "600519"
+        },
+        "success": false,
+        "result_length": 74,
+        "cached": false
+      }
+    ],
+    "total_steps": 2,
+    "total_tokens": 1418,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "贵州茅台",
+      "sentiment_score": 52,
+      "trend_prediction": "短期中性",
+      "operation_advice": "观望",
+      "decision_type": "hold",
+      "confidence_level": "低",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "基本面工具不可用，暂以观望为主",
+          "signal_type": "🟡持有观望",
+          "position_advice": {
+            "no_position": "暂不介入",
+            "has_position": "持有观察"
+          }
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0
+        },
+        "phase_decision": {
+          "phase_context": "部分工具不可用",
+          "action_window": "工具恢复后",
+          "immediate_action": "暂不操作",
+          "watch_conditions": "基本面数据可用后复核",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "缺少基本面数据",
+          "data_limitations": "get_fundamental_report 工具不可用"
+        }
+      },
+      "analysis_summary": "基本面工具不可用，仅凭有限数据维持观望。",
+      "key_points": "工具缺失；观望",
+      "risk_warning": "数据不完整，结论可靠性低"
+    },
+    "content": "该工具不可用，改用现有数据输出保守仪表盘：\n```json\n{\n  \"stock_name\": \"贵州茅台\",\n  \"sentiment_score\": 52,\n  \"trend_prediction\": \"短期中性\",\n  \"operation_advice\": \"观望\",\n  \"decision_type\": \"hold\",\n  \"confidence_level\": \"低\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"基本面工具不可用，暂以观望为主\",\n      \"signal_type\": \"🟡持有观望\",\n      \"position_advice\": {\n        \"no_position\": \"暂不介入\",\n        \"has_position\": \"持有观察\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"部分工具不可用\",\n      \"action_window\": \"工具恢复后\",\n      \"immediate_action\": \"暂不操作\",\n      \"watch_conditions\": \"基本面数据可用后复核\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"缺少基本面数据\",\n      \"data_limitations\": \"get_fundamental_report 工具不可用\"\n    }\n  },\n  \"analysis_summary\": \"基本面工具不可用，仅凭有限数据维持观望。\",\n  \"key_points\": \"工具缺失；观望\",\n  \"risk_warning\": \"数据不完整，结论可靠性低\"\n}\n```",
+    "error": null
+  }
+}

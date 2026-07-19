@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Contract tests for the authoritative LLM provider catalog.
 
 These guard three invariants that a prior full-suite flake exposed:

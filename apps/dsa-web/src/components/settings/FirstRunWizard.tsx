@@ -1,6 +1,8 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Button, InlineAlert, Input, Modal, Select } from '../common';
+import { Button, CredentialInput, InlineAlert, Input, Modal, Select } from '../common';
 import { systemConfigApi } from '../../api/systemConfig';
 import type { LlmConnectionFieldSchema, LlmProviderCatalogEntry } from '../../types/systemConfig';
 import { ModelMultiSelect } from './ModelMultiSelect';
@@ -9,10 +11,10 @@ import {
   buildConnectionContractValues,
   canonicalModelRoute,
   type ConnectionCredentialField,
-  evaluateConnectionFieldStates,
+  evaluateConnectionSchemaAuthority,
   getProviderDisplayLabel,
-  hasUnknownConnectionFieldCondition,
   isConnectionModelDiscoveryEnabled,
+  isConnectionSchemaFieldWritable,
   resolveConnectionRequirements,
   suggestConnectionName,
   validateConnectionContractValues,
@@ -160,31 +162,25 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     requirements?.showBaseUrl,
     suggestedConnectionName,
   ]);
-  const connectionFieldStates = connectionContractValues && hasConnectionSchema
-    ? evaluateConnectionFieldStates(connectionContractValues, connectionSchemaFields)
-    : {};
+  const connectionAuthority = evaluateConnectionSchemaAuthority(
+    connectionContractValues ?? {},
+    connectionFields,
+  );
+  const connectionFieldStates = connectionAuthority.states;
   const missingConnectionFields = connectionContractValues && hasConnectionSchema
     ? validateConnectionContractValues(connectionContractValues, connectionSchemaFields)
     : [];
-  const hasUnknownConnectionContract = connectionContractValues && hasConnectionSchema
-    ? hasUnknownConnectionFieldCondition(connectionContractValues, connectionSchemaFields)
-    : false;
   const fieldIsVisible = (key: string) => !hasConnectionSchema
     || connectionFieldStates[key]?.visible === true;
-  const fieldIsReadOnly = (key: string) => hasConnectionSchema
-    && connectionFieldStates[key]?.enabled !== true;
-  const fieldCanWrite = (key: string) => !hasConnectionSchema || Boolean(
-    connectionFieldStates[key]?.visible
-    && connectionFieldStates[key]?.enabled
-    && !connectionFieldStates[key]?.unknownCondition,
-  );
+  const fieldCanWrite = (key: string) => isConnectionSchemaFieldWritable(connectionAuthority, key);
+  const fieldIsReadOnly = (key: string) => !fieldCanWrite(key);
   const visibleApiKeyStates = hasConnectionSchema
     ? (['api_key', 'api_keys'] as ConnectionCredentialField[])
       .map((key) => ({ key, state: connectionFieldStates[key] }))
       .filter(({ state }) => state?.visible)
     : [];
   const writableCredentialFields = visibleApiKeyStates
-    .filter(({ state }) => state?.enabled && !state.unknownCondition)
+    .filter(({ key }) => fieldCanWrite(key))
     .map(({ key }) => key);
   const showProviderField = fieldIsVisible('provider_id');
   const showProtocolField = hasConnectionSchema
@@ -204,23 +200,22 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const showModelsField = fieldIsVisible('models');
   const modelsAreReadOnly = fieldIsReadOnly('models');
   const supportsDiscovery = provider?.supportsDiscovery === true;
+  const canPersistConnectionIdentity = connectionAuthority.usable
+    && fieldCanWrite('connection_name')
+    && fieldCanWrite('provider_id');
   const discoveryEnabledByContract = hasConnectionSchema
-    ? Boolean(connectionContractValues && isConnectionModelDiscoveryEnabled(
-      connectionContractValues,
-      connectionSchemaFields,
-    ))
+    ? Boolean(
+      canPersistConnectionIdentity
+      && connectionContractValues
+      && isConnectionModelDiscoveryEnabled(
+        connectionContractValues,
+        connectionSchemaFields,
+      )
+    )
     : !apiKeyRequired || Boolean(apiKey.trim());
-  const canPersistConnectionIdentity = !hasConnectionSchema || Boolean(
-    connectionSchemaFields.length > 0
-    && (
-      connectionFieldStates.connection_name === undefined
-      || fieldCanWrite('connection_name')
-    ),
-  );
   const cloudContractReady = Boolean(
     provider
     && canPersistConnectionIdentity
-    && !hasUnknownConnectionContract
     && missingConnectionFields.length === 0,
   );
   const protocolOptions = useMemo(() => Array.from(
@@ -251,28 +246,22 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     }
     const nextProtocol = nextProvider.protocol ?? 'openai';
     const nextBaseUrl = nextProvider.defaultBaseUrl ?? '';
-    const proposedStates = hasConnectionSchema
-      ? evaluateConnectionFieldStates(buildConnectionContractValues({
-        connectionName: suggestConnectionName(existingChannelNames, nextProvider.id),
-        displayName: getProviderDisplayLabel(nextProvider, language),
-        providerId: nextProvider.id,
-        provider: nextProvider,
-        protocol: nextProtocol,
-        baseUrl: nextBaseUrl,
-        apiKey,
-        credentialField,
-        models,
-        enabled: true,
-        emptyApiKeyHosts,
-      }), connectionSchemaFields)
-      : {};
-    const proposedContractKnown = !hasConnectionSchema
-      || !Object.values(proposedStates).some((state) => state.unknownCondition);
-    const proposedFieldCanWrite = (key: string) => !hasConnectionSchema || Boolean(
-      proposedContractKnown
-      && proposedStates[key]?.visible
-      && proposedStates[key]?.enabled
-      && !proposedStates[key]?.unknownCondition,
+    const proposedAuthority = evaluateConnectionSchemaAuthority(buildConnectionContractValues({
+      connectionName: suggestConnectionName(existingChannelNames, nextProvider.id),
+      displayName: getProviderDisplayLabel(nextProvider, language),
+      providerId: nextProvider.id,
+      provider: nextProvider,
+      protocol: nextProtocol,
+      baseUrl: nextBaseUrl,
+      apiKey,
+      credentialField,
+      models,
+      enabled: true,
+      emptyApiKeyHosts,
+    }), connectionFields);
+    const proposedStates = proposedAuthority.states;
+    const proposedFieldCanWrite = (key: string) => (
+      isConnectionSchemaFieldWritable(proposedAuthority, key)
     );
     if (!proposedFieldCanWrite('provider_id')) {
       return;
@@ -326,7 +315,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleDiscover = async () => {
-    if (!provider || !supportsDiscovery || !discoveryEnabledByContract) {
+    if (
+      !provider
+      || !canPersistConnectionIdentity
+      || !supportsDiscovery
+      || !discoveryEnabledByContract
+    ) {
       return;
     }
     setIsDiscovering(true);
@@ -355,7 +349,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   const handleTestConnection = async () => {
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return;
     }
     setIsTesting(true);
@@ -406,7 +400,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
           return Boolean(
             provider
             && canPersistConnectionIdentity
-            && !hasUnknownConnectionContract
             && !missingConnectionFields.some((field) => stepFields.has(field)),
           );
         }
@@ -419,16 +412,20 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
       }
       case 'models':
         return hasConnectionSchema
-          ? !missingConnectionFields.includes('models') && !hasUnknownConnectionContract
+          ? canPersistConnectionIdentity
+            && !missingConnectionFields.includes('models')
           : modelOptions.length > 0;
       case 'model':
-        return true; // defaults to the first model
+        return !hasConnectionSchema || cloudContractReady;
       default:
         return true;
     }
   })();
 
   const goNext = () => {
+    if (!canAdvance) {
+      return;
+    }
     if (step === 'model' && !reportModel && modelOptions.length > 0) {
       setReportModel(modelOptions[0]);
     }
@@ -460,7 +457,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     if (mode === 'cli') {
       return [{ key: 'GENERATION_BACKEND', value: cliBackend }];
     }
-    if (!provider) {
+    if (!provider || (hasConnectionSchema && !cloudContractReady)) {
       return [];
     }
     const name = suggestedConnectionName;
@@ -471,9 +468,6 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
     const primaryModelRef = primaryRoute ? encodeModelRef(name, primaryRoute) : '';
     // Merge into any existing channels instead of replacing the whole list.
     const mergedChannels = Array.from(new Set([...existingChannelNames, name])).filter(Boolean).join(',');
-    if (hasConnectionSchema && !canPersistConnectionIdentity) {
-      return [];
-    }
     const items: WizardDraftItem[] = [
       // Make the configured channels the active source so a co-existing YAML /
       // Legacy config doesn't silently shadow the wizard result.
@@ -534,7 +528,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   type="button"
                   aria-pressed={mode === value}
                   onClick={() => chooseMode(value)}
-                  className={`rounded-full border px-4 py-3 text-left text-sm transition-colors ${
+                  className={`rounded-lg border px-4 py-3 text-left text-sm transition-colors ${
                     mode === value
                       ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] text-foreground'
                       : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
@@ -555,7 +549,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         {step === 'connection' && mode === 'cloud' ? (
-          <div className="space-y-3">
+          <form className="space-y-3" onSubmit={(event) => event.preventDefault()}>
             {showProviderField ? (
               <div>
                 <label htmlFor="wizard-provider" className="mb-1 block text-sm text-foreground">
@@ -581,7 +575,11 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Select
                   id="wizard-protocol"
                   value={protocol}
-                  onChange={setProtocol}
+                  onChange={(nextProtocol) => {
+                    if (!fieldIsReadOnly('protocol')) {
+                      setProtocol(nextProtocol);
+                    }
+                  }}
                   options={protocolOptions}
                   disabled={fieldIsReadOnly('protocol')}
                 />
@@ -594,9 +592,9 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                     ? text.apiKey
                     : text.apiKeyOptional}
                 </label>
-                <Input
+                <CredentialInput
                   id="wizard-api-key"
-                  type="password"
+                  purpose="provider-secret"
                   value={apiKey}
                   onChange={(event) => handleApiKeyChange(event.target.value)}
                   placeholder={apiKeyRequired
@@ -623,19 +621,25 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Input
                   id="wizard-base-url"
                   value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
+                  onChange={(event) => {
+                    if (!fieldIsReadOnly('base_url')) {
+                      setBaseUrl(event.target.value);
+                    }
+                  }}
                   disabled={fieldIsReadOnly('base_url')}
                 />
               </div>
             ) : null}
-          </div>
+          </form>
         ) : null}
 
-        {step === 'connection' && mode === 'cloud' && hasUnknownConnectionContract ? (
+        {step !== 'mode' && mode === 'cloud' && !connectionAuthority.usable ? (
           <InlineAlert
             variant="warning"
             title={text.contractUnsupportedTitle}
-            message={text.contractUnsupportedMessage}
+            message={connectionAuthority.reason === 'unknown_condition'
+              ? text.contractUnknownMessage
+              : text.contractUnsupportedMessage}
           />
         ) : null}
 
@@ -668,6 +672,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   onClick={() => void handleDiscover()}
                   disabled={
                     isDiscovering
+                    || !canPersistConnectionIdentity
                     || !discoveryEnabledByContract
                   }
                   isLoading={isDiscovering}
@@ -710,7 +715,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       aria-label={formatUiText(text.removeModel, { model })}
                       disabled={modelsAreReadOnly}
                       onClick={() => removeModelToken(model)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger"
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger"
                     >
                       ×
                     </button>
@@ -828,7 +833,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                   variant="settings-secondary"
                   size="xsm"
                   onClick={() => void handleTestConnection()}
-                  disabled={isTesting}
+                  disabled={isTesting || (hasConnectionSchema && !cloudContractReady)}
                   isLoading={isTesting}
                 >
                   {text.testOptional}

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -12,4 +15,4 @@ const en: Record<keyof typeof zh, string> = {
   matchExact: 'Exact', matchPrefix: 'Prefix', matchContains: 'Contains', matchFuzzy: 'Fuzzy',
 };
 
-export const STOCK_SEARCH_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const STOCK_SEARCH_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.stockSearch.STOCK_SEARCH_TEXT", { zh, en });

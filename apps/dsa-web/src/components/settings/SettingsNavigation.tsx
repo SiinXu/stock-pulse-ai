@@ -1,4 +1,7 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { SegmentedControl, Select } from '../common';
 import { cn } from '../../utils/cn';
 import { SETTINGS_MISC_TEXT } from '../../locales/settingsMisc';
 import {
@@ -85,22 +88,21 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
   <nav aria-label={navLabel}>
     {/* Mobile: compact selector (short path, current section always visible). */}
     <div className="md:hidden">
-      <label htmlFor="settings-section-select" className="sr-only">{navLabel}</label>
-      <select
+      <Select
         id="settings-section-select"
-        className="min-h-11 w-full rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm text-foreground"
+        ariaLabel={navLabel}
+        className="w-full [&>div]:w-full"
+        triggerClassName="min-h-11 rounded-md border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm"
         value={activeSection}
-        onChange={(event) => (onMobileSelectSection ?? onSelectSection)(event.target.value as SettingsSectionId)}
-      >
-        {SETTINGS_SECTIONS.map((section) => {
+        onChange={(value) => (onMobileSelectSection ?? onSelectSection)(value as SettingsSectionId)}
+        options={SETTINGS_SECTIONS.map((section) => {
           const label = statusLabel(sectionStatus?.[section.id], language);
-          return (
-            <option key={section.id} value={section.id}>
-              {sectionLabel(section.id, language)}{label ? ` · ${label}` : ''}
-            </option>
-          );
+          return {
+            value: section.id,
+            label: `${sectionLabel(section.id, language)}${label ? ` · ${label}` : ''}`,
+          };
         })}
-      </select>
+      />
     </div>
 
     {/* Desktop: vertical sidebar with per-section status dots. */}
@@ -115,7 +117,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
             <button
               type="button"
               className={cn(
-                'flex min-h-11 w-full items-center gap-2 rounded-full border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
+                'flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
                 isActive
                   ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground'
                   : 'border-transparent bg-transparent text-secondary-text hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]',
@@ -160,31 +162,14 @@ export const SettingsViewTabs: React.FC<SettingsViewTabsProps> = ({
     return null;
   }
   return (
-    <div
-      role="tablist"
-      aria-label={tabsLabel}
-      className="flex gap-1 overflow-x-auto border-b border-[var(--settings-border)] pb-px"
-    >
-      {views.map((view) => {
-        const isActive = view.id === activeView;
-        return (
-          <button
-            key={view.id}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            className={cn(
-              'min-h-11 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors duration-200',
-              isActive
-                ? 'border-foreground font-medium text-foreground'
-                : 'border-transparent text-secondary-text hover:text-foreground',
-            )}
-            onClick={() => onSelectView(view.id)}
-          >
-            {viewLabel(section, view.id, language)}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      value={activeView}
+      options={views.map((view) => ({
+        value: view.id,
+        label: viewLabel(section, view.id, language),
+      }))}
+      onChange={onSelectView}
+      ariaLabel={tabsLabel}
+    />
   );
 };

@@ -38,11 +38,11 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, InlineAlert, Select } from '../components/common';
+import { AppPage, Button, InlineAlert, Input, Select } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
-import { formatUiDateTime, formatUiNumber } from '../utils/uiLocale';
+import { formatUiDateTime, formatUiNumber, getUiListSeparator } from '../utils/uiLocale';
 import { formatTaskMessage } from '../utils/taskMessage';
 import { getStrategyDisplay } from '../utils/strategyDisplay';
 
@@ -440,7 +440,7 @@ const formatHotspotMetric = (value: unknown, text: ScreeningText, digits = 1) =>
 const getHotspotLeadersText = (item: AlphaSiftHotspot, language: UiLanguage, text: ScreeningText) => {
   const leaders = (item.leaders || []).map((value) => String(value).trim()).filter(Boolean);
   if (leaders.length > 0) {
-    return leaders.slice(0, 2).join(language === 'en' ? ', ' : '、');
+    return leaders.slice(0, 2).join(getUiListSeparator(language));
   }
   return text.observing;
 };
@@ -538,6 +538,8 @@ const StockScreeningPage: React.FC = () => {
   const [strategy, setStrategy] = useState(initialRunParameters.strategy);
   const [strategies, setStrategies] = useState<AlphaSiftStrategy[]>([]);
   const [maxResults, setMaxResults] = useState(initialRunParameters.maxResults);
+  const [maxResultsDraft, setMaxResultsDraft] = useState(String(initialRunParameters.maxResults));
+  const [maxResultsError, setMaxResultsError] = useState('');
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
@@ -935,27 +937,37 @@ const StockScreeningPage: React.FC = () => {
     setMarket(nextMarket);
   };
 
-  const handleMaxResultsChange = (nextMaxResults: number) => {
-    if (nextMaxResults !== maxResults) {
+  const handleMaxResultsChange = (nextMaxResults: string) => {
+    if (nextMaxResults !== String(maxResults)) {
       clearScreeningResults();
     }
-    setMaxResults(nextMaxResults);
+    setMaxResultsDraft(nextMaxResults);
+    setMaxResultsError('');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const parsedMaxResults = Number(maxResultsDraft);
+    if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
+      setMaxResultsError(text.resultCountError);
+      document.getElementById('screening-max-results')?.focus();
+      return;
+    }
+    setMaxResults(parsedMaxResults);
+    setMaxResultsError('');
     setLoading(true);
     setError('');
     setScreenMeta(null);
     setTaskProgress(0);
     setTaskMessage(text.submittingTask);
     try {
-      const task = await alphasiftApi.startScreen({ market, strategy, maxResults });
+      const task = await alphasiftApi.startScreen({ market, strategy, maxResults: parsedMaxResults });
       if (!mountedRef.current) return;
       persistScreenTask({
         taskId: task.taskId,
         market,
         strategy,
-        maxResults,
+        maxResults: parsedMaxResults,
       });
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
@@ -1097,7 +1109,7 @@ const StockScreeningPage: React.FC = () => {
               return (
               <button
                 key={`${item.topic}-${item.rank ?? ''}`}
-                className={`group relative min-h-28 overflow-hidden rounded-full border px-3 py-3 text-left transition-all ${
+                className={`group relative min-h-28 overflow-hidden rounded-lg border px-3 py-3 text-left transition-all ${
                   selected
                     ? 'border-warning/50 bg-gradient-to-br from-warning/10 via-card to-card shadow-soft-card ring-1 ring-warning/20'
                     : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-soft-card'
@@ -1188,7 +1200,7 @@ const StockScreeningPage: React.FC = () => {
                 </summary>
                 <div className="mt-2 space-y-1 leading-5">
                   {(hotspotDetail.missingFields || []).length > 0 ? (
-                    <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(language === 'en' ? ', ' : '、') })}</p>
+                    <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(getUiListSeparator(language)) })}</p>
                   ) : null}
                   {(hotspotDetail.sourceErrors || []).slice(0, 4).map((message, index) => (
                     <p key={`${message}-${index}`}>{summarizeAlphaSiftDiagnostic(message, text)}</p>
@@ -1301,7 +1313,7 @@ const StockScreeningPage: React.FC = () => {
               return (
                 <button
                   key={item.id}
-                  className={`min-h-28 rounded-full border p-4 text-left transition-all ${
+                  className={`min-h-28 rounded-lg border p-4 text-left transition-all ${
                     selected
                       ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
                       : 'border-border/80 bg-surface/70 hover:border-primary/45 hover:bg-hover/70'
@@ -1323,7 +1335,7 @@ const StockScreeningPage: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
+      <form className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           {text.parameters}
@@ -1338,41 +1350,40 @@ const StockScreeningPage: React.FC = () => {
             options={markets.map((item) => ({ value: item.id, label: item.label }))}
           />
 
-          <label className="space-y-2 text-xs font-medium text-secondary-text">
-            {text.strategyParameter}
-            <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              value={strategy}
-              disabled={loading}
-              onChange={(event) => handleStrategyChange(event.target.value)}
-            />
-          </label>
+          <Input
+            label={text.strategyParameter}
+            className="rounded-xl bg-surface text-sm focus:border-primary"
+            value={strategy}
+            disabled={loading}
+            onChange={(event) => handleStrategyChange(event.target.value)}
+          />
 
-          <label className="space-y-2 text-xs font-medium text-secondary-text">
-            {text.resultCount}
-            <input
-              className="h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm text-foreground outline-none transition-colors focus:border-primary"
-              type="number"
-              min={1}
-              max={100}
-              value={maxResults}
-              disabled={loading}
-              onChange={(event) => handleMaxResultsChange(Number(event.target.value))}
-            />
-          </label>
+          <Input
+            id="screening-max-results"
+            label={text.resultCount}
+            className="rounded-xl bg-surface text-sm focus:border-primary"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={maxResultsDraft}
+            error={maxResultsError}
+            disabled={loading}
+            onChange={(event) => handleMaxResultsChange(event.target.value)}
+          />
 
           <Button
             className="h-11 min-w-40"
             isLoading={loading}
             loadingText={text.screening}
             disabled={!isScreeningEnabled || loading}
-            onClick={() => void handleSubmit()}
+            type="submit"
           >
             <Play className="h-4 w-4" />
             {text.run}
           </Button>
         </div>
-      </section>
+      </form>
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1557,13 +1568,13 @@ const StockScreeningPage: React.FC = () => {
                                 <div>
                                   <p className="text-xs font-semibold text-secondary-text">{text.watchItems}</p>
                                   <p className="mt-1 text-sm text-foreground">
-                                    {item.llmWatchItems?.length ? item.llmWatchItems.join(language === 'en' ? ', ' : '，') : llmDegraded ? text.degradedNoValue : text.none}
+                                    {item.llmWatchItems?.length ? item.llmWatchItems.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs font-semibold text-secondary-text">{text.catalysts}</p>
                                   <p className="mt-1 text-sm text-foreground">
-                                    {item.llmCatalysts?.length ? item.llmCatalysts.join(language === 'en' ? ', ' : '，') : llmDegraded ? text.degradedNoValue : text.none}
+                                    {item.llmCatalysts?.length ? item.llmCatalysts.join(getUiListSeparator(language)) : llmDegraded ? text.degradedNoValue : text.none}
                                   </p>
                                 </div>
                                 <div>

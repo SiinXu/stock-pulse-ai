@@ -198,14 +198,18 @@ class FeishuReplyClient:
                 "[Feishu Stream] Reply exceeds the message size limit and will be chunked: bytes=%d",
                 content_bytes,
             )
-            return self._send_to_chat_chunked(
-                formatted_text,
-                lambda chunk: self._send_interactive_card(
+
+            def send_chunk(chunk: str) -> bool:
+                return self._send_interactive_card(
                     chunk,
                     message_id=message_id,
                     at_user=at_user,
                     user_id=user_id,
-                ),
+                )
+
+            return self._send_to_chat_chunked(
+                formatted_text,
+                send_chunk,
             )
 
         # 单条消息，使用交互卡片
@@ -236,13 +240,17 @@ class FeishuReplyClient:
                 "[Feishu Stream] Message exceeds the size limit and will be chunked: bytes=%d",
                 content_bytes,
             )
-            return self._send_to_chat_chunked(
-                formatted_text,
-                lambda chunk: self._send_interactive_card(
+
+            def send_chunk(chunk: str) -> bool:
+                return self._send_interactive_card(
                     chunk,
                     chat_id=chat_id,
                     receive_id_type=receive_id_type,
-                ),
+                )
+
+            return self._send_to_chat_chunked(
+                formatted_text,
+                send_chunk,
             )
 
         # 单条消息，使用交互卡片

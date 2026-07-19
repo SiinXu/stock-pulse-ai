@@ -59,7 +59,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-sm transition-colors hover:bg-hover hover:text-foreground"
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-secondary-text shadow-soft-card backdrop-blur-sm transition-colors hover:bg-hover hover:text-foreground"
           aria-label={t('layout.openNav')}
         >
           <Menu className="h-5 w-5" />
@@ -85,7 +85,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           />
         </aside>
 
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-3xl border border-border bg-card shadow-soft-card mt-14 mx-3 mb-3 lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4 touch-pan-y">
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-xl border border-border bg-card shadow-soft-card mt-14 mx-3 mb-3 lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4 touch-pan-y">
           {children ?? <Outlet />}
         </main>
       </div>

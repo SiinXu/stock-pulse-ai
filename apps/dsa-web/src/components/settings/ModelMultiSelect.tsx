@@ -1,7 +1,9 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, X } from 'lucide-react';
-import { Input } from '../common';
+import { Checkbox, Input } from '../common';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT } from '../../locales/settingsControls';
 import type { UiLang } from './settingsInformationArchitecture';
@@ -87,7 +89,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
           aria-expanded={isOpen}
           aria-controls={isOpen ? listboxId : undefined}
           onClick={() => (isOpen ? close(false) : setIsOpen(true))}
-          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-lg px-1 text-left hover:bg-hover focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="shrink-0 text-muted-text">
             {formatUiText(text.selectedModels, { selected: selectedModels.length, total: options.length })}
@@ -102,7 +104,7 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
               disabled={disabled}
               aria-label={formatUiText(text.removeModel, { model: getOptionLabel(model) })}
               onClick={() => onToggle(model)}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-text hover:text-danger focus:outline-none disabled:cursor-not-allowed"
             >
               <X className="h-3 w-3" aria-hidden="true" />
             </button>
@@ -149,15 +151,12 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
                 aria-selected={isSelected(model)}
                 className="rounded-md hover:bg-hover"
               >
-                <label className="flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-secondary-text">
-                  <input
-                    type="checkbox"
-                    checked={isSelected(model)}
-                    onChange={() => onToggle(model)}
-                    className="settings-input-checkbox h-4 w-4 rounded border-border/70 bg-base"
-                  />
-                  <span className="min-w-0 truncate">{getOptionLabel(model)}</span>
-                </label>
+                <Checkbox
+                  checked={isSelected(model)}
+                  onChange={() => onToggle(model)}
+                  containerClassName="min-h-11 px-3 py-1.5 text-sm text-secondary-text"
+                  label={<span className="min-w-0 truncate font-normal text-secondary-text">{getOptionLabel(model)}</span>}
+                />
               </li>
             ))}
           </ul>

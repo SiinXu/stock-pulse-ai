@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom';
+import { loadAllUiLanguageTranslations } from './i18n/translations';
+
+await loadAllUiLanguageTranslations();
 
 class MemoryStorageMock implements Storage {
   private readonly values = new Map<string, string>();

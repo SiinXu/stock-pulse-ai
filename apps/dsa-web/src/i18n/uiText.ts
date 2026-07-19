@@ -1,4 +1,7 @@
-export type UiLanguage = 'zh' | 'en';
+import { createUiLanguageRecord } from './createUiLanguageRecord';
+import type { UiLanguage } from './uiLanguages';
+
+export type { UiLanguage } from './uiLanguages';
 
 const zh = {
   'common.cancel': '取消',
@@ -26,6 +29,8 @@ const zh = {
   'common.success': '成功',
   'common.copy': '复制',
   'common.copied': '已复制!',
+  'common.copyFailed': '复制失败，请重试',
+  'common.openCalendar': '打开 {field} 日历',
   'common.pageNav': '分页导航',
   'common.prevPage': '上一页',
   'common.nextPage': '下一页',
@@ -35,6 +40,8 @@ const zh = {
   'common.noMatches': '无匹配项',
   'common.staleValue': '当前配置不可用',
   'common.detailView': '详情',
+  'common.hours': '小时',
+  'common.minutes': '分钟',
 
   'language.current': '中文',
   'language.english': 'English',
@@ -154,7 +161,11 @@ const zh = {
   'login.loginPasswordPlaceholder': '请输入密码',
   'login.loginSubmit': '授权进入工作台',
   'login.loginSubmitting': '正在建立连接...',
+  'login.insecureConnection': '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。',
+  'login.localConnection': '当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。',
   'login.pageTitle': '登录 - StockPulse',
+  'login.passwordRequired': '请输入密码',
+  'login.confirmPasswordRequired': '请再次输入密码',
   'login.passwordMismatch': '两次输入的密码不一致',
   'login.setupDescription': '首次启用认证，请为系统工作台设置管理员密码。',
   'login.setupFailed': '配置失败',
@@ -163,7 +174,7 @@ const zh = {
   'login.setupSubmitting': '初始化中...',
   'login.setupTitle': '设置初始密码',
   'login.systemBadge': 'V3.X 量化系统',
-  'login.secureConnection': '已通过 StockPulse-V3-TLS 建立安全连接',
+  'login.secureConnection': '此登录页面使用 HTTPS 加密传输。',
   'login.validationFailed': '验证未通过',
 
   'home.analyze': '分析',
@@ -374,6 +385,19 @@ const zh = {
   'decisionSignals.reason': '理由',
   'decisionSignals.reassessBlockedNote': '该预览已被风控约束为非进攻展示动作。',
   'decisionSignals.reassessBlockedTitle': '预览被风控阻断',
+  'decisionSignals.reassessPersist': '确认保存',
+  'decisionSignals.reassessPersistBlockedTitle': '保存被风控阻断',
+  'decisionSignals.reassessPersistConfirmMessage': '服务端将基于同一份历史报告快照重新计算，并保存通过风控的结果。',
+  'decisionSignals.reassessPersistConfirmTitle': '保存重评估信号',
+  'decisionSignals.reassessPersistedCreated': '已保存为新的 DecisionSignal #{id}。',
+  'decisionSignals.reassessPersistedCreatedTitle': '重评估信号已保存',
+  'decisionSignals.reassessPersistedExisting': '同一报告、风格和信号身份的 DecisionSignal #{id} 已存在，本次没有重复创建；展示其原始服务端记录。',
+  'decisionSignals.reassessPersistedExistingTitle': '已复用现有信号',
+  'decisionSignals.reassessPersistedRefreshed': '现有 DecisionSignal #{id} 已按存储契约完成过期续期或缺失维度补齐；原始创建来源保持不变，请以后端返回记录为准。',
+  'decisionSignals.reassessPersistedRefreshedTitle': '重评估信号已刷新',
+  'decisionSignals.reassessPersistedTerminalExisting': 'DecisionSignal #{id} 已处于“{status}”状态，本次没有新建或重新激活信号。',
+  'decisionSignals.reassessPersistedTerminalTitle': '现有信号保持终态',
+  'decisionSignals.reassessPersisting': '正在保存',
   'decisionSignals.reassessPreview': '生成预览',
   'decisionSignals.reassessProfile': '重评估风格',
   'decisionSignals.reassessRawFinal': '原始/最终',
@@ -512,6 +536,7 @@ const zh = {
   'watchlist.tabHistory': '历史',
   'watchlist.tabToday': '今日',
   'watchlist.tabWatchlist': '自选',
+  'watchlist.tabsAria': '工作台视图切换',
   'watchlist.taskRunning': '任务{status}',
   'watchlist.title': '自选股',
   'watchlist.todayStatusLoading': '确认今日状态中',
@@ -691,6 +716,12 @@ const zh = {
   'report.watchlist': '自选',
 
   'settings.actionSuccess': '操作成功',
+  'settings.noChangesToSave': '当前没有可保存的修改。',
+  'settings.configUpdated': '配置已更新',
+  'settings.configUpdatedWithWarnings': '配置已更新；警告：{warnings}',
+  'settings.validationFailedTitle': '配置校验未通过',
+  'settings.validationFailedMessage': '请先修正表单错误后再保存。',
+  'settings.saveFailed': '保存失败',
   'settings.activePanelDescription': '使用统一字段卡片维护当前分类的系统配置。',
   'settings.activePanelTitle': '当前分类配置项',
   'settings.agentSettings': 'Agent 设置',
@@ -857,6 +888,7 @@ const zh = {
   'settings.schedulerRunningNow': '执行中...',
   'settings.schedulerStatus': '当前状态',
   'settings.schedulerTimeInputAria': '定时执行时间 {index}',
+  'settings.schedulerTimePlaceholder': '例如 18:00',
   'settings.schedulerTimes': '定时执行时间',
   'settings.schedulerTitle': '定时任务',
   'settings.envExported': '已导出当前已保存的 .env 备份。',
@@ -1032,6 +1064,8 @@ const en: Record<UiTextKey, string> = {
   'common.success': 'Success',
   'common.copy': 'Copy',
   'common.copied': 'Copied!',
+  'common.copyFailed': 'Copy failed. Try again.',
+  'common.openCalendar': 'Open {field} calendar',
   'common.pageNav': 'Pagination',
   'common.prevPage': 'Previous page',
   'common.nextPage': 'Next page',
@@ -1041,6 +1075,8 @@ const en: Record<UiTextKey, string> = {
   'common.noMatches': 'No matching options',
   'common.staleValue': 'The current selection is unavailable',
   'common.detailView': 'Detail view',
+  'common.hours': 'Hours',
+  'common.minutes': 'Minutes',
 
   'language.current': 'English',
   'language.english': 'English',
@@ -1160,7 +1196,11 @@ const en: Record<UiTextKey, string> = {
   'login.loginPasswordPlaceholder': 'Enter password',
   'login.loginSubmit': 'Enter workspace',
   'login.loginSubmitting': 'Connecting...',
+  'login.insecureConnection': 'Warning: This connection does not use HTTPS. Your login password could be exposed in transit. Use HTTPS before signing in.',
+  'login.localConnection': 'You are using a local HTTP connection. HTTPS is not in use.',
   'login.pageTitle': 'Login - StockPulse',
+  'login.passwordRequired': 'Enter a password.',
+  'login.confirmPasswordRequired': 'Enter the password again.',
   'login.passwordMismatch': 'The two passwords do not match',
   'login.setupDescription': 'Authentication is being enabled for the first time. Set an admin password for the workspace.',
   'login.setupFailed': 'Setup failed',
@@ -1169,7 +1209,7 @@ const en: Record<UiTextKey, string> = {
   'login.setupSubmitting': 'Initializing...',
   'login.setupTitle': 'Set initial password',
   'login.systemBadge': 'V3.X QUANTITATIVE SYSTEM',
-  'login.secureConnection': 'Secure connection established via StockPulse-V3-TLS',
+  'login.secureConnection': 'This login page uses HTTPS encryption in transit.',
   'login.validationFailed': 'Validation failed',
 
   'home.analyze': 'Analyze',
@@ -1380,6 +1420,19 @@ const en: Record<UiTextKey, string> = {
   'decisionSignals.reason': 'Reason',
   'decisionSignals.reassessBlockedNote': 'This preview is constrained to a non-aggressive display action.',
   'decisionSignals.reassessBlockedTitle': 'Preview blocked by guardrail',
+  'decisionSignals.reassessPersist': 'Confirm and save',
+  'decisionSignals.reassessPersistBlockedTitle': 'Save blocked by guardrail',
+  'decisionSignals.reassessPersistConfirmMessage': 'The server will recompute from the same persisted report snapshot and save only a guardrail-approved result.',
+  'decisionSignals.reassessPersistConfirmTitle': 'Save reassessed signal',
+  'decisionSignals.reassessPersistedCreated': 'Saved as a new DecisionSignal #{id}.',
+  'decisionSignals.reassessPersistedCreatedTitle': 'Reassessed signal saved',
+  'decisionSignals.reassessPersistedExisting': 'DecisionSignal #{id} already exists for the same report, profile, and signal identity. No duplicate was created; the original server record is shown.',
+  'decisionSignals.reassessPersistedExistingTitle': 'Existing signal reused',
+  'decisionSignals.reassessPersistedRefreshed': 'DecisionSignal #{id} was refreshed under the storage contract by renewing an expired record or filling missing identity dimensions. Original creation provenance is preserved; use the returned server record as authoritative.',
+  'decisionSignals.reassessPersistedRefreshedTitle': 'Reassessed signal refreshed',
+  'decisionSignals.reassessPersistedTerminalExisting': 'DecisionSignal #{id} is already {status}. No signal was created or reactivated.',
+  'decisionSignals.reassessPersistedTerminalTitle': 'Existing signal remains terminal',
+  'decisionSignals.reassessPersisting': 'Saving',
   'decisionSignals.reassessPreview': 'Generate preview',
   'decisionSignals.reassessProfile': 'Reassess profile',
   'decisionSignals.reassessRawFinal': 'Raw / final',
@@ -1518,6 +1571,7 @@ const en: Record<UiTextKey, string> = {
   'watchlist.tabHistory': 'History',
   'watchlist.tabToday': 'Today',
   'watchlist.tabWatchlist': 'Watchlist',
+  'watchlist.tabsAria': 'Workspace views',
   'watchlist.taskRunning': 'Task {status}',
   'watchlist.title': 'Watchlist',
   'watchlist.todayStatusLoading': 'Checking today status',
@@ -1697,6 +1751,12 @@ const en: Record<UiTextKey, string> = {
   'report.watchlist': 'Watchlist',
 
   'settings.actionSuccess': 'Success',
+  'settings.noChangesToSave': 'There are no changes to save.',
+  'settings.configUpdated': 'Configuration updated',
+  'settings.configUpdatedWithWarnings': 'Configuration updated. Warnings: {warnings}',
+  'settings.validationFailedTitle': 'Configuration validation failed',
+  'settings.validationFailedMessage': 'Fix the form errors before saving.',
+  'settings.saveFailed': 'Save failed',
   'settings.activePanelDescription': 'Use unified field cards to maintain this configuration category.',
   'settings.activePanelTitle': 'Current category fields',
   'settings.agentSettings': 'Agent settings',
@@ -1863,6 +1923,7 @@ const en: Record<UiTextKey, string> = {
   'settings.schedulerRunningNow': 'Running...',
   'settings.schedulerStatus': 'Current status',
   'settings.schedulerTimeInputAria': 'Scheduled time {index}',
+  'settings.schedulerTimePlaceholder': 'e.g. 18:00',
   'settings.schedulerTimes': 'Scheduled times',
   'settings.schedulerTitle': 'Scheduled task',
   'settings.envExported': 'Saved .env backup exported.',
@@ -2010,10 +2071,10 @@ const en: Record<UiTextKey, string> = {
   'settings.envDockerNote': 'In Docker deployments, --env-file and Compose env_file inject environment variables only at startup. This export/import area uses the backend active .env file. To keep WebUI-saved values across container rebuilds, point ENV_FILE to a writable data-volume file such as /app/data/runtime.env and avoid keeping same-name old values in the startup environment.',
 };
 
-export const UI_TEXT: Record<UiLanguage, Record<UiTextKey, string>> = {
+export const UI_TEXT: Record<UiLanguage, Record<UiTextKey, string>> = createUiLanguageRecord('i18n.uiText.UI_TEXT', {
   zh,
   en,
-};
+});
 
 export type UiTextParams = Record<string, string | number>;
 

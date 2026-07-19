@@ -4,7 +4,7 @@ import { SettingsField } from '../src/components/settings/SettingsField';
 
 describe('SettingsField description fallback', () => {
   it('uses schema.description when i18n map has no description for key', () => {
-    const { container } = render(
+    render(
       <SettingsField
         item={{
           key: 'UNMAPPED_FALLBACK_FIELD',
@@ -32,10 +32,9 @@ describe('SettingsField description fallback', () => {
       />
     );
 
-    const tooltipTrigger = container.querySelector('.cursor-help')?.parentElement;
-    expect(tooltipTrigger).toBeTruthy();
-    fireEvent.mouseEnter(tooltipTrigger as HTMLElement);
+    const tooltipTrigger = screen.getByRole('button', { name: /Unmapped fallback field/ });
+    fireEvent.mouseEnter(tooltipTrigger.parentElement!);
 
-    expect(screen.getByText('schema fallback description')).toBeTruthy();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('schema fallback description');
   });
 });

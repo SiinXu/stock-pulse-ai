@@ -27,7 +27,10 @@ import json
 import multiprocessing
 import os
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from src.notification import NotificationService
 
 from dotenv import dotenv_values
 from src.config import setup_env
@@ -51,7 +54,14 @@ if _packaged_import_probe:
     import sys
 
     try:
-        importlib.import_module(_packaged_import_probe)
+        probed_module = importlib.import_module(_packaged_import_probe)
+        if _packaged_import_probe == "src.migrations.registry":
+            target_version = probed_module.TARGET_VERSION
+            migration_ids = [
+                migration.id for migration in probed_module.get_migrations()
+            ]
+            if not migration_ids or migration_ids[-1] != target_version:
+                raise RuntimeError("Migration registry target is inconsistent")
     except Exception as exc:
         print(
             f"ERROR: packaged import failed for {_packaged_import_probe}: {exc}",
@@ -59,7 +69,13 @@ if _packaged_import_probe:
         )
         sys.exit(1)
 
-    print(f"OK: packaged import succeeded for {_packaged_import_probe}")
+    if _packaged_import_probe == "src.migrations.registry":
+        print(
+            "OK: packaged migration registry import succeeded "
+            f"target={target_version}"
+        )
+    else:
+        print(f"OK: packaged import succeeded for {_packaged_import_probe}")
     sys.exit(0)
 
 import argparse
@@ -647,7 +663,7 @@ def _market_review_report_text(review_result: Any) -> str:
 
 
 def _save_reused_market_review_report(
-    notifier: Any,
+    notifier: NotificationService,
     market_report: str,
     *,
     config: Config,

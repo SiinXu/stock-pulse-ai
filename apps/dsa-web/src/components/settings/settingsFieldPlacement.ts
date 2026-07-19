@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 // Field-level placement map: which settings `section / view` owns each config
 // key. This is the authoritative source for content rendering, per-section
 // status badges and cross-section error jumps, and it supersedes the coarse

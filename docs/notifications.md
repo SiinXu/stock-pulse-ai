@@ -219,6 +219,8 @@ P3 新增三类通知路由配置：
 - 留空或未配置：保持旧行为，发送到所有已配置静态渠道。
 - 非空：只发送到路由列表与已配置渠道的交集；交集为空时不会 fallback 到全渠道。
 - `send_to_context()` 不受路由限制，机器人会话上下文仍会收到触发任务的回复。
+- Web 设置页的路由下拉只列出已配置成功的渠道（存量已保存但对应渠道未配置的值仍会显示并可取消勾选）；未配置任何渠道时展示引导入口，可跳转到「通知渠道」页完成配置。
+- `GET /api/v1/system/config` 使用通知运行时的唯一权威 `NotificationService.detect_configured_channels`，从当前 live `Config` 快照计算 `configured_notification_channels`，不会从已保存值、展示值或 `******` 掩码重建第二份通知配置。因此 `reload_now=false` 只写入 `.env` 时，该状态会保持旧运行时值，直到显式重载；进程环境、`.env` 优先级和 `DISCORD_CHANNEL_ID` 等兼容别名也与实际运行时完全一致。Web 只消费该只读状态，不再重复推断凭据组或解析 ntfy / Gotify URL。旧后端未返回该字段时，Web 为兼容滚动升级将状态标为未知：暂不按已配置渠道过滤，继续展示完整渠道目录并保留已有选择；后端明确返回空列表时仍按“没有已配置渠道”处理。畸形 ntfy / Gotify authority、userinfo、端口或 NFKC 字符会关闭式判为未配置，不会令配置读取失败，也不会在响应或日志中回显原始 URL。
 - 交互式命令（钉钉会话、飞书会话、Telegram）带有来源上下文时，会跳过 `FEISHU_WEBHOOK_URL` 等静态通知渠道；`SCHEDULE`、CLI、API 或无来源上下文的任务仍按 report 路由发送。
 - 路由过滤发生在 Markdown 转图片前，`MARKDOWN_TO_IMAGE_CHANNELS` 只对路由后的渠道子集生效。
 - `MERGE_EMAIL_NOTIFICATION` 不需要额外配置；只要 `email` 仍在 report 路由后的渠道中，现有合并邮件行为保持不变。

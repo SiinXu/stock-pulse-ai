@@ -13,7 +13,10 @@ import re
 import threading
 import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Type, Callable
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Type
+
+if TYPE_CHECKING:
+    from src.config import Config
 
 from bot.models import BotMessage, BotResponse
 from bot.commands.base import BotCommand
@@ -625,7 +628,10 @@ User: "analyze TSLA and NVDA using trend strategy"
         return None
 
     @staticmethod
-    async def _parse_intent_via_llm(text: str, config) -> Optional[dict]:
+    async def _parse_intent_via_llm(
+        text: str,
+        config: "Config",
+    ) -> Optional[dict]:
         """Call LLM to parse user intent.  Returns parsed dict or None on failure."""
         try:
             from src.agent.llm_adapter import LLMToolAdapter
@@ -654,7 +660,10 @@ User: "analyze TSLA and NVDA using trend strategy"
             return None
 
     @staticmethod
-    def _parse_intent_via_llm_sync(text: str, config) -> Optional[dict]:
+    def _parse_intent_via_llm_sync(
+        text: str,
+        config: "Config",
+    ) -> Optional[dict]:
         """Synchronous variant for webhook/stream integrations."""
         try:
             from src.agent.llm_adapter import LLMToolAdapter

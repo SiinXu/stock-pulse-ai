@@ -1,7 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { SidebarNav } from '../SidebarNav';
+
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
 
 const mockLogout = vi.fn().mockResolvedValue(undefined);
 const mockGetAlphaSiftStatus = vi.fn().mockResolvedValue({ enabled: false, available: false, installSpecIsDefault: false });
@@ -57,7 +61,7 @@ describe('SidebarNav', () => {
     expect(screen.getByRole('button', { name: '搜索' })).toHaveClass('h-11', 'w-11');
   });
 
-  it('hides the screening navigation item while AlphaSift is disabled', () => {
+  it('keeps the screening navigation item discoverable while AlphaSift is disabled', () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 
     render(
@@ -66,7 +70,7 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
   });
 
   it('shows the screening navigation item when AlphaSift is enabled', async () => {
@@ -95,7 +99,7 @@ describe('SidebarNav', () => {
     expect(hrefs.slice(0, 5)).toEqual(['/', '/chat', '/screening', '/portfolio', '/decision-signals']);
   });
 
-  it('refreshes the screening navigation item after any config save event', async () => {
+  it('keeps the screening navigation item stable after config save events', () => {
     mockGetAlphaSiftStatus
       .mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false })
       .mockResolvedValueOnce({ enabled: true, available: false, installSpecIsDefault: false });
@@ -106,11 +110,9 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole('link', { name: '选股' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
     window.dispatchEvent(new Event('dsa-system-config-changed'));
-
-    expect(await screen.findByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
-    await waitFor(() => expect(mockGetAlphaSiftStatus.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.getByRole('link', { name: '选股' })).toHaveAttribute('href', '/screening');
   });
 
   it('shows the shared completion badge only when chat completion is pending', () => {
@@ -135,17 +137,22 @@ describe('SidebarNav', () => {
     expect(screen.queryByTestId('chat-completion-badge')).not.toBeInTheDocument();
   });
 
-  it('renders the collapsed theme toggle variant when the sidebar is collapsed', () => {
+  it('moves theme and language controls into the collapsed profile menu', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <SidebarNav collapsed />
       </MemoryRouter>,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'StockPulse' }));
     expect(mockThemeToggle).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: 'nav', collapsed: true }),
+      expect.objectContaining({ menuLayout: 'horizontal', wrapperClassName: 'w-full' }),
     );
-    expect(screen.getByRole('button', { name: '切换主题(折叠)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '切换主题' })).toBeInTheDocument();
+    const languageControl = screen.getByTestId('ui-language-selector');
+    expect(within(languageControl).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
+    fireEvent.click(within(languageControl).getByRole('combobox'));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 
   it('renders the alerts navigation item and marks it active', () => {

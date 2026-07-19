@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import Any, Dict, Optional
@@ -14,6 +15,7 @@ from src.agent.tools.execution import (
     _guard_tool_stock_scope,
     build_tool_audit,
     redact_diagnostic_value,
+    serialize_tool_error_result,
     serialize_tool_result,
 )
 from src.agent.tools.registry import (
@@ -22,6 +24,9 @@ from src.agent.tools.registry import (
     ToolParameter,
     ToolRegistry,
 )
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 
 _JSON_TYPE_TO_PYTHON = {
@@ -64,8 +69,18 @@ class ToolSurface:
         """Execute one registered tool by exact name and return structured output."""
         ctx = context or ToolAccessContext()
         started_at = time.time()
-        tool_name = name if isinstance(name, str) else str(name)
-        tool_def = self._registry.resolve(tool_name) if isinstance(name, str) else None
+        tool_name = name if type(name) is str else ""
+        if not tool_name.strip():
+            return self._error_result(
+                tool_name="",
+                code="invalid_tool_name",
+                message="Tool name must exactly match a registered StockPulse tool.",
+                started_at=started_at,
+                context=ctx,
+                retriable=False,
+                arguments=arguments,
+            )
+        tool_def = self._registry.resolve(tool_name)
 
         if tool_def is None:
             if isinstance(name, str) and (":" in name or "." in name):
@@ -88,47 +103,59 @@ class ToolSurface:
                 arguments=arguments,
             )
 
-        validation_error = _validate_arguments(tool_def, arguments)
-        if validation_error is not None:
-            return self._error_result(
-                tool_name=tool_name,
-                code="invalid_arguments",
-                message=validation_error,
-                started_at=started_at,
-                context=ctx,
-                retriable=False,
-                arguments=arguments,
-            )
-
-        scope_contract_error = _validate_scope_contract(tool_def)
-        if scope_contract_error is not None:
-            return self._error_result(
-                tool_name=tool_name,
-                code="scope_contract_violation",
-                message=scope_contract_error["message"],
-                started_at=started_at,
-                context=ctx,
-                retriable=False,
-                details=scope_contract_error["details"],
-                arguments=arguments,
-            )
-
-        guard_result = None
-        if _requires_stock_scope(tool_def):
-            if ctx.stock_scope is None:
+        if ctx.enforce_contract:
+            validation_error = _validate_arguments(tool_def, arguments)
+            if validation_error is not None:
                 return self._error_result(
                     tool_name=tool_name,
-                    code="stock_scope_violation",
-                    message="Tool call requires an explicit stock scope.",
+                    code="invalid_arguments",
+                    message=validation_error,
                     started_at=started_at,
                     context=ctx,
                     retriable=False,
-                    details={
-                        "reason": "stock_scope_required",
-                        "scope_dimensions": list(tool_def.policy.scope_dimensions),
-                    },
                     arguments=arguments,
                 )
+
+            scope_contract_error = _validate_scope_contract(tool_def)
+            if scope_contract_error is not None:
+                return self._error_result(
+                    tool_name=tool_name,
+                    code="scope_contract_violation",
+                    message=scope_contract_error["message"],
+                    started_at=started_at,
+                    context=ctx,
+                    retriable=False,
+                    details=scope_contract_error["details"],
+                    arguments=arguments,
+                )
+
+        guard_result = None
+        if ctx.enforce_contract:
+            if _requires_stock_scope(tool_def):
+                if ctx.stock_scope is None:
+                    return self._error_result(
+                        tool_name=tool_name,
+                        code="stock_scope_violation",
+                        message="Tool call requires an explicit stock scope.",
+                        started_at=started_at,
+                        context=ctx,
+                        retriable=False,
+                        details={
+                            "reason": "stock_scope_required",
+                            "scope_dimensions": list(tool_def.policy.scope_dimensions),
+                        },
+                        arguments=arguments,
+                    )
+                guard_result = _guard_tool_stock_scope(
+                    self._registry,
+                    tool_name,
+                    arguments,
+                    ctx.stock_scope,
+                )
+        elif ctx.stock_scope is not None:
+            # Native-compatibility guard: keyed on the presence of a
+            # ``stock_code`` parameter, applied only when a scope is supplied,
+            # exactly like the historical direct runner path.
             guard_result = _guard_tool_stock_scope(
                 self._registry,
                 tool_name,
@@ -175,7 +202,16 @@ class ToolSurface:
                 },
                 arguments=arguments,
             )
-        except Exception:
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "Agent tool execution failed",
+                exc,
+                error_code="agent_tool_execution_failed",
+                level=logging.WARNING,
+                context={"tool_name": tool_name},
+                exception_redaction_values=exception_chain_redaction_values(exc),
+            )
             return self._error_result(
                 tool_name=tool_name,
                 code="handler_error",
@@ -240,40 +276,68 @@ class ToolSurface:
         result_text: Optional[str] = None,
         arguments: Any = None,
     ) -> Dict[str, Any]:
-        duration = time.time() - started_at
-        safe_text = result_text or json.dumps(
-            {"error": message, "code": code, "retriable": retriable},
-            ensure_ascii=False,
+        return build_tool_error_result(
+            tool_name=tool_name,
+            code=code,
+            message=message,
+            started_at=started_at,
+            context=context,
+            retriable=retriable,
+            details=details,
+            result_text=result_text,
+            arguments=arguments,
         )
-        result_truncated = False
-        if context.max_result_bytes is not None and context.max_result_bytes >= 0:
-            safe_text, result_truncated = _truncate_text_bytes(safe_text, int(context.max_result_bytes))
-        return {
-            "ok": False,
-            "tool_name": tool_name,
-            "result": None,
-            "result_text": safe_text,
-            "error": {
-                "code": code,
-                "message": message,
-                "retriable": retriable,
-                "details": details or {},
-            },
-            "audit": build_tool_audit(
-                tool_name=tool_name,
-                arguments=arguments if arguments is not None else {},
-                result=safe_text,
-                error_code=code,
-                duration=duration,
-                context=context,
-            ),
-            "diagnostics": {
-                "redacted": True,
-                "result_length": len(safe_text.encode("utf-8")),
-                "result_truncated": result_truncated,
-                "preview": redact_diagnostic_value(safe_text),
-            },
-        }
+
+
+def build_tool_error_result(
+    *,
+    tool_name: str,
+    code: str,
+    message: str,
+    started_at: float,
+    context: ToolAccessContext,
+    retriable: bool,
+    details: Optional[Dict[str, Any]] = None,
+    result_text: Optional[str] = None,
+    arguments: Any = None,
+) -> Dict[str, Any]:
+    """Build the shared structured error result used by ToolSurface and
+    session-level gates so every rejection carries the same contract shape."""
+    duration = time.time() - started_at
+    safe_text = result_text or serialize_tool_error_result(
+        message=message,
+        code=code,
+        retriable=retriable,
+    )
+    result_truncated = False
+    if context.max_result_bytes is not None and context.max_result_bytes >= 0:
+        safe_text, result_truncated = _truncate_text_bytes(safe_text, int(context.max_result_bytes))
+    return {
+        "ok": False,
+        "tool_name": tool_name,
+        "result": None,
+        "result_text": safe_text,
+        "error": {
+            "code": code,
+            "message": message,
+            "retriable": retriable,
+            "details": details or {},
+        },
+        "audit": build_tool_audit(
+            tool_name=tool_name,
+            arguments=arguments if arguments is not None else {},
+            result=safe_text,
+            error_code=code,
+            duration=duration,
+            context=context,
+        ),
+        "diagnostics": {
+            "redacted": True,
+            "result_length": len(safe_text.encode("utf-8")),
+            "result_truncated": result_truncated,
+            "preview": redact_diagnostic_value(safe_text),
+        },
+    }
 
 
 def _execute_with_timeout(tool_def: ToolDefinition, arguments: Dict[str, Any], timeout: float) -> Any:

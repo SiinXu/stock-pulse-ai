@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useState } from 'react';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -11,6 +13,7 @@ import { ApiErrorAlert, Badge, Button, InlineAlert, Modal } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { SETTINGS_CONTROLS_TEXT, SETTINGS_SOURCE_LABELS } from '../../locales/settingsControls';
+import { getUiListSeparator } from '../../utils/uiLocale';
 
 interface LLMConfigModeBannerProps {
   status: LLMConfigModeStatus | null;
@@ -39,7 +42,7 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
   };
   const overridden = status.overriddenSources
     .map((source) => SETTINGS_SOURCE_LABELS[language][source] ?? source)
-    .join(language === 'en' ? ', ' : '、');
+    .join(getUiListSeparator(language));
   const canMigrate = Boolean(configVersion) && status.detectedSources.includes('legacy') && status.effectiveMode !== 'channels';
 
   const openPreview = async () => {

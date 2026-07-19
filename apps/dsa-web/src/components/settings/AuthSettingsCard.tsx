@@ -5,7 +5,7 @@ import { getParsedApiError, isParsedApiError, type ParsedApiError } from '../../
 import { useAuth } from '../../hooks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
-import { Badge, Button, Input, Checkbox } from '../common';
+import { Badge, Button, Checkbox, CredentialInput } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 
@@ -120,7 +120,7 @@ export const AuthSettingsCard: React.FC = () => {
               disabled={isSubmitting}
               label={desiredEnabled ? t('common.enabled') : t('common.disabled')}
               onChange={(event) => setDesiredEnabled(event.target.checked)}
-              containerClassName="rounded-full border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-4 py-2 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface)]"
+              containerClassName="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-1.5 shadow-soft-card transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)] hover:bg-[var(--settings-surface)]"
             />
           </div>
         </div>
@@ -132,14 +132,13 @@ export const AuthSettingsCard: React.FC = () => {
             {(setupState === 'password_retained' && desiredEnabled) || 
              (setupState === 'enabled' && !desiredEnabled) ? (
               <div className="space-y-3">
-                <Input
+                <CredentialInput
+                  purpose="admin-current-password"
                   label={t('settings.authCurrentPassword')}
-                  type="password"
                   allowTogglePassword
                   iconType="password"
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
-                  autoComplete="current-password"
                   disabled={isSubmitting}
                   placeholder={t('settings.authPasswordPlaceholder')}
                   hint={setupState === 'password_retained' ? t('settings.authPasswordHintRetained') : t('settings.authPasswordHintOff')}
@@ -151,27 +150,25 @@ export const AuthSettingsCard: React.FC = () => {
             {setupState === 'no_password' && desiredEnabled ? (
               <>
                 <div className="space-y-3">
-                  <Input
+                  <CredentialInput
+                    purpose="admin-new-password"
                     label={t('settings.authSetPassword')}
-                    type="password"
                     allowTogglePassword
                     iconType="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    autoComplete="new-password"
                     disabled={isSubmitting}
                     placeholder={t('settings.authSetPasswordPlaceholder')}
                   />
                 </div>
                 <div className="space-y-3">
-                  <Input
+                  <CredentialInput
+                    purpose="admin-new-password-confirmation"
                     label={t('settings.changePasswordConfirm')}
-                    type="password"
                     allowTogglePassword
                     iconType="password"
                     value={passwordConfirm}
                     onChange={(event) => setPasswordConfirm(event.target.value)}
-                    autoComplete="new-password"
                     disabled={isSubmitting}
                     placeholder={t('settings.changePasswordConfirmPlaceholder')}
                   />

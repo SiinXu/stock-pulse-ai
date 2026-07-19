@@ -66,7 +66,7 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       style={style}
-      className={cn('rounded-2xl', variantStyles[variant], hoverStyles, paddingStyles[padding], className)}
+      className={cn('rounded-xl', variantStyles[variant], hoverStyles, paddingStyles[padding], className)}
     >
       {header}
       {children}

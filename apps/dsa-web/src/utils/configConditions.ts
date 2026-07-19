@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { ConfigCondition, ConfigFieldContract } from '../types/systemConfig';
 
 export type ConditionResult = 'met' | 'notMet' | 'unknown';
@@ -8,7 +10,7 @@ export type ConditionResult = 'met' | 'notMet' | 'unknown';
  * field visible and still validated).
  */
 export function evaluateConfigConditions(
-  conditions: ConfigCondition[] | undefined,
+  conditions: ConfigCondition[] | null | undefined,
   values: Record<string, string>,
 ): ConditionResult {
   if (conditions === undefined || conditions === null) {

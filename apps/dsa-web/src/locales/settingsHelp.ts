@@ -1,4 +1,7 @@
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import type { UiLanguage } from '../i18n/uiText';
 import type { SystemConfigDocLink } from '../types/systemConfig';
+import { normalizeUiLanguage } from '../utils/uiLanguage';
 
 export interface SettingsHelpContent {
   title: string;
@@ -2377,11 +2380,18 @@ const settingsHelpEnUS: SettingsHelpMap = {
   },
 };
 
-function getPreferredHelpMap(locale?: string | null): SettingsHelpMap {
-  if (locale?.toLowerCase().startsWith('en')) {
-    return settingsHelpEnUS;
-  }
-  return settingsHelpZhCN;
+const SETTINGS_HELP_MAPS: Record<UiLanguage, SettingsHelpMap> = createUiLanguageRecord(
+  'locales.settingsHelp.SETTINGS_HELP_MAPS',
+  { zh: settingsHelpZhCN, en: settingsHelpEnUS },
+);
+
+const SETTINGS_HELP_FALLBACK_TITLES: Record<UiLanguage, string> = createUiLanguageRecord(
+  'locales.settingsHelp.SETTINGS_HELP_FALLBACK_TITLES',
+  { zh: '配置说明', en: 'Configuration help' },
+);
+
+function getPreferredHelpLanguage(locale?: string | null): UiLanguage {
+  return normalizeUiLanguage(locale) ?? 'zh';
 }
 
 export function getSettingsHelpContent(
@@ -2393,14 +2403,15 @@ export function getSettingsHelpContent(
     return null;
   }
 
-  const localized = getPreferredHelpMap(locale)[helpKey] ?? settingsHelpZhCN[helpKey];
+  const language = getPreferredHelpLanguage(locale);
+  const localized = SETTINGS_HELP_MAPS[language][helpKey];
   if (localized) {
     return localized;
   }
 
   if (fallbackDescription) {
     return {
-      title: locale?.toLowerCase().startsWith('en') ? 'Configuration help' : '配置说明',
+      title: SETTINGS_HELP_FALLBACK_TITLES[language],
       summary: fallbackDescription,
     };
   }

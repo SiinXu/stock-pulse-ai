@@ -1,7 +1,25 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import { getSettingsHelpContent } from '../settingsHelp';
+import { UI_LANGUAGES } from '../../i18n/uiLanguages';
 
 describe('fallback model settings help', () => {
+  it.each(UI_LANGUAGES)('returns complete localized settings help for %s', (language) => {
+    const content = getSettingsHelpContent('settings.ai_model.GENERATION_BACKEND', undefined, language);
+    expect(content?.title.trim()).not.toBe('');
+    expect(content?.summary?.trim()).not.toBe('');
+    expect(content?.valueNotes?.length).toBeGreaterThan(0);
+  });
+
+  it('uses the selected language for unknown-key fallback help', () => {
+    const content = getSettingsHelpContent('settings.future.UNKNOWN', 'Backend-provided summary', 'ja');
+
+    expect(content?.title.trim()).not.toBe('');
+    expect(content?.title).not.toBe('配置说明');
+    expect(content?.summary).toBe('Backend-provided summary');
+  });
+
   it.each(['zh-CN', 'en-US'])('uses StockPulse branding in user-facing settings help for %s', (locale) => {
     const generationHelp = getSettingsHelpContent('settings.ai_model.GENERATION_BACKEND', undefined, locale);
     const alphaSiftHelp = getSettingsHelpContent('settings.data_source.ALPHASIFT_ENABLED', undefined, locale);

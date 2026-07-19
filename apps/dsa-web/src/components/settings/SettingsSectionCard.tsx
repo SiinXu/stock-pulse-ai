@@ -19,7 +19,7 @@ export const SettingsSectionCard: React.FC<SettingsSectionCardProps> = ({
   contentBordered = false,
 }) => {
   return (
-    <section className={cn('rounded-2xl bg-card p-3 md:p-4', className)}>
+    <section className={cn('rounded-xl bg-card p-3 md:p-4', className)}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>

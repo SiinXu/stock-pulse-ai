@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   ArrowDownWideNarrow,
   CalendarDays,
@@ -12,7 +12,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, Input, ScrollArea, StatusDot } from '../common';
+import { Badge, Button, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -46,10 +46,11 @@ interface HomeStockWorkspaceProps {
   watchlistRows: HomeWatchlistRow[];
   watchlistLoading: boolean;
   watchlistActioning: boolean;
+  watchlistLoadError?: boolean;
   watchlistMessage: string | null;
-  onAddToWatchlist: (code: string) => Promise<void>;
-  onRemoveFromWatchlist: (code: string) => Promise<void>;
-  onRefreshWatchlist: () => Promise<void>;
+  onAddToWatchlist: (code: string) => Promise<boolean | void>;
+  onRemoveFromWatchlist: (code: string) => Promise<boolean | void>;
+  onRefreshWatchlist: () => Promise<boolean | void>;
   onAnalyzeWatchlist: (mode: WatchlistAnalyzeMode) => Promise<void>;
   isBatchAnalyzing: boolean;
   batchStatus: BatchStatus | null;
@@ -110,7 +111,7 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
 
 const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
-  onRemove: (code: string) => Promise<void>;
+  onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
 }> = ({ row, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
@@ -202,6 +203,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   watchlistRows,
   watchlistLoading,
   watchlistActioning,
+  watchlistLoadError = false,
   watchlistMessage,
   onAddToWatchlist,
   onRemoveFromWatchlist,
@@ -223,17 +225,20 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   className = '',
 }) => {
   const { t } = useUiLanguage();
+  const reactId = useId();
   const [draftCode, setDraftCode] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
     .length;
   const isTodayStatusUnavailable = watchlistRows.some((row) => row.isTodayStatusLoading || row.isTodayStatusUnknown);
   const topTodayItem = todayItems[0];
-  const tabs: Array<{ key: HomeWorkspaceTab; label: string }> = [
-    { key: 'history', label: t('watchlist.tabHistory') },
-    { key: 'watchlist', label: t('watchlist.tabWatchlist') },
-    { key: 'today', label: t('watchlist.tabToday') },
+  const tabs: Array<{ value: HomeWorkspaceTab; label: string }> = [
+    { value: 'history', label: t('watchlist.tabHistory') },
+    { value: 'watchlist', label: t('watchlist.tabWatchlist') },
+    { value: 'today', label: t('watchlist.tabToday') },
   ];
+  const activeTabLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? tabs[0].label;
 
   const statusClassName = useMemo(() => {
     if (!batchStatus) return '';
@@ -241,58 +246,96 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     if (batchStatus.variant === 'warning') return 'border-warning/30 bg-warning/10 text-warning';
     return 'border-success/30 bg-success/10 text-success';
   }, [batchStatus]);
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredWatchlistRows = useMemo(() => {
+    if (!normalizedSearchQuery) return watchlistRows;
+    return watchlistRows.filter((row) => {
+      const stockName = row.latestItem?.stockName ?? '';
+      return (
+        row.code.toLowerCase().includes(normalizedSearchQuery) ||
+        stockName.toLowerCase().includes(normalizedSearchQuery)
+      );
+    });
+  }, [normalizedSearchQuery, watchlistRows]);
+  const filteredTodayItems = useMemo(() => {
+    if (!normalizedSearchQuery) return todayItems;
+    return todayItems.filter((item) => (
+      item.stockCode.toLowerCase().includes(normalizedSearchQuery) ||
+      (item.stockName ?? '').toLowerCase().includes(normalizedSearchQuery)
+    ));
+  }, [normalizedSearchQuery, todayItems]);
+  const filteredHistoryItems = useMemo(() => {
+    if (!normalizedSearchQuery) return historyItems;
+    return historyItems.filter((item) => (
+      item.stockCode.toLowerCase().includes(normalizedSearchQuery) ||
+      (item.stockName ?? '').toLowerCase().includes(normalizedSearchQuery)
+    ));
+  }, [historyItems, normalizedSearchQuery]);
 
   const handleAddSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const code = draftCode.trim();
     if (!code) return;
-    void onAddToWatchlist(code).then(() => setDraftCode(''));
+    void onAddToWatchlist(code).then((success) => {
+      if (success !== false) setDraftCode('');
+    });
   };
 
+  const panelId = `${reactId}-panel`;
+
   const renderTabs = (
-    <div className="grid grid-cols-3 gap-1 rounded-xl border border-subtle bg-base/40 p-1">
-      {tabs.map((tab) => {
-        const selected = activeTab === tab.key;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            aria-pressed={selected}
-            className={`h-11 rounded-full px-2 text-xs font-medium transition-colors ${
-              selected ? 'bg-primary/15 text-primary shadow-inner' : 'text-secondary-text hover:bg-hover hover:text-foreground'
-            }`}
-            onClick={() => onTabChange(tab.key)}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+    <div className="flex min-w-0 flex-col gap-2">
+      <SegmentedControl
+        value={activeTab}
+        options={tabs}
+        onChange={onTabChange}
+        ariaLabel={t('watchlist.tabsAria')}
+        className="w-fit"
+        getPanelId={() => panelId}
+      />
+      <SearchInput
+        value={searchQuery}
+        onChange={(event) => setSearchQuery(event.target.value)}
+        placeholder={t('common.searchPlaceholder')}
+        aria-label={t('layout.search')}
+        wrapperClassName="w-full"
+      />
+    </div>
+  );
+
+  // Both branches share one skeleton so the controls keep an identical position.
+  const workspaceShell = (content: React.ReactNode) => (
+    <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
+      {renderTabs}
+      <div
+        role="tabpanel"
+        id={panelId}
+        aria-label={activeTabLabel}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        {content}
+      </div>
     </div>
   );
 
   if (activeTab === 'history') {
-    return (
-      <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
-        {renderTabs}
-        <StockBar
-          items={historyItems}
-          isLoading={isLoadingHistory}
-          selectedStockCode={selectedStockCode}
-          selectedRecordId={selectedRecordId}
-          onItemClick={onHistoryItemClick}
-          onDeleteStock={onDeleteStock}
-          isDeleting={isDeleting}
-          className="flex-1 overflow-hidden"
-        />
-      </div>
+    return workspaceShell(
+      <StockBar
+        items={filteredHistoryItems}
+        isLoading={isLoadingHistory}
+        selectedStockCode={selectedStockCode}
+        selectedRecordId={selectedRecordId}
+        onItemClick={onHistoryItemClick}
+        onDeleteStock={onDeleteStock}
+        isDeleting={isDeleting}
+        className="flex-1 overflow-hidden"
+      />,
     );
   }
 
-  return (
-    <aside className={`glass-card flex min-h-0 flex-1 flex-col overflow-hidden ${className}`}>
+  return workspaceShell(
+    <aside className="glass-card flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="space-y-3 border-b border-subtle px-4 py-4">
-        {renderTabs}
-
         {activeTab === 'watchlist' ? (
           <>
             <DashboardPanelHeader
@@ -398,19 +441,31 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         {activeTab === 'watchlist' ? (
           watchlistLoading ? (
             <DashboardStateBlock loading compact title={t('watchlist.loading')} />
+          ) : watchlistLoadError ? (
+            <DashboardStateBlock
+              compact
+              title={t('chat.actionFailed')}
+              action={(
+                <Button type="button" size="sm" variant="secondary" onClick={() => void onRefreshWatchlist()}>
+                  {t('common.retry')}
+                </Button>
+              )}
+            />
           ) : watchlistRows.length === 0 ? (
             <DashboardStateBlock
               compact
               title={t('watchlist.emptyTitle')}
               description={t('watchlist.emptyDescription')}
             />
+          ) : filteredWatchlistRows.length === 0 ? (
+            <DashboardStateBlock compact title={t('common.noData')} />
           ) : (
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-xs text-muted-text">
                 <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
                 {t('watchlist.listHint')}
               </div>
-              {watchlistRows.map((row) => (
+              {filteredWatchlistRows.map((row) => (
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
@@ -434,13 +489,15 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
             title={t('watchlist.todayEmptyTitle')}
             description={t('watchlist.todayEmptyDescription')}
           />
+        ) : filteredTodayItems.length === 0 ? (
+          <DashboardStateBlock compact title={t('common.noData')} />
         ) : (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-xs text-muted-text">
               <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden="true" />
               {t('watchlist.todaySortHint')}
             </div>
-            {todayItems.map((item) => (
+            {filteredTodayItems.map((item) => (
               <TodayItem key={`${item.stockCode}-${item.id}`} item={item} onClick={onHistoryItemClick} />
             ))}
           </div>
@@ -461,7 +518,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           </Button>
         </div>
       ) : null}
-    </aside>
+    </aside>,
   );
 };
 

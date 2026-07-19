@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { ReportDetails as ReportDetailsType, ReportLanguage } from '../../types/analysis';
-import { Card } from '../common';
+import { Card, InlineAlert, useClipboard } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
@@ -29,6 +29,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
     snapshot: false,
   });
   const copyResetTimerRef = useRef<Partial<Record<JsonPanel, number>>>({});
+  const { copyText, copyError } = useClipboard();
 
   useEffect(() => {
     return () => {
@@ -46,8 +47,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
   }
 
   const copyToClipboard = async (content: string, panel: JsonPanel) => {
-    try {
-      await navigator.clipboard.writeText(content);
+    if (await copyText(content)) {
       setCopiedPanels((prev) => ({
         ...prev,
         [panel]: true,
@@ -63,8 +63,6 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         }));
         delete copyResetTimerRef.current[panel];
       }, 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
     }
   };
 
@@ -97,6 +95,8 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         className="mb-3"
       />
 
+      {copyError ? <InlineAlert variant="danger" message={copyError} className="mb-3" /> : null}
+
       {/* Record ID */}
       {recordId && (
         <div className="home-divider mb-3 flex items-center gap-2 border-b pb-3 text-xs text-muted-text">
@@ -115,7 +115,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
             <button
               type="button"
               onClick={() => setShowRaw(!showRaw)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-full p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.rawResult}</span>
               <svg
@@ -141,7 +141,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
             <button
               type="button"
               onClick={() => setShowSnapshot(!showSnapshot)}
-              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-full p-2.5"
+              className="home-surface-button home-trace-toggle flex min-h-11 w-full items-center justify-between rounded-lg p-2.5"
             >
               <span className="text-xs text-foreground">{text.analysisSnapshot}</span>
               <svg

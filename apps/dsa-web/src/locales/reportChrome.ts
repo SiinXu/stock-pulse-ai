@@ -1,4 +1,6 @@
-import type { ReportLanguage } from '../types/analysis';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 
 const zh = {
   eyebrow: '运行诊断',
@@ -141,8 +143,7 @@ const ko = {
   },
 } as const;
 
-export const REPORT_CHROME_TEXT: Record<ReportLanguage, typeof zh | typeof en | typeof ko> = {
+export const REPORT_CHROME_TEXT = createUiLanguageRecord('locales.reportChrome.REPORT_CHROME_TEXT', {
   zh,
   en,
-  ko,
-};
+}, { ko });

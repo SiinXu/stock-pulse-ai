@@ -1,4 +1,30 @@
-MIT License
+StockPulse License Notice
+=========================
+
+This repository is an independently maintained fork of
+ZhuLinsen/daily_stock_analysis (https://github.com/ZhuLinsen/daily_stock_analysis).
+
+The project contains code under two different licenses:
+
+1. Upstream / Original Code
+   Copyright (c) 2026 ZhuLinsen
+   Licensed under the MIT License.
+   The full MIT License text is included below.
+
+2. New Contributions by StockPulse
+   Copyright (c) 2026 SiinXu and StockPulse contributors
+   Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-only).
+   Full text: https://www.gnu.org/licenses/agpl-3.0.txt
+   (You may also find a copy in LICENSE.AGPL if present)
+
+When the software is modified and/or made available to users over a network
+(including as a web service, API, or hosted agent platform), the terms of
+the AGPL-3.0 apply to the combined work.
+
+You must retain all copyright notices and license texts from both licenses.
+
+----------------------------------------------------------------------
+MIT License (for upstream code)
 
 Copyright (c) 2026 ZhuLinsen
 

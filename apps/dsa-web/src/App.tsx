@@ -15,7 +15,9 @@ import {
 } from './components/layout/RouteBoundary';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
+import type { UiLanguage } from './i18n/uiLanguages';
 import { useAgentChatStore } from './stores/agentChatStore';
+import { resolveLoginRedirect } from './utils/loginRedirect';
 import './App.css';
 
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -71,7 +73,9 @@ const AppLayout: React.FC = () => {
   }
 
   if (isLoginRoute) {
-    return <Navigate to="/" replace />;
+    // Preserve the deep link: every path into /login carries ?redirect=,
+    // and the post-login re-render must not race LoginPage back to "/".
+    return <Navigate to={resolveLoginRedirect(location.search)} replace />;
   }
 
   return <Outlet />;
@@ -118,13 +122,13 @@ const routes = [
   },
 ];
 
-const App: React.FC = () => {
+const App: React.FC<{ initialUiLanguage?: UiLanguage }> = ({ initialUiLanguage }) => {
   // Created on mount (not at module scope) so each mount picks up the current
   // window.location — tests push a URL right before rendering <App />.
   const [router] = useState(() => createBrowserRouter(routes));
 
   return (
-    <UiLanguageProvider>
+    <UiLanguageProvider initialLanguage={initialUiLanguage}>
       <RouterProvider router={router} />
     </UiLanguageProvider>
   );

@@ -4,6 +4,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import logging
 import os
 import tempfile
 import threading
@@ -13,6 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
+import pytest
 from fastapi import FastAPI, HTTPException, Request
 
 from tests._llm_env_isolation import restore_ambient_llm_env, strip_ambient_llm_env
@@ -27,6 +29,7 @@ from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     GenerationBackendStatusPreviewRequest,
     ImportSystemConfigRequest,
+    SystemConfigResponse,
     TestGenerationBackendRequest,
     TestLLMChannelRequest,
     TestNotificationChannelRequest,
@@ -43,6 +46,13 @@ class SystemConfigApiTestCase(unittest.TestCase):
     """System config API tests in isolation without loading the full app."""
 
     def setUp(self) -> None:
+        self._saved_notification_env = {
+            key: os.environ[key]
+            for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP
+            if key in os.environ
+        }
+        for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
+            os.environ.pop(key, None)
         # Keep ambient developer LLM env (e.g. litellm's load_dotenv at import)
         # from bleeding into config validation; the temp .env is authoritative.
         self._saved_llm_env = strip_ambient_llm_env()
@@ -99,6 +109,9 @@ class SystemConfigApiTestCase(unittest.TestCase):
             os.environ.pop("DATABASE_PATH", None)
         else:
             os.environ["DATABASE_PATH"] = self._orig_database_path
+        for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
+            os.environ.pop(key, None)
+        os.environ.update(self._saved_notification_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
 
@@ -165,6 +178,41 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(item_map["GEMINI_API_KEY"]["value"], payload["mask_token"])
         self.assertTrue(item_map["GEMINI_API_KEY"]["is_masked"])
         self.assertNotIn("secret-key-value", str(payload))
+
+    def test_system_config_response_defaults_missing_channel_status_for_compatibility(self) -> None:
+        payload = SystemConfigResponse.model_validate(
+            {
+                "config_version": "legacy-version",
+                "mask_token": "******",
+                "items": [],
+            }
+        )
+
+        self.assertEqual(payload.configured_notification_channels, [])
+
+    def test_get_config_reports_routable_channels_without_exposing_masked_urls(self) -> None:
+        self._rewrite_env(
+            "NTFY_URL=https://ntfy.example.com/stock-alerts",
+            "GOTIFY_URL=https://gotify.example.com/base",
+            "GOTIFY_TOKEN=gotify-secret-token",
+            "ADMIN_AUTH_ENABLED=true",
+        )
+
+        payload = system_config.get_system_config(
+            include_schema=True,
+            service=self.service,
+        ).model_dump(by_alias=True)
+        item_map = {item["key"]: item for item in payload["items"]}
+
+        for key in ("NTFY_URL", "GOTIFY_URL", "GOTIFY_TOKEN"):
+            self.assertEqual(item_map[key]["value"], payload["mask_token"])
+            self.assertTrue(item_map[key]["is_masked"])
+        self.assertEqual(
+            payload["configured_notification_channels"],
+            ["ntfy", "gotify"],
+        )
+        self.assertNotIn("stock-alerts", str(payload))
+        self.assertNotIn("gotify-secret-token", str(payload))
 
     def test_get_config_masks_dynamic_llm_connection_api_keys(self) -> None:
         self._rewrite_env(
@@ -416,6 +464,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(stock_schema["help_key"], "settings.base.STOCK_LIST")
         self.assertTrue(stock_schema["examples"])
         self.assertTrue(stock_schema["docs"])
+        self.assertEqual(item_map["AGENT_ORCHESTRATOR_TIMEOUT_S"]["schema"]["unit"], "s")
 
     def test_get_config_schema_exposes_generation_backend_bounds_and_agent_options(self) -> None:
         payload = system_config.get_system_config(include_schema=True, service=self.service).model_dump(by_alias=True)
@@ -1648,6 +1697,68 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["stage"], "model_discovery")
         mock_discover.assert_called_once()
         self.assertEqual(mock_discover.call_args.kwargs["provider_id"], "dashscope")
+
+
+@pytest.mark.parametrize(
+    ("env_lines", "secret_fragments"),
+    [
+        (
+            ["NTFY_URL=https://user:private-token@[private-host.invalid/topic"],
+            ("private-token", "private-host.invalid"),
+        ),
+        (
+            ["NTFY_URL=https://user:private-token＠private-host.invalid/topic"],
+            ("private-token", "private-host.invalid"),
+        ),
+        (
+            ["NTFY_URL=https://user:private-token@private-host.invalid/topic"],
+            ("private-token", "private-host.invalid"),
+        ),
+        (
+            [
+                "GOTIFY_URL=https://user:private-token@[private-host.invalid/base",
+                "GOTIFY_TOKEN=gotify-private-token",
+            ],
+            ("private-token", "private-host.invalid", "gotify-private-token"),
+        ),
+    ],
+)
+def test_get_config_malformed_notification_url_fails_closed_without_leaking(
+    tmp_path,
+    monkeypatch,
+    caplog,
+    env_lines,
+    secret_fragments,
+) -> None:
+    """Malformed notification authorities must not turn a masked GET into a 500."""
+    env_path = tmp_path / ".env"
+    env_path.write_text("\n".join(["STOCK_LIST=600519", *env_lines]) + "\n", encoding="utf-8")
+    monkeypatch.setenv("ENV_FILE", str(env_path))
+    for key in SystemConfigService._NOTIFICATION_TEST_KEY_MAP:
+        monkeypatch.delenv(key, raising=False)
+    Config.reset_instance()
+    service = SystemConfigService(manager=ConfigManager(env_path=env_path))
+    app = FastAPI()
+    app.include_router(system_config.router, prefix="/api/v1/system")
+    app.dependency_overrides[system_config.get_system_config_service] = lambda: service
+    add_error_handlers(app)
+
+    async def request_config() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.get("/api/v1/system/config?include_schema=false")
+
+    caplog.set_level(logging.ERROR)
+    try:
+        response = asyncio.run(request_config())
+    finally:
+        Config.reset_instance()
+
+    self_contained_evidence = response.text + "\n" + caplog.text
+    assert response.status_code == 200, response.text
+    assert response.json()["configured_notification_channels"] == []
+    for fragment in secret_fragments:
+        assert fragment not in self_contained_evidence
 
 
 if __name__ == "__main__":

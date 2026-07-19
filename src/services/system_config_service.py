@@ -12,7 +12,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 from urllib.parse import urlparse, urlunparse
 
 import requests
@@ -27,6 +27,7 @@ from src.config import (
     canonicalize_llm_channel_protocol,
     channel_allows_empty_api_key,
     get_configured_llm_models,
+    get_config as get_runtime_config,
     normalize_agent_litellm_model,
     normalize_news_strategy_profile,
     normalize_llm_channel_model,
@@ -309,9 +310,17 @@ class SystemConfigService:
         "astrbot": ("ASTRBOT_URL",),
     }
 
-    def __init__(self, manager: Optional[ConfigManager] = None, runtime_scheduler: Optional[Any] = None):
+    def __init__(
+        self,
+        manager: Optional[ConfigManager] = None,
+        runtime_scheduler: Optional[Any] = None,
+        runtime_config_provider: Optional[Callable[[], Config]] = None,
+    ):
         self._manager = manager or ConfigManager()
         self._runtime_scheduler = runtime_scheduler
+        # Keep the provider rather than a Config object so Config.reset_instance()
+        # is reflected on the next read.
+        self._runtime_config_provider = runtime_config_provider or get_runtime_config
 
     def get_schema(self) -> Dict[str, Any]:
         """Return grouped schema metadata for UI rendering."""
@@ -460,6 +469,7 @@ class SystemConfigService:
             **runtime_config_map,
             **saved_config_map,
         }
+        configured_notification_channels = self._detect_configured_notification_channels()
         registered_keys = set(get_registered_field_keys())
         all_keys = set(config_map.keys()) | registered_keys
         if include_schema:
@@ -507,8 +517,19 @@ class SystemConfigService:
             "config_version": self._manager.get_config_version(),
             "mask_token": mask_token,
             "items": items,
+            "configured_notification_channels": configured_notification_channels,
             "updated_at": self._manager.get_updated_at(),
         }
+
+    def _detect_configured_notification_channels(self) -> List[str]:
+        """Return channels from the live runtime Config without exposing credentials."""
+        from src.notification import NotificationService
+
+        config = self._runtime_config_provider()
+        return [
+            channel.value
+            for channel in NotificationService.detect_configured_channels(config)
+        ]
 
     def validate(self, items: Sequence[Dict[str, str]], mask_token: str = "******") -> Dict[str, Any]:
         """Validate submitted items without writing to `.env`."""
@@ -564,7 +585,7 @@ class SystemConfigService:
                 attempts=[],
             )
 
-        config = self._build_notification_test_config(effective_map)
+        config = self._build_notification_config(effective_map)
         try:
             return self._dispatch_notification_test(
                 channel=normalized_channel,
@@ -3636,8 +3657,8 @@ class SystemConfigService:
             return "GOTIFY_URL 必须是 Gotify server base URL，不包含 /message。"
         return None
 
-    def _build_notification_test_config(self, effective_map: Dict[str, str]) -> Config:
-        """Build an isolated Config instance for notification testing."""
+    def _build_notification_config(self, effective_map: Dict[str, str]) -> Config:
+        """Build an isolated Config instance from notification values."""
         kwargs: Dict[str, Any] = {"stock_list": []}
         for key, (attr, value_type) in self._NOTIFICATION_TEST_KEY_MAP.items():
             if key not in effective_map:

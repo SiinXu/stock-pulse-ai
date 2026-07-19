@@ -1,3 +1,5 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import { writeFile } from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import {
@@ -159,6 +161,22 @@ async function login(page: Page, language: 'zh' | 'en' = 'zh') {
   }
 }
 
+async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
+  await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  const selector = page.locator('[data-testid="ui-language-selector"]:visible [role="combobox"]').first();
+  await selector.click();
+  await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
+
+async function selectTheme(page: Page, optionName: '浅色' | '深色') {
+  const toggle = page.getByRole('button', { name: '切换主题' }).first();
+  if (!await toggle.isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: 'StockPulse', exact: true }).last().click();
+  }
+  await toggle.click();
+  await page.getByRole('menuitemradio', { name: optionName, exact: true }).click();
+}
+
 async function installMockAuth(page: Page, options: {
   language: 'zh' | 'en';
   passwordSet: boolean;
@@ -170,6 +188,15 @@ async function installMockAuth(page: Page, options: {
   await page.addInitScript(({ key, language }) => {
     localStorage.setItem(key, language);
   }, { key: uiLanguageStorageKey, language: options.language });
+  // The mock-auth world must keep every /api/v1 response authorized. After a
+  // mocked login the app has no real session, so workspace requests reaching
+  // the real backend return 401 and the global unauthorized interceptor
+  // hard-redirects back to /login, looping forever between / and /login.
+  // Playwright matches routes in reverse registration order, so the auth
+  // routes registered below take precedence over this catch-all.
+  await page.route('**/api/v1/**', async (route) => {
+    await fulfillJson(route, {});
+  });
   await page.route('**/api/v1/auth/status', async (route) => {
     await fulfillJson(route, {
       authEnabled: true,
@@ -641,7 +668,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('04 UI language switch persists through refresh and browser back-forward navigation', async ({ page }) => {
     await login(page);
-    await page.getByRole('button', { name: '切换界面语言' }).click();
+    await selectUiLanguage(page, 'en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     expect(await page.evaluate((key) => localStorage.getItem(key), uiLanguageStorageKey)).toBe('en');
     await page.reload();
@@ -911,7 +938,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await selectPortfolioAccount(page, account.id);
     await page.getByRole('button', { name: '录入交易' }).click();
     const dialog = page.getByRole('dialog', { name: '手工录入：交易' });
-    const dateBox = await dialog.getByLabel('交易日期').boundingBox();
+    const dateBox = await dialog.getByRole('textbox', { name: '交易日期', exact: true }).boundingBox();
     const sideBox = await dialog.getByRole('combobox', { name: '买卖方向' }).boundingBox();
     const submitBox = await dialog.getByRole('button', { name: '提交交易' }).boundingBox();
     expect(dateBox).not.toBeNull();
@@ -1379,6 +1406,59 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const oldPoll = deferred();
     const oldPollStarted = deferred();
     let submissions = 0;
+    let newReviewCompleted = false;
+    const persistedReviewId = 33;
+    await page.route('**/api/v1/history**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/history' && url.searchParams.get('report_type') === 'market_review') {
+        const items = newReviewCompleted
+          ? [{
+              ...historyItem(persistedReviewId, 'MARKET', 'Persisted New Market Review'),
+              query_id: 'new-review-task',
+              report_type: 'market_review',
+              analysis_summary: 'NEW_GENERATION_PERSISTED',
+            }]
+          : [];
+        await fulfillJson(route, { total: items.length, page: 1, limit: 10, items });
+        return;
+      }
+      if (url.pathname === `/api/v1/history/${persistedReviewId}`) {
+        await fulfillJson(route, {
+          meta: {
+            id: persistedReviewId,
+            query_id: 'new-review-task',
+            stock_code: 'MARKET',
+            stock_name: 'Persisted New Market Review',
+            report_type: 'market_review',
+            report_language: 'zh',
+            created_at: '2026-07-15T12:33:00Z',
+            model_used: 'e2e/model',
+          },
+          summary: {
+            analysis_summary: 'NEW_GENERATION_PERSISTED',
+            operation_advice: '新一代持久化复盘',
+            trend_prediction: '新一代结果',
+            sentiment_score: 66,
+          },
+          details: {
+            context_snapshot: {
+              market_review_payload: {
+                kind: 'market_review',
+                region: 'cn',
+                title: 'Persisted New Market Review',
+                sections: [{
+                  key: 'generation',
+                  title: 'Generation',
+                  markdown: 'NEW_GENERATION_PERSISTED',
+                }],
+              },
+            },
+          },
+        });
+        return;
+      }
+      await route.continue();
+    });
     await page.route('**/api/v1/analysis/market-review', async (route) => {
       submissions += 1;
       await fulfillJson(route, {
@@ -1396,10 +1476,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
         market_review_report: 'OLD_GENERATION_SHOULD_NOT_RENDER',
       });
     });
-    await page.route('**/api/v1/analysis/status/new-review-task', (route) => fulfillJson(route, {
-      task_id: 'new-review-task', status: 'completed', progress: 100,
-      market_review_report: 'NEW_GENERATION_RENDERED',
-    }));
+    await page.route('**/api/v1/analysis/status/new-review-task', async (route) => {
+      newReviewCompleted = true;
+      await fulfillJson(route, {
+        task_id: 'new-review-task', status: 'completed', progress: 100,
+        market_review_report: 'NEW_RAW_STATUS_SHOULD_NOT_RENDER',
+      });
+    });
     await login(page);
     const marketReviewButton = page.getByRole('button', { name: '大盘复盘', exact: true });
     await marketReviewButton.click();
@@ -1412,10 +1495,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(marketReviewButton).toBeEnabled();
     await marketReviewButton.click();
     await expect.poll(() => submissions).toBe(2);
-    await expect(page.getByText('NEW_GENERATION_RENDERED', { exact: true })).toBeVisible();
+    const persistedReport = page.getByTestId('market-review-report');
+    await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
+    await expect(page).toHaveURL(`/?recordId=${persistedReviewId}`);
+    await expect(page.getByText('NEW_RAW_STATUS_SHOULD_NOT_RENDER', { exact: true })).toHaveCount(0);
     oldPoll.resolve();
     await page.waitForTimeout(200);
-    await expect(page.getByText('NEW_GENERATION_RENDERED', { exact: true })).toBeVisible();
+    await expect(persistedReport.getByText('NEW_GENERATION_PERSISTED', { exact: true })).toBeVisible();
     await expect(page.getByText('OLD_GENERATION_SHOULD_NOT_RENDER', { exact: true })).toHaveCount(0);
   });
 
@@ -1593,15 +1679,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('40 light and dark themes keep Home and Settings key content readable', async ({ page }, testInfo) => {
     await login(page);
     const homeText = page.getByRole('button', { name: '大盘复盘', exact: true });
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
     const homeLightContrast = await getElementContrast(homeText);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '深色', exact: true }).click();
+    await selectTheme(page, '深色');
     await expect(page.locator('html')).toHaveClass(/dark/);
     await expect(homeText).toBeVisible();
     await expect.poll(async () => (await getElementContrast(homeText)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1619,8 +1703,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     const settingsDarkHeadingContrast = await getElementContrast(settingsHeading);
     const settingsDarkBodyContrast = await getElementContrast(settingsBody);
 
-    await page.getByRole('button', { name: '切换主题' }).first().click();
-    await page.getByRole('menuitemradio', { name: '浅色', exact: true }).click();
+    await selectTheme(page, '浅色');
     await expect(page.locator('html')).not.toHaveClass(/dark/);
     await expect.poll(async () => (await getElementContrast(settingsHeading)).ratio).toBeGreaterThanOrEqual(3);
     await expect.poll(async () => (await getElementContrast(settingsBody)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -1675,7 +1758,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await fallbackSelector.click();
     await expectMinimumTouchTarget(page.getByRole('textbox', { name: '搜索模型' }));
     const fallbackCheckbox = page.getByRole('checkbox', { name: /model-beta/ });
-    await expectMinimumTouchTarget(fallbackCheckbox.locator('..'));
+    await expectMinimumTouchTarget(fallbackCheckbox.locator('xpath=ancestor::label'));
 
     await page.goto('/settings?section=system_security&view=runtime');
     const logLevelSelect = page.getByRole('combobox', { name: '日志级别', exact: true });

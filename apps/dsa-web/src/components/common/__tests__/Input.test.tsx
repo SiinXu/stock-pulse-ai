@@ -88,6 +88,21 @@ describe('Input', () => {
     expect(onPasswordVisibleChange).toHaveBeenCalledWith(false);
   });
 
+  it('adds localized field context to the password visibility action', () => {
+    render(
+      <Input
+        aria-label="OpenAI API Keys 2"
+        type="password"
+        allowTogglePassword
+        passwordToggleLabel="OpenAI API Keys 2"
+      />
+    );
+
+    const show = screen.getByRole('button', { name: '显示内容：OpenAI API Keys 2' });
+    fireEvent.click(show);
+    expect(screen.getByRole('button', { name: '隐藏内容：OpenAI API Keys 2' })).toBeInTheDocument();
+  });
+
   it('supports the login appearance without affecting password toggle behavior', () => {
     render(<Input label="登录密码" type="password" allowTogglePassword appearance="login" />);
 

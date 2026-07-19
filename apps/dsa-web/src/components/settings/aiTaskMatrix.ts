@@ -1,13 +1,14 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../../i18n/createUiLanguageRecord';
+import { localeIndependent, type UiLanguage } from '../../i18n/uiLanguages';
 // Resolves the effective AI routing for each user-facing task into a matrix the
 // AI Overview renders, so users see execution backend + models per task without
 // reading env vars or internal route aliases.
 
-export type UiLang = 'zh' | 'en';
+export type UiLang = UiLanguage;
 
-interface BilingualLabel {
-  zh: string;
-  en: string;
-}
+type BilingualLabel = Record<UiLanguage, string>;
 
 export type AiTaskStatus = 'active' | 'unavailable' | 'unconfigured';
 
@@ -40,14 +41,26 @@ interface ResolveOptions {
 }
 
 const BACKEND_LABELS: Record<string, BilingualLabel> = {
-  litellm: { zh: 'LiteLLM（云 API）', en: 'LiteLLM (cloud API)' },
-  codex_cli: { zh: 'Codex CLI（本地）', en: 'Codex CLI (local)' },
-  claude_code_cli: { zh: 'Claude Code CLI（本地）', en: 'Claude Code CLI (local)' },
-  opencode_cli: { zh: 'OpenCode CLI（本地）', en: 'OpenCode CLI (local)' },
+  litellm: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.litellm", { zh: 'LiteLLM（云 API）', en: 'LiteLLM (cloud API)' }),
+  codex_cli: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.codex_cli", { zh: 'Codex CLI（本地）', en: 'Codex CLI (local)' }),
+  claude_code_cli: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.claude_code_cli", { zh: 'Claude Code CLI（本地）', en: 'Claude Code CLI (local)' }),
+  opencode_cli: createUiLanguageRecord("components.settings.aiTaskMatrix.BACKEND_LABELS.opencode_cli", { zh: 'OpenCode CLI（本地）', en: 'OpenCode CLI (local)' }),
 };
 
+const NOT_CONFIGURED_LABEL = createUiLanguageRecord('components.settings.aiTaskMatrix.NOT_CONFIGURED_LABEL', {
+  zh: '未配置',
+  en: 'Not configured',
+});
+
+const TASK_LABELS = {
+  report: createUiLanguageRecord('components.settings.aiTaskMatrix.TASK_LABELS.report', { zh: '股票报告', en: 'Stock report' }),
+  market_review: createUiLanguageRecord('components.settings.aiTaskMatrix.TASK_LABELS.market_review', { zh: '大盘复盘', en: 'Market review' }),
+  agent: createUiLanguageRecord('components.settings.aiTaskMatrix.TASK_LABELS.agent', { zh: '问股 / Agent', en: 'Ask / Agent' }),
+  vision: localeIndependent('Vision'),
+} satisfies Record<string, BilingualLabel>;
+
 function backendLabel(id: string): BilingualLabel {
-  return BACKEND_LABELS[id] ?? { zh: id || '未配置', en: id || 'Not configured' };
+  return BACKEND_LABELS[id] ?? (id ? localeIndependent(id) : NOT_CONFIGURED_LABEL);
 }
 
 function splitModels(value: string): string[] {
@@ -114,9 +127,9 @@ export function resolveAiTaskMatrix(
   };
 
   return [
-    row('report', { zh: '股票报告', en: 'Stock report' }, reportModel, false, fallbackModels),
-    row('market_review', { zh: '大盘复盘', en: 'Market review' }, reportModel, true, fallbackModels),
-    row('agent', { zh: '问股 / Agent', en: 'Ask / Agent' }, agentModel || reportModel, agentModel.length === 0, fallbackModels),
-    row('vision', { zh: 'Vision', en: 'Vision' }, visionModel || reportModel, visionModel.length === 0, []),
+    row('report', TASK_LABELS.report, reportModel, false, fallbackModels),
+    row('market_review', TASK_LABELS.market_review, reportModel, true, fallbackModels),
+    row('agent', TASK_LABELS.agent, agentModel || reportModel, agentModel.length === 0, fallbackModels),
+    row('vision', TASK_LABELS.vision, visionModel || reportModel, visionModel.length === 0, []),
   ];
 }

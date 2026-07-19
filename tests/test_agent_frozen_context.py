@@ -8,6 +8,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
+from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolDefinition, ToolRegistry
 from src.services.history_loader import (
     get_frozen_target_date,
@@ -39,6 +40,16 @@ def _make_spy_registry(tool_names: list[str], observed: list):
     return registry
 
 
+def _native_session(registry: ToolRegistry) -> BoundToolSession:
+    """Native-compatibility session matching the runner's own construction."""
+    return BoundToolSession(
+        registry,
+        execution_id="frozen-context-test",
+        allowed_tools=registry.list_names(),
+        enforce_access_policy=False,
+    )
+
+
 class ExecuteToolsFrozenContextTestCase(unittest.TestCase):
     """Test ContextVar propagation through _execute_tools ThreadPoolExecutor."""
 
@@ -55,7 +66,7 @@ class ExecuteToolsFrozenContextTestCase(unittest.TestCase):
         try:
             _execute_tools(
                 tool_calls=[tc],
-                tool_registry=registry,
+                tool_session=_native_session(registry),
                 step=1,
                 progress_callback=None,
                 tool_calls_log=[],
@@ -97,7 +108,7 @@ class ExecuteToolsFrozenContextTestCase(unittest.TestCase):
         try:
             _execute_tools(
                 tool_calls=tool_calls,
-                tool_registry=registry,
+                tool_session=_native_session(registry),
                 step=1,
                 progress_callback=None,
                 tool_calls_log=[],

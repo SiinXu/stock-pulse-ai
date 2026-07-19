@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 SiinXu / StockPulse contributors
+# SPDX-License-Identifier: AGPL-3.0-only
 """Prepare and run the isolated backend used by Playwright E2E tests."""
 
 from __future__ import annotations

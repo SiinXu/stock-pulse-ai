@@ -1,3 +1,6 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
 
 const zh = {
@@ -18,9 +21,9 @@ const en: Record<keyof typeof zh, string> = {
   overviewTitle: 'Task routing overview', overviewDescription: 'The execution backend and effective model for each task, without exposing environment variables.', colTask: 'Task', colBackend: 'Execution backend', colPrimary: 'Primary model', colFallback: 'Fallback models', colStatus: 'Status', inherited: 'inherits report model', none: 'not configured', failover: 'failover', editRouting: 'Edit task routing',
 };
 
-export const SETTINGS_MISC_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = { zh, en };
+export const SETTINGS_MISC_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsMisc.SETTINGS_MISC_TEXT", { zh, en });
 
-export const SETTINGS_OVERVIEW_STATUS: Record<UiLanguage, Record<'active' | 'unavailable' | 'unconfigured', string>> = {
+export const SETTINGS_OVERVIEW_STATUS: Record<UiLanguage, Record<'active' | 'unavailable' | 'unconfigured', string>> = createUiLanguageRecord("locales.settingsMisc.SETTINGS_OVERVIEW_STATUS", {
   zh: { active: '生效', unavailable: '当前配置不可用', unconfigured: '待配置' },
   en: { active: 'Active', unavailable: 'Unavailable', unconfigured: 'Needs config' },
-};
+});

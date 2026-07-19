@@ -1,0 +1,255 @@
+{
+  "id": "us-full-normal",
+  "notes": "US multi-agent full pipeline (technical -> intel -> risk -> decision) on the happy path; risk reports low risk (no veto).",
+  "config": {
+    "agent_arch": "multi",
+    "agent_orchestrator_mode": "full"
+  },
+  "input": {
+    "task": "分析苹果公司的投资价值",
+    "context": {
+      "stock_code": "AAPL",
+      "stock_name": "Apple"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "technical",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_ut1",
+          "name": "analyze_trend",
+          "arguments": {
+            "stock_code": "AAPL"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 640,
+        "completion_tokens": 26,
+        "total_tokens": 666
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "technical",
+      "content": "{\"signal\": \"buy\", \"confidence\": 0.7, \"reasoning\": \"美股均线多头排列，趋势延续。\", \"key_levels\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0}, \"trend_score\": 78, \"ma_alignment\": \"bullish\", \"volume_status\": \"normal\", \"pattern\": \"ascending_channel\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 712,
+        "completion_tokens": 90,
+        "total_tokens": 802
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_ui1",
+          "name": "search_stock_news",
+          "arguments": {
+            "stock_code": "AAPL"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 520,
+        "completion_tokens": 24,
+        "total_tokens": 544
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "intel",
+      "content": "{\"signal\": \"buy\", \"confidence\": 0.62, \"reasoning\": \"新品销售数据超预期，无重大负面消息。\", \"risk_alerts\": [], \"positive_catalysts\": [\"新品销售超预期\"], \"sentiment_label\": \"positive\", \"capital_flow_signal\": \"inflow\", \"key_news\": [{\"title\": \"新品销售数据超预期\", \"impact\": \"positive\"}]}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 604,
+        "completion_tokens": 92,
+        "total_tokens": 696
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "risk",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_ur1",
+          "name": "get_stock_info",
+          "arguments": {
+            "stock_code": "AAPL"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 500,
+        "completion_tokens": 22,
+        "total_tokens": 522
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "risk",
+      "content": "{\"risk_level\": \"low\", \"risk_score\": 26, \"flags\": [], \"veto_buy\": false, \"reasoning\": \"基本面稳健，估值处于合理区间，无重大合规风险。\", \"signal_adjustment\": \"none\"}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 588,
+        "completion_tokens": 66,
+        "total_tokens": 654
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "decision",
+      "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 74,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"三阶段共振，风险可控，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      }\n    },\n    \"battle_plan\": {\"support\": 98.0, \"resistance\": 105.0, \"stop_loss\": 95.0},\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术、情报、风险三阶段数据完整\",\n      \"data_limitations\": \"无\"\n    }\n  },\n  \"analysis_summary\": \"美股技术面多头、消息面正面、风险筛查为低风险，采取回踩低吸策略。\",\n  \"key_points\": \"MA5>MA10>MA20；新品销售超预期；风险评分26\",\n  \"risk_warning\": \"财报季波动较大，跌破MA20需止损\"\n}",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 1180,
+        "completion_tokens": 252,
+        "total_tokens": 1432
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": "buy",
+    "stage_sequence": [
+      "technical",
+      "technical",
+      "intel",
+      "intel",
+      "risk",
+      "risk",
+      "decision"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "analyze_trend",
+        "arguments": {
+          "stock_code": "AAPL"
+        },
+        "success": true,
+        "result_length": 177,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "search_stock_news",
+        "arguments": {
+          "stock_code": "AAPL"
+        },
+        "success": true,
+        "result_length": 184,
+        "cached": false
+      },
+      {
+        "step": 1,
+        "tool": "get_stock_info",
+        "arguments": {
+          "stock_code": "AAPL"
+        },
+        "success": true,
+        "result_length": 70,
+        "cached": false
+      }
+    ],
+    "total_steps": 4,
+    "total_tokens": 5316,
+    "provider": "gpt-4o-mini",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": [
+      "analysis_summary",
+      "confidence_level",
+      "dashboard",
+      "decision_type",
+      "key_points",
+      "operation_advice",
+      "risk_warning",
+      "sentiment_score",
+      "stock_name",
+      "trend_prediction"
+    ],
+    "dashboard": {
+      "stock_name": "Apple",
+      "sentiment_score": 74,
+      "trend_prediction": "震荡上行",
+      "operation_advice": "回踩MA5轻仓买入",
+      "decision_type": "buy",
+      "confidence_level": "中",
+      "dashboard": {
+        "core_conclusion": {
+          "one_sentence": "三阶段共振，风险可控，回踩低吸",
+          "signal_type": "🟢买入信号",
+          "position_advice": {
+            "no_position": "回踩98附近轻仓介入",
+            "has_position": "持有，跌破95止损"
+          },
+          "time_sensitivity": "本周内"
+        },
+        "battle_plan": {
+          "support": 98.0,
+          "resistance": 105.0,
+          "stop_loss": 95.0,
+          "sniper_points": {
+            "ideal_buy": 98.0,
+            "secondary_buy": "N/A",
+            "stop_loss": 95.0,
+            "take_profit": 105.0
+          },
+          "action_checklist": [],
+          "position_strategy": {
+            "suggested_position": "轻仓试仓",
+            "entry_plan": "回踩98附近轻仓介入",
+            "risk_control": "止损参考 95.0"
+          }
+        },
+        "phase_decision": {
+          "phase_context": "基于最近收盘数据",
+          "action_window": "次一交易日",
+          "immediate_action": "回踩支撑再介入",
+          "watch_conditions": "是否缩量回踩MA5",
+          "next_check_time": "次日收盘",
+          "confidence_reason": "技术、情报、风险三阶段数据完整",
+          "data_limitations": "无"
+        },
+        "data_perspective": {
+          "trend_status": {
+            "ma_alignment": "bullish",
+            "trend_score": 78,
+            "is_bullish": true
+          }
+        },
+        "intelligence": {
+          "risk_alerts": [],
+          "positive_catalysts": [
+            "新品销售超预期"
+          ]
+        }
+      },
+      "analysis_summary": "美股技术面多头、消息面正面、风险筛查为低风险，采取回踩低吸策略。",
+      "key_points": [
+        "美股均线多头排列，趋势延续。",
+        "新品销售数据超预期，无重大负面消息。",
+        "基本面稳健，估值处于合理区间，无重大合规风险。",
+        "美股技术面多头、消息面正面、风险筛查为低风险，采取回踩低吸策略。"
+      ],
+      "risk_warning": "财报季波动较大，跌破MA20需止损"
+    },
+    "content": "{\n  \"stock_name\": \"Apple\",\n  \"sentiment_score\": 74,\n  \"trend_prediction\": \"震荡上行\",\n  \"operation_advice\": \"回踩MA5轻仓买入\",\n  \"decision_type\": \"buy\",\n  \"confidence_level\": \"中\",\n  \"dashboard\": {\n    \"core_conclusion\": {\n      \"one_sentence\": \"三阶段共振，风险可控，回踩低吸\",\n      \"signal_type\": \"🟢买入信号\",\n      \"position_advice\": {\n        \"no_position\": \"回踩98附近轻仓介入\",\n        \"has_position\": \"持有，跌破95止损\"\n      },\n      \"time_sensitivity\": \"本周内\"\n    },\n    \"battle_plan\": {\n      \"support\": 98.0,\n      \"resistance\": 105.0,\n      \"stop_loss\": 95.0,\n      \"sniper_points\": {\n        \"ideal_buy\": 98.0,\n        \"secondary_buy\": \"N/A\",\n        \"stop_loss\": 95.0,\n        \"take_profit\": 105.0\n      },\n      \"action_checklist\": [],\n      \"position_strategy\": {\n        \"suggested_position\": \"轻仓试仓\",\n        \"entry_plan\": \"回踩98附近轻仓介入\",\n        \"risk_control\": \"止损参考 95.0\"\n      }\n    },\n    \"phase_decision\": {\n      \"phase_context\": \"基于最近收盘数据\",\n      \"action_window\": \"次一交易日\",\n      \"immediate_action\": \"回踩支撑再介入\",\n      \"watch_conditions\": \"是否缩量回踩MA5\",\n      \"next_check_time\": \"次日收盘\",\n      \"confidence_reason\": \"技术、情报、风险三阶段数据完整\",\n      \"data_limitations\": \"无\"\n    },\n    \"data_perspective\": {\n      \"trend_status\": {\n        \"ma_alignment\": \"bullish\",\n        \"trend_score\": 78,\n        \"is_bullish\": true\n      }\n    },\n    \"intelligence\": {\n      \"risk_alerts\": [],\n      \"positive_catalysts\": [\n        \"新品销售超预期\"\n      ]\n    }\n  },\n  \"analysis_summary\": \"美股技术面多头、消息面正面、风险筛查为低风险，采取回踩低吸策略。\",\n  \"key_points\": [\n    \"美股均线多头排列，趋势延续。\",\n    \"新品销售数据超预期，无重大负面消息。\",\n    \"基本面稳健，估值处于合理区间，无重大合规风险。\",\n    \"美股技术面多头、消息面正面、风险筛查为低风险，采取回踩低吸策略。\"\n  ],\n  \"risk_warning\": \"财报季波动较大，跌破MA20需止损\"\n}",
+    "error": null
+  }
+}

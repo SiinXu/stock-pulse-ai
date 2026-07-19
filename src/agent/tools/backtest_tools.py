@@ -11,7 +11,7 @@ Tools:
 import logging
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition, ToolPolicy
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import exception_chain_redaction_values, log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,7 @@ def _handle_get_overall_backtest_summary(eval_window_days: int = 30) -> dict:
             exc,
             error_code="agent_overall_backtest_summary_failed",
             level=logging.WARNING,
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         return {"error": "Failed to retrieve backtest summary."}
 
@@ -121,6 +122,7 @@ def _handle_get_skill_backtest_summary(skill_id: str = "", eval_window_days: int
             error_code="agent_skill_backtest_summary_failed",
             level=logging.WARNING,
             context={"skill_id": skill_id},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         return {"error": "Failed to retrieve backtest summary."}
 
@@ -233,6 +235,7 @@ def _handle_get_stock_backtest_summary(stock_code: str, eval_window_days: int = 
             error_code="agent_stock_backtest_summary_failed",
             level=logging.WARNING,
             context={"stock_code": stock_code},
+            exception_redaction_values=exception_chain_redaction_values(exc),
         )
         return {"error": "Failed to retrieve backtest data."}
 

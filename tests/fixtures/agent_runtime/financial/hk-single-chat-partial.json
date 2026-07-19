@@ -1,0 +1,82 @@
+{
+  "id": "hk-single-chat-partial",
+  "notes": "HK single-agent chat on a degraded path: the tool handler raises (failing_tool), the model acknowledges the data gap and still answers; chat succeeds with a degraded-data reply.",
+  "input": {
+    "message": "hk00700 帮我看下主力资金动向",
+    "session_id": "replay-hk-chat-partial",
+    "context": {
+      "stock_code": "hk00700",
+      "stock_name": "腾讯控股"
+    }
+  },
+  "transcript": [
+    {
+      "allowed_stage": "single_chat",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_hcp1",
+          "name": "failing_tool",
+          "arguments": {}
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 480,
+        "completion_tokens": 20,
+        "total_tokens": 500
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "allowed_stage": "single_chat",
+      "content": "抱歉，资金流数据接口当前不可用，无法给出主力资金动向的确切数据。\n\n可以先参考以下替代做法：\n- 观察盘口大单成交与南向资金整体流向作为近似判断。\n- 待数据源恢复后我可以再帮你查询具体的主力净流入数据。\n\n仅从最近的价格走势看，股价仍运行在均线多头结构上方，未见明显放量出逃迹象。",
+      "tool_calls": [],
+      "usage": {
+        "prompt_tokens": 580,
+        "completion_tokens": 120,
+        "total_tokens": 700
+      },
+      "provider": "openai",
+      "model": "gpt-4o-mini"
+    }
+  ],
+  "expected": {
+    "success": true,
+    "signal": null,
+    "stage_sequence": [
+      "single_chat",
+      "single_chat"
+    ],
+    "transcript_fully_consumed": true,
+    "tool_calls": [
+      {
+        "step": 1,
+        "tool": "failing_tool",
+        "arguments": {},
+        "success": false,
+        "result_length": 78,
+        "cached": false
+      }
+    ],
+    "total_steps": 2,
+    "total_tokens": 1200,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "dashboard_keys": null,
+    "dashboard": null,
+    "content": "抱歉，资金流数据接口当前不可用，无法给出主力资金动向的确切数据。\n\n可以先参考以下替代做法：\n- 观察盘口大单成交与南向资金整体流向作为近似判断。\n- 待数据源恢复后我可以再帮你查询具体的主力净流入数据。\n\n仅从最近的价格走势看，股价仍运行在均线多头结构上方，未见明显放量出逃迹象。",
+    "error": null,
+    "conversation": [
+      {
+        "role": "user",
+        "content": "hk00700 帮我看下主力资金动向"
+      },
+      {
+        "role": "assistant",
+        "content": "抱歉，资金流数据接口当前不可用，无法给出主力资金动向的确切数据。\n\n可以先参考以下替代做法：\n- 观察盘口大单成交与南向资金整体流向作为近似判断。\n- 待数据源恢复后我可以再帮你查询具体的主力净流入数据。\n\n仅从最近的价格走势看，股价仍运行在均线多头结构上方，未见明显放量出逃迹象。"
+      }
+    ],
+    "provider_turns": []
+  }
+}

@@ -1,15 +1,17 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pie, PieChart, ResponsiveContainer, Tooltip, Legend, Cell } from 'recharts';
+import { X } from 'lucide-react';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Card, Badge, ConfirmDialog, EmptyState, InlineAlert, Modal, Select } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, InlineAlert, Input, Modal, Select } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import { formatUiText } from '../i18n/uiText';
-import { PORTFOLIO_LIMITATION_LABELS, PORTFOLIO_TEXT } from '../locales/portfolio';
+import { getUiClauseSeparator } from '../utils/uiLocale';
+import { formatUiText, type UiLanguage } from '../i18n/uiText';
+import { PORTFOLIO_FILE_TEXT, PORTFOLIO_LIMITATION_LABELS, PORTFOLIO_TEXT } from '../locales/portfolio';
 import type { FxRefreshFeedback } from '../utils/portfolioFormat';
 import {
   buildFxRefreshFeedback,
@@ -64,11 +66,6 @@ const PIE_COLORS = [
 ];
 const DEFAULT_PAGE_SIZE = 20;
 const PORTFOLIO_SIGNAL_LOOKUP_CONCURRENCY = 6;
-const FALLBACK_BROKERS: PortfolioImportBrokerItem[] = [
-  { broker: 'huatai', aliases: [], displayName: 'Huatai' },
-  { broker: 'citic', aliases: ['zhongxin'], displayName: 'CITIC' },
-  { broker: 'cmb', aliases: ['cmbchina', 'zhaoshang'], displayName: 'CMB' },
-];
 
 type AccountOption = 'all' | number;
 type EventType = 'trade' | 'cash' | 'corporate';
@@ -122,7 +119,7 @@ function resolveOperationAttempt(
 const PORTFOLIO_INPUT_CLASS =
   'h-11 w-full rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 const PORTFOLIO_FILE_PICKER_CLASS =
-  'flex h-11 w-full cursor-pointer items-center justify-center rounded-sm border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
+  'flex h-11 w-full cursor-pointer items-center justify-center rounded-full border border-border bg-transparent px-3 text-xs text-foreground transition-colors duration-200 hover:bg-hover focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 
 function getSignalTime(item: DecisionSignalItem): number {
   return parseDecisionSignalDate(item.createdAt)?.getTime()
@@ -135,7 +132,7 @@ function isNewerSignal(left: DecisionSignalItem | undefined, right: DecisionSign
   return getSignalTime(right) > getSignalTime(left);
 }
 
-function formatPortfolioLimitation(limitation: string, language: 'zh' | 'en'): string {
+function formatPortfolioLimitation(limitation: string, language: UiLanguage): string {
   return PORTFOLIO_LIMITATION_LABELS[language][limitation] ?? limitation;
 }
 
@@ -188,6 +185,7 @@ async function loadPortfolioSignalLookup(lookup: PortfolioSignalLookup): Promise
 const PortfolioPage: React.FC = () => {
   const { language, t } = useUiLanguage();
   const text = PORTFOLIO_TEXT[language];
+  const fileText = PORTFOLIO_FILE_TEXT[language];
   const decisionActionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
 
   // Set page title
@@ -236,7 +234,7 @@ const PortfolioPage: React.FC = () => {
   const [positionAnalysisMessage, setPositionAnalysisMessage] = useState<string | null>(null);
 
   const [brokers, setBrokers] = useState<PortfolioImportBrokerItem[]>([]);
-  const [selectedBroker, setSelectedBroker] = useState('huatai');
+  const [selectedBroker, setSelectedBroker] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvDryRun, setCsvDryRun] = useState(true);
   const [csvParsing, setCsvParsing] = useState(false);
@@ -253,16 +251,28 @@ const PortfolioPage: React.FC = () => {
   const [eventSide, setEventSide] = useState<'' | PortfolioSide>('');
   const [eventDirection, setEventDirection] = useState<'' | PortfolioCashDirection>('');
   const [eventActionType, setEventActionType] = useState<'' | PortfolioCorporateActionType>('');
+  const [appliedEventFilters, setAppliedEventFilters] = useState({
+    dateFrom: '',
+    dateTo: '',
+    symbol: '',
+    side: '' as '' | PortfolioSide,
+    direction: '' as '' | PortfolioCashDirection,
+    actionType: '' as '' | PortfolioCorporateActionType,
+  });
   const [eventPage, setEventPage] = useState(1);
+  const [eventRefreshKey, setEventRefreshKey] = useState(0);
   const [eventTotal, setEventTotal] = useState(0);
   const [eventLoading, setEventLoading] = useState(false);
+  const [eventError, setEventError] = useState<ParsedApiError | null>(null);
   const [tradeEvents, setTradeEvents] = useState<PortfolioTradeListItem[]>([]);
   const [cashEvents, setCashEvents] = useState<PortfolioCashLedgerListItem[]>([]);
   const [corporateEvents, setCorporateEvents] = useState<PortfolioCorporateActionListItem[]>([]);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pendingAccountDelete, setPendingAccountDelete] = useState<PendingAccountDelete | null>(null);
   const [accountDeleteLoading, setAccountDeleteLoading] = useState(false);
+  const [accountDeleteError, setAccountDeleteError] = useState<string | null>(null);
 
   const [tradeForm, setTradeForm] = useState({
     symbol: '',
@@ -294,6 +304,9 @@ const PortfolioPage: React.FC = () => {
   const cashOperationRef = useRef<OperationAttempt | null>(null);
   const corporateOperationRef = useRef<OperationAttempt | null>(null);
   const csvOperationRef = useRef<OperationAttempt | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
+  const snapshotRequestRef = useRef(0);
+  const eventRequestRef = useRef(0);
 
   const queryAccountId = selectedAccount === 'all' ? undefined : selectedAccount;
   const refreshViewKey = `${selectedAccount === 'all' ? 'all' : `account:${selectedAccount}`}:cost:${costMethod}`;
@@ -337,28 +350,26 @@ const PortfolioPage: React.FC = () => {
       const response = await portfolioApi.listImportBrokers();
       const brokerItems = response.brokers || [];
       if (brokerItems.length === 0) {
-        setBrokers(FALLBACK_BROKERS);
+        setBrokers([]);
         setBrokerLoadWarning(text.brokerListEmpty);
-        if (!FALLBACK_BROKERS.some((item) => item.broker === selectedBroker)) {
-          setSelectedBroker(FALLBACK_BROKERS[0].broker);
-        }
+        setSelectedBroker('');
         return;
       }
       setBrokers(brokerItems);
       setBrokerLoadWarning(null);
-      if (!brokerItems.some((item) => item.broker === selectedBroker)) {
-        setSelectedBroker(brokerItems[0].broker);
-      }
+      setSelectedBroker((current) => (
+        brokerItems.some((item) => item.broker === current) ? current : brokerItems[0].broker
+      ));
     } catch {
-      setBrokers(FALLBACK_BROKERS);
+      setBrokers([]);
       setBrokerLoadWarning(text.brokerListUnavailable);
-      if (!FALLBACK_BROKERS.some((item) => item.broker === selectedBroker)) {
-        setSelectedBroker(FALLBACK_BROKERS[0].broker);
-      }
+      setSelectedBroker('');
     }
-  }, [selectedBroker, text.brokerListEmpty, text.brokerListUnavailable]);
+  }, [text.brokerListEmpty, text.brokerListUnavailable]);
 
   const loadSnapshotAndRisk = useCallback(async () => {
+    const requestId = snapshotRequestRef.current + 1;
+    snapshotRequestRef.current = requestId;
     setIsLoading(true);
     setRiskWarning(null);
     try {
@@ -367,6 +378,7 @@ const PortfolioPage: React.FC = () => {
         costMethod,
         includeRealtime: false,
       });
+      if (requestId !== snapshotRequestRef.current) return;
       setSnapshot(snapshotData);
       setError(null);
 
@@ -376,71 +388,82 @@ const PortfolioPage: React.FC = () => {
           costMethod,
           includeRealtime: false,
         });
-        setRisk(riskData);
+        if (requestId === snapshotRequestRef.current) {
+          setRisk(riskData);
+        }
       } catch (riskErr) {
+        if (requestId !== snapshotRequestRef.current) return;
         setRisk(null);
         setRiskWarning(getParsedApiError(riskErr, language).message || text.riskFallback);
       }
     } catch (err) {
+      if (requestId !== snapshotRequestRef.current) return;
       setSnapshot(null);
       setRisk(null);
       setError(getParsedApiError(err));
     } finally {
-      setIsLoading(false);
+      if (requestId === snapshotRequestRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [queryAccountId, costMethod, language, text.riskFallback]);
 
   const loadEventsPage = useCallback(async (page: number) => {
+    const requestId = eventRequestRef.current + 1;
+    eventRequestRef.current = requestId;
     setEventLoading(true);
+    setEventError(null);
     try {
       if (eventType === 'trade') {
         const response = await portfolioApi.listTrades({
           accountId: queryAccountId,
-          dateFrom: eventDateFrom || undefined,
-          dateTo: eventDateTo || undefined,
-          symbol: eventSymbol || undefined,
-          side: eventSide || undefined,
+          dateFrom: appliedEventFilters.dateFrom || undefined,
+          dateTo: appliedEventFilters.dateTo || undefined,
+          symbol: appliedEventFilters.symbol || undefined,
+          side: appliedEventFilters.side || undefined,
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
+        if (requestId !== eventRequestRef.current) return;
         setTradeEvents(response.items || []);
         setEventTotal(response.total || 0);
       } else if (eventType === 'cash') {
         const response = await portfolioApi.listCashLedger({
           accountId: queryAccountId,
-          dateFrom: eventDateFrom || undefined,
-          dateTo: eventDateTo || undefined,
-          direction: eventDirection || undefined,
+          dateFrom: appliedEventFilters.dateFrom || undefined,
+          dateTo: appliedEventFilters.dateTo || undefined,
+          direction: appliedEventFilters.direction || undefined,
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
+        if (requestId !== eventRequestRef.current) return;
         setCashEvents(response.items || []);
         setEventTotal(response.total || 0);
       } else {
         const response = await portfolioApi.listCorporateActions({
           accountId: queryAccountId,
-          dateFrom: eventDateFrom || undefined,
-          dateTo: eventDateTo || undefined,
-          symbol: eventSymbol || undefined,
-          actionType: eventActionType || undefined,
+          dateFrom: appliedEventFilters.dateFrom || undefined,
+          dateTo: appliedEventFilters.dateTo || undefined,
+          symbol: appliedEventFilters.symbol || undefined,
+          actionType: appliedEventFilters.actionType || undefined,
           page,
           pageSize: DEFAULT_PAGE_SIZE,
         });
+        if (requestId !== eventRequestRef.current) return;
         setCorporateEvents(response.items || []);
         setEventTotal(response.total || 0);
       }
     } catch (err) {
-      setError(getParsedApiError(err));
+      if (requestId === eventRequestRef.current) {
+        setEventError(getParsedApiError(err));
+      }
     } finally {
-      setEventLoading(false);
+      if (requestId === eventRequestRef.current) {
+        setEventLoading(false);
+      }
     }
   }, [
-    eventActionType,
-    eventDateFrom,
-    eventDateTo,
-    eventDirection,
-    eventSide,
-    eventSymbol,
+    appliedEventFilters,
     eventType,
     queryAccountId,
   ]);
@@ -448,6 +471,19 @@ const PortfolioPage: React.FC = () => {
   const loadEvents = useCallback(async () => {
     await loadEventsPage(eventPage);
   }, [eventPage, loadEventsPage]);
+
+  const applyEventFilters = useCallback(() => {
+    setEventPage(1);
+    setAppliedEventFilters({
+      dateFrom: eventDateFrom,
+      dateTo: eventDateTo,
+      symbol: eventSymbol.trim(),
+      side: eventSide,
+      direction: eventDirection,
+      actionType: eventActionType,
+    });
+    setEventRefreshKey((current) => current + 1);
+  }, [eventActionType, eventDateFrom, eventDateTo, eventDirection, eventSide, eventSymbol]);
 
   const refreshPortfolioData = useCallback(async (page = eventPage) => {
     await Promise.all([loadSnapshotAndRisk(), loadEventsPage(page)]);
@@ -464,7 +500,7 @@ const PortfolioPage: React.FC = () => {
 
   useEffect(() => {
     void loadEvents();
-  }, [loadEvents]);
+  }, [eventRefreshKey, loadEvents]);
 
   useEffect(() => {
     refreshContextRef.current = {
@@ -477,7 +513,7 @@ const PortfolioPage: React.FC = () => {
 
   useEffect(() => {
     setEventPage(1);
-  }, [eventType, queryAccountId, eventDateFrom, eventDateTo, eventSymbol, eventSide, eventDirection, eventActionType]);
+  }, [eventType, queryAccountId]);
 
   useEffect(() => {
     if (!writeBlocked) {
@@ -644,6 +680,14 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountWrite);
       return;
     }
+    if (!Number.isFinite(Number(tradeForm.quantity)) || Number(tradeForm.quantity) <= 0) {
+      document.getElementById('portfolio-trade-quantity')?.focus();
+      return;
+    }
+    if (!Number.isFinite(Number(tradeForm.price)) || Number(tradeForm.price) <= 0) {
+      document.getElementById('portfolio-trade-price')?.focus();
+      return;
+    }
     if (tradeSubmitting) return;
     const requestPayload = {
       accountId: writableAccountId,
@@ -689,6 +733,10 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountWrite);
       return;
     }
+    if (!Number.isFinite(Number(cashForm.amount)) || Number(cashForm.amount) <= 0) {
+      document.getElementById('portfolio-cash-amount')?.focus();
+      return;
+    }
     if (cashSubmitting) return;
     const requestPayload = {
       accountId: writableAccountId,
@@ -730,6 +778,13 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountWrite);
       return;
     }
+    if (
+      corpForm.actionType === 'split_adjustment'
+      && (!Number.isFinite(Number(corpForm.splitRatio)) || Number(corpForm.splitRatio) <= 0)
+    ) {
+      document.getElementById('portfolio-split-ratio')?.focus();
+      return;
+    }
     if (corpSubmitting) return;
     const requestPayload = {
       accountId: writableAccountId,
@@ -767,7 +822,7 @@ const PortfolioPage: React.FC = () => {
   };
 
   const handleParseCsv = async () => {
-    if (!csvFile) return;
+    if (!csvFile || !selectedBroker) return;
     try {
       setCsvParsing(true);
       setCsvError(null);
@@ -782,7 +837,7 @@ const PortfolioPage: React.FC = () => {
   };
 
   const handleCommitCsv = async () => {
-    if (!csvFile) return;
+    if (!csvFile || !selectedBroker) return;
     if (!writableAccountId) {
       setWriteWarning(text.selectAccountWrite);
       return;
@@ -837,6 +892,7 @@ const PortfolioPage: React.FC = () => {
       setWriteWarning(text.selectAccountDeleteEntry);
       return;
     }
+    setDeleteError(null);
     setPendingDelete(item);
   };
 
@@ -849,6 +905,7 @@ const PortfolioPage: React.FC = () => {
       accountId: writableAccount.id,
       accountName: writableAccount.name,
     });
+    setAccountDeleteError(null);
   };
 
   const handleConfirmAccountDelete = async () => {
@@ -861,11 +918,12 @@ const PortfolioPage: React.FC = () => {
       const nextAccount = accounts.find((item) => item.id !== pendingAccountDelete.accountId);
       setSelectedAccount(nextAccount?.id ?? 'all');
       setPendingAccountDelete(null);
+      setAccountDeleteError(null);
       setShowCreateAccount(false);
       await loadAccounts();
       setEventPage(1);
     } catch (err) {
-      setError(getParsedApiError(err));
+      setAccountDeleteError(getParsedApiError(err, language).message);
     } finally {
       setAccountDeleteLoading(false);
     }
@@ -876,6 +934,7 @@ const PortfolioPage: React.FC = () => {
     if (!writableAccountId) {
       setWriteWarning(text.selectAccountDeleteEntry);
       setPendingDelete(null);
+      setDeleteError(null);
       return;
     }
 
@@ -896,7 +955,7 @@ const PortfolioPage: React.FC = () => {
       }
       await refreshPortfolioData(nextPage);
     } catch (err) {
-      setError(getParsedApiError(err));
+      setDeleteError(getParsedApiError(err, language).message);
     } finally {
       setDeleteLoading(false);
     }
@@ -1056,7 +1115,7 @@ const PortfolioPage: React.FC = () => {
   const snapshotQualityMessage = snapshot?.dataQuality === 'partial' && snapshot.limitations?.length
     ? snapshot.limitations
       .map((limitation) => formatPortfolioLimitation(limitation, language))
-      .join(language === 'en' ? '; ' : '；')
+      .join(getUiClauseSeparator(language))
     : null;
 
   return (
@@ -1090,9 +1149,11 @@ const PortfolioPage: React.FC = () => {
                 ]}
               />
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
-                  className="btn-secondary text-sm flex-1"
+                  variant="secondary"
+                  size="xl"
+                  className="flex-1"
                   onClick={() => {
                     setShowCreateAccount(true);
                     setAccountCreateError(null);
@@ -1100,23 +1161,31 @@ const PortfolioPage: React.FC = () => {
                   }}
                 >
                   {text.createAccount}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => void handleRefresh()}
                   disabled={isLoading || fxRefreshing}
-                  className="btn-secondary text-sm flex-1"
+                  variant="secondary"
+                  size="xl"
+                  isLoading={isLoading}
+                  loadingText={text.refreshing}
+                  className="flex-1"
                 >
-                  {isLoading ? text.refreshing : text.refreshData}
-                </button>
-                <button
+                  {text.refreshData}
+                </Button>
+                <Button
                   type="button"
                   onClick={openAccountDeleteDialog}
                   disabled={!canDeleteSelectedAccount}
-                  className="btn-secondary text-sm flex-1 border-red-400/40 text-red-100 hover:bg-red-500/15 disabled:border-white/10 disabled:text-secondary"
+                  variant="danger-subtle"
+                  size="xl"
+                  isLoading={accountDeleteLoading}
+                  loadingText={text.deletingAccount}
+                  className="flex-1"
                 >
-                  {accountDeleteLoading ? text.deletingAccount : text.deleteAccount}
-                </button>
+                  {text.deleteAccount}
+                </Button>
               </div>
             </div>
           </div>
@@ -1126,9 +1195,10 @@ const PortfolioPage: React.FC = () => {
             className="rounded-lg px-3 py-2 text-xs shadow-none"
             message={text.noAccounts}
             action={(
-              <button
+              <Button
                 type="button"
-                className="btn-secondary inline-flex min-h-11 min-w-11 items-center gap-2 text-xs"
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
@@ -1136,7 +1206,7 @@ const PortfolioPage: React.FC = () => {
                 }}
               >
                 {text.addAccount}
-              </button>
+              </Button>
             )}
           />
         )}
@@ -1190,33 +1260,27 @@ const PortfolioPage: React.FC = () => {
             />
           ) : null}
           <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.accountName}</span>
-              <input
-                className={PORTFOLIO_INPUT_CLASS}
-                placeholder={text.required}
-                value={accountForm.name}
-                onChange={(e) => setAccountForm((prev) => ({ ...prev, name: e.target.value }))}
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.broker}</span>
-              <input
-                className={PORTFOLIO_INPUT_CLASS}
-                placeholder={text.brokerPlaceholder}
-                value={accountForm.broker}
-                onChange={(e) => setAccountForm((prev) => ({ ...prev, broker: e.target.value }))}
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.baseCurrency}</span>
-              <input
-                className={PORTFOLIO_INPUT_CLASS}
-                placeholder={text.baseCurrencyPlaceholder}
-                value={accountForm.baseCurrency}
-                onChange={(e) => setAccountForm((prev) => ({ ...prev, baseCurrency: e.target.value.toUpperCase() }))}
-              />
-            </label>
+            <Input
+              label={text.accountName}
+              className={PORTFOLIO_INPUT_CLASS}
+              placeholder={text.required}
+              value={accountForm.name}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, name: e.target.value }))}
+            />
+            <Input
+              label={text.broker}
+              className={PORTFOLIO_INPUT_CLASS}
+              placeholder={text.brokerPlaceholder}
+              value={accountForm.broker}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, broker: e.target.value }))}
+            />
+            <Input
+              label={text.baseCurrency}
+              className={PORTFOLIO_INPUT_CLASS}
+              placeholder={text.baseCurrencyPlaceholder}
+              value={accountForm.baseCurrency}
+              onChange={(e) => setAccountForm((prev) => ({ ...prev, baseCurrency: e.target.value.toUpperCase() }))}
+            />
             <Select
               label={text.market}
               value={accountForm.market}
@@ -1230,9 +1294,16 @@ const PortfolioPage: React.FC = () => {
                 { value: 'tw', label: text.marketTw },
               ]}
             />
-            <button type="submit" className="btn-secondary text-sm md:col-span-2" disabled={accountCreating}>
-              {accountCreating ? text.creatingAccount : text.createAccount}
-            </button>
+            <Button
+              type="submit"
+              variant="secondary"
+              size="xl"
+              className="md:col-span-2"
+              isLoading={accountCreating}
+              loadingText={text.creatingAccount}
+            >
+              {text.createAccount}
+            </Button>
           </form>
       </Modal>
 
@@ -1261,14 +1332,18 @@ const PortfolioPage: React.FC = () => {
         <Card variant="gradient" padding="md">
           <div className="flex items-start justify-between gap-3">
             <p className="text-xs text-secondary">{text.fxStatus}</p>
-            <button
+            <Button
               type="button"
-              className="btn-secondary min-h-11 min-w-11 !px-3 !py-1 !text-xs shrink-0"
+              variant="secondary"
+              size="xl"
+              className="shrink-0 text-xs"
               onClick={() => void handleRefreshFx()}
               disabled={!hasAccounts || isLoading || fxRefreshing}
+              isLoading={fxRefreshing}
+              loadingText={text.refreshing}
             >
-              {fxRefreshing ? text.refreshing : text.refreshFx}
-            </button>
+              {text.refreshFx}
+            </Button>
           </div>
           <div className="mt-2">{snapshot?.fxStale ? <Badge variant="warning">{text.stale}</Badge> : <Badge variant="success">{text.latest}</Badge>}</div>
           {fxRefreshFeedback ? (
@@ -1363,14 +1438,18 @@ const PortfolioPage: React.FC = () => {
                         <PortfolioSignalSummary item={signal} loading={portfolioSignalsLoading} />
                       </td>
                       <td className="py-2 text-right">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => void handleAnalyzePosition(row)}
                           disabled={analyzing}
-                          className="btn-secondary min-h-11 min-w-11 px-2 py-1 text-xs disabled:cursor-wait disabled:opacity-60"
+                          variant="secondary"
+                          size="xl"
+                          isLoading={analyzing}
+                          loadingText={text.submitting}
+                          className="px-2 text-xs"
                         >
-                          {analyzing ? text.submitting : text.analyze}
-                        </button>
+                          {text.analyze}
+                        </Button>
                       </td>
                     </tr>
                     );
@@ -1476,27 +1555,33 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-secondary text-sm" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</button>
-        <button type="button" className="btn-secondary text-sm" onClick={() => setEventModalOpen(true)}>{text.eventLog}</button>
+        <Button type="button" variant="secondary" size="xl" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
+        <Button type="button" variant="secondary" size="xl" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
+        <Button type="button" variant="secondary" size="xl" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
+        <Button type="button" variant="secondary" size="md" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
+        <Button type="button" variant="secondary" size="xl" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 
       <Modal isOpen={tradeModalOpen} closeDisabled={tradeSubmitting} onClose={() => { setTradeError(null); setTradeModalOpen(false); }} title={text.manualTrade}>
           <form onSubmit={handleTradeSubmit} aria-busy={tradeSubmitting}>
             <fieldset disabled={tradeSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.stockCode}</span>
-              <input className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockExample} value={tradeForm.symbol}
-                onChange={(e) => setTradeForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
-            </label>
+            <Input
+              label={text.stockCode}
+              className={PORTFOLIO_INPUT_CLASS}
+              placeholder={text.stockExample}
+              value={tradeForm.symbol}
+              onChange={(e) => setTradeForm((prev) => ({ ...prev, symbol: e.target.value }))}
+              required
+            />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.tradeDate}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="date" value={tradeForm.tradeDate}
-                  onChange={(e) => setTradeForm((prev) => ({ ...prev, tradeDate: e.target.value }))} required />
-              </label>
+              <DatePicker
+                label={text.tradeDate}
+                value={tradeForm.tradeDate}
+                onChange={(tradeDate) => setTradeForm((prev) => ({ ...prev, tradeDate }))}
+                required
+                className="w-full"
+                triggerClassName={PORTFOLIO_INPUT_CLASS}
+              />
               <Select
                 label={text.side}
                 value={tradeForm.side}
@@ -1509,36 +1594,24 @@ const PortfolioPage: React.FC = () => {
               />
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.quantity}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.required} value={tradeForm.quantity}
-                  onChange={(e) => setTradeForm((prev) => ({ ...prev, quantity: e.target.value }))} required />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.tradePrice}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.required} value={tradeForm.price}
-                  onChange={(e) => setTradeForm((prev) => ({ ...prev, price: e.target.value }))} required />
-              </label>
+              <Input id="portfolio-trade-quantity" label={text.quantity} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.quantity}
+                onChange={(e) => setTradeForm((prev) => ({ ...prev, quantity: e.target.value }))} required />
+              <Input id="portfolio-trade-price" label={text.tradePrice} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.required} value={tradeForm.price}
+                onChange={(e) => setTradeForm((prev) => ({ ...prev, price: e.target.value }))} required />
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.fee}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.fee}
-                  onChange={(e) => setTradeForm((prev) => ({ ...prev, fee: e.target.value }))} />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.tax}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.tax}
-                  onChange={(e) => setTradeForm((prev) => ({ ...prev, tax: e.target.value }))} />
-              </label>
+              <Input label={text.fee} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.fee}
+                onChange={(e) => setTradeForm((prev) => ({ ...prev, fee: e.target.value }))} />
+              <Input label={text.tax} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.optional} value={tradeForm.tax}
+                onChange={(e) => setTradeForm((prev) => ({ ...prev, tax: e.target.value }))} />
             </div>
             <p className="text-xs text-secondary">{text.feeHint}</p>
             {tradeError ? (
               <ApiErrorAlert error={tradeError} onDismiss={() => setTradeError(null)} />
             ) : null}
-            <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || tradeSubmitting}>
-              {tradeSubmitting ? text.submitting : text.submitTrade}
-            </button>
+            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
+              {text.submitTrade}
+            </Button>
             </fieldset>
           </form>
       </Modal>
@@ -1547,11 +1620,14 @@ const PortfolioPage: React.FC = () => {
           <form onSubmit={handleCashSubmit} aria-busy={cashSubmitting}>
             <fieldset disabled={cashSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.date}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="date" value={cashForm.eventDate}
-                  onChange={(e) => setCashForm((prev) => ({ ...prev, eventDate: e.target.value }))} required />
-              </label>
+              <DatePicker
+                label={text.date}
+                value={cashForm.eventDate}
+                onChange={(eventDate) => setCashForm((prev) => ({ ...prev, eventDate }))}
+                required
+                className="w-full"
+                triggerClassName={PORTFOLIO_INPUT_CLASS}
+              />
               <Select
                 label={text.direction}
                 value={cashForm.direction}
@@ -1563,22 +1639,16 @@ const PortfolioPage: React.FC = () => {
                 ]}
               />
             </div>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.amount}</span>
-              <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.0001" placeholder={text.amount}
-                value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} required />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.currency}</span>
-              <input className={PORTFOLIO_INPUT_CLASS} placeholder={formatUiText(text.defaultCurrency, { currency: writableAccount?.baseCurrency || text.accountBaseCurrency })} value={cashForm.currency}
-                onChange={(e) => setCashForm((prev) => ({ ...prev, currency: e.target.value }))} />
-            </label>
+            <Input id="portfolio-cash-amount" label={text.amount} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.0001" step="0.0001" placeholder={text.amount}
+              value={cashForm.amount} onChange={(e) => setCashForm((prev) => ({ ...prev, amount: e.target.value }))} required />
+            <Input label={text.currency} className={PORTFOLIO_INPUT_CLASS} placeholder={formatUiText(text.defaultCurrency, { currency: writableAccount?.baseCurrency || text.accountBaseCurrency })} value={cashForm.currency}
+              onChange={(e) => setCashForm((prev) => ({ ...prev, currency: e.target.value }))} />
             {cashError ? (
               <ApiErrorAlert error={cashError} onDismiss={() => setCashError(null)} />
             ) : null}
-            <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || cashSubmitting}>
-              {cashSubmitting ? text.submitting : text.submitCash}
-            </button>
+            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
+              {text.submitCash}
+            </Button>
             </fieldset>
           </form>
       </Modal>
@@ -1586,17 +1656,17 @@ const PortfolioPage: React.FC = () => {
       <Modal isOpen={corpModalOpen} closeDisabled={corpSubmitting} onClose={() => { setCorpError(null); setCorpModalOpen(false); }} title={text.manualCorporate}>
           <form onSubmit={handleCorporateSubmit} aria-busy={corpSubmitting}>
             <fieldset disabled={corpSubmitting} className="m-0 min-w-0 space-y-2 border-0 p-0">
-            <label className="block space-y-1">
-              <span className="text-xs text-muted-text">{text.stockCode}</span>
-              <input className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockCode} value={corpForm.symbol}
-                onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
-            </label>
+            <Input label={text.stockCode} className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockCode} value={corpForm.symbol}
+              onChange={(e) => setCorpForm((prev) => ({ ...prev, symbol: e.target.value }))} required />
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.effectiveDate}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="date" value={corpForm.effectiveDate}
-                  onChange={(e) => setCorpForm((prev) => ({ ...prev, effectiveDate: e.target.value }))} required />
-              </label>
+              <DatePicker
+                label={text.effectiveDate}
+                value={corpForm.effectiveDate}
+                onChange={(effectiveDate) => setCorpForm((prev) => ({ ...prev, effectiveDate }))}
+                required
+                className="w-full"
+                triggerClassName={PORTFOLIO_INPUT_CLASS}
+              />
               <Select
                 label={text.actionType}
                 value={corpForm.actionType}
@@ -1609,26 +1679,20 @@ const PortfolioPage: React.FC = () => {
               />
             </div>
             {corpForm.actionType === 'cash_dividend' ? (
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.dividendPerShare}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.000001" placeholder={text.dividendPerShare}
-                  value={corpForm.cashDividendPerShare}
-                  onChange={(e) => setCorpForm((prev) => ({ ...prev, cashDividendPerShare: e.target.value, splitRatio: '' }))} required />
-              </label>
+              <Input label={text.dividendPerShare} className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.000001" placeholder={text.dividendPerShare}
+                value={corpForm.cashDividendPerShare}
+                onChange={(e) => setCorpForm((prev) => ({ ...prev, cashDividendPerShare: e.target.value, splitRatio: '' }))} required />
             ) : (
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.splitRatio}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="number" min="0" step="0.000001" placeholder={text.splitRatio}
-                  value={corpForm.splitRatio}
-                  onChange={(e) => setCorpForm((prev) => ({ ...prev, splitRatio: e.target.value, cashDividendPerShare: '' }))} required />
-              </label>
+              <Input id="portfolio-split-ratio" label={text.splitRatio} className={PORTFOLIO_INPUT_CLASS} type="number" min="0.000001" step="0.000001" placeholder={text.splitRatio}
+                value={corpForm.splitRatio}
+                onChange={(e) => setCorpForm((prev) => ({ ...prev, splitRatio: e.target.value, cashDividendPerShare: '' }))} required />
             )}
             {corpError ? (
               <ApiErrorAlert error={corpError} onDismiss={() => setCorpError(null)} />
             ) : null}
-            <button type="submit" className="btn-secondary w-full" disabled={!writableAccountId || corpSubmitting}>
-              {corpSubmitting ? text.submitting : text.submitCorporate}
-            </button>
+            <Button type="submit" variant="secondary" size="xl" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
+              {text.submitCorporate}
+            </Button>
             </fieldset>
           </form>
       </Modal>
@@ -1663,16 +1727,14 @@ const PortfolioPage: React.FC = () => {
                   csvOperationRef.current = null;
                   setCsvCommitResult(null);
                 }}
-                disabled={csvParsing || csvCommitting}
-                options={brokers.length > 0
-                  ? brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))
-                  : [{ value: 'huatai', label: formatBrokerLabel('huatai', undefined, language) }]}
+                disabled={csvParsing || csvCommitting || brokers.length === 0}
+                options={brokers.map((item) => ({ value: item.broker, label: formatBrokerLabel(item.broker, item.displayName, language) }))}
               />
               <div className="space-y-1">
                 <span className="block text-xs text-muted-text">{text.csvFile}</span>
                 <label className={PORTFOLIO_FILE_PICKER_CLASS}>
                   {text.chooseCsv}
-                  <input type="file" accept=".csv" className="hidden"
+                  <input ref={csvInputRef} type="file" accept=".csv" className="hidden"
                     onChange={(e) => {
                       setCsvFile(e.target.files && e.target.files[0] ? e.target.files[0] : null);
                       csvOperationRef.current = null;
@@ -1680,28 +1742,49 @@ const PortfolioPage: React.FC = () => {
                       setCsvCommitResult(null);
                     }} />
                 </label>
+                {csvFile ? (
+                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5">
+                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>
+                    <span className="shrink-0 text-xs text-muted-text">
+                      {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={fileText.clear}
+                      onClick={() => {
+                        setCsvFile(null);
+                        if (csvInputRef.current) csvInputRef.current.value = '';
+                        csvOperationRef.current = null;
+                        setCsvParseResult(null);
+                        setCsvCommitResult(null);
+                      }}
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </div>
-            <label htmlFor="csv-dry-run" className="flex min-h-11 cursor-pointer items-center gap-2 text-xs text-secondary">
-              <input
-                id="csv-dry-run"
-                type="checkbox"
-                checked={csvDryRun}
-                onChange={(e) => {
-                  setCsvDryRun(e.target.checked);
-                  csvOperationRef.current = null;
-                }}
-              />
-              <span>{text.dryRun}</span>
-            </label>
+            <Checkbox
+              id="csv-dry-run"
+              checked={csvDryRun}
+              onChange={(event) => {
+                setCsvDryRun(event.target.checked);
+                csvOperationRef.current = null;
+              }}
+              containerClassName="min-h-11 text-xs text-secondary"
+              label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
+            />
             <div className="flex gap-2">
-              <button type="button" className="btn-secondary flex-1" disabled={!csvFile || csvParsing || csvCommitting} onClick={() => void handleParseCsv()}>
-                {csvParsing ? text.parsing : text.parseFile}
-              </button>
-              <button type="button" className="btn-secondary flex-1"
-                disabled={!csvFile || !writableAccountId || csvParsing || csvCommitting} onClick={() => void handleCommitCsv()}>
-                {csvCommitting ? text.submitting : text.commitImport}
-              </button>
+              <Button type="button" variant="secondary" size="xl" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
+                {text.parseFile}
+              </Button>
+              <Button type="button" variant="secondary" size="xl" className="flex-1"
+                disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
+                {text.commitImport}
+              </Button>
             </div>
             {csvError ? (
               <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
@@ -1725,7 +1808,7 @@ const PortfolioPage: React.FC = () => {
           </fieldset>
       </Modal>
 
-      <Modal isOpen={eventModalOpen} onClose={() => setEventModalOpen(false)} title={text.eventLog}>
+      <Modal isOpen={eventModalOpen} onClose={() => { setEventError(null); setEventModalOpen(false); }} title={text.eventLog}>
           <div className="space-y-2">
             <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2">
               <Select
@@ -1738,29 +1821,33 @@ const PortfolioPage: React.FC = () => {
                   { value: 'corporate', label: text.corporateAction },
                 ]}
               />
-              <button type="button" className="btn-secondary text-sm" onClick={() => void loadEvents()} disabled={eventLoading}>
-                {eventLoading ? text.loading : text.refreshLedger}
-              </button>
+              <Button type="button" variant="secondary" size="xl" onClick={applyEventFilters} isLoading={eventLoading} loadingText={text.loading}>
+                {text.refreshLedger}
+              </Button>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.startDate}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="date" value={eventDateFrom} onChange={(e) => setEventDateFrom(e.target.value)} />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.endDate}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} type="date" value={eventDateTo} onChange={(e) => setEventDateTo(e.target.value)} />
-              </label>
+              <DatePicker
+                label={text.startDate}
+                value={eventDateFrom}
+                onChange={setEventDateFrom}
+                className="w-full"
+                triggerClassName={PORTFOLIO_INPUT_CLASS}
+              />
+              <DatePicker
+                label={text.endDate}
+                value={eventDateTo}
+                onChange={setEventDateTo}
+                className="w-full"
+                triggerClassName={PORTFOLIO_INPUT_CLASS}
+              />
             </div>
             {(eventType === 'trade' || eventType === 'corporate') ? (
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">{text.stockCode}</span>
-                <input className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockFilter} value={eventSymbol}
-                  onChange={(e) => setEventSymbol(e.target.value)} />
-              </label>
+              <Input label={text.stockCode} className={PORTFOLIO_INPUT_CLASS} placeholder={text.stockFilter} value={eventSymbol}
+                onChange={(e) => setEventSymbol(e.target.value)} />
             ) : null}
             {eventType === 'trade' ? (
               <Select
+                ariaLabel={text.side}
                 value={eventSide}
                 onChange={(value) => setEventSide(value as '' | PortfolioSide)}
                 options={[
@@ -1772,6 +1859,7 @@ const PortfolioPage: React.FC = () => {
             ) : null}
             {eventType === 'cash' ? (
               <Select
+                ariaLabel={text.direction}
                 value={eventDirection}
                 onChange={(value) => setEventDirection(value as '' | PortfolioCashDirection)}
                 options={[
@@ -1783,6 +1871,7 @@ const PortfolioPage: React.FC = () => {
             ) : null}
             {eventType === 'corporate' ? (
               <Select
+                ariaLabel={text.actionType}
                 value={eventActionType}
                 onChange={(value) => setEventActionType(value as '' | PortfolioCorporateActionType)}
                 options={[
@@ -1795,6 +1884,14 @@ const PortfolioPage: React.FC = () => {
             <div className="text-xs text-secondary">
               {writeBlocked ? text.deleteBlocked : text.deleteHint}
             </div>
+            {eventError ? (
+              <ApiErrorAlert
+                error={eventError}
+                actionLabel={t('common.retry')}
+                onAction={applyEventFilters}
+                onDismiss={() => setEventError(null)}
+              />
+            ) : null}
             <div className="max-h-64 overflow-auto rounded-lg border border-white/10 p-2">
               {eventType === 'trade' && tradeEvents.map((item) => (
                 <div key={`t-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
@@ -1802,9 +1899,11 @@ const PortfolioPage: React.FC = () => {
                     {formatUiText(text.tradeRow, { date: item.tradeDate, side: formatSideLabel(item.side, language), symbol: item.symbol, quantity: item.quantity, price: item.price })}
                   </div>
                   {!writeBlocked ? (
-                    <button
+                    <Button
                       type="button"
-                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
+                      variant="danger-subtle"
+                      size="xl"
+                      className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'trade',
                         id: item.id,
@@ -1812,7 +1911,7 @@ const PortfolioPage: React.FC = () => {
                       })}
                     >
                       {t('common.delete')}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               ))}
@@ -1822,9 +1921,11 @@ const PortfolioPage: React.FC = () => {
                     {item.eventDate} {formatCashDirectionLabel(item.direction, language)} {item.amount} {item.currency}
                   </div>
                   {!writeBlocked ? (
-                    <button
+                    <Button
                       type="button"
-                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
+                      variant="danger-subtle"
+                      size="xl"
+                      className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'cash',
                         id: item.id,
@@ -1832,7 +1933,7 @@ const PortfolioPage: React.FC = () => {
                       })}
                     >
                       {t('common.delete')}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               ))}
@@ -1842,9 +1943,11 @@ const PortfolioPage: React.FC = () => {
                     {item.effectiveDate} {formatCorporateActionLabel(item.actionType, language)} {item.symbol}
                   </div>
                   {!writeBlocked ? (
-                    <button
+                    <Button
                       type="button"
-                      className="btn-secondary min-h-11 min-w-11 shrink-0 !px-3 !py-1 !text-xs"
+                      variant="danger-subtle"
+                      size="xl"
+                      className="shrink-0 text-xs"
                       onClick={() => openDeleteDialog({
                         eventType: 'corporate',
                         id: item.id,
@@ -1852,7 +1955,7 @@ const PortfolioPage: React.FC = () => {
                       })}
                     >
                       {t('common.delete')}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               ))}
@@ -1870,14 +1973,14 @@ const PortfolioPage: React.FC = () => {
             <div className="flex items-center justify-between text-xs text-secondary">
               <span>{formatUiText(text.page, { page: eventPage, pages: totalEventPages })}</span>
               <div className="flex gap-2">
-                <button type="button" className="btn-secondary min-h-11 min-w-11 text-xs px-3 py-1" disabled={eventPage <= 1}
+                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage <= 1}
                   onClick={() => setEventPage((prev) => Math.max(1, prev - 1))}>
                   {text.prevPage}
-                </button>
-                <button type="button" className="btn-secondary min-h-11 min-w-11 text-xs px-3 py-1" disabled={eventPage >= totalEventPages}
+                </Button>
+                <Button type="button" variant="secondary" size="xl" className="text-xs" disabled={eventPage >= totalEventPages}
                   onClick={() => setEventPage((prev) => Math.min(totalEventPages, prev + 1))}>
                   {text.nextPage}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -1889,10 +1992,14 @@ const PortfolioPage: React.FC = () => {
         confirmText={deleteLoading ? text.deletingEntry : text.confirmDelete}
         cancelText={t('common.cancel')}
         isDanger
+        confirmDisabled={deleteLoading}
+        cancelDisabled={deleteLoading}
+        error={deleteError}
         onConfirm={() => void handleConfirmDelete()}
         onCancel={() => {
           if (!deleteLoading) {
             setPendingDelete(null);
+            setDeleteError(null);
           }
         }}
       />
@@ -1909,10 +2016,14 @@ const PortfolioPage: React.FC = () => {
         }
         confirmText={accountDeleteLoading ? text.deletingAccount : text.deleteAccountConfirm}
         isDanger
+        confirmDisabled={accountDeleteLoading}
+        cancelDisabled={accountDeleteLoading}
+        error={accountDeleteError}
         onConfirm={() => void handleConfirmAccountDelete()}
         onCancel={() => {
           if (!accountDeleteLoading) {
             setPendingAccountDelete(null);
+            setAccountDeleteError(null);
           }
         }}
       />

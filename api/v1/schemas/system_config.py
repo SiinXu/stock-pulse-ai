@@ -129,6 +129,7 @@ class SystemConfigFieldSchema(BaseModel):
     )
     is_editable: bool
     default_value: Optional[str] = None
+    unit: Optional[str] = Field(None, description="Short unit label displayed next to the field value")
     options: List[str | SystemConfigOption] = Field(default_factory=list)
     validation: Dict[str, Any] = Field(default_factory=dict)
     display_order: int
@@ -188,6 +189,10 @@ class SystemConfigResponse(BaseModel):
     config_version: str
     mask_token: str
     items: List[SystemConfigItem]
+    configured_notification_channels: List[str] = Field(
+        default_factory=list,
+        description="Routable static channels detected from the current live runtime Config snapshot",
+    )
     updated_at: Optional[str] = None
 
 

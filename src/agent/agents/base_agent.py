@@ -99,6 +99,7 @@ class BaseAgent(ABC):
         ctx: AgentContext,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         timeout_seconds: Optional[float] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> StageResult:
         """Execute this agent and return a :class:`StageResult`.
 
@@ -127,6 +128,7 @@ class BaseAgent(ABC):
                 max_wall_clock_seconds=timeout_seconds,
                 stock_scope=ctx.meta.get("stock_scope"),
                 emit_stage_events=False,
+                cancelled_check=cancelled_check,
             )
 
             result.tokens_used = loop_result.total_tokens

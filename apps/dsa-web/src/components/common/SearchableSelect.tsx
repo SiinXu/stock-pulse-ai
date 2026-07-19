@@ -1,7 +1,17 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import React, {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { useFixedPopup } from './useFixedPopup';
 
 export interface SearchableSelectOption {
   /** Stable value stored on selection (e.g. a canonical model route). */
@@ -75,8 +85,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
@@ -106,27 +114,41 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
       }),
     [filtered],
   );
+  const popupContentVersion = useMemo(
+    () => [navItems.length, query] as const,
+    [navItems.length, query],
+  );
+  const {
+    portalHost,
+    popupStyle,
+    prepareForOpen,
+    resetPosition,
+  } = useFixedPopup({
+    isOpen,
+    triggerRef,
+    popupRef: popoverRef,
+    contentVersion: popupContentVersion,
+    constrainWidthToViewport: true,
+  });
 
   const open = useCallback(() => {
     if (disabled) {
       return;
     }
-    setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
-    setPortalHost(
-      (triggerRef.current?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body,
-    );
+    prepareForOpen();
     setQuery('');
     setActiveIndex(0);
     setIsOpen(true);
-  }, [disabled]);
+  }, [disabled, prepareForOpen]);
 
   const close = useCallback((refocus: boolean) => {
     setIsOpen(false);
     setQuery('');
+    resetPosition();
     if (refocus) {
       triggerRef.current?.focus();
     }
-  }, []);
+  }, [resetPosition]);
 
   const commit = useCallback(
     (next: string) => {
@@ -157,19 +179,6 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [isOpen, close]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-    const updateRect = () => setTriggerRect(triggerRef.current?.getBoundingClientRect() ?? null);
-    window.addEventListener('scroll', updateRect, true);
-    window.addEventListener('resize', updateRect);
-    return () => {
-      window.removeEventListener('scroll', updateRect, true);
-      window.removeEventListener('resize', updateRect);
-    };
-  }, [isOpen]);
 
   const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) {
@@ -246,7 +255,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
           onClick={() => (isOpen ? close(false) : open())}
           onKeyDown={handleTriggerKeyDown}
           className={cn(
-            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-full border bg-transparent px-3 text-left text-xs text-foreground',
+            'flex h-11 min-h-11 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-left text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : '',
@@ -272,7 +281,7 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
             type="button"
             aria-label={ariaLabel ? `${t('common.clear')} ${ariaLabel}` : t('common.clear')}
             onClick={() => onChange('')}
-            className="absolute right-7 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-secondary-text hover:text-foreground"
+            className="absolute right-7 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-secondary-text hover:text-foreground"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -285,12 +294,12 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
         <span id={staleValueId} className="mt-1 text-xs text-warning">{staleValueLabel ?? t('common.staleValue')}</span>
       ) : null}
 
-      {isOpen && triggerRect && portalHost
+      {isOpen && popupStyle && portalHost
         ? createPortal(
           <div
             ref={popoverRef}
             data-dialog-popup="true"
-            style={{ top: triggerRect.bottom + 4, left: triggerRect.left, minWidth: triggerRect.width }}
+            style={popupStyle}
             className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           >
             <div className="border-b border-border p-1.5">
@@ -311,10 +320,10 @@ export const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleSearchKeyDown}
-                className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-xs text-foreground focus:outline-none"
+                className="h-11 min-h-11 w-full rounded-md bg-transparent px-2 text-base text-foreground focus:outline-none sm:text-xs"
               />
             </div>
-            <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="max-h-60 overflow-auto p-1">
+            <ul id={listboxId} role="listbox" aria-label={ariaLabel} className="min-h-0 max-h-60 overflow-auto p-1">
               {navItems.length === 0 ? (
                 <li role="presentation" className="px-3 py-1.5 text-xs text-muted-text">
                   {emptyText ?? t('common.noMatches')}
