@@ -1006,7 +1006,7 @@ const StockScreeningPage: React.FC = () => {
           title={text.notEnabledTitle}
           message={text.notEnabledMessage}
           action={
-            <Button variant="primary" size="sm" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
+            <Button variant="primary" size="default" isLoading={enabling} loadingText={text.enabling} onClick={() => void handleEnable()}>
               {text.enable}
             </Button>
           }
@@ -1053,7 +1053,7 @@ const StockScreeningPage: React.FC = () => {
           <div className="flex flex-col items-start gap-2 lg:items-end">
             <div className="flex flex-wrap items-center gap-2">
               <Button
-                size="sm"
+                size="default"
                 variant="secondary"
                 disabled={!isScreeningEnabled}
                 onClick={toggleHotspotsExpanded}
@@ -1064,7 +1064,7 @@ const StockScreeningPage: React.FC = () => {
               </Button>
               {hotspotsExpanded ? (
               <Button
-                size="sm"
+                size="default"
                 variant="secondary"
                 isLoading={loadingHotspots}
                 loadingText={text.refreshing}

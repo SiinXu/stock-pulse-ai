@@ -334,7 +334,7 @@ const AlertsPage: React.FC = () => {
           <Button
             type="button"
             variant="primary"
-            size="sm"
+            size="default"
             onClick={() => {
               setCreateError(null);
               setCreateRuleModalOpen(true);
@@ -441,7 +441,7 @@ const AlertsPage: React.FC = () => {
           ) : null}
           <Button
             type="button"
-            size="sm"
+            size="default"
             variant="secondary"
             onClick={() => void loadNotifications(notificationsPage)}
             isLoading={notificationsLoading}

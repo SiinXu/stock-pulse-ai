@@ -630,7 +630,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             <p className="text-sm font-semibold text-foreground">{t('settings.setupGuideHiddenTitle')}</p>
             <p className="mt-1 text-xs leading-5 text-muted-text">{t('settings.setupGuideHiddenDescription')}</p>
           </div>
-          <Button type="button" variant="secondary" size="sm" onClick={() => setIsHidden(false)}>
+          <Button type="button" variant="secondary" size="default" onClick={() => setIsHidden(false)}>
             {t('settings.setupGuideOpen')}
           </Button>
         </div>
@@ -658,7 +658,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             <Button
               type="button"
               variant="secondary"
-              size="sm"
+              size="default"
               disabled={isLoading}
               isLoading={isLoading}
               loadingText={t('settings.setupGuideRefreshing')}
@@ -667,7 +667,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
               {t('settings.setupGuideRefresh')}
             </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setIsHidden(true)}>
+            <Button type="button" variant="secondary" size="default" onClick={() => setIsHidden(true)}>
               {t('settings.setupGuideHide')}
             </Button>
           </div>
@@ -707,19 +707,19 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('ai_model')}>
+          <Button type="button" variant="secondary" size="default" onClick={() => onSelectCategory('ai_model')}>
             {t('settings.setupGuideConfigureLlm')}
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('base')}>
+          <Button type="button" variant="secondary" size="default" onClick={() => onSelectCategory('base')}>
             {t('settings.setupGuideAddStocks')}
           </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={() => onSelectCategory('notification')}>
+          <Button type="button" variant="secondary" size="default" onClick={() => onSelectCategory('notification')}>
             {t('settings.setupGuideConfigureNotification')}
           </Button>
           <Button
             type="button"
             variant="primary"
-            size="sm"
+            size="default"
             disabled={!canRunSmoke || isSaving || isRunningSmoke}
             isLoading={isRunningSmoke}
             loadingText={t('settings.setupGuideSmokeRunning')}
@@ -994,7 +994,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                   <Button
                     type="button"
                     variant="secondary"
-                    size="sm"
+                    size="default"
                     className="shrink-0"
                     data-testid="scheduler-add-time-button"
                     disabled={disabled}
@@ -1047,7 +1047,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
+                size="default"
                 data-testid="scheduler-refresh-status-button"
                 disabled={disabled || isRefreshingStatus}
                 isLoading={isRefreshingStatus}
@@ -1060,7 +1060,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               <Button
                 type="button"
                 variant="primary"
-                size="sm"
+                size="default"
                 data-testid="scheduler-run-now-button"
                 disabled={disabled || isRunningNow}
                 isLoading={isRunningNow}
@@ -1656,7 +1656,7 @@ const SettingsPage: React.FC = () => {
       <Button
         type="button"
         variant="secondary"
-        size="sm"
+        size="default"
         className="text-xs shadow-none"
         onClick={() => selectSectionView('notifications', 'channels')}
       >
@@ -2645,7 +2645,7 @@ const SettingsPage: React.FC = () => {
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
+                size="default"
                 onClick={() => setShowResetConfirm(true)}
                 disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
               >
@@ -2685,7 +2685,7 @@ const SettingsPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xsm"
+                  size="compact"
                   onClick={() => resolveAllSettingsConflicts('server')}
                 >
                   {settingsText.useAllServer}
@@ -2693,7 +2693,7 @@ const SettingsPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xsm"
+                  size="compact"
                   onClick={() => resolveAllSettingsConflicts('local')}
                 >
                   {settingsText.keepAllLocal}
@@ -2719,7 +2719,7 @@ const SettingsPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="secondary"
-                        size="xsm"
+                        size="compact"
                         onClick={() => resolveSettingsConflict(field.key, 'server')}
                       >
                         {settingsText.useServer}
@@ -2727,7 +2727,7 @@ const SettingsPage: React.FC = () => {
                       <Button
                         type="button"
                         variant="primary"
-                        size="xsm"
+                        size="compact"
                         onClick={() => resolveSettingsConflict(field.key, 'local')}
                       >
                         {settingsText.keepLocal}
@@ -2812,7 +2812,7 @@ const SettingsPage: React.FC = () => {
                 <Button
                   type="button"
                   variant="primary"
-                  size="sm"
+                  size="default"
                   className="shrink-0"
                   disabled={isProviderCatalogLoading || providerCatalog.length === 0}
                   onClick={() => setIsWizardOpen(true)}
@@ -3136,7 +3136,7 @@ const SettingsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="primary"
-                      size="sm"
+                      size="default"
                       className="mt-3"
                       onClick={goToModelAccessFromTaskRouting}
                     >

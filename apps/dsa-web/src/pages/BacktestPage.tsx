@@ -601,7 +601,7 @@ const BacktestPage: React.FC = () => {
             onClick={handleFilter}
             disabled={isLoadingResults}
             variant="secondary"
-            size="md"
+            size="comfortable"
             isLoading={isLoadingResults}
             loadingText={text.filter}
             className="whitespace-nowrap text-xs"
@@ -658,7 +658,7 @@ const BacktestPage: React.FC = () => {
             onClick={handleShowNextDay}
             disabled={isLoadingResults || isLoadingPerf}
             variant={isNextDayValidation ? 'primary' : 'secondary'}
-            size="md"
+            size="comfortable"
             aria-pressed={isNextDayValidation}
             className="text-xs"
           >
@@ -669,7 +669,7 @@ const BacktestPage: React.FC = () => {
             onClick={() => setForceRerun(!forceRerun)}
             disabled={isRunning}
             variant={forceRerun ? 'primary' : 'secondary'}
-            size="md"
+            size="comfortable"
             aria-pressed={forceRerun}
             className="text-xs"
           >
@@ -679,7 +679,7 @@ const BacktestPage: React.FC = () => {
             type="button"
             onClick={handleRun}
             variant="primary"
-            size="md"
+            size="comfortable"
             isLoading={isRunning}
             loadingText={text.running}
             className="whitespace-nowrap text-xs"

@@ -668,7 +668,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xsm"
+                  size="compact"
                   onClick={() => void handleDiscover()}
                   disabled={
                     isDiscovering
@@ -754,7 +754,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               <Button
                 type="button"
                 variant="secondary"
-                size="xsm"
+                size="compact"
                 className="shrink-0"
                 disabled={modelsAreReadOnly || !modelDraft.trim()}
                 onClick={() => addModelToken(modelDraft)}
@@ -831,7 +831,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 <Button
                   type="button"
                   variant="secondary"
-                  size="xsm"
+                  size="compact"
                   onClick={() => void handleTestConnection()}
                   disabled={isTesting || (hasConnectionSchema && !cloudContractReady)}
                   isLoading={isTesting}
@@ -850,12 +850,12 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         <div className="flex items-center justify-between gap-2 border-t border-[var(--settings-border)] pt-4">
-          <Button type="button" variant="secondary" size="sm" onClick={onClose}>
+          <Button type="button" variant="secondary" size="default" onClick={onClose}>
             {text.cancel}
           </Button>
           <div className="flex items-center gap-2">
             {stepIndex > 0 ? (
-              <Button type="button" variant="secondary" size="sm" onClick={goBack} disabled={isSaving}>
+              <Button type="button" variant="secondary" size="default" onClick={goBack} disabled={isSaving}>
                 {text.back}
               </Button>
             ) : null}
@@ -863,7 +863,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               <Button
                 type="button"
                 variant="primary"
-                size="sm"
+                size="default"
                 onClick={() => void handleSave()}
                 disabled={isSaving || (mode === 'cloud' && hasConnectionSchema && !cloudContractReady)}
                 isLoading={isSaving}
@@ -874,7 +874,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               <Button
                 type="button"
                 variant="primary"
-                size="sm"
+                size="default"
                 onClick={goNext}
                 disabled={!canAdvance}
               >

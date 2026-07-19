@@ -261,8 +261,8 @@ export const TimePicker = ({
             </div>
           </div>
           <div className="mt-3 flex justify-end gap-2 border-t border-border pt-3">
-            <Button variant="ghost" size="sm" onClick={() => closePicker(true)}>{t('common.cancel')}</Button>
-            <Button variant="primary" size="sm" onClick={() => {
+            <Button variant="ghost" size="default" onClick={() => closePicker(true)}>{t('common.cancel')}</Button>
+            <Button variant="primary" size="default" onClick={() => {
               onChange(draftValue);
               closePicker(true);
             }}>{t('common.confirm')}</Button>

@@ -1131,7 +1131,7 @@ const ChatPage: React.FC = () => {
                   <span className="inline-flex">
                     <Button
                       variant="secondary"
-                      size="sm"
+                      size="default"
                       onClick={() => downloadSession(messages, language)}
                       aria-label={t('chat.exportSession')}
                     >
@@ -1156,7 +1156,7 @@ const ChatPage: React.FC = () => {
                   <span className="inline-flex">
                     <Button
                       variant="secondary"
-                      size="sm"
+                      size="default"
                       disabled={sending}
                       onClick={async () => {
                         if (sending) return;
@@ -1567,7 +1567,7 @@ const ChatPage: React.FC = () => {
                 <span className="text-xs text-muted-text font-mono">{activeStockCode}</span>
                 <Button
                   variant="secondary"
-                  size="xsm"
+                  size="compact"
                   isLoading={isWatchlistActioning}
                   onClick={() => void handleToggleWatchlist(activeStockCode)}
                   className="text-xs"
