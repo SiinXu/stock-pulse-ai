@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -44,6 +46,9 @@ RUN_FLOW_PATHS = (
     "/api/v1/analysis/tasks/{task_id}/flow",
     "/api/v1/history/{record_id}/flow",
 )
+RUN_FLOW_OPENAPI_SHA256 = (
+    "14d4816b582eec9af86fede9edda8deb07e204641b4cdbccf2bf44799184faae"
+)
 
 
 def _message(**overrides) -> BotMessage:
@@ -70,15 +75,6 @@ def _imported_modules(path: Path) -> set[str]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             modules.add(node.module)
     return modules
-
-
-def _minimum_value(schema: dict) -> int | None:
-    if "minimum" in schema:
-        return schema["minimum"]
-    for candidate in schema.get("anyOf", []):
-        if "minimum" in candidate:
-            return candidate["minimum"]
-    return None
 
 
 def test_src_does_not_import_delivery_boundary_dtos() -> None:
@@ -112,87 +108,24 @@ def test_run_flow_api_path_reexports_the_neutral_contract() -> None:
     assert "from_node" not in payload
 
 
-def test_run_flow_openapi_shape_preserves_all_components_and_constraints() -> None:
+def test_run_flow_openapi_surface_is_unchanged() -> None:
     spec = create_app().openapi()
     schemas = spec["components"]["schemas"]
+    surface = {
+        "paths": {path: spec["paths"][path] for path in RUN_FLOW_PATHS},
+        "schemas": {
+            application_model.__name__: schemas[application_model.__name__]
+            for _, application_model in RUN_FLOW_MODEL_PAIRS
+        },
+    }
+    canonical = json.dumps(
+        surface,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
 
-    for path in RUN_FLOW_PATHS:
-        response_schema = spec["paths"][path]["get"]["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]
-        assert response_schema == {"$ref": "#/components/schemas/RunFlowSnapshot"}
-
-    assert set(schemas["RunFlowLane"]["properties"]) == {"id", "label", "order"}
-    assert set(schemas["RunFlowNode"]["properties"]) == {
-        "id",
-        "lane",
-        "kind",
-        "label",
-        "status",
-        "provider",
-        "started_at",
-        "ended_at",
-        "duration_ms",
-        "attempts",
-        "record_count",
-        "message",
-        "metadata",
-    }
-    assert set(schemas["RunFlowEdge"]["properties"]) == {
-        "id",
-        "from",
-        "to",
-        "kind",
-        "status",
-        "label",
-        "message",
-        "metadata",
-    }
-    assert set(schemas["RunFlowEvent"]["properties"]) == {
-        "id",
-        "timestamp",
-        "severity",
-        "type",
-        "node_id",
-        "title",
-        "message",
-        "metadata",
-    }
-    assert set(schemas["RunFlowSummary"]["properties"]) == {
-        "elapsed_ms",
-        "bottleneck_node_id",
-        "failed_attempts",
-        "fallback_count",
-        "model",
-        "data_source_count",
-        "event_count",
-    }
-    assert set(schemas["RunFlowSnapshot"]["properties"]) == {
-        "task_id",
-        "trace_id",
-        "stock_code",
-        "stock_name",
-        "status",
-        "summary",
-        "lanes",
-        "nodes",
-        "edges",
-        "events",
-        "generated_at",
-    }
-    for field_name in ("duration_ms", "attempts", "record_count"):
-        assert _minimum_value(schemas["RunFlowNode"]["properties"][field_name]) == 0
-    for field_name in (
-        "elapsed_ms",
-        "failed_attempts",
-        "fallback_count",
-        "data_source_count",
-        "event_count",
-    ):
-        assert _minimum_value(schemas["RunFlowSummary"]["properties"][field_name]) == 0
-    assert schemas["RunFlowSnapshot"]["properties"]["summary"] == {
-        "$ref": "#/components/schemas/RunFlowSummary"
-    }
+    assert hashlib.sha256(canonical).hexdigest() == RUN_FLOW_OPENAPI_SHA256
 
 
 def test_bot_mapping_snapshots_provenance_and_hides_reply_credentials() -> None:
