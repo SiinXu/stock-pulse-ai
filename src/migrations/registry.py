@@ -13,12 +13,16 @@ from src.migrations.versions.v20260605_create_all_baseline import (
 from src.migrations.versions.v202607160001_migration_runner_registry import (
     MIGRATION as REGISTRY_METADATA_MIGRATION,
 )
+from src.migrations.versions.v202607190001_llm_usage_telemetry_columns import (
+    MIGRATION as LLM_USAGE_TELEMETRY_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
     (
         LEGACY_BASELINE_MIGRATION,
         REGISTRY_METADATA_MIGRATION,
+        LLM_USAGE_TELEMETRY_MIGRATION,
     )
 )
 

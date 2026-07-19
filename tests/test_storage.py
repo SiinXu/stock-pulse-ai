@@ -1157,7 +1157,10 @@ class TestStorage(unittest.TestCase):
         )
 
         try:
-            with patch("src.storage.apply_pending", return_value=failure):
+            with patch(
+                "src.storage.apply_pending_within_transaction",
+                return_value=failure,
+            ):
                 with self.assertRaises(MigrationError) as ctx:
                     DatabaseManager(db_url=f"sqlite:///{db_path}")
 
@@ -1200,7 +1203,10 @@ class TestStorage(unittest.TestCase):
                 "src.storage.create_engine",
                 side_effect=create_engine_with_failing_dispose,
             ):
-                with patch("src.storage.apply_pending", return_value=failure):
+                with patch(
+                    "src.storage.apply_pending_within_transaction",
+                    return_value=failure,
+                ):
                     with self.assertLogs("src.storage", level="WARNING") as logs:
                         with self.assertRaises(MigrationError) as ctx:
                             DatabaseManager(db_url="sqlite:///:memory:")

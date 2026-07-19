@@ -32,6 +32,7 @@ from src.migrations.legacy_profiles import (
 )
 from src.migrations.registry import (
     LEGACY_BASELINE_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
@@ -48,7 +49,15 @@ from src.migrations.types import (
     read_checksum_source,
     validate_registry,
 )
-from src.storage import Base, DatabaseManager
+from src.migrations.versions.v202607190001_llm_usage_telemetry_columns import (
+    _TELEMETRY_COLUMNS as LLM_USAGE_TELEMETRY_COLUMNS,
+)
+from src.storage import (
+    Base,
+    DatabaseManager,
+    LLMUsage,
+    _LLM_USAGE_TELEMETRY_COLUMN_SQL,
+)
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "schema_migrations"
@@ -395,7 +404,11 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
     assert before == after
     assert ids == tuple(sorted(ids))
     assert len(ids) == len(set(ids))
-    assert ids == (LEGACY_BASELINE_MIGRATION.id, REGISTRY_METADATA_MIGRATION.id)
+    assert ids == (
+        LEGACY_BASELINE_MIGRATION.id,
+        REGISTRY_METADATA_MIGRATION.id,
+        LLM_USAGE_TELEMETRY_MIGRATION.id,
+    )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
 
@@ -823,7 +836,7 @@ def test_source_guard_respects_nested_parameter_shadowing(tmp_path: Path) -> Non
     assert migration.source_bound is True
 
 
-def test_fresh_memory_database_has_core_tables_and_two_applied_migrations() -> None:
+def test_fresh_memory_database_has_core_tables_and_all_applied_migrations() -> None:
     database = DatabaseManager(db_url="sqlite:///:memory:")
 
     assert CORE_TABLES.issubset(set(inspect(database._engine).get_table_names()))
@@ -863,7 +876,7 @@ def test_fresh_file_database_restart_is_idempotent(tmp_path: Path) -> None:
     assert CORE_TABLES.issubset(set(inspect(second._engine).get_table_names()))
     assert _applied_rows(second._engine) == first_rows
     assert second_applied_at == first_applied_at
-    assert len(first_rows) == 2
+    assert len(first_rows) == len(get_migrations())
 
 
 @pytest.mark.parametrize(
@@ -2861,3 +2874,200 @@ def test_cli_preserves_checksum_mismatch_state_and_failure_exit_code(
     assert payload["failure_code"] == "migration_checksum_mismatch"
     assert payload["failed_migration_id"] == REGISTRY_METADATA_MIGRATION.id
     assert payload["checksum_mismatches"] == [REGISTRY_METADATA_MIGRATION.id]
+
+
+_LEGACY_LLM_USAGE_DDL = (
+    "CREATE TABLE llm_usage ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+    "call_type VARCHAR(32) NOT NULL, "
+    "model VARCHAR(128) NOT NULL, "
+    "stock_code VARCHAR(16), "
+    "prompt_tokens INTEGER NOT NULL DEFAULT 0, "
+    "completion_tokens INTEGER NOT NULL DEFAULT 0, "
+    "total_tokens INTEGER NOT NULL DEFAULT 0, "
+    "called_at DATETIME)"
+)
+_LEGACY_LLM_USAGE_ROW = (
+    "INSERT INTO llm_usage "
+    "(call_type, model, stock_code, prompt_tokens, completion_tokens, total_tokens) "
+    "VALUES ('analysis', 'gpt-legacy', '600519', 3, 5, 8)"
+)
+
+
+def _engine_with_registry_before_llm_usage_migration(path: Path) -> Engine:
+    """Stamp every production migration except the pending llm_usage backfill."""
+    engine = create_engine(_database_url(path))
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in get_migrations():
+            if migration.id == LLM_USAGE_TELEMETRY_MIGRATION.id:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _llm_usage_columns(db_path: Path) -> set[str]:
+    with sqlite3.connect(db_path) as connection:
+        return {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(llm_usage)").fetchall()
+        }
+
+
+def test_llm_usage_telemetry_migration_reproduces_model_backfill_columns() -> None:
+    migration_columns = tuple(name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS)
+
+    # Every migrated column is a real, correctly-typed telemetry column on the
+    # model, so the frozen migration cannot drift into adding unknown columns.
+    model_columns = {column.name for column in LLMUsage.__table__.columns}
+    assert set(migration_columns).issubset(model_columns)
+    assert all(
+        _LLM_USAGE_TELEMETRY_COLUMN_SQL.get(name) == column_type
+        for name, column_type in LLM_USAGE_TELEMETRY_COLUMNS
+    )
+    assert len(migration_columns) == len(set(migration_columns))
+
+
+def test_llm_usage_telemetry_migration_backfills_legacy_columns_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_ROW)
+        assert LLM_USAGE_TELEMETRY_MIGRATION.id not in _applied_ids(engine)
+
+        result = MigrationRunner().apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (LLM_USAGE_TELEMETRY_MIGRATION.id,)
+
+        migration_columns = {name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS}
+        assert migration_columns.issubset(_llm_usage_columns(db_path))
+        with sqlite3.connect(db_path) as connection:
+            preserved = connection.execute(
+                "SELECT call_type, model, stock_code, prompt_tokens, "
+                "completion_tokens, total_tokens FROM llm_usage"
+            ).fetchall()
+        assert preserved == [("analysis", "gpt-legacy", "600519", 3, 5, 8)]
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner().verify(engine).success is True
+
+        rerun = MigrationRunner().apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_is_noop_when_columns_already_present(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "modern-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        extra_columns = "".join(
+            f", {name} {column_type}"
+            for name, column_type in LLM_USAGE_TELEMETRY_COLUMNS
+        )
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                _LEGACY_LLM_USAGE_DDL[:-1] + extra_columns + ")"
+            )
+        before_schema = _sqlite_master_snapshot(db_path)
+
+        result = MigrationRunner().apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (LLM_USAGE_TELEMETRY_MIGRATION.id,)
+        assert _sqlite_master_snapshot(db_path) == before_schema
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_rolls_back_added_columns_on_registry_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-llm-usage.sqlite"
+    engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+        before_columns = _llm_usage_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == LLM_USAGE_TELEMETRY_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner().apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == LLM_USAGE_TELEMETRY_MIGRATION.id
+        assert _llm_usage_columns(db_path) == before_columns
+        assert LLM_USAGE_TELEMETRY_MIGRATION.id not in _applied_ids(engine)
+    finally:
+        engine.dispose()
+
+
+def test_llm_usage_telemetry_migration_applies_once_under_two_engines(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "concurrent-llm-usage.sqlite"
+    url = _database_url(db_path)
+    setup_engine = _engine_with_registry_before_llm_usage_migration(db_path)
+    with setup_engine.begin() as connection:
+        connection.exec_driver_sql(_LEGACY_LLM_USAGE_DDL)
+        connection.exec_driver_sql(_LEGACY_LLM_USAGE_ROW)
+    setup_engine.dispose()
+
+    engines = (
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+        create_engine(url, connect_args={"timeout": 2.0}, poolclass=NullPool),
+    )
+    barrier = threading.Barrier(2)
+
+    def apply(engine: Engine):
+        barrier.wait(timeout=5)
+        return MigrationRunner().apply_pending(engine)
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(apply, engines))
+    finally:
+        for engine in engines:
+            engine.dispose()
+
+    assert all(result.success for result in results)
+    assert sorted(len(result.executed_ids) for result in results) == [0, 1]
+    migration_columns = {name for name, _ in LLM_USAGE_TELEMETRY_COLUMNS}
+    assert migration_columns.issubset(_llm_usage_columns(db_path))
+    with sqlite3.connect(db_path) as connection:
+        applied_count = connection.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE version = ?",
+            (LLM_USAGE_TELEMETRY_MIGRATION.id,),
+        ).fetchone()[0]
+        preserved = connection.execute(
+            "SELECT call_type, model, prompt_tokens FROM llm_usage"
+        ).fetchall()
+    assert applied_count == 1
+    assert preserved == [("analysis", "gpt-legacy", 3)]

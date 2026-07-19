@@ -6,6 +6,7 @@ from src.migrations.registry import MIGRATIONS, TARGET_VERSION, get_migrations
 from src.migrations.runner import (
     MigrationRunner,
     apply_pending,
+    apply_pending_within_transaction,
     preflight_existing,
     status,
     verify,
@@ -28,6 +29,7 @@ __all__ = [
     "MigrationStatus",
     "VerificationResult",
     "apply_pending",
+    "apply_pending_within_transaction",
     "get_migrations",
     "preflight_existing",
     "status",
