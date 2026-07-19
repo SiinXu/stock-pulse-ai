@@ -424,7 +424,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
 
     expect(await screen.findByText('过期')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: '刷新汇率' })).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
   });
 
   it('shows aggregate partial valuation limitations near summary totals', async () => {
@@ -935,7 +935,7 @@ describe('PortfolioPage FX refresh', () => {
     const row = screen.getByText('HK00700').closest('tr');
     expect(row).not.toBeNull();
     const analyzeButton = within(row as HTMLTableRowElement).getByRole('button', { name: '分析' });
-    expect(analyzeButton).toHaveClass('h-11', 'min-w-11');
+    expect(analyzeButton).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
     fireEvent.click(analyzeButton);
 
     await waitFor(() => {
@@ -1283,7 +1283,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
     fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
     expect(screen.getByLabelText('仅预演（不写入）').closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveClass('h-11', 'w-full');
+    expect(screen.getByRole('button', { name: '选择 CSV' })).toHaveClass('ui-touch-target', 'h-9', 'w-full');
     const file = new File(['header\nrow'], 'trades.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText('选择 CSV'), { target: { files: [file] } });
     fireEvent.click(screen.getByLabelText('仅预演（不写入）'));

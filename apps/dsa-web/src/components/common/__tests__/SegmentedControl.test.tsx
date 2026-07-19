@@ -18,7 +18,7 @@ describe('SegmentedControl', () => {
     );
 
     expect(screen.getByRole('tab', { name: 'Left' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Left' })).toHaveClass('segmented-control-tab', 'min-h-6');
+    expect(screen.getByRole('tab', { name: 'Left' })).toHaveClass('segmented-control-tab', 'min-h-5');
     fireEvent.click(screen.getByRole('tab', { name: 'Right' }));
     expect(onChange).toHaveBeenCalledWith('right');
   });
@@ -48,5 +48,24 @@ describe('SegmentedControl', () => {
 
     fireEvent.keyDown(middle, { key: 'End' });
     expect(onChange).toHaveBeenLastCalledWith('last');
+  });
+
+  it('uses radio semantics for single-value modes without tab panels', () => {
+    render(
+      <SegmentedControl
+        value="window"
+        options={[
+          { value: 'window', label: 'Window' },
+          { value: 'one-day', label: 'One day' },
+        ]}
+        onChange={() => undefined}
+        ariaLabel="Validation mode"
+        semantics="single-select"
+      />,
+    );
+
+    expect(screen.getByRole('radiogroup', { name: 'Validation mode' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Window' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
 });

@@ -57,7 +57,9 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
         className="h-auto min-w-0 flex-1 justify-start border-0 p-1.5 text-left text-foreground shadow-none hover:bg-transparent hover:text-foreground"
       >
         <div className="relative z-10 flex w-full items-center gap-2">
-          {isMarketReview ? null : sentimentColor ? (
+          {isMarketReview ? (
+            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
+          ) : sentimentColor ? (
             <div
               className="h-2 w-2 flex-shrink-0 rounded-full"
               style={{
@@ -129,8 +131,8 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
             onDelete(item.stockCode);
           }}
           disabled={isDeleting}
-          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 opacity-0 transition-opacity before:pointer-events-none before:absolute before:-inset-y-2 before:-left-8 before:right-0 before:bg-gradient-to-l before:from-elevated before:via-elevated/95 before:to-transparent before:content-[''] group-hover/item:opacity-100 focus-visible:opacity-100"
-          visualClassName="!rounded-none group-hover:!bg-transparent"
+          className="absolute right-2 top-1/2 z-20 -translate-y-1/2 opacity-0 transition-opacity before:pointer-events-none before:absolute before:-inset-y-1 before:-left-4 before:right-0 before:bg-gradient-to-l before:from-hover before:via-hover/95 before:to-transparent before:content-[''] group-hover/item:opacity-100 focus-visible:opacity-100"
+          visualClassName="relative z-10 !rounded-none group-hover:!bg-transparent"
           aria-label={t('history.deleteRecord', { name: item.stockName || item.stockCode })}
         >
           <Trash2 className="h-3.5 w-3.5 text-danger" aria-hidden="true" />

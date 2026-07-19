@@ -612,6 +612,39 @@ describe('SettingsField', () => {
     });
   });
 
+  it('renders direction color swatches for the market review color scheme', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'MARKET_REVIEW_COLOR_SCHEME',
+          value: 'green_up',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'MARKET_REVIEW_COLOR_SCHEME',
+            title: '配色方案',
+            category: 'system',
+            dataType: 'string',
+            uiControl: 'select',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: ['green_up', 'red_up'],
+            validation: { enum: ['green_up', 'red_up'] },
+            displayOrder: 1,
+          },
+        }}
+        value="green_up"
+        onChange={() => undefined}
+      />,
+    );
+
+    const trigger = screen.getByRole('combobox', { name: '大盘复盘涨跌颜色' });
+    expect(trigger.querySelector('[data-select-swatch="true"]')).toBeInTheDocument();
+    const listbox = openListbox(trigger);
+    expect(listbox.querySelectorAll('[data-select-swatch="true"]')).toHaveLength(2);
+  });
+
   it('renders MARKET_REVIEW_REGION as a multi-value enum checkbox group', () => {
     const onChange = vi.fn();
 
@@ -662,7 +695,7 @@ describe('SettingsField', () => {
     const checkboxes = screen.getAllByRole('checkbox');
     expect(checkboxes).toHaveLength(6);
     for (const checkbox of checkboxes) {
-      expect(checkbox.closest('label')).toHaveClass('min-h-11');
+      expect(checkbox.closest('label')).toHaveClass('ui-touch-target', 'min-h-9');
       expect(checkbox).toHaveClass('h-6', 'w-6');
     }
     expect(checkboxes[0]).toBeChecked(); // cn
@@ -1227,7 +1260,7 @@ describe('SettingsField', () => {
     );
 
     const helpTrigger = screen.getByRole('button', { name: '查看 自选股列表 配置说明' });
-    expect(helpTrigger).toHaveClass('h-11', 'w-11');
+    expect(helpTrigger).toHaveClass('h-6', 'w-6');
     fireEvent.mouseEnter(helpTrigger.parentElement!);
 
     const tooltip = screen.getByRole('tooltip');

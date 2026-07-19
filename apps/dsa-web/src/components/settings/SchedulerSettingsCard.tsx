@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
@@ -72,6 +72,7 @@ type SchedulerSettingsCardProps = {
   disabled: boolean;
   issueByKey: Record<string, ConfigValidationIssue[]>;
   statusRefreshToken: number;
+  overrideResetToken: string;
   onChange: (key: string, value: string) => void;
   onSchedulerStateChange?: (payload: {
     runtimeEnabled: boolean | null;
@@ -86,6 +87,7 @@ export const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   disabled,
   issueByKey,
   statusRefreshToken,
+  overrideResetToken,
   onChange,
   onSchedulerStateChange,
   t,
@@ -103,19 +105,35 @@ export const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [runNowSuccess, setRunNowSuccess] = useState('');
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
   const [isAddingTime, setIsAddingTime] = useState(false);
+  const statusRequestIdRef = useRef(0);
 
   const refreshSchedulerStatus = useCallback(async () => {
+    const requestId = statusRequestIdRef.current + 1;
+    statusRequestIdRef.current = requestId;
     setStatusError(null);
     setIsRefreshingStatus(true);
     try {
       const payload = await systemConfigApi.getSchedulerStatus();
+      if (statusRequestIdRef.current !== requestId) {
+        return;
+      }
       setStatus(payload);
+      setScheduleEnabledOverride((current) => current === payload.enabled ? null : current);
     } catch (error: unknown) {
+      if (statusRequestIdRef.current !== requestId) {
+        return;
+      }
       setStatusError(getParsedApiError(error));
     } finally {
-      setIsRefreshingStatus(false);
+      if (statusRequestIdRef.current === requestId) {
+        setIsRefreshingStatus(false);
+      }
     }
   }, []);
+
+  useEffect(() => {
+    setScheduleEnabledOverride(null);
+  }, [overrideResetToken]);
 
   useEffect(() => {
     if (!hasSchedulerSettings) {
@@ -277,7 +295,7 @@ export const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-9 shrink-0"
+                    className="shrink-0"
                     data-testid="scheduler-add-time-button"
                     disabled={disabled}
                     onClick={() => setIsAddingTime(true)}

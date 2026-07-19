@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { IconButton } from '../IconButton';
 
 describe('IconButton', () => {
-  it('keeps a 44px target around a compact visual and exposes a tooltip', () => {
+  it('matches the compact visual size and exposes a tooltip', () => {
     render(<IconButton aria-label="Close panel">x</IconButton>);
 
     const button = screen.getByRole('button', { name: 'Close panel' });
-    expect(button).toHaveClass('h-11', 'w-11');
-    expect(button.firstElementChild).toHaveClass('h-8', 'w-8');
+    expect(button).toHaveClass('h-7', 'w-7');
+    expect(button.firstElementChild).toHaveClass('h-7', 'w-7');
 
     fireEvent.mouseEnter(button.parentElement!);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Close panel');
@@ -36,7 +36,7 @@ describe('IconButton', () => {
     expect(button.querySelector('svg.animate-spin')).toBeInTheDocument();
   });
 
-  it('keeps the 44px target for a 20px compact visual', () => {
+  it('uses a 20px target for the extra-small visual', () => {
     render(
       <IconButton aria-label="Delete item" visualSize="xs" tooltip={false}>
         x
@@ -44,7 +44,7 @@ describe('IconButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Delete item' });
-    expect(button).toHaveClass('h-11', 'w-11');
+    expect(button).toHaveClass('h-5', 'w-5');
     expect(button.firstElementChild).toHaveClass('h-5', 'w-5');
   });
 });

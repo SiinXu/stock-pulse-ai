@@ -391,7 +391,7 @@ const AlertsPage: React.FC = () => {
           message={createSuccess}
           variant="success"
           action={(
-            <Button type="button" variant="ghost" size="md" className="h-auto min-h-11 px-1 text-sm underline" onClick={() => setCreateSuccess(null)}>
+            <Button type="button" variant="ghost" size="md" className="h-auto px-1 text-sm underline" onClick={() => setCreateSuccess(null)}>
               {t('common.close')}
             </Button>
           )}

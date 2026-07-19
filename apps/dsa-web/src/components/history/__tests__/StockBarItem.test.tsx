@@ -49,7 +49,7 @@ describe('StockBarItemComponent', () => {
 
     const deleteButton = screen.getByRole('button', { name: /删除 贵州茅台股票股份有限公司 历史记录/ });
     expect(deleteButton).toBeInTheDocument();
-    expect(deleteButton).toHaveClass('h-11', 'w-11');
+    expect(deleteButton).toHaveClass('h-5', 'w-5');
     expect(deleteButton.firstElementChild).toHaveClass('h-5', 'w-5');
     expect(openButton).not.toContainElement(deleteButton);
   });
@@ -64,6 +64,25 @@ describe('StockBarItemComponent', () => {
     );
 
     expect(screen.queryByRole('button', { name: /删除/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the market review in the same leading-marker layout', () => {
+    render(
+      <StockBarItemComponent
+        item={{
+          ...issue1600Item,
+          stockCode: 'MARKET',
+          stockName: 'A股市场复盘',
+        }}
+        isViewing={false}
+        isMarketReview
+        onClick={vi.fn()}
+      />,
+    );
+
+    const openButton = screen.getByRole('button', { name: /A股市场复盘 MARKET/ });
+    expect(openButton.querySelector('.bg-warning')).toBeInTheDocument();
+    expect(within(openButton).getByText('大盘')).toBeInTheDocument();
   });
 
   it('uses structured action before legacy operation advice', () => {

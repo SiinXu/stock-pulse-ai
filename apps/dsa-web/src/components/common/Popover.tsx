@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { getOverlayStyle, type OverlayLayer } from './overlayZ';
 
+const openPopoverStack: object[] = [];
+
 interface PopoverRenderProps {
   open: boolean;
   close: () => void;
@@ -44,6 +46,7 @@ export const Popover = ({
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const stackEntryRef = useRef<object>({});
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [shouldRestoreFocus, setShouldRestoreFocus] = useState(false);
@@ -90,14 +93,20 @@ export const Popover = ({
   }, [open, shouldRestoreFocus]);
 
   useEffect(() => {
-    if (!open || contentRole !== 'menu') return;
+    if (!open || (contentRole !== 'menu' && contentRole !== 'dialog')) return;
     const frame = requestAnimationFrame(() => {
       const content = contentRef.current;
       if (!content || content.contains(document.activeElement)) return;
-      const activeItem = content.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"], [role="menuitemcheckbox"][aria-checked="true"]');
-      const firstItem = content.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]');
-      const target = activeItem ?? firstItem;
-      content.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]').forEach((item) => {
+      const menuItems = content.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]');
+      const activeItem = contentRole === 'menu'
+        ? content.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"], [role="menuitemcheckbox"][aria-checked="true"]')
+        : null;
+      const firstItem = contentRole === 'menu' ? menuItems[0] : null;
+      const firstControl = contentRole === 'dialog'
+        ? content.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+        : null;
+      const target = activeItem ?? firstItem ?? firstControl;
+      menuItems.forEach((item) => {
         item.tabIndex = item === target ? 0 : -1;
       });
       target?.focus();
@@ -108,7 +117,11 @@ export const Popover = ({
   useEffect(() => {
     if (!open) return;
 
+    const stackEntry = stackEntryRef.current;
+    openPopoverStack.push(stackEntry);
+
     const handlePointerDown = (event: MouseEvent) => {
+      if (openPopoverStack[openPopoverStack.length - 1] !== stackEntry) return;
       const target = event.target;
       if (!(target instanceof Element)) {
         dismiss();
@@ -118,6 +131,7 @@ export const Popover = ({
       dismiss();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (openPopoverStack[openPopoverStack.length - 1] !== stackEntry) return;
       if (closeOnEscape && event.key === 'Escape') {
         event.preventDefault();
         close();
@@ -129,6 +143,8 @@ export const Popover = ({
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      const index = openPopoverStack.lastIndexOf(stackEntry);
+      if (index >= 0) openPopoverStack.splice(index, 1);
     };
   }, [close, closeOnEscape, dismiss, open]);
 

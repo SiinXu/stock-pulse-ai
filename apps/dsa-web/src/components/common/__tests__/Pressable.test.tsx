@@ -11,7 +11,7 @@ describe('Pressable', () => {
 
     const button = screen.getByRole('button', { name: 'Open row' });
     expect(button).toHaveAttribute('type', 'button');
-    expect(button).toHaveClass('min-h-11', 'min-w-11', 'focus-visible:ring-4');
+    expect(button).toHaveClass('min-h-6', 'min-w-6', 'focus-visible:ring-2');
     expect(ref.current).toBe(button);
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);

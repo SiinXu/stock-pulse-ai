@@ -26,8 +26,8 @@ describe('RunFlowNodeDetails', () => {
     expect(screen.queryByText('尝试次数')).not.toBeInTheDocument();
     expect(screen.queryByText('记录数')).not.toBeInTheDocument();
     const closeButton = screen.getByRole('button', { name: '关闭节点详情' });
-    expect(closeButton).toHaveClass('h-11', 'w-11');
-    expect(closeButton.querySelector('span')).toHaveClass('h-7', 'w-7');
+    expect(closeButton).toHaveClass('ui-touch-target', 'h-6', 'w-6');
+    expect(closeButton.querySelector('span')).toHaveClass('h-6', 'w-6');
   });
 
   it('renders ContextPack quality metadata as structured details instead of raw JSON', () => {

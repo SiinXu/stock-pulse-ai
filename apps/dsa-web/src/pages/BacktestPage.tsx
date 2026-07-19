@@ -793,6 +793,7 @@ const BacktestPage: React.FC = () => {
             ]}
             onChange={handleValidationModeChange}
             ariaLabel={text.evalWindow}
+            semantics="single-select"
           />
           <Button
             type="button"

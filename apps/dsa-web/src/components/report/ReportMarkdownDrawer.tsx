@@ -80,7 +80,7 @@ const ReportMarkdownChunkErrorState: React.FC<{
       variant="secondary"
       size="md"
       onClick={onRequestClose}
-      className="mt-4 min-h-11"
+      className="mt-4"
     >
       {dismissText}
     </Button>

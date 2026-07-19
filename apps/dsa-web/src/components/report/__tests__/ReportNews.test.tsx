@@ -41,7 +41,7 @@ describe('ReportNews', () => {
     expect(newsItem).toHaveClass('bg-card', 'rounded-lg');
 
     const refreshButton = screen.getByRole('button', { name: '刷新' });
-    expect(refreshButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(refreshButton).toHaveClass('ui-touch-target', 'h-6', 'min-w-6');
     fireEvent.click(refreshButton);
 
     await waitFor(() => {

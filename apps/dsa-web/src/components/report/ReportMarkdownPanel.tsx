@@ -153,7 +153,6 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
           variant="secondary"
           size="md"
           onClick={onRequestClose}
-          className="min-h-11"
         >
           {text.dismiss}
         </Button>

@@ -30,12 +30,12 @@ export const Card: React.FC<CardProps> = ({
   padding = 'md',
 }) => {
   const header = (title || subtitle || headerRight) ? (
-    <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         {subtitle ? <span className="label-uppercase">{subtitle}</span> : null}
         {title ? <h3 className="mt-1 text-lg font-semibold text-foreground">{title}</h3> : null}
       </div>
-      {headerRight ? <div className="shrink-0">{headerRight}</div> : null}
+      {headerRight ? <div className="min-w-0 max-w-full shrink-0">{headerRight}</div> : null}
     </div>
   ) : null;
   const paddingStyles = {

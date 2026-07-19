@@ -381,13 +381,13 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
               {t('settings.intelligentImportSelectionSummary', { valid: validCount, checked: checkedCount })}
             </span>
             <div className="flex flex-wrap gap-1">
-              <Button type="button" variant="ghost" size="sm" className="min-h-11 min-w-11 px-2" onClick={() => toggleAll(true)}>
+              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => toggleAll(true)}>
                 {t('common.selectAllCurrent')}
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="min-h-11 min-w-11 px-2" onClick={() => toggleAll(false)}>
+              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={() => toggleAll(false)}>
                 {t('common.cancel')}
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="min-h-11 min-w-11 px-2" onClick={clearAll}>
+              <Button type="button" variant="ghost" size="sm" className="px-2" onClick={clearAll}>
                 {t('settings.intelligentImportClear')}
               </Button>
             </div>

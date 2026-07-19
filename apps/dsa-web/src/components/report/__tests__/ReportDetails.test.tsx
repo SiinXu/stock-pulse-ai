@@ -45,14 +45,14 @@ describe('ReportDetails', () => {
 
     const rawToggle = screen.getByRole('button', { name: '原始分析结果' });
     const snapshotToggle = screen.getByRole('button', { name: '分析快照' });
-    expect(rawToggle).toHaveClass('h-11');
-    expect(snapshotToggle).toHaveClass('h-11');
+    expect(rawToggle).toHaveClass('ui-touch-target', 'h-9');
+    expect(snapshotToggle).toHaveClass('ui-touch-target', 'h-9');
     fireEvent.click(rawToggle);
     fireEvent.click(snapshotToggle);
 
     const [rawCopyButton, snapshotCopyButton] = screen.getAllByRole('button', { name: '复制' });
-    expect(rawCopyButton).toHaveClass('min-h-11', 'min-w-11');
-    expect(snapshotCopyButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(rawCopyButton).toHaveClass('ui-touch-target', 'h-6', 'min-w-6');
+    expect(snapshotCopyButton).toHaveClass('ui-touch-target', 'h-6', 'min-w-6');
 
     await act(async () => {
       fireEvent.click(rawCopyButton);

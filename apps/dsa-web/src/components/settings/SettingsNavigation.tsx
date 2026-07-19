@@ -170,6 +170,7 @@ export const SettingsViewTabs: React.FC<SettingsViewTabsProps> = ({
       }))}
       onChange={onSelectView}
       ariaLabel={tabsLabel}
+      getPanelId={(view) => `settings-${section}-${view}-panel`}
     />
   );
 };

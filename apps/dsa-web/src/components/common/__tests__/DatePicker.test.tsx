@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DatePicker } from '../DatePicker';
+import { Modal } from '../Modal';
 
 describe('DatePicker', () => {
   it('opens the shared calendar and commits a selected ISO date', () => {
@@ -45,5 +46,22 @@ describe('DatePicker', () => {
 
     expect(input).toHaveFocus();
     expect(screen.queryByRole('dialog', { name: '日期' })).not.toBeInTheDocument();
+  });
+
+  it('consumes Escape inside a parent modal without dismissing the modal', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal isOpen title="交易" onClose={onClose}>
+        <DatePicker value="2026-07-18" onChange={() => undefined} ariaLabel="交易日期" />
+      </Modal>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '打开 交易日期 日历' }));
+    const calendar = screen.getByRole('dialog', { name: '交易日期' });
+    fireEvent.keyDown(calendar, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: '交易日期' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '交易' })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -15,12 +15,12 @@ describe('ProfileMenu', () => {
     render(<ProfileMenu variant="mobile" />);
 
     const trigger = screen.getByRole('button', { name: 'StockPulse' });
-    expect(trigger).toHaveClass('h-11', 'w-11');
+    expect(trigger).toHaveClass('h-7', 'w-7');
     fireEvent.click(trigger);
 
-    const menu = screen.getByRole('menu', { name: 'StockPulse' });
-    expect(within(menu).getByRole('button', { name: 'Theme vertical' })).toBeInTheDocument();
-    expect(within(menu).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'StockPulse' });
+    expect(within(dialog).getByRole('button', { name: 'Theme vertical' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
     expect(mockThemeToggle).toHaveBeenCalledWith(expect.objectContaining({ menuLayout: 'vertical' }));
   });
 

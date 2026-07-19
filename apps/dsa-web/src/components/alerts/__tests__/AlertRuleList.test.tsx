@@ -276,7 +276,7 @@ describe('AlertRuleList', () => {
     renderList();
 
     fireEvent.click(screen.getAllByRole('button', { name: '测试' })[0]);
-    fireEvent.click(screen.getAllByRole('button', { name: '停用' })[0]);
+    fireEvent.click(screen.getByRole('switch', { name: '茅台价格突破 状态' }));
 
     expect(onTest).toHaveBeenCalledWith(rules[0]);
     expect(onToggleEnabled).toHaveBeenCalledWith(rules[0]);
@@ -286,7 +286,7 @@ describe('AlertRuleList', () => {
     renderList({ busyRules: { 1: 'toggle' } });
 
     expect(screen.getAllByRole('button', { name: '测试' })[0]).toBeDisabled();
-    expect(screen.getByRole('button', { name: '停用中' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('switch', { name: '茅台价格突破 状态' })).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('button', { name: '测试中' })).not.toBeInTheDocument();
   });
 

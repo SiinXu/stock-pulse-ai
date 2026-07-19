@@ -64,10 +64,11 @@ describe('StockHistoryTrendDrawer', () => {
 
     expect(screen.getAllByText('回避').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('买入')).not.toBeInTheDocument();
-    for (const rangeButton of ['全部历史', '近30天', '近90天'].map((name) => screen.getByRole('button', { name }))) {
-      expect(rangeButton).toHaveClass('min-h-11', 'min-w-11');
+    for (const rangeButton of ['全部历史', '近30天', '近90天'].map((name) => screen.getByRole('tab', { name }))) {
+      expect(rangeButton).toHaveClass('ui-touch-target', 'min-h-5');
     }
-    expect(screen.getByRole('button', { name: '查看报告' })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('tab', { name: '全部历史' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('button', { name: '查看报告' })).toHaveClass('h-6', 'min-w-6');
   });
 
   it('keeps full legacy operation advice when structured action is absent', () => {

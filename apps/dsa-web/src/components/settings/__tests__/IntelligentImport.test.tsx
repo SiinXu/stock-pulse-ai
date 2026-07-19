@@ -193,11 +193,11 @@ describe('IntelligentImport', () => {
 
     await screen.findByText('SZ000001');
     for (const actionName of ['全选当前', '取消', '清空']) {
-      expect(screen.getByRole('button', { name: actionName })).toHaveClass('min-h-11', 'min-w-11');
+      expect(screen.getByRole('button', { name: actionName })).toHaveClass('ui-touch-target', 'h-6', 'min-w-6');
     }
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox.closest('label')).toHaveClass('min-h-11');
     expect(checkbox).toHaveClass('h-6', 'w-6');
-    expect(screen.getByRole('button', { name: '删除' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: '删除' })).toHaveClass('ui-touch-target', 'h-7', 'w-7');
   });
 });

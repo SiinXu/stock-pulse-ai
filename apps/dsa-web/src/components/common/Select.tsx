@@ -17,7 +17,37 @@ import { useFixedPopup } from './useFixedPopup';
 export interface SelectOption {
   value: string;
   label: string;
+  swatch?: {
+    start: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+    end?: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+  };
 }
+
+const SELECT_SWATCH_STYLES = {
+  success: 'bg-success',
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+  neutral: 'bg-muted-text',
+} as const;
+
+const SelectOptionContent = ({ option }: { option: SelectOption }) => (
+  <span className="flex min-w-0 items-center gap-2">
+    {option.swatch ? (
+      <span
+        data-select-swatch="true"
+        aria-hidden="true"
+        className="flex h-4 w-4 shrink-0 overflow-hidden rounded-full border border-border"
+      >
+        <span className={cn('h-full flex-1', SELECT_SWATCH_STYLES[option.swatch.start])} />
+        {option.swatch.end ? (
+          <span className={cn('h-full flex-1', SELECT_SWATCH_STYLES[option.swatch.end])} />
+        ) : null}
+      </span>
+    ) : null}
+    <span className="truncate">{option.label}</span>
+  </span>
+);
 
 export interface SelectProps {
   id?: string;
@@ -216,15 +246,15 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(({
           onClick={() => (isOpen ? closeList() : openList())}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
+            'ui-touch-control flex min-h-9 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 text-xs text-foreground',
             'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text',
             error ? 'border-danger' : 'border-border',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
             triggerClassName,
           )}
         >
-          <span className={cn('truncate', !selectedOption && 'text-muted-text')}>
-            {selectedOption ? selectedOption.label : resolvedPlaceholder}
+          <span className={cn('min-w-0 truncate', !selectedOption && 'text-muted-text')}>
+            {selectedOption ? <SelectOptionContent option={selectedOption} /> : resolvedPlaceholder}
           </span>
           <ChevronDown
             className={cn('h-3.5 w-3.5 shrink-0 text-secondary-text transition-transform duration-200', isOpen && 'rotate-180')}
@@ -256,7 +286,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(({
                   index === activeIndex && 'bg-hover',
                 )}
               >
-                <span className="truncate">{option.label}</span>
+                <SelectOptionContent option={option} />
                 {option.value === value && (
                   <Check className="h-3.5 w-3.5 shrink-0 text-foreground" aria-hidden="true" />
                 )}

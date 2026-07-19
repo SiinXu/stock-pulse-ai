@@ -410,8 +410,8 @@ describe('BacktestPage', () => {
     render(<BacktestPage />);
 
     await screen.findByText('600519');
-    const oneDayButton = screen.getByRole('tab', { name: '1 日验证' });
-    expect(oneDayButton).toHaveClass('min-h-6');
+    const oneDayButton = screen.getByRole('radio', { name: '1 日验证' });
+    expect(oneDayButton).toHaveClass('ui-touch-target', 'min-h-5');
     expect(screen.getByText('高级选项')).toBeInTheDocument();
     const nextDayResults = createDeferred<{
       total: number;

@@ -91,7 +91,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             size="xl"
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="min-h-11"
           >
             {cancelText ?? t('common.cancel')}
           </Button>
@@ -101,7 +100,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             size="xl"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className="min-h-11"
           >
             {confirmText ?? t('common.confirm')}
           </Button>

@@ -62,10 +62,10 @@ describe('ConfirmDialog', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps both actions at least 44px tall for touch input', () => {
+  it('keeps compact actions on the shared touch-target contract', () => {
     renderDialog();
 
-    expect(screen.getByRole('button', { name: '确定' })).toHaveClass('min-h-11');
-    expect(screen.getByRole('button', { name: '取消' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '确定' })).toHaveClass('ui-touch-target', 'h-9');
+    expect(screen.getByRole('button', { name: '取消' })).toHaveClass('ui-touch-target', 'h-9');
   });
 });

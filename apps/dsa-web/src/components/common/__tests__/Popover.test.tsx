@@ -45,4 +45,33 @@ describe('Popover', () => {
     );
     expect(screen.queryByText('内容')).not.toBeInTheDocument();
   });
+
+  it('closes only the topmost nested popover on Escape', () => {
+    render(
+      <Popover
+        contentRole="dialog"
+        ariaLabel="Profile"
+        trigger={({ toggle }) => <button type="button" onClick={toggle}>Open profile</button>}
+      >
+        <Popover
+          contentRole="menu"
+          ariaLabel="Theme"
+          trigger={({ toggle }) => <button type="button" onClick={toggle}>Open theme</button>}
+        >
+          <button type="button" role="menuitem">Dark</button>
+        </Popover>
+      </Popover>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open theme' }));
+    expect(screen.getByRole('menu', { name: 'Theme' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu', { name: 'Theme' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Profile' })).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Profile' })).not.toBeInTheDocument();
+  });
 });

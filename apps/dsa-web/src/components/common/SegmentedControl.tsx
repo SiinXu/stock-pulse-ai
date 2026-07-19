@@ -16,6 +16,7 @@ interface SegmentedControlProps<T extends string> {
   ariaLabel: string;
   className?: string;
   getPanelId?: (value: T) => string | undefined;
+  semantics?: 'tabs' | 'single-select';
 }
 
 export function SegmentedControl<T extends string>({
@@ -25,8 +26,10 @@ export function SegmentedControl<T extends string>({
   ariaLabel,
   className,
   getPanelId,
+  semantics = 'tabs',
 }: SegmentedControlProps<T>) {
   const generatedId = useId();
+  const isTabList = semantics === 'tabs';
 
   const selectOption = (index: number) => {
     const option = options[index];
@@ -56,10 +59,10 @@ export function SegmentedControl<T extends string>({
 
   return (
     <div
-      role="tablist"
+      role={isTabList ? 'tablist' : 'radiogroup'}
       aria-label={ariaLabel}
       className={cn(
-        'segmented-control inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full p-1',
+        'segmented-control inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg p-0.5',
         className,
       )}
     >
@@ -70,13 +73,14 @@ export function SegmentedControl<T extends string>({
             key={option.value}
             id={`${generatedId}-${option.value}`}
             type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={getPanelId?.(option.value)}
+            role={isTabList ? 'tab' : 'radio'}
+            aria-selected={isTabList ? selected : undefined}
+            aria-checked={isTabList ? undefined : selected}
+            aria-controls={isTabList ? getPanelId?.(option.value) : undefined}
             tabIndex={selected ? 0 : -1}
             disabled={option.disabled}
             className={cn(
-              'segmented-control-tab inline-flex min-h-6 shrink-0 items-center justify-center gap-1.5 px-3 py-1 text-xs leading-[1.35] tracking-normal transition-colors',
+              'ui-touch-target segmented-control-tab inline-flex min-h-5 shrink-0 items-center justify-center gap-1 px-2.5 py-0.5 text-xs leading-[1.35] tracking-normal transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15',
               selected
                 ? 'bg-card font-medium text-foreground shadow-soft-card dark:bg-border'

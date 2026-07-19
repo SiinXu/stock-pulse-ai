@@ -32,9 +32,41 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const isFocusedRef = useRef(false);
   const isEscapeDismissedRef = useRef(false);
   const tooltipId = useId();
+  const describedElementRef = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
   const [resolvedSide, setResolvedSide] = useState<'top' | 'bottom'>(side);
   const [style, setStyle] = useState<TooltipStyle>({ top: 0, left: 0 });
+
+  const detachTooltipDescription = useCallback(() => {
+    const target = describedElementRef.current;
+    if (!target) {
+      return;
+    }
+
+    const remainingIds = (target.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter((id) => id && id !== tooltipId);
+    if (remainingIds.length > 0) {
+      target.setAttribute('aria-describedby', remainingIds.join(' '));
+    } else {
+      target.removeAttribute('aria-describedby');
+    }
+    describedElementRef.current = null;
+  }, [tooltipId]);
+
+  const attachTooltipDescription = useCallback((target: HTMLElement) => {
+    if (describedElementRef.current !== target) {
+      detachTooltipDescription();
+      describedElementRef.current = target;
+    }
+
+    const describedByIds = (target.getAttribute('aria-describedby') ?? '')
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!describedByIds.includes(tooltipId)) {
+      target.setAttribute('aria-describedby', [...describedByIds, tooltipId].join(' '));
+    }
+  }, [detachTooltipDescription, tooltipId]);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -88,6 +120,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   useEffect(() => {
     if (!open) {
+      detachTooltipDescription();
       return;
     }
 
@@ -99,7 +132,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [open, updatePosition]);
+  }, [detachTooltipDescription, open, updatePosition]);
+
+  useEffect(() => () => detachTooltipDescription(), [detachTooltipDescription]);
 
   if (!content) {
     return <>{children}</>;
@@ -123,14 +158,16 @@ export const Tooltip: React.FC<TooltipProps> = ({
             isEscapeDismissedRef.current = false;
           }
         }}
-        onFocus={() => {
+        onFocus={(event) => {
           isFocusedRef.current = true;
+          attachTooltipDescription(event.target as HTMLElement);
           if (!isEscapeDismissedRef.current) {
             setOpen(true);
           }
         }}
         onBlur={() => {
           isFocusedRef.current = false;
+          detachTooltipDescription();
           setOpen(false);
           if (!isHoveredRef.current) {
             isEscapeDismissedRef.current = false;
@@ -141,11 +178,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
             event.preventDefault();
             event.stopPropagation();
             isEscapeDismissedRef.current = true;
+            detachTooltipDescription();
             setOpen(false);
           }
         }}
         tabIndex={focusable ? 0 : undefined}
-        aria-describedby={open ? tooltipId : undefined}
+        aria-describedby={focusable && open ? tooltipId : undefined}
         data-dialog-popup={open ? 'true' : undefined}
       >
         {children}

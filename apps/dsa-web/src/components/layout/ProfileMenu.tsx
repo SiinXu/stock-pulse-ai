@@ -33,7 +33,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
         isCollapsed ? 'self-center' : isMobile ? '' : 'w-full',
         className,
       )}
-      contentRole="menu"
+      contentRole="dialog"
       ariaLabel={t('layout.appFallbackTitle')}
       layer="tooltip"
       contentClassName={cn(
@@ -47,7 +47,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       trigger={({ open, toggle }) => isMobile ? (
         <IconButton
           type="button"
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={t('layout.appFallbackTitle')}
           data-state={open ? 'open' : 'closed'}
@@ -60,7 +60,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({
       ) : (
         <Pressable
           type="button"
-          aria-haspopup="menu"
+          aria-haspopup="dialog"
           aria-expanded={open}
           aria-label={t('layout.appFallbackTitle')}
           data-state={open ? 'open' : 'closed'}

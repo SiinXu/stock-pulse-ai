@@ -169,7 +169,7 @@ export const TimePicker = ({
         aria-expanded={isOpen}
         onClick={() => (isOpen ? closePicker() : openPicker())}
         className={cn(
-          'flex h-11 min-h-11 min-w-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
+          'ui-touch-control flex h-11 min-h-11 min-w-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-transparent px-3 text-xs text-foreground',
           'transition-colors duration-200 hover:bg-hover focus:outline-none focus-visible:border-muted-text disabled:cursor-not-allowed disabled:opacity-60',
           ariaInvalid && 'border-danger/40 focus-visible:border-danger',
           triggerClassName,
@@ -186,6 +186,7 @@ export const TimePicker = ({
         <div
           ref={popupRef}
           role="dialog"
+          data-dialog-popup="true"
           aria-label={resolvedAriaLabel}
           style={getOverlayStyle('dropdown', popupStyle)}
           className="fixed w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"

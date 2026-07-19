@@ -109,7 +109,6 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
             type="button"
             variant="secondary"
             size="sm"
-            className="min-h-11 min-w-11"
             onClick={onEditRouting}
           >
             {text.editRouting}

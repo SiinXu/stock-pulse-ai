@@ -1588,7 +1588,7 @@ const HomePage: React.FC = () => {
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
-                className="h-9 min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
+                className="min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}

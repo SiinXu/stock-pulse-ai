@@ -560,6 +560,7 @@ const SettingsPage: React.FC = () => {
   const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null);
   const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
+  const [schedulerOverrideResetToken, setSchedulerOverrideResetToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
@@ -1746,10 +1747,11 @@ const SettingsPage: React.FC = () => {
       setLlmChannelResetSignal((current) => current + 1);
     }
     if (items.some((item) => item.key === 'SCHEDULE_ENABLED')) {
-      setSchedulerOverrideFromUi(schedulerRuntimeEnabled);
+      setSchedulerOverrideFromUi(null);
+      setSchedulerOverrideResetToken((current) => current + 1);
     }
     setGroupSaveState(group, { status: 'idle', fingerprint: '' });
-  }, [resetDraftKeys, schedulerRuntimeEnabled, setGroupSaveState]);
+  }, [resetDraftKeys, setGroupSaveState]);
 
   // First-run wizard commits its minimal config through the same save
   // transaction (validate + update + apply server payload), so channel keys are
@@ -2080,12 +2082,12 @@ const SettingsPage: React.FC = () => {
                 )}
                 <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
                 {state.status === 'failed' ? (
-                  <Button type="button" variant="ghost" size="md" className="h-auto min-h-11 min-w-11 px-1 underline" onClick={() => retryAutosaveGroup(group)}>
+                  <Button type="button" variant="ghost" size="md" className="h-auto px-1 underline" onClick={() => retryAutosaveGroup(group)}>
                     {settingsText.autosaveRetry}
                   </Button>
                 ) : null}
                 {state.status === 'failed' || state.status === 'conflicted' ? (
-                  <Button type="button" variant="ghost" size="md" className="h-auto min-h-11 min-w-11 px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+                  <Button type="button" variant="ghost" size="md" className="h-auto px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
                     {settingsText.autosaveRestore}
                   </Button>
                 ) : null}
@@ -2238,6 +2240,11 @@ const SettingsPage: React.FC = () => {
               language={uiLanguage}
               tabsLabel={t('settings.categoryNavTitle')}
             />
+            <div
+              id={`settings-${activeSection}-${activeView}-panel`}
+              role="tabpanel"
+              className="space-y-4"
+            >
             <SettingsErrorSummary
               entries={errorSummaryEntries}
               onJump={jumpToErrorField}
@@ -2348,6 +2355,7 @@ const SettingsPage: React.FC = () => {
                 disabled={isSaving || isLoading}
                 issueByKey={issueByKey}
                 statusRefreshToken={schedulerStatusRefreshToken}
+                overrideResetToken={`${configVersion}:${schedulerOverrideResetToken}`}
                 onSchedulerStateChange={handleSchedulerRuntimeStateChange}
                 onChange={setDraftValue}
                 t={t}
@@ -2689,7 +2697,7 @@ const SettingsPage: React.FC = () => {
                       type="button"
                       variant="ghost"
                       size="md"
-                      className="h-auto min-h-11 min-w-11 px-1 underline-offset-2 hover:underline"
+                      className="h-auto px-1 underline-offset-2 hover:underline"
                       onClick={() => selectSectionView('ai_models', 'reliability')}
                     >
                       {settingsText.editReliability}
@@ -2879,6 +2887,7 @@ const SettingsPage: React.FC = () => {
                 </form>
               </SettingsSectionCard>
             ) : null}
+            </div>
           </section>
         </div>
       )}

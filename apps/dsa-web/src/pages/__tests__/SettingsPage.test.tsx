@@ -793,6 +793,8 @@ describe('SettingsPage', () => {
       isFallbackVersion: false,
     });
     load.mockResolvedValue(true);
+    save.mockReset();
+    save.mockResolvedValue({ success: true });
     exportEnv.mockResolvedValue({
       content: 'STOCK_LIST=600519\n',
       configVersion: 'v1',
@@ -1917,7 +1919,7 @@ describe('SettingsPage', () => {
     expect(await screen.findByText(/自动保存失败/, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(resetDraftKeys).not.toHaveBeenCalled();
     const retryButton = screen.getByRole('button', { name: '重试' });
-    expect(retryButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(retryButton).toHaveClass('ui-touch-target', 'h-auto', 'min-w-7');
     fireEvent.click(retryButton);
 
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
@@ -1937,7 +1939,7 @@ describe('SettingsPage', () => {
 
     expect(await screen.findByText(/保存冲突/, {}, { timeout: 2000 })).toBeInTheDocument();
     const restoreButton = screen.getByRole('button', { name: '恢复服务器值' });
-    expect(restoreButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(restoreButton).toHaveClass('ui-touch-target', 'h-auto', 'min-w-7');
     fireEvent.click(restoreButton);
     expect(resetDraftKeys).toHaveBeenCalledWith(['WEBUI_PORT']);
   });
@@ -2217,7 +2219,7 @@ describe('SettingsPage', () => {
 
     // The jump link routes to the Reliability view (the canonical fallback editor).
     const reliabilityButton = screen.getByRole('button', { name: /前往可靠性设置/ });
-    expect(reliabilityButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(reliabilityButton).toHaveClass('ui-touch-target', 'h-auto', 'min-w-7');
     fireEvent.click(reliabilityButton);
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('ai_models');

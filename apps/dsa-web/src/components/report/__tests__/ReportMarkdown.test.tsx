@@ -49,7 +49,7 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: '复制 Markdown 源码' });
     expect(copyButton).toBeDisabled();
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('ui-touch-target', 'h-7');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
     expect(copyButton).toBeEnabled();
@@ -76,8 +76,8 @@ describe('ReportMarkdown', () => {
 
     const copyButton = await screen.findByRole('button', { name: 'Copy Markdown Source' });
     expect(copyButton).toBeDisabled();
-    expect(copyButton).toHaveClass('h-11', 'w-11');
-    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toHaveClass('h-11', 'w-11');
+    expect(copyButton).toHaveClass('ui-touch-target', 'h-7', 'w-7');
+    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toHaveClass('ui-touch-target', 'h-7', 'w-7');
     markdown.resolve('# 中文报告');
     expect(await screen.findByRole('heading', { name: '中文报告' })).toBeInTheDocument();
     expect(copyButton).toBeEnabled();

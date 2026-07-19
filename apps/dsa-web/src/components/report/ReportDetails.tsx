@@ -77,7 +77,7 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => copyToClipboard(jsonStr, panel)}
-            className="min-h-11 min-w-11 text-xs"
+            className="text-xs"
             aria-label={copiedPanels[panel] ? text.copied : text.copy}
           >
             {copiedPanels[panel] ? text.copied : text.copy}

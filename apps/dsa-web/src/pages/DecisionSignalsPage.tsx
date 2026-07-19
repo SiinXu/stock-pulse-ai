@@ -1489,7 +1489,7 @@ const DecisionSignalsPage: React.FC = () => {
                     type="button"
                     variant="outline"
                     size="xl"
-                    className="h-auto min-h-11 whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
+                    className="h-auto whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);
@@ -1526,6 +1526,7 @@ const DecisionSignalsPage: React.FC = () => {
         >
           <Card padding="sm" variant="bordered" className="bg-card/60">
           <ResponsiveFilterPanel
+            className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0"
             filterLabel={t('decisionSignals.filter')}
             drawerTitle={t('decisionSignals.filter')}
             applyLabel={t('decisionSignals.filter')}
@@ -1734,6 +1735,7 @@ const DecisionSignalsPage: React.FC = () => {
             ) : undefined}
           >
             <ResponsiveFilterPanel
+            className="xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] xl:items-end xl:gap-2 xl:space-y-0"
             filterLabel={t('decisionSignals.timelineSearch')}
             drawerTitle={t('decisionSignals.timelineTitle')}
             applyLabel={t('decisionSignals.timelineSearch')}

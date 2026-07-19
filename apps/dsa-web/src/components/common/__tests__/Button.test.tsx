@@ -4,11 +4,11 @@ import { Button } from '../Button';
 
 describe('Button', () => {
   it.each([
-    ['xsm', 'h-6', 'min-w-6'],
-    ['sm', 'h-8', 'min-w-8'],
-    ['md', 'h-9', 'min-w-9'],
-    ['lg', 'h-10', 'min-w-10'],
-    ['xl', 'h-11', 'min-w-11'],
+    ['xsm', 'h-5', 'min-w-5'],
+    ['sm', 'h-6', 'min-w-6'],
+    ['md', 'h-7', 'min-w-7'],
+    ['lg', 'h-8', 'min-w-8'],
+    ['xl', 'h-9', 'min-w-9'],
   ] as const)(
     'uses the compact shared dimensions for the %s variant',
     (size, heightClass, widthClass) => {
@@ -23,9 +23,9 @@ describe('Button', () => {
     render(<Button size="icon" aria-label="Open details">+</Button>);
 
     expect(screen.getByRole('button', { name: 'Open details' })).toHaveClass(
-      'h-9',
-      'w-9',
-      'min-w-9',
+      'h-5',
+      'w-5',
+      'min-w-5',
       'p-0',
     );
   });
@@ -33,7 +33,7 @@ describe('Button', () => {
   it('renders children', () => {
     render(<Button>Click me</Button>);
 
-    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-lg');
+    expect(screen.getByRole('button', { name: 'Click me' })).toHaveClass('rounded-md');
   });
 
   it('forwards the native button ref', () => {

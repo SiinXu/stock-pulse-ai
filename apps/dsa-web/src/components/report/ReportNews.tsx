@@ -75,7 +75,7 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
               variant="ghost"
               size="sm"
               onClick={() => void fetchNews()}
-              className="min-h-11 min-w-11 text-xs"
+              className="text-xs"
               aria-label={t('usage.refresh')}
             >
               {t('usage.refresh')}

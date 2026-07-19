@@ -289,7 +289,7 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('h-9');
+    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('ui-touch-target', 'h-7');
     expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-9');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
@@ -2021,15 +2021,15 @@ describe('HomePage', () => {
     const historyTrendButton = await screen.findByRole('button', { name: '历史趋势' });
     fireEvent.click(historyTrendButton);
 
-    const range30Button = await screen.findByRole('button', { name: '近30天' });
+    const range30Button = await screen.findByRole('tab', { name: '近30天' });
     fireEvent.click(range30Button);
 
     await waitFor(() => {
       expect(screen.getByText('暂无更多同股历史分析')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: '全部历史' })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: '全部历史' })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '全部历史' }));
+    fireEvent.click(screen.getByRole('tab', { name: '全部历史' }));
 
     await waitFor(() => {
       expect(screen.queryByText('暂无更多同股历史分析')).not.toBeInTheDocument();

@@ -218,7 +218,7 @@ describe('AlertsPage', () => {
       }));
     });
     expect(await screen.findByText(/已创建告警规则/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('min-h-11');
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveClass('ui-touch-target', 'min-w-7');
   });
 
   it('keeps create form values when create API fails', async () => {
@@ -254,15 +254,17 @@ describe('AlertsPage', () => {
 
     const firstRow = (await screen.findByText('茅台价格突破')).closest('tr') as HTMLElement;
     const secondRow = screen.getByText('苹果价格突破').closest('tr') as HTMLElement;
-    fireEvent.click(within(firstRow).getByRole('button', { name: '停用' }));
+    const firstSwitch = within(firstRow).getByRole('switch', { name: '茅台价格突破 状态' });
+    fireEvent.click(firstSwitch);
     fireEvent.click(within(secondRow).getByRole('button', { name: '测试' }));
-    expect(within(firstRow).getByRole('button', { name: '停用中' })).toBeDisabled();
+    expect(firstSwitch).toBeDisabled();
+    expect(firstSwitch).toHaveAttribute('aria-busy', 'true');
     expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
 
     await act(async () => {
       disableRequest.resolve({ ...rule, enabled: false });
     });
-    await waitFor(() => expect(within(firstRow).queryByRole('button', { name: '停用中' })).not.toBeInTheDocument());
+    await waitFor(() => expect(firstSwitch).not.toHaveAttribute('aria-busy'));
     expect(within(secondRow).getByRole('button', { name: '测试中' })).toBeDisabled();
 
     await act(async () => {

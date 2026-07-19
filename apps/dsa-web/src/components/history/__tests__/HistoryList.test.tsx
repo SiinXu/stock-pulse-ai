@@ -74,7 +74,7 @@ describe('HistoryList', () => {
     expect(onItemClick).toHaveBeenCalledWith(1);
 
     const itemCheckbox = screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' });
-    expect(itemCheckbox.closest('label')).toHaveClass('h-11', 'w-11');
+    expect(itemCheckbox.closest('label')).toHaveClass('min-h-6', 'min-w-6');
     expect(itemCheckbox.parentElement).toHaveClass('h-6', 'w-6');
     fireEvent.click(itemCheckbox);
     expect(onToggleItemSelection).toHaveBeenCalledWith(1);
@@ -265,7 +265,7 @@ describe('HistoryList', () => {
       />,
     );
 
-    expect(screen.getByRole('checkbox', { name: '全选当前已加载历史记录' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '全选当前已加载历史记录' }).closest('label')).toHaveClass('min-h-8');
     fireEvent.click(screen.getByText('全选当前'));
 
     expect(onToggleSelectAll).toHaveBeenCalledTimes(1);

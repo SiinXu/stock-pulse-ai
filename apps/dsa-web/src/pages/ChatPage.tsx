@@ -852,7 +852,7 @@ const ChatPage: React.FC = () => {
         variant="ghost"
         size="md"
         onClick={() => toggleThinking(msg.id)}
-        className="mb-2 h-auto min-h-11 w-full justify-start px-0 text-left text-xs text-muted-text hover:text-secondary-text"
+        className="mb-2 h-auto w-full justify-start px-0 text-left text-xs text-muted-text hover:text-secondary-text"
       >
         <ChevronRight
           className={`h-3 w-3 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -1195,7 +1195,7 @@ const ChatPage: React.FC = () => {
                           variant="secondary"
                           size="sm"
                           onClick={() => handleQuickQuestion(q)}
-                          className="h-auto min-h-11 max-w-full whitespace-normal text-left"
+                          className="h-auto max-w-full whitespace-normal text-left"
                         >
                           {q.label}
                         </Button>

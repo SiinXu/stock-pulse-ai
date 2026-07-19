@@ -99,7 +99,7 @@ describe('LoginPage', () => {
     expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
   });
 
-  it('does not override login theme tokens inline so light mode can take effect', () => {
+  it('does not override login theme tokens or hardcode decorative colors', () => {
     useAuthMock.mockReturnValue({
       login: vi.fn(),
       passwordSet: true,
@@ -111,6 +111,10 @@ describe('LoginPage', () => {
 
     expect(pageRoot).not.toBeNull();
     expect(pageRoot?.getAttribute('style') ?? '').not.toContain('--login-bg-main');
+    expect(pageRoot).toHaveClass('bg-[var(--login-bg-main)]');
+    for (const layer of Array.from(pageRoot?.children ?? []).filter((child) => child.getAttribute('aria-hidden') === 'true')) {
+      expect(layer.getAttribute('class') ?? '').not.toMatch(/#[\da-f]{3,8}|blur-\[/i);
+    }
   });
 
   it('presents the current StockPulse brand as an accessible heading', () => {

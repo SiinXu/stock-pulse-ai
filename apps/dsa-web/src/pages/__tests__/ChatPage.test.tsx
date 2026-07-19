@@ -643,7 +643,7 @@ describe('ChatPage', () => {
 
     const mobileToggle = await screen.findByRole('button', { name: '展开策略选择' });
     const skillPanel = screen.getByTestId('chat-skill-picker-panel');
-    expect(mobileToggle).toHaveClass('h-9');
+    expect(mobileToggle).toHaveClass('ui-touch-target', 'h-7');
     expect(screen.getByRole('textbox', { name: '消息输入框' })).toHaveClass('min-h-11');
     expect(mobileToggle).toHaveAttribute('aria-expanded', 'false');
     expect(skillPanel).toHaveClass('hidden');
@@ -653,8 +653,8 @@ describe('ChatPage', () => {
     expect(screen.getByRole('button', { name: '收起策略选择' })).toHaveAttribute('aria-expanded', 'true');
     expect(skillPanel).not.toHaveClass('hidden');
     expect(skillPanel).toHaveClass('flex');
-    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('min-h-11');
+    expect(screen.getByRole('checkbox', { name: '通用分析' }).closest('label')).toHaveClass('ui-touch-target', 'min-h-8');
+    expect(screen.getByRole('checkbox', { name: '均线金叉' }).closest('label')).toHaveClass('ui-touch-target', 'min-h-8');
 
     fireEvent.click(screen.getByRole('checkbox', { name: '均线金叉' }));
     fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {

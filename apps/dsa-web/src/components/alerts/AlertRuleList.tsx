@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import { Bell, Trash2 } from 'lucide-react';
-import { Badge, Button, Card, ConfirmDialog, DataTable, Pagination, Select, StatePanel, type DataTableColumn } from '../common';
+import { Badge, Button, Card, ConfirmDialog, DataTable, Pagination, Select, StatePanel, Switch, type DataTableColumn } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -178,9 +178,18 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       id: 'status',
       header: text.status,
       cell: (rule) => (
-        <Badge variant={rule.enabled ? 'success' : 'default'}>
-          {rule.enabled ? text.enabled : text.disabled}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={rule.enabled}
+            onCheckedChange={() => onToggleEnabled(rule)}
+            disabled={isLoading || isRuleBusy(rule)}
+            aria-label={`${rule.name} ${text.status}`}
+            aria-busy={isRuleActionBusy(rule, 'toggle') || undefined}
+          />
+          <span className="text-xs text-secondary-text">
+            {rule.enabled ? text.enabled : text.disabled}
+          </span>
+        </div>
       ),
       priority: 'primary',
       cellClassName: 'align-top',
@@ -227,16 +236,6 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           </Button>
           <Button
             size="xsm"
-            variant={rule.enabled ? 'secondary' : 'primary'}
-            onClick={() => onToggleEnabled(rule)}
-            isLoading={isRuleActionBusy(rule, 'toggle')}
-            loadingText={rule.enabled ? text.disabling : text.enabling}
-            disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'toggle'))}
-          >
-            {rule.enabled ? text.disable : text.enable}
-          </Button>
-          <Button
-            size="xsm"
             variant="danger-subtle"
             aria-label={formatUiText(text.deleteAria, { name: rule.name })}
             onClick={() => setPendingDelete(rule)}
@@ -254,29 +253,34 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
     <Card
       title={text.title}
       subtitle={formatUiText(text.subtitle, { total })}
+      headerRight={(
+        <div className="flex max-w-full flex-wrap items-end justify-end gap-2">
+          <Select
+            ariaLabel={text.enabledFilter}
+            value={enabledFilter}
+            options={ALERT_ENABLED_FILTER_OPTIONS[language]}
+            onChange={(value) => {
+              onEnabledFilterChange(value as AlertRuleEnabledFilter);
+            }}
+            width="full"
+            className="w-32"
+          />
+          <Select
+            ariaLabel={text.alertTypeFilter}
+            value={alertTypeFilter}
+            options={ALERT_TYPE_FILTER_OPTIONS[language]}
+            onChange={(value) => {
+              onAlertTypeFilterChange(value as AlertTypeFilter);
+            }}
+            width="full"
+            className="w-44 max-w-full"
+          />
+        </div>
+      )}
       variant="bordered"
       padding="md"
       className={className}
     >
-      <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <Select
-          label={text.enabledFilter}
-          value={enabledFilter}
-          options={ALERT_ENABLED_FILTER_OPTIONS[language]}
-          onChange={(value) => {
-            onEnabledFilterChange(value as AlertRuleEnabledFilter);
-          }}
-        />
-        <Select
-          label={text.alertTypeFilter}
-          value={alertTypeFilter}
-          options={ALERT_TYPE_FILTER_OPTIONS[language]}
-          onChange={(value) => {
-            onAlertTypeFilterChange(value as AlertTypeFilter);
-          }}
-        />
-      </div>
-
       <DataTable
         ariaLabel={text.title}
         columns={columns}
@@ -287,7 +291,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         minWidthClassName="min-w-[38rem] lg:min-w-240"
         rowClassName="align-top"
         emptyState={(
-          <div className="flex min-h-56 flex-1 items-center justify-center">
+          <div className="flex min-h-40 flex-1 items-center justify-center">
           <StatePanel status="empty"
             icon={<Bell className="h-6 w-6" />}
             title={text.emptyTitle}
@@ -297,12 +301,14 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         )}
       />
 
-      <Pagination
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={onPageChange}
-        className="mt-5"
-      />
+      {totalPages > 1 ? (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          className="mt-5"
+        />
+      ) : null}
 
       <ConfirmDialog
         isOpen={pendingDelete != null}

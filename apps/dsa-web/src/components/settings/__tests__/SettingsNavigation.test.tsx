@@ -132,7 +132,7 @@ describe('SettingsViewTabs', () => {
     ]);
     expect(screen.getByRole('tab', { name: 'Task Routing' })).toHaveAttribute('aria-selected', 'true');
     for (const tab of tabs) {
-      expect(tab).toHaveClass('min-h-6', 'segmented-control-tab');
+      expect(tab).toHaveClass('ui-touch-target', 'min-h-5', 'segmented-control-tab');
     }
   });
 

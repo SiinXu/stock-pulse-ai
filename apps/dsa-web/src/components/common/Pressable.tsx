@@ -18,7 +18,7 @@ export const Pressable = forwardRef<HTMLButtonElement, PressableProps>(({
     ref={ref}
     type={type}
     className={cn(
-      'min-h-11 min-w-11 cursor-pointer focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15',
+      'ui-touch-target min-h-6 min-w-6 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15',
       'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
       className,
     )}

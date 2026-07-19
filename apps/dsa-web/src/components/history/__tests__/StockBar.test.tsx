@@ -16,7 +16,7 @@ const item: StockBarItem = {
 };
 
 describe('StockBar', () => {
-  it('uses 44px labels for batch and row selection checkboxes', () => {
+  it('uses compact labels for batch and row selection checkboxes', () => {
     render(
       <StockBar
         items={[item]}
@@ -26,7 +26,7 @@ describe('StockBar', () => {
       />,
     );
 
-    expect(screen.getByRole('checkbox', { name: '全选当前个股' }).closest('label')).toHaveClass('min-h-11');
-    expect(screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' }).closest('label')).toHaveClass('h-11', 'w-11', 'justify-start');
+    expect(screen.getByRole('checkbox', { name: '全选当前个股' }).closest('label')).toHaveClass('min-h-8');
+    expect(screen.getByRole('checkbox', { name: '选择 贵州茅台 历史记录' }).closest('label')).toHaveClass('min-h-6', 'min-w-6');
   });
 });

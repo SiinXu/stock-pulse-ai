@@ -56,8 +56,8 @@ describe('HomeStockWorkspace', () => {
     expect(screen.getByRole('combobox', { name: '工作台视图切换' })).toHaveClass('rounded-lg');
     expect(screen.getByRole('searchbox', { name: '搜索' }).parentElement).toHaveClass('h-11', 'sm:h-7');
     expect(screen.getByRole('textbox', { name: '添加代码，如 600519' })).toHaveClass('h-9');
-    expect(screen.getByRole('button', { name: '添加自选股' })).toHaveClass('h-9', 'w-9');
-    expect(screen.getByRole('button', { name: '从自选股移除 600519' })).toHaveClass('h-9', 'w-9');
+    expect(screen.getByRole('button', { name: '添加自选股' })).toHaveClass('ui-touch-target', 'h-5', 'w-5');
+    expect(screen.getByRole('button', { name: '从自选股移除 600519' })).toHaveClass('ui-touch-target', 'h-5', 'w-5');
   });
 
   it('keeps the busy add action spinner-only inside its fixed icon target', () => {
@@ -86,7 +86,7 @@ describe('HomeStockWorkspace', () => {
     );
 
     const addButton = screen.getByRole('button', { name: '添加自选股' });
-    expect(addButton).toHaveClass('h-9', 'w-9');
+    expect(addButton).toHaveClass('ui-touch-target', 'h-5', 'w-5');
     expect(addButton).toHaveAttribute('aria-busy', 'true');
     expect(addButton.textContent).toBe('');
     expect(addButton.querySelector('svg.animate-spin')).toBeInTheDocument();

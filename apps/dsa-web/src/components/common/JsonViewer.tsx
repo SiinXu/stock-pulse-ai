@@ -111,7 +111,7 @@ export const JsonViewer: React.FC<JsonViewerProps> = ({
             size="xl"
             onClick={handleCopy}
             aria-label={copied ? t('common.copied') : t('common.copy')}
-            className="absolute right-2 top-2 z-10 min-h-11 min-w-11 px-3 text-xs"
+            className="absolute right-2 top-2 z-10 px-3 text-xs"
           >
             {copied ? t('common.copied') : t('common.copy')}
           </Button>

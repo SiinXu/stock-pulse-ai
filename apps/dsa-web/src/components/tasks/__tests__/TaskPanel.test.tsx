@@ -118,7 +118,7 @@ describe('TaskPanel', () => {
     );
 
     const runFlowButton = screen.getByRole('button', { name: '查看 贵州茅台 运行流' });
-    expect(runFlowButton).toHaveClass('h-11', 'w-11', 'min-w-11');
+    expect(runFlowButton).toHaveClass('h-5', 'w-5');
     fireEvent.click(runFlowButton);
 
     expect(onOpenRunFlow).toHaveBeenCalledWith(baseTask);
@@ -160,7 +160,7 @@ describe('TaskPanel', () => {
     expect(screen.getByLabelText('任务状态：已完成')).toBeInTheDocument();
 
     const dismissButton = screen.getByRole('button', { name: '关闭 贵州茅台 任务' });
-    expect(dismissButton).toHaveClass('h-11', 'w-11', 'min-w-11');
+    expect(dismissButton).toHaveClass('h-5', 'w-5');
     fireEvent.click(dismissButton);
     expect(onDismiss).toHaveBeenCalledWith('task-1');
   });

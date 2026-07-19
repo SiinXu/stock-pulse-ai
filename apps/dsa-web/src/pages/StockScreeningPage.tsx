@@ -37,7 +37,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Badge, Button, DataTable, InlineAlert, Input, PageHeader, ResponsiveFilterPanel, Select, StatePanel } from '../components/common';
+import { AppPage, Badge, Button, DataTable, InlineAlert, Input, Modal, PageHeader, Select, StatePanel } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
@@ -525,7 +525,7 @@ const MiniSparkline: React.FC<{ score?: number | null; selected?: boolean }> = (
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const text = SCREENING_TEXT[language];
   const markets = useMemo(() => [{ id: 'cn', label: text.marketCn }], [text.marketCn]);
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
@@ -539,6 +539,7 @@ const StockScreeningPage: React.FC = () => {
   const [maxResults, setMaxResults] = useState(initialRunParameters.maxResults);
   const [maxResultsDraft, setMaxResultsDraft] = useState(String(initialRunParameters.maxResults));
   const [maxResultsError, setMaxResultsError] = useState('');
+  const [configurationOpen, setConfigurationOpen] = useState(false);
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
@@ -944,12 +945,12 @@ const StockScreeningPage: React.FC = () => {
     setMaxResultsError('');
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<boolean> => {
     const parsedMaxResults = Number(maxResultsDraft);
     if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
       setMaxResultsError(text.resultCountError);
       document.getElementById('screening-max-results')?.focus();
-      return;
+      return false;
     }
     setMaxResults(parsedMaxResults);
     setMaxResultsError('');
@@ -960,7 +961,7 @@ const StockScreeningPage: React.FC = () => {
     setTaskMessage(text.submittingTask);
     try {
       const task = await alphasiftApi.startScreen({ market, strategy, maxResults: parsedMaxResults });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return false;
       persistScreenTask({
         taskId: task.taskId,
         market,
@@ -970,12 +971,14 @@ const StockScreeningPage: React.FC = () => {
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
       setTaskMessage(formatTaskMessage(task, language));
+      return true;
     } catch (err) {
       if (mountedRef.current) {
         setCandidates([]);
         setLoading(false);
         setError(toApiErrorMessage(err, text.taskSubmitFailed, language));
       }
+      return false;
     }
   };
 
@@ -1252,7 +1255,7 @@ const StockScreeningPage: React.FC = () => {
                                 variant="secondary"
                                 size="sm"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="h-auto min-h-11 min-w-11 px-2 text-xs"
+                                className="h-auto px-2 text-xs"
                                 onClick={() => handleAnalyzeHotspotStock(stock)}
                               >
                                 <Play className="h-3 w-3" />
@@ -1289,7 +1292,7 @@ const StockScreeningPage: React.FC = () => {
               {selectedStrategyDisplay?.description || text.strategyDescription}
             </p>
           </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
             <Select
               value={strategy}
               onChange={handleStrategyChange}
@@ -1305,65 +1308,79 @@ const StockScreeningPage: React.FC = () => {
             <span className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
               {selectedStrategyTag}
             </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setConfigurationOpen(true)}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              {text.parameters}
+            </Button>
           </div>
         </div>
         {strategyLoadError ? <p role="alert" className="mt-2 text-xs text-danger">{strategyLoadError}</p> : null}
       </section>
 
-      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
-        <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
-          {text.parameters}
+      <Modal
+        isOpen={configurationOpen}
+        onClose={() => setConfigurationOpen(false)}
+        title={text.parameters}
+        description={selectedStrategyDisplay?.description || text.strategyDescription}
+        closeDisabled={loading}
+        footer={(
+          <>
+            <Button type="button" variant="ghost" size="sm" disabled={loading} onClick={() => setConfigurationOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!isScreeningEnabled || loading}
+              isLoading={loading}
+              loadingText={text.screening}
+              onClick={() => {
+                void handleSubmit().then((started) => {
+                  if (started) setConfigurationOpen(false);
+                });
+              }}
+            >
+              <Play className="h-3.5 w-3.5" aria-hidden="true" />
+              {text.run}
+            </Button>
+          </>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            label={text.market}
+            value={market}
+            disabled={loading}
+            onChange={handleMarketChange}
+            options={markets.map((item) => ({ value: item.id, label: item.label }))}
+          />
+          <Input
+            label={text.strategyParameter}
+            className="rounded-xl bg-surface-1 text-sm focus:border-primary"
+            value={strategy}
+            disabled={loading}
+            onChange={(event) => handleStrategyChange(event.target.value)}
+          />
+          <Input
+            id="screening-max-results"
+            label={text.resultCount}
+            className="rounded-xl bg-surface-1 text-sm focus:border-primary sm:col-span-2"
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={maxResultsDraft}
+            error={maxResultsError}
+            disabled={loading}
+            onChange={(event) => handleMaxResultsChange(event.target.value)}
+          />
         </div>
-
-        <ResponsiveFilterPanel
-          filterLabel={text.parameters}
-          drawerTitle={text.parameters}
-          applyLabel={text.run}
-          onApply={() => void handleSubmit()}
-          applyDisabled={!isScreeningEnabled || loading}
-          isApplying={loading}
-          loadingLabel={text.screening}
-          activeCount={Number(maxResultsDraft !== String(maxResults))}
-          basicClassName="sm:grid-cols-2 [&>*]:min-w-0 [&>*]:!w-full"
-          advancedClassName="lg:grid-cols-[minmax(0,180px)] [&>*]:min-w-0 [&>*]:!w-full"
-          drawerAdvancedClassName="content-start [&>*]:min-w-0 [&>*]:!w-full"
-          basic={(
-            <>
-              <Select
-                label={text.market}
-                value={market}
-                disabled={loading}
-                onChange={handleMarketChange}
-                options={markets.map((item) => ({ value: item.id, label: item.label }))}
-              />
-
-              <Input
-                label={text.strategyParameter}
-                className="rounded-xl bg-surface-1 text-sm focus:border-primary"
-                value={strategy}
-                disabled={loading}
-                onChange={(event) => handleStrategyChange(event.target.value)}
-              />
-            </>
-          )}
-          advanced={(
-            <Input
-              id="screening-max-results"
-              label={text.resultCount}
-              className="rounded-xl bg-surface-1 text-sm focus:border-primary"
-              type="number"
-              min={1}
-              max={100}
-              step={1}
-              value={maxResultsDraft}
-              error={maxResultsError}
-              disabled={loading}
-              onChange={(event) => handleMaxResultsChange(event.target.value)}
-            />
-          )}
-        />
-      </section>
+      </Modal>
 
       <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1465,7 +1482,7 @@ const StockScreeningPage: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="xl"
-                    className="h-11 min-h-11 min-w-11 px-2 text-primary shadow-none hover:text-foreground"
+                    className="px-2 text-primary shadow-none hover:text-foreground"
                     aria-expanded={expanded}
                     onClick={() => setExpandedCode(expanded ? null : item.code)}
                   >

@@ -9,6 +9,23 @@ if (!HTMLElement.prototype.scrollIntoView) {
 }
 
 describe('Select', () => {
+  it('renders a semantic swatch in both the trigger and matching option', () => {
+    render(
+      <Select
+        ariaLabel="Color scheme"
+        value="green_up"
+        onChange={() => undefined}
+        options={[
+          { value: 'green_up', label: 'Green up', swatch: { start: 'success', end: 'danger' } },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole('combobox', { name: 'Color scheme' }).querySelector('[data-select-swatch="true"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Color scheme' }));
+    expect(screen.getByRole('option', { name: 'Green up' }).querySelector('[data-select-swatch="true"]')).toBeInTheDocument();
+  });
+
   it('associates validation errors with the combobox trigger', () => {
     render(
       <>

@@ -66,7 +66,7 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
           type="button"
           variant="ghost"
           size="sm"
-          className="mt-1 !min-h-11 !min-w-11 border-0 text-[hsl(var(--color-danger-alert-text))] hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)] hover:text-[hsl(var(--color-danger-alert-text))]"
+          className="mt-1 border-0 text-[hsl(var(--color-danger-alert-text))] hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)] hover:text-[hsl(var(--color-danger-alert-text))]"
           onClick={onAction}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />

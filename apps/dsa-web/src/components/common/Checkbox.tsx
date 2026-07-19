@@ -8,7 +8,7 @@ export interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputE
 }
 
 /**
- * Shared checkbox matching the 24px Figma control and preserving native input semantics.
+ * Shared compact checkbox preserving native input semantics.
  */
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(({
   label,
@@ -24,10 +24,10 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(({
     <label
       htmlFor={checkboxId}
       className={cn(
-        'flex items-center gap-2 select-none',
+        'ui-touch-target flex items-center gap-2 select-none',
+        'min-h-6 min-w-6',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         containerClassName,
-        'min-h-11 min-w-11',
       )}
     >
       <span className="relative h-6 w-6 shrink-0">

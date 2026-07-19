@@ -39,7 +39,7 @@ describe('JsonViewer', () => {
     expect(screen.getByText('true')).toHaveClass('text-secondary-text');
     expect(screen.getByText('82')).toHaveClass('text-warning');
     expect(screen.getByText('"ok"')).toHaveClass('text-success');
-    expect(screen.getByRole('button', { name: /^(?:复制|Copy)$/ })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('button', { name: /^(?:复制|Copy)$/ })).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
   });
 
   it('supports an icon-only copy action without changing its accessible name', () => {

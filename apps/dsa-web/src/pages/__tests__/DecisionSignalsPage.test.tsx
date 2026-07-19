@@ -635,7 +635,7 @@ describe('DecisionSignalsPage', () => {
     vi.mocked(decisionSignalsApi.list).mockClear();
 
     const reassessButton = screen.getByRole('button', { name: '生成预览' });
-    expect(reassessButton).toHaveClass('h-11', 'min-w-11');
+    expect(reassessButton).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
     fireEvent.click(reassessButton);
 
     await waitFor(() => {
@@ -1139,7 +1139,7 @@ describe('DecisionSignalsPage', () => {
 
     expect(await screen.findByText('最近分析')).toBeInTheDocument();
     const candidateButton = screen.getByRole('button', { name: /600519/ });
-    expect(candidateButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(candidateButton).toHaveClass('ui-touch-target', 'h-auto', 'min-w-9');
     fireEvent.click(candidateButton);
 
     await waitFor(() => {
@@ -1988,9 +1988,9 @@ describe('DecisionSignalsPage', () => {
     expect(within(dialog).getByRole('button', { name: '关闭信号' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '标记失效' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '归档' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '关闭信号' })).toHaveClass('h-11', 'min-w-11');
-    expect(within(dialog).getByRole('button', { name: '标记失效' })).toHaveClass('h-11', 'min-w-11');
-    expect(within(dialog).getByRole('button', { name: '归档' })).toHaveClass('h-11', 'min-w-11');
+    expect(within(dialog).getByRole('button', { name: '关闭信号' })).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
+    expect(within(dialog).getByRole('button', { name: '标记失效' })).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
+    expect(within(dialog).getByRole('button', { name: '归档' })).toHaveClass('ui-touch-target', 'h-9', 'min-w-9');
     expect(within(dialog).queryByRole('button', { name: '有效' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: '已过期' })).not.toBeInTheDocument();
 

@@ -141,7 +141,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                 onChange={toggleSelectAll}
                 disabled={isDeleting}
                 aria-label={t('history.selectAllStockAria')}
-                containerClassName="min-h-11 flex-1 rounded-lg py-1"
+                containerClassName="min-h-8 flex-1 rounded-lg py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
               <Button
@@ -193,7 +193,7 @@ export const StockBar: React.FC<StockBarProps> = ({
                       onChange={() => toggleCode(code)}
                       disabled={isDeleting}
                       aria-label={t('history.selectRecordAria', { name: item.stockName || code })}
-                      containerClassName="h-11 w-11 shrink-0 justify-start self-center"
+                      containerClassName="shrink-0 self-center"
                     />
                   )}
                   <StockBarItemComponent

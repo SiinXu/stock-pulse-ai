@@ -77,7 +77,15 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]">
+    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[var(--login-bg-main)] px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.045)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.045)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_65%_at_50%_50%,var(--mask-opaque)_55%,transparent_100%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_12%_18%,hsl(var(--primary)/0.12),transparent_32%),radial-gradient(circle_at_88%_82%,hsl(var(--primary)/0.08),transparent_36%)]"
+      />
       <div className="absolute right-4 top-4 z-20">
         <UiLanguageToggle />
       </div>
@@ -169,7 +177,7 @@ const LoginPage: React.FC = () => {
               type="submit"
               variant="primary"
               size="lg"
-              className="h-12 w-full font-medium"
+              className="w-full font-medium"
               disabled={isSubmitting}
               isLoading={isSubmitting}
               loadingText={isFirstTime ? t('login.setupSubmitting') : t('login.loginSubmitting')}

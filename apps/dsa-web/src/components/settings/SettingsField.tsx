@@ -176,12 +176,23 @@ function renderFieldControl(
   // regardless of the backend ui_control hint, so a stray ui_control=text never
   // degrades an enum into a free-text Input.
   if (schema?.options?.length && !isMultiValue) {
+    const options = normalizeSelectOptions(item.key, schema.options, language).map((option) => {
+      if (item.key !== 'MARKET_REVIEW_COLOR_SCHEME') {
+        return option;
+      }
+      return {
+        ...option,
+        swatch: option.value === 'green_up'
+          ? { start: 'success' as const, end: 'danger' as const }
+          : { start: 'danger' as const, end: 'success' as const },
+      };
+    });
     return (
         <Select
           id={controlId}
           value={value}
           onChange={onChange}
-          options={normalizeSelectOptions(item.key, schema.options, language)}
+          options={options}
           disabled={disabled || !schema.isEditable}
           placeholder={t('common.selectPlaceholder')}
           error={hasError}

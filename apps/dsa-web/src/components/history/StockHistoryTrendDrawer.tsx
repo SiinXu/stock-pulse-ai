@@ -10,7 +10,7 @@ import {
   type DecisionActionLabelMap,
 } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { Badge, Button, Card, DataTable, Pressable, StatePanel, Tooltip, type DataTableColumn } from '../common';
+import { Badge, Button, Card, DataTable, SegmentedControl, StatePanel, Tooltip, type DataTableColumn } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 
@@ -155,22 +155,15 @@ const RangeControls: React.FC<{
   const { t } = useUiLanguage();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {RANGE_OPTIONS.map((option) => (
-        <Pressable
-          key={option.value}
-          type="button"
-          onClick={() => onRangeChange(option.value)}
-          className={`min-h-11 min-w-11 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-            filters.range === option.value
-              ? 'border-primary/50 bg-primary/10 text-primary'
-              : 'border-border/70 bg-background/50 text-secondary-text hover:bg-hover hover:text-foreground'
-          }`}
-        >
-          {t(option.labelKey)}
-        </Pressable>
-      ))}
-    </div>
+    <SegmentedControl
+      value={filters.range}
+      options={RANGE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: t(option.labelKey),
+      }))}
+      onChange={onRangeChange}
+      ariaLabel={t('stockTrend.title')}
+    />
   );
 };
 
@@ -294,7 +287,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           type="button"
           variant="outline"
           size="sm"
-          className="min-h-11 min-w-11 text-xs"
+          className="text-xs"
           onClick={(event) => {
             event.stopPropagation();
             onSelectRecord(item.id);

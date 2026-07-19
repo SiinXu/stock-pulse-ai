@@ -1928,6 +1928,18 @@ a {
   border-radius: var(--radius-dot);
 }
 
+@media (pointer: coarse) {
+  .ui-touch-target,
+  .segmented-control-tab {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .ui-touch-control {
+    min-height: 2.75rem;
+  }
+}
+
 .badge-trend-up {
   border-color: rgb(var(--trend-up-border));
   background: rgb(var(--trend-up-bg));

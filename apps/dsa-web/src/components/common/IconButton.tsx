@@ -21,9 +21,9 @@ export interface IconButtonProps extends Omit<
 
 const ICON_VISUAL_SIZE_STYLES = {
   xs: 'h-5 w-5',
-  sm: 'h-7 w-7',
-  md: 'h-8 w-8',
-  lg: 'h-9 w-9',
+  sm: 'h-6 w-6',
+  md: 'h-7 w-7',
+  lg: 'h-8 w-8',
 } as const;
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
@@ -49,9 +49,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(({
       aria-busy={isLoading || undefined}
       disabled={disabled || isLoading}
       className={cn(
-        'group relative inline-flex shrink-0 items-center justify-center bg-transparent p-0',
-        'h-11 w-11',
-        'text-secondary-text transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-foreground/15',
+        'ui-touch-target group relative inline-flex shrink-0 items-center justify-center bg-transparent p-0',
+        ICON_VISUAL_SIZE_STYLES[visualSize],
+        'text-secondary-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15',
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40',
         tone === 'danger' ? 'hover:text-danger' : 'hover:text-foreground',
         className,

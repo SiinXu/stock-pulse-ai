@@ -124,7 +124,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                 onChange={onToggleSelectAll}
                 disabled={isDeleting}
                 aria-label={t('history.selectAllHistoryAria')}
-                containerClassName="min-h-11 flex-1 rounded-lg px-2 py-1"
+                containerClassName="min-h-8 flex-1 rounded-lg px-2 py-1"
                 label={<span className="text-xs font-normal text-muted-text">{t('common.selectAllCurrent')}</span>}
               />
               <Button
