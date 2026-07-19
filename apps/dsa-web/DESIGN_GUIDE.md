@@ -1,11 +1,12 @@
 # StockPulse Web 设计准则
 
 > `src/index.css` 和公共组件是当前可执行视觉事实；本文档是 StockPulse **已采纳视觉规则**的
-> 权威。当前 [UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 仅为
-> `Ready for HITL review, not approved` 的候选材料。只有维护者明确批准后，它才能成为导航、
-> 页面归属、URL、状态与交互契约；批准前不得据此启动 UI-02～UI-07。Coinstax/Figma 仅是
-> 外部模式参考；只有根目录 `DESIGN.md` 明确批准并完成 StockPulse 语义映射的颜色变量值可
-> 作为目标 token，外部变量名、raw fill、产品需求、组件 API、页面 IA 和像素细节均不是权威。
+> 权威。[UI 信息架构审计](../../docs/stockpulse-ui-information-architecture.md) 的 HITL-H1～H8
+> 已于 2026-07-17 由维护者批准（结论见其 §18.1），自此是导航、页面归属、URL、状态与交互
+> 契约的已批准目标；实施仍须按其 §17 顺序、tracker 登记与各 slice 门禁推进，不得越序启动
+> UI-02～UI-07 父任务。Coinstax/Figma 仅是外部模式参考；只有根目录 `DESIGN.md` 明确批准并
+> 完成 StockPulse 语义映射的颜色变量值可作为目标 token，外部变量名、raw fill、产品需求、
+> 组件 API、页面 IA 和像素细节均不是权威。
 
 ## 0. 铁律
 
@@ -19,9 +20,17 @@
    lint/build 报错涉及任务范围外逻辑、拿不准是否需要扩展公共组件——一律停下提问。
    提问时给出：页面/文件、现状、StockPulse 依据、外部参考（如有）和倾向方案。
 4. **禁止硬编码**：
-   - 颜色一律走 CSS 变量 / tailwind token；**hex 色值只允许出现在
-     `src/index.css` 的 `:root` / `.dark` 变量定义里（WP1 唯一入口）**，
-     禁止在组件里写 `bg-[#151514]`、`text-[#41B83D]` 这类任意值类名或内联 hex。
+   - 组件和普通生产 `TS/TSX/JS/CSS` 不得出现 raw hex；新增运行时颜色必须引用
+     `src/index.css` 的 semantic token。唯一允许声明 raw color source value 的生产入口，是
+     `src/index.css` 的 `:root` / `.dark` 内 semantic-token custom-property declaration。这不是
+     `index.css` 整文件豁免；非 token CSS declaration、组件、types、utils 和 renderer 均不得
+     使用 raw hex，组件内也禁止 `bg-[#151514]`、`text-[#41B83D]` 等任意值类名或内联 hex。
+   - 设计文档中的 HSL-to-hex 换算值只用于人工审阅，不是可复制到生产组件或样式的实现值。
+     测试与 fixture 如确需固定 hex，必须进入具名显式白名单，并逐项记录文件、值及颜色语义或
+     guard sentinel 用途；目录级排除不等同于白名单。
+   - 当前 `productionDesignGuard.test.ts` 的可执行生产扫描覆盖 `TSX`，以及由 CSS 路径完整性
+     断言约束的 `App.css` / `index.css`；尚未加载 `.ts` / `.js`，当前 types/utils 中的 `.ts` 与
+     其它 `.ts/.js` 生产路径缺口继续登记在 `UI01-P2-06`。因此本规则尚未对所有生产源类型自动执行。
    - 字号/圆角/间距优先用现有 tailwind 阶梯与 `--radius` 体系，不写魔法数字。
    - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑（仓库硬规则）。
 
@@ -35,8 +44,9 @@
 ## 2. 颜色 Token（当前项目定义）
 
 下表是审计基线 `ed729c1b` 中 `src/index.css` semantic token 的文档快照。HSL 源值是精确
-代码事实，hex 仅是便于审阅的换算值。代码取值与本表不一致时，应先核对当前实现和变更
-历史，再更新本表；不得用外部文件变量静默覆盖项目 token。
+代码事实，hex 仅是便于人工审阅的换算值，不是生产实现值或测试 fixture 的默认来源。代码
+取值与本表不一致时，应先核对当前实现和变更历史，再更新本表；不得用外部文件变量静默
+覆盖项目 token。
 
 ### 2.1 基础色
 
@@ -129,7 +139,8 @@
 | 保留 CSS 变量名，只改取值 | 重命名/删除现有 token 变量 |
 | 保留 tailwind 的 cyan/purple key（值改为新色） | 删除 key 导致未清扫处编译爆炸 |
 | 用边框补层次（去辉光后） | 用新的发光/渐变替代旧辉光 |
-| 颜色走 token/CSS 变量，hex 只进 `index.css` 变量定义 | 组件里写 `bg-[#xxx]` 任意值类名或内联 hex |
+| 生产颜色引用 `index.css` semantic token；只在 `:root/.dark` 的 semantic-token declaration 声明 raw source value；文档 hex 只作审阅换算 | 在普通 CSS declaration、组件、types、utils 或 renderer 写 raw hex，或把 `index.css` 当作整文件豁免 |
+| 测试 fixture 的固定 hex 有具名白名单，并记录值和颜色/guard-sentinel 语义 | 把目录级 fixture 排除当成白名单，或用无说明的 fixture hex 绕过生产 token 规则 |
 | 尺寸用 tailwind 阶梯 / `--radius` 体系 | 魔法数字（`h-[37px]` 之类） |
 | token 缺口 → 停下提问 | 自己发明颜色值 |
 
@@ -155,6 +166,9 @@
 - [ ] 主按钮软圆角（`rounded-lg`）+ 黑白反色；焦点环为绿
 - [ ] 涨跌红绿未被改动
 - [ ] `grep -rn 'cyan\|purple\|glow' src/` 无非白名单残留
+- [ ] `productionDesignGuard.test.ts` 的生产 `TSX` / CSS guard 通过；在 `UI01-P2-06` 扩展
+      `.ts` / `.js` 覆盖前，另行人工审计 types、utils 与其它 `.ts/.js` 生产路径，且不声称规则已
+      全量自动执行
 - [ ] `git diff` 仅含样式面改动
 - [ ] Playwright 逐页明/暗截图符合本指南和批准的产品语义；外部参考只记录采用/拒绝理由
 - [ ] 抽查交互无回归：登录、主题切换、导航、Analyze 触发、历史列表、设置保存
