@@ -139,6 +139,10 @@ describe('AlertRuleList', () => {
     expect(screen.getByText('冷却中')).toBeInTheDocument();
     expect(screen.getByRole('table', { name: '告警规则' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '参数' })).toHaveAttribute('data-column-priority', 'tertiary');
+    expect(screen.getByText('茅台价格突破').closest('tr')).toHaveClass(
+      '[&>td:first-child]:rounded-l-lg',
+      '[&>td:last-child]:rounded-r-lg',
+    );
 
     chooseOption(screen.getByLabelText('启停状态'), 'enabled');
     chooseOption(screen.getByLabelText('规则类型'), 'price_cross');
@@ -161,6 +165,14 @@ describe('AlertRuleList', () => {
     });
 
     expect(screen.getByText('未冷却')).toBeInTheDocument();
+  });
+
+  it('shows an unknown alert type instead of rendering an empty badge', () => {
+    renderList({
+      rules: [{ ...rules[0], alertType: 'future_alert_type' as AlertRuleItem['alertType'] }],
+    });
+
+    expect(screen.getByText('future_alert_type')).toBeInTheDocument();
   });
 
   it('renders portfolio scope labels and child-target cooldown hint', () => {

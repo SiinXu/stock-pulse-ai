@@ -13,7 +13,7 @@ import {
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../components/alerts/AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Button, Card, DataTable, InlineAlert, Modal, PageHeader, Pagination, SegmentedControl, StatePanel, Toolbar, type DataTableColumn } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, Card, DataTable, InlineAlert, Modal, PageHeader, Pagination, SegmentedControl, Select, StatePanel, Toolbar, type DataTableColumn } from '../components/common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -132,6 +132,8 @@ const AlertsPage: React.FC = () => {
   const [notificationsLastUpdated, setNotificationsLastUpdated] = useState<string | null>(null);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<ParsedApiError | null>(null);
+  const [notificationChannelFilter, setNotificationChannelFilter] = useState('all');
+  const [notificationSuccessFilter, setNotificationSuccessFilter] = useState<'all' | 'success' | 'failure'>('all');
 
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
@@ -265,7 +267,12 @@ const AlertsPage: React.FC = () => {
     setNotificationsLoading(true);
     setNotificationsError(null);
     try {
-      const response = await alertsApi.listNotifications({ page, pageSize: PAGE_SIZE });
+      const response = await alertsApi.listNotifications({
+        ...(notificationChannelFilter === 'all' ? {} : { channel: notificationChannelFilter }),
+        ...(notificationSuccessFilter === 'all' ? {} : { success: notificationSuccessFilter === 'success' }),
+        page,
+        pageSize: PAGE_SIZE,
+      });
       if (!isLatestRequest()) return;
       setNotifications(response.items);
       setNotificationsTotal(response.total);
@@ -277,7 +284,7 @@ const AlertsPage: React.FC = () => {
     } finally {
       if (isLatestRequest()) setNotificationsLoading(false);
     }
-  }, []);
+  }, [notificationChannelFilter, notificationSuccessFilter]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -368,7 +375,6 @@ const AlertsPage: React.FC = () => {
   return (
     <AppPage className="space-y-5">
       <PageHeader
-        eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
         actions={(
@@ -498,6 +504,56 @@ const AlertsPage: React.FC = () => {
           <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
             <Toolbar
               className="mb-3"
+              left={(
+                <>
+                  <Select
+                    label={text.channel}
+                    value={notificationChannelFilter}
+                    onChange={(value) => {
+                      setNotificationChannelFilter(value);
+                      setNotificationsPage(1);
+                    }}
+                    options={[
+                      { value: 'all', label: t('usage.period.all') },
+                      ...[
+                        'wechat',
+                        'feishu',
+                        'telegram',
+                        'dingtalk',
+                        'email',
+                        'discord',
+                        'slack',
+                        'pushplus',
+                        'pushover',
+                        'ntfy',
+                        'gotify',
+                        'serverchan3',
+                        'astrbot',
+                        'custom',
+                        '__cooldown__',
+                        '__cooldown_read_failed__',
+                        '__noise_suppressed__',
+                        '__no_channel__',
+                        '__dispatch__',
+                        '__context__',
+                      ].map((channel) => ({ value: channel, label: formatNotificationChannel(channel, language) })),
+                    ]}
+                  />
+                  <Select
+                    label={text.status}
+                    value={notificationSuccessFilter}
+                    onChange={(value) => {
+                      setNotificationSuccessFilter(value as 'all' | 'success' | 'failure');
+                      setNotificationsPage(1);
+                    }}
+                    options={[
+                      { value: 'all', label: t('usage.period.all') },
+                      { value: 'success', label: ALERT_NOTIFICATION_STATUS_LABELS[language].success },
+                      { value: 'failure', label: ALERT_NOTIFICATION_STATUS_LABELS[language].failure },
+                    ]}
+                  />
+                </>
+              )}
               right={(
                 <>
                   {notificationsLastUpdated ? (

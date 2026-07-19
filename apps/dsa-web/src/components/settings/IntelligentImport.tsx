@@ -302,15 +302,15 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
         </p>
       </div>
 
-      <div
-        onDrop={onDrop}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-        className={`flex min-h-24 flex-col gap-4 rounded-xl border border-dashed  p-4 transition-colors ${
-          isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
-        } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
-      >
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div
+          onDrop={onDrop}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          className={`flex min-h-18 flex-wrap items-center justify-center gap-2 rounded-xl border border-dashed p-3 transition-colors ${
+            isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
+          } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
+        >
           <Button
             type="button"
             variant="secondary"
@@ -340,10 +340,11 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
             disabled={disabled || isLoading}
           />
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
           <Textarea
             placeholder={t('settings.intelligentImportPastePlaceholder')}
-            className="settings-surface-strong settings-border-strong min-h-18 text-xs shadow-none"
+            fieldClassName="min-w-0 flex-1"
+            className="settings-surface-strong settings-border-strong min-h-18 resize-none text-xs shadow-none"
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             disabled={disabled || isLoading}
@@ -351,7 +352,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
           <Button
             type="button"
             variant="secondary"
-            className="shrink-0 sm:self-start"
+            className="shrink-0 sm:self-end"
             onClick={handlePasteParse}
             disabled={disabled || isLoading || !pasteText.trim()}
           >

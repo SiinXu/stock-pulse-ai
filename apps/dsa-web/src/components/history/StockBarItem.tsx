@@ -44,7 +44,7 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
 
   return (
     <div
-      className={`history-item relative flex items-stretch group/item ${
+      className={`history-item group/item relative flex w-full min-w-0 flex-1 items-stretch ${
         isViewing ? 'history-item-selected' : ''
       }`}
     >

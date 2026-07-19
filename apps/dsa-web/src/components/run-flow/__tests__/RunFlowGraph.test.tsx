@@ -505,7 +505,7 @@ describe('RunFlowGraph', () => {
     expect(onSelectNode).not.toHaveBeenCalled();
   });
 
-  it('uses clearer default and selected card states without changing border width', () => {
+  it('uses lightweight default and selected card states', () => {
     render(
       <RunFlowGraph
         lanes={lanes}
@@ -516,17 +516,15 @@ describe('RunFlowGraph', () => {
     );
 
     expect(screen.getByTestId('run-flow-node-request')).toHaveClass(
-      'border-2',
+      'border',
       'border-subtle/80',
-      'ring-1',
-      'ring-border/50',
+      'shadow-none',
     );
     expect(screen.getByTestId('run-flow-node-news')).toHaveClass(
-      'border-2',
-      'border-primary/85',
+      'border',
+      'border-primary/60',
       'bg-primary/8',
-      'ring-2',
-      'ring-primary/25',
+      'shadow-none',
     );
   });
 

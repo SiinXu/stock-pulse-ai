@@ -246,7 +246,9 @@ describe('StockScreeningPage', () => {
     await waitFor(() => expect(screen.getAllByText('AI算力').length).toBeGreaterThan(0));
     expect(screen.getByText('强势领先')).toBeInTheDocument();
     expect(screen.getByText(/中际旭创、工业富联/)).toBeInTheDocument();
-    expect(screen.getByText(/覆盖 8 股/)).toBeInTheDocument();
+    const coverage = screen.getByText(/覆盖 8 股/);
+    expect(coverage).toBeInTheDocument();
+    expect(coverage.parentElement).toHaveClass('flex-1', 'pr-24');
     expect(await screen.findByText('发酵时间线')).toBeInTheDocument();
     expect(screen.getByText('标准题材：算力')).toBeInTheDocument();
     expect(screen.getByText('质量 stale')).toBeInTheDocument();

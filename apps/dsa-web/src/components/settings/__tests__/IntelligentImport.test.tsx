@@ -57,7 +57,13 @@ describe('IntelligentImport', () => {
       configurable: true,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '选择图片' }));
+    const imageButton = screen.getByRole('button', { name: '选择图片' });
+    const pasteInput = screen.getByPlaceholderText('或粘贴 CSV/Excel 复制的文本...');
+
+    expect(imageButton.parentElement?.parentElement).toHaveClass('grid', 'lg:grid-cols-2');
+    expect(imageButton.parentElement).not.toContainElement(pasteInput);
+
+    fireEvent.click(imageButton);
     fireEvent.click(screen.getByRole('button', { name: '选择文件' }));
 
     expect(imageClick).toHaveBeenCalledTimes(1);

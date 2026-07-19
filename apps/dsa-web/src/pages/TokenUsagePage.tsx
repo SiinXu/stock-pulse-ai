@@ -67,7 +67,7 @@ function buildParsedError(error: unknown, t: Translate): ParsedApiError {
 
 const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguage; t: Translate }> = ({ model, language, t }) => {
   return (
-    <Card padding="sm" className="rounded-lg">
+    <Card padding="none" className="rounded-lg p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>
@@ -77,7 +77,7 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
           {formatNumber(model.totalTokens, language)} {t('usage.tokenUnit')}
         </span>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+      <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
         <div>
           <p className="text-xs text-secondary-text">{t('usage.promptLabel')}</p>
           <p className="mt-1 font-medium text-foreground">{formatNumber(model.promptTokens, language)}</p>
@@ -194,7 +194,6 @@ const TokenUsagePage: React.FC = () => {
     <AppPage>
       <div className="space-y-5">
         <PageHeader
-          eyebrow={t('usage.eyebrow')}
           title={t('usage.title')}
           description={t('usage.description')}
           actions={(

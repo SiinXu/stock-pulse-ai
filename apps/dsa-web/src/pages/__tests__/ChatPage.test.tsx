@@ -783,9 +783,12 @@ describe('ChatPage', () => {
 
     const exportButton = await screen.findByRole('button', { name: '导出此条消息为 Markdown' });
     const actionGroup = exportButton.parentElement;
+    const copyButton = screen.getByRole('button', { name: '复制' });
 
     expect(actionGroup).toHaveClass('chat-message-actions');
     expect(actionGroup?.className).not.toMatch(/pointer-events-none|opacity-0/);
+    expect(copyButton.firstElementChild).toHaveClass('rounded-lg', 'group-hover:bg-hover');
+    expect(copyButton.firstElementChild).not.toHaveClass('!rounded-none');
   });
 
   it('sends exported markdown to notification channel and shows success feedback', async () => {

@@ -69,6 +69,10 @@ describe('StockHistoryTrendDrawer', () => {
     }
     expect(screen.getByRole('tab', { name: '全部历史' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: '查看报告' })).toHaveClass('h-6', 'min-w-6');
+    expect(screen.getByRole('button', { name: '查看报告' }).closest('tr')).toHaveClass(
+      '[&>td:first-child]:rounded-l-lg',
+      '[&>td:last-child]:rounded-r-lg',
+    );
   });
 
   it('keeps full legacy operation advice when structured action is absent', () => {

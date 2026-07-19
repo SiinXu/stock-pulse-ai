@@ -50,7 +50,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const taskMessage = formatTaskMessage(task, language);
 
   return (
-    <Surface variant="bordered" radius="md" padding="none" className="grid min-w-0 gap-2.5 px-3 py-2.5" data-testid="task-panel-item">
+    <Surface variant="bordered" radius="md" padding="none" className="grid min-w-0 gap-1.5 px-2.5 py-2" data-testid="task-panel-item">
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <div className="shrink-0 pt-1.5">
@@ -147,7 +147,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
       {traceId ? (
         <details className="group/task text-xs">
           <summary
-            className="grid min-h-11 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-muted-text"
+            className="grid min-h-7 cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-muted-text"
             data-testid="task-panel-diagnostics-summary"
           >
             <span className="whitespace-nowrap">{t('taskPanel.diagnostics')}</span>

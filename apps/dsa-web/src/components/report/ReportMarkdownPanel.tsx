@@ -98,6 +98,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
 
         <div className="flex items-center gap-2">
           <IconButton
+                visualSize="sm"
                 type="button"
                 onClick={handleCopyMarkdown}
                 disabled={isLoading || !content || copiedType !== null}
@@ -105,13 +106,14 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 tooltip={text.copyMarkdownSource}
               >
                 {copiedType === 'markdown' ? (
-                  <Check className="h-6 w-6 text-success" aria-hidden="true" />
+                  <Check className="h-4 w-4 text-success" aria-hidden="true" />
                 ) : (
-                  <Code2 className="h-6 w-6" aria-hidden="true" />
+                  <Code2 className="h-4 w-4" aria-hidden="true" />
                 )}
           </IconButton>
 
           <IconButton
+                visualSize="sm"
                 type="button"
                 onClick={handleCopyPlainText}
                 disabled={isLoading || !content || copiedType !== null}
@@ -119,9 +121,9 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
                 tooltip={text.copyPlainText}
               >
                 {copiedType === 'text' ? (
-                  <Check className="h-6 w-6 text-success" aria-hidden="true" />
+                  <Check className="h-4 w-4 text-success" aria-hidden="true" />
                 ) : (
-                  <FileText className="h-6 w-6" aria-hidden="true" />
+                  <FileText className="h-4 w-4" aria-hidden="true" />
                 )}
           </IconButton>
         </div>

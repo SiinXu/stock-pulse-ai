@@ -66,23 +66,36 @@ describe('StockBarItemComponent', () => {
     expect(screen.queryByRole('button', { name: /删除/ })).not.toBeInTheDocument();
   });
 
-  it('keeps the market review in the same leading-marker layout', () => {
-    render(
+  it('keeps the market review in the same leading-marker layout and selected surface', () => {
+    const { rerender } = render(
       <StockBarItemComponent
         item={{
           ...issue1600Item,
           stockCode: 'MARKET',
           stockName: 'A股市场复盘',
         }}
-        isViewing={false}
+        isViewing
         isMarketReview
         onClick={vi.fn()}
       />,
     );
 
     const openButton = screen.getByRole('button', { name: /A股市场复盘 MARKET/ });
+    const marketReviewRowClassName = openButton.parentElement?.className;
+    expect(openButton.parentElement).toHaveClass('w-full', 'min-w-0', 'flex-1');
     expect(openButton.querySelector('.bg-warning')).toBeInTheDocument();
     expect(within(openButton).getByText('大盘')).toBeInTheDocument();
+
+    rerender(
+      <StockBarItemComponent
+        item={issue1600Item}
+        isViewing
+        onClick={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /贵州茅台股票股份有限公司 600519/ }).parentElement?.className)
+      .toBe(marketReviewRowClassName);
   });
 
   it('uses structured action before legacy operation advice', () => {

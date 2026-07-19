@@ -215,7 +215,7 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
               }}
             />
           </div>
-          <div className="min-h-[20rem] xl:max-h-[calc(100dvh-18rem)]" data-testid="run-flow-events-column">
+          <div className="h-[32rem] min-h-80 max-h-[calc(100dvh-18rem)]" data-testid="run-flow-events-column">
             <RunFlowEventList
               events={topology?.events || snapshot.events}
               selectedNodeId={graphSelectedNodeId}

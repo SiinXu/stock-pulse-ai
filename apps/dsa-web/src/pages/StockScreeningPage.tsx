@@ -1145,7 +1145,7 @@ const StockScreeningPage: React.FC = () => {
                     {formatNumber(item.heatScore, 0)}
                   </span>
                 </div>
-                <div className="mt-4 grid max-w-[72%] gap-1 text-xs text-secondary-text">
+                <div className="relative z-10 mt-4 grid min-w-0 flex-1 gap-1 pr-24 text-xs text-secondary-text">
                   <span>{text.change} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.changePct, text)}%</strong></span>
                   <span>{text.trend} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.trendScore, text)}</strong> · {text.persistence} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.persistenceScore, text)}</strong></span>
                   <span>{getHotspotSampleText(item, text)} · {text.leader} {getHotspotLeadersText(item, language, text)}</span>

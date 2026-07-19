@@ -102,7 +102,7 @@ describe('TaskPanel', () => {
 
     const diagnosticsSummary = screen.getByTestId('task-panel-diagnostics-summary');
     expect(diagnosticsSummary).toHaveClass('grid-cols-[auto_minmax(0,1fr)_auto]');
-    expect(diagnosticsSummary).toHaveClass('min-h-11');
+    expect(diagnosticsSummary).toHaveClass('min-h-7');
     expect(screen.getByText('运行诊断')).toHaveClass('whitespace-nowrap');
     expect(screen.getByText('c5b9665a64...')).toHaveClass('truncate');
     expect(screen.getByRole('button', { name: '查看 长飞光纤 运行流' })).toBeInTheDocument();

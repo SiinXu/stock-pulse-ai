@@ -24,8 +24,8 @@ const StrategyItem: React.FC<StrategyItemProps> = ({
     variant="bordered"
     radius="md"
     padding="sm"
-    className="report-strategy-card border-b-2"
-    style={{ ['--report-strategy-tone' as string]: `var(${tone})`, borderBottomColor: `var(${tone})` }}
+    className="report-strategy-card"
+    style={{ ['--report-strategy-tone' as string]: `var(${tone})` }}
   >
     <div className="flex flex-col">
       <span className="report-strategy-label mb-0.5 text-xs">{label}</span>

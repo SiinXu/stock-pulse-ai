@@ -375,6 +375,48 @@ describe('PortfolioPage FX refresh', () => {
     expect(getRisk).toHaveBeenCalledWith({ accountId: undefined, costMethod: 'fifo', includeRealtime: false });
   });
 
+  it('keeps the account actions equal in height and width', async () => {
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    for (const name of ['新建账户', '刷新数据', '删除账户']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('h-9', 'flex-1');
+    }
+  });
+
+  it('places account controls and summaries to the left of concentration', async () => {
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    const concentrationCard = screen
+      .getByRole('heading', { name: '行业数据暂不可用，当前展示个股集中度' })
+      .closest<HTMLElement>('.terminal-card');
+    const totalEquityCard = screen.getByText('总权益').closest<HTMLElement>('.gradient-border-card');
+    const positionsCard = screen.getByRole('heading', { name: '持仓明细' }).closest<HTMLElement>('.terminal-card');
+
+    expect(concentrationCard?.parentElement).toContainElement(totalEquityCard);
+    expect(concentrationCard?.parentElement).toContainElement(screen.getByText('账户视图'));
+    expect(concentrationCard?.parentElement).not.toBe(positionsCard?.parentElement);
+    expect(concentrationCard).toHaveClass(
+      'xl:col-start-3',
+      'xl:row-start-1',
+    );
+    expect(screen.getByText('总权益')).toHaveClass('text-sm');
+    expect(totalEquityCard?.querySelectorAll('p')[1]).toHaveClass('text-2xl');
+  });
+
+  it('keeps all portfolio entry buttons at the same height', async () => {
+    render(<PortfolioPage />);
+
+    await waitForInitialLoad();
+
+    for (const name of ['录入交易', '录入资金流水', '录入公司行为', '券商 CSV 导入', '事件记录']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('h-9');
+    }
+  });
+
   it('shows one account setup state without zero metrics or a positions table', async () => {
     getAccounts.mockResolvedValueOnce(makeAccounts([]));
 

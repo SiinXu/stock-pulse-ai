@@ -7,7 +7,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, IconButton, InlineAlert, Popover, StatePanel } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, IconButton, InlineAlert, Modal, Popover, StatePanel } from '../components/common';
 import { OVERLAY_Z } from '../components/common/overlayZ';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -1588,7 +1588,7 @@ const HomePage: React.FC = () => {
                 isLoading={isSubmittingMarketReview}
                 loadingText={t('home.submitMarketReview')}
                 onClick={() => void handleTriggerMarketReview()}
-                className="min-w-0 flex-1 basis-32 whitespace-nowrap md:flex-none md:basis-auto"
+                className="h-9 min-w-0 flex-1 basis-32 whitespace-nowrap text-xs md:flex-none md:basis-auto"
               >
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
@@ -1601,7 +1601,7 @@ const HomePage: React.FC = () => {
                 disabled={!query || isAnalyzing}
                 isLoading={isAnalyzing}
                 loadingText={t('home.analyzing')}
-                className="min-w-0 flex-1 basis-32 whitespace-nowrap px-3 text-xs md:flex-none md:basis-auto"
+                className="h-9 min-w-0 flex-1 basis-32 whitespace-nowrap px-3 text-xs md:flex-none md:basis-auto"
               >
                 {t('home.analyze')}
               </Button>
@@ -1892,12 +1892,12 @@ const HomePage: React.FC = () => {
       ) : null}
 
       {runFlowDrawer.open ? (
-        <Drawer
+        <Modal
           isOpen={runFlowDrawer.open}
           onClose={closeRunFlowDrawer}
           title={t('runFlow.drawerTitle')}
-          width="max-w-[96vw]"
-          zIndex={OVERLAY_Z.runFlowDrawer}
+          className="max-h-[92dvh] max-w-[96vw]"
+          bodyClassName="p-5"
         >
           <RunFlowPanel
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
@@ -1905,7 +1905,7 @@ const HomePage: React.FC = () => {
             title={runFlowDrawer.title}
             onUnavailable={handleUnavailableRunFlow}
           />
-        </Drawer>
+        </Modal>
       ) : null}
 
     </div>

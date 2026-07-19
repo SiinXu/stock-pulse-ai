@@ -412,7 +412,8 @@ describe('BacktestPage', () => {
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('radio', { name: '1 日验证' });
     expect(oneDayButton).toHaveClass('ui-touch-target', 'min-h-5');
-    expect(screen.getByText('高级选项')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '强制重跑' })).toHaveClass('h-9', 'w-11');
+    expect(screen.queryByText('高级选项')).not.toBeInTheDocument();
     const nextDayResults = createDeferred<{
       total: number;
       page: number;
@@ -464,8 +465,7 @@ describe('BacktestPage', () => {
     render(<BacktestPage />);
 
     await screen.findByText('600519');
-    fireEvent.click(screen.getByText('高级选项'));
-    fireEvent.click(screen.getByRole('checkbox', { name: '强制重跑' }));
+    fireEvent.click(screen.getByRole('switch', { name: '强制重跑' }));
     fireEvent.click(screen.getByRole('button', { name: '运行回测' }));
 
     const dialog = await screen.findByRole('dialog', { name: '确认强制重跑' });

@@ -289,8 +289,9 @@ describe('HomePage', () => {
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
     expect(screen.getByTestId('home-dashboard-scroll')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('ui-touch-target', 'h-7');
+    expect(screen.getByRole('button', { name: '分析' })).toHaveClass('ui-touch-target', 'h-9');
     expect(screen.getByRole('checkbox', { name: '推送通知' }).closest('label')).toHaveClass('h-9');
+    expect(screen.getByRole('button', { name: '大盘复盘' })).toHaveClass('h-9');
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -388,6 +389,7 @@ describe('HomePage', () => {
     });
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(screen.getByText('贵州茅台 运行流')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '运行流' }).closest('[data-overlay-root="modal"]')).toBeInTheDocument();
   });
 
   it('opens the run-flow drawer from completed report diagnostics', async () => {

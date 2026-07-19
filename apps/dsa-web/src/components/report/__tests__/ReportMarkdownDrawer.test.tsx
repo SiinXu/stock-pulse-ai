@@ -37,10 +37,13 @@ describe('ReportMarkdownDrawer', () => {
     try {
       await renderDrawer(onClose);
 
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      const dialog = screen.getByRole('dialog');
+      expect(dialog).toBeInTheDocument();
+      expect(dialog.closest('[data-overlay-root="modal"]')).toBeInTheDocument();
+      expect(dialog).toHaveClass('max-w-3xl', 'rounded-xl');
       expect(await screen.findByText('加载报告失败')).toBeInTheDocument();
 
-      const closeButton = screen.getByRole('button', { name: '关闭' });
+      const closeButton = screen.getAllByRole('button', { name: '关闭' })[0];
       expect(closeButton).toHaveClass('ui-touch-target', 'h-7');
       fireEvent.click(closeButton);
 

@@ -1092,9 +1092,9 @@ a {
 }
 
 .history-item-selected {
-  border-color: hsl(var(--primary) / 0.32);
-  background: hsl(var(--primary) / 0.1);
-  box-shadow: var(--shadow-soft-card);
+  border-color: hsl(var(--foreground) / 0.12);
+  background: hsl(var(--foreground) / 0.05);
+  box-shadow: none;
 }
 
 .history-selection-badge {
@@ -1160,7 +1160,7 @@ a {
 
 .chat-message-actions {
   position: absolute;
-  top: calc(100% + 0.875rem);
+  top: calc(100% + 1rem);
   left: -1.25rem;
   display: flex;
   width: max-content;
@@ -1659,7 +1659,7 @@ a {
 .report-markdown-prose :where(blockquote) {
   border-color: var(--home-prose-blockquote-border);
   background: var(--home-prose-blockquote-bg);
-  border-radius: 0 0.75rem 0.75rem 0;
+  border-radius: 0.75rem;
   padding: 0.5rem 1rem;
   color: var(--text-secondary-text);
 }

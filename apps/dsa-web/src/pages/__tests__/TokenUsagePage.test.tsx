@@ -103,7 +103,8 @@ describe('TokenUsagePage', () => {
   it('renders token summary, model breakdowns, and recent calls from the dashboard API shape', async () => {
     renderPage();
 
-    expect(await screen.findByRole('heading', { name: 'Token 用量监控' })).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: 'Token 用量监控' });
+    expect(heading.parentElement?.querySelector('.label-uppercase')).toBeNull();
     expect(document.title).toBe('Token 用量监控 - StockPulse');
     expect(await screen.findByText('400')).toBeInTheDocument();
     expect(screen.getAllByText('openai/gpt-test')).toHaveLength(2);

@@ -462,7 +462,9 @@ describe('DecisionSignalsPage', () => {
   it('loads active signals by default', async () => {
     renderPage();
 
-    expect(await screen.findByRole('heading', { name: 'AI 建议' })).toBeInTheDocument();
+    expect((await screen.findByRole('heading', { name: 'AI 建议' })).closest('header')).toHaveClass('[&>div>div:first-child]:sr-only');
+    expect(screen.queryByText('默认展示 active 信号')).not.toBeInTheDocument();
+    expect(screen.queryByText('按股票、阶段、来源和状态查询结构化 AI 建议，并保留风险与数据质量上下文。')).not.toBeInTheDocument();
     const signalsTab = screen.getByRole('tab', { name: '全部信号' });
     expect(signalsTab).toHaveAttribute('aria-selected', 'true');
     await waitFor(() => {

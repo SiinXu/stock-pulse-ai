@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowDown, Bot, ChevronDown, ChevronRight, Copy, Download, History, Lightbulb, Plus, Send, SlidersHorizontal, Trash2, UserRound, X, Zap } from 'lucide-react';
+import { ArrowDown, Bot, Check, ChevronDown, ChevronRight, Copy, Download, History, Lightbulb, Plus, Send, SlidersHorizontal, Trash2, UserRound, X, Zap } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
@@ -1257,16 +1257,18 @@ const ChatPage: React.FC = () => {
                             tooltip={false}
                             onClick={() => copyMessageToClipboard(msg.id, displayContent)}
                             aria-label={copiedMessages.has(msg.id) ? text.copied : text.copy}
-                            visualClassName="!rounded-none group-hover:!bg-transparent"
                           >
-                            <Copy className="h-4 w-4" aria-hidden="true" />
+                            {copiedMessages.has(msg.id) ? (
+                              <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                            ) : (
+                              <Copy className="h-4 w-4" aria-hidden="true" />
+                            )}
                           </IconButton>
                           <IconButton
                             visualSize="xs"
                             tooltip={false}
                             onClick={() => downloadMessageAsMarkdown(msg)}
                             aria-label={t('chat.exportMessage')}
-                            visualClassName="!rounded-none group-hover:!bg-transparent"
                           >
                             <Download className="h-4 w-4" aria-hidden="true" />
                           </IconButton>

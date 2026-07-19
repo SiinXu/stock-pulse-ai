@@ -4,10 +4,9 @@ import { TriangleAlert } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
-import { Drawer } from '../common/Drawer';
+import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Spinner } from '../common/Spinner';
-import { OVERLAY_Z } from '../common/overlayZ';
 
 interface ReportMarkdownDrawerProps {
   recordId: number;
@@ -108,13 +107,12 @@ export const ReportMarkdownDrawer: React.FC<ReportMarkdownDrawerProps> = ({
   }, [onClose]);
 
   return (
-    <Drawer
+    <Modal
       isOpen={isOpen}
       onClose={handleClose}
       title={text.fullReport}
-      width="max-w-3xl"
-      zIndex={OVERLAY_Z.reportDrawer}
-      backdropClassName="bg-background/56 backdrop-blur-[2px]"
+      className="max-h-[92dvh] max-w-3xl"
+      bodyClassName="p-5"
     >
       <ReportMarkdownDrawerErrorBoundary
         resetKey={recordId}
@@ -136,6 +134,6 @@ export const ReportMarkdownDrawer: React.FC<ReportMarkdownDrawerProps> = ({
           />
         </Suspense>
       </ReportMarkdownDrawerErrorBoundary>
-    </Drawer>
+    </Modal>
   );
 };

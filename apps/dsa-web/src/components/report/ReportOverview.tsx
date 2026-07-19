@@ -245,7 +245,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   return (
     <div className="space-y-5">
       {/* 主信息区 - 两列布局 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
         {/* 左侧：股票信息与结论 */}
         <div className="lg:col-span-2 space-y-5">
           {/* 股票头部 */}
@@ -366,7 +366,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
         </div>
 
         {/* 右侧：情绪指标 / 自选操作 */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex h-full flex-col space-y-4">
           {watchlist && meta.reportType !== 'market_review' && (
             <Card variant="bordered" padding="sm">
               <div className="text-center space-y-3">
@@ -387,7 +387,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
           )}
-          <Card variant="bordered" padding="md" className="report-rail-card !overflow-visible">
+          <Card variant="bordered" padding="md" className="report-rail-card flex-1 !overflow-visible">
             <div className="text-center">
               <h3 className="mb-5 text-sm font-medium text-foreground">{text.marketSentiment}</h3>
               <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />

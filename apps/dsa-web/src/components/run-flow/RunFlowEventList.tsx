@@ -72,7 +72,7 @@ export const RunFlowEventList: React.FC<RunFlowEventListProps> = ({
   const filters: EventFilter[] = ['all', 'important', 'problems', 'fallback', 'cancelled'];
 
   return (
-    <Surface variant="bordered" radius="md" padding="sm" className="flex min-h-0 flex-col overflow-hidden" data-testid="run-flow-events">
+    <Surface variant="bordered" radius="md" padding="sm" className="flex h-full min-h-0 flex-col overflow-hidden" data-testid="run-flow-events">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="label-uppercase">{t('runFlow.events.title')}</p>

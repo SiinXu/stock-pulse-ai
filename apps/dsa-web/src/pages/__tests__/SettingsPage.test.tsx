@@ -920,8 +920,9 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     expect(await screen.findByRole('heading', { name: '系统设置' })).toBeInTheDocument();
-    expect(screen.getByText('认证与登录保护')).toBeInTheDocument();
-    expect(screen.getByText('修改密码')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '认证与登录保护' }));
+    expect(screen.getByText('认证与登录保护', { selector: 'div' })).toBeVisible();
+    expect(screen.getByText('修改密码')).toBeVisible();
     expect(load).toHaveBeenCalled();
   });
 
@@ -3514,6 +3515,7 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
+    fireEvent.click(screen.getByRole('tab', { name: '定时任务' }));
     expect(await screen.findByTestId('scheduler-settings-card')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_ENABLED')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-SCHEDULE_TIME')).not.toBeInTheDocument();

@@ -4,7 +4,7 @@ import { Check, ClipboardList, Minus, X } from 'lucide-react';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, DatePicker, Input, PageHeader, Pagination, Progress, SegmentedControl, Select, StatePanel, StatusDot, Toolbar, Tooltip, type DataTableColumn } from '../components/common';
+import { ApiErrorAlert, AppPage, Badge, Button, Card, Switch, ConfirmDialog, DataTable, DatePicker, Input, PageHeader, Pagination, Progress, SegmentedControl, Select, StatePanel, StatusDot, Toolbar, Tooltip, type DataTableColumn } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -795,6 +795,17 @@ const BacktestPage: React.FC = () => {
             ariaLabel={text.evalWindow}
             semantics="single-select"
           />
+          <div className="flex h-9 items-center gap-1.5">
+            <span className="whitespace-nowrap text-xs font-medium text-secondary-text">{text.forceRerun}</span>
+            <Switch
+              checked={forceRerun}
+              disabled={isRunning}
+              onCheckedChange={setForceRerun}
+              aria-label={text.forceRerun}
+              title={text.forceRerunDescription}
+              className="h-9 w-11"
+            />
+          </div>
           <Button
             type="button"
             onClick={handleRun}
@@ -807,18 +818,6 @@ const BacktestPage: React.FC = () => {
             {text.runBacktest}
           </Button>
         </div>
-        <details className="mt-2 max-w-2xl rounded-lg border border-border/60 px-3 py-2">
-          <summary className="cursor-pointer text-xs font-medium text-secondary-text">{text.advancedOptions}</summary>
-          <div className="mt-2">
-            <Checkbox
-              checked={forceRerun}
-              disabled={isRunning}
-              onChange={(event) => setForceRerun(event.target.checked)}
-              label={text.forceRerun}
-            />
-            <p className="pl-8 text-xs text-muted-text">{text.forceRerunDescription}</p>
-          </div>
-        </details>
         {runResult && (
           <div className="mt-2 max-w-4xl">
             <RunSummary data={runResult} language={language} />

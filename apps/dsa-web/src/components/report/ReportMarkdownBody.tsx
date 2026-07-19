@@ -15,7 +15,7 @@ export const ReportMarkdownBody: React.FC<ReportMarkdownBodyProps> = ({
 }) => (
   <div
     data-testid={testId}
-    className={`report-markdown-prose prose prose-invert prose-sm max-w-none
+    className={`report-markdown-prose prose prose-invert prose-sm max-w-none overflow-hidden rounded-xl
       prose-headings:text-foreground prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2
       prose-h1:text-xl
       prose-h2:text-lg

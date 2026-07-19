@@ -1125,69 +1125,6 @@ const PortfolioPage: React.FC = () => {
     <AppPage className="portfolio-page space-y-4">
       <section className="space-y-3">
         <PageHeader title={text.title} description={text.description} />
-        {hasAccounts ? (
-          <div className="rounded-xl border border-border bg-surface-1 p-3">
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px_280px] gap-2 items-end">
-              <Select
-                label={text.accountView}
-                value={String(selectedAccount)}
-                onChange={(value) => setSelectedAccount(value === 'all' ? 'all' : Number(value))}
-                options={[
-                  { value: 'all', label: text.allAccounts },
-                  ...accounts.map((account) => ({ value: String(account.id), label: `${account.name} (#${account.id})` })),
-                ]}
-              />
-              <Select
-                label={text.costMethod}
-                value={costMethod}
-                onChange={(value) => setCostMethod(value as PortfolioCostMethod)}
-                options={[
-                  { value: 'fifo', label: text.fifo },
-                  { value: 'avg', label: text.avg },
-                ]}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="shrink-0 whitespace-nowrap"
-                  onClick={() => {
-                    setShowCreateAccount(true);
-                    setAccountCreateError(null);
-                    setAccountCreateSuccess(null);
-                  }}
-                >
-                  {text.createAccount}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => void handleRefresh()}
-                  disabled={isLoading || fxRefreshing}
-                  variant="secondary"
-                  size="xl"
-                  isLoading={isLoading}
-                  loadingText={text.refreshing}
-                  className="flex-1"
-                >
-                  {text.refreshData}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={openAccountDeleteDialog}
-                  disabled={!canDeleteSelectedAccount}
-                  variant="danger-subtle"
-                  size="xl"
-                  isLoading={accountDeleteLoading}
-                  loadingText={text.deletingAccount}
-                  className="flex-1"
-                >
-                  {text.deleteAccount}
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </section>
 
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
@@ -1323,49 +1260,148 @@ const PortfolioPage: React.FC = () => {
         />
       ) : null}
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalEquity}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY', language)}</p>
-        </Card>
-        <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalMarketValue}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY', language)}</p>
-        </Card>
-        <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalCash}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY', language)}</p>
-        </Card>
-        <Card variant="gradient" padding="md">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-xs text-secondary">{text.fxStatus}</p>
-            <Button
-              type="button"
-              variant="secondary"
-              size="xl"
-              className="shrink-0 text-xs"
-              onClick={() => void handleRefreshFx()}
-              disabled={!hasAccounts || isLoading || fxRefreshing}
-              isLoading={fxRefreshing}
-              loadingText={text.refreshing}
-            >
-              {text.refreshFx}
-            </Button>
+      <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+        <div className="space-y-3 xl:col-span-2">
+          <div className="rounded-xl border border-border bg-surface-1 p-3">
+            <div className="grid grid-cols-1 gap-2 items-end xl:grid-cols-[minmax(0,1fr)_220px_280px]">
+              <Select
+                label={text.accountView}
+                value={String(selectedAccount)}
+                onChange={(value) => setSelectedAccount(value === 'all' ? 'all' : Number(value))}
+                options={[
+                  { value: 'all', label: text.allAccounts },
+                  ...accounts.map((account) => ({ value: String(account.id), label: `${account.name} (#${account.id})` })),
+                ]}
+              />
+              <Select
+                label={text.costMethod}
+                value={costMethod}
+                onChange={(value) => setCostMethod(value as PortfolioCostMethod)}
+                options={[
+                  { value: 'fifo', label: text.fifo },
+                  { value: 'avg', label: text.avg },
+                ]}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xl"
+                  className="flex-1 whitespace-nowrap"
+                  onClick={() => {
+                    setShowCreateAccount(true);
+                    setAccountCreateError(null);
+                    setAccountCreateSuccess(null);
+                  }}
+                >
+                  {text.createAccount}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleRefresh()}
+                  disabled={isLoading || fxRefreshing}
+                  variant="secondary"
+                  size="xl"
+                  isLoading={isLoading}
+                  loadingText={text.refreshing}
+                  className="flex-1"
+                >
+                  {text.refreshData}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={openAccountDeleteDialog}
+                  disabled={!canDeleteSelectedAccount}
+                  variant="danger-subtle"
+                  size="xl"
+                  isLoading={accountDeleteLoading}
+                  loadingText={text.deletingAccount}
+                  className="flex-1"
+                >
+                  {text.deleteAccount}
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="mt-2">{snapshot?.fxStale ? <Badge variant="warning">{text.stale}</Badge> : <Badge variant="success">{text.latest}</Badge>}</div>
-          {fxRefreshFeedback ? (
-            <InlineAlert
-              variant={getFxRefreshFeedbackVariant(fxRefreshFeedback.tone)}
-              title={text.fxRefreshResult}
-              message={fxRefreshFeedback.text}
-              className="mt-3 rounded-xl px-3 py-2 text-xs shadow-none"
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Card variant="gradient" padding="md">
+              <p className="text-sm text-secondary">{text.totalEquity}</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY', language)}</p>
+            </Card>
+            <Card variant="gradient" padding="md">
+              <p className="text-sm text-secondary">{text.totalMarketValue}</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY', language)}</p>
+            </Card>
+            <Card variant="gradient" padding="md">
+              <p className="text-sm text-secondary">{text.totalCash}</p>
+              <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY', language)}</p>
+            </Card>
+            <Card variant="gradient" padding="md">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm text-secondary">{text.fxStatus}</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="xl"
+                  className="shrink-0 text-xs"
+                  onClick={() => void handleRefreshFx()}
+                  disabled={!hasAccounts || isLoading || fxRefreshing}
+                  isLoading={fxRefreshing}
+                  loadingText={text.refreshing}
+                >
+                  {text.refreshFx}
+                </Button>
+              </div>
+              <div className="mt-2">{snapshot?.fxStale ? <Badge variant="warning">{text.stale}</Badge> : <Badge variant="success">{text.latest}</Badge>}</div>
+              {fxRefreshFeedback ? (
+                <InlineAlert
+                  variant={getFxRefreshFeedbackVariant(fxRefreshFeedback.tone)}
+                  title={text.fxRefreshResult}
+                  message={fxRefreshFeedback.text}
+                  className="mt-3 rounded-xl px-3 py-2 text-xs shadow-none"
+                />
+              ) : null}
+            </Card>
+          </div>
+        </div>
+        <Card
+          padding="md"
+          className="xl:col-start-3 xl:row-start-1"
+        >
+          <h2 className="text-sm font-semibold text-foreground mb-3">
+            {concentrationMode === 'sector' ? text.sectorConcentration : text.positionConcentrationFallback}
+          </h2>
+          {concentrationPieData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={concentrationPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
+                    {concentrationPieData.map((entry, index) => (
+                      <Cell key={`cell-${entry.name}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <StatePanel status="empty"
+              title={text.noConcentrationTitle}
+              description={text.noConcentrationDescription}
+              className="border-none bg-transparent px-4 py-10 shadow-none"
             />
-          ) : null}
+          )}
+          <div className="mt-3 text-xs text-secondary space-y-1">
+            <div>{text.displayScope}: {concentrationMode === 'sector' ? text.sectorDimension : text.positionDimensionFallback}</div>
+            <div>{text.sectorAlert}: {risk?.sectorConcentration?.alert ? text.yes : text.no}</div>
+            <div>{text.topWeight}: {formatPct(risk?.sectorConcentration?.topWeightPct ?? risk?.concentration?.topWeightPct)}</div>
+          </div>
         </Card>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-        <Card className="xl:col-span-2" padding="md">
+      <section className="grid grid-cols-1 gap-3">
+        <Card padding="md">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-foreground">{text.positionsTitle}</h2>
             <span className="text-xs text-secondary">{formatUiText(text.countItems, { count: positionRows.length })}</span>
@@ -1466,38 +1502,6 @@ const PortfolioPage: React.FC = () => {
             ]}
           />
         </Card>
-
-        <Card padding="md">
-          <h2 className="text-sm font-semibold text-foreground mb-3">
-            {concentrationMode === 'sector' ? text.sectorConcentration : text.positionConcentrationFallback}
-          </h2>
-          {concentrationPieData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={concentrationPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
-                    {concentrationPieData.map((entry, index) => (
-                      <Cell key={`cell-${entry.name}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <StatePanel status="empty"
-              title={text.noConcentrationTitle}
-              description={text.noConcentrationDescription}
-              className="border-none bg-transparent px-4 py-10 shadow-none"
-            />
-          )}
-          <div className="mt-3 text-xs text-secondary space-y-1">
-            <div>{text.displayScope}: {concentrationMode === 'sector' ? text.sectorDimension : text.positionDimensionFallback}</div>
-            <div>{text.sectorAlert}: {risk?.sectorConcentration?.alert ? text.yes : text.no}</div>
-            <div>{text.topWeight}: {formatPct(risk?.sectorConcentration?.topWeightPct ?? risk?.concentration?.topWeightPct)}</div>
-          </div>
-        </Card>
       </section>
 
       {writeBlocked && hasAccounts ? (
@@ -1565,7 +1569,7 @@ const PortfolioPage: React.FC = () => {
         <Button type="button" variant="secondary" size="xl" onClick={() => setTradeModalOpen(true)} disabled={!writableAccountId}>{text.enterTrade}</Button>
         <Button type="button" variant="secondary" size="xl" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
         <Button type="button" variant="secondary" size="xl" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
-        <Button type="button" variant="secondary" size="md" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
+        <Button type="button" variant="secondary" size="xl" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
         <Button type="button" variant="secondary" size="xl" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 

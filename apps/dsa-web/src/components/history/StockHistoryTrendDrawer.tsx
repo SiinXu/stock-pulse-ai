@@ -409,8 +409,8 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
               getRowAriaLabel={(item) => `${formatHistoryTime(item.createdAt, language)} ${formatAdvice(item, actionLabels)}`}
               isRowSelected={(item) => item.id === selectedRecordId}
               rowClassName={(item) => item.id === selectedRecordId
-                ? 'bg-primary/10 ring-1 ring-inset ring-primary/35'
-                : 'hover:bg-hover/35'}
+                ? 'hover:bg-transparent [&>td]:bg-primary/10 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg'
+                : 'hover:bg-transparent [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg [&:hover>td]:bg-hover/35'}
             />
           </Card>
         </>

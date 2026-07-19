@@ -158,7 +158,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
       header: text.type,
       cell: (rule) => (
         <div className="flex flex-col items-start gap-1">
-          <Badge variant="info">{ALERT_TYPE_LABELS[language][rule.alertType]}</Badge>
+          <Badge variant="info">{ALERT_TYPE_LABELS[language][rule.alertType] || rule.alertType || text.type}</Badge>
           <Badge variant={rule.severity === 'critical' ? 'danger' : rule.severity === 'warning' ? 'warning' : 'default'}>
             {ALERT_SEVERITY_LABELS[language][rule.severity] ?? rule.severity}
           </Badge>
@@ -289,7 +289,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         isLoading={isLoading}
         loadingLabel={text.loadingRules}
         minWidthClassName="min-w-[38rem] lg:min-w-240"
-        rowClassName="align-top"
+        rowClassName="align-top hover:bg-transparent [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg [&:hover>td]:bg-hover/60"
         emptyState={(
           <div className="flex min-h-40 flex-1 items-center justify-center">
           <StatePanel status="empty"

@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, FileInput, PageHeader, SearchableSelect, StatePanel, useToast, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, FileInput, PageHeader, SearchableSelect, SegmentedControl, StatePanel, useToast, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -563,6 +563,7 @@ const SettingsPage: React.FC = () => {
   const [schedulerOverrideResetToken, setSchedulerOverrideResetToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
   const [schedulerOverrideFromUi, setSchedulerOverrideFromUi] = useState<boolean | null>(null);
+  const [activeSystemPanel, setActiveSystemPanel] = useState<'authentication' | 'scheduler' | 'runtime'>('runtime');
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isRefreshingSetupStatus, setIsRefreshingSetupStatus] = useState(false);
@@ -1925,6 +1926,9 @@ const SettingsPage: React.FC = () => {
     <SettingsSectionCard
       title={activeConfigPanelTitle}
       description={activeConfigPanelDescription || t('settings.activePanelDescription')}
+      className={activeSection === 'data_sources' && activeView === 'sources'
+        ? '[&_form>div]:py-1 [&_form>div_[role=combobox]]:!min-h-8'
+        : undefined}
     >
       {isNotificationChannelsSub ? (
         <NotificationChannelsPanel
@@ -2245,6 +2249,18 @@ const SettingsPage: React.FC = () => {
               role="tabpanel"
               className="space-y-4"
             >
+            {activeCategory === 'system' ? (
+              <SegmentedControl
+                value={activeSystemPanel}
+                options={[
+                  { value: 'authentication', label: t('settings.authTitle') },
+                  { value: 'scheduler', label: t('settings.schedulerTitle') },
+                  { value: 'runtime', label: t('settings.versionInfo') },
+                ]}
+                onChange={setActiveSystemPanel}
+                ariaLabel={sectionLabel('system_security', uiLanguage)}
+              />
+            ) : null}
             <SettingsErrorSummary
               entries={errorSummaryEntries}
               onJump={jumpToErrorField}
@@ -2348,26 +2364,33 @@ const SettingsPage: React.FC = () => {
                 ) : null}
               </SettingsSectionCard>
             ) : null}
-            {activeCategory === 'system' ? <AuthSettingsCard /> : null}
             {activeCategory === 'system' ? (
-              <SchedulerSettingsCard
-                items={rawActiveItems}
-                disabled={isSaving || isLoading}
-                issueByKey={issueByKey}
-                statusRefreshToken={schedulerStatusRefreshToken}
-                overrideResetToken={`${configVersion}:${schedulerOverrideResetToken}`}
-                onSchedulerStateChange={handleSchedulerRuntimeStateChange}
-                onChange={setDraftValue}
-                t={t}
-                language={uiLanguage}
-              />
+              <div hidden={activeSystemPanel !== 'authentication'}>
+                <AuthSettingsCard />
+              </div>
             ) : null}
             {activeCategory === 'system' ? (
-              <SettingsSectionCard
-                title={t('settings.versionInfo')}
-                description={t('settings.versionInfoDescription')}
-                contentBordered
-              >
+              <div hidden={activeSystemPanel !== 'scheduler'}>
+                <SchedulerSettingsCard
+                  items={rawActiveItems}
+                  disabled={isSaving || isLoading}
+                  issueByKey={issueByKey}
+                  statusRefreshToken={schedulerStatusRefreshToken}
+                  overrideResetToken={`${configVersion}:${schedulerOverrideResetToken}`}
+                  onSchedulerStateChange={handleSchedulerRuntimeStateChange}
+                  onChange={setDraftValue}
+                  t={t}
+                  language={uiLanguage}
+                />
+              </div>
+            ) : null}
+            {activeCategory === 'system' ? (
+              <div hidden={activeSystemPanel !== 'runtime'}>
+                <SettingsSectionCard
+                  title={t('settings.versionInfo')}
+                  description={t('settings.versionInfoDescription')}
+                  contentBordered
+                >
                 <div
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
                 >
@@ -2455,7 +2478,8 @@ const SettingsPage: React.FC = () => {
                     {t('settings.fallbackVersionWarning')}
                   </p>
                 ) : null}
-              </SettingsSectionCard>
+                </SettingsSectionCard>
+              </div>
             ) : null}
             {isTopLevelAdvanced ? (
               <SettingsSectionCard
@@ -2521,7 +2545,7 @@ const SettingsPage: React.FC = () => {
               <SettingsSectionCard
                 title={t('settings.intelligentImport')}
                 description={t('settings.intelligentImportDescription')}
-                contentBordered
+                className="md:p-3 [&>div:first-child]:mb-2"
               >
                 <IntelligentImport
                   stockListValue={
@@ -2838,7 +2862,9 @@ const SettingsPage: React.FC = () => {
               </section>
             ) : null}
             {activeCategory === 'system' && passwordChangeable ? (
-              <ChangePasswordCard />
+              <div hidden={activeSystemPanel !== 'authentication'}>
+                <ChangePasswordCard />
+              </div>
             ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
               <SettingsPanelErrorBoundary
@@ -2853,7 +2879,11 @@ const SettingsPage: React.FC = () => {
                 />
               </SettingsPanelErrorBoundary>
             ) : null}
-            {shouldGuardActiveConfigPanel && hasActiveConfigItems ? (
+            {activeCategory === 'system' ? (
+              <div hidden={activeSystemPanel !== 'runtime'}>
+                {activeConfigPanel}
+              </div>
+            ) : shouldGuardActiveConfigPanel && hasActiveConfigItems ? (
               <SettingsPanelErrorBoundary
                 title={activeConfigPanelErrorTitle}
                 resetKey={`${activeCategory}:${activeSubCategory ?? ''}:${configVersion}`}
