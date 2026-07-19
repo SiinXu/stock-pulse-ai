@@ -28,6 +28,7 @@ export * from './toastContext';
 export * from './PageHeader';
 export { Input } from './Input';
 export * from './InputPrimitive';
+export * from './CredentialInput';
 export * from './DatePicker';
 export * from './TimePicker';
 export * from './EyeToggleIcon';

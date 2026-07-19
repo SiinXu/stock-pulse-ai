@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Web 下拉、日期、时间、Tooltip 与 Toast 统一 overlay 层级，ModelMultiSelect 改用匹配触发器宽度的 Portal，Drawer 不再默认显示无语义的“详情视图”。
 - [修复] Web 登录页按 HTTPS、本机开发和非加密 HTTP 显示真实连接状态，模型 API Key 使用独立密码管理语义，报告动作统一以结构化 action 为准。
 - [测试] Web 新增公共组件绕过与 UI 硬编码架构守卫，并覆盖 Home、Chat 在 767、768、900、1024px 的单侧栏响应式契约。
+- [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
+- [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
 - [修复] 诊断脱敏 `sanitize_diagnostic_text` / `sanitize_sensitive_text` 现同时脱敏非 HTTP 连接串（postgresql/mysql/redis/mongodb/amqp 等）userinfo 中的凭据，此前仅覆盖 http(s)，SQLAlchemy 等连接错误可能把数据库密码泄漏进 Agent 诊断与日志；host 保留以维持诊断可读性。
 - [改进] 实验性 PydanticAI 运行时的 Single RUN 模型桥补全（RF-05，AR-RF-04/05/06/10/11）：模型桥从 PydanticAI `model_request_parameters` 下发真实工具 schema（不再固定空数组），ToolCall/ToolReturn/reasoning/provider trace 跨轮无损往返，复用 `AgentExecutor.build_run_messages` 的 system/skill/dashboard prompt 权威，usage 每次调用经单一 recorder 记录并修正为 `prompt_tokens/completion_tokens`，execution deadline 与协作取消在每次调用前 fence，CHAT/RESEARCH 显式返回 `unsupported_capability`（RF-06 裁决前冻结）；仍为默认关闭、可整体删除的实验路径，Native 默认路径零 PydanticAI 依赖不变，36 replay fixture 零改。
 - [改进] Agent 运行时契约改为运行中控制柄（RF-02，AR-RF-01/02）：`AgentRuntime.start()` 返回可查询状态、消费事件、请求取消并等待终态的运行中 `ExecutionHandle`（原 `execute()` 保留为启动后等待终态的兼容 helper），`ExecutionContext` 深层冻结为只读快照，调用方后续修改嵌套 dict/list/set 不再影响执行；terminal first-wins 与 36 replay fixture 逐字节不变。

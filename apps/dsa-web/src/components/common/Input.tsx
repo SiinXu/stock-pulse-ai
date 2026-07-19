@@ -3,6 +3,7 @@ import { forwardRef, useId, useState } from 'react';
 import { Lock, Key } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
+import { getUiColon } from '../../utils/uiLocale';
 import { EyeToggleIcon } from './EyeToggleIcon';
 import { Field } from './Field';
 import { getFieldDescriptionIds } from './fieldDescription';
@@ -23,6 +24,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   passwordVisible?: boolean;
   /** Notifies the parent when visibility changes in controlled mode. */
   onPasswordVisibleChange?: (visible: boolean) => void;
+  /** Adds field or row context to the password visibility action. */
+  passwordToggleLabel?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(({
@@ -37,9 +40,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   iconType = 'none',
   passwordVisible,
   onPasswordVisibleChange,
+  passwordToggleLabel,
   ...props
 }, ref) => {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const generatedId = useId();
   const inputId = id ?? props.name ?? generatedId;
   const { hintId, errorId, describedBy } = getFieldDescriptionIds(
@@ -89,6 +93,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
       ['--input-surface-focus-ring' as string]: '0 0 0 4px hsla(var(--destructive), 0.1)',
     }
     : props.style;
+  const passwordToggleAction = visible ? t('common.hideContent') : t('common.showContent');
+  const passwordToggleAriaLabel = passwordToggleLabel
+    ? `${passwordToggleAction}${getUiColon(language)}${passwordToggleLabel}`
+    : passwordToggleAction;
 
   const defaultTrailingAction = isPasswordInput && allowTogglePassword ? (
     <button
@@ -110,7 +118,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
         }
         onPasswordVisibleChange?.(nextVisible);
       }}
-      aria-label={visible ? t('common.hideContent') : t('common.showContent')}
+      aria-label={passwordToggleAriaLabel}
     >
       <EyeToggleIcon visible={visible} />
     </button>

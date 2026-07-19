@@ -395,7 +395,12 @@ describe('SettingsField', () => {
     const input = screen.getByLabelText('OpenAI API Key');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAttribute('aria-describedby', issue.id);
+    expect(input).toHaveAttribute('name', 'stockpulse-config-openai-api-key');
+    expect(input).toHaveAttribute('autocomplete', 'off');
+    expect(input).toHaveAttribute('data-credential-purpose', 'configuration-secret');
+    expect(input).toHaveAttribute('readonly');
     fireEvent.focus(input);
+    expect(input).not.toHaveAttribute('readonly');
     fireEvent.change(input, {
       target: { value: 'updated-secret' },
     });
@@ -431,8 +436,35 @@ describe('SettingsField', () => {
       />
     );
 
-    expect(screen.getAllByRole('button', { name: '显示内容' })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
+    const fieldTitle = getFieldTitleZh('OPENAI_API_KEYS', '');
+    const firstRowLabel = `${fieldTitle} 1`;
+    const secondRowLabel = `${fieldTitle} 2`;
+    expect(screen.getByRole('button', { name: `显示内容：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${firstRowLabel}` })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `删除：${secondRowLabel}` })).toBeInTheDocument();
+    const firstInput = screen.getByLabelText(firstRowLabel);
+    const secondInput = screen.getByLabelText(secondRowLabel);
+    expect(firstInput).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-1',
+    );
+    expect(secondInput).toHaveAttribute(
+      'name',
+      'stockpulse-config-openai-api-keys-2',
+    );
+    expect(firstInput).toHaveAttribute('readonly');
+    expect(secondInput).toHaveAttribute('readonly');
+
+    fireEvent.click(screen.getByRole('button', { name: `显示内容：${secondRowLabel}` }));
+    expect(screen.getByRole('textbox', { name: secondRowLabel })).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: `隐藏内容：${secondRowLabel}` })).toBeInTheDocument();
+    fireEvent.focus(secondInput);
+
+    expect(firstInput).not.toHaveAttribute('readonly');
+    expect(secondInput).not.toHaveAttribute('readonly');
+    fireEvent.change(secondInput, { target: { value: 'secret-c' } });
+    expect(onChange).toHaveBeenCalledWith('OPENAI_API_KEYS', 'secret-a,secret-c');
   });
 
   it('allows optional select fields to be cleared when schema provides an empty option', () => {

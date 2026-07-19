@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from '../LoginPage';
 
-const { navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
+const { connectionState, navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
+  connectionState: { status: 'local-http' },
   navigate: vi.fn(),
   useSearchParamsMock: vi.fn(),
   useAuthMock: vi.fn(),
@@ -10,6 +11,10 @@ const { navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
 
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock('../../utils/loginConnection', () => ({
+  getLoginConnectionStatus: () => connectionState.status,
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -24,6 +29,7 @@ vi.mock('react-router-dom', async () => {
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectionState.status = 'local-http';
     document.documentElement.className = 'light';
     useSearchParamsMock.mockReturnValue([new URLSearchParams('redirect=%2Fsettings')]);
   });
@@ -45,7 +51,11 @@ describe('LoginPage', () => {
     expect(await screen.findByText('两次输入的密码不一致')).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
     expect(screen.getByLabelText('管理员密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-new-password');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('autocomplete', 'new-password');
     expect(screen.getByLabelText('确认密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('name', 'stockpulse-admin-new-password-confirmation');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
   });
 
   it('navigates to redirect after a successful login', async () => {
@@ -61,10 +71,9 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '授权进入工作台' }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/settings', { replace: true }));
-    const passwordInput = screen.getByLabelText('登录密码');
-    expect(passwordInput).toHaveAttribute('data-appearance', 'login');
-    expect(passwordInput).toHaveAttribute('name', 'stockpulse-admin-password');
-    expect(passwordInput).toHaveAttribute('autocomplete', 'current-password');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('name', 'stockpulse-admin-current-password');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('autocomplete', 'current-password');
   });
 
   it('identifies first-time password fields independently from API credentials', () => {
@@ -76,11 +85,11 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
-    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-password');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-new-password');
     expect(screen.getByLabelText('管理员密码')).toHaveAttribute('autocomplete', 'new-password');
     expect(screen.getByLabelText('确认密码')).toHaveAttribute(
       'name',
-      'stockpulse-admin-password-confirmation',
+      'stockpulse-admin-new-password-confirmation',
     );
     expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
   });
@@ -94,8 +103,8 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
-    const status = screen.getByText('当前通过本机开发连接访问。');
-    expect(status).toHaveAttribute('data-connection-status', 'local');
+    const status = screen.getByText('当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。');
+    expect(status).toHaveAttribute('data-connection-status', 'local-http');
     expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
   });
 
@@ -130,4 +139,31 @@ describe('LoginPage', () => {
     expect(screen.queryByText('DAILY STOCK')).not.toBeInTheDocument();
     expect(screen.queryByText('Analysis Engine')).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['https', '此登录页面使用 HTTPS 加密传输。', false],
+    ['local-http', '当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。', false],
+    ['insecure-http', '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。', true],
+  ] as const)(
+    'renders truthful %s transport copy',
+    (status, expectedCopy, isWarning) => {
+      connectionState.status = status;
+      useAuthMock.mockReturnValue({
+        login: vi.fn(),
+        passwordSet: true,
+        setupState: 'enabled',
+      });
+
+      render(<LoginPage />);
+
+      const notice = screen.getByText(expectedCopy);
+      expect(notice).toHaveAttribute('data-connection-status', status);
+      expect(notice).toHaveAttribute('role', isWarning ? 'alert' : 'status');
+      if (isWarning) {
+        expect(notice).toHaveClass('text-[hsl(var(--color-danger-alert-text))]');
+        expect(notice).not.toHaveClass('text-warning');
+      }
+      expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
+    },
+  );
 });

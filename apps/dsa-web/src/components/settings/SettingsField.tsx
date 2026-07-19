@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, Select, Input, Textarea, TimePicker } from '../common';
+import { Badge, Button, CredentialInput, Select, Input, Textarea, TimePicker } from '../common';
 import type { ConfigValidationIssue, SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';
@@ -9,6 +9,7 @@ import { resolveSettingsFieldTitle } from '../../locales/settingsFieldTitle';
 import { getFieldDescriptionZh, getFieldOptionLabel } from '../../utils/systemConfigI18n';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
+import { formatUiNumber, getUiColon } from '../../utils/uiLocale';
 import { SettingsHelpButton } from './SettingsHelpButton';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -88,6 +89,7 @@ interface SettingsFieldProps {
 
 function renderFieldControl(
   item: SystemConfigItem,
+  fieldTitle: string,
   value: string,
   disabled: boolean,
   onChange: (nextValue: string) => void,
@@ -239,43 +241,49 @@ function renderFieldControl(
 
       return (
         <div className="space-y-2">
-          {values.map((entry, index) => (
-            <div className="flex items-center gap-2" key={`${item.key}-${index}`}>
-              <div className="flex-1">
-                <Input
-                  type="password"
-                  allowTogglePassword
-                  iconType={iconType}
-                  id={index === 0 ? controlId : `${controlId}-${index}`}
-                  aria-invalid={hasError || undefined}
-                  aria-describedby={ariaDescribedBy}
-                  readOnly={!isPasswordEditable}
-                  onFocus={onPasswordFocus}
-                  value={entry}
-                  disabled={disabled || !schema?.isEditable}
-                  onChange={(event) => {
-                    const nextValues = [...values];
-                    nextValues[index] = event.target.value;
-                    onChange(serializeMultiValues(nextValues));
+          {values.map((entry, index) => {
+            const rowLabel = `${fieldTitle} ${formatUiNumber(index + 1, language)}`;
+            return (
+              <div className="flex items-center gap-2" key={`${item.key}-${index}`}>
+                <div className="flex-1">
+                  <CredentialInput
+                    purpose="configuration-secret"
+                    credentialId={`${item.key}-${index + 1}`}
+                    allowTogglePassword
+                    passwordToggleLabel={rowLabel}
+                    iconType={iconType}
+                    id={index === 0 ? controlId : `${controlId}-${index}`}
+                    aria-label={rowLabel}
+                    aria-invalid={hasError || undefined}
+                    aria-describedby={ariaDescribedBy}
+                    readOnly={!isPasswordEditable}
+                    onFocus={onPasswordFocus}
+                    value={entry}
+                    disabled={disabled || !schema?.isEditable}
+                    onChange={(event) => {
+                      const nextValues = [...values];
+                      nextValues[index] = event.target.value;
+                      onChange(serializeMultiValues(nextValues));
+                    }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="lg"
+                  className="px-3 text-muted-text shadow-none hover:text-danger"
+                  aria-label={`${t('settings.fieldDelete')}${getUiColon(language)}${rowLabel}`}
+                  disabled={disabled || !schema?.isEditable || values.length <= 1}
+                  onClick={() => {
+                    const nextValues = values.filter((_, rowIndex) => rowIndex !== index);
+                    onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
                   }}
-                />
+                >
+                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                className="px-3 text-muted-text shadow-none hover:text-danger"
-                aria-label={t('settings.fieldDelete')}
-                disabled={disabled || !schema?.isEditable || values.length <= 1}
-                onClick={() => {
-                  const nextValues = values.filter((_, rowIndex) => rowIndex !== index);
-                  onChange(serializeMultiValues(nextValues.length ? nextValues : ['']));
-                }}
-              >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+            );
+          })}
 
           <div className="flex items-center gap-2">
             <Button
@@ -294,8 +302,9 @@ function renderFieldControl(
     }
 
     return (
-      <Input
-        type="password"
+      <CredentialInput
+        purpose="configuration-secret"
+        credentialId={item.key}
         allowTogglePassword
         iconType={iconType}
         id={controlId}
@@ -432,6 +441,7 @@ export const SettingsField: React.FC<SettingsFieldProps> = ({
       <div className={cn('min-w-0', !isTextarea && 'md:justify-self-end md:w-full')}>
         {renderFieldControl(
           item,
+          title,
           displayValue,
           disabled || dependencyLocked || Boolean(readOnlyDiagnostic),
           (nextValue) => onChange(item.key, nextValue),

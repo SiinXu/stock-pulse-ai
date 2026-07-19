@@ -2,7 +2,7 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import { motion } from "motion/react";
 import { TrendingUp } from "lucide-react";
-import { Button, Input } from '../components/common';
+import { Button, CredentialInput } from '../components/common';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
@@ -14,9 +14,9 @@ import { getLoginConnectionStatus } from '../utils/loginConnection';
 import { SettingsAlert } from '../components/settings';
 
 const CONNECTION_STATUS_TEXT = {
-  secure: 'login.secureConnection',
-  local: 'login.localConnection',
-  insecure: 'login.insecureConnection',
+  https: 'login.secureConnection',
+  'local-http': 'login.localConnection',
+  'insecure-http': 'login.insecureConnection',
 } as const;
 
 const LoginPage: React.FC = () => {
@@ -39,7 +39,8 @@ const LoginPage: React.FC = () => {
   const [passwordConfirmError, setPasswordConfirmError] = useState('');
 
   const isFirstTime = setupState === 'no_password' || !passwordSet;
-  const connectionStatus = getLoginConnectionStatus(window.location.protocol, window.location.hostname);
+  const connectionStatus = getLoginConnectionStatus(window.location);
+  const isInsecureConnection = connectionStatus === 'insecure-http';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,10 +115,9 @@ const LoginPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             <div className="space-y-4">
-              <Input
+              <CredentialInput
                 id="password"
-                name="stockpulse-admin-password"
-                type="password"
+                purpose={isFirstTime ? 'admin-new-password' : 'admin-current-password'}
                 appearance="login"
                 allowTogglePassword
                 iconType="password"
@@ -132,14 +132,12 @@ const LoginPage: React.FC = () => {
                 disabled={isSubmitting}
                 required
                 autoFocus
-                autoComplete={isFirstTime ? 'new-password' : 'current-password'}
               />
 
               {isFirstTime && (
-                <Input
+                <CredentialInput
                   id="passwordConfirm"
-                  name="stockpulse-admin-password-confirmation"
-                  type="password"
+                  purpose="admin-new-password-confirmation"
                   appearance="login"
                   allowTogglePassword
                   iconType="password"
@@ -153,7 +151,6 @@ const LoginPage: React.FC = () => {
                   error={passwordConfirmError}
                   disabled={isSubmitting}
                   required
-                  autoComplete="new-password"
                 />
               )}
             </div>
@@ -188,11 +185,12 @@ const LoginPage: React.FC = () => {
 
           <p
             className={
-              connectionStatus === 'insecure'
-                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-warning'
+              isInsecureConnection
+                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs font-medium text-[hsl(var(--color-danger-alert-text))]'
                 : 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-[var(--login-text-muted)]'
             }
             data-connection-status={connectionStatus}
+            role={isInsecureConnection ? 'alert' : 'status'}
           >
             {t(CONNECTION_STATUS_TEXT[connectionStatus])}
           </p>

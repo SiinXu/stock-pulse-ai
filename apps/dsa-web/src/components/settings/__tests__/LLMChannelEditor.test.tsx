@@ -1775,6 +1775,26 @@ describe('LLMChannelEditor', () => {
     return screen.getByRole('dialog', { name: '添加模型服务' });
   }
 
+  it('isolates provider credentials and keeps autofill-like modal changes local', async () => {
+    const onDraftItemsChange = vi.fn();
+    const dialog = openAddAfterRender({ onDraftItemsChange });
+    selectProvider('openai');
+    await waitFor(() => expect(onDraftItemsChange).toHaveBeenCalled());
+    onDraftItemsChange.mockClear();
+
+    const providerCredential = within(dialog).getByLabelText('API 密钥');
+    expect(providerCredential).toHaveAttribute('name', 'stockpulse-provider-api-key');
+    expect(providerCredential).toHaveAttribute('autocomplete', 'off');
+    expect(providerCredential).toHaveValue('');
+
+    fireEvent.change(providerCredential, { target: { value: 'autofilled-admin-password' } });
+
+    expect(providerCredential).toHaveValue('autofilled-admin-password');
+    expect(testLLMChannel).not.toHaveBeenCalled();
+    expect(onDraftItemsChange).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('connection-card-openai')).not.toBeInTheDocument();
+  });
+
   it('uses official protocol and endpoint defaults without seeding or exposing them', () => {
     const dialog = openAddAfterRender();
     selectProvider('deepseek');
@@ -1829,8 +1849,8 @@ describe('LLMChannelEditor', () => {
     expect(within(dialog).getByLabelText('协议')).toHaveAttribute('role', 'combobox');
     expect(within(dialog).getByLabelText('服务地址')).toBeInTheDocument();
     const apiKeyInput = within(dialog).getByLabelText('API 密钥');
-    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-llm-connection-api-key');
-    expect(apiKeyInput).toHaveAttribute('autocomplete', 'new-password');
+    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-provider-api-key');
+    expect(apiKeyInput).toHaveAttribute('autocomplete', 'off');
     expect(apiKeyInput).toHaveAttribute('autocapitalize', 'none');
     expect(apiKeyInput).toHaveAttribute('spellcheck', 'false');
   });

@@ -169,6 +169,33 @@ describe('FirstRunWizard', () => {
     expect(options.map((option) => option.textContent).join(' ')).not.toMatch(/[\u3400-\u9fff]/u);
   });
 
+  it('isolates provider credentials and keeps autofill-like changes side-effect free', () => {
+    const onComplete = okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="zh"
+        providers={[CATALOG.find((entry) => entry.id === 'openai')!]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /云 API/ }));
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    const providerCredential = screen.getByLabelText('API 密钥');
+    expect(providerCredential).toHaveAttribute('name', 'stockpulse-provider-api-key');
+    expect(providerCredential).toHaveAttribute('autocomplete', 'off');
+    expect(providerCredential).toHaveValue('');
+
+    fireEvent.change(providerCredential, { target: { value: 'autofilled-admin-password' } });
+
+    expect(providerCredential).toHaveValue('autofilled-admin-password');
+    expect(discoverLLMChannelModels).not.toHaveBeenCalled();
+    expect(testLLMChannel).not.toHaveBeenCalled();
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it('uses the schema API-key requirement when Catalog says the key is required', () => {
     render(
       <FirstRunWizard
@@ -195,8 +222,8 @@ describe('FirstRunWizard', () => {
 
     const apiKeyInput = screen.getByLabelText('API 密钥（可选）');
     expect(apiKeyInput).toHaveValue('');
-    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-first-run-llm-api-key');
-    expect(apiKeyInput).toHaveAttribute('autocomplete', 'new-password');
+    expect(apiKeyInput).toHaveAttribute('name', 'stockpulse-provider-api-key');
+    expect(apiKeyInput).toHaveAttribute('autocomplete', 'off');
     expect(apiKeyInput).toHaveAttribute('autocapitalize', 'none');
     expect(apiKeyInput).toHaveAttribute('spellcheck', 'false');
     expect(screen.getByRole('button', { name: '下一步' })).toBeEnabled();

@@ -487,8 +487,13 @@ test.describe('Settings Help shared tooltip contract', () => {
     await opener.click();
     const outerDialog = page.getByRole('dialog', { name: 'Outer modal' });
     const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
-    await helpTrigger.click();
+    const helpPopupTrigger = helpTrigger.locator('xpath=..');
+    // Keep this focus-restoration scenario keyboard-only. A pointer left over
+    // the trigger can legitimately reopen the hover tooltip after an overlay
+    // is removed, adding another topmost Escape target on some browsers.
+    await helpTrigger.focus();
     await expect(page.getByRole('tooltip')).toBeVisible();
+    await expect(helpPopupTrigger).toHaveAttribute('data-dialog-popup', 'true');
 
     await page.getByTestId('open-confirm').evaluate((element: HTMLElement) => element.click());
     const confirmDialog = page.getByRole('dialog', { name: 'Confirm contract action' });
@@ -502,10 +507,12 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expect(helpTrigger).toBeFocused();
     const restoredTooltip = page.getByRole('tooltip');
     await expect(restoredTooltip).toBeVisible();
+    await expect(helpPopupTrigger).toHaveAttribute('data-dialog-popup', 'true');
     await expectBodyOverflow(page, 'hidden');
     await page.keyboard.press('Escape');
 
     await expect(restoredTooltip).toHaveCount(0);
+    await expect(helpPopupTrigger).not.toHaveAttribute('data-dialog-popup', 'true');
     await expect(outerDialog).toBeVisible();
     await expect(helpTrigger).toBeFocused();
     await expectBodyOverflow(page, 'hidden');
