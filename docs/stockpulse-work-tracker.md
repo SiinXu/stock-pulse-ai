@@ -1,16 +1,18 @@
 # StockPulse Work Tracker — Agent Runtime(AR)工作线
 
 - 状态:`Living`(每个 AR 阶段合入/裁决后更新)
-- 日期:2026-07-19（Native Only 实施状态同步）
-- 代码 baseline:`main@b8983fc7`
+- 日期:2026-07-19（RT-02 历史证据边界校准）
+- 代码 baseline:`main@efb08302`
 - 历史计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Historical / Superseded`)
 - 权威决策:`docs/architecture/ADR-001-agent-runtime.md`
-- 历史修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Historical / Completed`,RF-00～RF-07 已结束)
+- 历史修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Historical / Completed` 计划生命周期；证据为 `Partial`)
 
 ## 1. 追踪原则
 
 - 本 tracker 只记录 AR 工作线的阶段状态、合入证据与裁决记录；现行架构以 ADR-001 为准，历史计划不再是执行权威。
 - 每行状态变更须附证据(PR 编号、commit、裁决日期);无证据不得标记完成。
+- 历史计划 `Completed` 只表示 Native Only 停止路径已经执行，不表示 benchmark、
+  依赖足迹、Desktop 或全部安全失败面证据已经收集。
 - 首版不含历史条目:此前不存在本文档,任何"旧 baseline"或"AR-07"历史描述均无从修正,以当前主线为唯一起点。
 
 ## 2. 阶段状态总览
@@ -23,7 +25,7 @@
 | AR-PY-02 | BoundToolSession | **Done** | 已随 PR #18 合入 `tool_session.py`(allowlist/权限/预算/deadline/审计/late-result fence);RF-03(PR #23,commit 4e0e820c;deadline 绝对单调化 9f4a7882)使 Native 经同一 `BoundToolSession`(`enforce_access_policy=False`)分发,消除第二套工具权威,关闭 AR-RF-03 |
 | AR-PY-03 | Lifecycle / typed events / 真实取消 | **Done** | 已随 PR #18 合入 `events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);RF-04(PR #25,commit 8ec4bdd4;changelog PR #27)以单一分类器统一全入口终态 write fence 与生命周期,关闭 AR-RF-07 |
 | AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Retired / Removed** | RF-05 曾完成隔离桥；RF-07 裁决 Native Only 后，2026-07-19 删除 Adapter、toolset、可选依赖和注入点。历史实现不再是主线能力 |
-| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Historical evidence complete** | RF-01/RF-06a/RF-06b 为 RF-07 提供历史裁决证据；cross-runtime 测试和专用 CI 随实验实现删除，通用 secret/URL/token 脱敏与长度回归已迁入 Native 异常路径。依赖数字和证据表述的进一步校准由 RT-02 处理 |
+| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Historical / Partial** | RF-06a 只证明 8 个精确 fixture 完全等价和 3 个精确 fixture 终态分类等价；RF-06b 只覆盖 provider-error 终端诊断。真实 provider、其它泄漏面、Desktop 和可复现依赖净增量未收集。cross-runtime 测试与专用 CI 已随实验实现删除，已证明的 Native 脱敏回归保留 |
 | AR-PY-06 | 有限产品化(条件阶段) | **Resolved / Implemented (Native Only)** | RF-07 于 2026-07-18 裁决 Native Only；2026-07-19 完整删除实验可执行面，不存在 runtime selector、fallback、休眠依赖或专用 CI |
 
 ## 3. 裁决记录
@@ -44,8 +46,8 @@
 | --- | --- |
 | `docs/architecture/pydanticai-runtime-development-plan.md` | `Historical / Superseded` |
 | `docs/architecture/ADR-001-agent-runtime.md` | `Accepted`(2026-07-19 修订，Native Only 已实施) |
-| `docs/architecture/pydanticai-runtime-recovery-plan.md` | `Historical / Completed` |
-| `docs/architecture/pydanticai-runtime-adoption-decision.md` | `Accepted / Implemented`(2026-07-19) |
+| `docs/architecture/pydanticai-runtime-recovery-plan.md` | `Historical / Completed`（计划停止路径完成，证据仍为 Partial） |
+| `docs/architecture/pydanticai-runtime-adoption-decision.md` | 决策 `Accepted / Implemented`；证据 `Historical / Partial`(2026-07-19) |
 | `docs/stockpulse-agent-runtime-framework-comparison.md` | `Historical` |
 | `docs/stockpulse-work-tracker.md` | `Living`(本文档) |
 | `docs/agent-stream-events.md` | 既存,SSE 事件契约权威 |
@@ -71,7 +73,8 @@
 | 2026-07-18 | RF-03 合入(PR #23):Native 统一经 `BoundToolSession` + deadline 绝对单调化;关闭 AR-RF-03;AR-PY-02 -> Done |
 | 2026-07-18 | RF-04 合入(PR #25;changelog PR #27):单一分类器统一全入口终态 write fence 与生命周期;关闭 AR-RF-07;AR-PY-03 -> Done |
 | 2026-07-18 | RF-05 合入(PR #28):PydanticAI Single RUN 真实模型桥(工具 schema 下发/ToolCall/ToolReturn/reasoning/provider trace 往返/prompt 复用/usage 修字段/deadline/cancel fence);CHAT/RESEARCH -> `unsupported_capability`;关闭 AR-RF-04/05/06/10/11;AR-PY-04 -> Experimental(桥完成,待 RF-06) |
-| 2026-07-18 | RF-06a 合入(PR #32):离线 cross-runtime conformance 双跑(Single RUN 8 等价 + 3 有意差异 ADR-001 D5 + 非 RUN unsupported);36 fixture 只读;含 review 强化(终态精确匹配) |
-| 2026-07-18 | RF-06b 合入(PR #33):实验 Runtime 失败面泄漏扫描(secret/URL/token 脱敏)+ RF-07 决策证据卷宗(`Draft`);关闭 AR-RF-08 离线部分;AR-PY-05 -> Done |
+| 2026-07-18 | RF-06a 合入(PR #32):离线 cross-runtime conformance 双跑 8 个精确 fixture 完全等价 + `contract-timeout-agent-wallclock` / `contract-cancelrace-single-slow-tool` / `contract-cancelrace-parallel-late-tool` 三例仅终态分类等价；另有 CHAT/RESEARCH 两个 direct capability test 返回 unsupported，其它 manifest 模式在矩阵外；36 fixture 只读；历史 fence 差异以 PR #32 为证据，不引用当前 ADR 编号 |
+| 2026-07-18 | RF-06b 合入(PR #33):实验 Runtime 的 provider-error 终端诊断泄漏扫描(secret/URL/token 脱敏)+ RF-07 决策证据卷宗(`Draft`);只完成 AR-RF-08 的该离线子集;AR-PY-05 保持 Partial |
 | 2026-07-18 | RF-07 裁决(本 PR):维护者裁决 `Native Only`;决策报告 `Draft` -> `Accepted`;AR-PY-06 -> Resolved(Native Only);RF-00～RF-07 修复计划收尾 |
 | 2026-07-19 | Native Only 实施：实验 Runtime 的 Adapter、toolset、可选依赖、注入点、cross-runtime tests 与 `pydanticai-installed` CI 删除；AR-PY-04 -> Retired / Removed，AR-PY-06 -> Implemented |
+| 2026-07-19 | RT-02 证据治理：conformance 历史范围冻结为 8+3 个精确 fixture ID，删除不可复现依赖数字，明确 leak scan 与未收集证据边界；AR-PY-05 校准为 Historical / Partial |
