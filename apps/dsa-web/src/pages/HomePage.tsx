@@ -1619,14 +1619,15 @@ const HomePage: React.FC = () => {
             {inputError ? (
               <InlineAlert
                 variant="danger"
+                size="compact"
                 title={t('home.inputInvalid')}
                 message={inputError}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {!inputError && duplicateError && duplicateBannerVisible ? (
               <InlineAlert
                 variant="warning"
+                size="compact"
                 title={t('home.duplicateTask')}
                 message={duplicateTask
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
@@ -1641,7 +1642,6 @@ const HomePage: React.FC = () => {
                     <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 )}
-                className="rounded-xl px-3 py-2 text-xs shadow-none"
               />
             ) : null}
           </div>
@@ -1651,6 +1651,7 @@ const HomePage: React.FC = () => {
           <div className="px-3 pb-2 md:px-4">
             <InlineAlert
               variant="warning"
+              size="compact"
               title={t('home.setupIncomplete')}
               message={
                 setupMissingLabels
@@ -1667,7 +1668,6 @@ const HomePage: React.FC = () => {
                   {t('home.goSettings')}
                 </Button>
               )}
-              className="rounded-xl px-3 py-2 text-xs shadow-none"
             />
           </div>
         ) : null}
@@ -1701,9 +1701,9 @@ const HomePage: React.FC = () => {
               <div className="mb-3">
                 <InlineAlert
                   variant={marketReviewNotice.variant}
+                  size="compact"
                   title={marketReviewNotice.title}
                   message={marketReviewNotice.message}
-                  className="rounded-xl px-3 py-2 text-xs shadow-none"
                 />
               </div>
             ) : null}
@@ -1875,7 +1875,7 @@ const HomePage: React.FC = () => {
                 <EmptyState
                   title={t('home.startAnalysisTitle')}
                   description={t('home.startAnalysisDescription')}
-                  className="max-w-xl border-dashed"
+                  className="max-w-xl"
                   icon={(
                     <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

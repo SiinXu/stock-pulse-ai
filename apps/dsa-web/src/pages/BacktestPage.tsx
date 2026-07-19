@@ -717,7 +717,7 @@ const BacktestPage: React.FC = () => {
             <EmptyState
               title={text.noMetricsTitle}
               description={text.noMetricsDescription}
-              className="h-full min-h-[12rem] border-dashed bg-card/45 shadow-none"
+              className="h-full min-h-[12rem]"
             />
           )}
 
@@ -751,7 +751,6 @@ const BacktestPage: React.FC = () => {
             <EmptyState
               title={text.noResultsTitle}
               description={text.noResultsDescription}
-              className="backtest-empty-state border-dashed"
               icon={(
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />

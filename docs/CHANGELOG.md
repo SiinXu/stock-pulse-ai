@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [改进] `llm_usage` 遥测列的 startup 兼容 DDL 转为正式 migration `202607190001_llm_usage_telemetry_columns`（稳定 ID + 源码 checksum，legacy 缺列时幂等补列、fresh 库 no-op）；startup 改为在初始化写锁与同一事务内、baseline 证明之前有序应用 pending migration，使 create_all、兼容修复、迁移 DDL 与 baseline 校验保持原子且整体回滚，并移除运行时 `_ensure_llm_usage_telemetry_columns` DDL；`apply_pending` engine 入口仍供独立诊断按 migration 单独取锁提交。
+- [改进] Web 新增权威 `Surface`、`Section`、`StatePanel` 与 `Alert` 契约，以 L0/L1/L2/Overlay 语义层级替代默认卡片边界；组件统一拥有 live-region / busy 语义与 compact/default Alert 密度，现有 Card、空态、加载态和 API 错误通过兼容适配器收敛，Token Usage 在加载、无数据与错误时只显示一个主状态、隐藏零值指标墙，并在跨周期请求失败时不再把旧周期数据标为当前结果；AST 守卫阻止页面重新叠加背景、边框、圆角和阴影。
 - [修复] Agent Runtime 历史证据治理改为精确 fixture ID：不再按 timeout/cancelrace profile 自动扩大 conformance 例外，删除缺少双环境快照的依赖包数量结论，并将仅覆盖离线子集的 AR-PY-05 状态校准为 `Historical / Partial`；同时明确 provider-error 脱敏不能代表 prompt、reasoning、tool result、日志和其它异常失败面已完成扫描。
 - [chore] Agent Runtime 完整执行 `Native Only` 裁决：删除休眠的 PydanticAI Adapter、toolset、可选依赖、内部注入点、cross-runtime 测试与专用 CI；保留 vendor-neutral Contract、Native Adapter、BoundToolSession、生命周期、事件、sanitizer 和 36 个 replay fixture，并将 API key、带凭据 URL、Bearer token 脱敏及 300 字符诊断上限迁入 Native 异常回归。
 - [改进] Web 共享 `Button` 的 90 处 `xsm`/`sm`/`md`/`lg` 旧尺寸调用改用 `compact`/`default`/`comfortable`/`primary` 语义档位，并删除兼容类型和重复样式；AST 设计守卫同时阻止共享样式表、直接调用、别名及命名空间调用重新引入旧尺寸，现有 28/32/36/40px 可见高度与交互行为保持不变。

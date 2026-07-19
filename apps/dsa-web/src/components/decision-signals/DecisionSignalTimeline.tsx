@@ -234,7 +234,7 @@ export const DecisionSignalTimeline: React.FC<DecisionSignalTimelineProps> = ({
   if (items.length === 0) {
     return (
       <EmptyState
-        className="border-none bg-transparent py-6 shadow-none"
+        compact
         title={t('decisionSignals.timelineEmptyTitle')}
         description={t('decisionSignals.timelineEmptyDescription')}
         icon={<Activity className="h-6 w-6" />}

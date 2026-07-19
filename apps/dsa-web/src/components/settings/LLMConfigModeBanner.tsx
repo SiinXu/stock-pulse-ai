@@ -113,10 +113,10 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
             <InlineAlert
               key={`${issue.code}-${issue.key}`}
               variant="warning"
+              size="compact"
               message={issue.code === 'forced_mode_no_config'
                 ? formatUiText(text.configModeIssue, { mode: status.requestedMode })
                 : text.unknownConfigIssue}
-              className="rounded-lg px-3 py-2 text-xs shadow-none"
             />
           ))}
         </div>
