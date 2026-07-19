@@ -176,7 +176,10 @@ function stableDigest(input: string): string {
 }
 
 export function computeManualSignalTraceId(fields: Array<string | number | undefined>): string {
-  const canonical = fields.map((value) => (value === undefined ? '' : String(value))).join('');
+  // JSON-encode the field array so boundaries between adjacent free-text
+  // fields are unambiguous; a plain join lets e.g. ["ab","c"] and ["a","bc"]
+  // hash identically and wrongly dedup two distinct drafts.
+  const canonical = JSON.stringify(fields.map((value) => (value === undefined ? '' : String(value))));
   return `${MANUAL_SIGNAL_TRIGGER_SOURCE}:${stableDigest(canonical)}`;
 }
 

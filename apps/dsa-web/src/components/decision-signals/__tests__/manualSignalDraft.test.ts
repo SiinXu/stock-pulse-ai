@@ -111,6 +111,12 @@ describe('buildManualSignalPayload', () => {
     expect(changedReason.traceId).not.toBe(base.traceId);
   });
 
+  it('keeps distinct signals distinct when free-text field boundaries shift', () => {
+    const a = buildManualSignalPayload(draft({ ...validMinimal, reason: 'ab', riskSummary: 'c' }));
+    const b = buildManualSignalPayload(draft({ ...validMinimal, reason: 'a', riskSummary: 'bc' }));
+    expect(a.traceId).not.toBe(b.traceId);
+  });
+
   it('treats equivalent stock-code spellings as the same signal identity', () => {
     const canonical = buildManualSignalPayload(draft({ stockCode: 'HK00700', market: 'hk', action: 'buy' }));
     const shorthand = buildManualSignalPayload(draft({ stockCode: '00700', market: 'hk', action: 'buy' }));
@@ -127,6 +133,10 @@ describe('computeManualSignalTraceId', () => {
 
   it('treats undefined and empty consistently but distinguishes field boundaries', () => {
     expect(computeManualSignalTraceId([undefined, 'x'])).toBe(computeManualSignalTraceId(['', 'x']));
+  });
+
+  it('does not collide when a boundary between adjacent fields shifts', () => {
+    expect(computeManualSignalTraceId(['ab', 'c'])).not.toBe(computeManualSignalTraceId(['a', 'bc']));
   });
 });
 
