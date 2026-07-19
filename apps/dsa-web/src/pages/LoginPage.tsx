@@ -180,7 +180,7 @@ const LoginPage: React.FC = () => {
           <p
             className={
               isInsecureConnection
-                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-warning'
+                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs font-medium text-[hsl(var(--color-danger-alert-text))]'
                 : 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-[var(--login-text-muted)]'
             }
             data-connection-status={connectionStatus}

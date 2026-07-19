@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { getE2eAuthStatus, loginAsE2eAdmin } from './auth-fixture';
+import { resolvePlaywrightPorts } from './playwright-result-paths.mjs';
+
+const { frontendPort } = resolvePlaywrightPorts(process.env);
+const localFrontendOrigin = `http://127.0.0.1:${frontendPort}`;
 
 async function login(page: Page) {
   await loginAsE2eAdmin(page);
@@ -20,6 +24,46 @@ async function selectUiLanguage(page: Page, language: 'zh' | 'en') {
   await openProfileMenu(page);
   await uiLanguageSelector(page).click();
   await page.locator(`[role="option"][data-value="${language}"]`).click();
+}
+
+async function openLoginAtBrowserOrigin(page: Page, browserOrigin: string) {
+  await page.route(`${browserOrigin}/**`, async (route) => {
+    const browserUrl = new URL(route.request().url());
+    const localUrl = new URL(`${browserUrl.pathname}${browserUrl.search}`, localFrontendOrigin);
+    const response = await route.fetch({ url: localUrl.href });
+    await route.fulfill({ response });
+  });
+  await page.goto(`${browserOrigin}/login`);
+  await page.waitForLoadState('domcontentloaded');
+}
+
+function relativeLuminance([red, green, blue]: number[]) {
+  const channels = [red, green, blue].map((value) => {
+    const normalized = value / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+}
+
+function contrastRatio(foreground: number[], background: number[]) {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+async function expectSecurityWarningContrast(page: Page, theme: 'light' | 'dark') {
+  await page.evaluate((nextTheme) => {
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(nextTheme);
+  }, theme);
+  const foreground = await page.locator('[data-connection-status="insecure-http"]').evaluate((element) => {
+    const match = getComputedStyle(element).color.match(/\d+(?:\.\d+)?/g);
+    return match?.slice(0, 3).map(Number) ?? [];
+  });
+  const conservativeBackground = theme === 'light' ? [255, 255, 255] : [0, 0, 0];
+  expect(contrastRatio(foreground, conservativeBackground)).toBeGreaterThanOrEqual(4.5);
 }
 
 test.describe('web smoke', () => {
@@ -47,6 +91,46 @@ test.describe('web smoke', () => {
     await expect(connectionNotice).toHaveText('当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。');
     await expect(page.getByText(/StockPulse-V3-TLS/)).toHaveCount(0);
   });
+
+  for (const transportCase of [
+    {
+      origin: 'https://secure.stockpulse.test',
+      protocol: 'https:',
+      hostname: 'secure.stockpulse.test',
+      status: 'https',
+      role: 'status',
+      copy: '此登录页面使用 HTTPS 加密传输。',
+    },
+    {
+      origin: 'http://stocks.example.test',
+      protocol: 'http:',
+      hostname: 'stocks.example.test',
+      status: 'insecure-http',
+      role: 'alert',
+      copy: '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。',
+    },
+  ] as const) {
+    test(`login page derives ${transportCase.status} from the browser origin`, async ({ page }) => {
+      await openLoginAtBrowserOrigin(page, transportCase.origin);
+
+      await expect.poll(() => page.evaluate(() => ({
+        hostname: window.location.hostname,
+        protocol: window.location.protocol,
+      }))).toEqual({
+        hostname: transportCase.hostname,
+        protocol: transportCase.protocol,
+      });
+      const connectionNotice = page.locator('[data-connection-status]');
+      await expect(connectionNotice).toHaveAttribute('data-connection-status', transportCase.status);
+      await expect(connectionNotice).toHaveAttribute('role', transportCase.role);
+      await expect(connectionNotice).toHaveText(transportCase.copy);
+
+      if (transportCase.status === 'insecure-http') {
+        await expectSecurityWarningContrast(page, 'light');
+        await expectSecurityWarningContrast(page, 'dark');
+      }
+    });
+  }
 
   test('home page shows analysis entry and history panel after login', async ({ page }) => {
     await login(page);

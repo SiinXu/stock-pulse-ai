@@ -117,6 +117,10 @@ describe('LoginPage', () => {
       const notice = screen.getByText(expectedCopy);
       expect(notice).toHaveAttribute('data-connection-status', status);
       expect(notice).toHaveAttribute('role', isWarning ? 'alert' : 'status');
+      if (isWarning) {
+        expect(notice).toHaveClass('text-[hsl(var(--color-danger-alert-text))]');
+        expect(notice).not.toHaveClass('text-warning');
+      }
       expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
     },
   );
