@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ReportOverview } from '../ReportOverview';
 
 const baseMeta = {
@@ -19,6 +20,53 @@ const baseSummary = {
 };
 
 describe('ReportOverview', () => {
+  it('uses canonical action instead of conflicting report advice', () => {
+    render(
+      <ReportOverview
+        meta={baseMeta}
+        summary={{
+          ...baseSummary,
+          action: 'buy',
+          actionLabel: 'Sell',
+          operationAdvice: 'Sell',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('买入')).toBeVisible();
+    expect(screen.queryByText('Sell')).not.toBeInTheDocument();
+  });
+
+  it('localizes canonical action in the current UI language', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportOverview
+          meta={{ ...baseMeta, reportLanguage: 'en' }}
+          summary={{
+            ...baseSummary,
+            action: 'buy',
+            actionLabel: 'Sell',
+            operationAdvice: 'Sell',
+          }}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByText('Buy')).toBeVisible();
+    expect(screen.queryByText('Sell')).not.toBeInTheDocument();
+  });
+
+  it('keeps full legacy advice when structured action is absent', () => {
+    render(
+      <ReportOverview
+        meta={baseMeta}
+        summary={{ ...baseSummary, actionLabel: '观望' }}
+      />,
+    );
+
+    expect(screen.getByText('继续观察买点')).toBeVisible();
+  });
+
   it('renders final market phase and partial-bar labels from report metadata', () => {
     render(
       <ReportOverview

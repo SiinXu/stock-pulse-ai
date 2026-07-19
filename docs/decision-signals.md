@@ -35,9 +35,9 @@
 
 Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标签；API 响应继续保留原始枚举值。
 
-`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。`presentation.action` 永远来自 canonical 八态 `action`；`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API JSON 序列化消费者必须优先读取 `presentation`，只有滚动升级连接旧后端时才回退平铺字段。当前没有独立的 DecisionSignal 导出端点或导出 UI，API JSON 是现有唯一导出面。通知会读取本次 worker 的 `REPORT_LANGUAGE`（`zh/en/ko`）重新本地化 `presentation.action`，Web 会按当前 UI 语言本地化同一 action。
+`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。`presentation.action` 永远来自 canonical 八态 `action`；`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。只有合法字符串 `metadata.report_language` 才参与语言选择；非字符串或不支持的值仍作为普通 caller metadata 保留，但会被 presentation 忽略，不能让 create/list/detail 序列化失败。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API JSON 序列化消费者必须优先读取 `presentation`，只有滚动升级连接旧后端时才回退平铺字段。当前没有独立的 DecisionSignal 导出端点或导出 UI，API JSON 是现有唯一导出面。通知会读取本次 worker 的 `REPORT_LANGUAGE`（`zh/en/ko`）重新本地化 `presentation.action`，Web 会按当前 UI 语言本地化同一 action。
 
-该模型只属于独立 `DecisionSignal` 资源和低敏 `decision_signal_summary`。主报告、历史列表、StockBar 与回测 schema 继续保持字段隔离，不嵌入完整 signal presentation。
+该模型只属于独立 `DecisionSignal` 资源和低敏 `decision_signal_summary`。主报告、历史列表、StockBar 与回测 schema 继续保持字段隔离，不嵌入完整 signal presentation；但主报告与历史已有的结构化 `action/action_label` 仍以 `action` 为方向权威，Web 报告动作卡与历史 badge 复用同一 taxonomy 标签工具，只有缺少结构化 action 的 legacy 报告才原样回退 `operation_advice`。
 
 ## Canonical 评分与 action 口径
 

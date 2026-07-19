@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [修复] DecisionSignal 新增 canonical `presentation` 视图模型，以 `action` 统一动作方向，并集中提供本地化标签、置信度、摘要、风险和时间戳；API、通知、Web 卡片/详情/时间线与组合风险不再分别信任可能冲突的 `action_label` 或平铺展示字段，状态 metadata 替换会保留正式语言 provenance，旧字段继续保留用于兼容。
+- [修复] DecisionSignal 新增 canonical `presentation` 视图模型，以 `action` 统一动作方向，并集中提供本地化标签、置信度、摘要、风险和时间戳；API、通知、Web 卡片/详情/时间线、主报告动作卡、历史 badge 与组合风险不再分别信任可能冲突的 `action_label`、`operation_advice` 或平铺展示字段，状态 metadata 替换会保留正式语言 provenance，旧字段继续保留用于兼容。
 - [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
 - [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
 - [修复] 诊断脱敏 `sanitize_diagnostic_text` / `sanitize_sensitive_text` 现同时脱敏非 HTTP 连接串（postgresql/mysql/redis/mongodb/amqp 等）userinfo 中的凭据，此前仅覆盖 http(s)，SQLAlchemy 等连接错误可能把数据库密码泄漏进 Agent 诊断与日志；host 保留以维持诊断可读性。

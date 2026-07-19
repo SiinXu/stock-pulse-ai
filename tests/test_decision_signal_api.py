@@ -301,6 +301,48 @@ def test_api_json_export_contract_prefers_canonical_presentation(client_and_db) 
 
 
 @pytest.mark.parametrize(
+    "invalid_report_language",
+    [123, ["en"], {"language": "en"}],
+    ids=("integer", "list", "object"),
+)
+def test_api_json_export_ignores_non_string_metadata_report_language(
+    client_and_db,
+    invalid_report_language,
+) -> None:
+    client, _db = client_and_db
+    create_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(
+            source_report_id=4004,
+            trace_id="trace-export-invalid-language-4004",
+            action="buy",
+            action_label="买入",
+            metadata={
+                "report_language": invalid_report_language,
+                "source_marker": "preserved",
+            },
+        ),
+    )
+
+    assert create_resp.status_code == 200, create_resp.text
+    created = create_resp.json()["item"]
+    signal_id = created["id"]
+    assert created["metadata"]["report_language"] == invalid_report_language
+    assert created["metadata"]["source_marker"] == "preserved"
+    assert created["presentation"]["label"] == "买入"
+
+    detail_resp = client.get(f"/api/v1/decision-signals/{signal_id}")
+    list_resp = client.get(
+        "/api/v1/decision-signals",
+        params={"source_report_id": 4004},
+    )
+    assert detail_resp.status_code == 200, detail_resp.text
+    assert list_resp.status_code == 200, list_resp.text
+    assert detail_resp.json()["presentation"]["label"] == "买入"
+    assert list_resp.json()["items"][0]["presentation"]["label"] == "买入"
+
+
+@pytest.mark.parametrize(
     ("replacement_metadata", "expected_metadata"),
     [
         ({}, {"decision_profile": "balanced", "report_language": "en"}),

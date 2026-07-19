@@ -1696,6 +1696,57 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
   });
 
+  test('34c report and history use canonical action when legacy advice conflicts', async ({ page }) => {
+    const conflictItem = {
+      ...historyItem(92, 'AAPL', 'Canonical report fixture'),
+      report_language: 'en',
+      action: 'buy',
+      action_label: 'Sell',
+      operation_advice: 'Sell',
+    };
+    const conflictDetail = historyDetail(92, 'AAPL', 'Canonical report fixture');
+    conflictDetail.meta.report_language = 'en';
+    conflictDetail.summary = {
+      ...conflictDetail.summary,
+      action: 'buy',
+      action_label: 'Sell',
+      operation_advice: 'Sell',
+    };
+
+    await page.route('**/api/v1/history**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/history/stocks') {
+        await fulfillJson(route, { total: 1, items: [conflictItem] });
+        return;
+      }
+      if (url.pathname === '/api/v1/history') {
+        const items = url.searchParams.get('report_type') === 'market_review' ? [] : [conflictItem];
+        await fulfillJson(route, { total: items.length, page: 1, limit: 20, items });
+        return;
+      }
+      if (url.pathname === '/api/v1/history/92') {
+        await fulfillJson(route, conflictDetail);
+        return;
+      }
+      await route.continue();
+    });
+
+    await login(page, 'en');
+    const reportItem = page.getByRole('button', {
+      name: 'Canonical report fixture AAPL history record',
+      exact: true,
+    });
+    await expect(reportItem).toBeVisible({ timeout: 15_000 });
+    await expect(reportItem.getByText('Buy 60', { exact: true })).toBeVisible();
+    await expect(reportItem.getByText('Sell', { exact: true })).toHaveCount(0);
+
+    await reportItem.click();
+    const actionAdvice = page.getByText('Action Advice', { exact: true });
+    await expect(actionAdvice).toBeVisible();
+    await expect(actionAdvice.locator('..').getByText('Buy', { exact: true })).toBeVisible();
+    await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
+  });
+
   test('35 Backtest rapid result-filter switch keeps results and performance on the same latest phase', async ({ page }) => {
     const oldResults = deferred();
     const oldPerformance = deferred();

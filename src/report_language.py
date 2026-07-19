@@ -661,9 +661,11 @@ def normalize_report_language(value: Optional[str], default: str = "zh") -> str:
     return default
 
 
-def is_supported_report_language_value(value: Optional[str]) -> bool:
+def is_supported_report_language_value(value: Any) -> bool:
     """Return whether the raw value is a supported language code or alias."""
-    candidate = (value or "").strip().lower().replace(" ", "_")
+    if not isinstance(value, str):
+        return False
+    candidate = value.strip().lower().replace(" ", "_")
     if not candidate:
         return False
     return candidate in SUPPORTED_REPORT_LANGUAGES or candidate in _REPORT_LANGUAGE_ALIASES
