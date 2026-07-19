@@ -60,7 +60,10 @@ const BUTTON_CANONICAL_SIZE_HEIGHTS = {
   comfortable: 'h-9',
   primary: 'h-10',
 } as const;
-const BUTTON_ALLOWED_HEIGHT_CLASSES = new Set<string>(Object.values(BUTTON_CANONICAL_SIZE_HEIGHTS));
+const BUTTON_COMPAT_SIZE_HEIGHTS = {
+  xl: 'h-10',
+} as const;
+const BUTTON_LEGACY_SIZE_ALIASES = new Set(['xsm', 'sm', 'md', 'lg']);
 const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
 type ExactButtonAllowance = {
   line: number;
@@ -774,7 +777,7 @@ function spreadMayOverrideButtonSize(
   return false;
 }
 
-function appendButtonXlViolations(
+function appendButtonSizeUsageViolations(
   filename: string,
   source: string,
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
@@ -811,8 +814,17 @@ function appendButtonXlViolations(
       token: 'size={dynamic}',
     });
   }
-  if (!candidates.includes('xl')) return;
   const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
+  for (const candidate of candidates) {
+    if (!BUTTON_LEGACY_SIZE_ALIASES.has(candidate)) continue;
+    violations.push({
+      file: filename,
+      line: openingLine,
+      rule: 'button-size-contract',
+      token: `size="${candidate}"`,
+    });
+  }
+  if (!candidates.includes('xl')) return;
   if (consumeExactButtonAllowance(
     'button-xl-allowlist',
     BUTTON_XL_ALLOWLIST,
@@ -1645,7 +1657,19 @@ function appendButtonSizeContractViolations(
   for (const [size, entry] of entries) {
     if (size in BUTTON_CANONICAL_SIZE_HEIGHTS) continue;
     const heights = buttonHeightClasses(entry.fragments);
-    if (heights.length === 1 && BUTTON_ALLOWED_HEIGHT_CLASSES.has(heights[0])) continue;
+    if (BUTTON_LEGACY_SIZE_ALIASES.has(size)) {
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, entry.index),
+        rule: 'button-size-contract',
+        token: `${size}:legacy`,
+      });
+      continue;
+    }
+    const compatibleHeight = BUTTON_COMPAT_SIZE_HEIGHTS[
+      size as keyof typeof BUTTON_COMPAT_SIZE_HEIGHTS
+    ];
+    if (compatibleHeight && heights.length === 1 && heights[0] === compatibleHeight) continue;
     violations.push({
       file: filename,
       line: lineNumberAt(source, entry.index),
@@ -1860,7 +1884,7 @@ function scanPrimaryCtasInBoundSource(
   };
   const visit = (node: ts.Node): void => {
     if (ts.isJsxElement(node)) {
-      appendButtonXlViolations(
+      appendButtonSizeUsageViolations(
         filename,
         source,
         node.openingElement,
@@ -1900,7 +1924,7 @@ function scanPrimaryCtasInBoundSource(
         appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
       }
     } else if (ts.isJsxSelfClosingElement(node)) {
-      appendButtonXlViolations(
+      appendButtonSizeUsageViolations(
         filename,
         source,
         node,
@@ -2262,8 +2286,42 @@ describe('production design guard', () => {
 
     expect(findProductionDesignViolations('fixture.tsx', source)).toEqual([
       expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-8' }),
-      expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:h-6' }),
+      expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:legacy' }),
     ]);
+  });
+
+  it('rejects legacy Button size aliases in both the style map and shared callers', () => {
+    const styleSource = `
+      const BUTTON_SIZE_STYLES = {
+        compact: 'h-7 rounded-lg px-2',
+        default: 'h-8 rounded-lg px-3',
+        comfortable: 'h-9 rounded-lg px-3',
+        primary: 'h-10 rounded-lg px-4',
+        xsm: 'h-7 rounded-lg px-2',
+        xl: 'h-10 rounded-lg px-5',
+      } as const;
+      export const Button = () => <button className={BUTTON_SIZE_STYLES.compact}>Run</button>;
+    `;
+
+    expect(findProductionDesignViolations('fixture.tsx', styleSource)).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:legacy' }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'import { Button } from "../common"; <Button variant="secondary" size="sm">Run</Button>',
+    )).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'size="sm"' }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'import { Button as Action } from "../common"; <Action variant="secondary" size="lg">Run</Action>',
+    )).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'size="lg"' }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      'import { Button } from "../common"; <Button variant="secondary" size="default">Run</Button>',
+    ).filter(({ rule }) => rule === 'button-size-contract')).toEqual([]);
   });
 
   it('self-test rejects non-soft radii in the shared Button size map', () => {

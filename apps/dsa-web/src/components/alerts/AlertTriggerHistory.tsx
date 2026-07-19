@@ -76,7 +76,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
           </span>
         ) : null}
         {onRefresh ? (
-          <Button type="button" size="sm" variant="secondary" onClick={onRefresh} isLoading={isLoading} loadingText={text.loading}>
+          <Button type="button" size="default" variant="secondary" onClick={onRefresh} isLoading={isLoading} loadingText={text.loading}>
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             {controlsText.refresh}
           </Button>

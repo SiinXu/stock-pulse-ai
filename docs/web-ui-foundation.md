@@ -74,6 +74,8 @@ do not replace the primitive contract.
 The AST-backed production design guard checks:
 
 - Button style-map soft rounding and the 28/32/36/40px tiers.
+- Legacy `xsm`/`sm`/`md`/`lg` Button sizes in both the shared style map and
+  aliased or namespaced callers.
 - `size="xl"` usage against an exact allowlist.
 - Icon- or symbol-only shared `Button` callers that must use `IconButton`.
 - Static and unresolved Button visual overrides, including `size-*` and
@@ -98,9 +100,9 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
 
 - `UI-F01A` establishes the primitives, removes business-named Button variants,
   removes Button icon sizing, and enables the production guards.
-- `UI-F01B` migrates `xsm`/`sm`/`md`/`lg` call sites to canonical semantic size
-  names, then deletes those compatibility aliases from `ButtonSize` and
-  `BUTTON_SIZE_STYLES`.
+- `UI-F01B` migrated `xsm`/`sm`/`md`/`lg` call sites to canonical semantic size
+  names and deleted those compatibility aliases from `ButtonSize` and
+  `BUTTON_SIZE_STYLES`; the production guard prevents their reintroduction.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`) before duplicate raw controls are
   deleted.

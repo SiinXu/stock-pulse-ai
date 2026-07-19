@@ -141,7 +141,7 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
           message={error.message}
           className="rounded-xl px-3 py-2 text-sm shadow-none"
         />
-        <Button type="button" variant="secondary" size="sm" onClick={() => void refetch()}>
+        <Button type="button" variant="secondary" size="default" onClick={() => void refetch()}>
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
           {t('runFlow.retry')}
         </Button>
@@ -174,7 +174,7 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="default"
           onClick={() => void refetch()}
           isLoading={isLoading}
           loadingText={t('runFlow.refreshing')}
