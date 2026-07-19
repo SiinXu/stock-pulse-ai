@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [改进] Web 共享交互控件建立业务无关的 `Button` / `IconButton` / `Input` / `Field` / `Textarea` 权威：按钮必须显式声明 intent，普通控件使用 28/32/36/40px 可见档位与软圆角，粗指针命中区独立扩展到 44px；移除 Settings/Home/Chat 私有 Button variant、Button 图标尺寸和 29 处非必要 `size="xl"`，新增 AST 守卫阻止页面通过尺寸、圆角、宽度或 flex class 绕过公共契约；Chat 在默认策略目录请求完成前阻断 Composer、Enter 与快捷问题发送，请求失败后再降级为“通用”，避免慢环境绕过已配置的默认策略。
+- [修复] PR Review 静态检查只对仍存在的新增、修改、重命名或类型变更 Python 文件运行 Flake8，删除 Python 文件的 PR 不再因不存在路径被误判为代码质量失败；已删除文件仍保留在完整 diff 与自动审查范围内。
 - [修复] DecisionSignal 新增 canonical `presentation` 视图模型，以 `action` 统一动作方向，并集中提供本地化标签、置信度、摘要、风险和时间戳；API、通知、Web 卡片/详情/时间线、主报告动作卡、历史 badge 与组合风险不再分别信任可能冲突的 `action_label`、`operation_advice` 或平铺展示字段，状态 metadata 替换会保留正式语言 provenance，旧字段继续保留用于兼容。
 - [修复] Web 管理员当前密码、新密码、确认密码、Provider API Key 与通用敏感配置统一使用 `CredentialInput`：稳定且相互隔离的 `name` / `autocomplete` 契约阻止管理员密码被相邻 Provider 字段误接收；首次向导和模型连接弹窗中的填充式变更只保留在本地草稿，不会自动测试连接或保存配置，并由真实首次设密浏览器流程覆盖；多值密钥输入及其显示、隐藏、删除动作提供本地化行级可访问名称。
 - [修复] Web 登录页按实际传输协议显示安全状态：HTTPS 仅陈述加密传输，本机 HTTP 使用中性说明，非本机 HTTP 明确警告密码传输风险，并移除虚构的 `StockPulse-V3-TLS` 声明。
