@@ -1,10 +1,15 @@
 # StockPulse PydanticAI Runtime Adapter 分阶段开发计划
 
+> **历史文档，已停止执行。** RF-07 于 2026-07-18 裁决 `Native Only`，
+> 该裁决于 2026-07-19 完整实施。本文仅保留 POC 的历史背景与证据，
+> 不是当前开发指令；不得据此恢复已删除的 Adapter、依赖、注入点或 CI。
+
 ## 1. 文档状态、baseline、适用范围与非目标
 
-- 状态:`Approved`(维护者于 2026-07-17 以"按照本计划开始开发"指令批准;编码阶段仍以 ADR-001 Accepted 为前置,见第 4.2 节 B1/B2)
-- 版本:v0.2
-- 日期:2026-07-17(v0.1 Proposed;v0.2 记录维护者批准并同步 baseline)
+- 状态:`Historical / Superseded`（曾于 2026-07-17 批准，现由 ADR-001 的
+  `Native Only` 实施结论取代）
+- 版本:v0.3
+- 日期:2026-07-19（标记历史状态；原计划内容保持为审计记录）
 - 作者角色:Principal Architect / Runtime Tech Lead
 - 代码 baseline:`main@fa7a6ee1`(`Merge pull request #10 ... login-modern-redesign`)
   - 本工作区远端命名:`mine` = `SiinXu/stock-pulse-ai`(StockPulse 权威主线);规划 prompt 中的 "origin/main" 在本工作区语境下即 `mine/main`
@@ -16,7 +21,7 @@
   - 不新增用户可见配置、API、数据库表或设置页(AR-PY-06 获批前)
   - 本文档本身不修改任何生产代码、依赖、配置或测试
 
-目标架构(全文约束):
+原计划目标架构（历史记录，不代表当前可执行架构）:
 
 ```text
 StockPulse Native Architecture
@@ -581,4 +586,6 @@ GitHub 协作内容按 `AGENTS.md` 一律英文,标题格式 `<type>: <change su
 
 ---
 
-本计划为 `Approved` 状态(维护者 2026-07-17 批准)。ADR-001 已 `Accepted` 且两个 degraded 行为已获裁决(2026-07-17,第 4.2 节 B1/B2 关闭),AR-PY-01 起的编码阶段按第 9.2 节依赖图与第 14 章剩余审批点推进。
+本计划曾于 2026-07-17 获批，并已完成 POC 与证据收集。RF-07 后续裁决为
+`Native Only`，2026-07-19 已删除实验 Adapter、可选依赖、注入点和专用 CI。
+任何未来框架评估必须新建 ADR，并从当前 Native Contract 重新接入。

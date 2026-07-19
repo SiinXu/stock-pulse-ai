@@ -1,14 +1,18 @@
 # StockPulse Agent Runtime 合并后问题修复计划
 
+> **历史文档，已完成并停止执行。** RF-00 至 RF-07 已结束，最终裁决为
+> `Native Only`，并于 2026-07-19 删除实验 Runtime 资产。本文保留原始审计、
+> 风险和验证思路，不再提供当前执行顺序。
+
 ## 1. 文档状态、基线与用途
 
-- 状态：`Accepted`（维护者已批准 RF-00～RF-07 顺序；RF-00～RF-05 已合入主线，RF-06～RF-07 待执行）
-- 版本：v0.1
-- 日期：2026-07-18
+- 状态：`Historical / Completed`（RF-00～RF-07 已结束，Native Only 已实施）
+- 版本：v0.2
+- 日期：2026-07-19
 - 审计基线：`main@309268760699cd9a833e702b6b8b0b1a8545376a`
 - 合并来源：[PR #18](https://github.com/SiinXu/stock-pulse-ai/pull/18)
 - 上位架构决策：`docs/architecture/ADR-001-agent-runtime.md`（`Accepted`）
-- 原始开发计划：`docs/architecture/pydanticai-runtime-development-plan.md`（`Approved`）
+- 原始开发计划：`docs/architecture/pydanticai-runtime-development-plan.md`（历史）
 - 用途：记录 PR #18 合入后的真实实现状态，并把未达到原计划验收条件的部分拆成可独立验证、独立回滚的小 PR。
 
 本计划不撤销已批准的目标架构和 degraded 行为裁决，也不把当前 Native 路径判定为不可用。它只修复实现与原计划之间的差距：运行中控制柄、统一工具权威、完整取消与 late-write fence、真实 PydanticAI 模型桥、可选依赖 CI 和 conformance 证据。
@@ -500,9 +504,9 @@ git diff --check
 - 对无法强制中断的工作明确标注 cooperative，不宣称停止计费。
 - 文档和 tracker 更新到实际合入状态。
 
-## 11. 维护者审批点
+## 11. 历史维护者审批点
 
-执行 RF-01 前需要确认：
+RF-01 执行前曾确认：
 
 1. 是否批准 RF-00～RF-07 的串行顺序。
 2. 是否同意在 RF-06 前把现有 PydanticAI CHAT 改为 explicit unsupported。
@@ -510,6 +514,8 @@ git diff --check
 4. 是否接受 `Native Only` 为默认最终裁决。
 5. 许可证 provenance、分发与 SaaS 义务是否另立治理任务；该决定不进入 Runtime 修复 PR。
 
-## 12. 当前推荐动作
+## 12. 收尾状态
 
-当前只执行 RF-00：合入本计划并同步 `docs/stockpulse-work-tracker.md` 的真实状态。不要同时修改 Runtime、CI、依赖或许可证。RF-00 获批准后，下一步是 RF-01，让可选依赖安装态首次成为不可静默跳过的阻断 CI；随后再依次修复 Contract、工具权威、生命周期和 PydanticAI Single RUN。
+RF-00 至 RF-07 已完成历史使命。最终 `Native Only` 裁决已经通过删除实验
+Adapter、toolset、可选依赖、注入点、cross-runtime 测试与专用 CI 完整实施；
+Contract、BoundToolSession、生命周期、事件、sanitizer 和 Native replay 证据保留。
