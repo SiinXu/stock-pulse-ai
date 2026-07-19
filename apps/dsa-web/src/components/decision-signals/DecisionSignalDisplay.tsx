@@ -361,7 +361,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         <DetailRow label={t('decisionSignals.expiresAt')} value={formatDateTime(item.expiresAt, language)} />
       </div>
 
-      <Card title={t('decisionSignals.pricePlan')} padding="sm" className="rounded-xl">
+      <Card title={t('decisionSignals.pricePlan')} padding="sm">
         <div className="grid gap-3 sm:grid-cols-3">
           <DetailRow label={t('decisionSignals.entryRange')} value={entryRange} />
           <DetailRow label={t('decisionSignals.stopLoss')} value={formatNumber(item.stopLoss)} />
@@ -369,7 +369,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         </div>
       </Card>
 
-      <Card padding="sm" className="rounded-xl">
+      <Card padding="sm">
         <div className="grid gap-3">
           <SignalTextBlock label={t('decisionSignals.reason')} value={formatJsonish(presentation.summary)} clamp={false} />
           <SignalTextBlock label={t('decisionSignals.catalystSummary')} value={formatJsonish(item.catalystSummary)} tone="info" clamp={false} />
@@ -379,7 +379,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         </div>
       </Card>
 
-      <Card title={t('decisionSignals.outcomes')} padding="sm" className="rounded-xl">
+      <Card title={t('decisionSignals.outcomes')} padding="sm">
         {outcomesLoading ? (
           <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
         ) : outcomesError ? (
@@ -414,7 +414,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
         )}
       </Card>
 
-      <Card title={t('decisionSignals.feedbackTitle')} padding="sm" className="rounded-xl">
+      <Card title={t('decisionSignals.feedbackTitle')} padding="sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm text-foreground">
@@ -449,17 +449,17 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
       </Card>
 
       {evidenceData ? (
-        <Card title={t('decisionSignals.evidence')} padding="sm" className="rounded-xl">
+        <Card title={t('decisionSignals.evidence')} padding="sm">
           <JsonViewer data={evidenceData} maxHeight="240px" />
         </Card>
       ) : null}
       {qualityData ? (
-        <Card title={t('decisionSignals.dataQuality')} padding="sm" className="rounded-xl">
+        <Card title={t('decisionSignals.dataQuality')} padding="sm">
           <JsonViewer data={qualityData} maxHeight="240px" />
         </Card>
       ) : null}
       {metadataData ? (
-        <Card title={t('decisionSignals.metadata')} padding="sm" className="rounded-xl">
+        <Card title={t('decisionSignals.metadata')} padding="sm">
           <JsonViewer data={metadataData} maxHeight="240px" />
         </Card>
       ) : null}

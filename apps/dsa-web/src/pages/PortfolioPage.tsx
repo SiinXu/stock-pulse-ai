@@ -1185,7 +1185,7 @@ const PortfolioPage: React.FC = () => {
         ) : (
           <InlineAlert
             variant="warning"
-            className="rounded-lg px-3 py-2 text-xs shadow-none"
+            size="compact"
             message={text.noAccounts}
             action={(
               <Button
@@ -1239,7 +1239,8 @@ const PortfolioPage: React.FC = () => {
           {accountCreateError ? (
             <InlineAlert
               variant="danger"
-              className="mt-2 rounded-lg px-2 py-1 text-xs shadow-none"
+              size="compact"
+              className="mt-2"
               title={text.createFailed}
               message={accountCreateError}
             />
@@ -1247,7 +1248,8 @@ const PortfolioPage: React.FC = () => {
           {accountCreateSuccess ? (
             <InlineAlert
               variant="success"
-              className="mt-2 rounded-lg px-2 py-1 text-xs shadow-none"
+              size="compact"
+              className="mt-2"
               title={text.createSuccess}
               message={accountCreateSuccess}
             />
@@ -1300,9 +1302,9 @@ const PortfolioPage: React.FC = () => {
       {snapshotQualityMessage ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={text.snapshotPartialTitle}
           message={snapshotQualityMessage}
-          className="rounded-xl px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 
@@ -1339,9 +1341,10 @@ const PortfolioPage: React.FC = () => {
           {fxRefreshFeedback ? (
             <InlineAlert
               variant={getFxRefreshFeedbackVariant(fxRefreshFeedback.tone)}
+              size="compact"
               title={text.fxRefreshResult}
               message={fxRefreshFeedback.text}
-              className="mt-3 rounded-xl px-3 py-2 text-xs shadow-none"
+              className="mt-3"
             />
           ) : null}
         </Card>
@@ -1356,16 +1359,17 @@ const PortfolioPage: React.FC = () => {
           {portfolioSignalsWarning ? (
             <InlineAlert
               variant="warning"
+              size="compact"
               title={t('decisionSignals.portfolioWarningTitle')}
               message={portfolioSignalsWarning}
-              className="mb-3 rounded-xl px-3 py-2 text-xs shadow-none"
+              className="mb-3"
             />
           ) : null}
           {positionRows.length === 0 ? (
             <EmptyState
               title={text.noPositionsTitle}
               description={text.noPositionsDescription}
-              className="border-none bg-transparent px-4 py-8 shadow-none"
+              compact
             />
           ) : (
             <div className="overflow-x-auto">
@@ -1472,7 +1476,7 @@ const PortfolioPage: React.FC = () => {
             <EmptyState
               title={text.noConcentrationTitle}
               description={text.noConcentrationDescription}
-              className="border-none bg-transparent px-4 py-10 shadow-none"
+              compact
             />
           )}
           <div className="mt-3 text-xs text-secondary space-y-1">
@@ -1486,7 +1490,7 @@ const PortfolioPage: React.FC = () => {
       {writeBlocked && hasAccounts ? (
         <InlineAlert
           variant="warning"
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
+          size="compact"
           message={text.writeBlocked}
         />
       ) : null}
@@ -1703,7 +1707,7 @@ const PortfolioPage: React.FC = () => {
             {brokerLoadWarning ? (
               <InlineAlert
                 variant="warning"
-                className="rounded-lg px-2 py-1 text-xs shadow-none"
+                size="compact"
                 message={brokerLoadWarning}
               />
             ) : null}
@@ -1781,17 +1785,17 @@ const PortfolioPage: React.FC = () => {
             {csvParseResult ? (
               <InlineAlert
                 variant={getCsvParseVariant(csvParseResult)}
+                size="compact"
                 title={text.csvParseResult}
                 message={formatUiText(text.csvParseSummary, { valid: csvParseResult.recordCount, skipped: csvParseResult.skippedCount, errors: csvParseResult.errorCount })}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {csvCommitResult ? (
               <InlineAlert
                 variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
+                size="compact"
                 title={csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult}
                 message={formatUiText(text.csvCommitSummary, { mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
           </fieldset>
@@ -1955,7 +1959,7 @@ const PortfolioPage: React.FC = () => {
                     <EmptyState
                       title={text.noLedger}
                       description={text.noLedgerDescription}
-                      className="border-none bg-transparent px-3 py-6 shadow-none"
+                      compact
                     />
                   ) : null}
             </div>
