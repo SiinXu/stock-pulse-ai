@@ -738,8 +738,9 @@ const ChatPage: React.FC = () => {
   };
 
   const handleQuickQuestion = (q: (typeof quickQuestions)[0]) => {
-    setSelectedSkillIds([q.skill]);
-    handleSend(q.label, [q.skill]);
+    const quickSkillIds = availableSkillIds.has(q.skill) ? [q.skill] : [];
+    setSelectedSkillIds(quickSkillIds);
+    handleSend(q.label, quickSkillIds);
   };
 
   const showSendFeedback = useCallback((nextToast: { type: 'success' | 'error'; message: string }, durationMs: number) => {

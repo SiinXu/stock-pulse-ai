@@ -219,7 +219,11 @@ test.describe('touch-capable foundation controls', () => {
 
     const accessibleName = await iconButton.getAttribute('aria-label');
     expect(accessibleName).toBeTruthy();
-    await expect(page.getByRole('tooltip')).toHaveText(accessibleName || '');
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toHaveText(accessibleName || '');
+    const tooltipId = await tooltip.getAttribute('id');
+    expect(tooltipId).toBeTruthy();
+    await expect(iconButton).toHaveAttribute('aria-describedby', tooltipId || '');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('tooltip')).toHaveCount(0);
 

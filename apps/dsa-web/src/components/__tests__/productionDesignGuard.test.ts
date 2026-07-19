@@ -28,6 +28,7 @@ type DesignRule =
   | 'button-xl-allowlist'
   | 'button-visual-override'
   | 'button-icon-only'
+  | 'control-visual-override'
   | 'hardcoded-hex'
   | 'hardcoded-color'
   | 'legacy-chromatic-token'
@@ -74,6 +75,8 @@ const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   }]],
 ]);
 const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
+const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
+const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
     line: 1445,
@@ -81,12 +84,12 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
   ['../../pages/PortfolioPage.tsx', [
-    ...[1152, 1165, 1177, 1781, 1784].map((line) => ({
+    ...[1152, 1165, 1177, 1777, 1780].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['flex-1'],
     })),
-    ...[1612, 1649, 1693].map((line) => ({
+    ...[1608, 1645, 1689].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['w-full'],
@@ -276,8 +279,9 @@ function expressionMayResolveToPrimaryCta(expression: ts.Expression): boolean {
   return true;
 }
 
-function isSharedButtonModuleSpecifier(specifier: string): boolean {
-  return /(?:^|\/)(?:components\/)?common(?:\/Button)?$/.test(specifier);
+function isSharedButtonModuleSpecifier(specifier: string, componentName = 'Button'): boolean {
+  return /(?:^|\/)(?:components\/)?common$/.test(specifier)
+    || specifier.endsWith(`/common/${componentName}`);
 }
 
 function importDeclarationFor(node: ts.Node): ts.ImportDeclaration | undefined {
@@ -305,6 +309,7 @@ function isSharedButtonNamespaceExpression(
   expression: ts.Expression,
   bindings: SharedButtonBindings,
   resolving: Set<ts.Symbol>,
+  componentName = 'Button',
 ): boolean {
   const current = unwrapExpression(expression);
   if (!ts.isIdentifier(current)) {
@@ -323,7 +328,7 @@ function isSharedButtonNamespaceExpression(
     return Boolean(
       importDeclaration
       && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-      && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+      && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
     );
   }
   if (
@@ -333,7 +338,12 @@ function isSharedButtonNamespaceExpression(
   ) {
     const nextResolving = new Set(resolving);
     nextResolving.add(symbol);
-    return isSharedButtonNamespaceExpression(declaration.initializer, bindings, nextResolving);
+    return isSharedButtonNamespaceExpression(
+      declaration.initializer,
+      bindings,
+      nextResolving,
+      componentName,
+    );
   }
   return false;
 }
@@ -425,13 +435,14 @@ function isSharedButtonExpression(
   expression: ts.Expression,
   bindings: SharedButtonBindings,
   resolving: Set<ts.Symbol>,
+  componentName = 'Button',
 ): boolean {
   const current = unwrapExpression(expression);
   if (ts.isIdentifier(current)) {
     const symbol = bindings.checker.getSymbolAtLocation(current);
     if (!symbol) {
       // Self-test snippets intentionally omit imports for the shared Button shorthand.
-      return current.text === 'Button';
+      return current.text === componentName;
     }
     if (resolving.has(symbol)) {
       return false;
@@ -442,11 +453,11 @@ function isSharedButtonExpression(
     }
     if (ts.isImportSpecifier(declaration)) {
       const importDeclaration = importDeclarationFor(declaration);
-      return (declaration.propertyName ?? declaration.name).text === 'Button'
+      return (declaration.propertyName ?? declaration.name).text === componentName
         && Boolean(
           importDeclaration
           && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-          && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+          && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
         );
     }
     if (ts.isImportClause(declaration)) {
@@ -454,8 +465,8 @@ function isSharedButtonExpression(
       return Boolean(
         importDeclaration
         && ts.isStringLiteral(importDeclaration.moduleSpecifier)
-        && /(?:^|\/)Button$/.test(importDeclaration.moduleSpecifier.text)
-        && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text),
+        && importDeclaration.moduleSpecifier.text.endsWith(`/common/${componentName}`)
+        && isSharedButtonModuleSpecifier(importDeclaration.moduleSpecifier.text, componentName),
       );
     }
     const nextResolving = new Set(resolving);
@@ -465,7 +476,12 @@ function isSharedButtonExpression(
       && isConstVariableDeclaration(declaration)
       && declaration.initializer
     ) {
-      return isSharedButtonExpression(declaration.initializer, bindings, nextResolving);
+      return isSharedButtonExpression(
+        declaration.initializer,
+        bindings,
+        nextResolving,
+        componentName,
+      );
     }
     if (
       ts.isBindingElement(declaration)
@@ -474,7 +490,7 @@ function isSharedButtonExpression(
         declaration,
         bindings,
         nextResolving,
-      ).includes('Button')
+      ).includes(componentName)
       && ts.isObjectBindingPattern(declaration.parent)
       && ts.isVariableDeclaration(declaration.parent.parent)
       && declaration.parent.parent.initializer
@@ -483,22 +499,33 @@ function isSharedButtonExpression(
         declaration.parent.parent.initializer,
         bindings,
         nextResolving,
+        componentName,
       );
     }
     return false;
   }
   if (
     ts.isPropertyAccessExpression(current)
-    && current.name.text === 'Button'
+    && current.name.text === componentName
   ) {
-    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+    return isSharedButtonNamespaceExpression(
+      current.expression,
+      bindings,
+      resolving,
+      componentName,
+    );
   }
   if (
     ts.isElementAccessExpression(current)
     && current.argumentExpression
-    && staticStringCandidates(current.argumentExpression, bindings, resolving).includes('Button')
+    && staticStringCandidates(current.argumentExpression, bindings, resolving).includes(componentName)
   ) {
-    return isSharedButtonNamespaceExpression(current.expression, bindings, resolving);
+    return isSharedButtonNamespaceExpression(
+      current.expression,
+      bindings,
+      resolving,
+      componentName,
+    );
   }
   return false;
 }
@@ -506,14 +533,15 @@ function isSharedButtonExpression(
 function isSharedButtonOpening(
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
+  componentName = 'Button',
 ): boolean {
   const { tagName } = opening;
   if (ts.isIdentifier(tagName)) {
-    return isSharedButtonExpression(tagName, bindings, new Set());
+    return isSharedButtonExpression(tagName, bindings, new Set(), componentName);
   }
   return ts.isPropertyAccessExpression(tagName)
-    && tagName.name.text === 'Button'
-    && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set());
+    && tagName.name.text === componentName
+    && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set(), componentName);
 }
 
 const VISIBLE_BUTTON_TEXT_PATTERN = /[\p{L}\p{N}]/u;
@@ -562,6 +590,8 @@ function jsxOpeningHidesVisibleText(
 
 function jsxExpressionMayRenderVisibleText(
   expression: ts.Expression,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
 ): boolean {
   const current = unwrapExpression(expression);
   if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
@@ -578,38 +608,49 @@ function jsxExpressionMayRenderVisibleText(
   ) {
     return false;
   }
+  if (ts.isIdentifier(current)) {
+    if (resolving.has(current.text) || !initializers.has(current.text)) return true;
+    const initializer = initializers.get(current.text);
+    if (!initializer) return true;
+    const nextResolving = new Set(resolving);
+    nextResolving.add(current.text);
+    return jsxExpressionMayRenderVisibleText(initializer, initializers, nextResolving);
+  }
   if (ts.isJsxElement(current)) {
-    return jsxElementMayRenderVisibleText(current);
+    return jsxElementMayRenderVisibleText(current, initializers, resolving);
   }
   if (ts.isJsxSelfClosingElement(current)) {
     return false;
   }
   if (ts.isJsxFragment(current)) {
-    return current.children.some((child) => jsxChildMayRenderVisibleText(child));
+    return current.children.some((child) => (
+      jsxChildMayRenderVisibleText(child, initializers, resolving)
+    ));
   }
   if (ts.isConditionalExpression(current)) {
-    return jsxExpressionMayRenderVisibleText(current.whenTrue)
-      || jsxExpressionMayRenderVisibleText(current.whenFalse);
+    return jsxExpressionMayRenderVisibleText(current.whenTrue, initializers, resolving)
+      || jsxExpressionMayRenderVisibleText(current.whenFalse, initializers, resolving);
   }
   if (ts.isBinaryExpression(current)) {
     if (
       current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
       || current.operatorToken.kind === ts.SyntaxKind.CommaToken
     ) {
-      return jsxExpressionMayRenderVisibleText(current.right);
+      return jsxExpressionMayRenderVisibleText(current.right, initializers, resolving);
     }
     if (
       current.operatorToken.kind === ts.SyntaxKind.BarBarToken
       || current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
       || current.operatorToken.kind === ts.SyntaxKind.PlusToken
     ) {
-      return jsxExpressionMayRenderVisibleText(current.left)
-        || jsxExpressionMayRenderVisibleText(current.right);
+      return jsxExpressionMayRenderVisibleText(current.left, initializers, resolving)
+        || jsxExpressionMayRenderVisibleText(current.right, initializers, resolving);
     }
   }
   if (ts.isArrayLiteralExpression(current)) {
     return current.elements.some((element) => (
-      !ts.isSpreadElement(element) && jsxExpressionMayRenderVisibleText(element)
+      !ts.isSpreadElement(element)
+      && jsxExpressionMayRenderVisibleText(element, initializers, resolving)
     ));
   }
 
@@ -619,24 +660,33 @@ function jsxExpressionMayRenderVisibleText(
 
 function jsxElementMayRenderVisibleText(
   element: ts.JsxElement,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
 ): boolean {
   if (jsxOpeningHidesVisibleText(element.openingElement)) return false;
-  return element.children.some((child) => jsxChildMayRenderVisibleText(child));
+  return element.children.some((child) => (
+    jsxChildMayRenderVisibleText(child, initializers, resolving)
+  ));
 }
 
 function jsxChildMayRenderVisibleText(
   child: ts.JsxChild,
+  initializers: StaticInitializerMap,
+  resolving = new Set<string>(),
 ): boolean {
   if (ts.isJsxText(child)) return VISIBLE_BUTTON_TEXT_PATTERN.test(child.text);
   if (ts.isJsxExpression(child)) {
     return Boolean(
-      child.expression && jsxExpressionMayRenderVisibleText(child.expression),
+      child.expression
+      && jsxExpressionMayRenderVisibleText(child.expression, initializers, resolving),
     );
   }
-  if (ts.isJsxElement(child)) return jsxElementMayRenderVisibleText(child);
+  if (ts.isJsxElement(child)) {
+    return jsxElementMayRenderVisibleText(child, initializers, resolving);
+  }
   if (ts.isJsxSelfClosingElement(child)) return false;
   return child.children.some((nestedChild) => (
-    jsxChildMayRenderVisibleText(nestedChild)
+    jsxChildMayRenderVisibleText(nestedChild, initializers, resolving)
   ));
 }
 
@@ -644,11 +694,14 @@ function appendButtonIconOnlyViolation(
   filename: string,
   source: string,
   element: ts.JsxElement,
+  initializers: StaticInitializerMap,
   bindings: SharedButtonBindings,
   violations: DesignViolation[],
 ): void {
   if (!isSharedButtonOpening(element.openingElement, bindings)) return;
-  if (element.children.some((child) => jsxChildMayRenderVisibleText(child))) return;
+  if (element.children.some((child) => (
+    jsxChildMayRenderVisibleText(child, initializers)
+  ))) return;
   violations.push({
     file: filename,
     line: lineNumberAt(source, element.openingElement.getStart(element.getSourceFile())),
@@ -882,6 +935,37 @@ function appendButtonVisualOverrideViolations(
       rule: 'button-visual-override',
       token: `dynamic:${unresolved.text}`,
     });
+  }
+}
+
+function appendNonButtonControlVisualOverrideViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  const controlName = NON_BUTTON_CONTROL_NAMES.find((name) => (
+    isSharedButtonOpening(opening, bindings, name)
+  ));
+  if (!controlName) return;
+
+  const overridePattern = controlName === 'IconButton'
+    ? BUTTON_VISUAL_OVERRIDE_PATTERN
+    : FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN;
+  const scan = classNameFragments(opening, sourceFile, initializers);
+  for (const fragment of scan.fragments) {
+    for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
+      if (!overridePattern.test(buttonUtilityName(token))) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
+        rule: 'control-visual-override',
+        token: `${controlName}:${token}`,
+      });
+    }
   }
 }
 
@@ -1794,10 +1878,20 @@ function scanPrimaryCtasInBoundSource(
         result.allowlistHits,
         result.violations,
       );
+      appendNonButtonControlVisualOverrideViolations(
+        filename,
+        source,
+        node.openingElement,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
       appendButtonIconOnlyViolation(
         filename,
         source,
         node,
+        initializers,
         buttonBindings,
         result.violations,
       );
@@ -1822,6 +1916,15 @@ function scanPrimaryCtasInBoundSource(
         initializers,
         buttonBindings,
         result.allowlistHits,
+        result.violations,
+      );
+      appendNonButtonControlVisualOverrideViolations(
+        filename,
+        source,
+        node,
+        sourceFile,
+        initializers,
+        buttonBindings,
         result.violations,
       );
       if (isPrimaryButtonOpening(node, buttonBindings)) {
@@ -2291,6 +2394,40 @@ describe('production design guard', () => {
       <Button variant="ghost"><Trash2 aria-hidden="true" />{label}</Button>
       <Button variant="ghost"><Trash2 aria-hidden="true" />{t('delete')}</Button>
     `)).toEqual([]);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      const icon = <Trash2 aria-hidden="true" />;
+      <Button variant="ghost" aria-label="Delete">{icon}</Button>
+    `)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+  });
+
+  it('rejects shared field and IconButton geometry overrides without blocking layout width', () => {
+    const source = `
+      <Input className="h-11 w-24 rounded-full px-4 text-center" />
+      <IconButton aria-label="Delete" className="size-12 text-danger"><span>X</span></IconButton>
+      <Textarea className="min-h-40 rounded-xl" />
+    `;
+    const violations = findProductionDesignViolations('fixture.tsx', source);
+
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:rounded-full' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:px-4' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'IconButton:size-12' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:min-h-40' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:rounded-xl' }),
+    ]));
+    expect(violations).not.toContainEqual(
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:w-24' }),
+    );
+    expect(findProductionDesignViolations('fixture.tsx', `
+      import { Input as SharedInput } from '../common';
+      <SharedInput className="h-11" />
+    `)).toContainEqual(
+      expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
+    );
   });
 
   it('keeps Button visual-override exceptions exact, consumable, and expiring', () => {

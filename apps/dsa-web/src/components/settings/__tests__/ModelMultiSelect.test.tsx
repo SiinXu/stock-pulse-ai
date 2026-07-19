@@ -26,7 +26,7 @@ describe('ModelMultiSelect', () => {
 
     fireEvent.click(trigger);
     expect(screen.getByRole('listbox')).toHaveAttribute('aria-multiselectable', 'true');
-    expect(screen.getByLabelText('搜索模型')).toHaveClass('min-h-11');
+    expect(screen.getByLabelText('搜索模型')).toHaveAttribute('data-size', 'comfortable');
     expect(screen.getByLabelText('deepseek-v4-flash').closest('label')).toHaveClass('min-h-11');
     expect(screen.getByLabelText('deepseek-v4-flash')).not.toBeChecked();
     expect(screen.getByLabelText('deepseek-v4-pro')).toBeChecked();

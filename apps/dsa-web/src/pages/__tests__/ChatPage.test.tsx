@@ -675,6 +675,38 @@ describe('ChatPage', () => {
     }
   });
 
+  it('keeps quick questions on the general fallback after skill loading fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSkills.mockRejectedValue(new Error('skills unavailable'));
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/chat']}>
+          <ChatPage />
+        </MemoryRouter>
+      );
+
+      const quickQuestion = screen.getByRole('button', { name: '用缠论分析茅台' });
+      await waitFor(() => expect(quickQuestion).not.toBeDisabled());
+      fireEvent.click(quickQuestion);
+
+      await waitFor(() => {
+        expect(mockStartStream).toHaveBeenCalledWith(
+          expect.objectContaining({
+            message: '用缠论分析茅台',
+          }),
+          expect.objectContaining({
+            skillNames: ['通用'],
+            skillName: '通用',
+          }),
+        );
+      });
+      expect(mockStartStream.mock.calls[0]?.[0]).not.toHaveProperty('skills');
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('sends multiple selected skills in order', async () => {
     mockGetSkills.mockResolvedValue({
       skills: [

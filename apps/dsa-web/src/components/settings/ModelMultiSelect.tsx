@@ -130,7 +130,6 @@ export const ModelMultiSelect: React.FC<ModelMultiSelectProps> = ({
               }}
               aria-label={text.searchModels}
               placeholder={text.searchModelsPlaceholder}
-              className="min-h-11"
             />
           </div>
           <ul

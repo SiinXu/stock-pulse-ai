@@ -17,12 +17,15 @@ describe('Input', () => {
   });
 
   it('uses the comfortable semantic size by default', () => {
-    render(<Input aria-label="Search" />);
+    render(<Input aria-label="Search" fieldClassName="w-24" />);
 
-    expect(screen.getByRole('textbox', { name: 'Search' })).toHaveAttribute(
+    const input = screen.getByRole('textbox', { name: 'Search' });
+    expect(input).toHaveAttribute(
       'data-size',
       'comfortable',
     );
+    expect(input.closest('.w-24')).not.toBeNull();
+    expect(input).not.toHaveClass('w-24');
   });
 
   it('keeps caller data attributes from replacing its semantic contract', () => {

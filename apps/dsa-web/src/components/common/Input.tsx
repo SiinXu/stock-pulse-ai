@@ -30,6 +30,8 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   passwordToggleLabel?: string;
   /** Selects a semantic visible control size without leaking the native size attribute. */
   size?: InputSize;
+  /** Applies layout sizing to the field wrapper without replacing input geometry. */
+  fieldClassName?: string;
 }
 
 const INPUT_SIZE_STYLES: Record<InputSize, string> = {
@@ -52,6 +54,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   onPasswordVisibleChange,
   passwordToggleLabel,
   size,
+  fieldClassName,
   style,
   type: inputType,
   'aria-describedby': ariaDescribedBy,
@@ -160,6 +163,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
       error={error}
       hintId={hintId}
       errorId={errorId}
+      className={fieldClassName}
       labelClassName={isLoginAppearance ? 'text-[var(--login-label-text)]' : undefined}
       hintClassName={isLoginAppearance ? 'text-[var(--login-hint-text)]' : undefined}
       errorClassName={isLoginAppearance ? 'text-[var(--login-error-text)]' : undefined}

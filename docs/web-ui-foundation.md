@@ -64,18 +64,22 @@ forwards focus to the native input. The visible background is not enlarged to
 
 ## Caller Constraints
 
-Callers must not use `className` to replace shared height, width, padding,
-radius, flex-basis, or flex-growth geometry. Typography, whitespace behavior,
-and contextual color adjustments remain valid when they do not replace the
-primitive contract.
+Button and IconButton callers must not use `className` to replace shared
+height, width, padding, radius, flex-basis, or flex-growth geometry. Input and
+Textarea callers must not replace shared height, padding, radius, or focus
+geometry; Input layout width belongs on `fieldClassName`. Typography,
+whitespace behavior, and contextual color adjustments remain valid when they
+do not replace the primitive contract.
 
 The AST-backed production design guard checks:
 
 - Button style-map soft rounding and the 28/32/36/40px tiers.
 - `size="xl"` usage against an exact allowlist.
 - Icon- or symbol-only shared `Button` callers that must use `IconButton`.
-- Static and unresolved caller-side visual overrides, including `size-*` and
+- Static and unresolved Button visual overrides, including `size-*` and
   arbitrary geometry properties, against exact call-site exceptions.
+- Static Input, IconButton, and Textarea height, padding, radius, or icon-box
+  overrides; Input wrapper width remains a Pattern/layout responsibility.
 - Primary CTA gradient/shimmer rules already enforced by the repository.
 
 Temporary override exceptions record both exact tokens and their removal work

@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { RefreshCw } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { IconButton } from '../IconButton';
@@ -31,5 +31,21 @@ describe('IconButton', () => {
     const button = screen.getByRole('button', { name: 'Refresh analysis' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('associates its visible tooltip with the focused button', async () => {
+    render(
+      <IconButton aria-label="Refresh analysis">
+        <RefreshCw aria-hidden="true" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Refresh analysis' });
+    fireEvent.focus(button);
+    const tooltip = await screen.findByRole('tooltip');
+
+    expect(button).toHaveAttribute('aria-describedby', tooltip.id);
+    fireEvent.keyDown(button, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

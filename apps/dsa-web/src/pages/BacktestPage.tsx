@@ -622,7 +622,8 @@ const BacktestPage: React.FC = () => {
             error={evalDaysError}
             placeholder="10"
             disabled={isRunning}
-            className="w-24 text-center tabular-nums"
+            fieldClassName="w-24"
+            className="text-center tabular-nums"
           />
           <DatePicker
             id="backtest-date-from"
