@@ -959,7 +959,6 @@ const ChatPage: React.FC = () => {
             loading
             compact
             title={t('chat.loadingSessions')}
-            className="rounded-2xl border border-dashed border-border/50 bg-surface/30"
           />
         ) : sessionsError ? (
           <ApiErrorAlert
@@ -973,7 +972,6 @@ const ChatPage: React.FC = () => {
             compact
             title={t('chat.emptySessionsTitle')}
             description={t('chat.emptySessionsDescription')}
-            className="rounded-2xl border border-dashed border-border/50 bg-surface/30"
           />
         ) : (
           <div className="space-y-2">
@@ -1247,7 +1245,7 @@ const ChatPage: React.FC = () => {
                 <EmptyState
                   title={t('chat.emptyTitle')}
                   description={t('chat.emptyDescription')}
-                  className="max-w-2xl border-dashed bg-card/55"
+                  className="max-w-2xl"
                   icon={(
                     <svg
                       className="h-8 w-8"

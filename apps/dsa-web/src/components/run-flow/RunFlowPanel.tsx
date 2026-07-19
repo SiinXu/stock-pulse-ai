@@ -155,7 +155,6 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
         title={t('runFlow.emptyTitle')}
         description={t('runFlow.emptyDescription')}
         icon={<Workflow className="h-6 w-6" aria-hidden="true" />}
-        className="border-dashed"
       />
     );
   }
@@ -191,7 +190,6 @@ export const RunFlowPanel: React.FC<RunFlowPanelProps> = ({ source, title, onUna
           title={t('runFlow.emptySnapshotTitle')}
           description={t('runFlow.emptySnapshotDescription')}
           icon={<AlertCircle className="h-6 w-6" aria-hidden="true" />}
-          className="border-dashed"
         />
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_19.25rem]" data-testid="run-flow-layout">

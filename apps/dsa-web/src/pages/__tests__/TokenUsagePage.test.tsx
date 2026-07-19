@@ -100,6 +100,83 @@ beforeEach(() => {
 });
 
 describe('TokenUsagePage', () => {
+  it('renders one stable loading state instead of a zero-value dashboard shell', async () => {
+    const request = createDeferred<{ data: typeof dashboardResponse }>();
+    get.mockReturnValue(request.promise);
+
+    const { container } = renderPage();
+
+    expect(screen.getByRole('status')).toHaveAttribute('data-state-panel', 'loading');
+    expect(container.querySelectorAll('[data-state-panel]')).toHaveLength(1);
+    expect(screen.queryByText('总 Token')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    await act(async () => {
+      request.resolve({ data: dashboardResponse });
+    });
+  });
+
+  it('renders one empty state and hides zero-value summaries and empty tables', async () => {
+    get.mockResolvedValue({
+      data: makeDashboardResponse({
+        total_calls: 0,
+        total_prompt_tokens: 0,
+        total_completion_tokens: 0,
+        total_tokens: 0,
+        by_call_type: [],
+        by_model: [],
+        recent_calls: [],
+      }),
+    });
+
+    const { container } = renderPage();
+
+    expect(await screen.findByText('暂无 Token 用量记录')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-state-panel="empty"]')).toHaveLength(1);
+    expect(screen.queryByText('总 Token')).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    get.mockRejectedValueOnce(new Error('refresh unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-alert-tone', 'danger');
+    expect(container.querySelectorAll('[data-state-panel="empty"]')).toHaveLength(1);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders a retryable error state and recovers through the same task surface', async () => {
+    get
+      .mockRejectedValueOnce(new Error('usage unavailable'))
+      .mockResolvedValueOnce({ data: dashboardResponse });
+
+    const { container } = renderPage();
+
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-state-panel', 'error');
+    expect(container.querySelectorAll('[data-state-panel]')).toHaveLength(1);
+    expect(screen.queryByText('总 Token')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    expect(await screen.findByText('400')).toBeInTheDocument();
+    expect(container.querySelector('[data-state-panel]')).toBeNull();
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps existing usage data visible when a refresh fails', async () => {
+    get
+      .mockResolvedValueOnce({ data: dashboardResponse })
+      .mockRejectedValueOnce(new Error('refresh unavailable'));
+
+    renderPage();
+
+    expect(await screen.findByText('400')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-alert-tone', 'danger');
+    expect(screen.getByText('400')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
   it('renders token summary, model breakdowns, and recent calls from the dashboard API shape', async () => {
     renderPage();
 

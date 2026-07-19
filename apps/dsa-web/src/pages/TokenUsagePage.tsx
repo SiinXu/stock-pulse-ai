@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
 import { usageApi, type UsageDashboard, type UsageModelBreakdown, type UsagePeriod } from '../api/usage';
-import type { ParsedApiError } from '../api/error';
-import { ApiErrorAlert, AppPage, Button, Card, EmptyState, PageHeader, SegmentedControl, StatCard } from '../components/common';
+import { localizeParsedApiError, type ParsedApiError } from '../api/error';
+import { ApiErrorAlert, AppPage, Button, PageHeader, Section, SegmentedControl, StatePanel, StatCard, Surface } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../i18n/uiText';
 import { getUiLocale } from '../utils/uiLocale';
@@ -67,7 +67,7 @@ function buildParsedError(error: unknown, t: Translate): ParsedApiError {
 
 const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguage; t: Translate }> = ({ model, language, t }) => {
   return (
-    <Card padding="sm" className="rounded-lg">
+    <Surface as="article" level="interactive" padding="sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-foreground">{model.model}</h3>
@@ -91,7 +91,7 @@ const ModelUsageCard: React.FC<{ model: UsageModelBreakdown; language: UiLanguag
           <p className="mt-1 font-medium text-foreground">{formatNumber(model.maxTotalTokens, language)}</p>
         </div>
       </div>
-    </Card>
+    </Surface>
   );
 };
 
@@ -139,6 +139,10 @@ const TokenUsagePage: React.FC = () => {
   const largestCallTypeTotal = useMemo(() => {
     return Math.max(...(dashboard?.byCallType.map((item) => item.totalTokens) ?? [0]), 1);
   }, [dashboard]);
+  const localizedError = useMemo(
+    () => error ? localizeParsedApiError(error, language) : null,
+    [error, language],
+  );
 
   return (
     <AppPage className="max-w-none">
@@ -171,17 +175,42 @@ const TokenUsagePage: React.FC = () => {
           )}
         />
 
-        {error ? <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} /> : null}
-
-        {loading && !dashboard ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="h-28 animate-pulse rounded-2xl border border-border/70 bg-card/60" />
-            ))}
-          </div>
+        {error && dashboard ? (
+          <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} />
         ) : null}
 
-        {dashboard ? (
+        {loading && !dashboard ? (
+          <StatePanel
+            state="loading"
+            title={t('common.loading')}
+            surfaceLevel="section"
+          />
+        ) : null}
+
+        {error && !dashboard && !loading && localizedError ? (
+          <StatePanel
+            state="error"
+            title={localizedError.title}
+            description={localizedError.message}
+            surfaceLevel="section"
+            action={(
+              <Button type="button" variant="secondary" size="default" onClick={() => void loadDashboard()}>
+                {t('common.retry')}
+              </Button>
+            )}
+          />
+        ) : null}
+
+        {dashboard && dashboard.totalCalls === 0 ? (
+          <StatePanel
+            state="empty"
+            title={t('usage.emptyTitle')}
+            description={t('usage.emptyDescription')}
+            surfaceLevel="section"
+          />
+        ) : null}
+
+        {dashboard && dashboard.totalCalls > 0 ? (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <StatCard label={t('usage.totalTokens')} value={formatNumber(dashboard.totalTokens, language)} hint={t('usage.dateRange', { from: dashboard.fromDate, to: dashboard.toDate })} icon={<Database className="h-5 w-5" />} tone="primary" />
@@ -190,24 +219,23 @@ const TokenUsagePage: React.FC = () => {
               <StatCard label={t('usage.completionTokens')} value={formatNumber(dashboard.totalCompletionTokens, language)} hint={t('usage.completionTokensHint')} icon={<Gauge className="h-5 w-5" />} />
             </div>
 
-            {dashboard.totalCalls === 0 ? (
-              <EmptyState title={t('usage.emptyTitle')} description={t('usage.emptyDescription')} />
-            ) : (
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-                <section className="space-y-4">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">{t('usage.modelUsage')}</h2>
-                    <p className="mt-1 text-sm text-secondary-text">{t('usage.modelUsageDescription')}</p>
-                  </div>
-                  <div className="grid gap-4">
-                    {dashboard.byModel.map((model) => (
-                      <ModelUsageCard key={model.model} model={model} language={language} t={t} />
-                    ))}
-                  </div>
-                </section>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+              <Section
+                title={t('usage.modelUsage')}
+                description={t('usage.modelUsageDescription')}
+                contentClassName="grid gap-4"
+              >
+                {dashboard.byModel.map((model) => (
+                  <ModelUsageCard key={model.model} model={model} language={language} t={t} />
+                ))}
+              </Section>
 
-                <section className="space-y-4">
-                  <Card title={t('usage.callTypeTitle')} subtitle={t('usage.breakdown')} className="rounded-lg">
+              <Section
+                title={t('usage.callTypeTitle')}
+                eyebrow={t('usage.breakdown')}
+                level="section"
+                padding="sm"
+              >
                     <div className="space-y-4">
                       {dashboard.byCallType.map((item) => (
                         <div key={item.callType}>
@@ -231,10 +259,8 @@ const TokenUsagePage: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                  </Card>
-                </section>
-              </div>
-            )}
+              </Section>
+            </div>
 
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">

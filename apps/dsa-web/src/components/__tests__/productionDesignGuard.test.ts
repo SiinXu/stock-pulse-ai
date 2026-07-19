@@ -38,7 +38,9 @@ type DesignRule =
   | 'primary-cta-unresolved-class'
   | 'raw-viewport-height'
   | 'glow-effect'
-  | 'strong-blur';
+  | 'strong-blur'
+  | 'surface-level-contract'
+  | 'state-surface-visual-override';
 
 type DesignViolation = {
   file: string;
@@ -80,6 +82,8 @@ const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
 const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
 const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
 const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
+const STATE_SURFACE_COMPONENT_NAMES = ['Surface', 'Section', 'StatePanel', 'Alert', 'EmptyState', 'Loading', 'DashboardStateBlock'] as const;
+const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*)/;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
     line: 1448,
@@ -237,6 +241,7 @@ type SharedButtonBindings = {
 type PrimaryCtaScan = {
   matchedButtons: number;
   matchedSharedStyles: number;
+  matchedSurfaceLevelStyles: number;
   allowlistHits: string[];
   violations: DesignViolation[];
 };
@@ -283,6 +288,10 @@ function expressionMayResolveToPrimaryCta(expression: ts.Expression): boolean {
 }
 
 function isSharedButtonModuleSpecifier(specifier: string, componentName = 'Button'): boolean {
+  if (componentName === 'DashboardStateBlock') {
+    return /(?:^|\/)(?:components\/)?dashboard$/.test(specifier)
+      || specifier.endsWith('/dashboard/DashboardStateBlock');
+  }
   return /(?:^|\/)(?:components\/)?common$/.test(specifier)
     || specifier.endsWith(`/common/${componentName}`);
 }
@@ -981,6 +990,48 @@ function appendNonButtonControlVisualOverrideViolations(
   }
 }
 
+function appendStateSurfaceVisualOverrideViolations(
+  filename: string,
+  source: string,
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  sourceFile: ts.SourceFile,
+  initializers: StaticInitializerMap,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  if (
+    filename.includes('/components/common/')
+    || filename.endsWith('/dashboard/DashboardStateBlock.tsx')
+    || filename.endsWith('/settings/SettingsSectionCard.tsx')
+  ) return;
+
+  const componentName = STATE_SURFACE_COMPONENT_NAMES.find((name) => (
+    isSharedButtonOpening(opening, bindings, name)
+  ));
+  if (!componentName) return;
+
+  const scan = classNameFragments(opening, sourceFile, initializers);
+  for (const fragment of scan.fragments) {
+    for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
+      if (!STATE_SURFACE_VISUAL_OVERRIDE_PATTERN.test(buttonUtilityName(token))) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
+        rule: 'state-surface-visual-override',
+        token: `${componentName}:${token}`,
+      });
+    }
+  }
+  for (const unresolved of scan.unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.index),
+      rule: 'state-surface-visual-override',
+      token: `${componentName}:dynamic:${unresolved.text}`,
+    });
+  }
+}
+
 function bindingIdentifiers(name: ts.BindingName): ts.Identifier[] {
   if (ts.isIdentifier(name)) {
     return [name];
@@ -1612,6 +1663,59 @@ type ButtonSizeStyleEntry = {
   fragments: StaticClassFragment[];
 };
 
+type SurfaceLevelStyleEntry = ButtonSizeStyleEntry;
+
+function surfaceLevelClasses(fragments: StaticClassFragment[]): string[] {
+  return Array.from(new Set(
+    fragments.flatMap(({ text }) => text.split(/\s+/).filter(Boolean).map(buttonUtilityName)),
+  ));
+}
+
+function appendSurfaceLevelContractViolations(
+  filename: string,
+  source: string,
+  declarationIndex: number,
+  entries: Map<string, SurfaceLevelStyleEntry>,
+  violations: DesignViolation[],
+): void {
+  const report = (level: string, entry: SurfaceLevelStyleEntry | undefined, token: string): void => {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry?.index ?? declarationIndex),
+      rule: 'surface-level-contract',
+      token: `${level}:${token}`,
+    });
+  };
+  const classesFor = (level: string): string[] => surfaceLevelClasses(entries.get(level)?.fragments ?? []);
+  const boundaryClasses = (classes: string[]): string[] => classes.filter((token) => (
+    /^(?:border(?:-|$)|shadow(?:-|$))/.test(token)
+  ));
+
+  for (const level of ['canvas', 'section', 'interactive', 'overlay']) {
+    if (!entries.has(level)) report(level, undefined, 'missing');
+  }
+
+  const canvas = classesFor('canvas');
+  if (!canvas.includes('bg-transparent')) report('canvas', entries.get('canvas'), 'background');
+  for (const token of canvas.filter((entry) => /^(?:border(?:-|$)|shadow(?:-|$)|rounded(?:-|$))/.test(entry))) {
+    report('canvas', entries.get('canvas'), token);
+  }
+
+  const section = classesFor('section');
+  if (!section.some((token) => token.startsWith('bg-'))) report('section', entries.get('section'), 'background');
+  for (const token of boundaryClasses(section)) report('section', entries.get('section'), token);
+
+  const interactive = classesFor('interactive');
+  if (!interactive.includes('border')) report('interactive', entries.get('interactive'), 'border:missing');
+  for (const token of interactive.filter((entry) => entry.startsWith('shadow'))) {
+    report('interactive', entries.get('interactive'), token);
+  }
+
+  const overlay = classesFor('overlay');
+  if (!overlay.includes('border')) report('overlay', entries.get('overlay'), 'border:missing');
+  if (!overlay.some((token) => token.startsWith('shadow'))) report('overlay', entries.get('overlay'), 'shadow:missing');
+}
+
 function buttonHeightClasses(fragments: StaticClassFragment[]): string[] {
   return Array.from(new Set(
     fragments.flatMap(({ text }) => text.split(/\s+/).filter((token) => BUTTON_HEIGHT_CLASS_PATTERN.test(token))),
@@ -1859,6 +1963,7 @@ function scanPrimaryCtasInBoundSource(
   const result: PrimaryCtaScan = {
     matchedButtons: 0,
     matchedSharedStyles: 0,
+    matchedSurfaceLevelStyles: 0,
     allowlistHits: [],
     violations: [],
   };
@@ -1911,6 +2016,15 @@ function scanPrimaryCtasInBoundSource(
         buttonBindings,
         result.violations,
       );
+      appendStateSurfaceVisualOverrideViolations(
+        filename,
+        source,
+        node.openingElement,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
       appendButtonIconOnlyViolation(
         filename,
         source,
@@ -1943,6 +2057,15 @@ function scanPrimaryCtasInBoundSource(
         result.violations,
       );
       appendNonButtonControlVisualOverrideViolations(
+        filename,
+        source,
+        node,
+        sourceFile,
+        initializers,
+        buttonBindings,
+        result.violations,
+      );
+      appendStateSurfaceVisualOverrideViolations(
         filename,
         source,
         node,
@@ -2035,6 +2158,42 @@ function scanPrimaryCtasInBoundSource(
           result.violations,
         );
       }
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'SURFACE_LEVEL_STYLES'
+      && node.initializer
+    ) {
+      result.matchedSurfaceLevelStyles += 1;
+      const initializer = unwrapExpression(node.initializer);
+      const entries = new Map<string, SurfaceLevelStyleEntry>();
+      if (ts.isObjectLiteralExpression(initializer)) {
+        for (const property of initializer.properties) {
+          if (!ts.isPropertyAssignment(property)) continue;
+          const scan = scanStaticClassExpression(
+            property.initializer,
+            sourceFile,
+            initializers,
+            new Set(),
+            'SURFACE_LEVEL_STYLES',
+          );
+          const names = propertyNameValues(property.name, initializers);
+          if (names?.length === 1) {
+            entries.set(names[0], {
+              index: property.getStart(sourceFile),
+              fragments: scan.fragments,
+            });
+          }
+        }
+      }
+      appendSurfaceLevelContractViolations(
+        filename,
+        source,
+        node.getStart(sourceFile),
+        entries,
+        result.violations,
+      );
     }
     ts.forEachChild(node, visit);
   };
@@ -2485,6 +2644,57 @@ describe('production design guard', () => {
       <SharedInput className="h-11" />
     `)).toContainEqual(
       expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
+    );
+  });
+
+  it('self-tests the semantic Surface level boundary contract', () => {
+    const source = `
+      const SURFACE_LEVEL_STYLES = {
+        canvas: 'rounded-xl border bg-card shadow-soft-card',
+        section: 'rounded-xl border bg-card',
+        interactive: 'rounded-xl bg-card shadow-soft-card',
+        overlay: 'rounded-xl border bg-elevated',
+      } as const;
+    `;
+    const violations = findProductionDesignViolations('fixture.tsx', source)
+      .filter(({ rule }) => rule === 'surface-level-contract');
+
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ token: 'canvas:background' }),
+      expect.objectContaining({ token: 'canvas:rounded-xl' }),
+      expect.objectContaining({ token: 'canvas:border' }),
+      expect.objectContaining({ token: 'section:border' }),
+      expect.objectContaining({ token: 'interactive:border:missing' }),
+      expect.objectContaining({ token: 'interactive:shadow-soft-card' }),
+      expect.objectContaining({ token: 'overlay:shadow:missing' }),
+    ]));
+  });
+
+  it('rejects caller-owned borders, backgrounds, radii, and shadows on state surfaces', () => {
+    const source = `
+      import { StatePanel as Status, EmptyState } from '../common';
+      import * as Common from '../common';
+      import { DashboardStateBlock } from '../dashboard';
+      declare const dynamicClasses: string;
+      <Status state="empty" title="Empty" className="rounded-2xl border border-dashed bg-card shadow-soft-card" />;
+      <EmptyState title="Empty" className="max-w-xl" />;
+      <Common.Surface level="section" className={dynamicClasses}>Content</Common.Surface>;
+      <DashboardStateBlock title="Empty" className="dashboard-card" />;
+    `;
+    const violations = findProductionDesignViolations('fixture.tsx', source)
+      .filter(({ rule }) => rule === 'state-surface-visual-override');
+
+    expect(violations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ token: 'StatePanel:rounded-2xl' }),
+      expect.objectContaining({ token: 'StatePanel:border' }),
+      expect.objectContaining({ token: 'StatePanel:border-dashed' }),
+      expect.objectContaining({ token: 'StatePanel:bg-card' }),
+      expect.objectContaining({ token: 'StatePanel:shadow-soft-card' }),
+      expect.objectContaining({ token: expect.stringContaining('Surface:dynamic:') }),
+      expect.objectContaining({ token: 'DashboardStateBlock:dashboard-card' }),
+    ]));
+    expect(violations).not.toContainEqual(
+      expect.objectContaining({ token: 'EmptyState:max-w-xl' }),
     );
   });
 
@@ -3092,6 +3302,10 @@ describe('production design guard', () => {
       (total, scan) => total + scan.matchedSharedStyles,
       0,
     );
+    const totalMatchedSurfaceLevelStyles = Array.from(primaryScans.values()).reduce(
+      (total, scan) => total + scan.matchedSurfaceLevelStyles,
+      0,
+    );
     const buttonClassNames = new Set(productionTsxSources
       .flatMap(([, source]) => Array.from(extractButtonClassNames(source))));
     const violations = scannedSources.flatMap(([filename, source]) => (
@@ -3107,6 +3321,7 @@ describe('production design guard', () => {
     expect(totalMatchedButtonTags).toBeGreaterThan(0);
     expect(totalMatchedPrimaryButtons).toBeGreaterThan(0);
     expect(totalMatchedSharedPrimaryStyles).toBe(PRIMARY_CTA_VARIANTS.size);
+    expect(totalMatchedSurfaceLevelStyles).toBe(1);
     expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);

@@ -1365,7 +1365,7 @@ const PortfolioPage: React.FC = () => {
             <EmptyState
               title={text.noPositionsTitle}
               description={text.noPositionsDescription}
-              className="border-none bg-transparent px-4 py-8 shadow-none"
+              compact
             />
           ) : (
             <div className="overflow-x-auto">
@@ -1472,7 +1472,7 @@ const PortfolioPage: React.FC = () => {
             <EmptyState
               title={text.noConcentrationTitle}
               description={text.noConcentrationDescription}
-              className="border-none bg-transparent px-4 py-10 shadow-none"
+              compact
             />
           )}
           <div className="mt-3 text-xs text-secondary space-y-1">
@@ -1955,7 +1955,7 @@ const PortfolioPage: React.FC = () => {
                     <EmptyState
                       title={text.noLedger}
                       description={text.noLedgerDescription}
-                      className="border-none bg-transparent px-3 py-6 shadow-none"
+                      compact
                     />
                   ) : null}
             </div>

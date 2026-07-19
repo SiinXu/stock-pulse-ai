@@ -1,9 +1,9 @@
 # Web UI Foundation Contract
 
-This document defines the shared interaction-control contract for
-`apps/dsa-web`. Page and domain components should consume these primitives
-instead of rebuilding size, focus, loading, field-description, or hit-target
-behavior.
+This document defines the shared interaction-control, surface, section, and
+state contract for `apps/dsa-web`. Page and domain components should consume
+these primitives and patterns instead of rebuilding size, focus, loading,
+field-description, hit-target, boundary, empty-state, or alert behavior.
 
 ## Layer Boundary
 
@@ -22,9 +22,58 @@ behavior.
 | `Input` | Forwards the native input ref, owns label/hint/error wiring, and uses a focusable coarse-pointer frame around the visible input. |
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
 | `Textarea` | Reuses `Field`, forwards the native textarea ref, and owns invalid/description semantics. |
+| `Surface` | Forwards native sectioning-element attributes and refs while exposing one semantic `canvas` / `section` / `interactive` / `overlay` level. |
+| `Alert` | Owns info/success/warning/danger presentation, live-region urgency, shared dismiss controls, and action placement. |
+
+Shared patterns compose these primitives:
+
+| Pattern | Contract |
+| --- | --- |
+| `Section` | Renders a visible heading and associates it with a semantic section; actions and content remain within one surface boundary. |
+| `StatePanel` | Represents one typed task state and owns its live-region, busy, icon, density, description, and action semantics. |
 
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
+
+## Surface Hierarchy
+
+| Level | Purpose | Visible boundary |
+| --- | --- | --- |
+| `canvas` | Page canvas or content already grouped by layout | Transparent, without border, radius, or shadow |
+| `section` | A content grouping that needs slight tonal separation | Semantic surface color, without border or shadow |
+| `interactive` | A selectable or independently interactive object | One necessary border; hover is opt-in; no default shadow |
+| `overlay` | Content above the document flow | Semantic overlay surface, one border, and the shared elevated shadow |
+
+Pages must not add background, border, radius, ring, or shadow utilities to
+`Surface`, `Section`, `StatePanel`, `Alert`, `EmptyState`, or
+`DashboardStateBlock`. Layout-only classes such as grid placement and maximum
+width remain valid. A normal page should expose no more than two visible
+surface boundaries; headings, rows, whitespace, and dividers group content
+inside a section.
+
+`Card` remains a compatibility adapter while domain pages migrate. Its
+`default` variant maps to the borderless `section` level; `bordered` and
+`gradient` map to `interactive`. New production code should choose `Surface`
+or `Section` directly instead of adding another `Card` variant.
+
+## State And Alert Semantics
+
+`StatePanel.state` is typed as `loading`, `blocked`, `partial`, `empty`,
+`error`, `retrying`, or `success`. Loading and retrying states expose
+`role="status"`, polite announcements, and `aria-busy`; errors expose an
+assertive alert. Persistent empty and blocked guidance is not a live region.
+Callers choose the correct heading level and provide one relevant next action.
+
+`StatePanel` is borderless by default. A page-level task may opt into the
+borderless `section` surface for stable tonal separation, but it must not show
+a second loading card, empty card, or alert for the same task. Existing results
+may remain visible during refresh; a refresh failure uses `Alert` while the
+last successful result stays readable.
+
+`Alert` uses `status` for non-urgent information and `alert` for danger or an
+explicit urgent announcement. A dismissible Alert requires a dismiss label at
+the type boundary and uses the shared `IconButton`; command actions remain
+shared Buttons.
 
 ## Button Intent
 
@@ -83,6 +132,11 @@ The AST-backed production design guard checks:
 - Static Input, IconButton, and Textarea height, padding, radius, or icon-box
   overrides; Input wrapper width remains a Pattern/layout responsibility.
 - Primary CTA gradient/shimmer rules already enforced by the repository.
+- The complete `Surface` level style map, including borderless L0/L1,
+  border-only L2, and shared-shadow Overlay invariants.
+- Direct, aliased, and namespaced state-surface callers, rejecting caller-owned
+  backgrounds, borders, radii, rings, shadows, named card classes, and dynamic
+  visual overrides.
 
 Temporary override exceptions record both exact tokens and their removal work
 item:
@@ -103,11 +157,19 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
 - `UI-F01B` migrated `xsm`/`sm`/`md`/`lg` call sites to canonical semantic size
   names and deleted those compatibility aliases from `ButtonSize` and
   `BUTTON_SIZE_STYLES`; the production guard prevents their reintroduction.
+- `UI-F02` establishes `Surface`, `Section`, `StatePanel`, and `Alert`; maps
+  `Card`, `SectionCard`, `EmptyState`, `InlineAlert`, `Loading`,
+  `ApiErrorAlert`, `DashboardStateBlock`, `StatCard`, and
+  `SettingsSectionCard` through compatibility adapters; and uses Token Usage
+  as the first complete state consumer. Each domain work item replaces its
+  compatibility calls with the authoritative API when it owns that page.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`) before duplicate raw controls are
   deleted.
-- `UI-QA01` removes expired allowlist entries and verifies that no duplicate
-  primitive implementation remains.
+- `UI-QA01` removes expired allowlist entries and deletes a compatibility
+  adapter only after its final production consumer has migrated; it also
+  verifies that no duplicate primitive, state, alert, or surface implementation
+  remains.
 
 Tests should assert role, accessible name, native state, semantic variant/size,
 and behavior. Tailwind classes such as `h-11` or `rounded-full` are not product
