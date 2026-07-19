@@ -20,10 +20,10 @@ const item = {
 } as DecisionSignalItem;
 
 describe('getDecisionSignalPresentation', () => {
-  it('uses the canonical nested contract for every presentation field', () => {
-    expect(getDecisionSignalPresentation(item, { buy: 'Localized Buy' })).toEqual({
-      action: 'buy',
-      label: 'Localized Buy',
+  it('keeps top-level action authoritative while using nested presentation details', () => {
+    expect(getDecisionSignalPresentation(item, { sell: 'Localized Sell' })).toEqual({
+      action: 'sell',
+      label: 'Localized Sell',
       confidence: 0.91,
       summary: 'Canonical summary',
       risk: 'Canonical risk',

@@ -112,7 +112,7 @@ describe('DecisionSignalTimeline helpers', () => {
     expect(alert.shape).toBe('diamond');
   });
 
-  it('uses canonical presentation action, confidence, and timestamp', () => {
+  it('uses top-level action with presentation confidence and timestamp', () => {
     const item = makeSignal({
       action: 'sell',
       confidence: 0.1,
@@ -129,8 +129,8 @@ describe('DecisionSignalTimeline helpers', () => {
     const style = getTimelinePointStyle(item);
     const [datum] = buildTimelineData([item]);
 
-    expect(style.rank).toBe(ACTION_RANK.buy);
-    expect(style.family).toBe('bullish');
+    expect(style.rank).toBe(ACTION_RANK.sell);
+    expect(style.family).toBe('defensive');
     expect(style.strokeWidth).toBeGreaterThan(4);
     expect(datum.createdTime).toBe(new Date('2026-06-16T09:30:00Z').getTime());
   });

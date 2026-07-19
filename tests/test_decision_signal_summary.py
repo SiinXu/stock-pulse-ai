@@ -133,7 +133,7 @@ def test_format_decision_signal_excerpt_formats_korean_canonical_fields() -> Non
     assert "Sell" not in excerpt
 
 
-def test_format_decision_signal_excerpt_uses_canonical_action_when_label_conflicts() -> None:
+def test_format_decision_signal_excerpt_uses_top_level_action_when_presentation_conflicts() -> None:
     summary = summarize_decision_signal({
         "action": "buy",
         "action_label": "Sell",
@@ -141,10 +141,27 @@ def test_format_decision_signal_excerpt_uses_canonical_action_when_label_conflic
         "reason": "Momentum confirmed",
         "risk_summary": "Gap risk",
         "created_at": "2026-07-19T00:00:00",
-    })
+        "presentation": {
+            "action": "sell",
+            "label": "Sell",
+            "confidence": 0.75,
+            "summary": "Canonical momentum confirmed",
+            "risk": "Canonical gap risk",
+            "timestamp": "2026-07-19T01:02:03Z",
+        },
+    }, report_language="en")
 
     excerpt = format_decision_signal_excerpt(summary, report_language="en")
 
+    assert summary is not None
+    assert summary["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.75,
+        "summary": "Canonical momentum confirmed",
+        "risk": "Canonical gap risk",
+        "timestamp": "2026-07-19T01:02:03Z",
+    }
     assert "Action: Buy" in excerpt
     assert "Action: Sell" not in excerpt
 

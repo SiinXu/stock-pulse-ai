@@ -1,4 +1,3 @@
-import type { DecisionAction } from '../types/analysis';
 import type {
   DecisionSignalItem,
   DecisionSignalPresentation,
@@ -27,7 +26,7 @@ export function getDecisionSignalPresentation(
   item: DecisionSignalPresentationSource,
   labels?: Partial<DecisionActionLabelMap>,
 ): DecisionSignalPresentation {
-  const action = presentationValue(item, 'action', item.action) as DecisionAction;
+  const action = item.action;
   const serverLabel = presentationValue(item, 'label', item.actionLabel?.trim() || action) as string;
   return {
     action,

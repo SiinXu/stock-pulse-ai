@@ -493,7 +493,7 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.queryByText('600519 · sell')).not.toBeInTheDocument();
   });
 
-  it('uses canonical presentation action when portfolio risk compatibility fields conflict', async () => {
+  it('uses top-level action when portfolio risk presentation fields conflict', async () => {
     getRisk.mockResolvedValueOnce(makeRisk({
       decisionSignalRisk: {
         available: true,
@@ -506,11 +506,11 @@ describe('PortfolioPage FX refresh', () => {
             market: 'cn',
             signal: makeDecisionSignal({
               id: 204,
-              action: 'buy',
-              actionLabel: 'Buy',
+              action: 'sell',
+              actionLabel: 'Sell',
               presentation: {
-                action: 'sell',
-                label: 'Sell',
+                action: 'buy',
+                label: 'Buy',
                 confidence: 0.91,
                 summary: 'Canonical summary',
                 risk: 'Canonical risk',
@@ -709,8 +709,8 @@ describe('PortfolioPage FX refresh', () => {
       createdAt: '2026-01-01T00:00:00Z',
       riskSummary: 'Flat timestamp loser',
       presentation: {
-        action: 'sell',
-        label: 'Sell',
+        action: 'hold',
+        label: 'Hold',
         confidence: 0.9,
         summary: 'Canonical newest',
         risk: 'Canonical timestamp winner',

@@ -142,6 +142,8 @@ def _presentation_for_excerpt(
     *,
     report_language: str,
 ) -> Optional[Dict[str, Any]]:
+    """Rebuild an excerpt presentation in the requested report language."""
+
     return build_decision_signal_presentation(summary, report_language=report_language)
 
 
@@ -152,6 +154,8 @@ def _public_scalar(value: Any, *, max_length: int) -> str:
 
 
 def _public_confidence(value: Any) -> str:
+    """Format a valid public confidence value as a whole-number percentage."""
+
     if value in (None, "") or isinstance(value, bool):
         return ""
     try:

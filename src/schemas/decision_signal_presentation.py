@@ -20,7 +20,7 @@ from src.schemas.decision_action import (
 
 
 class DecisionSignalPresentation(TypedDict):
-    """Low-sensitive, renderer-ready DecisionSignal presentation contract."""
+    """Renderer-ready fields whose action mirrors the top-level signal action."""
 
     action: DecisionAction
     label: str
@@ -35,15 +35,13 @@ def build_decision_signal_presentation(
     *,
     report_language: Optional[str] = None,
 ) -> Optional[DecisionSignalPresentation]:
-    """Build one presentation model without trusting a stored display label."""
+    """Build a presentation model with direction derived only from top-level action."""
 
     if not isinstance(item, Mapping):
         return None
     nested = item.get("presentation")
     presentation = nested if isinstance(nested, Mapping) else {}
-    action = normalize_decision_action(
-        _presentation_value(presentation, "action", item.get("action"))
-    )
+    action = normalize_decision_action(item.get("action"))
     if action is None:
         return None
     language = _presentation_language(
@@ -78,6 +76,8 @@ def _presentation_value(
     key: str,
     fallback: Any,
 ) -> Any:
+    """Return a nested non-direction field when the presentation supplies it."""
+
     return presentation[key] if key in presentation else fallback
 
 
@@ -88,6 +88,8 @@ def _presentation_language(
     action: DecisionAction,
     requested: Optional[str],
 ) -> str:
+    """Resolve presentation language from provenance or a matching stored label."""
+
     metadata = item.get("metadata")
     metadata_language = metadata.get("report_language") if isinstance(metadata, Mapping) else None
     for candidate in (requested, item.get("report_language"), metadata_language):
@@ -107,6 +109,8 @@ def _presentation_language(
 
 
 def _optional_confidence(value: Any) -> Optional[float]:
+    """Normalize a finite unit-interval confidence value or return none."""
+
     if value in (None, "") or isinstance(value, bool):
         return None
     try:
@@ -119,6 +123,8 @@ def _optional_confidence(value: Any) -> Optional[float]:
 
 
 def _optional_display_text(value: Any) -> Optional[str]:
+    """Normalize optional scalar or structured display content into text."""
+
     if value in (None, "", [], {}):
         return None
     if isinstance(value, (list, tuple)):
@@ -135,6 +141,8 @@ def _optional_display_text(value: Any) -> Optional[str]:
 
 
 def _optional_scalar_text(value: Any) -> Optional[str]:
+    """Normalize an optional scalar presentation value into stripped text."""
+
     if value in (None, ""):
         return None
     text = str(value).strip()

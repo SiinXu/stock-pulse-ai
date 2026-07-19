@@ -78,22 +78,22 @@ describe('DecisionSignalCard', () => {
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
   });
 
-  it('renders every canonical presentation field before conflicting legacy fields', () => {
+  it('renders top-level action with nested non-direction presentation fields', () => {
     window.localStorage.setItem('dsa.uiLanguage', 'en');
     render(
       <UiLanguageProvider>
         <DecisionSignalCard
           item={{
             ...signal,
-            action: 'sell',
+            action: 'buy',
             actionLabel: 'Sell',
             confidence: 0.1,
             reason: 'Legacy summary',
             riskSummary: 'Legacy risk',
             createdAt: '2026-01-01T00:00:00',
             presentation: {
-              action: 'buy',
-              label: 'Buy',
+              action: 'sell',
+              label: 'Sell',
               confidence: 0.91,
               summary: 'Canonical summary',
               risk: 'Canonical risk',

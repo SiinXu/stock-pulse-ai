@@ -1549,15 +1549,15 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   test('34b Decision Signals uses one canonical presentation across card, details, timeline, and Portfolio', async ({ page }) => {
     const canonicalSignal = {
       ...signalItem(91, 'AAPL', 'Canonical presentation fixture'),
-      action: 'sell',
+      action: 'buy',
       action_label: 'Sell',
       confidence: 0.1,
       reason: 'Legacy summary must not render',
       risk_summary: 'Legacy risk must not render',
       created_at: '2026-01-01T00:00:00Z',
       presentation: {
-        action: 'buy',
-        label: 'Buy',
+        action: 'sell',
+        label: 'Sell',
         confidence: 0.91,
         summary: 'Canonical momentum confirmed',
         risk: 'Canonical gap risk',
@@ -1669,11 +1669,11 @@ test.describe('infrastructure interaction acceptance matrix', () => {
               market: 'us',
               signal: {
                 id: 91,
-                action: 'buy',
+                action: 'sell',
                 action_label: 'Buy',
                 presentation: {
-                  action: 'sell',
-                  label: 'Sell',
+                  action: 'buy',
+                  label: 'Buy',
                   confidence: 0.91,
                   summary: 'Canonical portfolio summary',
                   risk: 'Canonical portfolio risk',

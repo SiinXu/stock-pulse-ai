@@ -4833,7 +4833,8 @@
           "action",
           "label"
         ],
-        "title": "DecisionSignalPresentation"
+        "title": "DecisionSignalPresentation",
+        "description": "Renderer-ready fields whose action mirrors the top-level signal action."
       },
       "DecisionSignalMutationResponse": {
         "properties": {

@@ -58,10 +58,13 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "source_agent=decision_profile_reassess" in topic
     assert "src/schemas/decision_signal_presentation.py" in topic
     assert "`action`、`label`、`confidence`、`summary`、`risk`、`timestamp`" in topic
+    assert "顶层 `action` 是唯一方向权威" in topic
+    assert "`presentation.action` 只是由它派生的只读镜像" in topic
     assert "非字符串或不支持的值仍作为普通 caller metadata 保留" in topic
     assert "Web 报告动作卡与历史 badge 复用同一 taxonomy 标签工具" in topic
     assert "没有正式语言键的 legacy 行继续使用原始 label 推断语言" in topic
     assert "canonical `presentation`" in full_guide_en
+    assert "Top-level `action` is the sole direction authority" in full_guide_en
     assert "non-string or unsupported caller metadata remains round-trippable" in full_guide_en
     assert "The Web report action card and history badges share the same taxonomy-label helper" in full_guide_en
     assert "trigger_source=web:decision_profile_reassess" in topic

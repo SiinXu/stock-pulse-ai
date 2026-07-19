@@ -1060,6 +1060,8 @@ class DecisionSignalService:
         self,
         row: DecisionSignalRecord,
     ) -> Optional[str]:
+        """Return supported formal presentation-language provenance from a row."""
+
         if not row.metadata_json:
             return None
         try:

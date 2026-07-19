@@ -222,6 +222,8 @@ class DecisionSignalFeedbackItem(BaseModel):
 
 
 class DecisionSignalPresentation(BaseModel):
+    """Renderer-ready fields whose action mirrors the top-level signal action."""
+
     action: Literal["buy", "add", "hold", "reduce", "sell", "watch", "avoid", "alert"]
     label: str
     confidence: Optional[float] = None

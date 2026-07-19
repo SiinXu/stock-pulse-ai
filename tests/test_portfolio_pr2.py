@@ -561,7 +561,7 @@ class PortfolioPr2TestCase(unittest.TestCase):
         self.assertEqual(signal_actions["300750"], "reduce")
         self.assertEqual(signal_actions["000001"], "alert")
 
-    def test_risk_report_uses_canonical_presentation_action(self) -> None:
+    def test_risk_report_uses_top_level_action_when_presentation_conflicts(self) -> None:
         account = self.service.create_account(name="Main", broker="Demo", market="cn", base_currency="CNY")
         account_id = account["id"]
         self.service.record_cash_ledger(
@@ -580,15 +580,15 @@ class PortfolioPr2TestCase(unittest.TestCase):
                         "id": 91,
                         "market": "cn",
                         "stock_code": "600519",
-                        "action": "buy",
-                        "action_label": "Buy",
+                        "action": "sell",
+                        "action_label": "Sell",
                         "confidence": 0.1,
                         "reason": "Legacy summary",
                         "risk_summary": "Legacy risk",
                         "created_at": "2026-01-01T00:00:00",
                         "presentation": {
-                            "action": "sell",
-                            "label": "Sell",
+                            "action": "buy",
+                            "label": "Buy",
                             "confidence": 0.91,
                             "summary": "Canonical summary",
                             "risk": "Canonical risk",
@@ -611,7 +611,7 @@ class PortfolioPr2TestCase(unittest.TestCase):
         block = report["decision_signal_risk"]
         self.assertTrue(block["available"])
         self.assertEqual(block["actions"]["sell"], 1)
-        self.assertEqual(block["items"][0]["signal"]["action"], "buy")
+        self.assertEqual(block["items"][0]["signal"]["action"], "sell")
         self.assertEqual(block["items"][0]["signal"]["presentation"]["action"], "sell")
         self.assertEqual(block["items"][0]["signal"]["presentation"]["summary"], "Canonical summary")
 

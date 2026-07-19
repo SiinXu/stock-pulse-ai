@@ -359,6 +359,8 @@ class DecisionSignalRepository:
         existing_metadata_json: Optional[str],
         replacement_metadata_json: Optional[str],
     ) -> Optional[str]:
+        """Carry formal presentation-language provenance across expired refresh."""
+
         if not existing_metadata_json:
             return replacement_metadata_json
         try:
