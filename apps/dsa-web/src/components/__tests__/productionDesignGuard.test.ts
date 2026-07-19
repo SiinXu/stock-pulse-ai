@@ -79,17 +79,17 @@ const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[t
 const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1445,
+    line: 1448,
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
   ['../../pages/PortfolioPage.tsx', [
-    ...[1152, 1165, 1177, 1777, 1780].map((line) => ({
+    ...[1145, 1158, 1170, 1770, 1773].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['flex-1'],
     })),
-    ...[1608, 1645, 1689].map((line) => ({
+    ...[1601, 1638, 1682].map((line) => ({
       line,
       removeBy: 'UI-P01',
       tokens: ['w-full'],
@@ -2442,7 +2442,7 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
-    const duplicateExactCaller = `${'\n'.repeat(1151)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    const duplicateExactCaller = `${'\n'.repeat(1144)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
     expect(findProductionDesignViolations(
       '../../pages/PortfolioPage.tsx',
       duplicateExactCaller,
