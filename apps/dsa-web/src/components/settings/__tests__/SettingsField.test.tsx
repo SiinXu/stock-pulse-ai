@@ -398,7 +398,9 @@ describe('SettingsField', () => {
     expect(input).toHaveAttribute('name', 'stockpulse-config-openai-api-key');
     expect(input).toHaveAttribute('autocomplete', 'off');
     expect(input).toHaveAttribute('data-credential-purpose', 'configuration-secret');
+    expect(input).toHaveAttribute('readonly');
     fireEvent.focus(input);
+    expect(input).not.toHaveAttribute('readonly');
     fireEvent.change(input, {
       target: { value: 'updated-secret' },
     });
@@ -436,14 +438,25 @@ describe('SettingsField', () => {
 
     expect(screen.getAllByRole('button', { name: '显示内容' })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: '删除' })).toHaveLength(2);
-    expect(screen.getByDisplayValue('secret-a')).toHaveAttribute(
+    const firstInput = screen.getByDisplayValue('secret-a');
+    const secondInput = screen.getByDisplayValue('secret-b');
+    expect(firstInput).toHaveAttribute(
       'name',
       'stockpulse-config-openai-api-keys-1',
     );
-    expect(screen.getByDisplayValue('secret-b')).toHaveAttribute(
+    expect(secondInput).toHaveAttribute(
       'name',
       'stockpulse-config-openai-api-keys-2',
     );
+    expect(firstInput).toHaveAttribute('readonly');
+    expect(secondInput).toHaveAttribute('readonly');
+
+    fireEvent.focus(secondInput);
+
+    expect(firstInput).not.toHaveAttribute('readonly');
+    expect(secondInput).not.toHaveAttribute('readonly');
+    fireEvent.change(secondInput, { target: { value: 'secret-c' } });
+    expect(onChange).toHaveBeenCalledWith('OPENAI_API_KEYS', 'secret-a,secret-c');
   });
 
   it('allows optional select fields to be cleared when schema provides an empty option', () => {

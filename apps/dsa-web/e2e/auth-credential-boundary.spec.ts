@@ -1,9 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type Request } from '@playwright/test';
-import { getE2eAuthStatus } from './auth-fixture';
+import { expect, test, type ConsoleMessage, type Request } from '@playwright/test';
+import { getE2eAuthStatus, loginAsE2eAdmin } from './auth-fixture';
 
 const firstRunPassword = process.env.DSA_WEB_SMOKE_PASSWORD || 'dsa-e2e-smoke';
+const interactionCanary = process.env.DSA_PLAYWRIGHT_ARTIFACT_CANARY
+  || 'stockpulse-e2e-credential-interaction-canary';
 
 function isCredentialSideEffect(request: Request): boolean {
   const { pathname } = new URL(request.url());
@@ -16,7 +18,8 @@ function isCredentialSideEffect(request: Request): boolean {
   );
 }
 
-test('first admin password stays isolated from the first-run Provider API key', async ({ page }) => {
+test('first admin password stays isolated from the first-run Provider API key', async ({ page }, testInfo) => {
+  expect(testInfo.project.use.trace, 'credential-bearing acceptance must not create browser traces').toBe('off');
   const status = await getE2eAuthStatus(page);
   expect(status.passwordSet, 'credential-boundary scenario requires the fresh E2E auth store').toBe(false);
 
@@ -73,4 +76,73 @@ test('first admin password stays isolated from the first-run Provider API key', 
   expect(credentialSideEffects).toEqual([]);
   await expect(providerCredential).toHaveValue('');
   page.off('request', recordSideEffect);
+});
+
+test('Provider secret reveal, native copy, and clear stay out of diagnostics', async ({ page }, testInfo) => {
+  expect(testInfo.project.use.trace, 'credential-bearing acceptance must not create browser traces').toBe('off');
+  await loginAsE2eAdmin(page);
+  await page.goto('/settings?section=ai_models&view=connections');
+  await expect(page.getByRole('heading', { name: '模型接入' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: /添加模型服务/ }).first().click();
+  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  await dialog.getByLabel('选择模型服务商').click();
+  await dialog.locator('[role="option"][data-value="openai"]').click();
+  await dialog.getByRole('button', { name: '下一步' }).click();
+
+  const providerCredential = dialog.getByLabel('API 密钥');
+  await expect(providerCredential).toHaveAttribute('name', 'stockpulse-provider-api-key');
+  await expect(providerCredential).toHaveAttribute('autocomplete', 'off');
+  const credentialSideEffects: string[] = [];
+  const browserDiagnostics: string[] = [];
+  let credentialReachedRequest = false;
+  const recordRequest = (request: Request) => {
+    if (isCredentialSideEffect(request)) credentialSideEffects.push(`${request.method()} ${request.url()}`);
+    const requestMaterial = `${request.url()}\n${request.postData() ?? ''}`;
+    if (requestMaterial.includes(interactionCanary)) credentialReachedRequest = true;
+  };
+  const recordConsole = (message: ConsoleMessage) => browserDiagnostics.push(message.text());
+  const recordPageError = (error: Error) => browserDiagnostics.push(error.message);
+  page.on('request', recordRequest);
+  page.on('console', recordConsole);
+  page.on('pageerror', recordPageError);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin: new URL(page.url()).origin,
+  });
+
+  let revealWorked = false;
+  let clipboardMatches = false;
+  let clearWorked = false;
+  let hideWorked = false;
+  try {
+    await providerCredential.fill(interactionCanary);
+    await dialog.getByRole('button', { name: '显示内容' }).click();
+    revealWorked = await providerCredential.getAttribute('type') === 'text';
+    await providerCredential.selectText();
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+C' : 'Control+C');
+    clipboardMatches = await page.evaluate(async (expected) => (
+      await navigator.clipboard.readText()
+    ) === expected, interactionCanary);
+    await page.keyboard.press('Backspace');
+    clearWorked = await providerCredential.inputValue() === '';
+    await dialog.getByRole('button', { name: '隐藏内容' }).click();
+    hideWorked = await providerCredential.getAttribute('type') === 'password';
+  } finally {
+    await providerCredential.fill('').catch(() => undefined);
+    await page.evaluate(() => navigator.clipboard.writeText('')).catch(() => undefined);
+    page.off('request', recordRequest);
+    page.off('console', recordConsole);
+    page.off('pageerror', recordPageError);
+  }
+
+  expect(revealWorked, 'Provider secret reveal must expose only the local input value').toBe(true);
+  expect(clipboardMatches, 'native copy must preserve the local credential value').toBe(true);
+  expect(clearWorked, 'native clear must remove the local credential value').toBe(true);
+  expect(hideWorked, 'Provider secret must return to password rendering after the interaction').toBe(true);
+  expect(credentialSideEffects).toEqual([]);
+  expect(credentialReachedRequest, 'credential interactions must remain browser-local').toBe(false);
+  expect(
+    browserDiagnostics.some((message) => message.includes(interactionCanary)),
+    'credential interactions must not reach browser console or page-error diagnostics',
+  ).toBe(false);
+  await expect(providerCredential).toHaveValue('');
 });
