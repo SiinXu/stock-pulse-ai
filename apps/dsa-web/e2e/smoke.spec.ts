@@ -42,6 +42,10 @@ test.describe('web smoke', () => {
     // Check for submit button
     await expect(page.getByRole('button', { name: /授权进入工作台|完成设置并登录/ })).toBeVisible();
 
+    const connectionNotice = page.locator('[data-connection-status]');
+    await expect(connectionNotice).toHaveAttribute('data-connection-status', 'local-http');
+    await expect(connectionNotice).toHaveText('当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。');
+    await expect(page.getByText(/StockPulse-V3-TLS/)).toHaveCount(0);
   });
 
   test('home page shows analysis entry and history panel after login', async ({ page }) => {

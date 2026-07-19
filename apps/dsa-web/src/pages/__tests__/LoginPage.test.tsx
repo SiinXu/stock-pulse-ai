@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LoginPage from '../LoginPage';
 
-const { navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
+const { connectionState, navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
+  connectionState: { status: 'local-http' },
   navigate: vi.fn(),
   useSearchParamsMock: vi.fn(),
   useAuthMock: vi.fn(),
@@ -10,6 +11,10 @@ const { navigate, useSearchParamsMock, useAuthMock } = vi.hoisted(() => ({
 
 vi.mock('../../hooks', () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock('../../utils/loginConnection', () => ({
+  getLoginConnectionStatus: () => connectionState.status,
 }));
 
 vi.mock('react-router-dom', async () => {
@@ -24,6 +29,7 @@ vi.mock('react-router-dom', async () => {
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    connectionState.status = 'local-http';
     document.documentElement.className = 'light';
     useSearchParamsMock.mockReturnValue([new URLSearchParams('redirect=%2Fsettings')]);
   });
@@ -91,4 +97,27 @@ describe('LoginPage', () => {
     expect(screen.queryByText('DAILY STOCK')).not.toBeInTheDocument();
     expect(screen.queryByText('Analysis Engine')).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['https', '此登录页面使用 HTTPS 加密传输。', false],
+    ['local-http', '当前通过本机 HTTP 连接访问；此连接未使用 HTTPS。', false],
+    ['insecure-http', '警告：当前连接未使用 HTTPS。登录密码可能在传输中暴露，请改用 HTTPS。', true],
+  ] as const)(
+    'renders truthful %s transport copy',
+    (status, expectedCopy, isWarning) => {
+      connectionState.status = status;
+      useAuthMock.mockReturnValue({
+        login: vi.fn(),
+        passwordSet: true,
+        setupState: 'enabled',
+      });
+
+      render(<LoginPage />);
+
+      const notice = screen.getByText(expectedCopy);
+      expect(notice).toHaveAttribute('data-connection-status', status);
+      expect(notice).toHaveAttribute('role', isWarning ? 'alert' : 'status');
+      expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
+    },
+  );
 });
