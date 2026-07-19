@@ -97,6 +97,21 @@ describe('DecisionSignalOutcomeRunPanel', () => {
     await waitFor(() => expect(runButton()).not.toBeDisabled());
   });
 
+  it('clears the previous result banner when a new run starts', async () => {
+    renderPanel();
+    runMock.mockResolvedValueOnce(makeRun());
+    confirmRun();
+    await waitFor(() => expect(screen.getByText('Run complete')).toBeTruthy());
+
+    let resolveSecond: (value: DecisionSignalOutcomeRunResponse) => void = () => {};
+    runMock.mockReturnValueOnce(new Promise<DecisionSignalOutcomeRunResponse>((resolve) => {
+      resolveSecond = resolve;
+    }));
+    confirmRun();
+    await waitFor(() => expect(screen.queryByText('Run complete')).toBeNull());
+    resolveSecond(makeRun());
+  });
+
   it('surfaces an error when the run fails', async () => {
     renderPanel();
     runMock.mockRejectedValue(new Error('boom'));

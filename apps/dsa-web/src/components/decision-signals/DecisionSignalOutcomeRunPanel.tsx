@@ -69,6 +69,7 @@ export const DecisionSignalOutcomeRunPanel: React.FC<DecisionSignalOutcomeRunPan
     setConfirmOpen(false);
     setRunning(true);
     setError(null);
+    setResult(null);
     try {
       const response = await decisionSignalsApi.runOutcomes(SAFE_RUN_PARAMS);
       if (!mountedRef.current || runSeqRef.current !== seq) return;
