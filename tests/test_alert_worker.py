@@ -431,12 +431,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertIn("跌破关键支撑", alert_text)
         self.assertIn("观察能否收回均线", alert_text)
 
-    def test_p6_triggered_stock_alert_creates_alert_signal_when_no_active_signal(self) -> None:
+    def test_p6_triggered_stock_alert_persists_runtime_language_when_creating_signal(self) -> None:
         self._create_rule(target="600519")
         signal_service = DecisionSignalService()
         notifier = self._notifier()
         worker = AlertWorker(
-            config_provider=lambda: self._config(),
+            config_provider=lambda: self._config(report_language="en"),
             service=self.service,
             decision_signal_service=signal_service,
             notifier=notifier,
@@ -458,10 +458,20 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(item["trigger_source"], "alert")
         self.assertEqual(item["source_agent"], "alert_worker")
         self.assertIsNone(item["market_phase"])
+        self.assertEqual(item["action_label"], "Alert")
+        self.assertEqual(item["metadata"]["report_language"], "en")
+        self.assertEqual(item["presentation"]["label"], "Alert")
         self.assertTrue(str(item["trace_id"]).startswith("alert-rule-"))
         self.assertEqual(item["metadata"]["rule_id"], 1)
         self.assertEqual(item["metadata"]["alert_type"], "price_cross")
-        self.assertEqual(self._triggers(status="triggered")[0]["decision_signal_summary"]["id"], item["id"])
+        persisted_summary = self._triggers(status="triggered")[0]["decision_signal_summary"]
+        self.assertEqual(persisted_summary["id"], item["id"])
+        self.assertEqual(persisted_summary["presentation"]["label"], "Alert")
+        reloaded = signal_service.get_signal(item["id"])
+        self.assertEqual(reloaded["presentation"]["label"], "Alert")
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertIn("Action: Alert", alert_text)
+        self.assertNotIn("动作: 预警", alert_text)
 
     def test_p6_alert_signal_trace_id_is_idempotent_for_same_rule(self) -> None:
         self._create_rule(target="600519")

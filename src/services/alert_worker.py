@@ -471,6 +471,7 @@ class AlertWorker:
                 result,
                 stock_code=stock_code,
                 market=market,
+                report_language=report_language,
             )
         )
         item = created.get("item") if isinstance(created, dict) else None
@@ -511,6 +512,7 @@ class AlertWorker:
         *,
         stock_code: str,
         market: str,
+        report_language: str,
     ) -> Dict[str, Any]:
         rule = getattr(runtime_rule, "rule", runtime_rule)
         metadata = getattr(rule, "metadata", None)
@@ -527,6 +529,7 @@ class AlertWorker:
             "trace_id": f"alert-rule-{key_hash[:32]}",
             "trigger_source": "alert",
             "action": "alert",
+            "report_language": report_language,
             "reason": result.get("reason") or result.get("message") or getattr(rule, "description", None),
             "watch_conditions": self._alert_watch_conditions(runtime_rule, result, alert_type),
             "risk_summary": self._alert_risk_summary(runtime_rule, result),
