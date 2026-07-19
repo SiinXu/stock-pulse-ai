@@ -37,6 +37,20 @@ export function computeGroupFingerprint(items: SystemConfigUpdateItem[]): string
   return JSON.stringify(items);
 }
 
+/**
+ * Whether a still-pending group should flip to `dirty` while an unresolved
+ * version conflict pauses autosave.
+ *
+ * Terminal and in-flight statuses are preserved: a `conflicted` or `failed`
+ * group keeps surfacing its own outcome, and a `saving` group is mid-write.
+ * Every other status (a group merely waiting) becomes explicitly `dirty`.
+ */
+export function shouldMarkDirtyOnConflict(previousStatus: SettingsSaveStatus | undefined): boolean {
+  return previousStatus !== 'saving'
+    && previousStatus !== 'conflicted'
+    && previousStatus !== 'failed';
+}
+
 /** Inputs that gate whether the `ai_model` group is safe to persist. */
 export interface AiModelSaveGate {
   catalogLoading: boolean;

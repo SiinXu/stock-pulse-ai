@@ -5,6 +5,7 @@ import {
   type AiModelSaveGate,
   classifyAiModelGate,
   computeGroupFingerprint,
+  shouldMarkDirtyOnConflict,
 } from '../autosaveMachine';
 
 const clearGate: AiModelSaveGate = {
@@ -61,5 +62,23 @@ describe('classifyAiModelGate', () => {
       channelDraftValid: false,
     };
     expect(classifyAiModelGate(gate, { checkConnection: true })).toBe('scheduled');
+  });
+});
+
+describe('shouldMarkDirtyOnConflict', () => {
+  it('preserves terminal and in-flight statuses while a conflict pauses autosave', () => {
+    // A group that hit the 409 keeps surfacing "conflicted"; a failed group
+    // keeps its failure; a saving group is mid-write.
+    expect(shouldMarkDirtyOnConflict('conflicted')).toBe(false);
+    expect(shouldMarkDirtyOnConflict('failed')).toBe(false);
+    expect(shouldMarkDirtyOnConflict('saving')).toBe(false);
+  });
+
+  it('marks otherwise-waiting groups dirty', () => {
+    expect(shouldMarkDirtyOnConflict(undefined)).toBe(true);
+    expect(shouldMarkDirtyOnConflict('idle')).toBe(true);
+    expect(shouldMarkDirtyOnConflict('scheduled')).toBe(true);
+    expect(shouldMarkDirtyOnConflict('saved')).toBe(true);
+    expect(shouldMarkDirtyOnConflict('dirty')).toBe(true);
   });
 });

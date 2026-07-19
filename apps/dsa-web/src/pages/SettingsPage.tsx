@@ -79,6 +79,7 @@ import {
   SETTINGS_AUTOSAVE_DEBOUNCE_MS,
   classifyAiModelGate,
   computeGroupFingerprint,
+  shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
@@ -2226,11 +2227,11 @@ const SettingsPage: React.FC = () => {
       // status; they return to `scheduled` once the conflict is resolved.
       if (conflictState) {
         for (const [group, items] of currentPendingGroups) {
-          const fingerprint = computeGroupFingerprint(items);
           const previous = groupSaveStatesRef.current[group];
-          if (previous?.status === 'saving') {
+          if (!shouldMarkDirtyOnConflict(previous?.status)) {
             continue;
           }
+          const fingerprint = computeGroupFingerprint(items);
           if (previous?.status !== 'dirty' || previous.fingerprint !== fingerprint) {
             setGroupSaveState(group, { status: 'dirty', fingerprint });
           }
