@@ -18,6 +18,7 @@
 - 计划与解释：`entry_low`、`entry_high`、`stop_loss`、`target_price`、`invalidation`、`watch_conditions`、`reason`、`risk_summary`、`catalyst_summary`。
 - 证据与质量：`evidence`、`data_quality_summary`、`metadata`。
 - 生命周期：`expires_at`、`created_at`、`updated_at`。
+- 展示模型：响应中的 `presentation` 固定包含 `action`、`label`、`confidence`、`summary`、`risk`、`timestamp`。
 
 枚举取值：
 
@@ -33,6 +34,10 @@
 | `status` | `active`、`expired`、`invalidated`、`closed`、`archived` |
 
 Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标签；API 响应继续保留原始枚举值。
+
+`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。`presentation.action` 永远来自 canonical 八态 `action`；`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API 导出消费者必须优先读取 `presentation`，只有滚动升级连接旧后端时才回退平铺字段。通知会按通知报告语言重新本地化 `presentation.action`，Web 会按当前 UI 语言本地化同一 action。
+
+该模型只属于独立 `DecisionSignal` 资源和低敏 `decision_signal_summary`。主报告、历史列表、StockBar 与回测 schema 继续保持字段隔离，不嵌入完整 signal presentation。
 
 ## Canonical 评分与 action 口径
 
@@ -131,6 +136,7 @@ Web 入口位于 `/decision-signals`：
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
+- 卡片、详情、组合摘要和时间线统一读取 `presentation` 的 action、confidence、summary、risk、timestamp；时间线 rank、颜色、tooltip 和排序不再各自读取平铺字段。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
 - 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。
 - 详情抽屉或已有来源报告 ID 的页面上下文可以发起 reassess preview；没有可用来源报告 ID 时入口禁用。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。
@@ -182,7 +188,7 @@ Web 入口位于 `/decision-signals`：
 - 股票级真实告警触发会优先关联同标的 latest active 信号，并把低敏 `decision_signal_summary` 写入 `alert_triggers.diagnostics`。
 - 没有 active 信号时，告警 worker 只创建最小 `source_type=alert/action=alert` 信号。
 - 告警信号的 `trace_id=alert-rule-<hash>` 只用于同源重试的 best-effort 去重，不覆盖 active 信号本体。
-- 通知只引用公开摘要字段：`action`、`horizon`、`reason`、`watch_conditions`、`risk_summary`、`source_report_id`。
+- 告警通知只引用公开摘要字段以及 canonical `presentation`：`action`、`label`、`confidence`、`summary`、`risk`、`timestamp`、`horizon`、`watch_conditions`、`source_report_id`；分析聚合报告保持字段隔离，不重复渲染 DecisionSignal excerpt。
 - 通知中的 `reason` 在脱敏后完整展示，避免固定字符数在句中截断；`watch_conditions` 和 `risk_summary` 仍保持紧凑摘要上限。
 - 通知不得输出 signal `metadata`、`evidence`、raw diagnostics、webhook URL、token 或 cookie。
 - `GET /api/v1/portfolio/risk` 的 `decision_signal_risk` 只统计当前持仓中的 active `sell/reduce/alert` 信号，查询失败时 fail-open。

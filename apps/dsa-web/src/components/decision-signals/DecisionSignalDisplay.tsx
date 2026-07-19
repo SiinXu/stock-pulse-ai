@@ -13,7 +13,6 @@ import type {
 } from '../../types/decisionSignals';
 import {
   buildDecisionActionLabelMap,
-  getDecisionActionLabel,
   getDecisionActionTone,
   type DecisionActionTone,
 } from '../../utils/decisionAction';
@@ -21,6 +20,7 @@ import { cn } from '../../utils/cn';
 import { parseDecisionSignalDate } from '../../utils/decisionSignalTime';
 import { getUiLocale } from '../../utils/uiLocale';
 import { getDecisionSignalProfileLabel } from '../../utils/decisionSignalProfile';
+import { getDecisionSignalPresentation } from '../../utils/decisionSignalPresentation';
 import {
   getDecisionSignalHorizonLabel,
   getDecisionSignalMarketLabel,
@@ -116,18 +116,8 @@ function asJsonViewerData(value: unknown): Record<string, unknown> | unknown[] |
   return null;
 }
 
-function getActionLabel(item: DecisionSignalItem, t: (key: UiTextKey) => string): string {
-  return getDecisionActionLabel(
-    item.action,
-    item.actionLabel,
-    null,
-    t('decisionSignals.action'),
-    buildDecisionActionLabelMap(t),
-  ) ?? t('decisionSignals.action');
-}
-
-function getActionVariant(item: DecisionSignalItem): BadgeVariant {
-  return ACTION_VARIANTS[getDecisionActionTone(item.action, item.actionLabel, null)];
+function getActionVariant(action: DecisionSignalItem['action']): BadgeVariant {
+  return ACTION_VARIANTS[getDecisionActionTone(action, null, null)];
 }
 
 function getOutcomeLabel(value: DecisionSignalOutcomeValue | null | undefined, t: (key: UiTextKey) => string): string {
@@ -205,7 +195,7 @@ type DecisionSignalCardProps = {
 
 export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, onSelect, selected = false }) => {
   const { language, t } = useUiLanguage();
-  const actionLabel = getActionLabel(item, t);
+  const presentation = getDecisionSignalPresentation(item, buildDecisionActionLabelMap(t));
   const profileLabel = getDecisionSignalProfileLabel(item, t);
   const interactive = Boolean(onSelect);
   const entryRange = formatEntryRange(item);
@@ -224,7 +214,7 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={getActionVariant(item)}>{actionLabel}</Badge>
+            <Badge variant={getActionVariant(presentation.action)}>{presentation.label}</Badge>
             <Badge variant={STATUS_VARIANTS[item.status]}>{t(STATUS_LABEL_KEYS[item.status])}</Badge>
             <Badge variant="info">{t('decisionSignals.profile')}: {profileLabel}</Badge>
             <span className="font-mono text-sm text-secondary-text">{item.stockCode}</span>
@@ -235,13 +225,13 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
         </div>
         <div className="text-right text-xs text-secondary-text">
           <div>{getDecisionSignalMarketLabel(item.market, t)}</div>
-          <div className="mt-1">{formatDateTime(item.createdAt, language)}</div>
+          <div className="mt-1">{formatDateTime(presentation.timestamp, language)}</div>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
         <SignalMetric label={t('decisionSignals.score')} value={formatNumber(item.score)} />
-        <SignalMetric label={t('decisionSignals.confidence')} value={formatConfidence(item.confidence)} />
+        <SignalMetric label={t('decisionSignals.confidence')} value={formatConfidence(presentation.confidence)} />
         <SignalMetric label={t('decisionSignals.horizon')} value={getDecisionSignalHorizonLabel(item.horizon, t)} />
       </div>
 
@@ -261,10 +251,10 @@ export const DecisionSignalCard: React.FC<DecisionSignalCardProps> = ({ item, on
       ) : null}
 
       <div className="mt-3 grid gap-2">
-        <SignalTextBlock label={t('decisionSignals.reason')} value={item.reason} />
+        <SignalTextBlock label={t('decisionSignals.reason')} value={presentation.summary} />
         <SignalTextBlock label={t('decisionSignals.catalystSummary')} value={item.catalystSummary} tone="info" />
         <SignalTextBlock label={t('decisionSignals.watchConditions')} value={item.watchConditions} />
-        <SignalTextBlock label={t('decisionSignals.riskSummary')} value={item.riskSummary} tone="warning" />
+        <SignalTextBlock label={t('decisionSignals.riskSummary')} value={presentation.risk} tone="warning" />
         <SignalTextBlock label={t('decisionSignals.invalidation')} value={item.invalidation} tone="danger" />
       </div>
 
@@ -337,7 +327,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
   onFeedbackSubmit,
 }) => {
   const { language, t } = useUiLanguage();
-  const actionLabel = getActionLabel(item, t);
+  const presentation = getDecisionSignalPresentation(item, buildDecisionActionLabelMap(t));
   const profileLabel = getDecisionSignalProfileLabel(item, t);
   const entryRange = formatEntryRange(item);
   const evidenceData = asJsonViewerData(item.evidence);
@@ -349,7 +339,7 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={getActionVariant(item)} size="md">{actionLabel}</Badge>
+            <Badge variant={getActionVariant(presentation.action)} size="md">{presentation.label}</Badge>
             <Badge variant={STATUS_VARIANTS[item.status]} size="md">{t(STATUS_LABEL_KEYS[item.status])}</Badge>
             <Badge variant="info" size="md">{t('decisionSignals.profile')}: {profileLabel}</Badge>
           </div>
@@ -361,13 +351,13 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <DetailRow label={t('decisionSignals.score')} value={formatNumber(item.score)} />
-        <DetailRow label={t('decisionSignals.confidence')} value={formatConfidence(item.confidence)} />
+        <DetailRow label={t('decisionSignals.confidence')} value={formatConfidence(presentation.confidence)} />
         <DetailRow label={t('decisionSignals.horizon')} value={getDecisionSignalHorizonLabel(item.horizon, t)} />
         <DetailRow label={t('decisionSignals.profile')} value={profileLabel} />
         <DetailRow label={t('decisionSignals.planQuality')} value={getDecisionSignalPlanQualityLabel(item.planQuality, t)} />
         <DetailRow label={t('decisionSignals.marketPhase')} value={getDecisionSignalMarketPhaseLabel(item.marketPhase, t)} />
         <DetailRow label={t('decisionSignals.sourceReport')} value={item.sourceReportId ? `#${item.sourceReportId}` : '-'} />
-        <DetailRow label={t('decisionSignals.createdAt')} value={formatDateTime(item.createdAt, language)} />
+        <DetailRow label={t('decisionSignals.createdAt')} value={formatDateTime(presentation.timestamp, language)} />
         <DetailRow label={t('decisionSignals.expiresAt')} value={formatDateTime(item.expiresAt, language)} />
       </div>
 
@@ -381,10 +371,10 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
 
       <Card padding="sm" className="rounded-xl">
         <div className="grid gap-3">
-          <SignalTextBlock label={t('decisionSignals.reason')} value={formatJsonish(item.reason)} clamp={false} />
+          <SignalTextBlock label={t('decisionSignals.reason')} value={formatJsonish(presentation.summary)} clamp={false} />
           <SignalTextBlock label={t('decisionSignals.catalystSummary')} value={formatJsonish(item.catalystSummary)} tone="info" clamp={false} />
           <SignalTextBlock label={t('decisionSignals.watchConditions')} value={formatJsonish(item.watchConditions)} clamp={false} />
-          <SignalTextBlock label={t('decisionSignals.riskSummary')} value={formatJsonish(item.riskSummary)} tone="warning" clamp={false} />
+          <SignalTextBlock label={t('decisionSignals.riskSummary')} value={formatJsonish(presentation.risk)} tone="warning" clamp={false} />
           <SignalTextBlock label={t('decisionSignals.invalidation')} value={formatJsonish(item.invalidation)} tone="danger" clamp={false} />
         </div>
       </Card>
@@ -490,14 +480,14 @@ export const PortfolioSignalSummary: React.FC<PortfolioSignalSummaryProps> = ({ 
   if (!item) {
     return <span className="text-xs text-muted-text">{t('decisionSignals.portfolioEmpty')}</span>;
   }
-  const actionLabel = getActionLabel(item, t);
+  const presentation = getDecisionSignalPresentation(item, buildDecisionActionLabelMap(t));
   return (
     <div className="min-w-[11rem] max-w-[18rem] text-left">
       <div className="flex flex-wrap items-center justify-end gap-1.5">
-        <Badge variant={getActionVariant(item)}>{actionLabel}</Badge>
+        <Badge variant={getActionVariant(presentation.action)}>{presentation.label}</Badge>
         {item.horizon ? <span className="text-xs text-secondary-text">{getDecisionSignalHorizonLabel(item.horizon, t)}</span> : null}
       </div>
-      {item.riskSummary ? <p className="mt-1 line-clamp-2 text-xs text-warning">{item.riskSummary}</p> : null}
+      {presentation.risk ? <p className="mt-1 line-clamp-2 text-xs text-warning">{presentation.risk}</p> : null}
       {item.watchConditions ? <p className="mt-1 line-clamp-2 text-xs text-secondary-text">{item.watchConditions}</p> : null}
     </div>
   );

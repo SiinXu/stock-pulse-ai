@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+from src.schemas.decision_signal_presentation import build_decision_signal_presentation
 from src.utils.sanitize import sanitize_decision_signal_payload, sanitize_decision_signal_text
 
 
@@ -15,6 +16,7 @@ SUMMARY_FIELDS = (
     "market",
     "action",
     "action_label",
+    "confidence",
     "horizon",
     "status",
     "source_type",
@@ -27,7 +29,10 @@ SUMMARY_FIELDS = (
 )
 
 
-def summarize_decision_signal(item: Any) -> Optional[Dict[str, Any]]:
+def summarize_decision_signal(
+    item: Any,
+    report_language: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """Return a low-sensitive summary from a serialized DecisionSignal item."""
 
     if not isinstance(item, dict):
@@ -38,6 +43,12 @@ def summarize_decision_signal(item: Any) -> Optional[Dict[str, Any]]:
         if value in (None, "", [], {}):
             continue
         summary[field_name] = sanitize_decision_signal_payload(value)
+    presentation = build_decision_signal_presentation(
+        item,
+        report_language=report_language,
+    )
+    if presentation is not None:
+        summary["presentation"] = sanitize_decision_signal_payload(presentation)
     return summary or None
 
 
@@ -68,8 +79,12 @@ def format_decision_signal_excerpt(summary: Any, report_language: str = "zh") ->
         },
     }[language]
 
+    presentation = _presentation_for_excerpt(summary, report_language=language)
     parts = []
-    action_label = _public_scalar(summary.get("action_label") or summary.get("action"), max_length=32)
+    action_label = _public_scalar(
+        presentation.get("label") if presentation else summary.get("action_label") or summary.get("action"),
+        max_length=32,
+    )
     if action_label:
         parts.append(f"{labels['action']}: {action_label}")
     horizon = _public_scalar(summary.get("horizon"), max_length=16)
@@ -82,12 +97,24 @@ def format_decision_signal_excerpt(summary: Any, report_language: str = "zh") ->
     lines = [f"**{labels['heading']}**"]
     if parts:
         lines.append(" | ".join(parts))
+    presentation_fields = {
+        "reason": presentation.get("summary") if presentation else summary.get("reason"),
+        "risk_summary": presentation.get("risk") if presentation else summary.get("risk_summary"),
+    }
     for key in ("reason", "watch_conditions", "risk_summary"):
         max_length = None if key == "reason" else 120
-        text = _public_text(summary.get(key), max_length=max_length)
+        text = _public_text(presentation_fields.get(key, summary.get(key)), max_length=max_length)
         if text:
             lines.append(f"- {labels[key]}: {text}")
     return "\n".join(lines)
+
+
+def _presentation_for_excerpt(
+    summary: Dict[str, Any],
+    *,
+    report_language: str,
+) -> Optional[Dict[str, Any]]:
+    return build_decision_signal_presentation(summary, report_language=report_language)
 
 
 def _public_scalar(value: Any, *, max_length: int) -> str:

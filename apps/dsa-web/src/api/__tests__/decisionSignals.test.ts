@@ -65,6 +65,14 @@ describe('decisionSignalsApi', () => {
           created_at: '2026-06-11T08:00:00',
           updated_at: '2026-06-11T08:00:00',
           metadata: { task_id: 'task-1' },
+          presentation: {
+            action: 'watch',
+            label: '观望',
+            confidence: 0.72,
+            summary: '趋势改善',
+            risk: '波动较高',
+            timestamp: '2026-06-11T08:00:00',
+          },
         },
         created: false,
       },
@@ -143,6 +151,14 @@ describe('decisionSignalsApi', () => {
     expect(response.item.evidence).toEqual({ source_url: 'https://example.com/news' });
     expect(response.item.dataQualitySummary).toEqual({ raw_score: 80, level: 'usable' });
     expect(response.item.metadata).toEqual({ task_id: 'task-1' });
+    expect(response.item.presentation).toEqual({
+      action: 'watch',
+      label: '观望',
+      confidence: 0.72,
+      summary: '趋势改善',
+      risk: '波动较高',
+      timestamp: '2026-06-11T08:00:00',
+    });
   });
 
   it('preserves explicit null metadata when creating a signal', async () => {

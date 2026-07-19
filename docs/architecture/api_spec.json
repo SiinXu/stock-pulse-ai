@@ -4744,6 +4744,9 @@
               }
             ],
             "title": "Metadata"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/DecisionSignalPresentation"
           }
         },
         "type": "object",
@@ -4755,9 +4758,82 @@
           "trigger_source",
           "action",
           "plan_quality",
-          "status"
+          "status",
+          "presentation"
         ],
         "title": "DecisionSignalItem"
+      },
+      "DecisionSignalPresentation": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "add",
+              "hold",
+              "reduce",
+              "sell",
+              "watch",
+              "avoid",
+              "alert"
+            ],
+            "title": "Action"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "label"
+        ],
+        "title": "DecisionSignalPresentation"
       },
       "DecisionSignalMutationResponse": {
         "properties": {

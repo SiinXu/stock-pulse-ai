@@ -561,6 +561,60 @@ class PortfolioPr2TestCase(unittest.TestCase):
         self.assertEqual(signal_actions["300750"], "reduce")
         self.assertEqual(signal_actions["000001"], "alert")
 
+    def test_risk_report_uses_canonical_presentation_action(self) -> None:
+        account = self.service.create_account(name="Main", broker="Demo", market="cn", base_currency="CNY")
+        account_id = account["id"]
+        self.service.record_cash_ledger(
+            account_id=account_id,
+            event_date=date(2026, 1, 1),
+            direction="in",
+            amount=10000.0,
+            currency="CNY",
+        )
+        self._create_position(account_id, "600519")
+
+        class ConflictingSignalService:
+            def list_signals(self, **_kwargs):
+                return {
+                    "items": [{
+                        "id": 91,
+                        "market": "cn",
+                        "stock_code": "600519",
+                        "action": "buy",
+                        "action_label": "Buy",
+                        "confidence": 0.1,
+                        "reason": "Legacy summary",
+                        "risk_summary": "Legacy risk",
+                        "created_at": "2026-01-01T00:00:00",
+                        "presentation": {
+                            "action": "sell",
+                            "label": "Sell",
+                            "confidence": 0.91,
+                            "summary": "Canonical summary",
+                            "risk": "Canonical risk",
+                            "timestamp": "2026-01-02T00:00:00",
+                        },
+                    }],
+                    "total": 1,
+                }
+
+        risk_service = PortfolioRiskService(
+            portfolio_service=self.service,
+            decision_signal_service=ConflictingSignalService(),
+        )
+        report = risk_service.get_risk_report(
+            account_id=account_id,
+            as_of=date(2026, 1, 1),
+            cost_method="fifo",
+        )
+
+        block = report["decision_signal_risk"]
+        self.assertTrue(block["available"])
+        self.assertEqual(block["actions"]["sell"], 1)
+        self.assertEqual(block["items"][0]["signal"]["action"], "buy")
+        self.assertEqual(block["items"][0]["signal"]["presentation"]["action"], "sell")
+        self.assertEqual(block["items"][0]["signal"]["presentation"]["summary"], "Canonical summary")
+
     def test_risk_report_uses_requested_snapshot_for_decision_signal_filters(self) -> None:
         account = self.service.create_account(name="Main", broker="Demo", market="cn", base_currency="CNY")
         aid = account["id"]

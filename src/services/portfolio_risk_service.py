@@ -126,7 +126,13 @@ class PortfolioRiskService:
                 )
                 items = response.get("items", []) if isinstance(response, dict) else []
                 for item in items:
-                    if str(item.get("action") or "") not in defensive_actions:
+                    item_presentation = item.get("presentation")
+                    item_action = str(
+                        item_presentation.get("action")
+                        if isinstance(item_presentation, dict)
+                        else item.get("action") or ""
+                    )
+                    if item_action not in defensive_actions:
                         continue
                     key = (
                         str(item.get("market") or "").strip().lower(),
@@ -147,7 +153,12 @@ class PortfolioRiskService:
                 summary = summarize_decision_signal(signal)
                 if not summary:
                     continue
-                action = str(summary.get("action") or "")
+                presentation = summary.get("presentation")
+                action = str(
+                    presentation.get("action")
+                    if isinstance(presentation, dict)
+                    else summary.get("action") or ""
+                )
                 if action not in action_counts:
                     continue
                 signal_id = int(summary.get("id") or 0)

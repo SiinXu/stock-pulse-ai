@@ -179,6 +179,14 @@ def test_create_duplicate_list_detail_latest_and_status_update(client_and_db) ->
     assert created["item"]["plan_quality"] == "partial"
     assert created["item"]["decision_profile"] == "balanced"
     assert created["item"]["metadata"]["decision_profile"] == "balanced"
+    assert created["item"]["presentation"] == {
+        "action": "buy",
+        "label": "买入",
+        "confidence": 0.75,
+        "summary": "突破平台",
+        "risk": None,
+        "timestamp": created["item"]["created_at"],
+    }
     assert created["item"]["expires_at"] is not None
 
     duplicate_resp = client.post(

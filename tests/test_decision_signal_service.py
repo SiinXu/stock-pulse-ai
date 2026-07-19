@@ -128,12 +128,48 @@ def test_service_normalizes_fields_and_partial_plan_quality(isolated_db) -> None
     assert item["action"] == "buy"
     assert item["action_label"] == "买入"
     assert item["confidence"] == 0.72
+    assert item["presentation"] == {
+        "action": "buy",
+        "label": "买入",
+        "confidence": 0.72,
+        "summary": "放量突破",
+        "risk": None,
+        "timestamp": item["created_at"],
+    }
     assert item["score"] == 83
     assert item["entry_low"] == 1680.5
     assert item["stop_loss"] == 1600.0
     assert item["plan_quality"] == "partial"
     assert item["decision_profile"] == "balanced"
     assert item["metadata"]["decision_profile"] == "balanced"
+
+
+def test_service_presentation_uses_action_and_explicit_report_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+
+    item = service.create_signal(
+        _payload(
+            source_report_id=102,
+            trace_id="trace-conflicting-label",
+            action="buy",
+            action_label="Sell",
+            report_language="en",
+            confidence=0.91,
+            reason="Momentum confirmed",
+            risk_summary="Gap risk",
+        )
+    )["item"]
+
+    assert item["action_label"] == "Sell"
+    assert item["metadata"]["report_language"] == "en"
+    assert item["presentation"] == {
+        "action": "buy",
+        "label": "Buy",
+        "confidence": 0.91,
+        "summary": "Momentum confirmed",
+        "risk": "Gap risk",
+        "timestamp": item["created_at"],
+    }
 
 
 def test_service_canonicalizes_decision_profile_and_rejects_non_object_metadata(isolated_db) -> None:

@@ -32,6 +32,7 @@ from src.schemas.decision_profile import (
     normalize_decision_profile_filter,
 )
 from src.schemas.decision_scale import action_for_score, score_action_conflicts_without_guardrail
+from src.schemas.decision_signal_presentation import build_decision_signal_presentation
 from src.services.portfolio_service import VALID_MARKETS
 from src.storage import (
     AnalysisHistory,
@@ -804,6 +805,8 @@ class DecisionSignalService:
             metadata = dict(raw_metadata)
         else:
             raise ValueError("metadata must be an object")
+        if payload.get("report_language") not in (None, ""):
+            metadata["report_language"] = report_language
 
         if "decision_profile" in payload:
             decision_profile = normalize_decision_profile(payload.get("decision_profile"))
@@ -1326,7 +1329,7 @@ class DecisionSignalService:
             ) from exc
 
     def _serialize(self, row: DecisionSignalRecord) -> Dict[str, Any]:
-        return {
+        item = {
             "id": row.id,
             "stock_code": row.stock_code,
             "stock_name": row.stock_name,
@@ -1365,3 +1368,10 @@ class DecisionSignalService:
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
             "metadata": self._json_loads(row.metadata_json, signal_id=row.id, field_name="metadata_json"),
         }
+        presentation = build_decision_signal_presentation(item)
+        if presentation is None:
+            raise DecisionSignalStorageError(
+                f"invalid persisted action for decision signal {row.id}"
+            )
+        item["presentation"] = presentation
+        return item

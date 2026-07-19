@@ -13,7 +13,8 @@ import { EmptyState, InlineAlert } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type { DecisionSignalItem, DecisionSignalStatus } from '../../types/decisionSignals';
-import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
+import { buildDecisionActionLabelMap } from '../../utils/decisionAction';
+import { getDecisionSignalPresentation } from '../../utils/decisionSignalPresentation';
 import { getDecisionSignalProfileLabel } from '../../utils/decisionSignalProfile';
 import {
   getDecisionSignalHorizonLabel,
@@ -191,21 +192,15 @@ export const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ active, payloa
   if (!active || !payload?.[0]?.payload) return null;
   const datum = payload[0].payload;
   const item = datum.item;
-  const actionLabel = getDecisionActionLabel(
-    item.action,
-    item.actionLabel,
-    null,
-    t('decisionSignals.action'),
-    actionLabels,
-  ) ?? item.action;
+  const presentation = getDecisionSignalPresentation(item, actionLabels);
   return (
     <div className="rounded-xl border border-border/70 bg-card/95 px-3 py-2 text-xs shadow-card">
       <div className="font-semibold text-foreground">{item.stockName || item.stockCode}</div>
       <div className="mt-2 grid gap-1 text-secondary-text">
-        <span>{t('decisionSignals.createdAt')}: {formatDateTime(item.createdAt, language)}</span>
-        <span>{t('decisionSignals.action')}: {actionLabel}</span>
+        <span>{t('decisionSignals.createdAt')}: {formatDateTime(presentation.timestamp, language)}</span>
+        <span>{t('decisionSignals.action')}: {presentation.label}</span>
         <span>{t('decisionSignals.score')}: {formatNumber(item.score)}</span>
-        <span>{t('decisionSignals.confidence')}: {formatConfidence(item.confidence)}</span>
+        <span>{t('decisionSignals.confidence')}: {formatConfidence(presentation.confidence)}</span>
         <span>{t('decisionSignals.horizon')}: {getDecisionSignalHorizonLabel(item.horizon, t)}</span>
         <span>{t('decisionSignals.status')}: {t(STATUS_LABEL_KEYS[item.status])}</span>
         <span>{t('decisionSignals.sourceReport')}: {item.sourceReportId ? `#${item.sourceReportId}` : '-'}</span>

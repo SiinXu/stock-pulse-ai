@@ -39,6 +39,7 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     for schema_name in (
         "DecisionSignalCreateRequest",
         "DecisionSignalItem",
+        "DecisionSignalPresentation",
         "DecisionSignalReassessRequest",
         "DecisionSignalReassessResponse",
         "DecisionSignalOutcomeItem",
@@ -55,6 +56,9 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "guardrail_blocked" in topic
     assert "MIN_ACTIONABLE_CONFIDENCE = 0.5" in topic
     assert "source_agent=decision_profile_reassess" in topic
+    assert "src/schemas/decision_signal_presentation.py" in topic
+    assert "`action`、`label`、`confidence`、`summary`、`risk`、`timestamp`" in topic
+    assert "canonical `presentation`" in full_guide_en
     assert "trigger_source=web:decision_profile_reassess" in topic
     assert "scoring_breakdown" in topic
     assert "persist_status=created" in topic
@@ -100,6 +104,7 @@ def test_decision_signal_topic_source_anchors_exist() -> None:
         "api/v1/schemas/decision_signals.py",
         "api/v1/endpoints/decision_signals.py",
         "src/services/decision_signal_service.py",
+        "src/schemas/decision_signal_presentation.py",
         "src/utils/sanitize.py",
     ):
         assert source_path in topic

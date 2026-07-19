@@ -1546,6 +1546,70 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page).toHaveURL(/stock=NEW/);
   });
 
+  test('34b Decision Signals uses one canonical presentation across card and timeline', async ({ page }) => {
+    const canonicalSignal = {
+      ...signalItem(91, 'AAPL', 'Canonical presentation fixture'),
+      action: 'sell',
+      action_label: 'Sell',
+      confidence: 0.1,
+      reason: 'Legacy summary must not render',
+      risk_summary: 'Legacy risk must not render',
+      created_at: '2026-01-01T00:00:00Z',
+      presentation: {
+        action: 'buy',
+        label: 'Buy',
+        confidence: 0.91,
+        summary: 'Canonical momentum confirmed',
+        risk: 'Canonical gap risk',
+        timestamp: '2026-07-18T12:00:00Z',
+      },
+    };
+    await page.route('**/api/v1/decision-signals**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/outcomes/stats')) {
+        await fulfillJson(route, {
+          total: 0,
+          hit: 0,
+          miss: 0,
+          unable: 0,
+          hit_rate_pct: 0,
+          unable_reasons: {},
+          breakdowns: {},
+        });
+        return;
+      }
+      await fulfillJson(route, {
+        items: [canonicalSignal],
+        total: 1,
+        page: 1,
+        page_size: 100,
+      });
+    });
+
+    const applyStockContext = async () => {
+      await page.getByRole('button', { name: 'Current stock' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Current stock' });
+      await dialog.getByRole('combobox', { name: 'Current stock' }).fill('AAPL');
+      await dialog.getByRole('button', { name: 'View stock' }).click();
+    };
+
+    await login(page, 'en');
+    await page.goto('/decision-signals');
+    await applyStockContext();
+    await expect(page.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('91%', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
+
+    const timelinePoint = page.getByTestId('timeline-hit-target-91');
+    await expect(timelinePoint).toBeVisible();
+    await timelinePoint.hover();
+    await expect(page.getByText('Action: Buy', { exact: true })).toBeVisible();
+    await expect(page.getByText('Confidence: 91%', { exact: true })).toBeVisible();
+  });
+
   test('35 Backtest rapid result-filter switch keeps results and performance on the same latest phase', async ({ page }) => {
     const oldResults = deferred();
     const oldPerformance = deferred();

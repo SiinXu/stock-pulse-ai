@@ -57,6 +57,7 @@ import {
 } from '../utils/decisionSignalLabels';
 import { getDecisionProfile } from '../utils/decisionSignalProfile';
 import { parseDecisionSignalDate } from '../utils/decisionSignalTime';
+import { getDecisionSignalPresentation } from '../utils/decisionSignalPresentation';
 import { areStockCodesEquivalent } from '../utils/stockCode';
 
 const PAGE_SIZE = 20;
@@ -396,8 +397,10 @@ function upsertDecisionSignal(
 ): DecisionSignalItem[] {
   const next = [item, ...current.filter((candidate) => candidate.id !== item.id)];
   next.sort((left, right) => {
-    const leftTime = parseDecisionSignalDate(left.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
-    const rightTime = parseDecisionSignalDate(right.createdAt)?.getTime() ?? Number.NEGATIVE_INFINITY;
+    const leftTime = parseDecisionSignalDate(getDecisionSignalPresentation(left).timestamp)?.getTime()
+      ?? Number.NEGATIVE_INFINITY;
+    const rightTime = parseDecisionSignalDate(getDecisionSignalPresentation(right).timestamp)?.getTime()
+      ?? Number.NEGATIVE_INFINITY;
     return rightTime - leftTime || right.id - left.id;
   });
   return limit ? next.slice(0, limit) : next;
@@ -417,7 +420,7 @@ function itemMatchesAppliedTimeline(
   if (context.market && item.market !== context.market) return false;
   if (context.status === 'active' && item.status !== 'active') return false;
   if (context.decisionProfile && getDecisionProfile(item) !== context.decisionProfile) return false;
-  const createdAt = parseDecisionSignalDate(item.createdAt)?.getTime();
+  const createdAt = parseDecisionSignalDate(getDecisionSignalPresentation(item).timestamp)?.getTime();
   if (createdAt === undefined) return false;
   return createdAt >= now - TIMELINE_RANGE_DAYS[context.range] * DAY_MS && createdAt <= now;
 }

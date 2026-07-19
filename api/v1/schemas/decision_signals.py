@@ -219,6 +219,15 @@ class DecisionSignalFeedbackItem(BaseModel):
     updated_at: Optional[str] = None
 
 
+class DecisionSignalPresentation(BaseModel):
+    action: Literal["buy", "add", "hold", "reduce", "sell", "watch", "avoid", "alert"]
+    label: str
+    confidence: Optional[float] = None
+    summary: Optional[str] = None
+    risk: Optional[str] = None
+    timestamp: Optional[str] = None
+
+
 class DecisionSignalItem(BaseModel):
     id: int
     stock_code: str
@@ -253,6 +262,7 @@ class DecisionSignalItem(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     metadata: Optional[Any] = None
+    presentation: DecisionSignalPresentation
 
 
 class DecisionSignalMutationResponse(BaseModel):
