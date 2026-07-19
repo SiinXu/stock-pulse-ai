@@ -2325,9 +2325,11 @@ describe('HomePage', () => {
 
     await screen.findByText('趋势维持强势');
 
-    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
+    });
 
-    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+    expect(screen.getByText('大盘复盘摘要')).toBeInTheDocument();
     expect(screen.getByText('大盘复盘已完成')).toBeInTheDocument();
     expect(screen.queryByText('RAW_TASK_OUTPUT_MUST_NOT_RENDER')).not.toBeInTheDocument();
 
