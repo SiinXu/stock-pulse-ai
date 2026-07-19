@@ -16,6 +16,7 @@ function loadMainModule(t, options = {}) {
     isPackaged: false,
     getVersion: () => '3.12.0',
     getPath: () => '/tmp/dsa-user-data',
+    requestSingleInstanceLock: () => true,
     whenReady: () => ({ then: () => undefined }),
     on: () => undefined,
     quit: () => undefined,
@@ -1121,6 +1122,102 @@ test('StockPulse migration treats a root data type conflict as a critical fallba
   assert.equal(record.status, 'incomplete');
   assert.equal(record.usingLegacyFallback, true);
   assert.match(record.failed.join('\n'), /data \(target type differs\)/);
+});
+
+test('StockPulse critical fallback preserves pre-existing target state without mixing snapshots', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-existing-target-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const legacyDatabase = path.join(legacyUserDataDir, 'data', 'stock_analysis.db');
+  const legacyAdditionalData = path.join(legacyUserDataDir, 'data', 'pending-copy.db');
+  const currentDatabase = path.join(currentUserDataDir, 'data', 'stock_analysis.db');
+  const originalCopyFileSync = fs.copyFileSync;
+  let activeUserDataDir = currentUserDataDir;
+
+  fs.mkdirSync(path.dirname(legacyDatabase), { recursive: true });
+  fs.mkdirSync(path.dirname(currentDatabase), { recursive: true });
+  fs.writeFileSync(legacyDatabase, 'legacy-db');
+  fs.writeFileSync(legacyAdditionalData, 'legacy-pending-copy');
+  fs.writeFileSync(currentDatabase, 'newer-stockpulse-db');
+  fs.copyFileSync = (source, target, mode) => {
+    if (source === legacyAdditionalData) {
+      throw new Error('pending data cannot be copied');
+    }
+    return originalCopyFileSync(source, target, mode);
+  };
+
+  loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return activeUserDataDir;
+      },
+      setPath: (name, value) => {
+        if (name === 'userData') {
+          activeUserDataDir = value;
+        }
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.copyFileSync = originalCopyFileSync;
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(activeUserDataDir, legacyUserDataDir);
+  assert.equal(fs.readFileSync(currentDatabase, 'utf-8'), 'newer-stockpulse-db');
+  assert.equal(fs.existsSync(path.join(currentUserDataDir, 'data', 'pending-copy.db')), false);
+  const record = JSON.parse(
+    fs.readFileSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json'), 'utf-8')
+  );
+  assert.equal(record.usingLegacyFallback, true);
+  assert.match(record.failed.join('\n'), /pending data cannot be copied/);
+});
+
+test('packaged StockPulse exits before migration when another instance owns the lock', (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'stockpulse-brand-instance-lock-'));
+  const legacyUserDataDir = path.join(tempRoot, 'Daily Stock Analysis');
+  const currentUserDataDir = path.join(tempRoot, 'StockPulse');
+  const lifecycle = [];
+
+  fs.mkdirSync(path.join(legacyUserDataDir, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(legacyUserDataDir, 'data', 'stock_analysis.db'), 'legacy-db');
+
+  loadMainModule(t, {
+    platform: 'darwin',
+    app: {
+      isPackaged: true,
+      getPath: (name) => {
+        if (name === 'exe') {
+          return path.join(tempRoot, 'StockPulse.app', 'Contents', 'MacOS', 'StockPulse');
+        }
+        return currentUserDataDir;
+      },
+      requestSingleInstanceLock: () => {
+        lifecycle.push('lock');
+        return false;
+      },
+      whenReady: () => {
+        lifecycle.push('ready');
+        return { then: () => undefined };
+      },
+      quit: () => {
+        lifecycle.push('quit');
+      },
+    },
+  });
+
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.deepEqual(lifecycle, ['lock', 'quit']);
+  assert.equal(fs.existsSync(currentUserDataDir), false);
 });
 
 test('StockPulse upgrade restores a legacy updater backup and recognizes both uninstaller names', (t) => {

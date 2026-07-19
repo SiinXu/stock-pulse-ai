@@ -2219,15 +2219,44 @@ async function createWindow(brandMigrationResult) {
   }
 }
 
-const desktopBrandMigrationResult = migrateLegacyProductUserData();
-
-app.whenReady().then(() => createWindow(desktopBrandMigrationResult));
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+function requestPackagedSingleInstanceLock() {
+  if (!app.isPackaged || typeof app.requestSingleInstanceLock !== 'function') {
+    return true;
   }
-});
+  return app.requestSingleInstanceLock();
+}
+
+function focusExistingMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (typeof mainWindow.isMinimized === 'function' && mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  if (typeof mainWindow.show === 'function') {
+    mainWindow.show();
+  }
+  if (typeof mainWindow.focus === 'function') {
+    mainWindow.focus();
+  }
+}
+
+const hasDesktopInstanceLock = requestPackagedSingleInstanceLock();
+const desktopBrandMigrationResult = hasDesktopInstanceLock
+  ? migrateLegacyProductUserData()
+  : null;
+
+if (hasDesktopInstanceLock) {
+  app.whenReady().then(() => createWindow(desktopBrandMigrationResult));
+  app.on('second-instance', focusExistingMainWindow);
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+} else {
+  app.quit();
+}
 
 app.on('window-all-closed', () => {
   void stopBackend();
@@ -2268,6 +2297,7 @@ module.exports = {
   normalizeVersionString,
   parseSemver,
   readEnvFileValue,
+  requestPackagedSingleInstanceLock,
   resolveAppDir,
   resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
