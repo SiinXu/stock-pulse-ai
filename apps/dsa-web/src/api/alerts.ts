@@ -97,6 +97,19 @@ export const alertsApi = {
     return toCamelCase<AlertRuleItem>(response.data);
   },
 
+  async getRule(ruleId: number): Promise<AlertRuleItem> {
+    const response = await apiClient.get<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}`);
+    return toCamelCase<AlertRuleItem>(response.data);
+  },
+
+  async updateRule(ruleId: number, payload: AlertRuleCreateRequest): Promise<AlertRuleItem> {
+    const response = await apiClient.patch<Record<string, unknown>>(
+      `/api/v1/alerts/rules/${ruleId}`,
+      toSnakeRulePayload(payload),
+    );
+    return toCamelCase<AlertRuleItem>(response.data);
+  },
+
   async deleteRule(ruleId: number): Promise<AlertDeleteResponse> {
     const response = await apiClient.delete<Record<string, unknown>>(`/api/v1/alerts/rules/${ruleId}`);
     return toCamelCase<AlertDeleteResponse>(response.data);

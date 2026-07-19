@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { portfolioApi } from '../../api/portfolio';
 import type {
   AlertRuleCreateRequest,
+  AlertRuleItem,
   AlertSeverity,
   AlertTargetScope,
   AlertType,
@@ -33,9 +34,82 @@ import { Button, Checkbox, Input, Select } from '../common';
 
 const MAX_REQUESTED_DAYS = 365;
 
+interface AlertRuleFormValues {
+  name: string;
+  targetScope: AlertTargetScope;
+  target: string;
+  portfolioTarget: string;
+  marketRegion: MarketRegion;
+  alertType: AlertType;
+  severity: AlertSeverity;
+  enabled: boolean;
+  priceDirection: 'above' | 'below';
+  changeDirection: 'up' | 'down';
+  thresholdDirection: 'above' | 'below';
+  crossDirection: 'bullish_cross' | 'bearish_cross';
+  stopLossMode: PortfolioStopLossMode;
+  price: string;
+  changePct: string;
+  multiplier: string;
+  window: string;
+  period: string;
+  threshold: string;
+  fastPeriod: string;
+  slowPeriod: string;
+  signalPeriod: string;
+  kPeriod: string;
+  dPeriod: string;
+  marketLightStatuses: MarketLightStatus[];
+  minDrop: string;
+}
+
+function numText(value: number | undefined | null, fallback = ''): string {
+  return value === undefined || value === null ? fallback : String(value);
+}
+
+// Reverse the create payload back into editable form field state so the
+// existing form can load an existing rule for editing.
+function alertRuleToFormValues(rule: AlertRuleItem): AlertRuleFormValues {
+  const params = rule.parameters ?? {};
+  const scope = rule.targetScope as AlertTargetScope;
+  const direction = params.direction;
+  return {
+    name: rule.name ?? '',
+    targetScope: scope,
+    target: scope === 'single_symbol' ? rule.target ?? '' : '',
+    portfolioTarget: isPortfolioScope(scope) ? rule.target || 'all' : 'all',
+    marketRegion: scope === 'market' ? ((rule.target as MarketRegion) || 'cn') : 'cn',
+    alertType: rule.alertType as AlertType,
+    severity: rule.severity as AlertSeverity,
+    enabled: rule.enabled,
+    priceDirection: direction === 'below' ? 'below' : 'above',
+    changeDirection: direction === 'down' ? 'down' : 'up',
+    thresholdDirection: direction === 'below' ? 'below' : 'above',
+    crossDirection: direction === 'bearish_cross' ? 'bearish_cross' : 'bullish_cross',
+    stopLossMode: (params.mode as PortfolioStopLossMode) ?? 'near',
+    price: numText(params.price),
+    changePct: numText(params.changePct),
+    multiplier: numText(params.multiplier),
+    window: numText(params.window, '20'),
+    period: numText(params.period, '12'),
+    threshold: numText(params.threshold),
+    fastPeriod: numText(params.fastPeriod, '12'),
+    slowPeriod: numText(params.slowPeriod, '26'),
+    signalPeriod: numText(params.signalPeriod, '9'),
+    kPeriod: numText(params.kPeriod, '3'),
+    dPeriod: numText(params.dPeriod, '3'),
+    marketLightStatuses: Array.isArray(params.statuses) && params.statuses.length > 0
+      ? params.statuses
+      : ['red', 'yellow'],
+    minDrop: numText(params.minDrop, '10'),
+  };
+}
+
 interface AlertRuleFormProps {
   onSubmit: (payload: AlertRuleCreateRequest) => Promise<boolean | void> | boolean | void;
   isSubmitting?: boolean;
+  mode?: 'create' | 'edit';
+  initialRule?: AlertRuleItem;
 }
 
 function isPortfolioScope(scope: AlertTargetScope): boolean {
@@ -52,37 +126,43 @@ function optionsForScope(scope: AlertTargetScope, language: UiLanguage) {
   return scope === 'portfolio_account' ? ALERT_PORTFOLIO_TYPE_OPTIONS[language] : ALERT_SYMBOL_TYPE_OPTIONS[language];
 }
 
-export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmitting = false }) => {
+export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({
+  onSubmit,
+  isSubmitting = false,
+  mode = 'create',
+  initialRule,
+}) => {
   const { language } = useUiLanguage();
   const text = ALERT_FORM_TEXT[language];
-  const [name, setName] = useState('');
-  const [targetScope, setTargetScope] = useState<AlertTargetScope>('single_symbol');
-  const [target, setTarget] = useState('');
-  const [portfolioTarget, setPortfolioTarget] = useState('all');
-  const [marketRegion, setMarketRegion] = useState<MarketRegion>('cn');
+  const seed = useMemo(() => (initialRule ? alertRuleToFormValues(initialRule) : null), [initialRule]);
+  const [name, setName] = useState(seed?.name ?? '');
+  const [targetScope, setTargetScope] = useState<AlertTargetScope>(seed?.targetScope ?? 'single_symbol');
+  const [target, setTarget] = useState(seed?.target ?? '');
+  const [portfolioTarget, setPortfolioTarget] = useState(seed?.portfolioTarget ?? 'all');
+  const [marketRegion, setMarketRegion] = useState<MarketRegion>(seed?.marketRegion ?? 'cn');
   const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  const [alertType, setAlertType] = useState<AlertType>('price_cross');
-  const [severity, setSeverity] = useState<AlertSeverity>('warning');
-  const [enabled, setEnabled] = useState(true);
-  const [priceDirection, setPriceDirection] = useState<'above' | 'below'>('above');
-  const [changeDirection, setChangeDirection] = useState<'up' | 'down'>('up');
-  const [thresholdDirection, setThresholdDirection] = useState<'above' | 'below'>('above');
-  const [crossDirection, setCrossDirection] = useState<'bullish_cross' | 'bearish_cross'>('bullish_cross');
-  const [stopLossMode, setStopLossMode] = useState<PortfolioStopLossMode>('near');
-  const [price, setPrice] = useState('');
-  const [changePct, setChangePct] = useState('');
-  const [multiplier, setMultiplier] = useState('');
-  const [window, setWindow] = useState('20');
-  const [period, setPeriod] = useState('12');
-  const [threshold, setThreshold] = useState('');
-  const [fastPeriod, setFastPeriod] = useState('12');
-  const [slowPeriod, setSlowPeriod] = useState('26');
-  const [signalPeriod, setSignalPeriod] = useState('9');
-  const [kPeriod, setKPeriod] = useState('3');
-  const [dPeriod, setDPeriod] = useState('3');
-  const [marketLightStatuses, setMarketLightStatuses] = useState<MarketLightStatus[]>(['red', 'yellow']);
-  const [minDrop, setMinDrop] = useState('10');
+  const [alertType, setAlertType] = useState<AlertType>(seed?.alertType ?? 'price_cross');
+  const [severity, setSeverity] = useState<AlertSeverity>(seed?.severity ?? 'warning');
+  const [enabled, setEnabled] = useState(seed?.enabled ?? true);
+  const [priceDirection, setPriceDirection] = useState<'above' | 'below'>(seed?.priceDirection ?? 'above');
+  const [changeDirection, setChangeDirection] = useState<'up' | 'down'>(seed?.changeDirection ?? 'up');
+  const [thresholdDirection, setThresholdDirection] = useState<'above' | 'below'>(seed?.thresholdDirection ?? 'above');
+  const [crossDirection, setCrossDirection] = useState<'bullish_cross' | 'bearish_cross'>(seed?.crossDirection ?? 'bullish_cross');
+  const [stopLossMode, setStopLossMode] = useState<PortfolioStopLossMode>(seed?.stopLossMode ?? 'near');
+  const [price, setPrice] = useState(seed?.price ?? '');
+  const [changePct, setChangePct] = useState(seed?.changePct ?? '');
+  const [multiplier, setMultiplier] = useState(seed?.multiplier ?? '');
+  const [window, setWindow] = useState(seed?.window ?? '20');
+  const [period, setPeriod] = useState(seed?.period ?? '12');
+  const [threshold, setThreshold] = useState(seed?.threshold ?? '');
+  const [fastPeriod, setFastPeriod] = useState(seed?.fastPeriod ?? '12');
+  const [slowPeriod, setSlowPeriod] = useState(seed?.slowPeriod ?? '26');
+  const [signalPeriod, setSignalPeriod] = useState(seed?.signalPeriod ?? '9');
+  const [kPeriod, setKPeriod] = useState(seed?.kPeriod ?? '3');
+  const [dPeriod, setDPeriod] = useState(seed?.dPeriod ?? '3');
+  const [marketLightStatuses, setMarketLightStatuses] = useState<MarketLightStatus[]>(seed?.marketLightStatuses ?? ['red', 'yellow']);
+  const [minDrop, setMinDrop] = useState(seed?.minDrop ?? '10');
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -340,6 +420,9 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
       enabled,
     });
     if (submitted === false) return;
+    // In edit mode the parent closes the modal on success; keep the values so
+    // a re-open (or a failed follow-up) does not lose the edited rule.
+    if (mode === 'edit') return;
     setName('');
     setTarget('');
     setPortfolioTarget('all');
@@ -747,8 +830,8 @@ export const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onSubmit, isSubmit
             onChange={(event) => setEnabled(event.target.checked)}
             disabled={isSubmitting}
           />
-          <Button variant="primary" type="submit" isLoading={isSubmitting} loadingText={text.creating}>
-            {text.create}
+          <Button variant="primary" type="submit" isLoading={isSubmitting} loadingText={mode === 'edit' ? text.updating : text.creating}>
+            {mode === 'edit' ? text.update : text.create}
           </Button>
         </div>
         {formError ? (

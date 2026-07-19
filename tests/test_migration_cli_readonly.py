@@ -21,8 +21,10 @@ from src.config import Config
 from src.migrations import cli as migration_cli
 from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
+    DECISION_SIGNAL_PROFILE_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
+    PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
     REGISTRY_METADATA_MIGRATION,
     TARGET_VERSION,
     get_migrations,
@@ -183,6 +185,8 @@ def test_pending_cli_subprocess_is_read_only(
     assert payload["pending_ids"] == [
         REGISTRY_METADATA_MIGRATION.id,
         LLM_USAGE_TELEMETRY_MIGRATION.id,
+        DECISION_SIGNAL_PROFILE_MIGRATION.id,
+        PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -241,6 +245,8 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
     assert payload["pending_ids"] == [
         REGISTRY_METADATA_MIGRATION.id,
         LLM_USAGE_TELEMETRY_MIGRATION.id,
+        DECISION_SIGNAL_PROFILE_MIGRATION.id,
+        PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}
