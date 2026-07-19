@@ -148,6 +148,33 @@ describe('AlertsPage rule editing', () => {
     })));
     await waitFor(() => expect(screen.getByText('更新成功')).toBeTruthy());
   });
+
+  it('does not let a slower edit-load overwrite a newer one', async () => {
+    const ruleB = { ...rule, id: 2, name: 'B 规则', parameters: { direction: 'above' as const, price: 2000 } };
+    listRules.mockResolvedValue({ items: [rule, ruleB], total: 2, page: 1, pageSize: 20 });
+    const deferredA = createDeferred<typeof rule>();
+    getRule.mockImplementation((id: number) => (id === 1 ? deferredA.promise : Promise.resolve(ruleB)));
+
+    render(<AlertsPage />);
+    await waitFor(() => expect(listRules).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 茅台价格突破' }));
+    await waitFor(() => expect(getRule).toHaveBeenCalledWith(1));
+    // Close rule A's modal (its load stays pending) so the list is reachable,
+    // then open rule B.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    fireEvent.click(await screen.findByRole('button', { name: '编辑 B 规则' }));
+    await waitFor(() => expect(screen.getByDisplayValue('2000')).toBeTruthy());
+
+    await act(async () => {
+      deferredA.resolve(rule);
+      await Promise.resolve();
+    });
+
+    // The late rule-A response must not replace the newer rule-B form.
+    expect(screen.getByDisplayValue('2000')).toBeTruthy();
+    expect(screen.queryByDisplayValue('1800')).toBeNull();
+  });
 });
 
 describe('AlertsPage', () => {

@@ -148,6 +148,7 @@ const AlertsPage: React.FC = () => {
   const rulesRequestIdRef = useRef(0);
   const triggersRequestIdRef = useRef(0);
   const notificationsRequestIdRef = useRef(0);
+  const editRequestIdRef = useRef(0);
   const busyRulesRef = useRef<Map<number, AlertRuleBusyAction>>(new Map());
   const mountedRef = useRef(true);
 
@@ -287,6 +288,8 @@ const AlertsPage: React.FC = () => {
   };
 
   const handleEditOpen = async (rule: AlertRuleItem) => {
+    const requestId = editRequestIdRef.current + 1;
+    editRequestIdRef.current = requestId;
     setEditError(null);
     setEditRule(null);
     setEditModalOpen(true);
@@ -295,12 +298,15 @@ const AlertsPage: React.FC = () => {
       // Load the current server state so the edit starts from the latest
       // values rather than a possibly stale list row (concurrent-change guard).
       const fresh = await alertsApi.getRule(rule.id);
-      if (!mountedRef.current) return;
+      // Latest-request-wins: opening edit on B after A must not let A's slower
+      // response seed the form with the wrong rule.
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
       setEditRule(fresh);
     } catch (error) {
-      if (mountedRef.current) setEditError(getParsedApiError(error));
+      if (!mountedRef.current || editRequestIdRef.current !== requestId) return;
+      setEditError(getParsedApiError(error));
     } finally {
-      if (mountedRef.current) setEditOpening(false);
+      if (mountedRef.current && editRequestIdRef.current === requestId) setEditOpening(false);
     }
   };
 
