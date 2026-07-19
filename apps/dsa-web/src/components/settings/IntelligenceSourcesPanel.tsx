@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { SETTINGS_INTELLIGENCE_TEXT } from '../../locales/settingsIntelligence';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
+import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../../api/error';
 import {
   intelligenceApi,
   type IntelligenceItem,
@@ -44,7 +44,7 @@ const EMPTY_DRAFT: DraftState = {
   description: '',
 };
 
-export function IntelligenceSourcesPanel(): JSX.Element {
+export function IntelligenceSourcesPanel() {
   const { language } = useUiLanguage();
   const text = SETTINGS_INTELLIGENCE_TEXT[language];
 
@@ -106,7 +106,7 @@ export function IntelligenceSourcesPanel(): JSX.Element {
     if (!draft.name.trim() || !draft.url.trim()) {
       setActionError(null);
       setNotice(null);
-      setActionError({ title: text.actionFailed, message: text.requiredFields, rawMessage: text.requiredFields, category: 'validation' });
+      setActionError(createParsedApiError({ title: text.actionFailed, message: text.requiredFields }));
       return;
     }
     void runAction('create', async () => {
@@ -126,7 +126,7 @@ export function IntelligenceSourcesPanel(): JSX.Element {
 
   const handleTest = useCallback(() => {
     if (!draft.name.trim() || !draft.url.trim()) {
-      setActionError({ title: text.actionFailed, message: text.requiredFields, rawMessage: text.requiredFields, category: 'validation' });
+      setActionError(createParsedApiError({ title: text.actionFailed, message: text.requiredFields }));
       return;
     }
     void runAction('test', async () => {
@@ -240,7 +240,7 @@ export function IntelligenceSourcesPanel(): JSX.Element {
         <section aria-label={text.sourcesTitle} className="space-y-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">{text.sourcesTitle}</h3>
-            <Button variant="secondary" size="compact" className="min-h-11" onClick={handleFetchAll} isLoading={busy === 'fetch-all'} loadingText={text.fetchingAll}>
+            <Button variant="secondary" size="compact" onClick={handleFetchAll} isLoading={busy === 'fetch-all'} loadingText={text.fetchingAll}>
               {text.fetchAll}
             </Button>
           </div>
@@ -265,10 +265,10 @@ export function IntelligenceSourcesPanel(): JSX.Element {
                     ) : null}
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    <Button variant="outline" size="compact" className="min-h-11" onClick={() => handleFetch(source.id, true)} isLoading={busy === `fetch:${source.id}:dry`}>
+                    <Button variant="outline" size="compact" onClick={() => handleFetch(source.id, true)} isLoading={busy === `fetch:${source.id}:dry`}>
                       {text.dryRun}
                     </Button>
-                    <Button variant="secondary" size="compact" className="min-h-11" onClick={() => handleFetch(source.id, false)} isLoading={busy === `fetch:${source.id}:live`} loadingText={text.fetching}>
+                    <Button variant="secondary" size="compact" onClick={() => handleFetch(source.id, false)} isLoading={busy === `fetch:${source.id}:live`} loadingText={text.fetching}>
                       {text.fetch}
                     </Button>
                   </div>
@@ -286,7 +286,7 @@ export function IntelligenceSourcesPanel(): JSX.Element {
             {templates.map((template) => (
               <li key={template.templateId} className="flex items-center justify-between gap-2 rounded-md border border-[var(--settings-border)] p-2">
                 <span className="min-w-0 truncate text-xs text-foreground">{template.name}</span>
-                <Button variant="ghost" size="compact" className="min-h-11 shrink-0" onClick={() => handleAddTemplate(template.templateId)} isLoading={busy === `template:${template.templateId}`}>
+                <Button variant="ghost" size="compact" onClick={() => handleAddTemplate(template.templateId)} isLoading={busy === `template:${template.templateId}`}>
                   {text.addFromTemplate}
                 </Button>
               </li>
@@ -322,10 +322,10 @@ export function IntelligenceSourcesPanel(): JSX.Element {
         </div>
         <Textarea label={text.sourceDescription} value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2} />
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="min-h-11" onClick={handleTest} isLoading={busy === 'test'} loadingText={text.testing}>
+          <Button variant="outline" onClick={handleTest} isLoading={busy === 'test'} loadingText={text.testing}>
             {text.test}
           </Button>
-          <Button variant="primary" className="min-h-11" onClick={handleCreate} isLoading={busy === 'create'} loadingText={text.creating}>
+          <Button variant="primary" onClick={handleCreate} isLoading={busy === 'create'} loadingText={text.creating}>
             {text.create}
           </Button>
         </div>
@@ -334,7 +334,7 @@ export function IntelligenceSourcesPanel(): JSX.Element {
       <section aria-label={text.itemsTitle} className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground">{text.itemsTitle}</h3>
-          <Button variant="secondary" size="compact" className="min-h-11" onClick={() => void handleLoadItems()} isLoading={busy === 'items'} loadingText={text.loadingItems}>
+          <Button variant="secondary" size="compact" onClick={() => void handleLoadItems()} isLoading={busy === 'items'} loadingText={text.loadingItems}>
             {text.loadItems}
           </Button>
         </div>
