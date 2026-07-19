@@ -31,15 +31,23 @@ cross-runtime 测试和专用 CI，导致“唯一正式运行时”和实际维
 
 ### D1: Native 是唯一可执行 Agent Runtime
 
-当前架构只有一条可执行路径：
+当前只有 Native 可执行实现。生产调用路径与保留的合同一致性路径分别为：
 
 ```text
-API / Web / Desktop / Bot
-  -> StockPulse Agent business architecture (single / multi / research)
-      -> vendor-neutral Runtime Contract and lifecycle
-          -> NativeRuntimeAdapter
-              -> AgentExecutor / AgentOrchestrator / ResearchAgent
+Production requests
+  API / Web / Desktop / Bot
+    -> StockPulse Agent business entrypoints
+        -> build_agent_executor() -> AgentExecutor / AgentOrchestrator
+        -> research entrypoints -> ResearchAgent
+
+Contract and parity coverage
+  vendor-neutral Runtime Contract and lifecycle
+    -> NativeRuntimeAdapter -> the same Native implementations
 ```
+
+`NativeRuntimeAdapter` 是中立合同、生命周期和一致性测试的 Native 包装，不是
+每个生产请求必须经过的装配层。现有生产入口继续直接调用
+`build_agent_executor()` 或 `ResearchAgent`。
 
 具体约束：
 
@@ -55,7 +63,7 @@ API / Web / Desktop / Bot
 以下资产属于 StockPulse，而不是历史 POC，必须保留：
 
 - `runtime/contract.py`: execution context、handle、状态机和 terminal first-wins；
-- `runtime/native_adapter.py`: Native 执行包装；
+- `runtime/native_adapter.py`: Native 合同与一致性包装，不是生产必经层；
 - `runtime/tool_session.py`: per-execution 工具 allowlist、权限、预算、deadline、
   取消、审计和 late-result fence；
 - `runtime/lifecycle.py` 与 `runtime/events.py`: 终态分类、usage 和事件边界；
@@ -114,7 +122,8 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 
 - 历史 cross-runtime benchmark 不能作为当前可执行能力；仅保留为决策记录；
 - 若未来重新评估框架，需要新建适配实现和验证矩阵，不能复活历史耦合；
-- Runtime Contract 仍会增加一层轻量包装，但已被 Native 生命周期和测试使用。
+- 中立 Contract 与 `NativeRuntimeAdapter` 仍有维护和测试成本，但当前生产入口
+  不经过 Adapter，因此不会增加每个生产请求的包装开销。
 
 ## 4. Compatibility and rollback
 
