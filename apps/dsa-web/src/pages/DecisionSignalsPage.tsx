@@ -28,6 +28,7 @@ import {
   DecisionSignalDetails,
 } from '../components/decision-signals/DecisionSignalDisplay';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
+import { DecisionSignalOutcomeRunPanel } from '../components/decision-signals/DecisionSignalOutcomeRunPanel';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,
@@ -1642,6 +1643,7 @@ const DecisionSignalsPage: React.FC = () => {
               icon={<BarChart3 className="h-6 w-6" />}
             />
           )}
+          <DecisionSignalOutcomeRunPanel onCompleted={() => void loadOutcomeStats()} />
         </Card>
 
         <Card
