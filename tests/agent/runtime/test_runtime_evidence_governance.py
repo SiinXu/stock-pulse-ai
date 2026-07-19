@@ -39,11 +39,19 @@ _HISTORICAL_TERMINAL_ONLY_IDS = (
     "contract-cancelrace-parallel-late-tool",
 )
 _HISTORICAL_CONFORMANCE_TABLE = {
-    "等价通过（8）": _HISTORICAL_FULL_EQUIVALENCE_IDS,
-    "仅终态分类等价（3）": _HISTORICAL_TERMINAL_ONLY_IDS,
+    "等价通过（8）": (
+        _HISTORICAL_FULL_EQUIVALENCE_IDS,
+        "Native 与实验侧均真实执行；终态分类、dashboard、LLM 调用序列、"
+        "工具调用序列和参数逐项一致",
+    ),
+    "仅终态分类等价（3）": (
+        _HISTORICAL_TERMINAL_ONLY_IDS,
+        "只执行实验侧；其 `TIMED_OUT` 与 Native frozen `expected` block 分类一致，"
+        "没有当场重跑 Native；工具执行日志因历史 fence 位置不同而不同",
+    ),
     "明确不支持（2 个直接调用）": (
-        "ExecutionMode.CHAT",
-        "ExecutionMode.RESEARCH",
+        ("ExecutionMode.CHAT", "ExecutionMode.RESEARCH"),
+        "历史 adapter 直接调用稳定返回 `unsupported_capability`，不计作 pass",
     ),
 }
 _RETIRED_EVIDENCE_PATHS = (
@@ -63,7 +71,7 @@ def _parse_conformance_table(decision):
             continue
         columns = tuple(column.strip() for column in stripped.strip("|").split("|"))
         assert len(columns) == 3, f"malformed conformance table row: {line}"
-        category, fixtures, _conclusion = columns
+        category, fixtures, conclusion = columns
         if category in {"类别", "---"}:
             continue
         assert category not in entries_by_category, (
@@ -76,7 +84,7 @@ def _parse_conformance_table(decision):
                 f"malformed conformance fixture entry in {category}: {fixture}"
             )
             parsed_fixtures.append(match.group(1))
-        entries_by_category[category] = tuple(parsed_fixtures)
+        entries_by_category[category] = (tuple(parsed_fixtures), conclusion)
 
     return entries_by_category
 
@@ -97,8 +105,8 @@ def test_historical_conformance_table_names_exact_fixture_ids_by_category():
 
     assert table == _HISTORICAL_CONFORMANCE_TABLE
     documented_fixture_ids = (
-        *table["等价通过（8）"],
-        *table["仅终态分类等价（3）"],
+        *table["等价通过（8）"][0],
+        *table["仅终态分类等价（3）"][0],
     )
     assert len(documented_fixture_ids) == len(set(documented_fixture_ids))
     assert documented_fixture_ids == (
