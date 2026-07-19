@@ -90,7 +90,7 @@ async function expectCoarseHitTarget(locator: Locator, label: string): Promise<v
     .toBeGreaterThanOrEqual(minimumCoarseTarget - pixelRoundingTolerance);
 }
 
-test.describe('coarse-pointer foundation controls', () => {
+test.describe('touch-capable foundation controls', () => {
   test.use({ hasTouch: true });
 
   test('separates visible density from touch targets and keeps keyboard feedback', async ({ page }) => {
@@ -101,7 +101,7 @@ test.describe('coarse-pointer foundation controls', () => {
     await page.evaluate(() => Promise.all(
       document.getAnimations().map((animation) => animation.finished),
     ));
-    expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
+    expect(await page.evaluate(() => matchMedia('(any-pointer: coarse)').matches)).toBe(true);
 
     const password = page.locator('#password');
     await expectVisibleHeights(password, inputHeights);

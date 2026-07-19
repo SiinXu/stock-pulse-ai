@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
+import { EllipsisVertical } from 'lucide-react';
 import { getParsedApiError } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import type {
@@ -7,7 +8,7 @@ import type {
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Badge, Button, ConfirmDialog, CredentialInput, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
+import { Badge, Button, ConfirmDialog, CredentialInput, IconButton, InlineAlert, Input, Modal, Popover, SearchableSelect, Select, StatusDot, Tooltip } from '../common';
 import type { SearchableSelectOption } from '../common';
 import type { ChannelProtocol } from './llmProviderTemplates';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -840,19 +841,19 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
             contentRole="menu"
             contentClassName="right-0 top-full z-20 mt-1 w-36 p-1"
             trigger={({ open, toggle }) => (
-              <Button
+              <IconButton
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="text-xs text-muted-text"
+                size="default"
+                className="text-muted-text"
                 disabled={busy}
                 aria-label={formatUiText(text.moreActions, { name: actionName })}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 onClick={toggle}
               >
-                ⋮
-              </Button>
+                <EllipsisVertical aria-hidden="true" />
+              </IconButton>
             )}
           >
             {({ close }) => (

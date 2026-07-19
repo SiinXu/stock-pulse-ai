@@ -261,6 +261,7 @@ async function expectUnavailableConnectionSchema(connectionFields: LlmConnection
   const test = within(card).getByRole('button', { name: '测试' });
   const edit = within(card).getByRole('button', { name: '编辑' });
   const more = within(card).getByRole('button', { name: '更多操作 openai' });
+  expect(more).toHaveAttribute('data-control', 'icon-button');
   expect(test).toBeDisabled();
   expect(edit).toBeDisabled();
   expect(more).toBeDisabled();

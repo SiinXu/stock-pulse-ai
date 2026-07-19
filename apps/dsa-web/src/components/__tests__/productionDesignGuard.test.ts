@@ -27,6 +27,7 @@ type DesignRule =
   | 'button-size-contract'
   | 'button-xl-allowlist'
   | 'button-visual-override'
+  | 'button-icon-only'
   | 'hardcoded-hex'
   | 'hardcoded-color'
   | 'legacy-chromatic-token'
@@ -60,23 +61,42 @@ const BUTTON_CANONICAL_SIZE_HEIGHTS = {
 } as const;
 const BUTTON_ALLOWED_HEIGHT_CLASSES = new Set<string>(Object.values(BUTTON_CANONICAL_SIZE_HEIGHTS));
 const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
-const BUTTON_XL_ALLOWLIST = new Map([
-  ['../../pages/NotFoundPage.tsx', 'UI-QA01'],
+type ExactButtonAllowance = {
+  line: number;
+  removeBy: string;
+  tokens: readonly string[];
+};
+const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../../pages/NotFoundPage.tsx', [{
+    line: 34,
+    removeBy: 'UI-QA01',
+    tokens: ['size="xl"'],
+  }]],
 ]);
-const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-)/;
-const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map([
-  ['../../pages/DecisionSignalsPage.tsx', {
+const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
+const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
+  ['../../pages/DecisionSignalsPage.tsx', [{
+    line: 1445,
     removeBy: 'UI-D01',
-    tokens: new Set(['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5']),
-  }],
-  ['../../pages/PortfolioPage.tsx', {
-    removeBy: 'UI-P01',
-    tokens: new Set(['flex-1', 'w-full']),
-  }],
-  ['../../pages/StockScreeningPage.tsx', {
+    tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
+  }]],
+  ['../../pages/PortfolioPage.tsx', [
+    ...[1152, 1165, 1177, 1781, 1784].map((line) => ({
+      line,
+      removeBy: 'UI-P01',
+      tokens: ['flex-1'],
+    })),
+    ...[1612, 1649, 1693].map((line) => ({
+      line,
+      removeBy: 'UI-P01',
+      tokens: ['w-full'],
+    })),
+  ]],
+  ['../../pages/StockScreeningPage.tsx', [{
+    line: 1375,
     removeBy: 'UI-SCR01',
-    tokens: new Set(['min-w-40']),
-  }],
+    tokens: ['min-w-40'],
+  }]],
 ]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
@@ -211,6 +231,7 @@ type SharedButtonBindings = {
 type PrimaryCtaScan = {
   matchedButtons: number;
   matchedSharedStyles: number;
+  allowlistHits: string[];
   violations: DesignViolation[];
 };
 
@@ -495,6 +516,147 @@ function isSharedButtonOpening(
     && isSharedButtonNamespaceExpression(tagName.expression, bindings, new Set());
 }
 
+const VISIBLE_BUTTON_TEXT_PATTERN = /[\p{L}\p{N}]/u;
+
+function jsxAttributeText(attribute: ts.JsxAttribute): string | null {
+  if (!attribute.initializer) return '';
+  if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text;
+  if (
+    ts.isJsxExpression(attribute.initializer)
+    && attribute.initializer.expression
+    && (
+      ts.isStringLiteral(attribute.initializer.expression)
+      || ts.isNoSubstitutionTemplateLiteral(attribute.initializer.expression)
+    )
+  ) {
+    return attribute.initializer.expression.text;
+  }
+  return null;
+}
+
+function jsxOpeningHidesVisibleText(
+  opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+): boolean {
+  for (const property of opening.attributes.properties) {
+    if (!ts.isJsxAttribute(property)) continue;
+    const name = property.name.getText();
+    if (name === 'hidden') return true;
+    if (name === 'className') {
+      const value = jsxAttributeText(property);
+      if (value?.split(/\s+/).includes('sr-only')) return true;
+    }
+    if (name === 'aria-hidden') {
+      const value = jsxAttributeText(property);
+      if (value === 'true') return true;
+      if (
+        property.initializer
+        && ts.isJsxExpression(property.initializer)
+        && property.initializer.expression?.kind === ts.SyntaxKind.TrueKeyword
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function jsxExpressionMayRenderVisibleText(
+  expression: ts.Expression,
+): boolean {
+  const current = unwrapExpression(expression);
+  if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+    return VISIBLE_BUTTON_TEXT_PATTERN.test(current.text);
+  }
+  if (ts.isTemplateExpression(current)) {
+    return VISIBLE_BUTTON_TEXT_PATTERN.test(current.head.text) || current.templateSpans.length > 0;
+  }
+  if (ts.isNumericLiteral(current)) return true;
+  if (
+    current.kind === ts.SyntaxKind.FalseKeyword
+    || current.kind === ts.SyntaxKind.TrueKeyword
+    || current.kind === ts.SyntaxKind.NullKeyword
+  ) {
+    return false;
+  }
+  if (ts.isJsxElement(current)) {
+    return jsxElementMayRenderVisibleText(current);
+  }
+  if (ts.isJsxSelfClosingElement(current)) {
+    return false;
+  }
+  if (ts.isJsxFragment(current)) {
+    return current.children.some((child) => jsxChildMayRenderVisibleText(child));
+  }
+  if (ts.isConditionalExpression(current)) {
+    return jsxExpressionMayRenderVisibleText(current.whenTrue)
+      || jsxExpressionMayRenderVisibleText(current.whenFalse);
+  }
+  if (ts.isBinaryExpression(current)) {
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      || current.operatorToken.kind === ts.SyntaxKind.CommaToken
+    ) {
+      return jsxExpressionMayRenderVisibleText(current.right);
+    }
+    if (
+      current.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      || current.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+      || current.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      return jsxExpressionMayRenderVisibleText(current.left)
+        || jsxExpressionMayRenderVisibleText(current.right);
+    }
+  }
+  if (ts.isArrayLiteralExpression(current)) {
+    return current.elements.some((element) => (
+      !ts.isSpreadElement(element) && jsxExpressionMayRenderVisibleText(element)
+    ));
+  }
+
+  // Calls and data expressions can render localized or runtime-owned text.
+  return true;
+}
+
+function jsxElementMayRenderVisibleText(
+  element: ts.JsxElement,
+): boolean {
+  if (jsxOpeningHidesVisibleText(element.openingElement)) return false;
+  return element.children.some((child) => jsxChildMayRenderVisibleText(child));
+}
+
+function jsxChildMayRenderVisibleText(
+  child: ts.JsxChild,
+): boolean {
+  if (ts.isJsxText(child)) return VISIBLE_BUTTON_TEXT_PATTERN.test(child.text);
+  if (ts.isJsxExpression(child)) {
+    return Boolean(
+      child.expression && jsxExpressionMayRenderVisibleText(child.expression),
+    );
+  }
+  if (ts.isJsxElement(child)) return jsxElementMayRenderVisibleText(child);
+  if (ts.isJsxSelfClosingElement(child)) return false;
+  return child.children.some((nestedChild) => (
+    jsxChildMayRenderVisibleText(nestedChild)
+  ));
+}
+
+function appendButtonIconOnlyViolation(
+  filename: string,
+  source: string,
+  element: ts.JsxElement,
+  bindings: SharedButtonBindings,
+  violations: DesignViolation[],
+): void {
+  if (!isSharedButtonOpening(element.openingElement, bindings)) return;
+  if (element.children.some((child) => jsxChildMayRenderVisibleText(child))) return;
+  violations.push({
+    file: filename,
+    line: lineNumberAt(source, element.openingElement.getStart(element.getSourceFile())),
+    rule: 'button-icon-only',
+    token: 'icon-or-symbol-only',
+  });
+}
+
 function isPrimaryButtonOpening(
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
@@ -564,6 +726,7 @@ function appendButtonXlViolations(
   source: string,
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
+  allowlistHits: string[],
   violations: DesignViolation[],
 ): void {
   if (!isSharedButtonOpening(opening, bindings)) return;
@@ -595,17 +758,89 @@ function appendButtonXlViolations(
       token: 'size={dynamic}',
     });
   }
-  if (!candidates.includes('xl') || BUTTON_XL_ALLOWLIST.has(filename)) return;
+  if (!candidates.includes('xl')) return;
+  const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
+  if (consumeExactButtonAllowance(
+    'button-xl-allowlist',
+    BUTTON_XL_ALLOWLIST,
+    filename,
+    openingLine,
+    'size="xl"',
+    allowlistHits,
+  )) return;
   violations.push({
     file: filename,
-    line: lineNumberAt(source, opening.getStart(opening.getSourceFile())),
+    line: openingLine,
     rule: 'button-xl-allowlist',
     token: 'size="xl"',
   });
 }
 
+function exactButtonAllowanceKey(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  filename: string,
+  line: number,
+  token: string,
+): string {
+  return `${rule}:${filename}:${line}:${token}`;
+}
+
+function consumeExactButtonAllowance(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  allowlist: Map<string, readonly ExactButtonAllowance[]>,
+  filename: string,
+  line: number,
+  token: string,
+  hits: string[],
+): boolean {
+  const allowance = allowlist.get(filename)?.find((entry) => (
+    entry.line === line && entry.tokens.includes(token)
+  ));
+  if (!allowance) return false;
+  const key = exactButtonAllowanceKey(rule, filename, line, token);
+  if (hits.includes(key)) return false;
+  hits.push(key);
+  return true;
+}
+
+function exactButtonAllowanceKeys(
+  rule: 'button-xl-allowlist' | 'button-visual-override',
+  allowlist: Map<string, readonly ExactButtonAllowance[]>,
+): string[] {
+  return Array.from(allowlist.entries()).flatMap(([filename, allowances]) => (
+    allowances.flatMap(({ line, tokens }) => tokens.map((token) => (
+      exactButtonAllowanceKey(rule, filename, line, token)
+    )))
+  ));
+}
+
 function buttonUtilityName(token: string): string {
-  return token.split(':').at(-1)?.replace(/^!/, '') ?? token;
+  let utilityStart = 0;
+  let squareDepth = 0;
+  let roundDepth = 0;
+  let curlyDepth = 0;
+  for (let index = 0; index < token.length; index += 1) {
+    const character = token[index];
+    if (character === '\\') {
+      index += 1;
+      continue;
+    }
+    if (character === '[') squareDepth += 1;
+    else if (character === ']') squareDepth = Math.max(0, squareDepth - 1);
+    else if (character === '(') roundDepth += 1;
+    else if (character === ')') roundDepth = Math.max(0, roundDepth - 1);
+    else if (character === '{') curlyDepth += 1;
+    else if (character === '}') curlyDepth = Math.max(0, curlyDepth - 1);
+    else if (
+      character === ':'
+      && squareDepth === 0
+      && roundDepth === 0
+      && curlyDepth === 0
+    ) {
+      utilityStart = index + 1;
+    }
+  }
+  return token.slice(utilityStart).replace(/^!/, '');
 }
 
 function appendButtonVisualOverrideViolations(
@@ -615,14 +850,23 @@ function appendButtonVisualOverrideViolations(
   sourceFile: ts.SourceFile,
   initializers: StaticInitializerMap,
   bindings: SharedButtonBindings,
+  allowlistHits: string[],
   violations: DesignViolation[],
 ): void {
   if (!isSharedButtonOpening(opening, bindings)) return;
+  const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
   const scan = classNameFragments(opening, sourceFile, initializers);
   for (const fragment of scan.fragments) {
     for (const token of fragment.text.split(/\s+/).filter(Boolean)) {
       if (!BUTTON_VISUAL_OVERRIDE_PATTERN.test(buttonUtilityName(token))) continue;
-      if (BUTTON_VISUAL_OVERRIDE_ALLOWLIST.get(filename)?.tokens.has(token)) continue;
+      if (consumeExactButtonAllowance(
+        'button-visual-override',
+        BUTTON_VISUAL_OVERRIDE_ALLOWLIST,
+        filename,
+        openingLine,
+        token,
+        allowlistHits,
+      )) continue;
       violations.push({
         file: filename,
         line: lineNumberAt(source, fragment.index + fragment.text.indexOf(token)),
@@ -1504,7 +1748,12 @@ function scanPrimaryCtasInBoundSource(
 ): PrimaryCtaScan {
   const initializers = collectStaticInitializers(sourceFile);
   const buttonBindings: SharedButtonBindings = { checker };
-  const result: PrimaryCtaScan = { matchedButtons: 0, matchedSharedStyles: 0, violations: [] };
+  const result: PrimaryCtaScan = {
+    matchedButtons: 0,
+    matchedSharedStyles: 0,
+    allowlistHits: [],
+    violations: [],
+  };
   const appendEffects = (effects: PrimaryCtaEffectScan): void => {
     appendPrimaryClassViolations(
       filename,
@@ -1532,6 +1781,7 @@ function scanPrimaryCtasInBoundSource(
         source,
         node.openingElement,
         buttonBindings,
+        result.allowlistHits,
         result.violations,
       );
       appendButtonVisualOverrideViolations(
@@ -1541,6 +1791,14 @@ function scanPrimaryCtasInBoundSource(
         sourceFile,
         initializers,
         buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
+      appendButtonIconOnlyViolation(
+        filename,
+        source,
+        node,
+        buttonBindings,
         result.violations,
       );
       if (isPrimaryButtonOpening(node.openingElement, buttonBindings)) {
@@ -1548,7 +1806,14 @@ function scanPrimaryCtasInBoundSource(
         appendEffects(primaryButtonEffectFragments(node, sourceFile, initializers, buttonBindings));
       }
     } else if (ts.isJsxSelfClosingElement(node)) {
-      appendButtonXlViolations(filename, source, node, buttonBindings, result.violations);
+      appendButtonXlViolations(
+        filename,
+        source,
+        node,
+        buttonBindings,
+        result.allowlistHits,
+        result.violations,
+      );
       appendButtonVisualOverrideViolations(
         filename,
         source,
@@ -1556,6 +1821,7 @@ function scanPrimaryCtasInBoundSource(
         sourceFile,
         initializers,
         buttonBindings,
+        result.allowlistHits,
         result.violations,
       );
       if (isPrimaryButtonOpening(node, buttonBindings)) {
@@ -1922,6 +2188,9 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations('fixture.tsx', source)).toContainEqual(
       expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
     );
+    expect(findProductionDesignViolations('../../pages/NotFoundPage.tsx', source)).toContainEqual(
+      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
+    );
   });
 
   it('fails closed for dynamic Button sizes and respects final JSX prop order', () => {
@@ -1973,9 +2242,58 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-auto' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-none' }),
     ]);
+
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.buttonSizeOverride,
+    )).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'size-12' }),
+    ]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.buttonArbitraryGeometryOverride,
+    )).toEqual([
+      expect.objectContaining({
+        rule: 'button-visual-override',
+        token: 'supports-[display:grid]:[height:3rem]',
+      }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[width:3rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[padding-inline:1rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[border-radius:1rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[flex-basis:10rem]' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: '[flex-shrink:0]' }),
+    ]);
   });
 
-  it('keeps Button visual-override exceptions token-scoped and expiring', () => {
+  it('rejects shared Button callers whose children are only icons or symbols', () => {
+    const iconOnlyViolations = (source: string) => findProductionDesignViolations(
+      'fixture.tsx',
+      source,
+    ).filter(({ rule }) => rule === 'button-icon-only');
+
+    expect(iconOnlyViolations(productionDesignGuardFixtures.iconOnlyButton)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+    expect(iconOnlyViolations(productionDesignGuardFixtures.symbolOnlyButton)).toEqual([
+      expect.objectContaining({ rule: 'button-icon-only', token: 'icon-or-symbol-only' }),
+    ]);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      <Button variant="ghost" aria-label="Delete">
+        <Trash2 aria-hidden="true" />
+        <span className="sr-only">Delete</span>
+      </Button>
+    `)).toHaveLength(1);
+    expect(iconOnlyViolations(`
+      import { Trash2 } from 'lucide-react';
+      declare const label: string;
+      <Button variant="ghost"><Trash2 aria-hidden="true" />Delete</Button>
+      <Button variant="ghost"><Trash2 aria-hidden="true" />{label}</Button>
+      <Button variant="ghost"><Trash2 aria-hidden="true" />{t('delete')}</Button>
+    `)).toEqual([]);
+  });
+
+  it('keeps Button visual-override exceptions exact, consumable, and expiring', () => {
     const source = `
       import { Button } from '../components/common';
       export const Example = () => (
@@ -1984,11 +2302,25 @@ describe('production design guard', () => {
     `;
 
     expect(findProductionDesignViolations('../../pages/PortfolioPage.tsx', source)).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
-    for (const { removeBy, tokens } of BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values()) {
-      expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
-      expect(tokens.size).toBeGreaterThan(0);
+    const duplicateExactCaller = `${'\n'.repeat(1151)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    expect(findProductionDesignViolations(
+      '../../pages/PortfolioPage.tsx',
+      duplicateExactCaller,
+    ).filter(({ rule }) => rule === 'button-visual-override')).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
+    ]);
+    for (const allowances of [
+      ...BUTTON_XL_ALLOWLIST.values(),
+      ...BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values(),
+    ]) {
+      for (const { line, removeBy, tokens } of allowances) {
+        expect(line).toBeGreaterThan(0);
+        expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
+        expect(tokens.length).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -2547,6 +2879,16 @@ describe('production design guard', () => {
       0,
     );
     const primaryScans = scanPrimaryCtaSources(productionTsxSources);
+    const allowlistHits = Array.from(primaryScans.values())
+      .flatMap((scan) => scan.allowlistHits)
+      .sort();
+    const expectedAllowlistHits = [
+      ...exactButtonAllowanceKeys('button-xl-allowlist', BUTTON_XL_ALLOWLIST),
+      ...exactButtonAllowanceKeys(
+        'button-visual-override',
+        BUTTON_VISUAL_OVERRIDE_ALLOWLIST,
+      ),
+    ].sort();
     const totalMatchedPrimaryButtons = Array.from(primaryScans.values()).reduce(
       (total, scan) => total + scan.matchedButtons,
       0,
@@ -2570,6 +2912,7 @@ describe('production design guard', () => {
     expect(totalMatchedButtonTags).toBeGreaterThan(0);
     expect(totalMatchedPrimaryButtons).toBeGreaterThan(0);
     expect(totalMatchedSharedPrimaryStyles).toBe(PRIMARY_CTA_VARIANTS.size);
+    expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
     expect(violations).toEqual([]);
   });

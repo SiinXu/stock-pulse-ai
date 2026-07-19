@@ -56,10 +56,11 @@ The canonical visible tiers are:
 resolve to `primary`. `IconButton` supports `compact`, `default`, and
 `comfortable` visible squares.
 
-On coarse pointers, `Button` and `IconButton` use a transparent pseudo-element
-to provide at least a 44x44px effective target. `Input` uses a 44px focus frame
-whose empty area forwards focus to the native input. The visible background is
-not enlarged to 44px.
+When any available pointer is coarse, including on hybrid touchscreen devices,
+`Button` and `IconButton` use a transparent pseudo-element to provide at least a
+44x44px effective target. `Input` uses a 44px focus frame whose empty area
+forwards focus to the native input. The visible background is not enlarged to
+44px.
 
 ## Caller Constraints
 
@@ -72,7 +73,9 @@ The AST-backed production design guard checks:
 
 - Button style-map soft rounding and the 28/32/36/40px tiers.
 - `size="xl"` usage against an exact allowlist.
-- Static and unresolved caller-side visual overrides.
+- Icon- or symbol-only shared `Button` callers that must use `IconButton`.
+- Static and unresolved caller-side visual overrides, including `size-*` and
+  arbitrary geometry properties, against exact call-site exceptions.
 - Primary CTA gradient/shimmer rules already enforced by the repository.
 
 Temporary override exceptions record both exact tokens and their removal work

@@ -567,7 +567,7 @@
   }
 }
 
-@media (pointer: coarse) {
+@media (any-pointer: coarse) {
   .control-input-target {
     min-height: 2.75rem;
   }
