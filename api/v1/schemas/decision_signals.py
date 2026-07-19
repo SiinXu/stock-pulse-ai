@@ -109,8 +109,10 @@ class DecisionSignalStatusUpdateRequest(BaseModel):
         default=None,
         description=(
             "Optional replacement metadata. Omit to preserve the stored value; "
-            "null clears it; an object replaces it while preserving the formal "
-            "decision_profile identity."
+            "null clears caller metadata; an object replaces caller metadata. "
+            "Both replacement forms preserve any formal decision_profile identity "
+            "and persisted presentation report_language provenance without promoting "
+            "either value from replacement metadata."
         ),
     )
 
@@ -219,6 +221,17 @@ class DecisionSignalFeedbackItem(BaseModel):
     updated_at: Optional[str] = None
 
 
+class DecisionSignalPresentation(BaseModel):
+    """Renderer-ready fields whose action mirrors the top-level signal action."""
+
+    action: Literal["buy", "add", "hold", "reduce", "sell", "watch", "avoid", "alert"]
+    label: str
+    confidence: Optional[float] = None
+    summary: Optional[str] = None
+    risk: Optional[str] = None
+    timestamp: Optional[str] = None
+
+
 class DecisionSignalItem(BaseModel):
     id: int
     stock_code: str
@@ -253,6 +266,7 @@ class DecisionSignalItem(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     metadata: Optional[Any] = None
+    presentation: DecisionSignalPresentation
 
 
 class DecisionSignalMutationResponse(BaseModel):

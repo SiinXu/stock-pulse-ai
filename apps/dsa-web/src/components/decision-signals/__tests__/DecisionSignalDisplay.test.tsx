@@ -78,6 +78,42 @@ describe('DecisionSignalCard', () => {
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
   });
 
+  it('renders top-level action with nested non-direction presentation fields', () => {
+    window.localStorage.setItem('dsa.uiLanguage', 'en');
+    render(
+      <UiLanguageProvider>
+        <DecisionSignalCard
+          item={{
+            ...signal,
+            action: 'buy',
+            actionLabel: 'Sell',
+            confidence: 0.1,
+            reason: 'Legacy summary',
+            riskSummary: 'Legacy risk',
+            createdAt: '2026-01-01T00:00:00',
+            presentation: {
+              action: 'sell',
+              label: 'Sell',
+              confidence: 0.91,
+              summary: 'Canonical summary',
+              risk: 'Canonical risk',
+              timestamp: '2026-07-19T00:00:00',
+            },
+          }}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByText('Buy')).toBeInTheDocument();
+    expect(screen.getByText('91%')).toBeInTheDocument();
+    expect(screen.getByText('Canonical summary')).toBeInTheDocument();
+    expect(screen.getByText('Canonical risk')).toBeInTheDocument();
+    expect(screen.queryByText('Sell')).not.toBeInTheDocument();
+    expect(screen.queryByText('10%')).not.toBeInTheDocument();
+    expect(screen.queryByText('Legacy summary')).not.toBeInTheDocument();
+    expect(screen.queryByText('Legacy risk')).not.toBeInTheDocument();
+  });
+
   it('hides missing optional plan text for sparse legacy signals', () => {
     window.localStorage.setItem('dsa.uiLanguage', 'zh');
     render(

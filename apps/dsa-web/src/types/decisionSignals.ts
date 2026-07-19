@@ -18,6 +18,15 @@ export type DecisionSignalFeedbackSource = 'web' | 'api';
 export type DecisionProfile = 'conservative' | 'balanced' | 'aggressive';
 export type DecisionProfileDisplay = DecisionProfile | 'unknown';
 
+export interface DecisionSignalPresentation {
+  action: DecisionAction;
+  label: string;
+  confidence?: number | null;
+  summary?: string | null;
+  risk?: string | null;
+  timestamp?: string | null;
+}
+
 export interface DecisionSignalItem {
   id: number;
   stockCode: string;
@@ -52,6 +61,8 @@ export interface DecisionSignalItem {
   createdAt?: string | null;
   updatedAt?: string | null;
   metadata?: DecisionSignalOpaqueJson;
+  /** Optional only for rolling upgrades from servers predating the canonical presentation contract. */
+  presentation?: DecisionSignalPresentation;
 }
 
 export interface DecisionSignalCreateRequest {

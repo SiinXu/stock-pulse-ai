@@ -126,7 +126,8 @@ class PortfolioRiskService:
                 )
                 items = response.get("items", []) if isinstance(response, dict) else []
                 for item in items:
-                    if str(item.get("action") or "") not in defensive_actions:
+                    item_action = str(item.get("action") or "")
+                    if item_action not in defensive_actions:
                         continue
                     key = (
                         str(item.get("market") or "").strip().lower(),

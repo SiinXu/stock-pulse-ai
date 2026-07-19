@@ -17,7 +17,10 @@ from src.repositories.decision_signal_repo import (
     DecisionSignalRepository,
 )
 from src.repositories.portfolio_repo import PortfolioRepository
-from src.report_language import normalize_report_language
+from src.report_language import (
+    is_supported_report_language_value,
+    normalize_report_language,
+)
 from src.schemas.decision_action import (
     DecisionAction,
     build_action_fields,
@@ -32,6 +35,7 @@ from src.schemas.decision_profile import (
     normalize_decision_profile_filter,
 )
 from src.schemas.decision_scale import action_for_score, score_action_conflicts_without_guardrail
+from src.schemas.decision_signal_presentation import build_decision_signal_presentation
 from src.services.portfolio_service import VALID_MARKETS
 from src.storage import (
     AnalysisHistory,
@@ -376,6 +380,7 @@ class DecisionSignalService:
             raise ValueError("terminal decision signal cannot be reactivated through status update")
         metadata_json = None
         if replace_metadata:
+            presentation_language = self._persisted_presentation_language(existing)
             if isinstance(metadata, dict):
                 normalized_metadata = dict(metadata)
                 if existing.decision_profile is None:
@@ -385,7 +390,13 @@ class DecisionSignalService:
                         normalized_metadata,
                         existing.decision_profile,
                     )
+                if presentation_language is not None:
+                    normalized_metadata["report_language"] = presentation_language
+                else:
+                    normalized_metadata.pop("report_language", None)
                 metadata_json = self._json_dumps(normalized_metadata)
+            elif metadata is None and presentation_language is not None:
+                metadata_json = self._json_dumps({"report_language": presentation_language})
             else:
                 metadata_json = self._json_dumps(metadata)
         row = self.repo.update_status(
@@ -804,6 +815,8 @@ class DecisionSignalService:
             metadata = dict(raw_metadata)
         else:
             raise ValueError("metadata must be an object")
+        if payload.get("report_language") not in (None, ""):
+            metadata["report_language"] = report_language
 
         if "decision_profile" in payload:
             decision_profile = normalize_decision_profile(payload.get("decision_profile"))
@@ -1042,6 +1055,26 @@ class DecisionSignalService:
         normalized = dict(metadata)
         normalized["decision_profile"] = decision_profile
         return normalized
+
+    def _persisted_presentation_language(
+        self,
+        row: DecisionSignalRecord,
+    ) -> Optional[str]:
+        """Return supported formal presentation-language provenance from a row."""
+
+        if not row.metadata_json:
+            return None
+        try:
+            metadata = json.loads(row.metadata_json)
+        except (TypeError, ValueError, RecursionError):
+            # A replacement remains the recovery path for malformed legacy metadata.
+            return None
+        if not isinstance(metadata, dict):
+            return None
+        value = metadata.get("report_language")
+        if not isinstance(value, str) or not is_supported_report_language_value(value):
+            return None
+        return normalize_report_language(value)
 
     @staticmethod
     def _metadata_for_invalidation(row: DecisionSignalRecord) -> Dict[str, Any]:
@@ -1326,7 +1359,7 @@ class DecisionSignalService:
             ) from exc
 
     def _serialize(self, row: DecisionSignalRecord) -> Dict[str, Any]:
-        return {
+        item = {
             "id": row.id,
             "stock_code": row.stock_code,
             "stock_name": row.stock_name,
@@ -1365,3 +1398,10 @@ class DecisionSignalService:
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
             "metadata": self._json_loads(row.metadata_json, signal_id=row.id, field_name="metadata_json"),
         }
+        presentation = build_decision_signal_presentation(item)
+        if presentation is None:
+            raise DecisionSignalStorageError(
+                f"invalid persisted action for decision signal {row.id}"
+            )
+        item["presentation"] = presentation
+        return item

@@ -1554,6 +1554,215 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page).toHaveURL(/stock=NEW/);
   });
 
+  test('34b Decision Signals uses one canonical presentation across card, details, timeline, and Portfolio', async ({ page }) => {
+    const canonicalSignal = {
+      ...signalItem(91, 'AAPL', 'Canonical presentation fixture'),
+      action: 'buy',
+      action_label: 'Sell',
+      confidence: 0.1,
+      reason: 'Legacy summary must not render',
+      risk_summary: 'Legacy risk must not render',
+      created_at: '2026-01-01T00:00:00Z',
+      presentation: {
+        action: 'sell',
+        label: 'Sell',
+        confidence: 0.91,
+        summary: 'Canonical momentum confirmed',
+        risk: 'Canonical gap risk',
+        timestamp: '2026-07-18T12:00:00Z',
+      },
+    };
+    await page.route('**/api/v1/decision-signals**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith('/outcomes/stats')) {
+        await fulfillJson(route, {
+          total: 0,
+          hit: 0,
+          miss: 0,
+          unable: 0,
+          hit_rate_pct: 0,
+          unable_reasons: {},
+          breakdowns: {},
+        });
+        return;
+      }
+      if (url.pathname.endsWith('/outcomes')) {
+        await fulfillJson(route, { items: [], total: 0, page: 1, page_size: 20 });
+        return;
+      }
+      if (url.pathname.endsWith('/feedback')) {
+        await fulfillJson(route, {
+          signal_id: 91,
+          feedback_value: null,
+          reason_code: null,
+          note: null,
+          source: null,
+          created_at: null,
+          updated_at: null,
+        });
+        return;
+      }
+      await fulfillJson(route, {
+        items: [canonicalSignal],
+        total: 1,
+        page: 1,
+        page_size: 100,
+      });
+    });
+
+    const applyStockContext = async () => {
+      await page.getByRole('button', { name: 'Current stock' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Current stock' });
+      await dialog.getByRole('combobox', { name: 'Current stock' }).fill('AAPL');
+      await dialog.getByRole('button', { name: 'View stock' }).click();
+    };
+
+    await login(page, 'en');
+    await page.goto('/decision-signals');
+    await applyStockContext();
+    await expect(page.getByText('Canonical momentum confirmed', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Canonical gap risk', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('91%', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
+
+    await page.getByRole('button', {
+      name: 'View AI signal details for Canonical presentation fixture',
+    }).first().click();
+    const details = page.getByRole('dialog', { name: 'Signal details' });
+    await expect(details).toBeVisible();
+    await expect(details.getByText('Canonical momentum confirmed', { exact: true })).toBeVisible();
+    await expect(details.getByText('Canonical gap risk', { exact: true })).toBeVisible();
+    await expect(details.getByText('91%', { exact: true })).toBeVisible();
+    await expect(details.getByText('Sell', { exact: true })).toHaveCount(0);
+    await expect(details.getByText('Legacy summary must not render', { exact: true })).toHaveCount(0);
+    await expect(details.getByText('Legacy risk must not render', { exact: true })).toHaveCount(0);
+
+    await test.step('390px details keep canonical content within the viewport', async () => {
+      const viewport = { width: 390, height: 844 };
+      await page.setViewportSize(viewport);
+      const box = await details.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(-1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+      await expect(details.getByText('Canonical momentum confirmed', { exact: true })).toBeVisible();
+    });
+    await test.step('320px details keep canonical content within the viewport', async () => {
+      const viewport = { width: 320, height: 720 };
+      await page.setViewportSize(viewport);
+      const box = await details.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(-1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+      await expect(details.getByText('Canonical momentum confirmed', { exact: true })).toBeVisible();
+    });
+    await page.keyboard.press('Escape');
+    await expect(details).toBeHidden();
+
+    const timelinePoint = page.getByTestId('timeline-hit-target-91');
+    await expect(timelinePoint).toBeVisible();
+    await timelinePoint.hover();
+    await expect(page.getByText('Action: Buy', { exact: true })).toBeVisible();
+    await expect(page.getByText('Confidence: 91%', { exact: true })).toBeVisible();
+
+    await page.route('**/api/v1/portfolio/risk**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json() as JsonObject;
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          decision_signal_risk: {
+            available: true,
+            total: 1,
+            actions: { sell: 1, reduce: 0, alert: 0 },
+            items: [{
+              account_id: null,
+              symbol: 'AAPL',
+              market: 'us',
+              signal: {
+                id: 91,
+                action: 'sell',
+                action_label: 'Buy',
+                presentation: {
+                  action: 'buy',
+                  label: 'Buy',
+                  confidence: 0.91,
+                  summary: 'Canonical portfolio summary',
+                  risk: 'Canonical portfolio risk',
+                  timestamp: '2026-07-18T12:00:00Z',
+                },
+              },
+            }],
+          },
+        },
+      });
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/portfolio');
+    await expect(page.getByRole('heading', { name: 'Portfolio management' })).toBeVisible();
+    await expect(page.getByText('AAPL · Sell', { exact: true })).toBeVisible();
+    await expect(page.getByText('AAPL · Buy', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await page.setViewportSize({ width: 320, height: 720 });
+    await expect(page.getByText('AAPL · Sell', { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  });
+
+  test('34c report and history use canonical action when legacy advice conflicts', async ({ page }) => {
+    const conflictItem = {
+      ...historyItem(92, 'AAPL', 'Canonical report fixture'),
+      report_language: 'en',
+      action: 'buy',
+      action_label: 'Sell',
+      operation_advice: 'Sell',
+    };
+    const conflictDetail = historyDetail(92, 'AAPL', 'Canonical report fixture');
+    conflictDetail.meta.report_language = 'en';
+    conflictDetail.summary = {
+      ...conflictDetail.summary,
+      action: 'buy',
+      action_label: 'Sell',
+      operation_advice: 'Sell',
+    };
+
+    await page.route('**/api/v1/history**', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === '/api/v1/history/stocks') {
+        await fulfillJson(route, { total: 1, items: [conflictItem] });
+        return;
+      }
+      if (url.pathname === '/api/v1/history') {
+        const items = url.searchParams.get('report_type') === 'market_review' ? [] : [conflictItem];
+        await fulfillJson(route, { total: items.length, page: 1, limit: 20, items });
+        return;
+      }
+      if (url.pathname === '/api/v1/history/92') {
+        await fulfillJson(route, conflictDetail);
+        return;
+      }
+      await route.continue();
+    });
+
+    await login(page, 'en');
+    const reportItem = page.getByRole('button', {
+      name: 'Canonical report fixture AAPL history record',
+      exact: true,
+    });
+    await expect(reportItem).toBeVisible({ timeout: 15_000 });
+    await expect(reportItem.getByText('Buy 60', { exact: true })).toBeVisible();
+    await expect(reportItem.getByText('Sell', { exact: true })).toHaveCount(0);
+
+    await reportItem.click();
+    const actionAdvice = page.getByText('Action Advice', { exact: true });
+    await expect(actionAdvice).toBeVisible();
+    await expect(actionAdvice.locator('..').getByText('Buy', { exact: true })).toBeVisible();
+    await expect(page.getByText('Sell', { exact: true })).toHaveCount(0);
+  });
+
   test('35 Backtest rapid result-filter switch keeps results and performance on the same latest phase', async ({ page }) => {
     const oldResults = deferred();
     const oldPerformance = deferred();

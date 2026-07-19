@@ -1,6 +1,7 @@
 import type { DecisionAction } from '../types/analysis';
 import type { DecisionSignalItem, DecisionSignalStatus } from '../types/decisionSignals';
 import { parseDecisionSignalDate } from './decisionSignalTime';
+import { getDecisionSignalPresentation } from './decisionSignalPresentation';
 
 const TERMINAL_STATUSES = new Set<DecisionSignalStatus>(['expired', 'invalidated', 'closed', 'archived']);
 const DEFAULT_RADIUS = 6;
@@ -67,15 +68,16 @@ function getPointColor(family: ActionFamily, terminal: boolean): string {
 }
 
 export function getTimelinePointStyle(item: DecisionSignalItem): TimelinePointStyle {
+  const presentation = getDecisionSignalPresentation(item);
   const score = finiteNumber(item.score);
-  const confidence = finiteNumber(item.confidence);
+  const confidence = finiteNumber(presentation.confidence);
   const normalizedScore = score === null ? null : clamp(score, 0, 100);
   const normalizedConfidence = confidence === null ? null : clamp(confidence, 0, 1);
   const terminal = TERMINAL_STATUSES.has(item.status);
-  const family = getActionFamily(item.action);
+  const family = getActionFamily(presentation.action);
   const color = getPointColor(family, terminal);
   return {
-    rank: ACTION_RANK[item.action],
+    rank: ACTION_RANK[presentation.action],
     family,
     radius: normalizedScore === null
       ? DEFAULT_RADIUS
@@ -84,7 +86,7 @@ export function getTimelinePointStyle(item: DecisionSignalItem): TimelinePointSt
       ? DEFAULT_STROKE_WIDTH
       : MIN_STROKE_WIDTH + ((MAX_STROKE_WIDTH - MIN_STROKE_WIDTH) * normalizedConfidence),
     terminal,
-    shape: item.action === 'alert' ? 'diamond' : 'circle',
+    shape: presentation.action === 'alert' ? 'diamond' : 'circle',
     fill: color,
     stroke: color,
     statusDasharray: getStatusDasharray(item.status),
@@ -101,15 +103,17 @@ function getStatusDasharray(status: DecisionSignalStatus): string | undefined {
 
 export function sortDecisionSignalTimelineItems(items: DecisionSignalItem[]): DecisionSignalItem[] {
   return [...items].sort((a, b) => {
-    const left = parseDecisionSignalDate(a.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY;
-    const right = parseDecisionSignalDate(b.createdAt)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const left = parseDecisionSignalDate(getDecisionSignalPresentation(a).timestamp)?.getTime() ?? Number.POSITIVE_INFINITY;
+    const right = parseDecisionSignalDate(getDecisionSignalPresentation(b).timestamp)?.getTime() ?? Number.POSITIVE_INFINITY;
     return left - right;
   });
 }
 
 export function buildTimelineData(items: DecisionSignalItem[], fallbackNow = Date.now()): TimelineDatum[] {
   const sortedItems = sortDecisionSignalTimelineItems(items);
-  const parsedTimes = sortedItems.map((item) => parseDecisionSignalDate(item.createdAt)?.getTime() ?? null);
+  const parsedTimes = sortedItems.map((item) => (
+    parseDecisionSignalDate(getDecisionSignalPresentation(item).timestamp)?.getTime() ?? null
+  ));
   const validTimes = parsedTimes.filter((time): time is number => time !== null);
   const maxTime = validTimes.length > 0 ? Math.max(...validTimes) : fallbackNow;
   let invalidOffset = 0;

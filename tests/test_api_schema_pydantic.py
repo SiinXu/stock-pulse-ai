@@ -31,6 +31,7 @@ DECISION_SIGNAL_SCHEMAS = (
     "DecisionSignalItem",
     "DecisionSignalListResponse",
     "DecisionSignalMutationResponse",
+    "DecisionSignalPresentation",
     "DecisionSignalOutcomeItem",
     "DecisionSignalOutcomeListResponse",
     "DecisionSignalOutcomeRunRequest",

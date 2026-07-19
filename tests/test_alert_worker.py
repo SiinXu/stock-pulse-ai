@@ -252,11 +252,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         os.environ.pop("DATABASE_PATH", None)
         self.temp_dir.cleanup()
 
-    def _config(self, raw_rules: str = "") -> SimpleNamespace:
+    def _config(self, raw_rules: str = "", *, report_language: str = "zh") -> SimpleNamespace:
         return SimpleNamespace(
             agent_event_monitor_enabled=True,
             agent_event_alert_rules_json=raw_rules,
             trading_day_check_enabled=False,
+            report_language=report_language,
         )
 
     def _create_rule(self, **overrides) -> dict:
@@ -316,6 +317,77 @@ class AlertWorkerTestCase(unittest.TestCase):
             notifier.send_with_results.side_effect = list(results)
         return notifier
 
+    def _assert_runtime_report_language_notification(
+        self,
+        *,
+        report_language: str,
+        expected_heading: str,
+        expected_action: str,
+        expected_confidence: str,
+        expected_timestamp_label: str,
+    ) -> None:
+        self._create_rule(target="600519")
+        signal_service = DecisionSignalService()
+        created = signal_service.create_signal({
+            "stock_code": "600519",
+            "stock_name": "Moutai",
+            "market": "cn",
+            "source_type": "analysis",
+            "source_report_id": 1391,
+            "trace_id": f"analysis-1391-{report_language}",
+            "trigger_source": "api",
+            "action": "buy",
+            "action_label": "Sell",
+            "confidence": 0.91,
+            "reason": "Momentum confirmed",
+            "watch_conditions": "Watch volume",
+            "risk_summary": "Gap risk",
+        })["item"]
+        notifier = self._notifier()
+        worker = AlertWorker(
+            config_provider=lambda: self._config(report_language=report_language),
+            service=self.service,
+            decision_signal_service=signal_service,
+            notifier=notifier,
+        )
+
+        with patch(
+            "src.agent.events.EventMonitor._get_realtime_quote",
+            new=AsyncMock(return_value=SimpleNamespace(price=1810.0)),
+        ):
+            stats = worker.run_once()
+
+        self.assertEqual(stats["triggered"], 1)
+        persisted_summary = self._triggers(status="triggered")[0]["decision_signal_summary"]
+        self.assertEqual(persisted_summary["presentation"]["action"], "buy")
+        self.assertEqual(persisted_summary["presentation"]["confidence"], 0.91)
+        self.assertEqual(persisted_summary["presentation"]["timestamp"], created["created_at"])
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertIn(expected_heading, alert_text)
+        self.assertIn(expected_action, alert_text)
+        self.assertIn(expected_confidence, alert_text)
+        self.assertIn(f"{expected_timestamp_label}: {created['created_at']}", alert_text)
+        self.assertNotIn("动作: 买入", alert_text)
+        self.assertNotIn("Action: Sell", alert_text)
+
+    def test_alert_notification_uses_runtime_english_for_persisted_signal_summary(self) -> None:
+        self._assert_runtime_report_language_notification(
+            report_language="en",
+            expected_heading="AI decision signal",
+            expected_action="Action: Buy",
+            expected_confidence="Confidence: 91%",
+            expected_timestamp_label="Time",
+        )
+
+    def test_alert_notification_uses_runtime_korean_for_persisted_signal_summary(self) -> None:
+        self._assert_runtime_report_language_notification(
+            report_language="ko",
+            expected_heading="AI 의사결정 신호",
+            expected_action="조치: 매수",
+            expected_confidence="신뢰도: 91%",
+            expected_timestamp_label="생성일",
+        )
+
     def test_p6_triggered_stock_alert_links_latest_active_decision_signal(self) -> None:
         self._create_rule(target="600519")
         signal_service = DecisionSignalService()
@@ -359,12 +431,12 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertIn("跌破关键支撑", alert_text)
         self.assertIn("观察能否收回均线", alert_text)
 
-    def test_p6_triggered_stock_alert_creates_alert_signal_when_no_active_signal(self) -> None:
+    def test_p6_triggered_stock_alert_persists_runtime_language_when_creating_signal(self) -> None:
         self._create_rule(target="600519")
         signal_service = DecisionSignalService()
         notifier = self._notifier()
         worker = AlertWorker(
-            config_provider=lambda: self._config(),
+            config_provider=lambda: self._config(report_language="en"),
             service=self.service,
             decision_signal_service=signal_service,
             notifier=notifier,
@@ -386,10 +458,20 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(item["trigger_source"], "alert")
         self.assertEqual(item["source_agent"], "alert_worker")
         self.assertIsNone(item["market_phase"])
+        self.assertEqual(item["action_label"], "Alert")
+        self.assertEqual(item["metadata"]["report_language"], "en")
+        self.assertEqual(item["presentation"]["label"], "Alert")
         self.assertTrue(str(item["trace_id"]).startswith("alert-rule-"))
         self.assertEqual(item["metadata"]["rule_id"], 1)
         self.assertEqual(item["metadata"]["alert_type"], "price_cross")
-        self.assertEqual(self._triggers(status="triggered")[0]["decision_signal_summary"]["id"], item["id"])
+        persisted_summary = self._triggers(status="triggered")[0]["decision_signal_summary"]
+        self.assertEqual(persisted_summary["id"], item["id"])
+        self.assertEqual(persisted_summary["presentation"]["label"], "Alert")
+        reloaded = signal_service.get_signal(item["id"])
+        self.assertEqual(reloaded["presentation"]["label"], "Alert")
+        alert_text = notifier.send_with_results.call_args.args[0]
+        self.assertIn("Action: Alert", alert_text)
+        self.assertNotIn("动作: 预警", alert_text)
 
     def test_p6_alert_signal_trace_id_is_idempotent_for_same_rule(self) -> None:
         self._create_rule(target="600519")
