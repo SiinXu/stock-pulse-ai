@@ -128,8 +128,8 @@ def _market_review_lock_path(config: Config) -> Path:
     return market_review_lock_path(config)
 
 
-def _build_market_review_runtime(config: Config, request_context: Optional[Any] = None) -> tuple[Any, Any, Any]:
-    return _runtime_build_market_review_runtime(config, request_context)
+def _build_market_review_runtime(config: Config) -> tuple[Any, Any, Any]:
+    return _runtime_build_market_review_runtime(config)
 
 
 def _with_request_report_language(config: Config, report_language: Optional[str]) -> Config:

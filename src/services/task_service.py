@@ -75,18 +75,17 @@ class TaskService:
         save_context_snapshot: Optional[bool] = None,
         query_source: str = "bot"
     ) -> Dict[str, Any]:
-        """
-        提交异步分析任务
+        """Submit an asynchronous stock analysis task.
 
         Args:
-            code: 股票代码
-            report_type: 报告类型枚举
-            request_context: 请求来源与会话回复上下文
-            save_context_snapshot: 是否保存上下文快照
-            query_source: 任务来源标识（bot/api/cli/system）
+            code: Stock code to analyze.
+            report_type: Requested report type.
+            request_context: Immutable requester and contextual reply data.
+            save_context_snapshot: Whether to persist the analysis context snapshot.
+            query_source: Task source identifier such as bot, API, CLI, or system.
 
         Returns:
-            任务信息字典
+            Submission metadata including the generated task id.
         """
         # 确保 report_type 是枚举类型
         if isinstance(report_type, str):
@@ -156,11 +155,7 @@ class TaskService:
         save_context_snapshot: Optional[bool] = None,
         query_source: str = "bot"
     ) -> Dict[str, Any]:
-        """
-        执行单只股票分析
-
-        内部方法，在线程池中运行
-        """
+        """Run one stock analysis inside the service thread pool."""
         # 初始化任务状态
         with self._tasks_lock:
             self._tasks[task_id] = {

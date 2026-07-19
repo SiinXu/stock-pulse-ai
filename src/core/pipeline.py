@@ -189,12 +189,12 @@ class StockAnalysisPipeline:
         daily_market_context_enabled: Optional[bool] = None,
         daily_market_context_allow_generate: bool = True,
     ):
-        """
-        初始化调度器
-        
+        """Initialize the analysis pipeline and its request-scoped services.
+
         Args:
-            config: 配置对象（可选，默认使用全局配置）
-            max_workers: 最大并发线程数（可选，默认从配置读取）
+            config: Optional runtime configuration; defaults to the global config.
+            max_workers: Optional worker count; defaults to the configured value.
+            request_context: Immutable requester provenance and contextual reply targets.
         """
         self.config = config or get_config()
         self.max_workers = max_workers or self.config.max_workers
@@ -3048,20 +3048,11 @@ class StockAnalysisPipeline:
         return None
 
     def _resolve_query_source(self, query_source: Optional[str] = None) -> str:
-        """
-        解析请求来源。
+        """Resolve the request source using explicit, Bot, Web, then system precedence.
 
-        优先级（从高到低）：
-        1. 显式传入的 query_source：调用方明确指定时优先使用，便于覆盖推断结果或兼容未来非 bot 的请求上下文
-        2. 存在 request_context 时推断为 "bot"：当前约定为机器人会话上下文
-        3. 存在 query_id 时推断为 "web"：Web 触发的请求会带上 query_id
-        4. 默认 "system"：定时任务或 CLI 等无上述上下文时
-
-        Args:
-            query_source: 调用方显式指定的来源，如 "bot" / "web" / "cli" / "system"
-
-        Returns:
-            归一化后的来源标识字符串，如 "bot" / "web" / "cli" / "system"
+        An explicit source wins. Otherwise an application request context identifies
+        a Bot request, a query id identifies a Web request, and all other calls are
+        classified as system work.
         """
         if query_source:
             return query_source
@@ -3072,9 +3063,7 @@ class StockAnalysisPipeline:
         return "system"
 
     def _build_query_context(self, query_id: Optional[str] = None) -> Dict[str, str]:
-        """
-        生成用户查询关联信息
-        """
+        """Build the low-sensitivity requester provenance persisted with a query."""
         effective_query_id = query_id or self.query_id or ""
 
         context: Dict[str, str] = {

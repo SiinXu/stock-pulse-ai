@@ -9,16 +9,41 @@ from pathlib import Path
 
 import pytest
 
+from api.app import create_app
+from api.v1.schemas.run_flow import RunFlowEvent as ApiRunFlowEvent
+from api.v1.schemas.run_flow import RunFlowLane as ApiRunFlowLane
+from api.v1.schemas.run_flow import RunFlowNode as ApiRunFlowNode
 from api.v1.schemas.run_flow import RunFlowEdge as ApiRunFlowEdge
 from api.v1.schemas.run_flow import RunFlowSnapshot as ApiRunFlowSnapshot
+from api.v1.schemas.run_flow import RunFlowSummary as ApiRunFlowSummary
 from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType, Platform
 from src.core.pipeline import StockAnalysisPipeline
-from src.schemas.run_flow import RunFlowEdge, RunFlowSnapshot
+from src.schemas.request_context import AnalysisRequestContext, NotificationReplyTarget
+from src.schemas.run_flow import (
+    RunFlowEdge,
+    RunFlowEvent,
+    RunFlowLane,
+    RunFlowNode,
+    RunFlowSnapshot,
+    RunFlowSummary,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SECRET_WEBHOOK = "https://oapi.dingtalk.com/robot/sendBySession?session=secret"
+RUN_FLOW_MODEL_PAIRS = (
+    (ApiRunFlowLane, RunFlowLane),
+    (ApiRunFlowNode, RunFlowNode),
+    (ApiRunFlowEdge, RunFlowEdge),
+    (ApiRunFlowEvent, RunFlowEvent),
+    (ApiRunFlowSummary, RunFlowSummary),
+    (ApiRunFlowSnapshot, RunFlowSnapshot),
+)
+RUN_FLOW_PATHS = (
+    "/api/v1/analysis/tasks/{task_id}/flow",
+    "/api/v1/history/{record_id}/flow",
+)
 
 
 def _message(**overrides) -> BotMessage:
@@ -47,19 +72,33 @@ def _imported_modules(path: Path) -> set[str]:
     return modules
 
 
+def _minimum_value(schema: dict) -> int | None:
+    if "minimum" in schema:
+        return schema["minimum"]
+    for candidate in schema.get("anyOf", []):
+        if "minimum" in candidate:
+            return candidate["minimum"]
+    return None
+
+
 def test_src_does_not_import_delivery_boundary_dtos() -> None:
     violations = []
     for path in sorted((ROOT / "src").rglob("*.py")):
         for module in _imported_modules(path):
-            if module == "api.v1" or module.startswith("api.v1.") or module == "bot.models":
+            if (
+                module == "api.v1"
+                or module.startswith("api.v1.")
+                or module == "bot"
+                or module == "bot.models"
+            ):
                 violations.append(f"{path.relative_to(ROOT)} -> {module}")
 
     assert violations == []
 
 
 def test_run_flow_api_path_reexports_the_neutral_contract() -> None:
-    assert ApiRunFlowSnapshot is RunFlowSnapshot
-    assert ApiRunFlowEdge is RunFlowEdge
+    for api_model, application_model in RUN_FLOW_MODEL_PAIRS:
+        assert api_model is application_model
 
     edge = RunFlowEdge(
         id="request_to_queue",
@@ -71,6 +110,89 @@ def test_run_flow_api_path_reexports_the_neutral_contract() -> None:
 
     assert payload["from"] == "request"
     assert "from_node" not in payload
+
+
+def test_run_flow_openapi_shape_preserves_all_components_and_constraints() -> None:
+    spec = create_app().openapi()
+    schemas = spec["components"]["schemas"]
+
+    for path in RUN_FLOW_PATHS:
+        response_schema = spec["paths"][path]["get"]["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        assert response_schema == {"$ref": "#/components/schemas/RunFlowSnapshot"}
+
+    assert set(schemas["RunFlowLane"]["properties"]) == {"id", "label", "order"}
+    assert set(schemas["RunFlowNode"]["properties"]) == {
+        "id",
+        "lane",
+        "kind",
+        "label",
+        "status",
+        "provider",
+        "started_at",
+        "ended_at",
+        "duration_ms",
+        "attempts",
+        "record_count",
+        "message",
+        "metadata",
+    }
+    assert set(schemas["RunFlowEdge"]["properties"]) == {
+        "id",
+        "from",
+        "to",
+        "kind",
+        "status",
+        "label",
+        "message",
+        "metadata",
+    }
+    assert set(schemas["RunFlowEvent"]["properties"]) == {
+        "id",
+        "timestamp",
+        "severity",
+        "type",
+        "node_id",
+        "title",
+        "message",
+        "metadata",
+    }
+    assert set(schemas["RunFlowSummary"]["properties"]) == {
+        "elapsed_ms",
+        "bottleneck_node_id",
+        "failed_attempts",
+        "fallback_count",
+        "model",
+        "data_source_count",
+        "event_count",
+    }
+    assert set(schemas["RunFlowSnapshot"]["properties"]) == {
+        "task_id",
+        "trace_id",
+        "stock_code",
+        "stock_name",
+        "status",
+        "summary",
+        "lanes",
+        "nodes",
+        "edges",
+        "events",
+        "generated_at",
+    }
+    for field_name in ("duration_ms", "attempts", "record_count"):
+        assert _minimum_value(schemas["RunFlowNode"]["properties"][field_name]) == 0
+    for field_name in (
+        "elapsed_ms",
+        "failed_attempts",
+        "fallback_count",
+        "data_source_count",
+        "event_count",
+    ):
+        assert _minimum_value(schemas["RunFlowSummary"]["properties"][field_name]) == 0
+    assert schemas["RunFlowSnapshot"]["properties"]["summary"] == {
+        "$ref": "#/components/schemas/RunFlowSummary"
+    }
 
 
 def test_bot_mapping_snapshots_provenance_and_hides_reply_credentials() -> None:
@@ -87,8 +209,8 @@ def test_bot_mapping_snapshots_provenance_and_hides_reply_credentials() -> None:
     assert context.requester_chat_id == "chat-1"
     assert context.requester_message_id == "message-1"
     assert context.requester_query == "/analyze 600519"
-    assert [target.kind for target in context.reply_targets] == ["dingtalk", "feishu"]
-    assert context.reply_address("dingtalk") == SECRET_WEBHOOK
+    assert [target.kind for target in context.reply_targets] == ["feishu"]
+    assert context.reply_address("dingtalk") is None
     assert context.reply_address("feishu") == "chat-1"
     assert SECRET_WEBHOOK not in repr(context)
     assert not hasattr(context, "raw_data")
@@ -96,7 +218,7 @@ def test_bot_mapping_snapshots_provenance_and_hides_reply_credentials() -> None:
     message.user_name = "mutated"
     message.raw_data.clear()
     assert context.requester_user_name == "Ada"
-    assert context.reply_address("dingtalk") == SECRET_WEBHOOK
+    assert context.reply_address("dingtalk") is None
     with pytest.raises(FrozenInstanceError):
         context.requester_user_name = "mutated"
 
@@ -115,6 +237,29 @@ def test_bot_mapping_preserves_dingtalk_session_webhook_shapes(raw_data) -> None
     context = to_analysis_request_context(_message(platform="dingtalk", raw_data=raw_data))
 
     assert context.reply_address("dingtalk") == SECRET_WEBHOOK
+    assert SECRET_WEBHOOK not in repr(context)
+
+
+@pytest.mark.parametrize(
+    "platform,url",
+    [
+        ("feishu", SECRET_WEBHOOK),
+        ("telegram", SECRET_WEBHOOK),
+        ("dingtalk", "http://oapi.dingtalk.com/robot/sendBySession?session=secret"),
+        ("dingtalk", "https://attacker.example/robot/sendBySession?session=secret"),
+        ("dingtalk", "https://oapi.dingtalk.com/robot/sendBySession?session="),
+        ("dingtalk", "https://oapi.dingtalk.com/robot/sendBySession/extra?session=secret"),
+    ],
+)
+def test_bot_mapping_rejects_cross_platform_or_untrusted_dingtalk_targets(
+    platform,
+    url,
+) -> None:
+    context = to_analysis_request_context(
+        _message(platform=platform, raw_data={"sessionWebhook": url})
+    )
+
+    assert context.reply_address("dingtalk") is None
 
 
 def test_bot_mapping_preserves_telegram_nested_numeric_chat_id() -> None:
@@ -136,6 +281,27 @@ def test_bot_mapping_ignores_non_mapping_raw_payload() -> None:
     context = to_analysis_request_context(message)
 
     assert context.reply_targets == ()
+
+
+def test_request_context_rejects_blank_targets_and_freezes_mutable_input() -> None:
+    with pytest.raises(ValueError, match="must not be blank"):
+        NotificationReplyTarget("dingtalk", "   ")
+    with pytest.raises(ValueError, match="official session endpoint"):
+        NotificationReplyTarget(
+            "dingtalk",
+            "https://attacker.example/robot/sendBySession?session=secret",
+        )
+
+    target = NotificationReplyTarget("feishu", "chat-1")
+    mutable_targets = [target]
+    context = AnalysisRequestContext(reply_targets=mutable_targets)
+    mutable_targets.clear()
+
+    assert context.reply_targets == (target,)
+    assert isinstance(context.reply_targets, tuple)
+
+    with pytest.raises(TypeError, match="provenance fields must be strings"):
+        AnalysisRequestContext(requester_query=[])
 
 
 def test_pipeline_persists_only_neutral_requester_provenance() -> None:

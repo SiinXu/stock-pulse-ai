@@ -216,11 +216,7 @@ class NotificationService(
     """
 
     def __init__(self, request_context: Optional[AnalysisRequestContext] = None):
-        """
-        初始化通知服务
-
-        检测所有已配置的渠道，推送时会向所有渠道发送
-        """
+        """Initialize configured channels and an optional contextual reply route."""
         config = get_config()
         self._config = config
         self._request_context = request_context
@@ -621,7 +617,7 @@ class NotificationService(
         session_webhook = self._extract_dingtalk_session_webhook()
         if session_webhook:
             try:
-                if self._send_dingtalk_chunked(session_webhook, content, max_bytes=20000):
+                if self._send_dingtalk_session_chunked(session_webhook, content, max_bytes=20000):
                     logger.info("已通过钉钉会话（Stream）推送报告")
                     success = True
                 else:

@@ -409,7 +409,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             request_context=to_analysis_request_context(_make_dingtalk_message())
         )
 
-        with mock.patch.object(service, "_send_dingtalk_chunked", return_value=True) as mock_dingtalk, \
+        with mock.patch.object(service, "_send_dingtalk_session_chunked", return_value=True) as mock_dingtalk, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
             result = service.send_with_results("content", route_type="report")
 
@@ -418,6 +418,33 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         self.assertEqual([item.channel for item in result.channel_results], ["__context__"])
         mock_dingtalk.assert_called_once_with("https://oapi.dingtalk.com/robot/sendBySession?session=abc123", "content", max_bytes=20000)
         mock_wechat.assert_not_called()
+
+    @mock.patch("src.notification.get_config")
+    @mock.patch("requests.post")
+    def test_dingtalk_context_never_sends_custom_bearer_token(
+        self,
+        mock_post: mock.MagicMock,
+        mock_get_config: mock.MagicMock,
+    ):
+        mock_get_config.return_value = _make_config(
+            custom_webhook_bearer_token="global-custom-secret",
+        )
+        mock_post.return_value = _make_response(200)
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
+
+        result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.success)
+        self.assertNotIn("Authorization", mock_post.call_args.kwargs["headers"])
+        self.assertFalse(
+            service._send_dingtalk_session_chunked(
+                "https://attacker.example/robot/sendBySession?session=secret",
+                "content",
+            )
+        )
+        self.assertEqual(mock_post.call_count, 1)
 
     @mock.patch("src.notification.get_config")
     def test_telegram_context_response_skips_static_webhook(self, mock_get_config: mock.MagicMock):

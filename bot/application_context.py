@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from bot.models import BotMessage
+from src.notification_contracts import is_dingtalk_session_webhook_url
 from src.schemas.request_context import AnalysisRequestContext, NotificationReplyTarget
 
 
@@ -26,7 +27,7 @@ def _dingtalk_session_webhook(raw_data: Dict[str, Any]) -> Optional[str]:
     )
     if not candidate and isinstance(raw_data.get("headers"), dict):
         candidate = raw_data["headers"].get("sessionWebhook")
-    return candidate if isinstance(candidate, str) and candidate else None
+    return candidate if is_dingtalk_session_webhook_url(candidate) else None
 
 
 def _telegram_chat_id(message: BotMessage, raw_data: Dict[str, Any]) -> Optional[str]:
@@ -49,9 +50,10 @@ def to_analysis_request_context(message: BotMessage) -> AnalysisRequestContext:
     platform = _string_value(message.platform).lower()
     reply_targets = []
 
-    dingtalk_webhook = _dingtalk_session_webhook(raw_data)
-    if dingtalk_webhook:
-        reply_targets.append(NotificationReplyTarget("dingtalk", dingtalk_webhook))
+    if platform == "dingtalk":
+        dingtalk_webhook = _dingtalk_session_webhook(raw_data)
+        if dingtalk_webhook:
+            reply_targets.append(NotificationReplyTarget("dingtalk", dingtalk_webhook))
 
     if platform == "feishu" and message.chat_id:
         reply_targets.append(NotificationReplyTarget("feishu", _string_value(message.chat_id)))
