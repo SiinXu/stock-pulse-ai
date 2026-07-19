@@ -33,6 +33,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const DESKTOP_UPDATE_BACKUP_DIR = '.dsa-desktop-update-backup';
 const DESKTOP_UPDATE_BACKUP_MANIFEST_FILE = 'runtime-state.json';
 const DESKTOP_BRAND_MIGRATION_RECORD_FILE = '.stockpulse-brand-migration.json';
+const DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX = '.stockpulse-migration.tmp';
 const LEGACY_DESKTOP_PRODUCT_NAMES = Object.freeze(['Daily Stock Analysis']);
 const WINDOWS_NSIS_UNINSTALLER_NAMES = Object.freeze([
   'Uninstall StockPulse.exe',
@@ -552,6 +553,17 @@ function writeDesktopBrandMigrationRecord(result) {
   result.recordPath = recordPath;
 }
 
+function copyLegacyUserDataFileAtomically(source, target) {
+  const temporaryTarget = `${target}${DESKTOP_BRAND_MIGRATION_TEMP_SUFFIX}`;
+  fs.rmSync(temporaryTarget, { force: true });
+  try {
+    fs.copyFileSync(source, temporaryTarget, fs.constants.COPYFILE_EXCL);
+    fs.linkSync(temporaryTarget, target);
+  } finally {
+    fs.rmSync(temporaryTarget, { force: true });
+  }
+}
+
 function copyMissingLegacyUserDataPath(source, target, relativePath, result) {
   try {
     const sourceStats = fs.lstatSync(source);
@@ -599,7 +611,7 @@ function copyMissingLegacyUserDataPath(source, target, relativePath, result) {
     }
 
     ensureDirectory(path.dirname(target));
-    fs.copyFileSync(source, target, fs.constants.COPYFILE_EXCL);
+    copyLegacyUserDataFileAtomically(source, target);
     result.migrated.push(relativePath);
   } catch (error) {
     result.failed.push(`${relativePath} (${error instanceof Error ? error.message : String(error)})`);

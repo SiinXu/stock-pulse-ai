@@ -1030,7 +1030,8 @@ test('StockPulse migration falls back to the legacy directory when critical data
   fs.writeFileSync(legacyDatabase, 'legacy-db');
   fs.copyFileSync = (source, target, mode) => {
     if (source === legacyDatabase) {
-      throw new Error('target volume is unavailable');
+      fs.writeFileSync(target, 'interrupted-partial-copy');
+      throw new Error('copy interrupted after destination write');
     }
     return originalCopyFileSync(source, target, mode);
   };
@@ -1062,11 +1063,12 @@ test('StockPulse migration falls back to the legacy directory when critical data
   assert.equal(fs.existsSync(currentEnv), false);
   assert.equal(fs.readFileSync(legacyDatabase, 'utf-8'), 'legacy-db');
   assert.equal(fs.existsSync(currentDatabase), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(currentDatabase)), []);
   const record = JSON.parse(
     fs.readFileSync(path.join(currentUserDataDir, '.stockpulse-brand-migration.json'), 'utf-8')
   );
   assert.equal(record.status, 'incomplete');
-  assert.match(record.failed.join('\n'), /target volume is unavailable/);
+  assert.match(record.failed.join('\n'), /copy interrupted after destination write/);
   assert.deepEqual(record.rollbackFailed, []);
 
   fs.copyFileSync = originalCopyFileSync;

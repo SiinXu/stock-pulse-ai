@@ -263,7 +263,7 @@ win-unpacked/
 - macOS 打包版的 `.env`、`data/` 和 `logs/` 放在 Electron 用户数据目录；新安装使用 `StockPulse` 目录，避免替换 `.app` 时丢失
 - 首次启动时自动从 `.env.example` 复制生成
 - 从旧版本升级时，如果当前 `.app` 或与 `StockPulse.app` 同目录的 `Daily Stock Analysis.app` 内部仍有 `.env`、`data/stock_analysis.db` 或日志文件，新版本会在目标文件不存在时自动迁移到用户数据目录；已有目标文件不会被覆盖，旧应用包也不会被删除
-- 从可见品牌仍为 `Daily Stock Analysis` 的版本首次升级时，StockPulse 会在 Electron ready 之前查找同级旧用户数据目录，并复制 `.env`、`data/`、`logs/`、Web 会话状态和待恢复的更新备份；任何已存在的 StockPulse 目标文件都不会被覆盖
+- 从可见品牌仍为 `Daily Stock Analysis` 的版本首次升级时，StockPulse 会在 Electron ready 之前查找同级旧用户数据目录，并复制 `.env`、`data/`、`logs/`、Web 会话状态和待恢复的更新备份；任何已存在的 StockPulse 目标文件都不会被覆盖。每个缺失文件先完整复制到同目录临时文件，再以不覆盖目标的原子操作发布；进程中断留下的临时文件会在重试时清理
 - 打包版会在品牌迁移前取得 Electron 单实例锁；同一用户同时启动的第二个 StockPulse 进程会退出并唤起已有窗口，不会并发写入迁移文件或迁移记录
 - 品牌迁移完成后，新目录会保存 `.stockpulse-brand-migration.json`，记录旧目录、目标目录和逐项结果；旧目录不会被移动或删除，可用于审计和回滚。关键运行时数据复制失败时，本次启动会完整回退使用旧用户数据目录，不混用两个目录中的配置或数据库；新目录已有内容保持不变，后续启动可在故障解除后重试迁移
 - 迁移不是双向同步：升级后在 StockPulse 中产生的新配置或数据不会写回旧目录。需要回滚旧版本时，应先完全退出应用并导出最新配置或备份 `data/`；删除或改名新目录后可在下一次升级时重新执行迁移
