@@ -153,6 +153,9 @@ jobs:
             tests/agent/runtime/test_pydantic_ai_adapter.py \
             tests/agent/runtime/test_tool_session.py \
             tests/agent/runtime/test_conformance.py \
+            tests/agent/runtime/test_conformance_replay.py \
+            tests/agent/runtime/test_pydantic_ai_real_bridge.py \
+            tests/agent/runtime/test_conformance_leak_scan.py \
             > /tmp/pydanticai_pytest.log 2>&1
           status=$?
           set -e

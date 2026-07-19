@@ -88,6 +88,15 @@ PydanticAI 只允许拥有:单个 Execution/Stage 内部的模型调用与工具
 - 版本升级走独立 PR,伴随 conformance 全量重跑。
 - 模型接入方式(方案 A:PydanticAI LiteLLM Model;方案 B:自定义 Model 包装 `LLMToolAdapter`)**不预选**,由隔离 Spike 按开发计划第 6.3 节标准打分,维护者裁决(官方 LiteLLM Model 文档页 2026-07-17 访问 404,为 Evidence gap G1)。
 
+### D5:实验 Runtime 的 timeout/cancel fence 位置差异(有意差异,已记录)
+
+RF-06a conformance 双跑(`tests/agent/runtime/test_conformance_replay.py`)发现:对 timeout / cancelrace fixtures,Native 在"LLM 调用返回后、执行该步工具前"检查 wall-clock 超时并终止(`runner.py` 每步后置检查),而实验 PydanticAI Runtime 由 PydanticAI 驱动循环,在"下一次模型请求前"于模型桥检查 deadline/cancel(`pydantic_ai_adapter.py` request 前置检查点)。因此:
+
+- **终态分类等价**:两者都以非成功终态收场(timed_out/cancelled/failed),都不写 dashboard、都不伪成功。
+- **工具执行日志可不同**:实验 Runtime 可能已执行当前步的工具,Native 则可能在执行前已终止。
+
+裁决(2026-07-18):该差异属实验 Runtime 的可接受有意差异,不改动 Native 语义、不重录或新增 replay fixture(36 个只读)。conformance 对这三例只断言终态分类等价;等价子集(normal/partial/modelref/fallback/toolscope/malformed)仍要求 LLM 调用序列、工具序列与 dashboard 逐项一致。若未来把实验 Runtime 的 fence 前移以完全对齐,另走独立 PR。
+
 ## 3. Consequences(后果)
 
 正面:
@@ -130,3 +139,4 @@ PydanticAI 只允许拥有:单个 Execution/Stage 内部的模型调用与工具
 | 2026-07-17 | Proposed | 初稿随 AR-PY-00 送审;D2 为建议裁决,待维护者批准 |
 | 2026-07-17 | Accepted | 维护者批准审批点 1(架构)与审批点 2(D2 冻结为兼容契约);AR-PY-01 解除阻断 |
 | 2026-07-18 | Accepted(不变) | PR #18 合入后实施状态审计:实现与计划存在差距(AR-RF-01～13),修复按 `docs/architecture/pydanticai-runtime-recovery-plan.md` 执行;本 ADR 已批准决策不变 |
+| 2026-07-18 | Accepted(不变) | RF-06a conformance 双跑落地:Single RUN 支持矩阵 8 例完全等价 + 3 例(timeout/cancel)终态等价;新增 D5 记录 fence 位置有意差异;36 fixture 只读不变 |

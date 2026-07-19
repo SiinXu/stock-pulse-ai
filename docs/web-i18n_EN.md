@@ -10,6 +10,8 @@ The UI currently supports Simplified Chinese, Traditional Chinese, English, Japa
 
 When an English UI displays a Chinese report, the report body may remain Chinese, but copy, refresh, close, diagnostics, and other surrounding actions must remain English.
 
+Stable financial-term semantics, ten-language recommended wording, do-not-translate items, risk phrasing, and the review workflow live in the [Multilingual Financial Terminology Guide](financial-terminology-guide.md), the **single governance source** for financial terminology across the ten UI languages. Consult it before adding or changing financial/risk copy or maintaining locale resources. (The guide body is written in Simplified Chinese; its term matrix covers all ten languages.)
+
 ## Translation Files
 
 Do not grow one monolithic dictionary. Cross-page copy belongs in `src/i18n/uiText.ts`; large pages and business domains use focused modules under `src/locales/`, for example:
