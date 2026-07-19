@@ -58,6 +58,7 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "source_agent=decision_profile_reassess" in topic
     assert "src/schemas/decision_signal_presentation.py" in topic
     assert "`action`、`label`、`confidence`、`summary`、`risk`、`timestamp`" in topic
+    assert "没有正式语言键的 legacy 行继续使用原始 label 推断语言" in topic
     assert "canonical `presentation`" in full_guide_en
     assert "trigger_source=web:decision_profile_reassess" in topic
     assert "scoring_breakdown" in topic
@@ -81,6 +82,8 @@ def test_decision_signal_topic_references_live_api_schema_and_docs() -> None:
     assert "null replacement retains that one metadata key instead of writing SQL `NULL`" in full_guide_en
     assert "object/null 替换都会保留这一 presentation provenance" in full_guide
     assert "object and null replacements preserve that formal presentation provenance" in full_guide_en
+    assert "没有正式 `report_language` provenance 时，`null` 才写入 SQL `NULL`" in topic
+    assert "显式 `null` 时清空为 SQL `NULL`" not in topic
     assert "正式字段为 legacy `NULL` 时会移除请求 object 中的 profile key" in full_guide
     assert "for a legacy formal `NULL`, the profile key is removed" in full_guide_en
     assert "API 响应 schema 不变" not in full_guide

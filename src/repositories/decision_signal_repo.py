@@ -3,12 +3,17 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, or_, select
 
+from src.report_language import (
+    is_supported_report_language_value,
+    normalize_report_language,
+)
 from src.schemas.decision_profile import (
     DECISION_PROFILE_FILTER_ALL,
     DecisionProfileFilter,
@@ -52,6 +57,7 @@ class DecisionSignalRepository:
         "stock_code",
         "decision_profile",
         "action",
+        "action_label",
         "horizon",
         "market_phase",
     })
@@ -340,8 +346,44 @@ class DecisionSignalRepository:
         for field_name, value in fields.items():
             if field_name in cls._IMMUTABLE_REFRESH_FIELDS:
                 continue
+            if field_name == "metadata_json":
+                value = cls._preserve_refresh_report_language(
+                    existing.metadata_json,
+                    value,
+                )
             setattr(existing, field_name, value)
         existing.updated_at = utc_naive_now()
+
+    @staticmethod
+    def _preserve_refresh_report_language(
+        existing_metadata_json: Optional[str],
+        replacement_metadata_json: Optional[str],
+    ) -> Optional[str]:
+        if not existing_metadata_json:
+            return replacement_metadata_json
+        try:
+            existing_metadata = json.loads(existing_metadata_json)
+        except (TypeError, ValueError, RecursionError):
+            return replacement_metadata_json
+        if not isinstance(existing_metadata, dict):
+            return replacement_metadata_json
+        report_language = existing_metadata.get("report_language")
+        if not isinstance(report_language, str) or not is_supported_report_language_value(report_language):
+            return replacement_metadata_json
+
+        try:
+            replacement_metadata = json.loads(replacement_metadata_json or "null")
+        except (TypeError, ValueError, RecursionError):
+            replacement_metadata = None
+        if not isinstance(replacement_metadata, dict):
+            replacement_metadata = {}
+        replacement_metadata["report_language"] = normalize_report_language(report_language)
+        return json.dumps(
+            replacement_metadata,
+            ensure_ascii=False,
+            sort_keys=True,
+            default=str,
+        )
 
     @staticmethod
     def _find_existing_in_session(*, session: Any, fields: Dict[str, Any]) -> Optional[DecisionSignalRecord]:

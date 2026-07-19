@@ -1485,6 +1485,65 @@ def test_service_expired_refresh_invalidates_later_opposing_active_signal(isolat
     assert [item["id"] for item in latest["items"]] == [old_buy["id"]]
 
 
+def test_service_expired_refresh_preserves_formal_presentation_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    identity = {
+        "source_report_id": 378,
+        "trace_id": "trace-refresh-formal-language",
+    }
+    original = service.create_signal(
+        _payload(
+            **identity,
+            action_label="Sell",
+            report_language="en",
+        )
+    )["item"]
+    service.update_status(original["id"], status="expired")
+
+    refreshed = service.create_signal(
+        _payload(
+            **identity,
+            reason="Refreshed reason",
+            expires_at=(utc_naive_now() + timedelta(days=1)).isoformat(),
+        )
+    )["item"]
+
+    assert refreshed["id"] == original["id"]
+    assert refreshed["reason"] == "Refreshed reason"
+    assert refreshed["metadata"]["report_language"] == "en"
+    assert refreshed["presentation"]["label"] == "Buy"
+
+
+def test_service_expired_refresh_preserves_legacy_inferred_presentation_language(isolated_db) -> None:
+    service = DecisionSignalService(db_manager=isolated_db)
+    identity = {
+        "source_report_id": 379,
+        "trace_id": "trace-refresh-legacy-language",
+    }
+    original = service.create_signal(
+        _payload(
+            **identity,
+            action_label="Buy",
+        )
+    )["item"]
+    assert "report_language" not in original["metadata"]
+    assert original["presentation"]["label"] == "Buy"
+    service.update_status(original["id"], status="expired")
+
+    refreshed = service.create_signal(
+        _payload(
+            **identity,
+            reason="Refreshed legacy reason",
+            expires_at=(utc_naive_now() + timedelta(days=1)).isoformat(),
+        )
+    )["item"]
+
+    assert refreshed["id"] == original["id"]
+    assert refreshed["reason"] == "Refreshed legacy reason"
+    assert "report_language" not in refreshed["metadata"]
+    assert refreshed["presentation"]["label"] == "Buy"
+
+
 def test_service_does_not_invalidate_neutral_or_terminal_signals(isolated_db) -> None:
     service = DecisionSignalService(db_manager=isolated_db)
     old_buy = service.create_signal(

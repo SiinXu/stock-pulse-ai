@@ -67,6 +67,7 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 - `decision_profile` 参与信号身份：`NULL` 只与 `NULL` 匹配，非空 profile 只与相同 profile 匹配。Exact dedup、relaxed dedup、horizon/phase fill、expired refresh、active invalidation 和 stale backfill invalidation 都遵循该 same-profile 语义。
 - 新的相反 active 信号只会把同 profile 的旧 active 信号标记为 `invalidated`，并把失效来源写入 metadata。不同非 `NULL` profile 可并存，即使 action 相反。
 - Expired duplicate refresh 不会改写 `decision_profile`，只能刷新同 profile 记录。
+- Expired duplicate refresh 也保留原始 `action_label` 和已有的正式 `metadata.report_language`，因此新请求省略语言时，同一 signal ID 的 canonical presentation label 不会漂移；没有正式语言键的 legacy 行继续使用原始 label 推断语言。
 
 ## API
 
@@ -161,7 +162,7 @@ Web 入口位于 `/decision-signals`：
 
 - 新写入时，顶层合法 `decision_profile` 优先；顶层显式 `null`、空值或非法值直接拒绝。顶层缺失时才 fallback 合法 `metadata.decision_profile`；二者都缺失或 metadata profile 非法时默认写入 `balanced`。
 - 新写入会同步 `metadata.decision_profile` 为正式字段值，避免双源冲突；metadata 省略或显式 `null` 均按无 metadata 处理，object 会浅复制，非 object 会被拒绝。
-- PATCH metadata 省略时保留原值，显式 `null` 时清空为 SQL `NULL`，object 时整包替换。正式 profile 非 `NULL` 时会覆盖 metadata 中的冲突值；正式 profile 为 legacy `NULL` 时会移除请求 object 中的 profile key，且不会提升正式字段。
+- PATCH metadata 省略时保留原值，显式 `null` 或 object 时替换调用方 metadata。正式 profile 非 `NULL` 时会覆盖 metadata 中的冲突值；正式 profile 为 legacy `NULL` 时会移除请求 object 中的 profile key，且不会提升正式字段。已有正式 `report_language` provenance 时，object/null 替换都会保留该键，`null` 的结果是只含该 provenance 的 object；没有正式 `report_language` provenance 时，`null` 才写入 SQL `NULL`，replacement object 中的该键也不会被提升。
 - 自动失效写入同样遵循正式字段权威语义：正式 profile 非 `NULL` 时同步 metadata profile；legacy `NULL` 时只追加失效信息，保留原 legacy metadata，不注入或删除 profile。
 - Legacy / unknown 只用数据库 `NULL` 表示。普通自动生成与 lazy backfill 不写入 `scoring_version` 或 `scoring_breakdown`；只有用户显式发起的 reassess 路径根据 profile policy 生成并审计这些字段。这不代表自动生成三套 profile，也不包含 #1758 的 profile-aware outcome calibration。
 - Lazy backfill 语义：省略 profile 保留旧的 `source_type=analysis + source_report_id` 懒回填；`decision_profile=balanced` 可生成 balanced 回填；`decision_profile=unknown`、`conservative`、`aggressive` 不自动创建行。回填与 reassess persist 共享来源报告时间、历史 TTL 和 superseded 判断，不存在第二套历史生命周期。
