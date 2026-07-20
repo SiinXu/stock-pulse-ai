@@ -29,7 +29,7 @@ type PendingMarker = {
 type PendingTransition = {
   locationKey: string;
   navigationType: 'PUSH' | 'REPLACE' | 'POP';
-  pathnameChanged: boolean;
+  shouldFocusHeading: boolean;
 };
 
 type RegisteredTarget = {
@@ -107,6 +107,7 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
   const navigationType = useNavigationType();
   const currentLocationKeyRef = useRef<string | null>(null);
   const currentPathnameRef = useRef<string | null>(null);
+  const currentUrlRef = useRef<string | null>(null);
   const entriesRef = useRef(new Map<string, RouteFocusEntry>());
   const pendingMarkerRef = useRef<PendingMarker | null>(null);
   const pendingTransitionRef = useRef<PendingTransition | null>(null);
@@ -190,9 +191,11 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
 
   useLayoutEffect(() => {
     const previousLocationKey = currentLocationKeyRef.current;
+    const nextUrl = `${location.pathname}${location.search}${location.hash}`;
     if (previousLocationKey === null) {
       currentLocationKeyRef.current = location.key;
       currentPathnameRef.current = location.pathname;
+      currentUrlRef.current = nextUrl;
       clearPendingMarker();
       return;
     }
@@ -218,15 +221,25 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
     }
 
     const pathnameChanged = currentPathnameRef.current !== location.pathname;
+    const shouldFocusHeading = pathnameChanged
+      || (navigationType === 'PUSH' && currentUrlRef.current === nextUrl);
     currentLocationKeyRef.current = location.key;
     currentPathnameRef.current = location.pathname;
+    currentUrlRef.current = nextUrl;
     pendingTransitionRef.current = {
       locationKey: location.key,
       navigationType,
-      pathnameChanged,
+      shouldFocusHeading,
     };
     clearPendingMarker();
-  }, [clearPendingMarker, location.key, location.pathname, navigationType]);
+  }, [
+    clearPendingMarker,
+    location.hash,
+    location.key,
+    location.pathname,
+    location.search,
+    navigationType,
+  ]);
 
   const register = useCallback<RouteFocusRegistration['register']>((target) => {
     const token = Symbol(target.routeId);
@@ -263,7 +276,7 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
           : null;
         if (restoreTarget) restoreTarget.focus({ preventScroll: true });
         if (
-          transition.pathnameChanged
+          transition.shouldFocusHeading
           && (!restoreTarget || document.activeElement !== restoreTarget)
         ) {
           heading.focus({ preventScroll: true });
