@@ -50,7 +50,7 @@ create engine / install SQLite PRAGMAs / create Session factory
   -> mark DatabaseManager initialized
 ```
 
-Migration 在 `DatabaseManager` 初始化调用内同步完成，不会在后台继续升级。SQLite 的 `create_all + baseline stamp + pending migrations + baseline 证明` 全部在同一个数据库级写锁和事务内串行化，避免两个 fresh 进程竞争建表，并让整笔初始化对 registry、Schema 与 baseline 证明保持原子性。startup 在这把写锁内直接应用有序 migration，因此 baseline 证明看到的是补齐后的完整 Schema。startup 不再执行任何业务 schema DDL 兼容步骤：初始化期间的全部 `CREATE`/`ALTER`/`DROP` 只发生在 `metadata.create_all`（fresh baseline）或已登记 migration 的独立 upgrade 调用内，回归测试会捕获这些 DDL，并拒绝 create_all 与已登记 upgrade 之外的游离 schema DDL（包括重新引入 runner 编排层的启动期 ensure）。首次需要 `DatabaseManager` 的后端路径只有在迁移完成后才会返回。初始化任一步失败时，`DatabaseManager` 保持未初始化；create_all、applied row 与该事务内的所有 DDL/DML 一起回滚，不留半迁移状态。
+Migration 在 `DatabaseManager` 初始化调用内同步完成，不会在后台继续升级。SQLite 的 `create_all + baseline stamp + pending migrations + baseline 证明` 全部在同一个数据库级写锁和事务内串行化，避免两个 fresh 进程竞争建表，并让整笔初始化对 registry、Schema 与 baseline 证明保持原子性。startup 在这把写锁内直接应用有序 migration，因此 baseline 证明看到的是补齐后的完整 Schema。startup 不再执行任何业务 schema DDL 兼容步骤：初始化期间的全部 `CREATE`/`ALTER`/`DROP` 只发生在 `metadata.create_all`（fresh baseline）或已登记 migration 的 `upgrade` callable 实际执行期间，回归测试会捕获这些 DDL，并拒绝 create_all 与已登记 callable 之外的游离 schema DDL（包括 runner 外层编排、savepoint、bootstrap 检查与 applied-row 写入阶段重新引入的启动期 ensure）。首次需要 `DatabaseManager` 的后端路径只有在迁移完成后才会返回。初始化任一步失败时，`DatabaseManager` 保持未初始化；create_all、applied row 与该事务内的所有 DDL/DML 一起回滚，不留半迁移状态。
 
 通用 `/api/health` 当前不是数据库 readiness probe，因此 health 响应不承诺已 eager 初始化数据库。该 lazy 边界不会产生后台 migration：实际首次进入 `DatabaseManager` 的调用仍会等待 runner 完整成功或失败。
 

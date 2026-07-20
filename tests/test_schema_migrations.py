@@ -3744,8 +3744,8 @@ def _leading_sql_word(statement: str) -> str:
 @contextmanager
 def _capture_startup_ddl_outside_migration_phases():
     """Capture CREATE/ALTER/DROP statements executed during DatabaseManager
-    initialization, tracking whether each runs inside metadata create_all or an
-    individual registered migration upgrade.
+    initialization, tracking whether each runs inside metadata create_all or a
+    registered migration's upgrade callable.
 
     Startup may run DDL only inside `Base.metadata.create_all` (the fresh
     baseline) and a migration listed in the production registry. Any DDL outside
@@ -3761,8 +3761,10 @@ def _capture_startup_ddl_outside_migration_phases():
     registered_migration_phases = {
         f"migration:{migration.id}" for migration in get_migrations()
     }
+    original_upgrades = tuple(
+        (migration, migration.upgrade) for migration in get_migrations()
+    )
     original_create_all = storage_module.Base.metadata.create_all
-    original_run_guarded_upgrade = MigrationRunner._run_guarded_upgrade
 
     def _record(statement) -> None:
         keyword = _leading_sql_word(str(statement))
@@ -3790,24 +3792,37 @@ def _capture_startup_ddl_outside_migration_phases():
         finally:
             phase["name"] = previous_phase
 
-    def wrapped_run_guarded_upgrade(self, connection, migration):
-        previous_phase = phase["name"]
-        phase["name"] = f"migration:{migration.id}"
-        try:
-            return original_run_guarded_upgrade(self, connection, migration)
-        finally:
-            phase["name"] = previous_phase
+    def instrument_upgrade(migration, upgrade):
+        @wraps(upgrade)
+        def wrapped_upgrade(execution):
+            previous_phase = phase["name"]
+            phase["name"] = f"migration:{migration.id}"
+            try:
+                return upgrade(execution)
+            finally:
+                phase["name"] = previous_phase
 
-    event.listen(Engine, "connect", install_sqlite_trace)
+        return wrapped_upgrade
+
+    listener_installed = False
     try:
+        for migration, upgrade in original_upgrades:
+            object.__setattr__(
+                migration,
+                "upgrade",
+                instrument_upgrade(migration, upgrade),
+            )
+        event.listen(Engine, "connect", install_sqlite_trace)
+        listener_installed = True
         with patch.object(
             storage_module.Base.metadata, "create_all", wrapped_create_all
-        ), patch.object(
-            MigrationRunner, "_run_guarded_upgrade", wrapped_run_guarded_upgrade
         ):
             yield captured
     finally:
-        event.remove(Engine, "connect", install_sqlite_trace)
+        if listener_installed:
+            event.remove(Engine, "connect", install_sqlite_trace)
+        for migration, upgrade in original_upgrades:
+            object.__setattr__(migration, "upgrade", upgrade)
         for connection in traced_connections:
             try:
                 connection.set_trace_callback(None)
@@ -3872,6 +3887,33 @@ def test_startup_ddl_guard_detects_unregistered_runner_ddl() -> None:
     assert len(captured["stray"]) == 1
     assert captured["stray"][0][:2] == ("startup", "CREATE")
     assert "startup_ddl_guard_probe" in captured["stray"][0][2]
+
+
+def test_startup_ddl_guard_detects_unregistered_applied_row_ddl() -> None:
+    original_insert_applied = MigrationRunner._insert_applied
+    injected = False
+
+    def insert_applied_with_unregistered_ddl(connection, migration):
+        nonlocal injected
+        if not injected:
+            injected = True
+            connection.exec_driver_sql(
+                "/* unregistered applied-row orchestration */\n"
+                "CREATE TABLE startup_ddl_inner_guard_probe "
+                "(id INTEGER PRIMARY KEY)"
+            )
+        return original_insert_applied(connection, migration)
+
+    with patch.object(
+        MigrationRunner,
+        "_insert_applied",
+        staticmethod(insert_applied_with_unregistered_ddl),
+    ), _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+
+    assert len(captured["stray"]) == 1
+    assert captured["stray"][0][:2] == ("startup", "CREATE")
+    assert "startup_ddl_inner_guard_probe" in captured["stray"][0][2]
 
 
 def test_migration_verify_explains_fresh_database() -> None:
