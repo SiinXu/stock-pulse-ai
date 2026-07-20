@@ -17,6 +17,7 @@ import time
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import List, Dict, Any, Optional, Tuple, Callable
@@ -66,13 +67,18 @@ from src.services.analysis_context_builder import (
 )
 from src.services.market_structure_service import MarketStructureService
 from src.services.run_diagnostics import (
+    PIPELINE_STAGE_NAMES,
+    PipelineStageObservation,
     activate_run_diagnostic_context,
     current_diagnostic_snapshot,
     get_current_diagnostic_context,
+    observe_pipeline_stage,
     record_history_run,
     record_llm_run,
     record_llm_run_started,
+    record_missing_pipeline_stages_as_skipped,
     record_notification_run,
+    record_pipeline_stage,
     reset_run_diagnostic_context,
     sanitize_diagnostic_text,
 )
@@ -96,6 +102,10 @@ logger = logging.getLogger(__name__)
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
 _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD = threading.Lock()
 _DAILY_MARKET_CONTEXT_SERVICE_LOCK_INIT_GUARD = threading.Lock()
+_DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
+    "defer_pipeline_delivery_observation",
+    default=False,
+)
 
 
 def _symbol_scope_lookup_values(code: str, market: str) -> List[str]:
@@ -422,7 +432,20 @@ class StockAnalysisPipeline:
             AnalysisResult 或 None（如果分析失败）
         """
         stock_name = code
+        active_stage: Optional[PipelineStageObservation] = None
         try:
+            daily_market_context_enabled = self._is_daily_market_context_enabled()
+            active_stage = observe_pipeline_stage(
+                "fetch",
+                input_summary={
+                    "stock_code": code,
+                    "operation": "assemble_market_inputs",
+                    "realtime_enabled": bool(self.config.enable_realtime_quote),
+                    "chip_enabled": bool(self.config.enable_chip_distribution),
+                    "daily_market_context_enabled": daily_market_context_enabled,
+                },
+                retryable=True,
+            )
             portfolio_context = getattr(self, "portfolio_context", None)
             if not isinstance(portfolio_context, dict):
                 portfolio_context = None
@@ -490,7 +513,7 @@ class StockAnalysisPipeline:
                         stock_name,
                         code,
                     )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Realtime failure is safely logged before historical-price fallback.
                 log_safe_exception(
                     logger,
                     "Realtime quote retrieval failed; using historical close data",
@@ -522,7 +545,7 @@ class StockAnalysisPipeline:
                         stock_name,
                         code,
                     )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Chip-data failure is safely logged before optional-input degradation.
                 log_safe_exception(
                     logger,
                     "Chip distribution retrieval failed",
@@ -564,7 +587,7 @@ class StockAnalysisPipeline:
                         FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT,
                     ),
                 )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Fundamental failure is safely logged before a failed-context fallback is built.
                 log_safe_exception(
                     logger,
                     "Fundamental data aggregation failed",
@@ -597,7 +620,7 @@ class StockAnalysisPipeline:
                     source_chain=fundamental_context.get("source_chain", []),
                     coverage=fundamental_context.get("coverage", {}),
                 )
-            except Exception as e:
+            except Exception as e:  # broad-exception: optional_metadata - The write-only fundamental snapshot is non-authoritative and safely logged.
                 log_safe_exception(
                     logger,
                     "Fundamental snapshot persistence failed",
@@ -630,7 +653,7 @@ class StockAnalysisPipeline:
                         trend_result.buy_signal.value,
                         trend_result.signal_score,
                     )
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Trend failure is safely logged before analysis continues without trend input.
                 log_safe_exception(
                     logger,
                     "Trend analysis failed",
@@ -639,6 +662,43 @@ class StockAnalysisPipeline:
                     level=logging.WARNING,
                     context={"stock_code": code},
                 )
+
+            fundamental_status = (
+                str(fundamental_context.get("status") or "").lower()
+                if isinstance(fundamental_context, dict)
+                else "missing"
+            )
+            fetch_degraded = bool(
+                (self.config.enable_realtime_quote and realtime_quote is None)
+                or (
+                    getattr(self.config, "enable_chip_distribution", False)
+                    and chip_data is None
+                )
+                or fundamental_status in {"failed", "partial", "missing"}
+                or trend_result is None
+                or (
+                    daily_market_context_enabled
+                    and daily_market_context is None
+                )
+            )
+            active_stage.finish(
+                status="degraded" if fetch_degraded else "success",
+                output_summary={
+                    "realtime_available": realtime_quote is not None,
+                    "chip_available": chip_data is not None,
+                    "fundamental_status": fundamental_status or "available",
+                    "trend_available": trend_result is not None,
+                    "daily_market_context_enabled": daily_market_context_enabled,
+                    "daily_market_context_available": daily_market_context is not None,
+                },
+                degradation_reason=(
+                    "One or more market inputs were unavailable; analysis continued with existing fallbacks."
+                    if fetch_degraded
+                    else None
+                ),
+                retryable=fetch_degraded,
+            )
+            active_stage = None
 
             if use_agent:
                 logger.info("%s(%s) running analysis in Agent mode", stock_name, code)
@@ -660,7 +720,20 @@ class StockAnalysisPipeline:
                 )
 
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
+            active_stage = observe_pipeline_stage(
+                "intelligence",
+                input_summary={
+                    "stock_code": code,
+                    "market": market or "cn",
+                    "remote_search_available": bool(
+                        self.search_service is not None
+                        and self.search_service.is_available
+                    ),
+                },
+                retryable=True,
+            )
             news_context = None
+            fresh_intelligence_available = False
             persisted_intelligence_context = self._load_persisted_intelligence_context(
                 code=code,
                 stock_name=stock_name,
@@ -685,6 +758,9 @@ class StockAnalysisPipeline:
                         len(r.results) for r in intel_results.values() if r.success
                     )
                     news_result_count = total_results
+                    fresh_intelligence_available = bool(
+                        total_results > 0 and news_context
+                    )
                     logger.info(
                         "%s(%s) intelligence search completed: result_count=%s",
                         stock_name,
@@ -711,7 +787,7 @@ class StockAnalysisPipeline:
                                     response=response,
                                     query_context=query_context
                                 )
-                    except Exception as e:
+                    except Exception as e:  # broad-exception: optional_metadata - Intelligence evidence remains usable when its optional cache write fails.
                         log_safe_exception(
                             logger,
                             "News intelligence persistence failed",
@@ -732,12 +808,13 @@ class StockAnalysisPipeline:
                 try:
                     social_context = self.social_sentiment_service.get_social_context(code)
                     if social_context:
+                        fresh_intelligence_available = True
                         logger.info(f"{stock_name}({code}) Social sentiment data retrieved")
                         if news_context:
                             news_context = news_context + "\n\n" + social_context
                         else:
                             news_context = social_context
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Social-intelligence failure is safely logged before optional-input degradation.
                     log_safe_exception(
                         logger,
                         "Social sentiment retrieval failed",
@@ -754,9 +831,72 @@ class StockAnalysisPipeline:
                     else persisted_intelligence_context
                 )
 
+            remote_search_available = bool(
+                self.search_service is not None
+                and self.search_service.is_available
+            )
+            using_persisted_fallback = bool(
+                persisted_intelligence_context
+                and not fresh_intelligence_available
+            )
+            remote_search_empty = bool(
+                remote_search_available
+                and (news_result_count is None or news_result_count <= 0)
+            )
+            intelligence_degraded = bool(
+                not news_context
+                or using_persisted_fallback
+                or not remote_search_available
+                or remote_search_empty
+            )
+            intelligence_degradation_reason = None
+            if not news_context:
+                intelligence_degradation_reason = (
+                    "No intelligence evidence was available; analysis continued without it."
+                )
+            elif using_persisted_fallback:
+                intelligence_degradation_reason = (
+                    "Fresh intelligence was unavailable; persisted evidence was used."
+                )
+            elif not remote_search_available:
+                intelligence_degradation_reason = (
+                    "Remote intelligence search was unavailable; analysis continued with available evidence."
+                )
+            elif remote_search_empty:
+                intelligence_degradation_reason = (
+                    "Remote intelligence search returned no fresh results; analysis continued with available evidence."
+                )
+            active_stage.finish(
+                status="degraded" if intelligence_degraded else "success",
+                output_summary={
+                    "intelligence_available": bool(news_context),
+                    "fresh_intelligence_available": fresh_intelligence_available,
+                    "remote_result_count": news_result_count,
+                    "persisted_evidence_available": bool(
+                        persisted_intelligence_context
+                    ),
+                    "using_persisted_fallback": using_persisted_fallback,
+                },
+                degradation_reason=intelligence_degradation_reason,
+                retryable=intelligence_degraded,
+            )
+            active_stage = None
+
             # Step 5: 获取分析上下文（技术面数据）
+            active_stage = observe_pipeline_stage(
+                "context",
+                input_summary={
+                    "stock_code": code,
+                    "has_realtime": realtime_quote is not None,
+                    "has_chip": chip_data is not None,
+                    "has_fundamentals": isinstance(fundamental_context, dict),
+                    "has_intelligence": bool(news_context),
+                },
+                retryable=True,
+            )
             self._emit_progress(58, f"{stock_name}：正在整理分析上下文")
             context = self._get_analysis_context_with_market_fallback(code)
+            context_used_missing_fallback = context is None
 
             if context is None:
                 logger.warning(
@@ -823,6 +963,49 @@ class StockAnalysisPipeline:
                 code=code,
                 query_id=query_id,
             )
+            pack_counts = (
+                analysis_context_pack_overview.get("counts", {})
+                if isinstance(analysis_context_pack_overview, dict)
+                else {}
+            )
+            degraded_block_count = sum(
+                max(0, count)
+                for status in (
+                    "missing",
+                    "fallback",
+                    "stale",
+                    "estimated",
+                    "partial",
+                    "fetch_failed",
+                )
+                for count in (pack_counts.get(status),)
+                if isinstance(count, int) and not isinstance(count, bool)
+            )
+            context_pack_available = bool(analysis_context_pack_summary)
+            context_degraded = bool(
+                not context_pack_available
+                or context_used_missing_fallback
+                or degraded_block_count
+            )
+            active_stage.finish(
+                status="degraded" if context_degraded else "success",
+                output_summary={
+                    "context_pack_available": context_pack_available,
+                    "degraded_block_count": degraded_block_count,
+                    "historical_context_fallback": context_used_missing_fallback,
+                },
+                degradation_reason=(
+                    "ContextPack output generation was unavailable."
+                    if not context_pack_available
+                    else (
+                        "ContextPack contains missing or fallback inputs."
+                        if context_degraded
+                        else None
+                    )
+                ),
+                retryable=context_degraded,
+            )
+            active_stage = None
             llm_progress_state = {"last_progress": 64}
 
             def _on_llm_stream(chars_received: int) -> None:
@@ -835,6 +1018,16 @@ class StockAnalysisPipeline:
                     f"{stock_name}：LLM 正在生成分析结果（已接收 {chars_received} 字符）",
                 )
 
+            active_stage = observe_pipeline_stage(
+                "analyze",
+                input_summary={
+                    "stock_code": code,
+                    "mode": "legacy",
+                    "report_type": report_type.value,
+                    "context_pack_available": bool(analysis_context_pack_summary),
+                },
+                retryable=True,
+            )
             self._emit_progress(64, f"{stock_name}：正在请求 LLM 生成报告")
             llm_started_at = time.monotonic()
             try:
@@ -927,8 +1120,39 @@ class StockAnalysisPipeline:
                     previous_operation_advice=action_source_advice,
                 )
 
+            analysis_succeeded = bool(result and getattr(result, "success", True))
+            active_stage.finish(
+                status="success" if analysis_succeeded else "failed",
+                output_summary={
+                    "analysis_result_available": result is not None,
+                    "analysis_success": analysis_succeeded,
+                    "model": getattr(result, "model_used", None) if result else None,
+                },
+                degradation_reason=(
+                    getattr(result, "error_message", None)
+                    if result is not None and not analysis_succeeded
+                    else ("Analysis returned no result." if result is None else None)
+                ),
+                retryable=not analysis_succeeded,
+            )
+            active_stage = None
+
             # Step 8: 保存分析历史记录
             if result and result.success:
+                active_stage = observe_pipeline_stage(
+                    "persist",
+                    input_summary={
+                        "stock_code": code,
+                        "query_id": query_id,
+                        "report_type": report_type.value,
+                        "save_context_snapshot": bool(self.save_context_snapshot),
+                    },
+                    retryable=False,
+                )
+                saved_history_id = None
+                valid_saved_history_id = False
+                persistence_error = None
+                context_snapshot: Dict[str, Any] = {}
                 try:
                     self._emit_progress(97, f"{stock_name}：正在保存分析报告")
                     context_snapshot = self._build_context_snapshot(
@@ -970,7 +1194,8 @@ class StockAnalysisPipeline:
                             context_snapshot=context_snapshot,
                             portfolio_context=portfolio_context,
                         )
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - History failure is recorded and safely logged without changing analysis success.
+                    persistence_error = e
                     record_history_run(
                         report_saved=False,
                         metadata_saved=False,
@@ -985,9 +1210,47 @@ class StockAnalysisPipeline:
                         context={"stock_code": code},
                     )
 
+                persistence_succeeded = bool(saved_history_id)
+                active_stage.finish(
+                    status="success" if persistence_succeeded else "failed",
+                    output_summary={
+                        "history_saved": persistence_succeeded,
+                        "analysis_history_id": (
+                            saved_history_id if valid_saved_history_id else None
+                        ),
+                    },
+                    degradation_reason=(
+                        "Analysis history was not saved."
+                        if not persistence_succeeded
+                        else None
+                    ),
+                    retryable=False,
+                    error=persistence_error,
+                )
+                active_stage = None
+                latest_diagnostic_snapshot = current_diagnostic_snapshot()
+                if latest_diagnostic_snapshot is not None:
+                    context_snapshot["diagnostics"] = latest_diagnostic_snapshot
+                    result.diagnostic_context_snapshot = context_snapshot
+                if valid_saved_history_id:
+                    self._refresh_saved_diagnostic_snapshot(result=result)
+            else:
+                record_pipeline_stage(
+                    stage="persist",
+                    status="skipped",
+                    input_summary={
+                        "stock_code": code,
+                        "query_id": query_id,
+                    },
+                    output_summary={"reason": "analysis_unsuccessful"},
+                    retryable=False,
+                )
+
             return result
 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Analysis failures are safely logged and isolated to the current stock.
+            if active_stage is not None and not active_stage.finished:
+                active_stage.finish(status="failed", error=e)
             log_safe_exception(
                 logger,
                 "Stock analysis failed",
@@ -1465,6 +1728,7 @@ class StockAnalysisPipeline:
         """
         使用 Agent 模式分析单只股票。
         """
+        active_stage: Optional[PipelineStageObservation] = None
         try:
             from src.agent.factory import build_agent_executor
             report_language = normalize_report_language(getattr(self.config, "report_language", "zh"))
@@ -1506,6 +1770,21 @@ class StockAnalysisPipeline:
             if trend_result:
                 initial_context["trend_result"] = self._safe_to_dict(trend_result)
 
+            active_stage = observe_pipeline_stage(
+                "intelligence",
+                input_summary={
+                    "stock_code": code,
+                    "mode": "agent",
+                    "social_sentiment_available": bool(
+                        self.social_sentiment_service is not None
+                        and self.social_sentiment_service.is_available
+                        and is_us_stock_code(code)
+                    ),
+                },
+                retryable=True,
+            )
+            fresh_intelligence_available = False
+
             # Agent path: inject social sentiment as news_context so both
             # executor (_build_user_message) and orchestrator (ctx.set_data)
             # can consume it through the existing news_context channel
@@ -1513,13 +1792,14 @@ class StockAnalysisPipeline:
                 try:
                     social_context = self.social_sentiment_service.get_social_context(code)
                     if social_context:
+                        fresh_intelligence_available = True
                         existing = initial_context.get("news_context")
                         if existing:
                             initial_context["news_context"] = existing + "\n\n" + social_context
                         else:
                             initial_context["news_context"] = social_context
                         logger.info(f"[{code}] Agent mode: social sentiment data injected into news_context")
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Social-intelligence failure is safely logged before optional-input degradation.
                     log_safe_exception(
                         logger,
                         "Agent social sentiment retrieval failed",
@@ -1543,7 +1823,50 @@ class StockAnalysisPipeline:
                 )
                 logger.info(f"[{code}] Agent mode: local intelligence evidence injected into news_context")
 
+            agent_intelligence_available = bool(initial_context.get("news_context"))
+            using_persisted_fallback = bool(
+                persisted_intelligence_context
+                and not fresh_intelligence_available
+            )
+            agent_intelligence_degraded = bool(
+                not agent_intelligence_available or using_persisted_fallback
+            )
+            active_stage.finish(
+                status="degraded" if agent_intelligence_degraded else "success",
+                output_summary={
+                    "intelligence_available": agent_intelligence_available,
+                    "fresh_intelligence_available": fresh_intelligence_available,
+                    "persisted_evidence_available": bool(
+                        persisted_intelligence_context
+                    ),
+                    "using_persisted_fallback": using_persisted_fallback,
+                },
+                degradation_reason=(
+                    "No intelligence evidence was available to the Agent context."
+                    if not agent_intelligence_available
+                    else (
+                        "Fresh intelligence was unavailable; persisted evidence was used."
+                        if using_persisted_fallback
+                        else None
+                    )
+                ),
+                retryable=agent_intelligence_degraded,
+            )
+            active_stage = None
+
             # Issue #1066: ensure deep history is in DB before agent tools run
+            active_stage = observe_pipeline_stage(
+                "context",
+                input_summary={
+                    "stock_code": code,
+                    "mode": "agent",
+                    "has_realtime": realtime_quote is not None,
+                    "has_chip": chip_data is not None,
+                    "has_fundamentals": isinstance(fundamental_context, dict),
+                    "has_intelligence": agent_intelligence_available,
+                },
+                retryable=True,
+            )
             self._ensure_agent_history(code)
 
             analysis_context = self._load_agent_analysis_context(code, stock_name)
@@ -1570,11 +1893,62 @@ class StockAnalysisPipeline:
             if analysis_context_pack_summary:
                 initial_context["analysis_context_pack_summary"] = analysis_context_pack_summary
 
+            agent_pack_counts = (
+                analysis_context_pack_overview.get("counts", {})
+                if isinstance(analysis_context_pack_overview, dict)
+                else {}
+            )
+            agent_degraded_block_count = sum(
+                max(0, count)
+                for status in (
+                    "missing",
+                    "fallback",
+                    "stale",
+                    "estimated",
+                    "partial",
+                    "fetch_failed",
+                )
+                for count in (agent_pack_counts.get(status),)
+                if isinstance(count, int) and not isinstance(count, bool)
+            )
+            agent_context_pack_available = bool(analysis_context_pack_summary)
+            agent_context_degraded = bool(
+                not agent_context_pack_available or agent_degraded_block_count
+            )
+            active_stage.finish(
+                status="degraded" if agent_context_degraded else "success",
+                output_summary={
+                    "context_pack_available": agent_context_pack_available,
+                    "degraded_block_count": agent_degraded_block_count,
+                },
+                degradation_reason=(
+                    "Agent ContextPack output generation was unavailable."
+                    if not agent_context_pack_available
+                    else (
+                        "Agent ContextPack contains missing or fallback inputs."
+                        if agent_context_degraded
+                        else None
+                    )
+                ),
+                retryable=agent_context_degraded,
+            )
+            active_stage = None
+
             # 运行 Agent
             if report_language in ("en", "ko"):
                 message = f"Analyze stock {code} ({stock_name}) and return the full decision dashboard JSON."
             else:
                 message = f"请分析股票 {code} ({stock_name})，并生成决策仪表盘报告。"
+            active_stage = observe_pipeline_stage(
+                "analyze",
+                input_summary={
+                    "stock_code": code,
+                    "mode": "agent",
+                    "report_type": report_type.value,
+                    "context_pack_available": bool(analysis_context_pack_summary),
+                },
+                retryable=True,
+            )
             llm_started_at = time.monotonic()
             try:
                 record_llm_run_started(
@@ -1681,6 +2055,29 @@ class StockAnalysisPipeline:
                     previous_operation_advice=action_source_advice,
                 )
 
+            agent_analysis_succeeded = bool(
+                result and getattr(result, "success", True)
+            )
+            active_stage.finish(
+                status="success" if agent_analysis_succeeded else "failed",
+                output_summary={
+                    "analysis_result_available": result is not None,
+                    "analysis_success": agent_analysis_succeeded,
+                    "model": getattr(result, "model_used", None) if result else None,
+                },
+                degradation_reason=(
+                    getattr(result, "error_message", None)
+                    if result is not None and not agent_analysis_succeeded
+                    else (
+                        "Agent analysis returned no result."
+                        if result is None
+                        else None
+                    )
+                ),
+                retryable=not agent_analysis_succeeded,
+            )
+            active_stage = None
+
             resolved_stock_name = result.name if result and result.name else stock_name
 
             # 保存新闻情报到数据库（Agent 工具结果仅用于 LLM 上下文，未持久化，Fixes #396）
@@ -1707,7 +2104,7 @@ class StockAnalysisPipeline:
                             code,
                             len(news_response.results),
                         )
-                except Exception as e:
+                except Exception as e:  # broad-exception: optional_metadata - Agent intelligence remains usable when its optional cache write fails.
                     log_safe_exception(
                         logger,
                         "Agent news intelligence persistence failed",
@@ -1719,6 +2116,21 @@ class StockAnalysisPipeline:
 
             # 保存分析历史记录
             if result and result.success:
+                active_stage = observe_pipeline_stage(
+                    "persist",
+                    input_summary={
+                        "stock_code": code,
+                        "query_id": query_id,
+                        "report_type": report_type.value,
+                        "mode": "agent",
+                        "save_context_snapshot": bool(self.save_context_snapshot),
+                    },
+                    retryable=False,
+                )
+                saved_history_id = None
+                valid_saved_history_id = False
+                persistence_error = None
+                agent_context_snapshot: Dict[str, Any] = {}
                 try:
                     agent_context_snapshot = self._build_context_snapshot(
                         enhanced_context={
@@ -1766,7 +2178,8 @@ class StockAnalysisPipeline:
                     if latest_diagnostic_snapshot is not None:
                         agent_context_snapshot["diagnostics"] = latest_diagnostic_snapshot
                         result.diagnostic_context_snapshot = agent_context_snapshot
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Agent history failure is recorded and safely logged without changing analysis success.
+                    persistence_error = e
                     record_history_run(
                         report_saved=False,
                         metadata_saved=False,
@@ -1781,9 +2194,48 @@ class StockAnalysisPipeline:
                         context={"stock_code": code},
                     )
 
+                persistence_succeeded = bool(saved_history_id)
+                active_stage.finish(
+                    status="success" if persistence_succeeded else "failed",
+                    output_summary={
+                        "history_saved": persistence_succeeded,
+                        "analysis_history_id": (
+                            saved_history_id if valid_saved_history_id else None
+                        ),
+                    },
+                    degradation_reason=(
+                        "Agent analysis history was not saved."
+                        if not persistence_succeeded
+                        else None
+                    ),
+                    retryable=False,
+                    error=persistence_error,
+                )
+                active_stage = None
+                latest_diagnostic_snapshot = current_diagnostic_snapshot()
+                if latest_diagnostic_snapshot is not None:
+                    agent_context_snapshot["diagnostics"] = latest_diagnostic_snapshot
+                    result.diagnostic_context_snapshot = agent_context_snapshot
+                if valid_saved_history_id:
+                    self._refresh_saved_diagnostic_snapshot(result=result)
+            else:
+                record_pipeline_stage(
+                    stage="persist",
+                    status="skipped",
+                    input_summary={
+                        "stock_code": code,
+                        "query_id": query_id,
+                        "mode": "agent",
+                    },
+                    output_summary={"reason": "analysis_unsuccessful"},
+                    retryable=False,
+                )
+
             return result
 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Agent failures are safely logged and isolated to the current stock.
+            if active_stage is not None and not active_stage.finished:
+                active_stage.finish(status="failed", error=e)
             log_safe_exception(
                 logger,
                 "Agent stock analysis failed",
@@ -1914,6 +2366,14 @@ class StockAnalysisPipeline:
 
         return context
 
+    def _is_daily_market_context_enabled(self) -> bool:
+        """Return whether stock analysis expects daily market context."""
+        return bool(
+            getattr(self, "daily_market_context_enabled", True) is True
+            and getattr(self.config, "daily_market_context_enabled", True) is True
+            and getattr(self.config, "market_review_enabled", None) is True
+        )
+
     def _load_daily_market_context(
         self,
         market: str,
@@ -1922,11 +2382,7 @@ class StockAnalysisPipeline:
         target_date: Optional[date] = None,
     ) -> Optional[DailyMarketContext]:
         """Load/generate today's market context when market review is explicitly enabled."""
-        if getattr(self, "daily_market_context_enabled", True) is not True:
-            return None
-        if getattr(self.config, "daily_market_context_enabled", True) is not True:
-            return None
-        if getattr(self.config, "market_review_enabled", None) is not True:
+        if not self._is_daily_market_context_enabled():
             return None
 
         try:
@@ -1952,7 +2408,7 @@ class StockAnalysisPipeline:
             if isinstance(current_query_id, str) and current_query_id.strip():
                 get_context_kwargs["current_query_id"] = current_query_id
             return service.get_context(**get_context_kwargs)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Daily context failure is safely logged before stock analysis continues without it.
             log_safe_exception(
                 logger,
                 "Daily market context load failed; continuing stock analysis",
@@ -2748,6 +3204,120 @@ class StockAnalysisPipeline:
             payload["error_message_sanitized"] = sanitized_error
         return payload
 
+    def _activate_delivery_diagnostic_context(
+        self,
+        results: List[AnalysisResult],
+    ):
+        """Activate an isolated delivery trace nested under any caller context."""
+        try:
+            first_result = results[0] if results else None
+            context_snapshot = (
+                getattr(first_result, "diagnostic_context_snapshot", None)
+                if first_result is not None
+                else None
+            )
+            existing_diagnostics = (
+                context_snapshot.get("diagnostics")
+                if isinstance(context_snapshot, dict)
+                else None
+            )
+            single_result = len(results) == 1
+            inherited_trace_id = (
+                existing_diagnostics.get("trace_id")
+                if single_result and isinstance(existing_diagnostics, dict)
+                else None
+            )
+            inherited_query_id = (
+                getattr(first_result, "query_id", None)
+                if single_result and first_result is not None
+                else None
+            )
+            delivery_id = (
+                getattr(self, "trace_id", None)
+                or getattr(self, "query_id", None)
+                or inherited_trace_id
+                or f"delivery_{uuid.uuid4().hex}"
+            )
+            return activate_run_diagnostic_context(
+                trace_id=delivery_id,
+                query_id=(
+                    getattr(self, "query_id", None)
+                    or inherited_query_id
+                    or delivery_id
+                ),
+                stock_code=(
+                    getattr(first_result, "code", None)
+                    if single_result and first_result is not None
+                    else None
+                ),
+                trigger_source=getattr(self, "query_source", None),
+                scope="pipeline_delivery",
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Delivery context failures are logged and leave delivery behavior unchanged.
+            log_safe_exception(
+                logger,
+                "Pipeline delivery diagnostic context activation failed",
+                exc,
+                error_code="pipeline_delivery_context_activation_failed",
+                level=logging.WARNING,
+                context={"result_count": len(results)},
+            )
+            return None
+
+    @staticmethod
+    def _merge_delivery_diagnostic_snapshot(
+        item: AnalysisResult,
+        delivery_snapshot: Dict[str, Any],
+        notification_run: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Merge delivery-only runs into one result without replacing analysis runs."""
+        raw_context_snapshot = getattr(item, "diagnostic_context_snapshot", None)
+        context_snapshot = (
+            dict(raw_context_snapshot)
+            if isinstance(raw_context_snapshot, dict)
+            else {}
+        )
+        raw_diagnostics = context_snapshot.get("diagnostics")
+        diagnostics = dict(raw_diagnostics) if isinstance(raw_diagnostics, dict) else {}
+        diagnostics.setdefault(
+            "trace_id",
+            getattr(item, "trace_id", None)
+            or getattr(item, "query_id", None)
+            or delivery_snapshot.get("trace_id"),
+        )
+        diagnostics.setdefault("query_id", getattr(item, "query_id", None))
+        diagnostics.setdefault("stock_code", getattr(item, "code", None))
+
+        for field_name in ("notification_runs", "pipeline_stage_runs"):
+            raw_existing_runs = diagnostics.get(field_name)
+            existing_runs = (
+                list(raw_existing_runs)
+                if isinstance(raw_existing_runs, list)
+                else []
+            )
+            if field_name == "notification_runs":
+                candidate_runs = (
+                    [notification_run] if notification_run is not None else []
+                )
+            else:
+                candidates = delivery_snapshot.get(field_name)
+                candidate_runs = (
+                    list(candidates) if isinstance(candidates, list) else []
+                )
+            for candidate in candidate_runs:
+                if not isinstance(candidate, dict):
+                    continue
+                payload = dict(candidate)
+                if field_name == "notification_runs" and not payload.get("trace_id"):
+                    payload["trace_id"] = delivery_snapshot.get("trace_id")
+                if payload not in existing_runs:
+                    existing_runs.append(payload)
+            diagnostics[field_name] = existing_runs
+
+        context_snapshot["diagnostics"] = diagnostics
+        item.diagnostic_context_snapshot = context_snapshot
+        return diagnostics
+
     def _refresh_saved_diagnostic_snapshot(
         self,
         *,
@@ -2756,7 +3326,7 @@ class StockAnalysisPipeline:
         fallback_code: Optional[str] = None,
         notification_run: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Patch persisted history diagnostics with notification outcomes."""
+        """Patch persisted history with the latest fail-open diagnostic snapshot."""
         if not getattr(self, "save_context_snapshot", True):
             return
 
@@ -2766,6 +3336,41 @@ class StockAnalysisPipeline:
             return
 
         diagnostic_snapshot = current_diagnostic_snapshot()
+        target_results = list(results or ([] if result is None else [result]))
+        if diagnostic_snapshot is not None and (
+            results is not None
+            or diagnostic_snapshot.get("scope") == "pipeline_delivery"
+        ):
+            for item in target_results:
+                query_id = (
+                    getattr(item, "query_id", None)
+                    or getattr(self, "query_id", None)
+                )
+                if not query_id:
+                    continue
+                code = getattr(item, "code", None) or fallback_code
+                try:
+                    merged_diagnostics = self._merge_delivery_diagnostic_snapshot(
+                        item,
+                        diagnostic_snapshot,
+                        notification_run,
+                    )
+                    updater(
+                        query_id=query_id,
+                        code=code,
+                        diagnostics=merged_diagnostics,
+                    )
+                except Exception as exc:  # broad-exception: optional_metadata - Delivery diagnostics are best-effort and cannot change delivery outcomes.
+                    log_safe_exception(
+                        logger,
+                        "Delivery diagnostic snapshot update failed; continuing without the update",
+                        exc,
+                        error_code="pipeline_delivery_snapshot_update_failed",
+                        level=logging.WARNING,
+                        context={"query_id": query_id, "stock_code": code},
+                    )
+            return
+
         if diagnostic_snapshot is not None:
             query_id = (
                 diagnostic_snapshot.get("query_id")
@@ -2781,7 +3386,7 @@ class StockAnalysisPipeline:
                 return
             try:
                 updater(query_id=query_id, code=code, diagnostics=diagnostic_snapshot)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: optional_metadata - Run diagnostics are best-effort and cannot change analysis outcomes.
                 log_safe_exception(
                     logger,
                     "Run diagnostic snapshot update failed; continuing without the update",
@@ -2795,7 +3400,6 @@ class StockAnalysisPipeline:
         if notification_run is None:
             return
 
-        target_results = list(results or ([] if result is None else [result]))
         for item in target_results:
             query_id = getattr(item, "query_id", None) or getattr(self, "query_id", None)
             if not query_id:
@@ -2807,7 +3411,7 @@ class StockAnalysisPipeline:
                     code=code,
                     notification_runs=[notification_run],
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: optional_metadata - Notification diagnostics are best-effort and cannot change delivery outcomes.
                 log_safe_exception(
                     logger,
                     "Notification diagnostic snapshot update failed; continuing without the update",
@@ -3118,11 +3722,10 @@ class StockAnalysisPipeline:
         logger.info("========== Processing %s ==========", code)
 
         from src.services.history_loader import set_frozen_target_date, reset_frozen_target_date
-        frozen_td = self._resolve_resume_target_date(code, current_time=current_time)
-        token = set_frozen_target_date(frozen_td)
         effective_query_id = analysis_query_id or getattr(self, "query_id", None) or uuid.uuid4().hex
         effective_trace_id = getattr(self, "trace_id", None) or effective_query_id
         diag_token = None
+        frozen_target_token = None
         if get_current_diagnostic_context() is None:
             diag_token = activate_run_diagnostic_context(
                 trace_id=effective_trace_id,
@@ -3131,11 +3734,59 @@ class StockAnalysisPipeline:
                 trigger_source=getattr(self, "query_source", None),
             )
         try:
+            with observe_pipeline_stage(
+                "resolve",
+                input_summary={
+                    "stock_code": code,
+                    "query_source": getattr(self, "query_source", None),
+                },
+                retryable=False,
+            ) as resolve_stage:
+                frozen_td = self._resolve_resume_target_date(
+                    code,
+                    current_time=current_time,
+                )
+                frozen_target_token = set_frozen_target_date(frozen_td)
+                resolve_stage.finish(
+                    status="success",
+                    output_summary={
+                        "query_id": effective_query_id,
+                        "target_date": frozen_td.isoformat(),
+                    },
+                    retryable=False,
+                )
+        except Exception:
+            record_missing_pipeline_stages_as_skipped(
+                PIPELINE_STAGE_NAMES,
+                input_summary={"stock_code": code},
+                reason="stock_resolution_failed",
+            )
+            reset_run_diagnostic_context(diag_token)
+            if frozen_target_token is not None:
+                reset_frozen_target_date(frozen_target_token)
+            raise
+
+        try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: 获取并保存数据
-            success, error = self.fetch_and_save_stock_data(
-                code, current_time=current_time
-            )
+            with observe_pipeline_stage(
+                "fetch",
+                input_summary={
+                    "stock_code": code,
+                    "operation": "prepare_daily_data",
+                    "force_refresh": False,
+                },
+                retryable=True,
+            ) as fetch_stage:
+                success, error = self.fetch_and_save_stock_data(
+                    code, current_time=current_time
+                )
+                fetch_stage.finish(
+                    status="success" if success else "degraded",
+                    output_summary={"data_ready": success},
+                    degradation_reason=error if not success else None,
+                    retryable=not success,
+                )
             
             if not success:
                 logger.warning("[%s] Market data preparation failed", code)
@@ -3146,6 +3797,24 @@ class StockAnalysisPipeline:
             # Step 2: AI 分析
             if skip_analysis:
                 logger.info("[%s] Skipping AI analysis in dry-run mode", code)
+                for stage_name in (
+                    "intelligence",
+                    "context",
+                    "analyze",
+                    "persist",
+                    "render",
+                    "dispatch",
+                ):
+                    record_pipeline_stage(
+                        stage=stage_name,
+                        status="skipped",
+                        input_summary={
+                            "stock_code": code,
+                            "mode": "dry_run",
+                        },
+                        output_summary={"reason": "analysis_disabled"},
+                        retryable=False,
+                    )
                 return None
             
             analyze_kwargs = {"query_id": effective_query_id}
@@ -3169,11 +3838,46 @@ class StockAnalysisPipeline:
                     )
             elif result:
                 logger.warning("[%s] Analysis returned an unsuccessful result", code)
+
+            missing_stage_count = 0
+            if result and result.success:
+                if (
+                    not single_stock_notify
+                    and not _DEFER_PIPELINE_DELIVERY_OBSERVATION.get()
+                ):
+                    missing_stage_count = record_missing_pipeline_stages_as_skipped(
+                        ("render", "dispatch"),
+                        input_summary={"stock_code": code},
+                        reason="stock_delivery_not_requested",
+                    )
+            else:
+                missing_stage_count = record_missing_pipeline_stages_as_skipped(
+                    (
+                        "intelligence",
+                        "context",
+                        "analyze",
+                        "persist",
+                        "render",
+                        "dispatch",
+                    ),
+                    input_summary={"stock_code": code},
+                    reason="analysis_unsuccessful",
+                )
+            if missing_stage_count and result and result.success:
+                self._refresh_saved_diagnostic_snapshot(
+                    result=result,
+                    fallback_code=code,
+                )
             
             return result
             
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Per-stock failures are safely logged so the batch can continue.
             # 捕获所有异常，确保单股失败不影响整体
+            record_missing_pipeline_stages_as_skipped(
+                PIPELINE_STAGE_NAMES,
+                input_summary={"stock_code": code},
+                reason="stock_processing_failed",
+            )
             log_safe_exception(
                 logger,
                 "Stock processing failed",
@@ -3184,7 +3888,20 @@ class StockAnalysisPipeline:
             return None
         finally:
             reset_run_diagnostic_context(diag_token)
-            reset_frozen_target_date(token)
+            if frozen_target_token is not None:
+                reset_frozen_target_date(frozen_target_token)
+
+    def _process_single_stock_for_batch(
+        self,
+        code: str,
+        **kwargs,
+    ) -> Optional[AnalysisResult]:
+        """Run one stock while deferring delivery observations to the batch trace."""
+        token = _DEFER_PIPELINE_DELIVERY_OBSERVATION.set(True)
+        try:
+            return self.process_single_stock(code, **kwargs)
+        finally:
+            _DEFER_PIPELINE_DELIVERY_OBSERVATION.reset(token)
     
     def run(
         self,
@@ -3288,7 +4005,7 @@ class StockAnalysisPipeline:
             # 提交任务
             future_to_code = {
                 executor.submit(
-                    self.process_single_stock,
+                    self._process_single_stock_for_batch,
                     code,
                     skip_analysis=dry_run,
                     single_stock_notify=False,
@@ -3307,11 +4024,17 @@ class StockAnalysisPipeline:
                     if result and result.success:
                         results.append(result)
                         if single_stock_notify and send_notification and not dry_run:
-                            self._send_single_stock_notification(
-                                result,
-                                report_type=report_type,
-                                fallback_code=code,
+                            delivery_diag_token = (
+                                self._activate_delivery_diagnostic_context([result])
                             )
+                            try:
+                                self._send_single_stock_notification(
+                                    result,
+                                    report_type=report_type,
+                                    fallback_code=code,
+                                )
+                            finally:
+                                reset_run_diagnostic_context(delivery_diag_token)
                     elif result and not result.success:
                         logger.warning(
                             "[%s] Unsuccessful analysis result excluded from aggregate output",
@@ -3330,7 +4053,7 @@ class StockAnalysisPipeline:
                         )
                         time.sleep(analysis_delay)
 
-                except Exception as e:
+                except Exception as e:  # broad-exception: fallback_recorded - Worker failures are safely logged and the remaining stock tasks continue.
                     log_safe_exception(
                         logger,
                         "Stock analysis task failed",
@@ -3368,26 +4091,74 @@ class StockAnalysisPipeline:
             elapsed_time,
         )
         
-        # 保存报告到本地文件（无论是否推送通知都保存）
-        if results and not dry_run:
-            self._save_local_report(results, report_type)
-
-        # 发送通知（单股推送模式下跳过汇总推送，避免重复）
-        if results and send_notification and not dry_run:
-            if single_stock_notify:
-                # 单股推送模式：只保存汇总报告，不再重复推送
-                logger.info(
-                    "Single-stock notification mode: skipping aggregate delivery and saving locally"
-                )
-                self._send_notifications(results, report_type, skip_push=True)
-            elif merge_notification:
-                # 合并模式（Issue #190）：仅保存，不推送，由 main 层合并个股+大盘后统一发送
-                logger.info(
-                    "Combined-delivery mode: deferring delivery until stock and market reports are merged"
-                )
-                self._send_notifications(results, report_type, skip_push=True)
+        delivery_diag_token = (
+            self._activate_delivery_diagnostic_context(results)
+            if results and not dry_run
+            else None
+        )
+        try:
+            # Always save the report locally, independently of notification delivery.
+            if results and not dry_run:
+                self._save_local_report(results, report_type)
+                self._refresh_saved_diagnostic_snapshot(results=results)
             else:
-                self._send_notifications(results, report_type)
+                record_pipeline_stage(
+                    stage="render",
+                    status="skipped",
+                    input_summary={
+                        "result_count": len(results),
+                        "dry_run": dry_run,
+                        "report_type": report_type.value,
+                    },
+                    output_summary={
+                        "reason": "dry_run" if dry_run else "no_successful_results"
+                    },
+                    retryable=False,
+                )
+
+            if not (results and send_notification and not dry_run):
+                record_pipeline_stage(
+                    stage="dispatch",
+                    status="skipped",
+                    input_summary={
+                        "result_count": len(results),
+                        "dry_run": dry_run,
+                        "send_notification": send_notification,
+                    },
+                    output_summary={
+                        "reason": (
+                            "dry_run"
+                            if dry_run
+                            else (
+                                "notification_disabled"
+                                if not send_notification
+                                else "no_successful_results"
+                            )
+                        )
+                    },
+                    retryable=False,
+                )
+                if results and not dry_run:
+                    self._refresh_saved_diagnostic_snapshot(results=results)
+
+            # Deliver notifications; single-stock mode skips duplicate aggregate delivery.
+            if results and send_notification and not dry_run:
+                if single_stock_notify:
+                    # Save the aggregate report without delivering it again.
+                    logger.info(
+                        "Single-stock notification mode: skipping aggregate delivery and saving locally"
+                    )
+                    self._send_notifications(results, report_type, skip_push=True)
+                elif merge_notification:
+                    # Issue #190: defer delivery until stock and market reports are combined.
+                    logger.info(
+                        "Combined-delivery mode: deferring delivery until stock and market reports are merged"
+                    )
+                    self._send_notifications(results, report_type, skip_push=True)
+                else:
+                    self._send_notifications(results, report_type)
+        finally:
+            reset_run_diagnostic_context(delivery_diag_token)
         
         return results
 
@@ -3399,6 +4170,28 @@ class StockAnalysisPipeline:
     ) -> None:
         """发送单股通知，供直接单股入口和批量串行推送共用。"""
         if not self.notifier.is_available():
+            record_pipeline_stage(
+                stage="render",
+                status="skipped",
+                input_summary={
+                    "stock_code": getattr(result, "code", None) or fallback_code,
+                    "report_type": report_type.value,
+                    "result_count": 1,
+                },
+                output_summary={"reason": "notification_not_configured"},
+                retryable=False,
+            )
+            record_pipeline_stage(
+                stage="dispatch",
+                status="skipped",
+                input_summary={
+                    "stock_code": getattr(result, "code", None) or fallback_code,
+                    "route": "report",
+                    "result_count": 1,
+                },
+                output_summary={"reason": "notification_not_configured"},
+                retryable=False,
+            )
             notification_run = self._build_notification_run_snapshot(
                 channel="report",
                 status="not_configured",
@@ -3428,6 +4221,16 @@ class StockAnalysisPipeline:
                     setattr(self, "_single_stock_notify_lock", notify_lock)
 
         with notify_lock:
+            render_stage = observe_pipeline_stage(
+                "render",
+                input_summary={
+                    "stock_code": stock_code,
+                    "report_type": report_type.value,
+                    "result_count": 1,
+                },
+                retryable=False,
+            )
+            dispatch_stage: Optional[PipelineStageObservation] = None
             try:
                 if report_type == ReportType.FULL:
                     report_content = self.notifier.generate_dashboard_report([result])
@@ -3439,34 +4242,221 @@ class StockAnalysisPipeline:
                     report_content = self.notifier.generate_single_stock_report(result)
                     logger.info("[%s] Using simple report format", stock_code)
 
-                sent = self.notifier.send(
-                    report_content,
-                    email_stock_codes=[stock_code],
-                    route_type="report",
-                    severity="info",
-                    dedup_key=f"report:single:{stock_code}:{report_type.value}",
-                    cooldown_key=f"report:single:{stock_code}:{report_type.value}",
+                render_stage.finish(
+                    status="success",
+                    output_summary={
+                        "content_length": (
+                            len(report_content)
+                            if isinstance(report_content, (str, bytes))
+                            else None
+                        ),
+                        "route": "single_stock",
+                    },
+                    retryable=False,
                 )
-                notification_run = self._build_notification_run_snapshot(
-                    channel="report",
-                    status="success" if sent else "failed",
-                    success=sent,
+
+                dispatch_stage = observe_pipeline_stage(
+                    "dispatch",
+                    input_summary={
+                        "stock_code": stock_code,
+                        "route": "report",
+                        "result_count": 1,
+                    },
+                    retryable=True,
                 )
-                record_notification_run(
-                    channel="report",
-                    status="success" if sent else "failed",
-                    success=sent,
+                send_kwargs = {
+                    "email_stock_codes": [stock_code],
+                    "route_type": "report",
+                    "severity": "info",
+                    "dedup_key": (
+                        f"report:single:{stock_code}:{report_type.value}"
+                    ),
+                    "cooldown_key": (
+                        f"report:single:{stock_code}:{report_type.value}"
+                    ),
+                }
+                notifier_type_method = getattr(
+                    type(self.notifier),
+                    "send_with_results",
+                    None,
                 )
-                self._refresh_saved_diagnostic_snapshot(
-                    result=result,
-                    fallback_code=fallback_code,
-                    notification_run=notification_run,
+                notifier_instance_values = getattr(
+                    self.notifier,
+                    "__dict__",
+                    {},
                 )
+                send_with_results = (
+                    getattr(self.notifier, "send_with_results", None)
+                    if callable(notifier_type_method)
+                    else notifier_instance_values.get("send_with_results")
+                )
+
+                dispatch_result = None
+                channel_results: List[Any] = []
+                dispatch_result_status = ""
+                dispatched = False
+                if callable(send_with_results):
+                    dispatch_result = send_with_results(report_content, **send_kwargs)
+                    raw_channel_results = getattr(
+                        dispatch_result,
+                        "channel_results",
+                        None,
+                    )
+                    if isinstance(raw_channel_results, (list, tuple)):
+                        channel_results = list(raw_channel_results)
+                    dispatch_result_status = str(
+                        getattr(dispatch_result, "status", "") or ""
+                    ).strip().lower()
+                    sent = bool(getattr(dispatch_result, "success", False))
+                    dispatched = bool(
+                        getattr(dispatch_result, "dispatched", False)
+                    )
+                else:
+                    sent = bool(self.notifier.send(report_content, **send_kwargs))
+                    dispatched = True
+
+                delivery_failure_count = (
+                    sum(
+                        not bool(getattr(item, "success", False))
+                        for item in channel_results
+                    )
+                    if channel_results
+                    else int(dispatched and not sent)
+                )
+                if (
+                    dispatch_result_status == "partial_failed"
+                    or (sent and delivery_failure_count)
+                ):
+                    dispatch_status = "degraded"
+                elif sent or dispatch_result_status == "sent":
+                    dispatch_status = "success"
+                elif dispatch_result_status in {
+                    "noise_suppressed",
+                    "no_channel",
+                }:
+                    dispatch_status = "skipped"
+                else:
+                    dispatch_status = "failed"
+
+                dispatch_retryable = False
+                if dispatch_status == "failed":
+                    dispatch_retryable = (
+                        any(
+                            bool(getattr(item, "retryable", True))
+                            for item in channel_results
+                        )
+                        if channel_results
+                        else True
+                    )
+                dispatch_stage.finish(
+                    status=dispatch_status,
+                    output_summary={
+                        "delivered": sent,
+                        "dispatched": dispatched,
+                        "route": "report",
+                        "dispatch_status": dispatch_result_status or None,
+                        "attempt_count": len(channel_results) or int(dispatched),
+                        "failure_count": delivery_failure_count,
+                    },
+                    degradation_reason=(
+                        "Some notification deliveries failed after at least one delivery succeeded."
+                        if dispatch_status == "degraded"
+                        else (
+                            "All attempted notification deliveries failed."
+                            if dispatch_status == "failed"
+                            else None
+                        )
+                    ),
+                    retryable=dispatch_retryable,
+                )
+                if channel_results:
+                    for channel_result in channel_results:
+                        channel_label = str(
+                            getattr(channel_result, "channel", None) or "report"
+                        )
+                        channel_success = bool(
+                            getattr(channel_result, "success", False)
+                        )
+                        channel_error = (
+                            getattr(channel_result, "diagnostics", None)
+                            or getattr(channel_result, "error_code", None)
+                        )
+                        notification_run = self._build_notification_run_snapshot(
+                            channel=channel_label,
+                            status="success" if channel_success else "failed",
+                            success=channel_success,
+                            error_message=channel_error,
+                        )
+                        record_notification_run(
+                            channel=channel_label,
+                            status="success" if channel_success else "failed",
+                            success=channel_success,
+                            error_message=channel_error,
+                        )
+                        self._refresh_saved_diagnostic_snapshot(
+                            result=result,
+                            fallback_code=fallback_code,
+                            notification_run=notification_run,
+                        )
+                else:
+                    notification_status = (
+                        "success"
+                        if dispatch_status in {"success", "degraded"}
+                        else (
+                            "skipped"
+                            if dispatch_status == "skipped"
+                            else "failed"
+                        )
+                    )
+                    notification_run = self._build_notification_run_snapshot(
+                        channel="report",
+                        status=notification_status,
+                        success=sent,
+                        attempts=int(dispatched),
+                        error_message=(
+                            getattr(dispatch_result, "message", None)
+                            if dispatch_result is not None
+                            else None
+                        ),
+                    )
+                    record_notification_run(
+                        channel="report",
+                        status=notification_status,
+                        success=sent,
+                        attempts=int(dispatched),
+                        error_message=(
+                            getattr(dispatch_result, "message", None)
+                            if dispatch_result is not None
+                            else None
+                        ),
+                    )
+                    self._refresh_saved_diagnostic_snapshot(
+                        result=result,
+                        fallback_code=fallback_code,
+                        notification_run=notification_run,
+                    )
                 if sent:
                     logger.info("[%s] Single-stock notification delivered", stock_code)
+                elif dispatch_status == "skipped":
+                    logger.info("[%s] Single-stock notification skipped", stock_code)
                 else:
                     logger.warning("[%s] Single-stock notification delivery failed", stock_code)
-            except Exception as e:
+            except Exception as e:  # broad-exception: fallback_recorded - Notification failures are recorded and safely logged without changing analysis success.
+                if not render_stage.finished:
+                    render_stage.finish(status="failed", error=e, retryable=False)
+                    record_pipeline_stage(
+                        stage="dispatch",
+                        status="skipped",
+                        input_summary={
+                            "stock_code": stock_code,
+                            "route": "report",
+                            "result_count": 1,
+                        },
+                        output_summary={"reason": "render_failed"},
+                        retryable=False,
+                    )
+                elif dispatch_stage is not None and not dispatch_stage.finished:
+                    dispatch_stage.finish(status="failed", error=e, retryable=True)
                 notification_run = self._build_notification_run_snapshot(
                     channel="report",
                     status="failed",
@@ -3498,11 +4488,33 @@ class StockAnalysisPipeline:
         report_type: ReportType = ReportType.SIMPLE,
     ) -> None:
         """保存分析报告到本地文件（与通知推送解耦）"""
+        render_stage = observe_pipeline_stage(
+            "render",
+            input_summary={
+                "report_type": report_type.value,
+                "result_count": len(results),
+                "route": "local_report",
+            },
+            retryable=False,
+        )
         try:
             report = self._generate_aggregate_report(results, report_type)
             filepath = self.notifier.save_report_to_file(report)
+            render_stage.finish(
+                status="success",
+                output_summary={
+                    "content_length": (
+                        len(report) if isinstance(report, (str, bytes)) else None
+                    ),
+                    "route": "local_report",
+                    "report_saved": True,
+                },
+                retryable=False,
+            )
             logger.info("Decision dashboard saved: %s", filepath)
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Local report failures are safely logged and do not change analysis results.
+            if not render_stage.finished:
+                render_stage.finish(status="failed", error=e, retryable=False)
             log_safe_exception(
                 logger,
                 "Local report persistence failed",
@@ -3527,12 +4539,48 @@ class StockAnalysisPipeline:
         """
         noise_decision = None
         noise_finalized = False
+        delivery_attempt_count = 0
+        delivery_failure_count = 0
+        render_stage = observe_pipeline_stage(
+            "render",
+            input_summary={
+                "report_type": report_type.value,
+                "result_count": len(results),
+                "route": "aggregate_notification",
+            },
+            retryable=False,
+        )
+        dispatch_stage: Optional[PipelineStageObservation] = None
         try:
             logger.info("Generating the decision dashboard")
             report = self._generate_aggregate_report(results, report_type)
+            render_stage.finish(
+                status="success",
+                output_summary={
+                    "content_length": (
+                        len(report) if isinstance(report, (str, bytes)) else None
+                    ),
+                    "route": "aggregate_notification",
+                },
+                retryable=False,
+            )
+            dispatch_stage = observe_pipeline_stage(
+                "dispatch",
+                input_summary={
+                    "report_type": report_type.value,
+                    "result_count": len(results),
+                    "skip_push": skip_push,
+                },
+                retryable=True,
+            )
             
             # 跳过推送（单股推送模式 / 合并模式：报告已由 _save_local_report 保存）
             if skip_push:
+                dispatch_stage.finish(
+                    status="skipped",
+                    output_summary={"reason": "push_deferred"},
+                    retryable=False,
+                )
                 notification_run = self._build_notification_run_snapshot(
                     channel="report",
                     status="skipped",
@@ -3578,6 +4626,10 @@ class StockAnalysisPipeline:
                     error_message: Optional[Exception] = None,
                     target_results: Optional[List[AnalysisResult]] = None,
                 ) -> None:
+                    nonlocal delivery_attempt_count, delivery_failure_count
+                    delivery_attempt_count += 1
+                    if not success:
+                        delivery_failure_count += 1
                     notification_run = self._build_notification_run_snapshot(
                         channel=channel_label,
                         status="success" if success else "failed",
@@ -3595,9 +4647,29 @@ class StockAnalysisPipeline:
                         notification_run=notification_run,
                     )
 
+                context_route_available = False
+                has_context_channel = getattr(
+                    self.notifier,
+                    "_has_context_channel",
+                    None,
+                )
+                if callable(has_context_channel):
+                    try:
+                        context_route_available = bool(has_context_channel())
+                    except Exception as e:  # broad-exception: optional_metadata - Context-route availability only refines diagnostics and cannot block delivery.
+                        log_safe_exception(
+                            logger,
+                            "Context notification availability check failed",
+                            e,
+                            error_code="pipeline_context_notification_availability_failed",
+                            level=logging.WARNING,
+                        )
+
                 send_context = self.notifier.send_to_context(report)
                 if send_context:
                     _record_channel_result("__context__", True)
+                elif context_route_available:
+                    _record_channel_result("__context__", False)
 
                 should_broadcast_static = True
                 should_broadcast_static_func = getattr(
@@ -3608,7 +4680,7 @@ class StockAnalysisPipeline:
                 if callable(should_broadcast_static_func):
                     should_broadcast_static = bool(should_broadcast_static_func())
                 if not should_broadcast_static:
-                    if not send_context:
+                    if not send_context and not context_route_available:
                         _record_channel_result("__context__", False)
                     if send_context:
                         logger.info("Decision dashboard delivered")
@@ -3617,6 +4689,20 @@ class StockAnalysisPipeline:
                     logger.info(
                         "Interactive context-reply mode enabled; static notification channels skipped"
                     )
+                    dispatch_stage.finish(
+                        status="success" if send_context else "failed",
+                        output_summary={
+                            "delivered": bool(send_context),
+                            "route": "context_reply",
+                        },
+                        degradation_reason=(
+                            "Context-reply delivery failed."
+                            if not send_context
+                            else None
+                        ),
+                        retryable=not send_context,
+                    )
+                    self._refresh_saved_diagnostic_snapshot(results=results)
                     return
 
                 if channels and hasattr(self.notifier, "evaluate_noise_control"):
@@ -3633,6 +4719,33 @@ class StockAnalysisPipeline:
                         cooldown_key=noise_key,
                     )
                     if not noise_decision.should_send:
+                        if send_context:
+                            suppressed_dispatch_status = "success"
+                            suppressed_retryable = False
+                            suppressed_reason = None
+                        elif context_route_available:
+                            suppressed_dispatch_status = "failed"
+                            suppressed_retryable = True
+                            suppressed_reason = (
+                                "Context-reply delivery failed and static channels "
+                                "were suppressed by noise control."
+                            )
+                        else:
+                            suppressed_dispatch_status = "skipped"
+                            suppressed_retryable = False
+                            suppressed_reason = None
+                        dispatch_stage.finish(
+                            status=suppressed_dispatch_status,
+                            output_summary={
+                                "reason": "noise_control",
+                                "reason_code": noise_decision.reason_code,
+                                "context_delivered": bool(send_context),
+                                "context_attempted": context_route_available,
+                                "static_suppressed": True,
+                            },
+                            degradation_reason=suppressed_reason,
+                            retryable=suppressed_retryable,
+                        )
                         notification_run = self._build_notification_run_snapshot(
                             channel="report",
                             status="skipped",
@@ -4015,7 +5128,38 @@ class StockAnalysisPipeline:
                         results=results,
                         notification_run=notification_run,
                     )
+                dispatch_status = (
+                    "degraded"
+                    if success and delivery_failure_count
+                    else ("success" if success else "failed")
+                )
+                dispatch_stage.finish(
+                    status=dispatch_status,
+                    output_summary={
+                        "delivered": bool(success),
+                        "channel_count": len(channels),
+                        "context_delivered": bool(send_context),
+                        "attempt_count": delivery_attempt_count,
+                        "failure_count": delivery_failure_count,
+                    },
+                    degradation_reason=(
+                        "Some notification deliveries failed."
+                        if dispatch_status == "degraded"
+                        else (
+                            "All configured notification deliveries failed."
+                            if dispatch_status == "failed"
+                            else None
+                        )
+                    ),
+                    retryable=dispatch_status == "failed",
+                )
+                self._refresh_saved_diagnostic_snapshot(results=results)
             else:
+                dispatch_stage.finish(
+                    status="skipped",
+                    output_summary={"reason": "notification_not_configured"},
+                    retryable=False,
+                )
                 notification_run = self._build_notification_run_snapshot(
                     channel="report",
                     status="not_configured",
@@ -4034,7 +5178,41 @@ class StockAnalysisPipeline:
                 )
                 logger.info("No notification channel is configured; skipping delivery")
                 
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Dispatch failures are recorded and safely logged without changing analysis results.
+            if not render_stage.finished:
+                render_stage.finish(status="failed", error=e, retryable=False)
+                record_pipeline_stage(
+                    stage="dispatch",
+                    status="skipped",
+                    input_summary={
+                        "report_type": report_type.value,
+                        "result_count": len(results),
+                    },
+                    output_summary={"reason": "render_failed"},
+                    retryable=False,
+                )
+            elif dispatch_stage is not None and not dispatch_stage.finished:
+                confirmed_delivery_count = max(
+                    0,
+                    delivery_attempt_count - delivery_failure_count,
+                )
+                dispatch_stage.finish(
+                    status=(
+                        "degraded" if confirmed_delivery_count else "failed"
+                    ),
+                    output_summary={
+                        "attempt_count": delivery_attempt_count,
+                        "failure_count": delivery_failure_count,
+                        "confirmed_delivery_count": confirmed_delivery_count,
+                    },
+                    degradation_reason=(
+                        "Dispatch failed after one or more deliveries succeeded."
+                        if confirmed_delivery_count
+                        else "Dispatch failed before any delivery was confirmed."
+                    ),
+                    error=e,
+                    retryable=not confirmed_delivery_count,
+                )
             notification_run = self._build_notification_run_snapshot(
                 channel="report",
                 status="failed",
