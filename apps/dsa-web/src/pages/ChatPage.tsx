@@ -2,12 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Switch, Tooltip, useClipboard } from '../components/common';
-import { OVERLAY_Z } from '../components/common/overlayZ';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
 import { DashboardStateBlock } from '../components/dashboard';
@@ -916,7 +915,7 @@ const ChatPage: React.FC = () => {
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
-        <h2 className="text-sm font-semibold text-primary uppercase tracking-[0.2em] flex items-center gap-2">
+        <h2 className="hidden text-sm font-semibold text-primary uppercase tracking-[0.2em] md:flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -942,14 +941,6 @@ const ChatPage: React.FC = () => {
                 d="M12 4v16m8-8H4"
               />
             </svg>
-          </button>
-          <button
-            type="button"
-            onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground md:hidden"
-            aria-label={t('common.closeDrawer')}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -1053,13 +1044,7 @@ const ChatPage: React.FC = () => {
         isOpen={sidebarOpen}
         onClose={closeSidebar}
         title={t('chat.history')}
-        width="w-72"
-        zIndex={OVERLAY_Z.pageDrawer}
-        side="left"
-        backdropClassName="page-drawer-overlay"
-        panelClassName="glass-card !rounded-none overflow-hidden border-white/10 bg-card/90 shadow-2xl"
-        contentClassName="overflow-hidden !p-0"
-        showHeader={false}
+        variant="navigation"
       >
         {sidebarContent}
       </Drawer>

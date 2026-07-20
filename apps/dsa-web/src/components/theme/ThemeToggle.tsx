@@ -66,13 +66,15 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
       rootClassName={cn(isRailVariant ? 'w-full' : '', wrapperClassName)}
       contentRole="menu"
       ariaLabel={t('theme.menu')}
+      placement={isHorizontalMenu || isNavVariant || isRailVariant ? 'top' : 'bottom'}
+      align={isHorizontalMenu || isNavVariant || isRailVariant ? 'start' : 'end'}
       contentClassName={cn(
         'min-w-[8rem] rounded-2xl border-border/70 p-1.5 shadow-2xl backdrop-blur-sm',
         isHorizontalMenu
-          ? 'bottom-0 left-full ml-2 grid min-w-80 grid-cols-3'
+          ? 'grid w-[min(20rem,calc(100vw-1rem))] grid-cols-3'
           : isNavVariant || isRailVariant
-          ? 'bottom-full left-0 mb-2 w-max min-w-[9rem]'
-          : 'right-0 top-full mt-2'
+          ? 'w-max min-w-[9rem]'
+          : 'w-max'
       )}
       trigger={({ open, toggle }) => (
         <button

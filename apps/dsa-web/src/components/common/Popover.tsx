@@ -1,6 +1,10 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import { isFixedPopupOwnedBy, useFixedPopup } from './useFixedPopup';
 
 interface PopoverRenderProps {
   open: boolean;
@@ -21,6 +25,8 @@ interface PopoverProps {
   ariaLabel?: string;
   ariaLabelledBy?: string;
   closeOnEscape?: boolean;
+  placement?: 'auto' | 'top' | 'bottom';
+  align?: 'start' | 'end';
   onContentKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
 }
 
@@ -37,6 +43,8 @@ export const Popover = ({
   ariaLabel,
   ariaLabelledBy,
   closeOnEscape = true,
+  placement = 'auto',
+  align = 'start',
   onContentKeyDown,
 }: PopoverProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -45,29 +53,52 @@ export const Popover = ({
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [shouldRestoreFocus, setShouldRestoreFocus] = useState(false);
   const open = controlledOpen ?? internalOpen;
+  const {
+    portalHost,
+    popupStyle,
+    prepareForOpen,
+    resetPosition,
+    isTopmostPopup,
+  } = useFixedPopup({
+    isOpen: open,
+    triggerRef: rootRef,
+    popupRef: contentRef,
+    contentVersion: open,
+    constrainWidthToViewport: true,
+    placement,
+    align,
+  });
 
   const setOpen = useCallback((nextOpen: boolean) => {
-    if (controlledOpen === undefined) {
-      setInternalOpen(nextOpen);
-    }
+    if (controlledOpen === undefined) setInternalOpen(nextOpen);
     onOpenChange?.(nextOpen);
   }, [controlledOpen, onOpenChange]);
 
+  const openPopover = useCallback(() => {
+    setShouldRestoreFocus(false);
+    prepareForOpen();
+    setOpen(true);
+  }, [prepareForOpen, setOpen]);
+
   const close = useCallback(() => {
     setShouldRestoreFocus(true);
+    resetPosition();
     setOpen(false);
-  }, [setOpen]);
+  }, [resetPosition, setOpen]);
 
-  const dismiss = useCallback(() => setOpen(false), [setOpen]);
+  const dismiss = useCallback(() => {
+    resetPosition();
+    setOpen(false);
+  }, [resetPosition, setOpen]);
 
   const toggle = useCallback(() => {
-    if (open) {
-      close();
-      return;
-    }
-    setShouldRestoreFocus(false);
-    setOpen(true);
-  }, [close, open, setOpen]);
+    if (open) close();
+    else openPopover();
+  }, [close, open, openPopover]);
+
+  useEffect(() => {
+    if (open && !portalHost) prepareForOpen();
+  }, [open, portalHost, prepareForOpen]);
 
   useEffect(() => {
     if (open) {
@@ -78,8 +109,13 @@ export const Popover = ({
     }
     if (!shouldRestoreFocus) return;
     const frame = requestAnimationFrame(() => {
-      const target = restoreFocusRef.current
-        ?? rootRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const trigger = rootRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      ) ?? null;
+      const remembered = restoreFocusRef.current;
+      const target = remembered && rootRef.current?.contains(remembered)
+        ? remembered
+        : trigger ?? remembered;
       target?.focus();
       setShouldRestoreFocus(false);
     });
@@ -100,34 +136,48 @@ export const Popover = ({
       target?.focus();
     });
     return () => cancelAnimationFrame(frame);
-  }, [contentRole, open]);
+  }, [contentRole, open, portalHost]);
 
   useEffect(() => {
     if (!open) return;
-
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target;
       if (!(target instanceof Element)) {
         dismiss();
         return;
       }
-      if (rootRef.current?.contains(target) || target.closest('[role="listbox"]')) return;
+      if (
+        rootRef.current?.contains(target)
+        || contentRef.current?.contains(target)
+        || (rootRef.current && isFixedPopupOwnedBy(rootRef.current, target))
+        || (contentRef.current && isFixedPopupOwnedBy(contentRef.current, target))
+      ) {
+        return;
+      }
       dismiss();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (closeOnEscape && event.key === 'Escape') {
+      const nestedPopupOpen = contentRef.current?.querySelector(
+        '[data-dialog-popup="true"], [aria-haspopup][aria-expanded="true"]',
+      );
+      if (
+        closeOnEscape
+        && event.key === 'Escape'
+        && !nestedPopupOpen
+        && isTopmostPopup()
+      ) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         close();
       }
     };
-
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [close, closeOnEscape, dismiss, open]);
+  }, [close, closeOnEscape, dismiss, isTopmostPopup, open]);
 
   const handleContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onContentKeyDown?.(event);
@@ -138,15 +188,10 @@ export const Popover = ({
     if (items.length === 0) return;
     const currentIndex = Math.max(items.indexOf(document.activeElement as HTMLElement), 0);
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
-      nextIndex = (currentIndex + 1) % items.length;
-    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
-      nextIndex = (currentIndex - 1 + items.length) % items.length;
-    } else if (event.key === 'Home') {
-      nextIndex = 0;
-    } else if (event.key === 'End') {
-      nextIndex = items.length - 1;
-    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % items.length;
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + items.length) % items.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = items.length - 1;
     if (nextIndex !== null) {
       event.preventDefault();
       items.forEach((item, index) => {
@@ -159,22 +204,27 @@ export const Popover = ({
   return (
     <div ref={rootRef} className={cn('relative', rootClassName)}>
       {trigger({ open, close, toggle })}
-      {open ? (
-        <div
-          ref={contentRef}
-          id={contentId}
-          role={contentRole}
-          aria-label={ariaLabel}
-          aria-labelledby={ariaLabelledBy}
-          onKeyDown={handleContentKeyDown}
-          className={cn(
-            'absolute z-[100] overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
-            contentClassName,
-          )}
-        >
-          {typeof children === 'function' ? children({ close }) : children}
-        </div>
-      ) : null}
+      {open && portalHost && popupStyle
+        ? createPortal(
+            <div
+              ref={contentRef}
+              id={contentId}
+              role={contentRole}
+              aria-label={ariaLabel}
+              aria-labelledby={ariaLabelledBy}
+              data-dialog-popup="true"
+              style={popupStyle}
+              onKeyDown={handleContentKeyDown}
+              className={cn(
+                'fixed overflow-hidden rounded-xl border border-border bg-elevated shadow-lg',
+                contentClassName,
+              )}
+            >
+              {typeof children === 'function' ? children({ close }) : children}
+            </div>,
+            portalHost,
+          )
+        : null}
     </div>
   );
 };

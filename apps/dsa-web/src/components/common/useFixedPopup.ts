@@ -1,8 +1,58 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
+import { getOverlayStyle, OVERLAY_Z, type OverlayLayer } from './overlayZ';
 
 export const FIXED_POPUP_GAP_PX = 4;
 export const FIXED_POPUP_VIEWPORT_MARGIN_PX = 8;
+
+type PopupEscapeLayer = Extract<OverlayLayer, 'popover' | 'tooltip'>;
+type PopupEscapeToken = object;
+
+interface PopupEscapeEntry {
+  token: PopupEscapeToken;
+  layer: PopupEscapeLayer;
+}
+
+const popupEscapeStack: PopupEscapeEntry[] = [];
+const fixedPopupOwners = new WeakMap<HTMLElement, HTMLElement>();
+
+export function registerPopupEscapeLayer(
+  token: PopupEscapeToken,
+  layer: PopupEscapeLayer,
+): () => void {
+  const entry = { token, layer };
+  popupEscapeStack.push(entry);
+  return () => {
+    const index = popupEscapeStack.indexOf(entry);
+    if (index >= 0) popupEscapeStack.splice(index, 1);
+  };
+}
+
+export function isTopmostPopupEscapeLayer(token: PopupEscapeToken): boolean {
+  let topmost: PopupEscapeEntry | undefined;
+  for (const entry of popupEscapeStack) {
+    if (!topmost || OVERLAY_Z[entry.layer] >= OVERLAY_Z[topmost.layer]) {
+      topmost = entry;
+    }
+  }
+  return topmost?.token === token;
+}
+
+export function isFixedPopupOwnedBy(container: HTMLElement, target: Element): boolean {
+  let popup = target.closest<HTMLElement>('[data-dialog-popup="true"]');
+  const visited = new Set<HTMLElement>();
+  while (popup && !visited.has(popup)) {
+    visited.add(popup);
+    const owner = fixedPopupOwners.get(popup);
+    if (!owner) {
+      popup = popup.parentElement?.closest<HTMLElement>('[data-dialog-popup="true"]') ?? null;
+      continue;
+    }
+    if (container.contains(owner)) return true;
+    popup = owner.closest<HTMLElement>('[data-dialog-popup="true"]');
+  }
+  return false;
+}
 
 interface PopupPosition {
   top: number;
@@ -43,12 +93,15 @@ export const useFixedPopup = <
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null);
+  const escapeLayerTokenRef = useRef<PopupEscapeToken>({});
 
   const prepareForOpen = useCallback(() => {
     const trigger = triggerRef.current;
     setPopupPosition(null);
     setTriggerRect(trigger?.getBoundingClientRect() ?? null);
-    setPortalHost((trigger?.closest('[role="dialog"]') as HTMLElement | null) ?? document.body);
+    setPortalHost(
+      (trigger?.closest('[data-overlay-dialog="true"]') as HTMLElement | null) ?? document.body,
+    );
   }, [triggerRef]);
 
   const resetPosition = useCallback(() => {
@@ -104,6 +157,21 @@ export const useFixedPopup = <
     setPopupPosition({ top, left, maxHeight });
   }, [align, contentVersion, isOpen, placement, popupRef, portalHost, triggerRect]);
 
+  useLayoutEffect(() => {
+    const popup = popupRef.current;
+    const trigger = triggerRef.current;
+    if (!isOpen || !portalHost || !popup || !trigger) return undefined;
+    fixedPopupOwners.set(popup, trigger);
+    return () => {
+      fixedPopupOwners.delete(popup);
+    };
+  }, [isOpen, popupRef, portalHost, triggerRef]);
+
+  useEffect(() => {
+    if (!isOpen || !portalHost || !popupRef.current) return undefined;
+    return registerPopupEscapeLayer(escapeLayerTokenRef.current, 'popover');
+  }, [isOpen, popupRef, portalHost]);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -120,7 +188,7 @@ export const useFixedPopup = <
   }, [isOpen, triggerRef]);
 
   const popupStyle: CSSProperties | undefined = triggerRect
-    ? {
+    ? getOverlayStyle('popover', {
         top: popupPosition?.top ?? triggerRect.bottom + FIXED_POPUP_GAP_PX,
         left: popupPosition?.left ?? triggerRect.left,
         minWidth: triggerRect.width,
@@ -129,13 +197,18 @@ export const useFixedPopup = <
           : undefined,
         maxHeight: popupPosition?.maxHeight,
         visibility: popupPosition ? 'visible' : 'hidden',
-      }
+      })
     : undefined;
+  const isTopmostPopup = useCallback(
+    () => isTopmostPopupEscapeLayer(escapeLayerTokenRef.current),
+    [],
+  );
 
   return {
     portalHost,
     popupStyle,
     prepareForOpen,
     resetPosition,
+    isTopmostPopup,
   };
 };

@@ -32,11 +32,9 @@ from sqlalchemy import (
     DateTime,
     Integer,
     ForeignKey,
-    ForeignKeyConstraint,
     Index,
     UniqueConstraint,
     Text,
-    text,
     select,
     and_,
     or_,
@@ -45,8 +43,6 @@ from sqlalchemy import (
     event,
     func,
     inspect,
-    MetaData,
-    Table,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import (
@@ -1279,8 +1275,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                     # runner apply pending migrations inside this same transaction
                     # before the baseline is proven and committed.
                     Base.metadata.create_all(connection)
-                    self._ensure_intelligence_item_scope_values()
-                    self._ensure_intelligence_items_unique_index()
                     self._ensure_schema_migration_record(
                         allow_insert=can_stamp_baseline,
                     )
@@ -1644,160 +1638,6 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
                 connection.execute(
                     DatabaseSchemaMigration.__table__.insert().values(**values)
                 )
-
-    def _ensure_intelligence_items_unique_index(self) -> None:
-        if not self._is_sqlite_engine:
-            return
-
-        if not inspect(self._schema_bind()).has_table("intelligence_items"):
-            return
-
-        try:
-            unique_indexes = self._list_sqlite_unique_indexes("intelligence_items")
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Intelligence item unique index inspection failed; migration skipped",
-                exc,
-                error_code="storage_intelligence_index_inspection_failed",
-                level=logging.WARNING,
-            )
-            return
-
-        target_columns = ("source_id", "url", "scope_type", "scope_value", "market")
-        has_target_index = any(tuple(cols) == target_columns for cols in unique_indexes)
-        has_legacy_url_unique = any(tuple(cols) == ("url",) for cols in unique_indexes)
-
-        if has_target_index:
-            return
-        if unique_indexes and not has_legacy_url_unique:
-            # Table has other unique index shapes; avoid aggressive changes and add
-            # the expected scoped uniqueness directly.
-            self._ensure_intelligence_items_scoped_unique_index_once()
-            return
-
-        self._rebuild_intelligence_items_table()
-
-    def _rebuild_intelligence_items_table(self) -> None:
-        temporary_table = f"intelligence_items_recreate_tmp_{int(time.time() * 1_000_000_000)}"
-        columns = [column.name for column in IntelligenceItem.__table__.columns]
-        select_clause = ", ".join(f'"{column}"' for column in columns)
-        scoped_index_columns = ", ".join(["source_id", "url", "scope_type", "scope_value", "market"])
-        scoped_index_name = "uix_intel_item_scope"
-
-        tmp_metadata = MetaData()
-        Table(
-            IntelligenceSource.__tablename__,
-            tmp_metadata,
-            Column("id", Integer, primary_key=True),
-        )
-        tmp_table = Table(
-            temporary_table,
-            tmp_metadata,
-            *(column.copy() for column in IntelligenceItem.__table__.columns),
-            ForeignKeyConstraint(
-                ["source_id"],
-                [f"{IntelligenceSource.__tablename__}.id"],
-                ondelete="SET NULL",
-            ),
-        )
-        logger.info("Rebuilding intelligence_items table to align composite uniqueness constraints.")
-        with self._schema_connection() as connection:
-            connection.execute(text(f'DROP TABLE IF EXISTS "{temporary_table}"'))
-            tmp_table.create(connection)
-            connection.execute(
-                text(
-                    f"INSERT INTO \"{temporary_table}\" ({select_clause}) "
-                    f"SELECT {select_clause} FROM intelligence_items"
-                )
-            )
-            connection.execute(text('DROP TABLE "intelligence_items"'))
-            connection.execute(
-                text(f'ALTER TABLE "{temporary_table}" RENAME TO intelligence_items')
-            )
-            connection.execute(
-                text(
-                    f"CREATE UNIQUE INDEX IF NOT EXISTS {scoped_index_name} ON "
-                    f"intelligence_items ({scoped_index_columns})"
-                )
-            )
-
-    def _ensure_intelligence_items_scoped_unique_index_once(self) -> None:
-        target_index_name = "uix_intel_item_scope"
-        with self._schema_connection() as connection:
-            rows = connection.execute(
-                text("PRAGMA index_list(intelligence_items)")
-            ).fetchall()
-            for row in rows:
-                if row[1] == target_index_name:
-                    return
-            index_columns = ", ".join(["source_id", "url", "scope_type", "scope_value", "market"])
-            connection.execute(
-                text(
-                    f"CREATE UNIQUE INDEX IF NOT EXISTS {target_index_name} ON "
-                    f"intelligence_items ({index_columns})"
-                )
-            )
-
-    def _list_sqlite_unique_indexes(self, table_name: str):
-        with self._schema_connection() as connection:
-            rows = connection.execute(
-                text(f"PRAGMA index_list({table_name})")
-            ).fetchall()
-            unique_indexes = []
-            for row in rows:
-                # row: (seq, name, unique, origin, partial)
-                if int(row[2]) != 1:
-                    continue
-                index_name = row[1]
-                index_columns = []
-                for index_info in connection.execute(
-                    text(f"PRAGMA index_xinfo({index_name})")
-                ).fetchall():
-                    # index_xinfo: (seqno, cid, name, desc, coll, key, ... )
-                    column_name = index_info[2]
-                    if column_name is None:
-                        continue
-                    index_columns.append(column_name)
-                unique_indexes.append(index_columns)
-            return unique_indexes
-
-    def _ensure_intelligence_item_scope_values(self) -> None:
-        """Backfill nullable intelligence item scopes so SQLite unique keys work."""
-        if not self._is_sqlite_engine:
-            return
-        try:
-            existing = {
-                column["name"]
-                for column in inspect(self._schema_bind()).get_columns(IntelligenceItem.__tablename__)
-            }
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Intelligence item scope schema inspection failed; backfill skipped",
-                exc,
-                error_code="storage_intelligence_scope_schema_inspection_failed",
-                level=logging.WARNING,
-            )
-            return
-        if "scope_value" not in existing:
-            return
-        try:
-            with self._schema_connection() as connection:
-                connection.exec_driver_sql(
-                    f"UPDATE {IntelligenceItem.__tablename__} "
-                    "SET scope_value = ? "
-                    "WHERE scope_value IS NULL OR scope_value = ''",
-                    (INTELLIGENCE_ITEM_NULL_SCOPE_VALUE,),
-                )
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "Intelligence item scope value backfill failed; migration skipped",
-                exc,
-                error_code="storage_intelligence_scope_backfill_failed",
-                level=logging.WARNING,
-            )
 
     @classmethod
     def get_instance(cls) -> 'DatabaseManager':

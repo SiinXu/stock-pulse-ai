@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
-import { OVERLAY_Z } from '../common/overlayZ';
 import { SidebarNav } from './SidebarNav';
 import { cn } from '../../utils/cn';
 import { ThemeToggle } from '../theme/ThemeToggle';
@@ -94,9 +93,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         isOpen={mobileOpen}
         onClose={() => setMobileOpen(false)}
         title={t('layout.navMenu')}
-        width="max-w-xs"
-        zIndex={OVERLAY_Z.navigationDrawer}
-        side="left"
+        variant="navigation"
       >
         <div className="flex h-full flex-col">
           <SidebarNav onNavigate={() => setMobileOpen(false)} />

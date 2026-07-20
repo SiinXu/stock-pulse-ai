@@ -22,6 +22,8 @@ from src.migrations import cli as migration_cli
 from src.migrations.engine import read_only_migration_connection
 from src.migrations.registry import (
     DECISION_SIGNAL_PROFILE_MIGRATION,
+    INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
@@ -187,6 +189,8 @@ def test_pending_cli_subprocess_is_read_only(
         LLM_USAGE_TELEMETRY_MIGRATION.id,
         DECISION_SIGNAL_PROFILE_MIGRATION.id,
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
     ]
     assert payload["target_version"] == TARGET_VERSION
     assert str(db_path) not in completed.stdout
@@ -247,6 +251,8 @@ def test_legacy_registry_without_checksum_is_reported_without_alter(
         LLM_USAGE_TELEMETRY_MIGRATION.id,
         DECISION_SIGNAL_PROFILE_MIGRATION.id,
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
     ]
     assert _database_snapshot(db_path) == before
     assert "checksum" not in {row[1] for row in before["registry_columns"]}
