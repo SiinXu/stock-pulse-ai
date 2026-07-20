@@ -13,7 +13,7 @@ import {
   type AlertTypeFilter,
 } from '../components/alerts/AlertRuleList';
 import { AlertTriggerHistory } from '../components/alerts/AlertTriggerHistory';
-import { ApiErrorAlert, AppPage, Button, Card, EmptyState, InlineAlert, Loading, Modal, PageHeader, Pagination } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination } from '../components/common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -373,6 +373,39 @@ const AlertsPage: React.FC = () => {
     }
   };
 
+  const notificationColumns: DataTableColumn<AlertNotificationItem>[] = [
+    {
+      id: 'channel',
+      header: text.channel,
+      cell: (notification) => formatNotificationChannel(notification.channel, language),
+    },
+    {
+      id: 'status',
+      header: text.status,
+      cell: (notification) => formatNotificationStatus(notification, language),
+    },
+    {
+      id: 'errorCode',
+      header: text.errorCode,
+      cell: (notification) => notification.errorCode ?? '--',
+    },
+    {
+      id: 'latency',
+      header: text.latency,
+      cell: (notification) => (notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`),
+    },
+    {
+      id: 'time',
+      header: text.time,
+      cell: (notification) => formatUiDateTime(notification.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' }),
+    },
+    {
+      id: 'diagnostics',
+      header: text.diagnostics,
+      cell: (notification) => notification.diagnostics ?? '--',
+    },
+  ];
+
   return (
     <AppPage className="max-w-none space-y-5">
       <PageHeader
@@ -544,42 +577,20 @@ const AlertsPage: React.FC = () => {
             {controlsText.refresh}
           </Button>
         </div>
-        {notificationsLoading ? <Loading label={text.loadingNotifications} /> : null}
-        {!notificationsLoading && notifications.length === 0 ? (
-          <EmptyState
-            icon={<BellRing className="h-6 w-6" />}
-            title={text.noNotifications}
-            description={text.noNotificationsDescription}
-          />
-        ) : null}
-        {!notificationsLoading && notifications.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-170 text-left text-sm">
-              <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{text.channel}</th>
-                  <th className="px-3 py-2 font-medium">{text.status}</th>
-                  <th className="px-3 py-2 font-medium">{text.errorCode}</th>
-                  <th className="px-3 py-2 font-medium">{text.latency}</th>
-                  <th className="px-3 py-2 font-medium">{text.time}</th>
-                  <th className="px-3 py-2 font-medium">{text.diagnostics}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {notifications.map((notification) => (
-                  <tr key={notification.id}>
-                    <td className="px-3 py-3">{formatNotificationChannel(notification.channel, language)}</td>
-                    <td className="px-3 py-3">{formatNotificationStatus(notification, language)}</td>
-                    <td className="px-3 py-3">{notification.errorCode ?? '--'}</td>
-                    <td className="px-3 py-3">{notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`}</td>
-                    <td className="px-3 py-3">{formatUiDateTime(notification.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                    <td className="px-3 py-3">{notification.diagnostics ?? '--'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
+        <DataTable<AlertNotificationItem>
+          caption={text.notificationAttempts}
+          columns={notificationColumns}
+          rows={notifications}
+          getRowKey={(notification) => notification.id}
+          status={notificationsLoading ? { state: 'loading', title: text.loadingNotifications } : undefined}
+          emptyState={{
+            icon: <BellRing className="h-6 w-6" />,
+            title: text.noNotifications,
+            description: text.noNotificationsDescription,
+          }}
+          density="compact"
+          minWidth="content"
+        />
         <Pagination
           currentPage={notificationsPage}
           totalPages={Math.max(1, Math.ceil(notificationsTotal / PAGE_SIZE))}

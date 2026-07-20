@@ -28,13 +28,10 @@ type LegacyTableAllowance = {
 };
 
 const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
-  { file: '../alerts/AlertRuleList.tsx', line: 169, owner: 'TRACK-UI2', removeBy: 'UI-A01' },
-  { file: '../alerts/AlertTriggerHistory.tsx', line: 95, owner: 'TRACK-UI2', removeBy: 'UI-A01' },
   { file: '../history/StockHistoryTrendDrawer.tsx', line: 297, owner: 'TRACK-UI1', removeBy: 'UI-R02' },
   { file: '../report/MarketReviewReportView.tsx', line: 536, owner: 'TRACK-UI1', removeBy: 'UI-R01' },
   { file: '../run-flow/RunFlowNodeDetails.tsx', line: 261, owner: 'TRACK-UI1', removeBy: 'UI-R03' },
   { file: '../settings/AiOverviewMatrix.tsx', line: 57, owner: 'TRACK-UI3', removeBy: 'UI-S02' },
-  { file: '../../pages/AlertsPage.tsx', line: 557, owner: 'TRACK-UI2', removeBy: 'UI-A01' },
   { file: '../../pages/BacktestPage.tsx', line: 771, owner: 'TRACK-UI2', removeBy: 'UI-BT01' },
   { file: '../../pages/PortfolioPage.tsx', line: 1440, owner: 'TRACK-UI2', removeBy: 'UI-P01' },
   { file: '../../pages/StockDetailsPage.tsx', line: 398, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
