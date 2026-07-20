@@ -223,24 +223,11 @@ function findHistoryMutations(
   boundSource = createBoundSourceFile(filename, source),
 ): SourceFinding[] {
   const { sourceFile, checker } = boundSource;
-  const aliases = new Map<ts.Symbol, AliasValue>();
   const findings: SourceFinding[] = [];
 
   const symbolFor = (identifier: ts.Identifier): ts.Symbol | undefined => (
     checker.getSymbolAtLocation(identifier)
   );
-  const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
-    const symbol = symbolFor(identifier);
-    return symbol ? aliases.get(symbol) ?? undefined : undefined;
-  };
-  const setAlias = (identifier: ts.Identifier, method: HistoryMethod | undefined): boolean => {
-    const symbol = symbolFor(identifier);
-    if (!symbol) return false;
-    const next = method ?? null;
-    if (aliases.has(symbol) && aliases.get(symbol) === next) return false;
-    aliases.set(symbol, next);
-    return true;
-  };
   const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
     if (!name) return undefined;
     const text = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
@@ -248,75 +235,77 @@ function findHistoryMutations(
       : undefined;
     return text === 'pushState' || text === 'replaceState' ? text : undefined;
   };
-  const applyObjectAssignment = (object: ts.ObjectLiteralExpression): void => {
-    for (const property of object.properties) {
-      if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) {
-        setAlias(property.initializer, propertyMethod(property.name));
-      } else if (ts.isShorthandPropertyAssignment(property)) {
-        setAlias(property.name, propertyMethod(property.name));
+
+  const scanScope = (scope: ts.Node, inheritedAliases: ReadonlyMap<ts.Symbol, AliasValue>): void => {
+    const aliases = new Map(inheritedAliases);
+    const deferredFunctions: ts.SignatureDeclaration[] = [];
+    const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
+      const symbol = symbolFor(identifier);
+      return symbol ? aliases.get(symbol) ?? undefined : undefined;
+    };
+    const setAlias = (identifier: ts.Identifier, method: HistoryMethod | undefined): void => {
+      const symbol = symbolFor(identifier);
+      if (symbol) aliases.set(symbol, method ?? null);
+    };
+    const applyObjectAssignment = (object: ts.ObjectLiteralExpression): void => {
+      for (const property of object.properties) {
+        if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) {
+          setAlias(property.initializer, propertyMethod(property.name));
+        } else if (ts.isShorthandPropertyAssignment(property)) {
+          setAlias(property.name, propertyMethod(property.name));
+        }
       }
+    };
+    const applyVariableDeclaration = (node: ts.VariableDeclaration): void => {
+      if (ts.isIdentifier(node.name)) {
+        setAlias(
+          node.name,
+          node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
+        );
+      } else if (ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue;
+          setAlias(element.name, propertyMethod(element.propertyName ?? element.name));
+        }
+      }
+    };
+    const visit = (node: ts.Node): void => {
+      if (node !== scope && ts.isFunctionLike(node)) {
+        deferredFunctions.push(node);
+        return;
+      }
+      if (ts.isVariableDeclaration(node)) {
+        applyVariableDeclaration(node);
+      }
+      if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+        const left = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
+        if (ts.isIdentifier(left)) {
+          setAlias(left, historyMethodReference(node.right, aliasFor));
+        } else if (ts.isObjectLiteralExpression(left)) {
+          applyObjectAssignment(left);
+        }
+      }
+      if (ts.isCallExpression(node)) {
+        const method = historyMethodReference(node.expression, aliasFor);
+        if (method) {
+          findings.push({
+            file: filename,
+            line: lineOf(sourceFile, node.expression),
+            token: method,
+          });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+
+    visit(scope);
+    for (const deferredFunction of deferredFunctions) {
+      scanScope(deferredFunction, aliases);
     }
   };
 
-  const applyVariableDeclaration = (node: ts.VariableDeclaration): boolean => {
-    if (ts.isIdentifier(node.name)) {
-      return setAlias(
-        node.name,
-        node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
-      );
-    }
-    let changed = false;
-    if (ts.isObjectBindingPattern(node.name)) {
-      for (const element of node.name.elements) {
-        if (!ts.isIdentifier(element.name)) continue;
-        changed = setAlias(element.name, propertyMethod(element.propertyName ?? element.name)) || changed;
-      }
-    }
-    return changed;
-  };
-
-  const declarations: ts.VariableDeclaration[] = [];
-  const collectDeclarations = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node)) declarations.push(node);
-    ts.forEachChild(node, collectDeclarations);
-  };
-  collectDeclarations(sourceFile);
-
-  // Resolve declaration initializers before visiting deferred function bodies.
-  for (let pass = 0; pass <= declarations.length; pass += 1) {
-    let changed = false;
-    for (const declaration of declarations) {
-      changed = applyVariableDeclaration(declaration) || changed;
-    }
-    if (!changed) break;
-  }
-
-  const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node)) {
-      applyVariableDeclaration(node);
-    }
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      const left = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
-      if (ts.isIdentifier(left)) {
-        setAlias(left, historyMethodReference(node.right, aliasFor));
-      } else if (ts.isObjectLiteralExpression(left)) {
-        applyObjectAssignment(left);
-      }
-    }
-    if (ts.isCallExpression(node)) {
-      const method = historyMethodReference(node.expression, aliasFor);
-      if (method) {
-        findings.push({
-          file: filename,
-          line: lineOf(sourceFile, node.expression),
-          token: method,
-        });
-      }
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return findings;
+  scanScope(sourceFile, new Map());
+  return findings.sort((left, right) => left.line - right.line);
 }
 
 function historyCountKey(file: string, method: string): string {
@@ -383,6 +372,23 @@ describe('page and Router pattern production guard', () => {
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 1, token: 'replaceState' },
+    ]);
+  });
+
+  it('resolves deferred assignment aliases after their enclosing scope settles', () => {
+    const fixture = [
+      'let assignedReplace;',
+      'function assignedMutation() { assignedReplace({}, "", "?market=us"); }',
+      'assignedReplace = window.history.replaceState;',
+      'assignedMutation();',
+      'let staleReplace = window.history.replaceState;',
+      'function staleMutation() { staleReplace({}, "", "?market=fr"); }',
+      'staleReplace = () => undefined;',
+      'staleMutation();',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 2, token: 'replaceState' },
     ]);
   });
 
