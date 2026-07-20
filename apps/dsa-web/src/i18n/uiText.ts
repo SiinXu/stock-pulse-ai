@@ -1806,7 +1806,7 @@ const en: Record<UiTextKey, string> = {
   'stockTrend.window30': 'Last 30 days',
   'stockTrend.window90': 'Last 90 days',
   'stockTrend.changePct': 'Change',
-  'stockTrend.turnoverRate': 'Turnover',
+  'stockTrend.turnoverRate': 'Turnover rate',
 
   'taskPanel.diagnostics': 'Diagnostics',
   'taskPanel.pending': 'Pending',
