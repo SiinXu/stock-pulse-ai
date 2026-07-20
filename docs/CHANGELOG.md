@@ -211,6 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] `get_stock_info` 工具描述标注多市场（A股/美股/港股），使 agent 对美股/港股标的也调用基本面工具，不再退化为纯行情/资讯回答。
 - [修复] MiniMax 等推理模型的补全提取仅取最终文本块，过滤带类型的推理块，避免推理内容与 JSON 拼接导致结果无法解析和持久化。
 - [修复] MiniMax 字符串响应仅剥离开头完整的 `<think>` 推理包装，兼容流式分片并保留 JSON 内容中的同名字面标签；dict 形态的渠道测试响应改用字段无关访问读取，修复填写 MiniMax API 时分析/渠道测试报错。
+- [新功能] Web 对话页（`ChatPage`）会话侧栏按 PR#35 恢复会话搜索过滤：复用共享 `SearchInput`，按会话标题大小写不敏感即时过滤列表，无匹配时用 `DashboardStateBlock` 显示“无匹配项”空态；复用现有 i18n key（`layout.search`/`common.searchPlaceholder`/`common.noMatches`），不新增文案，会话切换/新建/删除行为不变。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
