@@ -444,6 +444,27 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_wechat.assert_not_called()
 
     @mock.patch("src.notification.get_config")
+    def test_missing_dingtalk_context_preserves_static_channel_routing(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data = {}
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertTrue(result.success)
+        self.assertEqual([item.channel for item in result.channel_results], ["wechat"])
+        mock_wechat.assert_called_once_with("content")
+
+    @mock.patch("src.notification.get_config")
     @mock.patch("requests.post")
     def test_dingtalk_context_never_sends_custom_bearer_token(
         self,

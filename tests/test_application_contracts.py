@@ -215,19 +215,25 @@ def test_bot_mapping_ignores_non_mapping_raw_payload() -> None:
     context = to_analysis_request_context(message)
 
     assert context.reply_targets == ()
-    assert context.contextual_reply_only is True
+    assert context.contextual_reply_only is False
 
 
-@pytest.mark.parametrize("platform", ["feishu", "telegram"])
-def test_bot_mapping_rejects_blank_target_without_losing_reply_only_intent(
-    platform,
-) -> None:
+def test_bot_mapping_rejects_blank_feishu_target_without_losing_reply_only_intent() -> None:
     context = to_analysis_request_context(
-        _message(platform=platform, chat_id="   ", raw_data={})
+        _message(platform="feishu", chat_id="   ", raw_data={})
     )
 
     assert context.reply_targets == ()
     assert context.contextual_reply_only is True
+
+
+def test_bot_mapping_keeps_missing_telegram_target_as_non_contextual() -> None:
+    context = to_analysis_request_context(
+        _message(platform="telegram", chat_id="   ", raw_data={})
+    )
+
+    assert context.reply_targets == ()
+    assert context.contextual_reply_only is False
 
 
 def test_request_context_rejects_blank_targets_and_freezes_mutable_input() -> None:
