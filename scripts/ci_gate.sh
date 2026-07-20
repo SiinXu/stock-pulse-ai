@@ -14,6 +14,8 @@ syntax_check() {
 flake8_checks() {
   echo "==> backend-gate: flake8 critical checks"
   flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+  echo "==> backend-gate: broad exception classification guard"
+  python scripts/check_broad_exceptions.py
 }
 
 deterministic_checks() {
