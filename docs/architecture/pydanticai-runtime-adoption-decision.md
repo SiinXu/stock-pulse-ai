@@ -134,6 +134,8 @@ RF-07 的 `Native Only` 是 recovery plan 的默认规则结果：`Continue Expe
   运行；runtime fallback 默认关闭；本轮不新增用户设置、环境变量开关或公开
   API；实验资产保持整体可删除。
 - POC 只允许测试/证据 harness 直接构造，不存在生产 factory/config/env/API
-  selector；`start()` 的 live handle 契约和完整精确依赖闭包由安装态门禁覆盖。
+  selector；`start()` 的 live handle、状态锁内原子 cancel/deadline 终态解析、bridge
+  与 direct-model tool dispatch/result acceptance reservation、迟到结果审计 fence，
+  以及完整精确依赖闭包均由安装态门禁覆盖。
 - ADR-002 明确、有限覆盖 ADR-001 D5 的直接恢复禁令；真实 provider、完整泄漏面、
   Desktop 与双环境净增量仍阻断任何产品入口、支持矩阵扩展或默认 Runtime 变更。

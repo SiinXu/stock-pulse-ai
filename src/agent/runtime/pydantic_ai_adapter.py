@@ -495,30 +495,62 @@ class PydanticAIRuntimeAdapter:
 
         def _worker() -> None:
             try:
-                result = self._run_once(
-                    context,
-                    execution=execution,
-                    deadline_monotonic=deadline_monotonic,
-                    event_emitter=event_emitter,
+                result = None
+                worker_exception: Optional[BaseException] = None
+                try:
+                    result = self._run_once(
+                        context,
+                        execution=execution,
+                        deadline_monotonic=deadline_monotonic,
+                        event_emitter=event_emitter,
+                    )
+                except Exception as exc:
+                    worker_exception = exc
+
+                cancelled_result = self._cancelled_result()
+                timed_out_result = self._timed_out_result()
+                failure_error = (
+                    sanitize_agent_diagnostic(
+                        str(worker_exception) or worker_exception.__class__.__name__
+                    )
+                    if worker_exception is not None
+                    else None
                 )
-            except Exception as exc:
-                execution.finish(
-                    ExecutionState.FAILED,
-                    error=sanitize_agent_diagnostic(
-                        str(exc) or exc.__class__.__name__
-                    ),
-                )
-                handle._set_worker_exception(exc)
-            else:
-                execution.finish(
-                    classify_terminal_state(
-                        success=bool(getattr(result, "success", False)),
-                        cancelled=bool(getattr(result, "cancelled", False)),
-                        timed_out=bool(getattr(result, "timed_out", False)),
-                    ),
-                    result=result,
-                    error=getattr(result, "error", None),
-                )
+
+                def _resolve_terminal(
+                    cancel_requested: bool,
+                ) -> Tuple[ExecutionState, Any, Optional[str]]:
+                    if cancel_requested:
+                        selected_result = cancelled_result
+                    elif (
+                        deadline_monotonic is not None
+                        and time.monotonic() >= deadline_monotonic
+                    ):
+                        selected_result = timed_out_result
+                    elif worker_exception is not None:
+                        return ExecutionState.FAILED, None, failure_error
+                    else:
+                        selected_result = result
+                    return (
+                        classify_terminal_state(
+                            success=bool(getattr(selected_result, "success", False)),
+                            cancelled=bool(
+                                getattr(selected_result, "cancelled", False)
+                            ),
+                            timed_out=bool(
+                                getattr(selected_result, "timed_out", False)
+                            ),
+                        ),
+                        selected_result,
+                        getattr(selected_result, "error", None),
+                    )
+
+                execution.finish_resolved(_resolve_terminal)
+                if (
+                    worker_exception is not None
+                    and execution.state is ExecutionState.FAILED
+                ):
+                    handle._set_worker_exception(worker_exception)
             finally:
                 event_stream.close()
                 done_event.set()
@@ -591,26 +623,38 @@ class PydanticAIRuntimeAdapter:
             )
             self._check_execution_fence(execution, deadline_monotonic)
         except _ExecutionCancelled:
-            result = AgentResult(
-                success=False,
-                content="",
-                dashboard=None,
-                error="Agent execution cancelled",
-                cancelled=True,
-            )
+            result = self._cancelled_result()
         except _ExecutionTimedOut:
-            result = AgentResult(
-                success=False,
-                content="",
-                dashboard=None,
-                error="Agent execution timed out",
-                timed_out=True,
-            )
+            result = self._timed_out_result()
         except _ProviderBridgeError as exc:
             result = AgentResult(
                 success=False, content="", dashboard=None, error=str(exc)
             )
         return result
+
+    @staticmethod
+    def _cancelled_result() -> Any:
+        from src.agent.executor import AgentResult
+
+        return AgentResult(
+            success=False,
+            content="",
+            dashboard=None,
+            error="Agent execution cancelled",
+            cancelled=True,
+        )
+
+    @staticmethod
+    def _timed_out_result() -> Any:
+        from src.agent.executor import AgentResult
+
+        return AgentResult(
+            success=False,
+            content="",
+            dashboard=None,
+            error="Agent execution timed out",
+            timed_out=True,
+        )
 
     @staticmethod
     def _check_execution_fence(
@@ -621,6 +665,35 @@ class PydanticAIRuntimeAdapter:
             raise _ExecutionCancelled()
         if deadline_monotonic is not None and time.monotonic() >= deadline_monotonic:
             raise _ExecutionTimedOut()
+
+    @staticmethod
+    def _claim_execution_operation(
+        execution: AgentExecution,
+        deadline_monotonic: Optional[float],
+        claim: Callable[[], None],
+    ) -> None:
+        from src.agent.runtime.tool_session import ExecutionFenceRejected
+
+        blocked_by = execution.claim_operation(
+            claim,
+            deadline_monotonic=deadline_monotonic,
+        )
+        if blocked_by is ExecutionState.CANCELLED:
+            raise ExecutionFenceRejected(
+                "cancelled",
+                "Execution cancellation was requested; tool call rejected.",
+            )
+        if blocked_by is ExecutionState.TIMED_OUT:
+            raise ExecutionFenceRejected(
+                "deadline_exceeded",
+                "Session deadline exceeded.",
+            )
+        if blocked_by is not None:
+            raise ExecutionFenceRejected(
+                "execution_not_running",
+                "Agent execution stopped before the tool operation claim.",
+                {"state": blocked_by.value},
+            )
 
     def _dispatch(
         self,
@@ -643,7 +716,21 @@ class PydanticAIRuntimeAdapter:
 
             toolsets.append(
                 build_bound_session_toolset(
-                    self._tool_session, event_emitter=event_emitter
+                    self._tool_session,
+                    event_emitter=event_emitter,
+                    execution_fence=lambda: self._check_execution_fence(
+                        execution, deadline_monotonic
+                    ),
+                    dispatch_guard=lambda claim: self._claim_execution_operation(
+                        execution,
+                        deadline_monotonic,
+                        claim,
+                    ),
+                    completion_guard=lambda claim: self._claim_execution_operation(
+                        execution,
+                        deadline_monotonic,
+                        claim,
+                    ),
                 )
             )
 

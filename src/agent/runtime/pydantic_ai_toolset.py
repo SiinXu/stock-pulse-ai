@@ -19,22 +19,36 @@ exactly and avoids depending on PydanticAI's internal tool-validator types.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable, Optional
 
 _EMPTY_SCHEMA = {"type": "object", "properties": {}}
 
 
-def build_bound_session_toolset(session: Any, *, event_emitter: Any = None) -> Any:
+def build_bound_session_toolset(
+    session: Any,
+    *,
+    event_emitter: Any = None,
+    execution_fence: Optional[Callable[[], None]] = None,
+    dispatch_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+    completion_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+) -> Any:
     """Build a PydanticAI ``FunctionToolset`` backed by a ``BoundToolSession``.
 
     Only the session's allowed tools are exposed, and each call is dispatched
     through the session's fail-closed gates. The structured result dict
     (success or the shared error contract) is returned to the model unchanged.
 
+    ``execution_fence`` is the adapter-owned, per-execution cancel/deadline
+    checkpoint before and after the session dispatch. ``dispatch_guard`` closes
+    the check-to-dispatch window by atomically authorizing the session's dispatch
+    claim against the same execution state. ``completion_guard`` applies the
+    same ordering when the session accepts the returned result.
+
     When ``event_emitter`` (an AR-PY-03 ``RuntimeEventEmitter``) is provided,
-    each call emits ``tool_start`` / ``tool_done`` through that single event
-    stream, so PydanticAI tool activity shares the same versioned event path
-    and late-write fence as the native runtime.
+    each accepted dispatch emits ``tool_start`` and each unfenced completion
+    emits ``tool_done`` through that single event stream. PydanticAI tool
+    activity therefore shares the Native runtime's versioned event path and
+    late-write fence without reporting rejected calls as started.
     """
     from src.agent.runtime.pydantic_ai_adapter import _require_pydantic_ai
 
@@ -44,10 +58,27 @@ def build_bound_session_toolset(session: Any, *, event_emitter: Any = None) -> A
 
     def _make_caller(tool_name: str):
         def _call(**kwargs: Any) -> Any:
-            if event_emitter is not None:
-                event_emitter.emit("tool_start", tool=tool_name)
-            result = session.execute(tool_name, kwargs)
-            if event_emitter is not None:
+            if execution_fence is not None:
+                execution_fence()
+
+            dispatched = False
+
+            def _on_dispatched() -> None:
+                nonlocal dispatched
+                dispatched = True
+                if event_emitter is not None:
+                    event_emitter.emit("tool_start", tool=tool_name)
+
+            result = session.execute(
+                tool_name,
+                kwargs,
+                dispatch_guard=dispatch_guard,
+                completion_guard=completion_guard,
+                on_dispatched=_on_dispatched,
+            )
+            if execution_fence is not None:
+                execution_fence()
+            if event_emitter is not None and dispatched:
                 succeeded = not (isinstance(result, dict) and result.get("error"))
                 event_emitter.emit("tool_done", tool=tool_name, success=succeeded)
             return result

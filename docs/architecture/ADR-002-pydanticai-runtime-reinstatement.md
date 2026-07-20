@@ -56,7 +56,10 @@ ADR 审批。本 ADR 同时完成该审批（见 D3）。
   也不把该路径声明为受支持的产品能力。
 - `start()` 必须遵循中立 Contract：在 worker 运行时返回 live
   `ExecutionHandle`，允许观察 `RUNNING`、协作取消、订阅事件及等待终态；
-  `execute()` 仅为 start + wait 的同步兼容 helper。
+  `execute()` 仅为 start + wait 的同步兼容 helper。终态解析与写入必须在
+  `AgentExecution` 同一状态锁内完成，使已接受的取消与终态 first-wins 原子串行；
+  direct model 与 StockPulse bridge 的工具 dispatch/result acceptance 均通过同一
+  per-execution cancel/deadline fence 原子 reservation，迟到结果必须审计后丢弃。
 - 零 PydanticAI 依赖可运行：默认依赖清单不含 pydantic-ai，backend-gate 在未
   安装状态下运行并保持绿色。
 - Runtime fallback 默认关闭：不存在自动切换或降级到实验 Runtime 的路径。
@@ -97,7 +100,9 @@ ADR 审批。本 ADR 同时完成该审批（见 D3）。
 
 - 中立 Contract、8 个完全等价 fixture、3 个终态分类 fixture 与未知 fixture
   fail-closed 门禁保持通过；
-- PydanticAI `start()` 的 live handle、取消、订阅、等待及异常传播有直接回归；
+- PydanticAI `start()` 的 live handle、取消、订阅、等待及异常传播有直接回归，
+  并覆盖 pre-terminal cancel/deadline race、direct-model tool dispatch reservation
+  与 in-flight result audit fence；
 - 可选依赖完整传递闭包精确锁定，安装态 CI 执行 `pip check`；
 - Native 默认环境无 PydanticAI，生产 factory/config/env/API 无实验 selector；
 - 已有 provider-error 脱敏回归保持通过，未收集安全面继续如实列为缺口。
