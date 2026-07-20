@@ -226,6 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [新功能] 多策略证据契约新增呈现层：`strategy_synthesis` 以中英韩三语渲染到 Markdown、微信简报、通知与历史报告，展示综合信号、共识、冲突、支持/反方策略及无效观点计数；历史或外部宽松载荷经共享 helper 安全降级，DecisionAgent prompt 明确隔离 Evidence Chain 与 invalid diagnostics。
 - [改进] Web 决策信号的 `DecisionSignalDisplay`、`DecisionSignalOutcomeRunPanel`、`DecisionSignalTimeline` 与 `DecisionSignalCreateDrawer` 从手搓或兼容卡片边界迁移到共享 `Surface`/`Section` 语义层级：信号条目与独立运行任务使用 interactive、详情和创建预览使用 section、图表提示使用 overlay，并保留 selected 标识、业务 tone、交互和响应式布局；最近分析候选改用共享 `SelectionChip`，同步删除 `productionDesignGuard` 中 `UI-D01` 的 Button 几何覆盖 allowlist，未新增 i18n 键。
 - [修复] Web Router 焦点协调器区分跨路径、完全相同 URL 的新 key PUSH 与同路径 query/hash 状态更新：跨页及同 URL 独立 PUSH 等目标页就绪后聚焦 H1，筛选/分页等 URL 状态更新保留当前控件，同路径 Back 仅恢复唯一稳定触发器；多轮 Back/Forward 不再覆盖已保存 opener，取消及 `useBlocker` proceed/reset 不再污染后续历史项，失效触发器稳定回退 H1。生产守卫覆盖 history 方法的声明/赋值/解构/`bind`/`call`/`apply` 别名，`ResponsiveRail` 复用 `IconButton`，`Toolbar` 类型强制可访问名称。
+- [修复] 多 Agent 新增内部低敏 runtime facts，区分 stage 前后 timeout/budget degradation 与 Pipeline termination；dashboard 改为单次 risk application 后按 post-risk signal 收尾，并清除模型伪造的保留解释字段，不新增公开 schema。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

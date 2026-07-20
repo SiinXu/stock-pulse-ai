@@ -2737,8 +2737,11 @@ class TestRiskOverride(unittest.TestCase):
         ))
         ctx.add_risk_flag("insider", "大股东减持", severity="high")
 
-        orch._apply_risk_override(ctx)
-        dashboard = ctx.get_data("final_dashboard")
+        dashboard = orch._resolve_dashboard_payload(
+            ctx,
+            ctx.get_data("final_dashboard"),
+            None,
+        )
 
         self.assertEqual(dashboard["decision_type"], "hold")
         self.assertLessEqual(dashboard["sentiment_score"], 59)
@@ -2767,7 +2770,7 @@ class TestRiskOverride(unittest.TestCase):
         ))
         ctx.add_risk_flag("insider", "大股东减持", severity="high")
 
-        orch._apply_risk_override(ctx)
+        dashboard = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
         self.assertEqual(dashboard["decision_type"], "hold")
         self.assertEqual(ctx.opinions[0].signal, "hold")
@@ -2791,7 +2794,7 @@ class TestRiskOverride(unittest.TestCase):
         ))
         ctx.add_risk_flag("insider", "大股东减持", severity="high")
 
-        orch._apply_risk_override(ctx)
+        dashboard = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
         self.assertEqual(dashboard["decision_type"], "buy")
         self.assertIsNone(ctx.get_data("risk_override_applied"))
@@ -2815,7 +2818,7 @@ class TestRiskOverride(unittest.TestCase):
             raw_data={"risk_level": "high"},
         ))
 
-        orch._apply_risk_override(ctx)
+        dashboard = orch._resolve_dashboard_payload(ctx, dashboard, None)
 
         self.assertEqual(dashboard["decision_type"], "buy")
         self.assertIsNone(ctx.get_data("risk_override_applied"))
