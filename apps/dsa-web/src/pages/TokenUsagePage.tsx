@@ -271,14 +271,11 @@ const TokenUsagePage: React.FC = () => {
               </Section>
             </div>
 
-            <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">{t('usage.recentCalls')}</h2>
-                  <p className="mt-1 text-sm text-secondary-text">{t('usage.recentCallsDescription')}</p>
-                </div>
-                <Clock3 className="h-5 w-5 text-secondary-text" />
-              </div>
+            <Section
+              title={t('usage.recentCalls')}
+              description={t('usage.recentCallsDescription')}
+              actions={<Clock3 className="h-5 w-5 text-secondary-text" aria-hidden="true" />}
+            >
               <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/75 shadow-soft-card">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-border/70 text-sm">
@@ -314,7 +311,7 @@ const TokenUsagePage: React.FC = () => {
                   </table>
                 </div>
               </div>
-            </section>
+            </Section>
           </>
         ) : null}
       </div>
