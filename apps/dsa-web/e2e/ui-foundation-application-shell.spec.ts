@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const FIXTURE_PATH = '/e2e/application-shell-fixture.html';
 
@@ -15,6 +15,14 @@ async function expectNoDocumentOverflow(page: Page) {
   }))).toEqual(expect.objectContaining({
     scrollWidth: await page.evaluate(() => document.documentElement.clientWidth),
   }));
+}
+
+async function expectSidebarWidth(sidebar: Locator, width: number) {
+  await expect.poll(async () => (
+    Math.round((await sidebar.boundingBox())?.width ?? 0)
+  ), {
+    message: `sidebar should settle at ${width}px`,
+  }).toBe(width);
 }
 
 test.describe('application shell foundation', () => {
@@ -65,7 +73,7 @@ test.describe('application shell foundation', () => {
     await expect(sidebar).toBeVisible();
     await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'compact');
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeHidden();
-    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(80);
+    await expectSidebarWidth(sidebar, 80);
     const compactBrand = sidebar.locator('[data-shell-brand-mark]');
     await compactBrand.locator('..').hover();
     await expect(compactBrand).toHaveCSS('opacity', '0');
@@ -73,7 +81,7 @@ test.describe('application shell foundation', () => {
     await expect(expand).toHaveCSS('opacity', '1');
     await expand.click();
     await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'expanded');
-    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(240);
+    await expectSidebarWidth(sidebar, 240);
     expect(await page.evaluate(() => localStorage.getItem('dsa-sidebar-collapsed'))).toBe('0');
     await expectNoDocumentOverflow(page);
 
@@ -83,7 +91,7 @@ test.describe('application shell foundation', () => {
     ]) {
       await openFixture(page, width, height);
       await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'expanded');
-      expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(240);
+      await expectSidebarWidth(sidebar, 240);
       await expect(sidebar.getByText('StockPulse', { exact: true }).first()).toBeVisible();
       await expectNoDocumentOverflow(page);
     }

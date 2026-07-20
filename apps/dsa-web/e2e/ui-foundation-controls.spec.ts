@@ -19,6 +19,7 @@ const iconButtonHeights: Record<string, number> = {
   compact: 28,
   default: 32,
   comfortable: 36,
+  navigation: 44,
 };
 
 const inputHeights: Record<string, number> = {
