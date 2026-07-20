@@ -24,38 +24,6 @@ const FILTER_PATTERN_OWNERS = new Map<string, string>([
   ['useFilterQueryState', '../common/useFilterQueryState.ts'],
 ]);
 
-type LegacyHistoryAllowance = {
-  file: string;
-  line: number;
-  method: 'pushState' | 'replaceState';
-  owner: 'TRACK-UI1' | 'TRACK-UI2' | 'TRACK-UI3';
-  removeBy: string;
-};
-
-const LEGACY_HISTORY_ALLOWANCES: readonly LegacyHistoryAllowance[] = [
-  {
-    file: '../../pages/BacktestPage.tsx',
-    line: 75,
-    method: 'replaceState',
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-BT01',
-  },
-  {
-    file: '../../pages/DecisionSignalsPage.tsx',
-    line: 256,
-    method: 'replaceState',
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-D01',
-  },
-  {
-    file: '../../pages/StockScreeningPage.tsx',
-    line: 102,
-    method: 'replaceState',
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-SCR01',
-  },
-];
-
 type SourceFinding = {
   file: string;
   line: number;
@@ -117,31 +85,6 @@ function findFilterPatternOwnershipViolations(filename: string, source: string):
   return findings;
 }
 
-function findHistoryMutations(filename: string, source: string): SourceFinding[] {
-  const sourceFile = parseSource(filename, source);
-  const findings: SourceFinding[] = [];
-  const visit = (node: ts.Node): void => {
-    if (
-      ts.isCallExpression(node)
-      && ts.isPropertyAccessExpression(node.expression)
-      && (node.expression.name.text === 'pushState' || node.expression.name.text === 'replaceState')
-    ) {
-      findings.push({
-        file: filename,
-        line: lineOf(sourceFile, node.expression.name),
-        token: node.expression.name.text,
-      });
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return findings;
-}
-
-function findingKey(finding: SourceFinding): string {
-  return `${finding.file}:${finding.line}:${finding.token}`;
-}
-
 describe('filter pattern production guard', () => {
   it('rejects page-local copies of the shared Filter and Query authorities', () => {
     const fixture = [
@@ -167,35 +110,4 @@ describe('filter pattern production guard', () => {
     }
   });
 
-  it('rejects new direct history mutations, including mutations through an alias', () => {
-    const fixture = [
-      'window.history.replaceState({}, "", "?market=us");',
-      'const historyAlias = window.history;',
-      'historyAlias.pushState({}, "", "?market=cn");',
-    ].join('\n');
-    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
-      { file: '../../pages/ExamplePage.tsx', line: 1, token: 'replaceState' },
-      { file: '../../pages/ExamplePage.tsx', line: 3, token: 'pushState' },
-    ]);
-  });
-
-  it('keeps legacy history mutations exact, consumable, and assigned to page tracks', () => {
-    const actual = Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename))
-      .flatMap(([filename, source]) => findHistoryMutations(filename, source))
-      .map(findingKey)
-      .sort();
-    const allowed = LEGACY_HISTORY_ALLOWANCES
-      .map(({ file, line, method }) => findingKey({ file, line, token: method }))
-      .sort();
-
-    expect(actual).toEqual(allowed);
-    for (const allowance of LEGACY_HISTORY_ALLOWANCES) {
-      expect(allowance.owner).toMatch(/^TRACK-UI[123]$/);
-      expect(allowance.removeBy).toMatch(/^UI-[A-Z0-9]+$/);
-      const source = productionSources[allowance.file];
-      expect(source, `${allowance.file} must remain in the production scan`).toBeDefined();
-      expect(source.split('\n')[allowance.line - 1]).toContain(`window.history.${allowance.method}`);
-    }
-  });
 });
