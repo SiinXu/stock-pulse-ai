@@ -203,8 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] 建立统一的进程内 `TaskExecutionPort` 与不可变 task snapshot/event 契约：现有分析队列统一提供 submit/get/cancel/retry/subscribe、幂等与去重权威、首终态获胜的取消竞态、显式 `interrupted` 关停语义及有界 SSE stream，同时保留既有轮询与 SSE 载荷兼容。
 - [改进] Web 股票行情工作区页（`StockDetailsPage`）的行情与历史加载占位统一走语义 `Loading`：将实时行情与历史 K 线两处 ad-hoc 加载文本 `<p>` 改用共享 `Loading`（compact `StatePanel`），与页内 `ApiErrorAlert` 错误态一致；加载文案、行情/历史数据与交互行为不变。
 - [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
-- [修复] 修正 Web 十语言交易动作、成交量/成交额/换手率、风险告警、认证与 API Key、错误和 AlphaSift 免责声明中的高风险语义漂移，并新增带来源、审查状态、code/display 边界和逐语言快照的 fail-closed i18n 审计守卫；八个翻译 bundle 均保持 `PENDING_NATIVE_REVIEW`。
 - [改进] Web 自选/工作区面板（`HomeStockWorkspace`）的批量分析状态提示统一走语义 `InlineAlert`：移除手搓的 `variant→className` 映射（`statusClassName`）与 ad-hoc 状态 `<div>`，改用共享 `InlineAlert`（compact，`danger`/`warning`/`success` 语义色并补 `role`/`aria-live`）；加载/空/错误态此前已用 `DashboardStateBlock`。自选头部 5 处 `bg-base/35` 半透明 tile 与共享 `glass-card` 面板属基础层玻璃视觉（跨轨复用），保持 cyan/purple/glow 干净并记 Deferred to UIUX。批量分析行为与文案不变。
+- [修复] 修正 Web 十语言交易动作、成交量/成交额/换手率、风险告警、认证与 API Key、错误和 AlphaSift 免责声明中的高风险语义漂移，并新增带来源、审查状态、code/display 边界和逐语言快照的 fail-closed i18n 审计守卫；八个翻译 bundle 均保持 `PENDING_NATIVE_REVIEW`。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
