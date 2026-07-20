@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 新增共享 `SelectionChip` 选择控件：保持原生非提交 button 与 ref/disabled/loading/键盘语义，loading 期间以 `aria-busy` 禁止重复激活，单行最小可见高度 36px、长标签自动换行增高，粗指针命中区独立扩展至 44px；持续选择可选用 `aria-pressed` 与稳定选中标识，一次性选择命令不伪造 pressed 状态。控件拒绝页面覆盖 height/width/padding/radius/flex 几何，并由生产守卫阻止私有同名实现；Decision Signals 旧候选 Button 仍由 `UI-D01`/`TRACK-UI2` 独立迁移并删除精确 allowlist。
 - [改进] Web 新增共享 `DataTable` 基础：typed columns/row keys、原生 caption/column/row 语义、受控 `aria-sort` 排序、唯一 empty/loading/error/retrying 状态、click/Enter/Space 行激活与嵌套控件事件隔离；窄屏使用命名且可聚焦的内部横向滚动区和稳定最小宽度，不造成文档横溢。生产守卫阻止复制 DataTable 或新增 raw table，现有 12 处旧表格按精确行绑定 UI1/UI2/UI3 迁移项。
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
 - [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
@@ -203,6 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 股票行情工作区页（`StockDetailsPage`）的行情与历史加载占位统一走语义 `Loading`：将实时行情与历史 K 线两处 ad-hoc 加载文本 `<p>` 改用共享 `Loading`（compact `StatePanel`），与页内 `ApiErrorAlert` 错误态一致；加载文案、行情/历史数据与交互行为不变。
 - [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
 - [修复] 修正 Web 十语言交易动作、成交量/成交额/换手率、风险告警、认证与 API Key、错误和 AlphaSift 免责声明中的高风险语义漂移，并新增带来源、审查状态、code/display 边界和逐语言快照的 fail-closed i18n 审计守卫；八个翻译 bundle 均保持 `PENDING_NATIVE_REVIEW`。
+- [改进] Web 自选/工作区面板（`HomeStockWorkspace`）的批量分析状态提示统一走语义 `InlineAlert`：移除手搓的 `variant→className` 映射（`statusClassName`）与 ad-hoc 状态 `<div>`，改用共享 `InlineAlert`（compact，`danger`/`warning`/`success` 语义色并补 `role`/`aria-live`）；加载/空/错误态此前已用 `DashboardStateBlock`。自选头部 5 处 `bg-base/35` 半透明 tile 与共享 `glass-card` 面板属基础层玻璃视觉（跨轨复用），保持 cyan/purple/glow 干净并记 Deferred to UIUX。批量分析行为与文案不变。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
