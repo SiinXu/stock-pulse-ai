@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, Loading, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, InlineAlert, Loading, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -1019,29 +1019,31 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
               </p>
             </div>
             <dl className="grid grid-cols-1 gap-2 text-xs">
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerEffectiveTimes')}</dt>
                 <dd className="mt-1 font-medium text-foreground">{effectiveStatusTimes.join(', ') || '-'}</dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              </Surface>
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerNextRun')}</dt>
                 <dd className="mt-1 font-medium text-foreground">
                   {formatSchedulerTimestamp(status?.nextRunAt, language)}
                 </dd>
-              </div>
-              <div className="rounded-xl border settings-border bg-card/60 px-3 py-2">
+              </Surface>
+              <Surface as="div" level="interactive" className="px-3 py-2">
                 <dt className="text-muted-text">{t('settings.schedulerLastSuccess')}</dt>
                 <dd data-testid="scheduler-last-success" className="mt-1 font-medium text-foreground">
                   {formatSchedulerTimestamp(status?.lastSuccessAt, language)}
                 </dd>
-              </div>
-              {status?.lastError ? (
-                <div className="rounded-xl border border-danger/40 bg-danger/10 px-3 py-2">
-                  <dt className="text-danger">{t('settings.schedulerLastError')}</dt>
-                  <dd data-testid="scheduler-last-error" className="mt-1 break-words text-danger">{status.lastError}</dd>
-                </div>
-              ) : null}
+              </Surface>
             </dl>
+            {status?.lastError ? (
+              <InlineAlert
+                variant="danger"
+                title={t('settings.schedulerLastError')}
+                message={status.lastError}
+                data-testid="scheduler-last-error"
+              />
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 type="button"
@@ -1074,11 +1076,16 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
         </div>
 
         {validationIssues.length ? (
-          <div className="space-y-1 text-xs text-danger">
-            {validationIssues.map((issue) => (
-              <p key={`${issue.key}-${issue.code}`}>{issue.message}</p>
-            ))}
-          </div>
+          <InlineAlert
+            variant="danger"
+            message={(
+              <ul className="space-y-1">
+                {validationIssues.map((issue) => (
+                  <li key={`${issue.key}-${issue.code}`}>{issue.message}</li>
+                ))}
+              </ul>
+            )}
+          />
         ) : null}
         {statusError ? <ApiErrorAlert error={statusError} /> : null}
         {runNowError ? <ApiErrorAlert error={runNowError} /> : null}
@@ -2820,7 +2827,7 @@ const SettingsPage: React.FC = () => {
               />
             ) : null}
             {shouldShowFirstRunSetup && !setupStatus?.isComplete ? (
-              <div className="flex flex-col gap-2 rounded-2xl border settings-border bg-card/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <Surface level="interactive" className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">
                     {settingsText.quickSetup}
@@ -2839,7 +2846,7 @@ const SettingsPage: React.FC = () => {
                 >
                   {settingsText.startWizard}
                 </Button>
-              </div>
+              </Surface>
             ) : null}
             {shouldShowFirstRunSetup ? (
               <FirstRunSetupCard
@@ -2866,7 +2873,7 @@ const SettingsPage: React.FC = () => {
                 title={t('settings.alphaSift')}
                 description={t('settings.alphaSiftDescription')}
               >
-                <div className="flex flex-col gap-4 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <Surface level="interactive" className="flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-foreground">
                       {alphasiftEnabled ? t('settings.alphaSiftEnabled') : t('settings.alphaSiftDisabled')}
@@ -2897,7 +2904,7 @@ const SettingsPage: React.FC = () => {
                       {alphasiftEnabled ? t('settings.disableAlphaSift') : t('settings.enableAlphaSift')}
                     </Button>
                   </div>
-                </div>
+                </Surface>
                 {alphaSiftActionError ? (
                   <div className="mt-3">
                     <ApiErrorAlert error={alphaSiftActionError} />
@@ -2932,46 +2939,46 @@ const SettingsPage: React.FC = () => {
                 <div
                   className={`grid grid-cols-1 gap-3 ${shouldShowDesktopVersionCard ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}
                 >
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionWebui')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.version}
                     </p>
-                  </div>
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  </Surface>
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildId')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.buildId}
                     </p>
-                  </div>
-                  <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                  </Surface>
+                  <Surface level="interactive" className="px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                       {t('settings.versionBuildTime')}
                     </p>
                     <p className="mt-2 break-all font-mono text-sm text-foreground">
                       {WEB_BUILD_INFO.buildTime}
                     </p>
-                  </div>
+                  </Surface>
                   {shouldShowDesktopVersionCard ? (
-                    <div className="rounded-2xl border settings-border bg-background/40 px-4 py-3">
+                    <Surface level="interactive" className="px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-text">
                         {t('settings.versionDesktop')}
                       </p>
                       <p className="mt-2 break-all font-mono text-sm text-foreground">
                         {desktopAppVersion}
                       </p>
-                    </div>
+                    </Surface>
                   ) : null}
                 </div>
                 <p className="text-xs leading-6 text-muted-text">
                   {t('settings.updateBuildDescription')}
                 </p>
                 {canCheckDesktopUpdate ? (
-                  <div className="mt-4 space-y-3 rounded-2xl border settings-border bg-background/30 px-4 py-4">
+                  <Surface level="interactive" className="mt-4 space-y-3 px-4 py-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-sm font-medium text-foreground">{t('settings.desktopUpdate')}</p>
@@ -3009,7 +3016,7 @@ const SettingsPage: React.FC = () => {
                         {t('settings.desktopCurrentNoStatus')}
                       </p>
                     )}
-                  </div>
+                  </Surface>
                 ) : null}
                 {WEB_BUILD_INFO.isFallbackVersion ? (
                   <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
@@ -3023,7 +3030,7 @@ const SettingsPage: React.FC = () => {
                 title={t('settings.configBackup')}
                 description={t('settings.configBackupDescription')}
               >
-                <div className="space-y-4 rounded-xl border settings-border p-4">
+                <Surface level="interactive" className="space-y-4 p-4">
                   {!isEnvBackupAllowed ? (
                     <p className="text-xs leading-6 text-amber-700 dark:text-amber-300">
                       {t('settings.disabledAuthBackupWarning')}
@@ -3076,7 +3083,7 @@ const SettingsPage: React.FC = () => {
                   {!envBackupActionError && envBackupActionSuccess ? (
                     <SettingsAlert title={t('settings.actionSuccess')} message={envBackupActionSuccess} variant="success" />
                   ) : null}
-                </div>
+                </Surface>
               </SettingsSectionCard>
             ) : null}
             {activeCategory === 'base' ? (
