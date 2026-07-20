@@ -52,7 +52,7 @@ from src.schemas.decision_action import (
     display_decision_type_for_result,
     display_operation_advice_for_result,
 )
-from bot.models import BotMessage
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
@@ -215,15 +215,11 @@ class NotificationService(
     注意：所有已配置的渠道都会收到推送
     """
 
-    def __init__(self, source_message: Optional[BotMessage] = None):
-        """
-        初始化通知服务
-
-        检测所有已配置的渠道，推送时会向所有渠道发送
-        """
+    def __init__(self, request_context: Optional[AnalysisRequestContext] = None):
+        """Initialize configured channels and an optional contextual reply route."""
         config = get_config()
         self._config = config
-        self._source_message = source_message
+        self._request_context = request_context
         self._context_channels: List[str] = []
 
         # Markdown 转图片（Issue #289）
@@ -570,53 +566,24 @@ class NotificationService(
             or self._extract_telegram_context_chat_id() is not None
         )
 
-    def _source_platform(self) -> str:
-        """Return normalized platform from the source bot message."""
-        platform = getattr(self._source_message, "platform", "")
-        if hasattr(platform, "value"):
-            platform = platform.value
-        return str(platform or "").lower()
-
     def _extract_telegram_context_chat_id(self) -> Optional[str]:
         """从来源消息中提取 Telegram 上下文 chat_id（用于异步回复）。"""
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        if self._source_platform() != "telegram":
-            return None
-        raw_data = getattr(self._source_message, "raw_data", {}) or {}
-        for candidate in (
-            getattr(self._source_message, "chat_id", ""),
-            raw_data.get("chat_id"),
-            raw_data.get("message", {}).get("chat", {}).get("id") if isinstance(raw_data.get("message"), dict) else None,
-        ):
-            if isinstance(candidate, str) and candidate.strip():
-                return candidate.strip()
-            if candidate is not None and not isinstance(candidate, str):
-                candidate_text = str(candidate).strip()
-                if candidate_text:
-                    return candidate_text
-        return None
+        return self._request_context.reply_address("telegram")
 
     def should_broadcast_static_channels(self) -> bool:
         """Whether static notification channels should receive this dispatch."""
-        return not self._has_context_channel()
+        return not (
+            self._request_context is not None
+            and self._request_context.contextual_reply_only
+        )
 
     def _extract_dingtalk_session_webhook(self) -> Optional[str]:
         """从来源消息中提取钉钉会话 Webhook（用于 Stream 模式回复）"""
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        raw_data = getattr(self._source_message, "raw_data", {}) or {}
-        if not isinstance(raw_data, dict):
-            return None
-        session_webhook = (
-            raw_data.get("_session_webhook")
-            or raw_data.get("sessionWebhook")
-            or raw_data.get("session_webhook")
-            or raw_data.get("session_webhook_url")
-        )
-        if not session_webhook and isinstance(raw_data.get("headers"), dict):
-            session_webhook = raw_data["headers"].get("sessionWebhook")
-        return session_webhook
+        return self._request_context.reply_address("dingtalk")
 
     def _extract_feishu_reply_info(self) -> Optional[Dict[str, str]]:
         """
@@ -625,11 +592,9 @@ class NotificationService(
         Returns:
             包含 chat_id 的字典，或 None
         """
-        if not isinstance(self._source_message, BotMessage):
+        if self._request_context is None:
             return None
-        if getattr(self._source_message, "platform", "") != "feishu":
-            return None
-        chat_id = getattr(self._source_message, "chat_id", "")
+        chat_id = self._request_context.reply_address("feishu")
         if not chat_id:
             return None
         return {"chat_id": chat_id}
@@ -655,7 +620,7 @@ class NotificationService(
         session_webhook = self._extract_dingtalk_session_webhook()
         if session_webhook:
             try:
-                if self._send_dingtalk_chunked(session_webhook, content, max_bytes=20000):
+                if self._send_dingtalk_session_chunked(session_webhook, content, max_bytes=20000):
                     logger.info("已通过钉钉会话（Stream）推送报告")
                     success = True
                 else:

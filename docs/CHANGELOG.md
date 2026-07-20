@@ -9,8 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
+- [改进] Web 报告展示组件收敛守卫债：跨 `ReportOverview`/`ReportNews`/`ReportStrategy`/`ReportDetails`/`ReportDiagnostics`/`AnalysisContextSummary`/`MarketReviewReportView` 移除 15 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），并同步删除设计守卫里对应的本轨 allowlist 例外（`ReportOverview` 仍保留真实的 `home-insight-card`/`home-rail-card` 类及其 allowlist token）；`text-left`/`min-w-0` 等既有类不变。报告的 `home-insight-card`/`home-rail-card`/`home-report-hero`/`home-subpanel`/`home-accent-chip` 为真实定制视觉，其到 `Surface` 的收敛待可视化 QA，记为本轨后续。
+- [改进] Web 持仓中心页（`PortfolioPage`）迁移到语义容器与控件契约：账户视图控制条改用 `Surface`（`interactive` 档）；账户操作、CSV 导入与交易/现金/分红提交按钮不再用 `flex-1`/`w-full` 覆写共享 `Button` 尺寸，改由 `grid` 布局包裹拉伸，并清除设计守卫中 `PortfolioPage` 的 `UI-P01` allowlist 例外（连带把引用该例外的守卫自测 fixture 改指到仍在册的本轨 `DecisionSignalsPage` 例外，不动守卫规则逻辑）；账户/持仓数字、盈亏语义色、提交与幂等行为不变。滚动事件列表视口与 CSV 文件 chip 属列表内部/紧凑元素，记为本轨后续。
+- [改进] Web 历史趋势抽屉（`StockHistoryTrendDrawer`）收敛 ad-hoc 面板：移除 3 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉，纯守卫债），并同步删除设计守卫里对应的本轨 allowlist 例外；页内 ad-hoc 指标卡片改用语义 `Surface`（`interactive` 档，圆角/内边距/数值不变，边框与底色对齐设计 token）。范围/查看报告按钮为保 44px 粗指针命中区暂不改用 `SegmentedControl`/`Button`，`glass-card` 列表面板的层级取舍待可视化 QA，均记为本轨后续。
 - [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
+- [改进] Web 回测页加载态统一走语义 `Loading`：性能侧栏与结果表两处 bespoke `backtest-spinner` 加载块改用共享 `Loading`（compact `StatePanel`），与页面既有的 `EmptyState`/`ApiErrorAlert` 空态/错误态一致；结果表加载文案、指标卡与数字涨跌语义色不变。
+- [改进] Web 设置页 FirstRunSetupCard 与 SchedulerSettingsCard 的手搓边框面板迁移到语义 `Surface`（interactive 层级），首次启动检查的裸加载文案改用 `Loading`；间距、圆角、边框与背景改由 token 与层级提供，读写、保存、调度状态与文案行为不变。
 - [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
+- [改进] Web 决策信号页迁移到冻结语义容器：重评估面板与预览指标块改用 `Surface`，全局后验统计卡改用 `StatCard`（涨跌语义色以内联 span 保留），重评估告警列表改用 `InlineAlert`，块级加载态统一改用 `Loading`（compact `StatePanel`），移除页面内 ad-hoc 卡片边框/背景/圆角；数字、方向、单位与文案不变，候选股多行 chip 按钮受限于基础层暂缺多行控件，保留其既有样式并记 Deferred to UIUX。
 - [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
 - [改进] Web 新增统一的底部 Sheet 与 Toast 基础：筛选 Sheet 使用固定 header、单一滚动 body 和固定 footer，并复用 Dialog 的滚动锁、Escape、焦点循环与恢复；Toast 通过应用级 Provider、语义层级和保留 live region 在 Modal/Drawer/Sheet 打开时保持可见可读，设置与决策信号页不再维护私有高位 z-index。
 - [改进] Agent Runtime 按 ADR-002 恢复实验 PydanticAI Adapter、toolset、可选依赖清单与 `pydanticai-installed` 安装态 CI 门禁；cross-runtime conformance 改为显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；Native 保持永久默认、零 PydanticAI 依赖可运行、无 runtime fallback，且不新增用户设置或公开 API。
@@ -181,6 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [新功能] Web AI 建议页支持确认保存基于历史报告快照重算的决策风格信号，以 created/existing/refreshed 区分新建、原样复用和既有记录续期或维度补齐，复用 profile-aware 去重与失效语义，将历史信号的创建时间、有效期和相反信号失效顺序锚定来源报告时间，并提供可审计 guardrail 提示与阻断。
 - [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
 - [改进] 历史记录按股票代码删除的代码变体解析、10,000 行分批与无进度保护收敛到 `HistoryService` / `AnalysisRepository`，API endpoint 只负责 HTTP 错误映射；每个级联删除批次保持原子、既有跨批 best-effort 语义不变，并新增 endpoint 事务边界静态守卫与失败回滚回归。
+- [改进] 下沉运行流程与通知上下文契约：API 保留兼容重导出，Bot 在异步边界前生成不可变请求快照，核心服务不再依赖 API Schema 或 Bot DTO；上下文回复目标按平台验证并隔离凭据，拒绝的目标继续抑制静态广播。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

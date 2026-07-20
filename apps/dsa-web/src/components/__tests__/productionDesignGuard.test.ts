@@ -104,22 +104,10 @@ const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-
 const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1500,
+    line: 1510,
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
-  ['../../pages/PortfolioPage.tsx', [
-    ...[1199, 1214, 1226, 1238, 1842, 1845].map((line) => ({
-      line,
-      removeBy: 'UI-P01',
-      tokens: ['flex-1'],
-    })),
-    ...[1673, 1710, 1754].map((line) => ({
-      line,
-      removeBy: 'UI-P01',
-      tokens: ['w-full'],
-    })),
-  ]],
   ['../../pages/StockScreeningPage.tsx', [{
     line: 1375,
     removeBy: 'UI-SCR01',
@@ -182,58 +170,18 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     removeBy: 'UI-QA01',
     tokens: ['dynamic:className'],
   }]],
-  ['../history/StockHistoryTrendDrawer.tsx', [205, 239, 272].map((line) => ({
-    line,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }))],
-  ['../report/AnalysisContextSummary.tsx', [{
-    line: 119,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/MarketReviewReportView.tsx', [474, 490, 635, 642, 650].map((line) => ({
-    line,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }))],
-  ['../report/ReportDetails.tsx', [{
-    line: 91,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/ReportDiagnostics.tsx', [{
-    line: 209,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/ReportNews.tsx', [{
-    line: 60,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
   ['../report/ReportOverview.tsx', [
     ...[298, 321].map((line) => ({
       line,
       removeBy: 'UI-R01',
-      tokens: ['home-panel-card', 'home-insight-card'],
-    })),
-    ...[345, 363].map((line) => ({
-      line,
-      removeBy: 'UI-R01',
-      tokens: ['home-panel-card'],
+      tokens: ['home-insight-card'],
     })),
     {
       line: 382,
       removeBy: 'UI-R01',
-      tokens: ['home-panel-card', 'home-rail-card'],
+      tokens: ['home-rail-card'],
     },
   ]],
-  ['../report/ReportStrategy.tsx', [{
-    line: 72,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }]],
   ['../tasks/TaskPanel.tsx', [{
     line: 218,
     removeBy: 'UI-R03',
@@ -3236,12 +3184,12 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
-    const duplicateExactCaller = `${'\n'.repeat(1198)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    const duplicateExactCaller = `${'\n'.repeat(1509)}<Button variant="secondary" className="min-h-11">First</Button><Button variant="secondary" className="min-h-11">Second</Button>`;
     expect(findProductionDesignViolations(
-      '../../pages/PortfolioPage.tsx',
+      '../../pages/DecisionSignalsPage.tsx',
       duplicateExactCaller,
     ).filter(({ rule }) => rule === 'button-visual-override')).toEqual([
-      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'min-h-11' }),
     ]);
     for (const allowances of [
       ...BUTTON_XL_ALLOWLIST.values(),

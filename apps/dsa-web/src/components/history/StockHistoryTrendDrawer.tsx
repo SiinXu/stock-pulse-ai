@@ -9,7 +9,7 @@ import {
   type DecisionActionLabelMap,
 } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
-import { Badge, Button, Card } from '../common';
+import { Badge, Button, Card, Surface } from '../common';
 import { DashboardStateBlock } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
@@ -137,13 +137,13 @@ const MetricCard: React.FC<{ label: string; value: React.ReactNode; hint?: strin
   hint,
   title,
 }) => (
-  <div className="rounded-xl border border-border/70 bg-background/45 px-4 py-3">
+  <Surface level="interactive" className="px-4 py-3">
     <p className="text-xs text-secondary-text">{label}</p>
     <p className="mt-1 truncate text-lg font-semibold text-foreground" title={title}>
       {value}
     </p>
     {hint ? <p className="mt-1 text-xs text-muted-text">{hint}</p> : null}
-  </div>
+  </Surface>
 );
 
 const RangeControls: React.FC<{
@@ -202,7 +202,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <Card variant="gradient" padding="md" className="home-panel-card">
+      <Card variant="gradient" padding="md">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -236,7 +236,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           )}
         />
       ) : items.length === 0 ? (
-        <Card variant="bordered" padding="md" className="home-panel-card">
+        <Card variant="bordered" padding="md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-foreground">{t('stockTrend.moreEmptyTitle')}</h3>
@@ -269,7 +269,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
             />
           </div>
 
-          <Card variant="bordered" padding="md" className="home-panel-card">
+          <Card variant="bordered" padding="md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-foreground">{t('stockTrend.records')}</h3>
