@@ -1803,6 +1803,126 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIn("**🟡 Avoid** | Bullish", markdown)
         self.assertNotIn("Strong Buy", markdown)
 
+    def test_history_markdown_renders_strategy_synthesis_localized(self) -> None:
+        service = HistoryService(self.db)
+        record = MagicMock(created_at=None)
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "strategy_synthesis": {
+                    "final_signal": "buy",
+                    "confidence": 0.8,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "high",
+                    "summary_params": {"opinion_count": 2, "invalid_opinion_count": 1},
+                    "supporting_skills": [{"skill_id": "bull_trend", "signal": "buy", "confidence": 0.8}],
+                    "opposing_skills": [],
+                },
+            },
+        )
+
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("综合信号: 买入", markdown)
+        self.assertIn("默认多头趋势/买入/80%", markdown)
+        self.assertIn("反方策略: 无", markdown)
+        self.assertIn("另有 1 个策略解析失败", markdown)
+        self.assertNotIn("bull_trend", markdown)
+
+    def test_history_markdown_uses_english_empty_strategy_labels(self) -> None:
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for confirmation"},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "confidence": 0.0,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "insufficient",
+                    "summary_params": {"opinion_count": 0},
+                    "supporting_skills": [],
+                    "opposing_skills": [],
+                    "conflicts": [],
+                },
+            },
+        )
+
+        markdown = HistoryService(self.db)._generate_single_stock_markdown(
+            result,
+            MagicMock(created_at=None),
+        )
+
+        self.assertIn("Supporting Strategies: None", markdown)
+        self.assertIn("Opposing Strategies: None", markdown)
+        self.assertNotIn("支持策略", markdown)
+
+    def test_history_markdown_handles_legacy_strategy_synthesis_shapes(self) -> None:
+        service = HistoryService(self.db)
+        record = MagicMock(created_at=None)
+
+        for malformed in ("bad-shape", ["bad-shape"], 42, True):
+            result = AnalysisResult(
+                code="600519",
+                name="贵州茅台",
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                report_language="zh",
+                dashboard={
+                    "core_conclusion": {"one_sentence": "测试"},
+                    "intelligence": {},
+                    "battle_plan": {},
+                    "strategy_synthesis": malformed,
+                },
+            )
+
+            markdown = service._generate_single_stock_markdown(result, record)
+
+            self.assertNotIn("多策略综合", markdown)
+
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "intelligence": {},
+                "battle_plan": {},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": "insufficient",
+                    "conflict_severity": "none",
+                    "conflict_count": 0,
+                    "supporting_skills": "bad-shape",
+                    "opposing_skills": ["bad-shape"],
+                    "conflicts": "bad-shape",
+                    "summary_params": {"invalid_opinion_count": "3"},
+                },
+            },
+        )
+
+        markdown = service._generate_single_stock_markdown(result, record)
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("另有 3 个策略解析失败", markdown)
+
     def test_history_markdown_returns_persisted_market_review_report(self) -> None:
         """Market review history should return the saved Markdown without rebuilding a stock report."""
         result = AnalysisResult(

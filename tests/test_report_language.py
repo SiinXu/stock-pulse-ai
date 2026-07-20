@@ -5,6 +5,7 @@ import unittest
 
 from src.report_language import (
     SUPPORTED_REPORT_LANGUAGES,
+    format_strategy_skill_items,
     get_bias_status_emoji,
     get_localized_stock_name,
     get_report_labels,
@@ -12,10 +13,18 @@ from src.report_language import (
     get_signal_level,
     infer_decision_type_from_advice,
     is_supported_report_language_value,
+    localize_conflict_severity,
+    localize_consensus_level,
     localize_operation_advice,
+    localize_strategy_conflict_description,
+    localize_strategy_signal,
+    localize_strategy_skill,
+    localize_strategy_synthesis_summary,
     localize_trend_prediction,
     localize_bias_status,
     normalize_report_language,
+    normalize_strategy_synthesis_payload,
+    strategy_invalid_opinion_count,
 )
 
 
@@ -151,6 +160,173 @@ class KoreanReportLanguageTestCase(unittest.TestCase):
     def test_korean_values_canonicalize_back_for_other_languages(self) -> None:
         self.assertEqual(localize_trend_prediction("상승", "en"), "Bullish")
         self.assertEqual(localize_operation_advice("적극 매도", "zh"), "强烈卖出")
+
+
+class StrategyLocalizationTestCase(unittest.TestCase):
+    def test_strategy_signal_translates_three_languages(self) -> None:
+        self.assertEqual(localize_strategy_signal("buy", "zh"), "买入")
+        self.assertEqual(localize_strategy_signal("buy", "en"), "Buy")
+        self.assertEqual(localize_strategy_signal("buy", "ko"), "매수")
+        # canonicalizes case/space aliases before translating
+        self.assertEqual(localize_strategy_signal("STRONG BUY", "en"), "Strong Buy")
+        self.assertEqual(localize_strategy_signal("强烈卖出", "en"), "Strong Sell")
+
+    def test_strategy_signal_passes_through_unknown(self) -> None:
+        self.assertEqual(localize_strategy_signal("moon", "en"), "moon")
+        self.assertEqual(localize_strategy_signal("", "en"), "")
+        self.assertEqual(localize_strategy_signal(None, "en"), "")
+
+    def test_consensus_level_translates_three_languages(self) -> None:
+        self.assertEqual(localize_consensus_level("insufficient", "zh"), "证据不足")
+        self.assertEqual(localize_consensus_level("insufficient", "en"), "Insufficient")
+        self.assertEqual(localize_consensus_level("insufficient", "ko"), "증거 부족")
+        self.assertEqual(localize_consensus_level("high", "en"), "High")
+
+    def test_consensus_level_passes_through_unknown(self) -> None:
+        self.assertEqual(localize_consensus_level("weird", "en"), "weird")
+
+    def test_conflict_severity_translates_three_languages(self) -> None:
+        self.assertEqual(localize_conflict_severity("none", "zh"), "无")
+        self.assertEqual(localize_conflict_severity("none", "en"), "None")
+        self.assertEqual(localize_conflict_severity("none", "ko"), "없음")
+        self.assertEqual(localize_conflict_severity("high", "en"), "High")
+
+    def test_conflict_severity_passes_through_unknown(self) -> None:
+        self.assertEqual(localize_conflict_severity("extreme", "en"), "extreme")
+
+    def test_strategy_skill_translates_three_languages(self) -> None:
+        self.assertEqual(localize_strategy_skill("bull_trend", "zh"), "默认多头趋势")
+        self.assertEqual(localize_strategy_skill("bull_trend", "en"), "Bull Trend")
+        self.assertEqual(localize_strategy_skill("bull_trend", "ko"), "기본 상승 추세")
+        self.assertEqual(localize_strategy_skill("热点题材", "en"), "Hot Theme")
+
+    def test_strategy_skill_passes_through_unknown(self) -> None:
+        self.assertEqual(localize_strategy_skill("nonexistent_skill", "en"), "nonexistent_skill")
+
+    def test_strategy_conflict_description_translates_three_languages(self) -> None:
+        conflict_type = "directional_opposition"
+        self.assertIn("策略方向出现对立", localize_strategy_conflict_description(conflict_type, "zh"))
+        self.assertIn("Strategy directions diverge", localize_strategy_conflict_description(conflict_type, "en"))
+        self.assertIn("전략 방향이 엇갈립니다", localize_strategy_conflict_description(conflict_type, "ko"))
+
+    def test_strategy_conflict_description_passes_through_unknown(self) -> None:
+        self.assertEqual(localize_strategy_conflict_description("new_conflict", "en"), "new_conflict")
+
+    def test_strategy_empty_labels_translate_three_languages(self) -> None:
+        self.assertEqual(get_report_labels("zh")["none_label"], "无")
+        self.assertEqual(get_report_labels("en")["none_label"], "None")
+        self.assertEqual(get_report_labels("ko")["none_label"], "없음")
+
+    def test_strategy_skill_items_share_localized_formatting(self) -> None:
+        items = [{"skill_id": "bull_trend", "signal": "buy", "confidence": 0.8}]
+
+        self.assertEqual(format_strategy_skill_items(items, "en"), "Bull Trend/Buy/80%")
+        self.assertEqual(
+            format_strategy_skill_items(items, "en", include_details=False),
+            "Bull Trend",
+        )
+        self.assertEqual(format_strategy_skill_items(["bad", {}], "ko"), "없음")
+
+    def test_normalize_payload_returns_empty_for_non_dict(self) -> None:
+        self.assertEqual(normalize_strategy_synthesis_payload("bad"), {})
+        self.assertEqual(normalize_strategy_synthesis_payload(None), {})
+        self.assertEqual(normalize_strategy_synthesis_payload([1, 2]), {})
+        self.assertEqual(normalize_strategy_synthesis_payload(42), {})
+        self.assertEqual(normalize_strategy_synthesis_payload({}), {})
+
+    def test_normalize_payload_drops_malformed_list_items(self) -> None:
+        payload = normalize_strategy_synthesis_payload(
+            {
+                "final_signal": "hold",
+                "supporting_skills": [{"skill_id": "a"}, "bad", 3, None],
+                "opposing_skills": "not-a-list",
+                "conflicts": [
+                    {
+                        "conflict_type": "x",
+                        "participants": [" bull_trend ", "", 7, None],
+                    },
+                    ["bad"],
+                ],
+            }
+        )
+        self.assertEqual(payload["supporting_skills"], [{"skill_id": "a"}])
+        self.assertEqual(payload["opposing_skills"], [])
+        self.assertEqual(
+            payload["conflicts"],
+            [{"conflict_type": "x", "participants": ["bull_trend"]}],
+        )
+
+    def test_normalize_payload_rejects_non_list_conflict_participants(self) -> None:
+        payload = normalize_strategy_synthesis_payload(
+            {"conflicts": [{"conflict_type": "x", "participants": 7}]}
+        )
+
+        self.assertEqual(payload["conflicts"][0]["participants"], [])
+
+    def test_invalid_opinion_count_guards_bad_values(self) -> None:
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": 2}}), 2)
+        # summary_params missing or not a dict
+        self.assertEqual(strategy_invalid_opinion_count({}), 0)
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": "legacy"}), 0)
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": ["x"]}), 0)
+        # negative and zero collapse to 0
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": -3}}), 0)
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": 0}}), 0)
+        # bool is not counted as int
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": True}}), 0)
+        # decimal string is narrowly parsed; other strings collapse to 0
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": "5"}}), 5)
+        self.assertEqual(strategy_invalid_opinion_count({"summary_params": {"invalid_opinion_count": "5abc"}}), 0)
+        # non-dict top level
+        self.assertEqual(strategy_invalid_opinion_count("bad"), 0)
+
+    def test_synthesis_summary_no_conflict_three_languages(self) -> None:
+        payload = {
+            "final_signal": "buy",
+            "consensus_level": "high",
+            "conflict_severity": "none",
+            "conflict_count": 0,
+            "summary_params": {"opinion_count": 2},
+        }
+        self.assertIn("买入", localize_strategy_synthesis_summary(payload, "zh"))
+        self.assertIn("未检测到策略冲突", localize_strategy_synthesis_summary(payload, "zh"))
+        en = localize_strategy_synthesis_summary(payload, "en")
+        self.assertIn("Buy", en)
+        self.assertIn("no detected conflicts", en)
+        ko = localize_strategy_synthesis_summary(payload, "ko")
+        self.assertIn("매수", ko)
+        self.assertIn("감지된 전략 충돌은 없습니다", ko)
+
+    def test_synthesis_summary_with_conflict_three_languages(self) -> None:
+        payload = {
+            "final_signal": "sell",
+            "consensus_level": "low",
+            "conflict_severity": "high",
+            "conflict_count": 2,
+            "summary_params": {"opinion_count": 3},
+        }
+        zh = localize_strategy_synthesis_summary(payload, "zh")
+        self.assertIn("冲突强度为高", zh)
+        en = localize_strategy_synthesis_summary(payload, "en")
+        self.assertIn("conflict severity is High", en)
+        ko = localize_strategy_synthesis_summary(payload, "ko")
+        self.assertIn("충돌 강도는 높음", ko)
+
+    def test_synthesis_summary_empty_for_malformed(self) -> None:
+        self.assertEqual(localize_strategy_synthesis_summary("bad", "en"), "")
+        self.assertEqual(localize_strategy_synthesis_summary({}, "en"), "")
+
+    def test_synthesis_summary_counts_skills_when_opinion_count_absent(self) -> None:
+        payload = {
+            "final_signal": "hold",
+            "consensus_level": "medium",
+            "conflict_severity": "none",
+            "conflict_count": 0,
+            "supporting_skills": [{"skill_id": "a"}, {"skill_id": "b"}],
+            "opposing_skills": [{"skill_id": "c"}],
+        }
+        en = localize_strategy_synthesis_summary(payload, "en")
+        self.assertIn("from 3 strategies", en)
 
 
 if __name__ == "__main__":
