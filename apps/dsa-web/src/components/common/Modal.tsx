@@ -10,7 +10,7 @@ import { IconButton } from './IconButton';
 import { getOverlayStyle } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
-export type ModalSize = 'compact' | 'default' | 'wide';
+export type ModalSize = 'compact' | 'default' | 'wide' | 'fullscreen';
 
 export interface ModalProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ const MODAL_SIZE_STYLES: Record<ModalSize, string> = {
   compact: 'max-w-sm',
   default: 'max-w-lg',
   wide: 'max-w-xl',
+  fullscreen: 'max-w-[96vw] max-h-[92dvh]',
 };
 
 /** Centered form dialog with fixed chrome and a single scrollable body. */
