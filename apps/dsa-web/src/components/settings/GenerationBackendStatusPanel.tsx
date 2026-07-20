@@ -5,7 +5,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { GenerationBackendStatus, GenerationBackendStatusResponse, SystemConfigUpdateItem, TestGenerationBackendResponse } from '../../types/systemConfig';
-import { ApiErrorAlert, Badge, Button } from '../common';
+import { ApiErrorAlert, Badge, Button, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 
 type Translate = ReturnType<typeof useUiLanguage>['t'];
@@ -43,7 +43,7 @@ const BackendStatusRow: React.FC<{ title: string; status: GenerationBackendStatu
   }
 
   return (
-    <div className="rounded-xl border settings-border bg-background/35 px-4 py-3">
+    <Surface level="interactive" className="px-4 py-3">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -77,7 +77,7 @@ const BackendStatusRow: React.FC<{ title: string; status: GenerationBackendStatu
           <Badge variant="default" size="sm">{t('settings.generationBackendConcurrency', { count: status.maxConcurrency })}</Badge>
         </div>
       </div>
-    </div>
+    </Surface>
   );
 };
 
