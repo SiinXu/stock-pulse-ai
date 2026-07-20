@@ -49,6 +49,7 @@ from src.enums import ReportType
 from src.services.analysis_service import AnalysisService
 from src.services.image_stock_extractor import _call_litellm_vision
 from src.services.task_queue import AnalysisTaskQueue, TaskInfo as QueueTaskInfo, TaskStatus
+from src.task_execution import deep_thaw
 
 
 def tearDownModule() -> None:
@@ -2694,6 +2695,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             },
         )
 
+    def test_openapi_uses_canonical_task_status_components(self) -> None:
+        if create_app is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        schemas = create_app().openapi()["components"]["schemas"]
+
+        self.assertIn("TaskStatus", schemas)
+        self.assertEqual(
+            schemas["TaskStatusEnum"]["enum"],
+            [
+                "pending",
+                "processing",
+                "cancel_requested",
+                "completed",
+                "failed",
+                "cancelled",
+                "interrupted",
+            ],
+        )
+        self.assertEqual(
+            schemas["TaskStatus"]["properties"]["status"]["$ref"],
+            "#/components/schemas/TaskStatusEnum",
+        )
+        self.assertEqual(
+            schemas["TaskInfo"]["properties"]["status"]["$ref"],
+            "#/components/schemas/TaskStatusEnum",
+        )
+
     def test_openapi_declares_backtest_phase_filter_enum_and_400(self) -> None:
         if create_app is None:
             self.skipTest("fastapi is not installed in this test environment")
@@ -3426,18 +3455,25 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         except Exception:  # pragma: no cover - optional dependency environments
             self.skipTest("api.v1.endpoints.analysis not importable")
 
-        class _NeverQueue:
-            """Queue that never returns from get(), used to exercise cancellation."""
-            async def get(self):
+        class _NeverStream:
+            """Stream that never returns from receive(), used to exercise cancellation."""
+
+            def __init__(self) -> None:
+                self.close_count = 0
+
+            async def receive(self, timeout=None):
+                del timeout
                 await asyncio.sleep(3600)
 
-        never_queue = _NeverQueue()
+            async def aclose(self):
+                self.close_count += 1
+
+        never_stream = _NeverStream()
         mock_task_queue = MagicMock()
-        mock_task_queue.list_pending_tasks.return_value = []
+        mock_task_queue.subscribe_all.return_value = never_stream
 
         async def run():
-            with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_task_queue), \
-                 patch("asyncio.Queue", return_value=never_queue):
+            with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_task_queue):
                 response = await task_stream()
                 gen = response.body_iterator
 
@@ -3453,7 +3489,59 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with self.assertRaises(asyncio.CancelledError):
             asyncio.run(run())
 
-        mock_task_queue.unsubscribe.assert_called_once_with(never_queue)
+        mock_task_queue.subscribe_all.assert_called_once_with()
+        self.assertEqual(never_stream.close_count, 1)
+
+    def test_sse_maps_canonical_events_to_legacy_event_names(self) -> None:
+        try:
+            from api.v1.endpoints.analysis import TaskEventType, task_stream
+        except Exception:  # pragma: no cover - optional dependency environments
+            self.skipTest("api.v1.endpoints.analysis not importable")
+
+        canonical_types = list(TaskEventType)
+        expected_names = [
+            "task_created",
+            "task_created",
+            "task_started",
+            "task_progress",
+            "task_progress",
+            "task_completed",
+            "task_failed",
+            "task_failed",
+            "task_failed",
+        ]
+
+        class _FiniteStream:
+            def __init__(self) -> None:
+                self.events = [
+                    SimpleNamespace(type=event_type, data={"index": index})
+                    for index, event_type in enumerate(canonical_types)
+                ]
+                self.closed = False
+
+            async def receive(self, timeout=None):
+                del timeout
+                if not self.events:
+                    raise StopAsyncIteration
+                return self.events.pop(0)
+
+            async def aclose(self):
+                self.closed = True
+
+        stream = _FiniteStream()
+        queue = MagicMock()
+        queue.subscribe_all.return_value = stream
+
+        async def consume():
+            with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+                response = await task_stream()
+                return [chunk async for chunk in response.body_iterator]
+
+        chunks = asyncio.run(consume())
+        event_names = [chunk.splitlines()[0].removeprefix("event: ") for chunk in chunks]
+
+        self.assertEqual(event_names, ["connected", *expected_names])
+        self.assertTrue(stream.closed)
 
     def test_get_task_list_includes_analysis_phase_and_skills(self) -> None:
         if get_task_list is None:
@@ -3583,19 +3671,18 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         self.assertEqual(accepted[0].portfolio_context["quantity"], 100)
         self.assertEqual(accepted[0].copy().portfolio_context["quantity"], 100)
         self.assertEqual(accepted[0].skills, ["growth_quality"])
-        self.assertIs(executor.calls[0][1][5], accepted[0].skills)
-        self.assertIsNone(executor.calls[0][1][6])
+        submitted_command = queue._commands[accepted[0].task_id]
+        submitted_metadata = deep_thaw(submitted_command.metadata)
+        self.assertEqual(submitted_metadata["skills"], ["growth_quality"])
+        self.assertEqual(submitted_metadata["portfolio_context"]["quantity"], 100)
 
         service_instance = MagicMock()
         service_instance.analyze_stock.return_value = {"stock_name": "贵州茅台"}
         with patch("src.services.analysis_service.AnalysisService", return_value=service_instance):
             executor.calls[0][0](*executor.calls[0][1])
 
-        self.assertIs(
-            service_instance.analyze_stock.call_args.kwargs["skills"],
-            accepted[0].skills,
-        )
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["skills"], ["growth_quality"])
+        self.assertIsNot(service_instance.analyze_stock.call_args.kwargs["skills"], request_skills)
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["analysis_phase"], "intraday")
         self.assertEqual(service_instance.analyze_stock.call_args.kwargs["query_source"], "portfolio")
         self.assertEqual(

@@ -81,10 +81,10 @@ from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.task_queue import (
     get_task_queue,
     DuplicateTaskError,
-    TaskStatus as TaskStatusEnum,
     public_task_error,
     public_task_message,
 )
+from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
 from src.utils.data_processing import (
@@ -718,35 +718,35 @@ async def task_stream():
     """
     async def event_generator():
         task_queue = get_task_queue()
-        event_queue: asyncio.Queue = asyncio.Queue()
-        
-        # 发送连接成功事件
-        yield _format_sse_event("connected", {"message": "Connected to task stream"})
-        
-        # 发送当前进行中的任务
-        pending_tasks = task_queue.list_pending_tasks()
-        for task in pending_tasks:
-            yield _format_sse_event("task_created", task.to_dict())
-        
-        # 订阅任务事件
-        task_queue.subscribe(event_queue)
-        
+        stream = task_queue.subscribe_all()
         try:
+            yield _format_sse_event("connected", {"message": "Connected to task stream"})
             while True:
                 try:
-                    # 等待事件，超时发送心跳
-                    event = await asyncio.wait_for(event_queue.get(), timeout=30)
-                    yield _format_sse_event(event["type"], event["data"])
+                    event = await stream.receive(timeout=30)
+                    legacy_type = {
+                        TaskEventType.CREATED: "task_created",
+                        TaskEventType.SNAPSHOT: "task_created",
+                        TaskEventType.STARTED: "task_started",
+                        TaskEventType.PROGRESS: "task_progress",
+                        TaskEventType.CANCEL_REQUESTED: "task_progress",
+                        TaskEventType.COMPLETED: "task_completed",
+                        TaskEventType.FAILED: "task_failed",
+                        TaskEventType.CANCELLED: "task_failed",
+                        TaskEventType.INTERRUPTED: "task_failed",
+                    }[event.type]
+                    yield _format_sse_event(legacy_type, deep_thaw(event.data))
                 except asyncio.TimeoutError:
-                    # 心跳
                     yield _format_sse_event("heartbeat", {
                         "timestamp": datetime.now().isoformat()
                     })
+                except StopAsyncIteration:
+                    break
         except asyncio.CancelledError:
             logger.debug("SSE client disconnected, cancelling event generator")
             raise
         finally:
-            task_queue.unsubscribe(event_queue)
+            await stream.aclose()
     
     return StreamingResponse(
         event_generator(),
