@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Pipeline 新增 `resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch` 阶段诊断，统一记录脱敏输入/输出摘要、trace、耗时、状态、降级与 retryability；观测失败保持 fail-open，通知失败与分析结果分离，既有行为、数据库结构和配置不变。
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
 - [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
 - [改进] Web 选股页（`StockScreeningPage`）迁移到语义容器与控件契约：5 个 ad-hoc `<section>`/`<form>` 面板、顶部状态 chip 与热点/概念/因子等内部卡片改用 `Surface`（`interactive` 档，边框/圆角/底色/阴影收敛到设计 token），热点错误提示改用 `InlineAlert`、无结果空态改用 `EmptyState`；主"开始选股"按钮不再用 `min-w-40` 覆写共享 `Button`，改由 `grid` 包裹保留最小宽度并清除设计守卫 `UI-SCR01` allowlist 例外；选股结果、涨跌/热度语义色、筛选与提交行为不变。装饰性圆点/徽章、可选卡片按钮与表格行内部按现状保留。
