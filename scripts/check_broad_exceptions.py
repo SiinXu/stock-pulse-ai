@@ -133,6 +133,13 @@ class Baseline:
     legacy_handlers: tuple[BaselineEntry, ...]
 
 
+@dataclass(frozen=True)
+class ParentLink:
+    parent: ast.AST
+    field: str
+    index: int | None
+
+
 def _iter_python_paths(root: Path) -> Iterator[Path]:
     for relative_path in SCOPED_FILES:
         path = root / relative_path
@@ -493,7 +500,9 @@ def _raise_kind(
     if _has_control_flow_escape(control_flow_nodes):
         return False, False
     finalbody_nodes = tuple(_walk_control_flow_nodes(owner.finalbody))
-    if _has_control_flow_escape(finalbody_nodes):
+    if _has_control_flow_escape(finalbody_nodes) or any(
+        isinstance(node, ast.Raise) for node in finalbody_nodes
+    ):
         return False, False
     final_raise = handler.body[-1]
     if final_raise.exc is None:
@@ -521,13 +530,76 @@ def _stable_ast_dump(value: object) -> str:
     return repr(value)
 
 
+def _build_parent_links(tree: ast.AST) -> dict[int, ParentLink]:
+    links: dict[int, ParentLink] = {}
+    for parent in ast.walk(tree):
+        for field, value in ast.iter_fields(parent):
+            if isinstance(value, ast.AST):
+                links[id(value)] = ParentLink(parent, field, None)
+            elif isinstance(value, list):
+                for index, child in enumerate(value):
+                    if isinstance(child, ast.AST):
+                        links[id(child)] = ParentLink(parent, field, index)
+    return links
+
+
+def _control_context(node: ast.AST) -> str:
+    if isinstance(node, (ast.If, ast.While)):
+        return f"test={_stable_ast_dump(node.test)}"
+    if isinstance(node, (ast.For, ast.AsyncFor)):
+        return (
+            f"target={_stable_ast_dump(node.target)},"
+            f"iter={_stable_ast_dump(node.iter)}"
+        )
+    if isinstance(node, (ast.With, ast.AsyncWith)):
+        return f"items={_stable_ast_dump(node.items)}"
+    if isinstance(node, ast.Match):
+        return f"subject={_stable_ast_dump(node.subject)}"
+    if isinstance(node, ast.match_case):
+        return (
+            f"pattern={_stable_ast_dump(node.pattern)},"
+            f"guard={_stable_ast_dump(node.guard)}"
+        )
+    if isinstance(node, ast.ExceptHandler):
+        return (
+            f"type={_stable_ast_dump(node.type)},"
+            f"name={_stable_ast_dump(node.name)}"
+        )
+    return ""
+
+
+def _site_ancestry(
+    node: ast.AST,
+    parent_links: Mapping[int, ParentLink],
+) -> tuple[dict[str, object], ...]:
+    ancestry: list[dict[str, object]] = []
+    current = node
+    while link := parent_links.get(id(current)):
+        parent = link.parent
+        if isinstance(parent, (*_LEXICAL_SCOPES, ast.Module)):
+            break
+        ancestry.append(
+            {
+                "context": _control_context(parent),
+                "field": link.field,
+                "index": link.index,
+                "kind": type(parent).__name__,
+            }
+        )
+        current = parent
+    return tuple(reversed(ancestry))
+
+
 def _handler_digest(
     owner: ast.Try | ast.TryStar,
     try_site_index: int,
     handler_index: int,
     handler: ast.ExceptHandler,
+    *,
+    ancestry: Sequence[Mapping[str, object]] = (),
 ) -> str:
     payload = {
+        "ancestry": list(ancestry),
         "finalbody": _stable_ast_dump(owner.finalbody),
         "handler": _stable_ast_dump(handler),
         "handler_index": handler_index,
@@ -542,9 +614,15 @@ def _handler_digest(
 
 
 class _HandlerVisitor(ast.NodeVisitor):
-    def __init__(self, path: str, source: str) -> None:
+    def __init__(
+        self,
+        path: str,
+        source: str,
+        parent_links: Mapping[int, ParentLink],
+    ) -> None:
         self.path = path
         self.comments = _comment_lines(source)
+        self.parent_links = parent_links
         self.handlers: list[BroadHandler] = []
         self._scope: list[str] = ["<module>"]
         self._try_site_counts: dict[tuple[str, ...], int] = {}
@@ -605,6 +683,7 @@ class _HandlerVisitor(ast.NodeVisitor):
                         try_site_index,
                         handler_index,
                         node,
+                        ancestry=_site_ancestry(owner, self.parent_links),
                     ),
                     marker=marker,
                     marker_error=marker_error,
@@ -639,7 +718,7 @@ def scan_file(path: Path, root: Path) -> tuple[BroadHandler, ...]:
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
     relative_path = path.relative_to(root).as_posix()
-    visitor = _HandlerVisitor(relative_path, source)
+    visitor = _HandlerVisitor(relative_path, source, _build_parent_links(tree))
     visitor.visit(tree)
     return tuple(visitor.handlers)
 
