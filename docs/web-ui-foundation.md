@@ -171,24 +171,12 @@ Callers provide localized titles, descriptions, action labels, and toolbar
 names.
 
 `ResponsiveRail` is an `aside` named by its visible H2. At `xl` it is visible
-and sticky within the workspace. From 1024px through 1279px and below 768px,
-it becomes one native button disclosure with caller-provided expand/collapse
-names. From 768px through 1023px, that same labelled trigger opens a shared
-Navigation Drawer, and leaving the tablet range closes any open rail before
-changing presentation. Its open state is controlled or uncontrolled and never
-enters business URL state. Callers provide a localized `drawerTitle`; the
-Pattern owns Drawer width, focus entry, Escape, scroll lock, and restoration.
+and sticky within the workspace; below `xl` it becomes one native button
+disclosure with caller-provided expand/collapse names. Its compact open state
+is controlled or uncontrolled and never enters business URL state. The
+disclosure retains the shared labelled Tooltip and 44px `navigation` target.
 `SummaryStrip` is one labelled definition list with stable metric IDs and
 semantic state tones; it does not create a row of nested cards.
-
-Owner exception (2026-07-20, final-closeout Harness): `ResponsiveRail`'s
-Drawer/disclosure behavior is intentionally retained before its first
-production page adoption because the owner explicitly requires this responsive
-foundation contract. Current consumers are fixtures and tests only; this is not
-recorded as production adoption. A page owner must consume this shared Pattern
-rather than create a parallel rail. If the product direction changes before
-that first consumer lands, revert the responsive behavior, fixture, and tests as
-one foundation unit.
 
 `Tabs` and `TabPanel` are reserved for mutually exclusive content under one
 page H1. They own tablist/tab/tabpanel association, disabled-item skipping,
@@ -211,11 +199,12 @@ Same-path POP may restore a unique stable trigger but never falls back to the
 H1. Blocked navigation retains its trigger until the Router proceeds or resets
 the transition. Entries are bounded in memory and contain strings only, never
 DOM refs, URL state, browser history state, `localStorage`, or `sessionStorage`.
-When a responsive overlay trigger is transient, it may declare one unique,
-persistent `data-route-focus-return-key` counterpart. The coordinator validates,
-captures, stores, and restores that key per `location.key`; Shell and navigation
-components only render the two stable markers and never copy route metadata or
-rewrite the persistent key.
+When a responsive overlay trigger is transient, it may declare one
+`data-route-focus-return-key` that names its persistent counterpart. The
+coordinator validates the transient source and requires exactly one persistent
+alias before storing that alias per `location.key`; an empty, missing, or
+duplicate alias fails closed. Shell and navigation components only render the
+stable markers and never copy route metadata or rewrite the persistent key.
 
 Business code must use React Router navigation APIs rather than direct
 `pushState` or `replaceState`. The production guard discovers calls through
@@ -249,15 +238,10 @@ The responsive contract has three states:
   mobile opener as its return target. `RouteFocusCoordinator` stores that target
   per history entry, so repeated Back/Forward restores the visible opener without
   Shell retaining or rewriting route metadata.
-- From 768px through 1023px, page-owned business navigation represented by a
-  `ResponsiveRail` uses its own labelled Navigation Drawer. Below 768px it
-  remains an inline disclosure, avoiding a second hamburger-style mobile menu.
 - From 1024px through 1279px, the global sidebar defaults to an 80px compact
   rail when the user has not chosen a state. A saved expanded or collapsed
   preference remains authoritative at this breakpoint, and the rail always
-  provides the corresponding 44px toggle. A contextual `ResponsiveRail`
-  remains in document flow and uses its compact disclosure, so it does not
-  create a second permanent sidebar at the constrained breakpoint.
+  provides the corresponding 44px toggle.
 - At 1280px and wider, the global sidebar uses the same persisted preference,
   defaulting to its 240px expanded state. The expanded state always displays
   the complete product name.

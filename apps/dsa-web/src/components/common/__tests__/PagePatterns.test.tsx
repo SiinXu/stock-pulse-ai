@@ -3,7 +3,7 @@
 import { createRef, useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AppPage,
   PageHeader,
@@ -15,10 +15,6 @@ import {
   WorkspaceNavigation,
   WorkspacePage,
 } from '..';
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 describe('page skeleton Patterns', () => {
   it('keeps AppPage inside the shell landmark and forwards native props and ref', () => {
@@ -76,7 +72,6 @@ describe('page skeleton Patterns', () => {
         rail={(
           <ResponsiveRail
             title="Run context"
-            drawerTitle="Run context"
             expandLabel="Show run context"
             collapseLabel="Hide run context"
           >
@@ -94,48 +89,11 @@ describe('page skeleton Patterns', () => {
     expect(workspace).not.toBeNull();
     expect(rail).toHaveAttribute('data-compact-state', 'collapsed');
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('data-size', 'navigation');
 
     fireEvent.click(toggle);
     expect(rail).toHaveAttribute('data-compact-state', 'expanded');
     expect(screen.getByRole('button', { name: 'Hide run context' })).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  it('moves a business rail into a Navigation Drawer at the tablet breakpoint', () => {
-    vi.stubGlobal('matchMedia', vi.fn().mockImplementation(() => ({
-      matches: true,
-      media: '(min-width: 768px) and (max-width: 1023px)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })));
-
-    render(
-      <ResponsiveRail
-        title="Run context"
-        drawerTitle="Run context"
-        expandLabel="Show run context"
-        collapseLabel="Hide run context"
-      >
-        <p>Context details</p>
-      </ResponsiveRail>,
-    );
-
-    const rail = screen.getByRole('complementary', { name: 'Run context' });
-    const trigger = screen.getByRole('button', { name: 'Show run context' });
-    expect(rail).toHaveAttribute('data-tablet-presentation', 'drawer');
-    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
-    expect(screen.queryByText('Context details')).not.toBeInTheDocument();
-
-    trigger.focus();
-    fireEvent.click(trigger);
-    const drawer = screen.getByRole('dialog', { name: 'Run context' });
-    expect(within(drawer).getByText('Context details')).toBeVisible();
-    fireEvent.keyDown(drawer, { key: 'Escape' });
-    expect(screen.queryByRole('dialog', { name: 'Run context' })).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
   });
 
   it('implements roving Tabs and associated tab panels without using segmented controls', () => {

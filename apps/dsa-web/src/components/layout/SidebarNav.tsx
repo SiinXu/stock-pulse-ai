@@ -218,7 +218,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           return (
             <React.Fragment key={key}>
               {collapsed ? (
-                <Tooltip content={label} className="w-full">
+                <Tooltip content={label} className="w-full shrink-0">
                   {link}
                 </Tooltip>
               ) : link}

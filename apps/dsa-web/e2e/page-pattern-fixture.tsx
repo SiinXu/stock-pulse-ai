@@ -52,7 +52,6 @@ function PatternPage({ routeId, title }: { routeId: string; title: string }) {
   const rail = (
     <ResponsiveRail
       title="Workspace context"
-      drawerTitle="Workspace context"
       expandLabel="Show workspace context"
       collapseLabel="Hide workspace context"
     >

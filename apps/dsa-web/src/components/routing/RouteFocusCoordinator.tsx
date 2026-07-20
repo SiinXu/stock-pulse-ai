@@ -162,7 +162,8 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
         || !focusKey
         || !currentLocationKey
         || uniqueFocusableMarker(focusKey) !== target
-        || (returnFocusKey && routeFocusElements(returnFocusKey).length !== 1)
+        || returnFocusKey === ''
+        || (returnFocusKey !== undefined && routeFocusElements(returnFocusKey).length !== 1)
       ) {
         if (!hasBlockedNavigation()) clearPendingMarker();
         return;
