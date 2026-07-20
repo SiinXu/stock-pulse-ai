@@ -66,6 +66,9 @@ This is the entry point for project documentation. The README covers the project
 | [API Spec](architecture/api_spec.json) | FastAPI OpenAPI artifact |
 | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | Issues, pull requests, tests, documentation sync, and collaboration expectations |
 | [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, guardrails, and migration ownership |
+| [Multilingual Financial Terminology Guide](financial-terminology-guide.md) | Product semantics and ten-language candidate terminology (guide body in Simplified Chinese) |
+| [High-risk i18n Semantic Audit](high-risk-i18n-audit.md) | Sources, review status, code/display boundaries, and machine snapshots for financial and security-sensitive copy |
+| [Web Internationalization Conventions](web-i18n_EN.md) | UI/report language boundaries, resource structure, errors, formatting, and validation |
 
 ## Languages
 

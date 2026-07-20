@@ -219,7 +219,7 @@ describe('AlertRuleList', () => {
       ],
     });
 
-    expect(screen.getByText('Alert rules')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Alert rules' })).toBeInTheDocument();
     const statusSelect = screen.getByLabelText('Status');
     const statusListbox = openListbox(statusSelect);
     expect(within(statusListbox).getByRole('option', { name: 'All statuses' })).toBeInTheDocument();
