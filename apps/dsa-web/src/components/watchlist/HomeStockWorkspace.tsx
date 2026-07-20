@@ -6,13 +6,14 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
+  Funnel,
   Loader2,
   Play,
   Plus,
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
+import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, Select, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -278,22 +279,26 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   const panelId = `${reactId}-panel`;
 
   const renderTabs = (
-    <div className="flex min-w-0 flex-col gap-2">
-      <SegmentedControl
-        value={activeTab}
-        options={tabs}
-        onChange={onTabChange}
-        ariaLabel={t('watchlist.tabsAria')}
-        className="w-fit"
-        getPanelId={() => panelId}
-      />
+    <div className="flex min-w-0 items-center gap-2">
       <SearchInput
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
         placeholder={t('common.searchPlaceholder')}
         aria-label={t('layout.search')}
-        wrapperClassName="w-full"
+        wrapperClassName="min-w-0 flex-1"
       />
+      <div className="relative w-11 shrink-0 sm:w-7">
+        <Select
+          value={activeTab}
+          options={tabs}
+          onChange={(value) => onTabChange(value as HomeWorkspaceTab)}
+          ariaLabel={t('watchlist.tabsAria')}
+          className="w-full"
+          triggerClassName="h-11 min-h-11 px-0 sm:h-7 sm:min-h-7 [&>span]:sr-only [&>svg]:hidden"
+          menuAlign="end"
+        />
+        <Funnel className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-secondary-text" aria-hidden="true" />
+      </div>
     </div>
   );
 
@@ -302,7 +307,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
       {renderTabs}
       <div
-        role="tabpanel"
+        role="region"
         id={panelId}
         aria-label={activeTabLabel}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
