@@ -617,7 +617,7 @@ describe('locale registries', () => {
     expect(frenchTranslations['i18n.uiText.UI_TEXT.runFlow.edgeLabel.invoke']).toBe('Appel');
   });
 
-  it('keeps reviewed financial and current-context terms in their product domains', () => {
+  it('keeps governed financial and current-context terms in their product domains', () => {
     const expected: Record<(typeof ADDITIONAL_UI_LANGUAGES)[number], {
       bullish: string;
       currentLanguage: string;
@@ -627,7 +627,7 @@ describe('locale registries', () => {
       stockSearchIndex: string;
     }> = {
       'zh-TW': { bullish: '偏多', currentLanguage: '中文', currentStock: '目前股票：{stock}', flat: '持平', hold: '持有', stockSearchIndex: '股票搜尋索引遠端更新' },
-      ja: { bullish: '強気', currentLanguage: '日本語', currentStock: '現在の銘柄：{stock}', flat: 'フラット', hold: 'ホールド', stockSearchIndex: '銘柄検索インデックスのリモート更新' },
+      ja: { bullish: '強気', currentLanguage: '日本語', currentStock: '現在の銘柄：{stock}', flat: 'フラット', hold: '保有', stockSearchIndex: '銘柄検索インデックスのリモート更新' },
       ko: { bullish: '강세', currentLanguage: '한국어', currentStock: '현재 종목: {stock}', flat: '보합', hold: '보유', stockSearchIndex: '종목 검색 인덱스 원격 업데이트' },
       de: { bullish: 'Bullisch', currentLanguage: 'Deutsch', currentStock: 'Aktuelle Aktie: {stock}', flat: 'Seitwärts', hold: 'Halten', stockSearchIndex: 'Remote-Updates des Aktiensuchindex' },
       es: { bullish: 'Alcista', currentLanguage: 'Español', currentStock: 'Acción actual: {stock}', flat: 'Sin cambios', hold: 'Mantener', stockSearchIndex: 'Actualizaciones remotas del índice de búsqueda de acciones' },
@@ -665,6 +665,32 @@ describe('locale registries', () => {
       expect(
         translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.stock_index_remote.valueNotes.1'],
       ).toContain(stockSearchFailureMarker[language]);
+    }
+  });
+
+  it('keeps high-risk alias options aligned with their governed display labels', () => {
+    for (const language of ADDITIONAL_UI_LANGUAGES) {
+      const translations = getLoadedUiLanguageTranslations(language);
+      if (!translations) throw new Error(`${language} bundle is not loaded`);
+
+      expect(translations['locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label']).toBe(
+        translations['locales.alerts.ALERT_TYPE_LABELS.volume_spike'],
+      );
+      expect(translations['locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label']).toBe(
+        translations['locales.alerts.ALERT_TYPE_LABELS.volume_spike'],
+      );
+      expect(translations['locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label']).toBe(
+        translations['locales.alerts.ALERT_SCOPE_LABELS.watchlist'],
+      );
+      expect(translations['locales.alerts.ALERT_SEVERITY_OPTIONS.0.label']).toBe(
+        translations['locales.alerts.ALERT_SEVERITY_LABELS.info'],
+      );
+      expect(translations['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.title']).toBe(
+        translations['locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKey'],
+      );
+      expect(translations['locales.settingsModelAccess.MODEL_ACCESS_TEXT.localKeyOptional']).toBe(
+        translations['locales.settingsWizard.SETTINGS_WIZARD_TEXT.localKeyPlaceholder'],
+      );
     }
   });
 
