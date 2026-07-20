@@ -146,7 +146,7 @@ class NativeRuntimeAdapter:
         progress_callback: Optional[ProgressCallback],
         request_context: Optional[dict],
     ) -> Any:
-        from src.agent.factory import get_tool_registry
+        from src.agent.runtime_assembly import get_tool_registry
         from src.agent.llm_adapter import LLMToolAdapter
         from src.agent.research import ResearchAgent
 
@@ -174,7 +174,7 @@ class NativeRuntimeAdapter:
 
     def _resolve_executor(self) -> Any:
         if self._executor is None:
-            from src.agent.factory import build_agent_executor
+            from src.agent.runtime_assembly import build_agent_executor
 
             self._executor = build_agent_executor(self._resolve_config(), skills=self._skills)
         return self._executor

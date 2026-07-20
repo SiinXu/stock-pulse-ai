@@ -201,6 +201,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
 - [改进] Web 用量页（`TokenUsagePage`）"最近调用"块由原生 `<section>` + 手写 `<h2>` 头部迁移到语义 `Section`（标题/描述/时钟图标走 `title`/`description`/`actions`），与同页其余两块 `Section` 一致；表格容器、数值与交互不变。该页其余部分已使用 `AppPage`/`PageHeader`/`Section`/`SegmentedControl`/`StatePanel`/`StatCard`/`Surface`，本次仅补齐最后一处 ad-hoc 头部容器。
 - [改进] Web 股票行情工作区页（`StockDetailsPage`）的行情与历史加载占位统一走语义 `Loading`：将实时行情与历史 K 线两处 ad-hoc 加载文本 `<p>` 改用共享 `Loading`（compact `StatePanel`），与页内 `ApiErrorAlert` 错误态一致；加载文案、行情/历史数据与交互行为不变。
+- [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
