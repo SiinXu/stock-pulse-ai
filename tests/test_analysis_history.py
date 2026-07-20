@@ -19,6 +19,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy import text
+from sqlalchemy.exc import DatabaseError
+
 # Keep this test runnable when optional LLM runtime deps are not installed.
 try:
     import litellm  # noqa: F401
@@ -48,7 +51,7 @@ from src.storage import (
 )
 from src.analyzer import AnalysisResult
 from src.daily_market_context_guardrail import apply_daily_market_context_guardrail
-from src.services.history_service import HistoryService
+from src.services.history_service import HistoryService, HistoryValidationError
 import src.auth as auth
 
 
@@ -187,9 +190,6 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertEqual(getattr(raised.exception, "status_code", None), 500)
 
     def test_delete_history_by_code_deletes_more_than_one_lookup_batch(self) -> None:
-        if delete_history_by_code is None:
-            self.skipTest("fastapi is not installed in this test environment")
-
         remaining = {record_id: SimpleNamespace(id=record_id) for record_id in range(1, 10_002)}
         db = MagicMock()
 
@@ -207,11 +207,36 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         db.get_analysis_history_paginated.side_effect = get_records
         db.delete_analysis_history_records.side_effect = delete_records
 
-        response = delete_history_by_code("600519", db_manager=db)
+        deleted = HistoryService(db).delete_history_by_code("600519")
 
-        self.assertEqual(response.deleted, 10_001)
+        self.assertEqual(deleted, 10_001)
         self.assertEqual(remaining, {})
         self.assertEqual(db.get_analysis_history_paginated.call_count, 2)
+
+    def test_delete_history_by_code_fails_when_a_batch_makes_no_progress(self) -> None:
+        db = MagicMock()
+        db.get_analysis_history_paginated.return_value = ([SimpleNamespace(id=1)], 1)
+        db.delete_analysis_history_records.return_value = 0
+
+        with self.assertRaisesRegex(RuntimeError, "made no progress"):
+            HistoryService(db).delete_history_by_code("600519")
+
+        db.get_analysis_history_paginated.assert_called_once()
+        db.delete_analysis_history_records.assert_called_once_with([1])
+
+    def test_delete_history_by_code_endpoint_delegates_to_service(self) -> None:
+        if delete_history_by_code is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        db = MagicMock()
+        with patch("api.v1.endpoints.history.HistoryService") as service_class:
+            service_class.return_value.delete_history_by_code.return_value = 3
+
+            response = delete_history_by_code("600519", db_manager=db)
+
+        self.assertEqual(response.deleted, 3)
+        service_class.assert_called_once_with(db)
+        service_class.return_value.delete_history_by_code.assert_called_once_with("600519")
 
     def test_delete_history_by_code_rejects_blank_code_before_query(self) -> None:
         if delete_history_by_code is None:
@@ -238,6 +263,9 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         delete.assert_not_called()
         with self.db.get_session() as session:
             self.assertIsNotNone(session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first())
+
+        with self.assertRaisesRegex(HistoryValidationError, "stock_code"):
+            HistoryService(self.db).delete_history_by_code(" ")
 
     def _build_result(self) -> AnalysisResult:
         """构造分析结果"""
@@ -2071,6 +2099,40 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             )
             self.assertEqual(
                 session.query(DecisionSignalRecord).filter(DecisionSignalRecord.trace_id == "trace-delete-unrelated").count(),
+                1,
+            )
+
+    def test_delete_analysis_history_records_rolls_back_dependent_cleanup(self) -> None:
+        """A parent-delete failure must restore dependent rows in the batch."""
+        record_id = self._save_history("query_delete_rollback")
+
+        with self.db.session_scope() as session:
+            session.add(BacktestResult(
+                analysis_history_id=record_id,
+                code="600519",
+                analysis_date=None,
+                eval_window_days=10,
+                engine_version="v1",
+                eval_status="pending",
+            ))
+            session.execute(text(
+                "CREATE TRIGGER fail_history_delete "
+                "BEFORE DELETE ON analysis_history "
+                f"WHEN OLD.id = {record_id} "
+                "BEGIN SELECT RAISE(ABORT, 'forced history delete failure'); END"
+            ))
+
+        with self.assertRaises(DatabaseError):
+            self.db.delete_analysis_history_records([record_id])
+
+        with self.db.get_session() as session:
+            self.assertIsNotNone(
+                session.query(AnalysisHistory).filter(AnalysisHistory.id == record_id).first()
+            )
+            self.assertEqual(
+                session.query(BacktestResult).filter(
+                    BacktestResult.analysis_history_id == record_id
+                ).count(),
                 1,
             )
 
