@@ -23,6 +23,7 @@ import {
   Field,
   InlineAlert,
   Input,
+  Loading,
   PageHeader,
   Select,
 } from '../components/common';
@@ -295,7 +296,7 @@ const StockDetailsPage: React.FC = () => {
               onAction={() => void loadQuote(canonicalCode)}
             />
           ) : quoteLoading && !quote ? (
-            <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
+            <Loading />
           ) : quote ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-baseline gap-3">
@@ -371,7 +372,7 @@ const StockDetailsPage: React.FC = () => {
               onAction={() => void loadHistory(canonicalCode, days)}
             />
           ) : historyLoading && !dailyCandles ? (
-            <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
+            <Loading />
           ) : displayCandles.length > 0 ? (
             <div className="space-y-4">
               <p className="text-sm text-secondary-text">
