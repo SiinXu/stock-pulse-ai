@@ -341,13 +341,6 @@ def build_stockpulse_backed_model(
                 llm_adapter.call_with_tools, sp_messages, tools, timeout=timeout
             )
 
-            if getattr(response, "provider", "") == "error":
-                # A sanitized public failure message: surface it as a bridge
-                # error so it never masquerades as a final dashboard answer.
-                raise _ProviderBridgeError(
-                    sanitize_agent_diagnostic(response.content or "LLM provider error")
-                )
-
             model_used = getattr(response, "model", "") or getattr(response, "provider", "")
             usage = response.usage or {}
             if recorder is not None and model_used and model_used != "error":
@@ -355,6 +348,22 @@ def build_stockpulse_backed_model(
             if model_used and model_used != "error":
                 self.models_used.append(model_used)
             self.total_tokens += int(usage.get("total_tokens", 0) or 0)
+
+            # A cancellation or deadline that arrived during the billed wire
+            # call must fence its response before PydanticAI can dispatch a
+            # returned tool call. The call's usage above is still accounted.
+            if cancelled_check is not None and cancelled_check():
+                raise _ExecutionCancelled()
+            timeout = remaining_timeout() if remaining_timeout is not None else None
+            if timeout is not None and timeout <= 0:
+                raise _ExecutionTimedOut()
+
+            if getattr(response, "provider", "") == "error":
+                # A sanitized public failure message: surface it as a bridge
+                # error so it never masquerades as a final dashboard answer.
+                raise _ProviderBridgeError(
+                    sanitize_agent_diagnostic(response.content or "LLM provider error")
+                )
 
             parts: List[Any] = []
             # RF-05 #4: carry the assistant-level provider trace (reasoning /

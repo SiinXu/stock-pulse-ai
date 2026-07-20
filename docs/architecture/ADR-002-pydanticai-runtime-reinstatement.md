@@ -74,9 +74,10 @@ ADR 审批。本 ADR 同时完成该审批（见 D3）。
   `contract-cancelrace-parallel-late-tool`。
 - 未列入允许清单的 `single_run` fixture 会使支持矩阵测试失败（fail closed）；
   扩大允许清单必须另立 ADR。
-- 3 个仅终态分类等价 fixture 的 fence 位置差异（Native 在当前 step 的工具前
-  fence timeout/cancel，实验 Runtime 在其后）记录为本 ADR 认可的 intentional
-  difference；两侧均不得伪造成功，dashboard 均保持为空。
+- 3 个仅终态分类等价 fixture 的历史工具执行日志差异记录为本 ADR 认可的
+  intentional difference，不据此宣称工具序列等价；live handle 的取消若在模型
+  wire call 中到达，实验 Runtime 仍须在处理返回的 tool call 前 fence。两侧均不得
+  伪造成功，dashboard 均保持为空。
 - 36 个 replay fixture 保持只读，不重录、不放宽。
 
 ### D4: 证据状态不升级

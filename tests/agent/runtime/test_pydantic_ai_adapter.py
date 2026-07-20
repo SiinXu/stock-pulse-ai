@@ -29,7 +29,7 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from src.agent.llm_adapter import LLMResponse
+from src.agent.llm_adapter import LLMResponse, ToolCall
 from src.agent.runtime.contract import ExecutionContext, ExecutionMode, ExecutionState
 from src.agent.runtime.pydantic_ai_adapter import (
     PydanticAIRuntimeAdapter,
@@ -265,6 +265,31 @@ def test_run_without_dashboard_json_fails_closed():
     assert "dashboard" in (handle.result.error or "").lower()
 
 
+def test_execute_reraises_worker_exception():
+    from pydantic_ai.models import Model
+
+    exception = RuntimeError("pydantic runtime boom")
+
+    class _RaisingModel(Model):
+        @property
+        def model_name(self) -> str:
+            return "raising-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            raise exception
+
+    adapter = PydanticAIRuntimeAdapter(model=_RaisingModel())
+
+    with pytest.raises(RuntimeError, match="pydantic runtime boom") as excinfo:
+        adapter.execute(_run_context("Analyze 600519"))
+
+    assert excinfo.value is exception
+
+
 def test_start_returns_live_running_handle_then_completes():
     started = threading.Event()
     release = threading.Event()
@@ -308,6 +333,52 @@ def test_live_handle_cancellation_wins_after_active_request_returns():
     assert handle.state is ExecutionState.CANCELLED
     assert handle.result.success is False
     assert handle.result.cancelled is True
+
+
+def test_live_cancel_fences_wire_response_before_tool_dispatch():
+    started = threading.Event()
+    release = threading.Event()
+
+    class _BlockingToolCallAdapter:
+        primary_model = "blocking-wire-model"
+
+        def call_with_tools(self, messages, tools, provider=None, timeout=None):
+            started.set()
+            assert release.wait(5)
+            return LLMResponse(
+                tool_calls=[
+                    ToolCall(
+                        id="call-after-cancel",
+                        name="echo",
+                        arguments={"message": "must-not-run"},
+                    )
+                ],
+                usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                model=self.primary_model,
+            )
+
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-cancel-fence",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        llm_adapter=_BlockingToolCallAdapter(),
+        tool_session=session,
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.request_cancel() is True
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert session.dispatched_calls == 0
 
 
 def test_live_handle_subscribes_to_tool_events_before_terminal():
