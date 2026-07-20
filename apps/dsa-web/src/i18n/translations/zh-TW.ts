@@ -2051,7 +2051,7 @@ export const translations: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.notes.0": "關閉後風險 Agent 的意見僅作參考，不會否決決策。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.summary": "允許風險 Agent 在檢測到關鍵風險訊號時否決買入訊號。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.title": "風險 Agent 否決權",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為觀望或賣出。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為持有或賣出。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.valueNotes.0": "僅在 AGENT_ORCHESTRATOR_MODE 包含風險階段時生效。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_AUTOWEIGHT.impact.0": "影響多策略綜合時的訊號權重分配。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_AUTOWEIGHT.notes.0": "需要先開啟回測功能並積累足夠的回測資料。",

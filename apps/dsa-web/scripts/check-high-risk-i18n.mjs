@@ -294,6 +294,18 @@ function validateDecisionEvidence(audit) {
   if (audit.decisionEvidence.sha256 !== canonicalDigest(audit.decisions)) {
     fail('decision evidence changed; review the rationale and refresh its count/hash together');
   }
+  const revisions = audit.decisions.flatMap((decision) => Object.keys(decision.before ?? {}).map(
+    (language) => [decision.key, language, decision.before[language], decision.recommended?.[language]],
+  )).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right), 'en'));
+  if (audit.decisionEvidence.localeValueCount !== revisions.length) {
+    fail('decisionEvidence.localeValueCount differs from the recorded locale revisions');
+  }
+  if (!/^[0-9a-f]{64}$/.test(audit.decisionEvidence.revisionSha256 ?? '')) {
+    fail('decisionEvidence.revisionSha256 must be a SHA-256 digest');
+  }
+  if (audit.decisionEvidence.revisionSha256 !== canonicalDigest(revisions)) {
+    fail('locale revision evidence changed; review every before/recommended value together');
+  }
 }
 
 function selectorMatches(key, selector, label) {
@@ -316,12 +328,15 @@ function validateDecisions(audit, bundles, uiLanguages, sourceIds) {
     fail('decisions must document the revised high-risk strings');
   }
   const decisionIds = new Set();
+  const decisionKeys = new Set();
   const categoriesById = new Map(audit.categories.map((category) => [category.id, category]));
   for (const decision of audit.decisions) {
     assertNonEmptyString(decision.id, 'decision.id');
     if (decisionIds.has(decision.id)) fail(`Duplicate decision id: ${decision.id}`);
     decisionIds.add(decision.id);
     assertNonEmptyString(decision.key, `${decision.id}.key`);
+    if (decisionKeys.has(decision.key)) fail(`Duplicate decision key: ${decision.key}`);
+    decisionKeys.add(decision.key);
     const category = categoriesById.get(decision.category);
     if (!category) fail(`${decision.id} has an unknown category`);
     if (!category.selectors.some((selector, index) => (
@@ -421,7 +436,7 @@ async function loadBaselineRecord(commit, language) {
   );
 }
 
-async function verifyDecisionBaseline(audit) {
+async function verifyDecisionBaseline(audit, bundles, allKeys, uiLanguages) {
   const mergeBase = await runGit(['merge-base', 'HEAD', audit.auditBaseline.ref]);
   if (mergeBase !== audit.auditBaseline.commit) {
     fail(
@@ -429,13 +444,14 @@ async function verifyDecisionBaseline(audit) {
     );
   }
 
-  const decisionLanguages = [...new Set(audit.decisions.flatMap(
+  const recordedLanguages = [...new Set(audit.decisions.flatMap(
     (decision) => Object.keys(decision.before ?? {}),
   ))].sort();
-  if (decisionLanguages.includes('zh')) {
+  if (recordedLanguages.includes('zh')) {
     fail('Baseline verification cannot use generated bundles for zh product-source decisions');
   }
-  const baselineRecords = Object.fromEntries(await Promise.all(decisionLanguages.map(async (language) => [
+  const baselineLanguages = uiLanguages.filter((language) => language !== 'zh').sort();
+  const baselineRecords = Object.fromEntries(await Promise.all(baselineLanguages.map(async (language) => [
     language,
     await loadBaselineRecord(audit.auditBaseline.commit, language),
   ])));
@@ -450,6 +466,28 @@ async function verifyDecisionBaseline(audit) {
       }
     }
   }
+
+  const actualRevisions = baselineLanguages.flatMap((language) => allKeys.flatMap((key) => {
+    const before = baselineRecords[language]?.[key];
+    const recommended = bundles[language]?.[key];
+    return before !== recommended ? [[key, language, before, recommended]] : [];
+  })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right), 'en'));
+  const recordedRevisions = audit.decisions.flatMap((decision) => Object.keys(decision.before).map(
+    (language) => [decision.key, language, decision.before[language], decision.recommended[language]],
+  )).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right), 'en'));
+  if (canonicalDigest(actualRevisions) !== canonicalDigest(recordedRevisions)) {
+    const revisionId = (revision) => `${revision[0]}[${revision[1]}]`;
+    const actualIds = new Set(actualRevisions.map(revisionId));
+    const recordedIds = new Set(recordedRevisions.map(revisionId));
+    const missing = actualRevisions.filter((revision) => !recordedIds.has(revisionId(revision))).map(revisionId);
+    const unexpected = recordedRevisions.filter((revision) => !actualIds.has(revisionId(revision))).map(revisionId);
+    fail(
+      'revision decision coverage differs from the baseline diff'
+        + `${missing.length ? `; missing ${missing.slice(0, 5).join(', ')}` : ''}`
+        + `${unexpected.length ? `; unexpected ${unexpected.slice(0, 5).join(', ')}` : ''}`,
+    );
+  }
+  return actualRevisions;
 }
 
 async function extractStringUnion(contract, label) {
@@ -606,9 +644,10 @@ async function run() {
   await validateContractBoundaries(audit, allKeys, bundles, uiLanguages);
   validateDecisions(audit, bundles, uiLanguages, sourceIds);
   if (shouldVerifyBaseline) {
-    await verifyDecisionBaseline(audit);
+    const revisions = await verifyDecisionBaseline(audit, bundles, allKeys, uiLanguages);
     process.stdout.write(
-      `High-risk i18n baseline verified: ${audit.decisions.length} decisions against ${audit.auditBaseline.commit}.\n`,
+      `High-risk i18n baseline verified: ${audit.decisions.length} stable keys and ${revisions.length} locale revisions `
+        + `against ${audit.auditBaseline.commit}.\n`,
     );
   }
   const snapshot = buildSnapshot(audit, bundles, uiLanguages, allKeys, sourceIds);
