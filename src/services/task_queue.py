@@ -1016,7 +1016,7 @@ class AnalysisTaskQueue:
                 child_command,
             )
         except BaseException as exc:
-            raised_error = exc
+            shared_error: Optional[BaseException] = None
             with self._data_lock:
                 current = self._retry_reservations.get(task_id)
                 if current is reservation:
@@ -1024,8 +1024,10 @@ class AnalysisTaskQueue:
                     del self._retry_reservations[task_id]
                     reservation.ready.set()
                 elif reservation.error is not None:
-                    raised_error = reservation.error
-            raise raised_error
+                    shared_error = reservation.error
+            if shared_error is not None and shared_error is not exc:
+                raise shared_error
+            raise
 
         return child_task_id
     
@@ -1658,7 +1660,8 @@ class AnalysisTaskQueue:
                 logger.info("[TaskQueue] Task completed: %s (%s)", task_id, stock_code)
             self._cleanup_old_tasks()
             return result
-        except BaseException as exc:  # noqa: B036 - worker failures become task state
+        except BaseException as exc:
+            # broad-exception: fallback_recorded - worker failures become sanitized task state.
             redaction_values = exception_chain_redaction_values(exc)
             diagnostic_error = sanitize_exception_chain(
                 exc,

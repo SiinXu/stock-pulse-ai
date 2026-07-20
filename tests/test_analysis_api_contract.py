@@ -2699,7 +2699,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         if create_app is None:
             self.skipTest("fastapi is not installed in this test environment")
 
-        schemas = create_app().openapi()["components"]["schemas"]
+        openapi_schema = create_app().openapi()
+        schemas = openapi_schema["components"]["schemas"]
 
         self.assertIn("TaskStatus", schemas)
         self.assertEqual(
@@ -2722,6 +2723,34 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             schemas["TaskInfo"]["properties"]["status"]["$ref"],
             "#/components/schemas/TaskStatusEnum",
         )
+        task_list_parameters = openapi_schema["paths"]["/api/v1/analysis/tasks"]["get"][
+            "parameters"
+        ]
+        status_parameter = next(
+            parameter for parameter in task_list_parameters if parameter["name"] == "status"
+        )
+        self.assertIn("interrupted", status_parameter["description"])
+
+        static_spec_path = (
+            Path(__file__).resolve().parents[1] / "docs/architecture/api_spec.json"
+        )
+        static_spec = json.loads(static_spec_path.read_text(encoding="utf-8"))
+        expected_statuses = schemas["TaskStatusEnum"]["enum"]
+        for schema_name in ("TaskStatus", "TaskInfo"):
+            self.assertEqual(
+                static_spec["components"]["schemas"][schema_name]["properties"][
+                    "status"
+                ]["enum"],
+                expected_statuses,
+            )
+        static_status_parameter = next(
+            parameter
+            for parameter in static_spec["paths"]["/api/v1/analysis/tasks"]["get"][
+                "parameters"
+            ]
+            if parameter["name"] == "status"
+        )
+        self.assertIn("interrupted", static_status_parameter["description"])
 
     def test_openapi_declares_backtest_phase_filter_enum_and_400(self) -> None:
         if create_app is None:

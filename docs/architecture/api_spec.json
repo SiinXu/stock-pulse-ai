@@ -213,7 +213,7 @@
           {
             "name": "status",
             "in": "query",
-            "description": "筛选状态：pending, processing, completed, failed, cancel_requested, cancelled（支持逗号分隔多个）",
+            "description": "筛选状态：pending, processing, completed, failed, cancel_requested, cancelled, interrupted（支持逗号分隔多个）",
             "schema": {
               "type": "string",
               "example": "pending,processing"
@@ -2959,8 +2959,11 @@
             "enum": [
               "pending",
               "processing",
+              "cancel_requested",
               "completed",
-              "failed"
+              "failed",
+              "cancelled",
+              "interrupted"
             ]
           },
           "progress": {
@@ -3012,8 +3015,11 @@
             "enum": [
               "pending",
               "processing",
+              "cancel_requested",
               "completed",
-              "failed"
+              "failed",
+              "cancelled",
+              "interrupted"
             ],
             "description": "任务状态"
           },
