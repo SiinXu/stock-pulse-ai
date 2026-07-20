@@ -22,6 +22,7 @@ export * from './FilterBar';
 export * from './AppliedFilterChips';
 export * from './AdvancedFilterSheet';
 export * from './useFilterQueryState';
+export * from './DataTable';
 export * from './ToastViewport';
 export * from './ToastProvider';
 export * from './toastContext';

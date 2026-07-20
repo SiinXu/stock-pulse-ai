@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 新增共享 `DataTable` 基础：typed columns/row keys、原生 caption/column/row 语义、受控 `aria-sort` 排序、唯一 empty/loading/error/retrying 状态、click/Enter/Space 行激活与嵌套控件事件隔离；窄屏使用命名且可聚焦的内部横向滚动区和稳定最小宽度，不造成文档横溢。生产守卫阻止复制 DataTable 或新增 raw table，现有 12 处旧表格按精确行绑定 UI1/UI2/UI3 迁移项。
+- [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
 - [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
 - [改进] Web 选股页（`StockScreeningPage`）迁移到语义容器与控件契约：5 个 ad-hoc `<section>`/`<form>` 面板、顶部状态 chip 与热点/概念/因子等内部卡片改用 `Surface`（`interactive` 档，边框/圆角/底色/阴影收敛到设计 token），热点错误提示改用 `InlineAlert`、无结果空态改用 `EmptyState`；主"开始选股"按钮不再用 `min-w-40` 覆写共享 `Button`，改由 `grid` 包裹保留最小宽度并清除设计守卫 `UI-SCR01` allowlist 例外；选股结果、涨跌/热度语义色、筛选与提交行为不变。装饰性圆点/徽章、可选卡片按钮与表格行内部按现状保留。
 - [改进] Web 设置组件 `LLMConfigModeBanner` 与 `GenerationBackendStatusPanel` 的手搓边框面板迁移到语义 `Surface`（interactive 层级），圆角/边框/背景改由 token 与层级提供，徽章、状态、迁移弹窗与文案行为不变。
@@ -197,6 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] 下沉运行流程与通知上下文契约：API 保留兼容重导出，Bot 在异步边界前生成不可变请求快照，核心服务不再依赖 API Schema 或 Bot DTO；上下文回复目标按平台验证并隔离凭据，拒绝的目标继续抑制静态广播。
 - [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
 - [改进] 建立统一的进程内 `TaskExecutionPort` 与不可变 task snapshot/event 契约：现有分析队列统一提供 submit/get/cancel/retry/subscribe、幂等与去重权威、首终态获胜的取消竞态、显式 `interrupted` 关停语义及有界 SSE stream，同时保留既有轮询与 SSE 载荷兼容。
+- [改进] Web 用量页（`TokenUsagePage`）"最近调用"块由原生 `<section>` + 手写 `<h2>` 头部迁移到语义 `Section`（标题/描述/时钟图标走 `title`/`description`/`actions`），与同页其余两块 `Section` 一致；表格容器、数值与交互不变。该页其余部分已使用 `AppPage`/`PageHeader`/`Section`/`SegmentedControl`/`StatePanel`/`StatCard`/`Surface`，本次仅补齐最后一处 ad-hoc 头部容器。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

@@ -35,6 +35,7 @@ Shared patterns compose these primitives:
 | `AdvancedFilterSheet` | Uses a non-modal dialog Popover at 768px and wider, a bottom Sheet below 768px, and one fixed reset/apply footer. |
 | `AppliedFilterChips` | Presents applied filters as individually removable tokens with one clear-all command. |
 | `useFilterQueryState` | Keeps applied filters in Router search params, preserves unrelated params, keeps drafts local, and restores both after Back/Forward navigation. |
+| `DataTable` | Renders typed columns and native table semantics, controlled sorting, one task state, contained narrow-screen scrolling, and isolated row activation. |
 
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
@@ -66,6 +67,51 @@ the other container can be opened. The caller owns all visible
 and accessible strings; the Pattern owns no business copy or API request.
 Both advanced-filter forms contain their submit event so a portalled form
 composed inside `FilterBar` cannot also submit the outer primary-filter form.
+
+## DataTable Semantics
+
+`DataTable<T>` is the shared authority for continuous business data. Callers
+provide typed columns, stable row keys, localized caption and state copy, and
+the already ordered row set. The Pattern does not fetch, paginate, infer a
+business schema, or sort data internally. Optional sort controls emit the next
+`columnId` / `ascending|descending` state; the caller owns local or server-side
+ordering. Every sortable column supplies its own localized accessible label,
+and the native column header exposes `aria-sort`.
+
+The Pattern renders one framed table surface. Empty rows use the required
+`emptyState`; loading, error, and retrying use one explicit `status` and hide
+the table so duplicate state blocks cannot appear. State content reuses
+`StatePanel` roles, live regions, busy state, and actions. Callers cannot pass
+`className`, `style`, or Surface attributes through `DataTable`; contextual
+layout belongs on a wrapper and cell typography belongs inside the cell
+renderer.
+
+On narrow screens the native table remains a table inside a named, keyboard-
+focusable horizontal scroll region. `content`, `wide`, and `extra-wide` are
+stable minimum-width contracts; scrolling is contained within the Pattern and
+must never increase document width. This preserves dense financial columns and
+their headers instead of duplicating rows into a second card DOM.
+
+An activatable row requires both `onRowActivate` and a localized
+`getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from
+nested `button`, link, input, label, select, textarea, summary,
+`contenteditable`, focusable element, or interactive ARIA role are ignored, so
+row navigation cannot fire together with an edit, menu, link, or form control.
+Disabled rows leave the activation tab sequence and expose `aria-disabled`.
+
+Existing raw tables remain exact, expiring page-track migrations:
+
+| Removal item | Execution owner | Current table sources |
+| --- | --- | --- |
+| `UI-R01` | `TRACK-UI1` | Market Review report table |
+| `UI-R02` | `TRACK-UI1` | Stock history trend table |
+| `UI-R03` | `TRACK-UI1` | Run Flow node-detail table |
+| `UI-U01` | `TRACK-UI1` | Token Usage recent calls |
+| `UI-A01` | `TRACK-UI2` | Alert rules, trigger history, and alert-event tables |
+| `UI-BT01` | `TRACK-UI2` | Backtest results |
+| `UI-P01` | `TRACK-UI2` | Portfolio positions |
+| `UI-SCR01` | `TRACK-UI2` | Screening results and stock history data |
+| `UI-S02` | `TRACK-UI3` | Settings AI overview matrix |
 
 ## Surface Hierarchy
 
@@ -179,6 +225,10 @@ The AST-backed production design guard checks:
   `components/common` owners.
 - New direct `pushState` or `replaceState` calls. Three existing filter-page
   calls remain exact line-level migration entries assigned to `TRACK-UI2`.
+- Shared `DataTable` implementations outside its declared common owner, plus
+  any new JSX / `createElement` raw table or page-local `role="table|grid"`
+  substitute. Twelve existing raw tables remain exact line-level entries
+  assigned to their page tracks and removal items.
 
 Temporary override exceptions record both exact tokens and their removal work
 item:
@@ -213,7 +263,11 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   migrate a business page: `TRACK-UI2` owns Decision Signals (`UI-D01`),
   Backtest (`UI-BT01`), and Stock Screening (`UI-SCR01`) and must delete each
   exact direct-history allowance in the same change that adopts the Router
-  query contract. `UI-F04B` adds the shared DataTable authority separately.
+  query contract.
+- `UI-F04B` establishes the typed `DataTable`, state, sorting, row-event, and
+  contained-scroll contracts. It does not migrate a business page. Each page
+  track deletes its exact raw-table allowance in the same change that adopts
+  the shared Pattern; the final migration deletes the legacy allowance list.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
   raw controls are deleted.
