@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -6,7 +6,7 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SegmentedControl, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Switch, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -186,6 +186,7 @@ const ChatPage: React.FC = () => {
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [showSkillDesc, setShowSkillDesc] = useState<string | null>(null);
   const [mobileSkillPickerOpen, setMobileSkillPickerOpen] = useState(false);
+  const [sessionSearch, setSessionSearch] = useState('');
   const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -914,6 +915,11 @@ const ChatPage: React.FC = () => {
     </div>
   );
 
+  const filteredSessions = useMemo(
+    () => sessions.filter((session) => session.title.toLocaleLowerCase().includes(sessionSearch.trim().toLocaleLowerCase())),
+    [sessions, sessionSearch],
+  );
+
   const sidebarContent = (
     <>
       <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
@@ -946,6 +952,15 @@ const ChatPage: React.FC = () => {
           </button>
         </div>
       </div>
+      <div className="px-3 pt-3">
+        <SearchInput
+          value={sessionSearch}
+          onChange={(event) => setSessionSearch(event.target.value)}
+          aria-label={t('layout.search')}
+          placeholder={t('common.searchPlaceholder')}
+          wrapperClassName="w-full shadow-none"
+        />
+      </div>
       <ScrollArea testId="chat-session-list-scroll" viewportClassName="p-3">
         {sessionsLoading ? (
           <DashboardStateBlock
@@ -965,9 +980,14 @@ const ChatPage: React.FC = () => {
             title={t('chat.emptySessionsTitle')}
             description={t('chat.emptySessionsDescription')}
           />
+        ) : filteredSessions.length === 0 ? (
+          <DashboardStateBlock
+            compact
+            title={t('common.noMatches')}
+          />
         ) : (
           <div className="space-y-2">
-            {sessions.map((s) => (
+            {filteredSessions.map((s) => (
               <div key={s.session_id} className="session-item-row">
                 <button
                   type="button"

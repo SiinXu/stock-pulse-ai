@@ -168,6 +168,35 @@ promptly when it becomes true. This process-local contract does not claim forced
 process termination for an uncooperative runner.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
-task sharing, or durable recovery after an ungraceful process loss. Deployment
-continues to require one Web process for a single task authority; broader startup
-and Bot authority migration is handled separately.
+task sharing, or durable recovery after an ungraceful process loss.
+
+## Single-Process Authority
+
+`AnalysisTaskQueue` is a per-process singleton: re-instantiating it returns the
+same object and never forks a second authority or resets live task state. A
+deployment therefore requires one process to own one task authority; a
+multi-process or multi-worker deployment would hold divergent in-memory task
+state and is out of scope for this process-local contract.
+
+Because the authority is process-local, `interrupted` is the recovery verdict for
+work fenced by a graceful shutdown: every non-terminal task transitions to the
+terminal `interrupted` state, and first-terminal-wins means a worker result that
+lands after the interrupt (a late `completed`/`failed`) is rejected instead of
+resurrecting the task. There is no cross-process or durable recovery; an
+`interrupted` task stays terminal.
+
+## Bot Semantics
+
+The Bot `/analyze` command submits through this same authority, not a parallel
+service. Bot submissions share the API/Web task ID, canonical stock-code dedupe,
+status enum, and stable error classification: a second in-flight request for an
+equivalent stock code is rejected with the same duplicate signal instead of
+starting a concurrent analysis. There is no separate Bot task lifecycle, status
+enum, or error vocabulary; the legacy `TaskService` has been removed.
+
+A Bot submission additionally carries the requester's contextual reply targets
+(the DingTalk/Feishu/Telegram conversation to notify). Those addresses are passed
+out-of-band through the command runner and are deliberately kept out of
+`TaskSnapshot`, the legacy `TaskInfo` projection, SSE payloads, and the
+idempotency fingerprint, so they never enter shared task state while the notifier
+still pushes the result back to the originating conversation.
