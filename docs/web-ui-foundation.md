@@ -31,9 +31,41 @@ Shared patterns compose these primitives:
 | --- | --- |
 | `Section` | Renders a visible heading and associates it with a semantic section; actions and content remain within one surface boundary. |
 | `StatePanel` | Represents one typed task state and owns its live-region, busy, icon, density, description, and action semantics. |
+| `FilterBar` | Owns the compact primary-filter form, Apply command, advanced-filter slot, and applied-filter summary slot. |
+| `AdvancedFilterSheet` | Uses a non-modal dialog Popover at 768px and wider, a bottom Sheet below 768px, and one fixed reset/apply footer. |
+| `AppliedFilterChips` | Presents applied filters as individually removable tokens with one clear-all command. |
+| `useFilterQueryState` | Keeps applied filters in Router search params, preserves unrelated params, keeps drafts local, and restores both after Back/Forward navigation. |
 
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
+
+## Filter And Query Semantics
+
+Applied filters are navigation state. A page supplies a typed
+`FilterQueryCodec` that reads and normalizes its owned search-param keys and
+writes only those keys. `useFilterQueryState` starts every write from the
+current Router params, so report provenance, source context, and other
+unrelated query state survive filter changes. Apply uses a new history entry by
+default; Back and Forward therefore restore both the applied value and local
+draft. Canonicalization-only callers may explicitly opt into replace
+navigation.
+
+The hook exposes separate applied and draft counts, dirty state, draft reset,
+draft discard, applied reset, and direct applied-value updates for individual
+chip removal. Filter controls must disable Apply when the draft is unchanged
+or a request is in flight. Applying filters may explicitly clear pagination
+keys, but the codec must not delete query keys owned by another route concern.
+
+`AdvancedFilterSheet` uses the existing semantic Overlay foundation. At the
+desktop breakpoint its non-modal dialog Popover moves focus to the first
+control and restores the trigger when dismissed. Below that breakpoint it
+uses `FilterSheet`, including the fixed header/body/footer, Escape, focus trap,
+scroll lock, and trigger restoration contracts. Crossing the 768px breakpoint
+while filters are open closes the old container and restores its trigger before
+the other container can be opened. The caller owns all visible
+and accessible strings; the Pattern owns no business copy or API request.
+Both advanced-filter forms contain their submit event so a portalled form
+composed inside `FilterBar` cannot also submit the outer primary-filter form.
 
 ## Surface Hierarchy
 
@@ -143,19 +175,22 @@ The AST-backed production design guard checks:
   shadows, named card classes, inline visual styles, arbitrary-property
   utilities, and dynamic visual overrides. Required adapter forwarding uses
   exact call-site exceptions with a deletion work item.
+- Shared Filter/Query implementation names outside their declared
+  `components/common` owners.
+- New direct `pushState` or `replaceState` calls. Three existing filter-page
+  calls remain exact line-level migration entries assigned to `TRACK-UI2`.
 
 Temporary override exceptions record both exact tokens and their removal work
 item:
 
-| Owner | Temporary reason |
-| --- | --- |
-| `UI-D01` | Replace the multiline Decision Signals candidate Button with the shared filter/pressable pattern. |
-| `UI-F03` | Replace Settings toast visual overrides with the shared Overlay and Toast contract. |
-| `UI-P01` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
-| `UI-R01` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
-| `UI-R02` | Remove report/history compatibility card classes during route-level reading and trend migration. |
-| `UI-R03` | Move TaskPanel layout and visual ownership into the route-level Run Flow workspace. |
-| `UI-SCR01` | Replace the Stock Screening loading-width shim with stable task-action layout. |
+| Removal item | Execution owner | Temporary reason |
+| --- | --- | --- |
+| `UI-D01` | `TRACK-UI2` | Replace the multiline Decision Signals candidate Button with the shared filter/pressable pattern. |
+| `UI-P01` | `TRACK-UI2` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
+| `UI-R01` | `TRACK-UI1` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
+| `UI-R02` | `TRACK-UI1` | Remove report/history compatibility card classes during route-level reading and trend migration. |
+| `UI-R03` | `TRACK-UI1` | Move TaskPanel layout and visual ownership into the route-level Run Flow workspace. |
+| `UI-SCR01` | `TRACK-UI2` | Replace the Stock Screening loading-width shim with stable task-action layout. |
 
 The sole temporary `size="xl"` caller is the NotFound recovery CTA; `UI-QA01`
 must re-evaluate and remove that compatibility entry when legacy cleanup lands.
@@ -173,9 +208,15 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   `SettingsSectionCard` through compatibility adapters; and uses Token Usage
   as the first complete state consumer. Each domain work item replaces its
   compatibility calls with the authoritative API when it owns that page.
+- `UI-F04A` establishes `FilterBar`, `AdvancedFilterSheet`,
+  `AppliedFilterChips`, `FilterChip`, and `useFilterQueryState`. It does not
+  migrate a business page: `TRACK-UI2` owns Decision Signals (`UI-D01`),
+  Backtest (`UI-BT01`), and Stock Screening (`UI-SCR01`) and must delete each
+  exact direct-history allowance in the same change that adopts the Router
+  query contract. `UI-F04B` adds the shared DataTable authority separately.
 - Existing page-local textarea implementations migrate through their owning
-  page work items (`UI-C01` and `UI-S02`) before duplicate raw controls are
-  deleted.
+  page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
+  raw controls are deleted.
 - `UI-QA01` removes expired allowlist entries and deletes a compatibility
   adapter only after its final production consumer has migrated; it also
   verifies that no duplicate primitive, state, alert, or surface implementation

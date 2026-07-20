@@ -50,6 +50,7 @@ export const productionDesignGuardFixtures = {
   nearViewportPanel: '<div className="max-w-[96vw]">Complex panel</div>',
   iconOnlyButton: 'import { Trash2 } from \'lucide-react\'; <Button variant="ghost" aria-label="Delete"><Trash2 aria-hidden="true" /></Button>',
   symbolOnlyButton: '<Button variant="ghost" aria-label="More">⋮</Button>',
+  filterChipPill: '<button type="button" data-control="filter-chip" className="rounded-full">Market: US</button>',
   sharedPrimaryTrailingOverride: [
     'const BAD = { primary: \'bg-primary-gradient\' } as const;',
     'const BUTTON_VARIANT_STYLES = {',

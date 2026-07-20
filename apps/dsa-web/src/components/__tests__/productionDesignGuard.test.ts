@@ -58,6 +58,8 @@ const PRIMARY_CTA_SHIMMER_PATTERN = /(?<![a-zA-Z0-9_-])(?:animate-\[[^\]\r\n]*sh
 const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(|var\(--[\w-]*gradient[\w-]*\))/i;
 const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
 const PILL_RADIUS_CLASS_PATTERN = /\brounded-(?:[trblse]{1,2}-)?full\b/g;
+const FILTER_CHIP_OWNER = '../common/AppliedFilterChips.tsx';
+const FILTER_CHIP_CONTROL_PATTERN = /\bdata-control\s*=\s*["']filter-chip["']/;
 const BUTTON_RADIUS_CLASS_PATTERN = /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?$/;
 const BUTTON_CANONICAL_SIZE_HEIGHTS = {
   compact: 'h-7',
@@ -2670,6 +2672,9 @@ function findProductionDesignViolations(
   for (const buttonMatch of source.matchAll(BUTTON_OPENING_TAG_PATTERN)) {
     const button = buttonMatch[0];
     const buttonIndex = buttonMatch.index ?? 0;
+    const isOwnedFilterChip = filename === FILTER_CHIP_OWNER
+      && FILTER_CHIP_CONTROL_PATTERN.test(button);
+    if (isOwnedFilterChip) continue;
     for (const radiusMatch of button.matchAll(PILL_RADIUS_CLASS_PATTERN)) {
       violations.push({
         file: filename,
@@ -2884,6 +2889,14 @@ describe('production design guard', () => {
       productionDesignGuardFixtures.mappedPillCssButton,
       new Set(['session-item']),
     )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'border-radius: 50%' })]);
+    expect(findProductionDesignViolations(
+      '../../pages/ExamplePage.tsx',
+      productionDesignGuardFixtures.filterChipPill,
+    )).toEqual([expect.objectContaining({ rule: 'button-shape', token: 'rounded-full' })]);
+    expect(findProductionDesignViolations(
+      FILTER_CHIP_OWNER,
+      productionDesignGuardFixtures.filterChipPill,
+    )).toEqual([]);
   });
 
   it('self-test inspects the shared Button size style map', () => {

@@ -123,10 +123,16 @@ export const Popover = ({
   }, [open, shouldRestoreFocus]);
 
   useEffect(() => {
-    if (!open || contentRole !== 'menu') return;
+    if (!open || (contentRole !== 'menu' && contentRole !== 'dialog')) return;
     const frame = requestAnimationFrame(() => {
       const content = contentRef.current;
       if (!content || content.contains(document.activeElement)) return;
+      if (contentRole === 'dialog') {
+        content.querySelector<HTMLElement>(
+          'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+        )?.focus();
+        return;
+      }
       const activeItem = content.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"], [role="menuitemcheckbox"][aria-checked="true"]');
       const firstItem = content.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]');
       const target = activeItem ?? firstItem;
