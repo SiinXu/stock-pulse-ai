@@ -19,7 +19,7 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 | --- | --- |
 | `Button` | Requires an explicit intent, forwards the native button ref, and exposes semantic variant and size state. |
 | `SelectionChip` | Provides a compact text-led selection command that grows for multi-line content without caller-owned geometry. |
-| `IconButton` | Requires an accessible name, provides an optional tooltip, and separates its visible icon surface from its coarse-pointer hit target. |
+| `IconButton` | Requires an accessible name, provides an optional tooltip, separates its visible icon surface from its coarse-pointer hit target, and owns the 44px `navigation` size used by shell and rail controls. |
 | `Input` | Forwards the native input ref, owns label/hint/error wiring, and uses a focusable coarse-pointer frame around the visible input. |
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
 | `Textarea` | Reuses `Field`, forwards the native textarea ref, and owns invalid/description semantics. |
@@ -171,11 +171,24 @@ Callers provide localized titles, descriptions, action labels, and toolbar
 names.
 
 `ResponsiveRail` is an `aside` named by its visible H2. At `xl` it is visible
-and sticky within the workspace; below `xl` it becomes one native button
-disclosure with caller-provided expand/collapse names. Its compact open state
-is controlled or uncontrolled and never enters business URL state.
+and sticky within the workspace. From 1024px through 1279px and below 768px,
+it becomes one native button disclosure with caller-provided expand/collapse
+names. From 768px through 1023px, that same labelled trigger opens a shared
+Navigation Drawer, and leaving the tablet range closes any open rail before
+changing presentation. Its open state is controlled or uncontrolled and never
+enters business URL state. Callers provide a localized `drawerTitle`; the
+Pattern owns Drawer width, focus entry, Escape, scroll lock, and restoration.
 `SummaryStrip` is one labelled definition list with stable metric IDs and
 semantic state tones; it does not create a row of nested cards.
+
+Owner exception (2026-07-20, final-closeout Harness): `ResponsiveRail`'s
+Drawer/disclosure behavior is intentionally retained before its first
+production page adoption because the owner explicitly requires this responsive
+foundation contract. Current consumers are fixtures and tests only; this is not
+recorded as production adoption. A page owner must consume this shared Pattern
+rather than create a parallel rail. If the product direction changes before
+that first consumer lands, revert the responsive behavior, fixture, and tests as
+one foundation unit.
 
 `Tabs` and `TabPanel` are reserved for mutually exclusive content under one
 page H1. They own tablist/tab/tabpanel association, disabled-item skipping,
@@ -198,6 +211,11 @@ Same-path POP may restore a unique stable trigger but never falls back to the
 H1. Blocked navigation retains its trigger until the Router proceeds or resets
 the transition. Entries are bounded in memory and contain strings only, never
 DOM refs, URL state, browser history state, `localStorage`, or `sessionStorage`.
+When a responsive overlay trigger is transient, it may declare one unique,
+persistent `data-route-focus-return-key` counterpart. The coordinator validates,
+captures, stores, and restores that key per `location.key`; Shell and navigation
+components only render the two stable markers and never copy route metadata or
+rewrite the persistent key.
 
 Business code must use React Router navigation APIs rather than direct
 `pushState` or `replaceState`. The production guard discovers calls through
@@ -205,6 +223,59 @@ direct, aliased, computed, or destructured method access. Three legacy
 TRACK-UI2 calls remain expiring migrations located by file, method, and count,
 so unrelated line insertions cannot break the allowlist. Their owning page
 work items must remove the matching entry when they adopt Router query state.
+
+## Application Shell And Navigation
+
+`Shell` owns the application's single `main` landmark and global navigation.
+The global `main` retains the owner-selected framed/floating surface: one card
+background, border, radius, shadow, and responsive outer gutter around page
+content. Wide page content remains reachable through the `main` scroll
+container instead of being clipped or widening the document. UI-N01 does not
+replace or reinterpret the separately owned UI4 L-09 target. The typed
+application navigation descriptor preserves the nine approved flat routes;
+Research, More, or another top-level destination requires a separate
+information-architecture decision.
+
+The responsive contract has three states:
+
+- Below 1024px, one shared navigation `IconButton`, the complete product name,
+  and one directly reachable compact Profile trigger form the mobile header.
+  Theme and language controls live inside the Profile dialog. Global navigation
+  uses the Navigation `Drawer`; closing with Escape or the close control
+  restores its opener. Only an unmodified primary same-window route activation
+  closes the Drawer and delegates focus to the destination's ready H1;
+  modifier, download, and new-context activation retain the current Drawer and
+  native browser behavior. Each transient Drawer route declares the one stable
+  mobile opener as its return target. `RouteFocusCoordinator` stores that target
+  per history entry, so repeated Back/Forward restores the visible opener without
+  Shell retaining or rewriting route metadata.
+- From 768px through 1023px, page-owned business navigation represented by a
+  `ResponsiveRail` uses its own labelled Navigation Drawer. Below 768px it
+  remains an inline disclosure, avoiding a second hamburger-style mobile menu.
+- From 1024px through 1279px, the global sidebar defaults to an 80px compact
+  rail when the user has not chosen a state. A saved expanded or collapsed
+  preference remains authoritative at this breakpoint, and the rail always
+  provides the corresponding 44px toggle. A contextual `ResponsiveRail`
+  remains in document flow and uses its compact disclosure, so it does not
+  create a second permanent sidebar at the constrained breakpoint.
+- At 1280px and wider, the global sidebar uses the same persisted preference,
+  defaulting to its 240px expanded state. The expanded state always displays
+  the complete product name.
+
+If an open mobile Drawer crosses into the desktop breakpoint, the shell closes
+it and moves focus to the current desktop route, or to the labelled desktop
+sidebar when no route matches. A breakpoint change while the Drawer is closed
+does not move focus. Desktop and mobile navigation instances use distinct,
+stable route-focus marker prefixes so Router restoration never sees duplicate
+targets. The profile surface uses dialog semantics, moves focus into its first
+control, closes on Escape, and restores its trigger; crossing the desktop
+breakpoint while Profile is open closes the old presentation and focuses the
+visible Profile counterpart. It does not claim an incomplete menu keyboard
+model. Compact navigation controls use the shared labelled Tooltip, route rows
+and preference controls retain 44px targets without flex shrinking, and the
+route list owns vertical scrolling so Profile and logout remain reachable at
+short viewport heights. The framed `main` permits native horizontal and vertical
+touch panning when page-owned content is wider than its viewport.
 
 ## Surface Hierarchy
 
@@ -311,10 +382,14 @@ The canonical visible tiers are:
 | `default` | 32px | Ordinary commands |
 | `comfortable` | 36px | Forms and regular submissions |
 | `primary` | 40px | The unique task CTA |
+| `navigation` | 44px | Shell, rail, and overlay navigation controls |
 
 `Button` defaults to `default`; `Input` defaults to `comfortable`; login inputs
 resolve to `primary`. `IconButton` supports `compact`, `default`, and
-`comfortable` visible squares.
+`comfortable` visible squares plus the 44px `navigation` square. The
+`navigation` tier is reserved for shell, rail, and overlay navigation controls
+whose visible target must remain 44px; it is not a general replacement for the
+smaller command tiers.
 
 When any available pointer is coarse, including on hybrid touchscreen devices,
 `Button` and `IconButton` use a transparent pseudo-element to provide at least a

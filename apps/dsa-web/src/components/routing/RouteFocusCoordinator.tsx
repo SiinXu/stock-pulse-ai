@@ -155,15 +155,22 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
         ? event.target.closest<HTMLElement>('[data-route-focus-key]')
         : null;
       const focusKey = target?.dataset.routeFocusKey?.trim();
+      const returnFocusKey = target?.dataset.routeFocusReturnKey?.trim();
       const currentLocationKey = currentLocationKeyRef.current;
-      if (!target || !focusKey || !currentLocationKey || uniqueFocusableMarker(focusKey) !== target) {
+      if (
+        !target
+        || !focusKey
+        || !currentLocationKey
+        || uniqueFocusableMarker(focusKey) !== target
+        || (returnFocusKey && routeFocusElements(returnFocusKey).length !== 1)
+      ) {
         if (!hasBlockedNavigation()) clearPendingMarker();
         return;
       }
 
       const marker = {
         locationKey: currentLocationKey,
-        focusKey,
+        focusKey: returnFocusKey || focusKey,
         historyKey: browserHistoryKey(),
       };
       pendingMarkerRef.current = marker;
