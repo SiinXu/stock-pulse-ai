@@ -182,11 +182,6 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     removeBy: 'UI-QA01',
     tokens: ['dynamic:className'],
   }]],
-  ['../history/StockHistoryTrendDrawer.tsx', [205, 239, 272].map((line) => ({
-    line,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }))],
   ['../report/AnalysisContextSummary.tsx', [{
     line: 119,
     removeBy: 'UI-R01',

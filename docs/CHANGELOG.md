@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 历史趋势抽屉（`StockHistoryTrendDrawer`）收敛 ad-hoc 面板：移除 3 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉，纯守卫债），并同步删除设计守卫里对应的本轨 allowlist 例外；页内 ad-hoc 指标卡片改用语义 `Surface`（`interactive` 档，圆角/内边距/数值不变，边框与底色对齐设计 token）。范围/查看报告按钮为保 44px 粗指针命中区暂不改用 `SegmentedControl`/`Button`，`glass-card` 列表面板的层级取舍待可视化 QA，均记为本轨后续。
 - [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
 - [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
 - [改进] Web 决策信号页迁移到冻结语义容器：重评估面板与预览指标块改用 `Surface`，全局后验统计卡改用 `StatCard`（涨跌语义色以内联 span 保留），重评估告警列表改用 `InlineAlert`，块级加载态统一改用 `Loading`（compact `StatePanel`），移除页面内 ad-hoc 卡片边框/背景/圆角；数字、方向、单位与文案不变，候选股多行 chip 按钮受限于基础层暂缺多行控件，保留其既有样式并记 Deferred to UIUX。
