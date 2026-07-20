@@ -796,6 +796,57 @@ def test_real_thread_pool_shutdown_returns_before_blocked_runner_exits(task_queu
     assert cancellation_observations == [True]
 
 
+def test_queue_is_process_local_singleton_authority(task_queue) -> None:
+    """The task authority is one per-process singleton, not a per-caller instance."""
+    task_queue._executor = DeferredExecutor()
+    task_id = task_queue.submit(make_command(lambda _context: {"ok": True}))
+
+    # Re-instantiating never forks a second authority or loses live task state.
+    assert AnalysisTaskQueue() is task_queue
+    assert AnalysisTaskQueue(max_workers=99) is task_queue
+    assert AnalysisTaskQueue().get(task_id).status == TaskStatus.PENDING
+
+
+def test_dedupe_key_enforces_single_flight_per_canonical_stock(task_queue) -> None:
+    """Equivalent market code forms cannot run two concurrent analyses."""
+    task_queue._executor = DeferredExecutor()
+    first = task_queue.submit_task("600519")
+    assert first.status == TaskStatus.PENDING
+
+    with pytest.raises(DuplicateTaskError) as excinfo:
+        task_queue.submit_task("600519.SH")
+    assert excinfo.value.existing_task_id == first.task_id
+
+
+def test_interrupted_task_stays_terminal_after_runner_completes(task_queue) -> None:
+    """A late completion after process interruption never resurrects the task."""
+    started = threading.Event()
+    release = threading.Event()
+    task_queue._executor = ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix="task_interrupt_final_",
+    )
+
+    def run(context):
+        started.set()
+        assert release.wait(timeout=5)
+        return {"ok": True}
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert started.wait(timeout=2)
+
+    try:
+        task_queue.shutdown()
+        assert task_queue.get(task_id).status == TaskStatus.INTERRUPTED
+    finally:
+        release.set()
+        future.result(timeout=2)
+
+    # First-terminal-wins: the runner's late {"ok": True} must not overwrite INTERRUPTED.
+    assert task_queue.get(task_id).status == TaskStatus.INTERRUPTED
+
+
 def test_cleanup_removes_all_owner_indexes(task_queue) -> None:
     task_queue._executor = SynchronousExecutor()
     task_queue._max_history = 1

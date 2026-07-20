@@ -997,6 +997,13 @@ class YfinanceFetcher(BaseFetcher):
             except Exception:
                 name = STOCK_NAME_MAP.get(symbol, '')
 
+            # Reuse the ticker_info fetched above for valuation; no extra request.
+            # Imported locally (module still has no module-level dependency on the
+            # fundamental adapter) to keep the module import block unchanged.
+            from .yfinance_fundamental_adapter import _safe_float
+            pe_ratio = _safe_float(ticker_info.get('trailingPE'))
+            pb_ratio = _safe_float(ticker_info.get('priceToBook'))
+
             missing_fields = [
                 field
                 for field, value in {
@@ -1004,8 +1011,8 @@ class YfinanceFetcher(BaseFetcher):
                     "prev_close": prev_close,
                     "volume": volume,
                     "amount": None,
-                    "pe_ratio": None,
-                    "pb_ratio": None,
+                    "pe_ratio": pe_ratio,
+                    "pb_ratio": pb_ratio,
                 }.items()
                 if value is None
             ]
@@ -1029,8 +1036,8 @@ class YfinanceFetcher(BaseFetcher):
                 high=high,
                 low=low,
                 pre_close=prev_close,
-                pe_ratio=None,
-                pb_ratio=None,
+                pe_ratio=pe_ratio,
+                pb_ratio=pb_ratio,
                 total_mv=market_cap,
                 circ_mv=None,
             )
@@ -1038,25 +1045,22 @@ class YfinanceFetcher(BaseFetcher):
             logger.info(f"[Yfinance] 获取 {symbol} 实时行情成功: 价格={price}")
             return quote
 
-        except Exception as e:
-            if self._is_us_stock(stock_code):
-                log_safe_exception(
-                    logger,
-                    "Yfinance US realtime quote failed; trying Stooq fallback",
-                    e,
-                    error_code="yfinance_us_realtime_quote_failed",
-                    level=logging.WARNING,
-                    context={"symbol": stock_code},
-                )
-                return self._get_us_stock_quote_from_stooq(stock_code)
+        except Exception as e:  # broad-exception: fallback_recorded - failure is logged, then degraded to Stooq (US) or None
+            is_us = self._is_us_stock(stock_code)
             log_safe_exception(
                 logger,
-                "Yfinance realtime quote failed",
+                "Yfinance US realtime quote failed; trying Stooq fallback"
+                if is_us
+                else "Yfinance realtime quote failed",
                 e,
-                error_code="yfinance_realtime_quote_failed",
+                error_code="yfinance_us_realtime_quote_failed"
+                if is_us
+                else "yfinance_realtime_quote_failed",
                 level=logging.WARNING,
                 context={"symbol": stock_code},
             )
+            if is_us:
+                return self._get_us_stock_quote_from_stooq(stock_code)
             return None
 
 
