@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import { Bell, Trash2 } from 'lucide-react';
-import { Badge, Button, Card, ConfirmDialog, EmptyState, Pagination, Select } from '../common';
+import { Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, Pagination, Select } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
@@ -129,6 +129,125 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
     busyRules[rule.id] === action
   );
 
+  const ruleColumns: DataTableColumn<AlertRuleItem>[] = [
+    {
+      id: 'rule',
+      header: text.rule,
+      cell: (rule) => (
+        <>
+          <div className="font-medium text-foreground">{rule.name}</div>
+          <div className="mt-1 text-xs text-muted-text">{formatUiText(text.source, { source: rule.source })}</div>
+        </>
+      ),
+    },
+    {
+      id: 'target',
+      header: text.target,
+      cell: (rule) => (
+        <>
+          <div className="font-mono">{formatTarget(rule, language)}</div>
+          <div className="mt-1 text-xs">{ALERT_SCOPE_LABELS[language][rule.targetScope] ?? rule.targetScope}</div>
+        </>
+      ),
+    },
+    {
+      id: 'type',
+      header: text.type,
+      cell: (rule) => (
+        <div className="flex flex-col items-start gap-1">
+          <Badge variant="info">{ALERT_TYPE_LABELS[language][rule.alertType]}</Badge>
+          <Badge variant={rule.severity === 'critical' ? 'danger' : rule.severity === 'warning' ? 'warning' : 'default'}>
+            {ALERT_SEVERITY_LABELS[language][rule.severity] ?? rule.severity}
+          </Badge>
+        </div>
+      ),
+    },
+    {
+      id: 'parameters',
+      header: text.parameters,
+      cell: (rule) => formatParameters(rule, language),
+    },
+    {
+      id: 'status',
+      header: text.status,
+      cell: (rule) => (
+        <Badge variant={rule.enabled ? 'success' : 'default'}>
+          {rule.enabled ? text.enabled : text.disabled}
+        </Badge>
+      ),
+    },
+    {
+      id: 'cooldown',
+      header: text.cooldown,
+      cell: (rule) => (
+        <div className="text-xs">
+          <div>{isCoolingDown(rule) ? text.coolingDown : text.notCoolingDown}</div>
+          <div className="mt-1">{formatUiDateTime(rule.cooldownUntil, language, { dateStyle: 'medium', timeStyle: 'short' })}</div>
+          {hasChildTargetCooldown(rule) ? (
+            <div className="mt-1 text-muted-text">{text.childTargetCooldown}</div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      id: 'updatedAt',
+      header: text.updatedAt,
+      cell: (rule) => (
+        <span className="text-xs">
+          {formatUiDateTime(rule.updatedAt ?? rule.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}
+        </span>
+      ),
+    },
+    {
+      id: 'action',
+      header: text.action,
+      align: 'end',
+      cell: (rule) => (
+        <div className="flex justify-end gap-2">
+          <Button
+            size="compact"
+            variant="outline"
+            aria-label={formatUiText(text.editAria, { name: rule.name })}
+            onClick={() => onEdit(rule)}
+            disabled={isLoading || isRuleBusy(rule)}
+          >
+            {text.edit}
+          </Button>
+          <Button
+            size="compact"
+            variant="outline"
+            onClick={() => onTest(rule)}
+            isLoading={isRuleActionBusy(rule, 'test')}
+            loadingText={text.testing}
+            disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'test'))}
+          >
+            {text.test}
+          </Button>
+          <Button
+            size="compact"
+            variant={rule.enabled ? 'secondary' : 'primary'}
+            onClick={() => onToggleEnabled(rule)}
+            isLoading={isRuleActionBusy(rule, 'toggle')}
+            loadingText={rule.enabled ? text.disabling : text.enabling}
+            disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'toggle'))}
+          >
+            {rule.enabled ? text.disable : text.enable}
+          </Button>
+          <Button
+            size="compact"
+            variant="danger-subtle"
+            aria-label={formatUiText(text.deleteAria, { name: rule.name })}
+            onClick={() => setPendingDelete(rule)}
+            disabled={isLoading || isRuleBusy(rule)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {text.delete}
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <Card
       title={text.title}
@@ -156,111 +275,24 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
         />
       </div>
 
-      {rules.length === 0 ? (
-        <div className="flex min-h-56 flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Bell className="h-6 w-6" />}
-            title={isLoading ? text.loadingRules : text.emptyTitle}
-            description={text.emptyDescription}
-          />
-        </div>
-      ) : (
-        <div className={`relative min-h-0 flex-1 overflow-x-auto ${isLoading ? 'pointer-events-none opacity-60' : ''}`} aria-busy={isLoading}>
-          <table className="w-full min-w-240 text-left text-sm">
-            <thead className="border-b border-border/60 text-xs uppercase text-muted-text">
-              <tr>
-                <th className="px-3 py-2 font-medium">{text.rule}</th>
-                <th className="px-3 py-2 font-medium">{text.target}</th>
-                <th className="px-3 py-2 font-medium">{text.type}</th>
-                <th className="px-3 py-2 font-medium">{text.parameters}</th>
-                <th className="px-3 py-2 font-medium">{text.status}</th>
-                <th className="px-3 py-2 font-medium">{text.cooldown}</th>
-                <th className="px-3 py-2 font-medium">{text.updatedAt}</th>
-                <th className="px-3 py-2 text-right font-medium">{text.action}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {rules.map((rule) => (
-                <tr key={rule.id} className="align-top">
-                  <td className="px-3 py-3">
-                    <div className="font-medium text-foreground">{rule.name}</div>
-                    <div className="mt-1 text-xs text-muted-text">{formatUiText(text.source, { source: rule.source })}</div>
-                  </td>
-                  <td className="px-3 py-3 text-secondary-text">
-                    <div className="font-mono">{formatTarget(rule, language)}</div>
-                    <div className="mt-1 text-xs">{ALERT_SCOPE_LABELS[language][rule.targetScope] ?? rule.targetScope}</div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-col items-start gap-1">
-                      <Badge variant="info">{ALERT_TYPE_LABELS[language][rule.alertType]}</Badge>
-                      <Badge variant={rule.severity === 'critical' ? 'danger' : rule.severity === 'warning' ? 'warning' : 'default'}>
-                        {ALERT_SEVERITY_LABELS[language][rule.severity] ?? rule.severity}
-                      </Badge>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-secondary-text">{formatParameters(rule, language)}</td>
-                  <td className="px-3 py-3">
-                    <Badge variant={rule.enabled ? 'success' : 'default'}>
-                      {rule.enabled ? text.enabled : text.disabled}
-                    </Badge>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-secondary-text">
-                    <div>{isCoolingDown(rule) ? text.coolingDown : text.notCoolingDown}</div>
-                    <div className="mt-1">{formatUiDateTime(rule.cooldownUntil, language, { dateStyle: 'medium', timeStyle: 'short' })}</div>
-                    {hasChildTargetCooldown(rule) ? (
-                      <div className="mt-1 text-muted-text">{text.childTargetCooldown}</div>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-3 text-xs text-secondary-text">{formatUiDateTime(rule.updatedAt ?? rule.createdAt, language, { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                  <td className="px-3 py-3">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="compact"
-                        variant="outline"
-                        aria-label={formatUiText(text.editAria, { name: rule.name })}
-                        onClick={() => onEdit(rule)}
-                        disabled={isLoading || isRuleBusy(rule)}
-                      >
-                        {text.edit}
-                      </Button>
-                      <Button
-                        size="compact"
-                        variant="outline"
-                        onClick={() => onTest(rule)}
-                        isLoading={isRuleActionBusy(rule, 'test')}
-                        loadingText={text.testing}
-                        disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'test'))}
-                      >
-                        {text.test}
-                      </Button>
-                      <Button
-                        size="compact"
-                        variant={rule.enabled ? 'secondary' : 'primary'}
-                        onClick={() => onToggleEnabled(rule)}
-                        isLoading={isRuleActionBusy(rule, 'toggle')}
-                        loadingText={rule.enabled ? text.disabling : text.enabling}
-                        disabled={isLoading || (isRuleBusy(rule) && !isRuleActionBusy(rule, 'toggle'))}
-                      >
-                        {rule.enabled ? text.disable : text.enable}
-                      </Button>
-                      <Button
-                        size="compact"
-                        variant="danger-subtle"
-                        aria-label={formatUiText(text.deleteAria, { name: rule.name })}
-                        onClick={() => setPendingDelete(rule)}
-                        disabled={isLoading || isRuleBusy(rule)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {text.delete}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div
+        className={`relative min-h-0 flex-1 ${isLoading && rules.length > 0 ? 'pointer-events-none opacity-60' : ''}`}
+        aria-busy={isLoading || undefined}
+      >
+        <DataTable<AlertRuleItem>
+          caption={text.title}
+          columns={ruleColumns}
+          rows={rules}
+          getRowKey={(rule) => rule.id}
+          emptyState={{
+            icon: <Bell className="h-6 w-6" />,
+            title: isLoading ? text.loadingRules : text.emptyTitle,
+            description: text.emptyDescription,
+          }}
+          density="compact"
+          minWidth="extra-wide"
+        />
+      </div>
 
       <Pagination
         currentPage={page}
