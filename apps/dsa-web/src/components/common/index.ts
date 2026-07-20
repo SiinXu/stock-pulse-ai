@@ -1,4 +1,5 @@
 export * from './Button';
+export * from './SelectionChip';
 export * from './IconButton';
 export * from './Field';
 export * from './Textarea';

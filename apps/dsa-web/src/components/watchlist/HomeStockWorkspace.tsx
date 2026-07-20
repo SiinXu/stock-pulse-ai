@@ -12,7 +12,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, IconButton, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
+import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, SegmentedControl, StatusDot } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -240,12 +240,6 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   ];
   const activeTabLabel = tabs.find((tab) => tab.value === activeTab)?.label ?? tabs[0].label;
 
-  const statusClassName = useMemo(() => {
-    if (!batchStatus) return '';
-    if (batchStatus.variant === 'danger') return 'border-danger/30 bg-danger/10 text-danger';
-    if (batchStatus.variant === 'warning') return 'border-warning/30 bg-warning/10 text-warning';
-    return 'border-success/30 bg-success/10 text-success';
-  }, [batchStatus]);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredWatchlistRows = useMemo(() => {
     if (!normalizedSearchQuery) return watchlistRows;
@@ -402,9 +396,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
               </IconButton>
             </form>
             {batchStatus ? (
-              <div className={`rounded-xl border px-3 py-2 text-xs ${statusClassName}`}>
-                {batchStatus.message}
-              </div>
+              <InlineAlert variant={batchStatus.variant} size="compact" message={batchStatus.message} />
             ) : null}
             {watchlistMessage ? (
               <div className="rounded-xl border border-subtle bg-base/35 px-3 py-2 text-xs text-secondary-text">
