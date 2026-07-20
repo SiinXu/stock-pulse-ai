@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [修复] Web 页面路由在多轮前进/后退导航时保留每个历史项的触发器焦点，失效触发器稳定回退到 H1，并加强对直接 history 方法别名的生产守卫。
 - [改进] Web 新增统一页面与 Router Pattern：`AppPage`/`WorkspacePage`、可折叠 `ResponsiveRail`、稳定 H1 ref 的 `PageHeader`、语义 `Toolbar`、同页 `Tabs`/`TabPanel`、`SummaryStrip` 与基于 Router Link/原生紧凑选择器的 `WorkspaceNavigation` 分离页面、工作区、命令、指标和导航职责；应用级焦点协调器在同窗口 PUSH/REPLACE 后等待目标 ready 再聚焦 H1，POP 优先恢复稳定触发点且重复/失效标记回退 H1，direct/refresh/new-tab 不强制移焦，元数据仅存内存。生产守卫禁止复制公共 Pattern 或新增业务 `pushState`/`replaceState`，三处遗留按文件/方法/计数交由页面轨清理。
 - [改进] Web 固化共享 Surface 迁移契约：确认 `canvas`/`section`/`interactive`/`overlay` 四层与现有 subtle token 足以替代旧 `glass-card`、raw white-alpha 和无效 `bg-surface`，不新增 glass 层级；删除无生产消费者的 `dashboard-card` 重复样式，并以不依赖行号的“文件 + token 计数”守卫冻结其余 UI1/UI2/UI3 页面迁移债，双主题与九视口 fixture 验证语义边界、填充、分隔线、ring 和横向溢出。
 - [改进] Pipeline 新增 `resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch` 阶段诊断，统一记录脱敏输入/输出摘要、trace、耗时、状态、降级与 retryability；观测失败保持 fail-open，通知失败与分析结果分离，既有行为、数据库结构和配置不变。

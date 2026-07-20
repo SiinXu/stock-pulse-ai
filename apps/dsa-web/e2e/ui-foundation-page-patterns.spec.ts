@@ -85,6 +85,10 @@ test.describe('shared page and Router Patterns', () => {
 
   test('treats reload as direct entry and never persists route-focus metadata', async ({ page }) => {
     await openFixture(page, 1024, 768);
+    const storageBeforeNavigation = await page.evaluate(() => ({
+      localStorage: JSON.stringify({ ...window.localStorage }),
+      sessionStorage: JSON.stringify({ ...window.sessionStorage }),
+    }));
     await page.getByRole('link', { name: 'Detailed evidence' }).click();
     const heading = page.getByRole('heading', {
       level: 1,
@@ -98,14 +102,26 @@ test.describe('shared page and Router Patterns', () => {
       localStorage: JSON.stringify({ ...window.localStorage }),
       sessionStorage: JSON.stringify({ ...window.sessionStorage }),
     }));
+    expect(persistedBeforeReload.localStorage).toBe(storageBeforeNavigation.localStorage);
+    expect(persistedBeforeReload.sessionStorage).toBe(storageBeforeNavigation.sessionStorage);
     for (const value of Object.values(persistedBeforeReload)) {
-      expect(value).not.toContain('page-pattern:');
+      expect(value).not.toContain('fixture-workspace-navigation:details');
       expect(value).not.toContain('route-focus');
     }
 
     await page.reload();
     await expect(heading).toBeVisible();
     await expect(heading).not.toBeFocused();
+    const persistedAfterReload = await page.evaluate(() => ({
+      url: window.location.href,
+      historyState: JSON.stringify(window.history.state),
+      localStorage: JSON.stringify({ ...window.localStorage }),
+      sessionStorage: JSON.stringify({ ...window.sessionStorage }),
+    }));
+    for (const value of Object.values(persistedAfterReload)) {
+      expect(value).not.toContain('fixture-workspace-navigation:details');
+      expect(value).not.toContain('route-focus');
+    }
   });
 
   test('uses native compact navigation and restores its focus on Back', async ({ page }) => {

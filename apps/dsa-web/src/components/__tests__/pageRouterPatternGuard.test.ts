@@ -135,59 +135,149 @@ function directHistoryMethod(node: ts.Expression): HistoryMethod | undefined {
 
 function historyMethodReference(
   node: ts.Expression,
-  aliases: ReadonlyMap<string, HistoryMethod>,
+  aliasFor: (identifier: ts.Identifier) => HistoryMethod | undefined,
 ): HistoryMethod | undefined {
   const direct = directHistoryMethod(node);
   if (direct) return direct;
-  if (ts.isIdentifier(node)) return aliases.get(node.text);
+  if (ts.isIdentifier(node)) return aliasFor(node);
+  if (
+    ts.isParenthesizedExpression(node)
+    || ts.isAsExpression(node)
+    || ts.isTypeAssertionExpression(node)
+    || ts.isNonNullExpression(node)
+  ) {
+    return historyMethodReference(node.expression, aliasFor);
+  }
   if (
     ts.isCallExpression(node)
     && ts.isPropertyAccessExpression(node.expression)
     && node.expression.name.text === 'bind'
   ) {
-    return historyMethodReference(node.expression.expression, aliases);
+    return historyMethodReference(node.expression.expression, aliasFor);
   }
   if (
     ts.isPropertyAccessExpression(node)
     && (node.name.text === 'call' || node.name.text === 'apply')
   ) {
-    return historyMethodReference(node.expression, aliases);
+    return historyMethodReference(node.expression, aliasFor);
   }
   return undefined;
 }
 
-function collectHistoryAliases(sourceFile: ts.SourceFile): Map<string, HistoryMethod> {
-  const aliases = new Map<string, HistoryMethod>();
+type AliasValue = HistoryMethod | null;
+
+type BoundSourceFile = {
+  sourceFile: ts.SourceFile;
+  checker: ts.TypeChecker;
+};
+
+type SourceEntry = readonly [filename: string, source: string];
+
+function createBoundSourceFiles(sources: readonly SourceEntry[]): Map<string, BoundSourceFile> {
+  const options: ts.CompilerOptions = {
+    jsx: ts.JsxEmit.Preserve,
+    module: ts.ModuleKind.ESNext,
+    noLib: true,
+    noResolve: true,
+    target: ts.ScriptTarget.Latest,
+  };
+  const virtualSources = new Map(sources.map(([filename, source], index) => {
+    const extension = filename.endsWith('.tsx') ? 'tsx' : 'ts';
+    const virtualFilename = `/page-router-pattern-guard/${index}.${extension}`;
+    return [virtualFilename, {
+      filename,
+      source,
+      sourceFile: ts.createSourceFile(
+        virtualFilename,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        extension === 'tsx' ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+      ),
+    }] as const;
+  }));
+  const host = ts.createCompilerHost(options, true);
+  host.fileExists = (requested) => virtualSources.has(requested);
+  host.readFile = (requested) => virtualSources.get(requested)?.source;
+  host.getSourceFile = (requested) => virtualSources.get(requested)?.sourceFile;
+  const program = ts.createProgram(Array.from(virtualSources.keys()), options, host);
+  const checker = program.getTypeChecker();
+  const boundSources = new Map<string, BoundSourceFile>();
+  for (const [virtualFilename, entry] of virtualSources) {
+    const sourceFile = program.getSourceFile(virtualFilename);
+    if (!sourceFile) throw new Error(`Page Router guard could not bind ${entry.filename}.`);
+    boundSources.set(entry.filename, { sourceFile, checker });
+  }
+  return boundSources;
+}
+
+function createBoundSourceFile(filename: string, source: string): BoundSourceFile {
+  const boundSource = createBoundSourceFiles([[filename, source]]).get(filename);
+  if (!boundSource) throw new Error(`Page Router guard could not bind ${filename}.`);
+  return boundSource;
+}
+
+function findHistoryMutations(
+  filename: string,
+  source: string,
+  boundSource = createBoundSourceFile(filename, source),
+): SourceFinding[] {
+  const { sourceFile, checker } = boundSource;
+  const aliases = new Map<ts.Symbol, AliasValue>();
+  const findings: SourceFinding[] = [];
+
+  const symbolFor = (identifier: ts.Identifier): ts.Symbol | undefined => (
+    checker.getSymbolAtLocation(identifier)
+  );
+  const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
+    const symbol = symbolFor(identifier);
+    return symbol ? aliases.get(symbol) ?? undefined : undefined;
+  };
+  const setAlias = (identifier: ts.Identifier, method: HistoryMethod | undefined): void => {
+    const symbol = symbolFor(identifier);
+    if (symbol) aliases.set(symbol, method ?? null);
+  };
+  const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
+    if (!name) return undefined;
+    const text = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+      ? name.text
+      : undefined;
+    return text === 'pushState' || text === 'replaceState' ? text : undefined;
+  };
+  const applyObjectAssignment = (object: ts.ObjectLiteralExpression): void => {
+    for (const property of object.properties) {
+      if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) {
+        setAlias(property.initializer, propertyMethod(property.name));
+      } else if (ts.isShorthandPropertyAssignment(property)) {
+        setAlias(property.name, propertyMethod(property.name));
+      }
+    }
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node)) {
-      if (ts.isIdentifier(node.name) && node.initializer) {
-        const method = historyMethodReference(node.initializer, aliases);
-        if (method) aliases.set(node.name.text, method);
+      if (ts.isIdentifier(node.name)) {
+        setAlias(
+          node.name,
+          node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
+        );
       } else if (ts.isObjectBindingPattern(node.name)) {
         for (const element of node.name.elements) {
           if (!ts.isIdentifier(element.name)) continue;
-          const sourceName = element.propertyName && ts.isIdentifier(element.propertyName)
-            ? element.propertyName.text
-            : element.name.text;
-          if (sourceName === 'pushState' || sourceName === 'replaceState') {
-            aliases.set(element.name.text, sourceName);
-          }
+          setAlias(element.name, propertyMethod(element.propertyName ?? element.name));
         }
       }
     }
-    ts.forEachChild(node, visit);
-  };
-  visit(sourceFile);
-  return aliases;
-}
-
-function findHistoryMutations(filename: string, source: string): SourceFinding[] {
-  const sourceFile = parseSource(filename, source);
-  const aliases = collectHistoryAliases(sourceFile);
-  const findings: SourceFinding[] = [];
-  const visit = (node: ts.Node): void => {
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      const left = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
+      if (ts.isIdentifier(left)) {
+        setAlias(left, historyMethodReference(node.right, aliasFor));
+      } else if (ts.isObjectLiteralExpression(left)) {
+        applyObjectAssignment(left);
+      }
+    }
     if (ts.isCallExpression(node)) {
-      const method = historyMethodReference(node.expression, aliases);
+      const method = historyMethodReference(node.expression, aliasFor);
       if (method) {
         findings.push({
           file: filename,
@@ -255,10 +345,55 @@ describe('page and Router pattern production guard', () => {
     ]);
   });
 
+  it('tracks assignment aliases without leaking through scopes or stale reassignments', () => {
+    const fixture = [
+      'let replace;',
+      'replace = window.history.replaceState.bind(window.history);',
+      'replace({}, "", "?market=jp");',
+      '{',
+      '  const replace = () => undefined;',
+      '  replace({}, "", "?market=de");',
+      '}',
+      'replace = () => undefined;',
+      'replace({}, "", "?market=fr");',
+      'let push;',
+      '({ pushState: push } = window.history);',
+      'push({}, "", "?market=uk");',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 3, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 12, token: 'pushState' },
+    ]);
+  });
+
+  it('uses TypeScript symbols for var aliases and lexical shadows', () => {
+    const fixture = [
+      'const outerReplace = window.history.replaceState;',
+      'function parameterShadow(outerReplace) { outerReplace({}, "", "?market=de"); }',
+      'try { throw new Error(); } catch (outerReplace) { outerReplace({}, "", "?market=fr"); }',
+      'function updateUrl() {',
+      '  { var replace; replace = window.history.replaceState.bind(window.history); }',
+      '  replace({}, "", "?market=jp");',
+      '}',
+      'outerReplace({}, "", "?market=us");',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 6, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 8, token: 'replaceState' },
+    ]);
+  });
+
   it('allows only the exact file/method/count migration inventory without line pinning', () => {
-    const actual = Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename))
-      .flatMap(([filename, source]) => findHistoryMutations(filename, source));
+    const productionEntries = Object.entries(productionSources)
+      .filter(([filename]) => isProductionSource(filename));
+    const boundSources = createBoundSourceFiles(productionEntries);
+    const actual = productionEntries.flatMap(([filename, source]) => {
+      const boundSource = boundSources.get(filename);
+      if (!boundSource) throw new Error(`Page Router guard lost ${filename}.`);
+      return findHistoryMutations(filename, source, boundSource);
+    });
     const actualCounts = new Map<string, number>();
     for (const finding of actual) {
       const key = historyCountKey(finding.file, finding.token);
