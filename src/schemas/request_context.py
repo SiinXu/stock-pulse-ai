@@ -42,6 +42,7 @@ class AnalysisRequestContext:
     requester_message_id: str = ""
     requester_query: str = ""
     reply_targets: Tuple[NotificationReplyTarget, ...] = ()
+    contextual_reply_only: bool = False
 
     def __post_init__(self) -> None:
         requester_fields = (
@@ -54,10 +55,14 @@ class AnalysisRequestContext:
         )
         if any(not isinstance(getattr(self, name), str) for name in requester_fields):
             raise TypeError("Requester provenance fields must be strings")
+        if not isinstance(self.contextual_reply_only, bool):
+            raise TypeError("contextual_reply_only must be a bool")
         targets = tuple(self.reply_targets)
         if any(not isinstance(target, NotificationReplyTarget) for target in targets):
             raise TypeError("reply_targets must contain NotificationReplyTarget values")
         object.__setattr__(self, "reply_targets", targets)
+        if targets:
+            object.__setattr__(self, "contextual_reply_only", True)
 
     def reply_address(self, kind: ReplyTargetKind) -> Optional[str]:
         """Return the first address for a contextual notification channel."""

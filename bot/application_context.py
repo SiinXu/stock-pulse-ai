@@ -18,7 +18,7 @@ def _string_value(value: Any) -> str:
     return str(value)
 
 
-def _dingtalk_session_webhook(raw_data: Dict[str, Any]) -> Optional[str]:
+def _dingtalk_session_webhook_candidate(raw_data: Dict[str, Any]) -> Any:
     candidate = (
         raw_data.get("_session_webhook")
         or raw_data.get("sessionWebhook")
@@ -27,7 +27,7 @@ def _dingtalk_session_webhook(raw_data: Dict[str, Any]) -> Optional[str]:
     )
     if not candidate and isinstance(raw_data.get("headers"), dict):
         candidate = raw_data["headers"].get("sessionWebhook")
-    return candidate if is_dingtalk_session_webhook_url(candidate) else None
+    return candidate
 
 
 def _telegram_chat_id(message: BotMessage, raw_data: Dict[str, Any]) -> Optional[str]:
@@ -49,11 +49,11 @@ def to_analysis_request_context(message: BotMessage) -> AnalysisRequestContext:
     raw_data = message.raw_data if isinstance(message.raw_data, dict) else {}
     platform = _string_value(message.platform).lower()
     reply_targets = []
+    dingtalk_candidate = _dingtalk_session_webhook_candidate(raw_data)
 
     if platform == "dingtalk":
-        dingtalk_webhook = _dingtalk_session_webhook(raw_data)
-        if dingtalk_webhook:
-            reply_targets.append(NotificationReplyTarget("dingtalk", dingtalk_webhook))
+        if is_dingtalk_session_webhook_url(dingtalk_candidate):
+            reply_targets.append(NotificationReplyTarget("dingtalk", dingtalk_candidate))
 
     if platform == "feishu" and message.chat_id:
         reply_targets.append(NotificationReplyTarget("feishu", _string_value(message.chat_id)))
@@ -71,4 +71,6 @@ def to_analysis_request_context(message: BotMessage) -> AnalysisRequestContext:
         requester_message_id=_string_value(message.message_id),
         requester_query=_string_value(message.content),
         reply_targets=tuple(reply_targets),
+        # Preserve reply-only intent even when an untrusted address is rejected.
+        contextual_reply_only=bool(dingtalk_candidate) or bool(reply_targets),
     )

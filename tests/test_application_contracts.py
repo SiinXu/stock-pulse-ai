@@ -193,6 +193,7 @@ def test_bot_mapping_rejects_cross_platform_or_untrusted_dingtalk_targets(
     )
 
     assert context.reply_address("dingtalk") is None
+    assert context.contextual_reply_only is True
 
 
 def test_bot_mapping_preserves_telegram_nested_numeric_chat_id() -> None:
@@ -214,6 +215,7 @@ def test_bot_mapping_ignores_non_mapping_raw_payload() -> None:
     context = to_analysis_request_context(message)
 
     assert context.reply_targets == ()
+    assert context.contextual_reply_only is False
 
 
 def test_request_context_rejects_blank_targets_and_freezes_mutable_input() -> None:
@@ -232,9 +234,12 @@ def test_request_context_rejects_blank_targets_and_freezes_mutable_input() -> No
 
     assert context.reply_targets == (target,)
     assert isinstance(context.reply_targets, tuple)
+    assert context.contextual_reply_only is True
 
     with pytest.raises(TypeError, match="provenance fields must be strings"):
         AnalysisRequestContext(requester_query=[])
+    with pytest.raises(TypeError, match="contextual_reply_only must be a bool"):
+        AnalysisRequestContext(contextual_reply_only="yes")
 
 
 def test_pipeline_persists_only_neutral_requester_provenance() -> None:

@@ -420,6 +420,30 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_wechat.assert_not_called()
 
     @mock.patch("src.notification.get_config")
+    def test_rejected_dingtalk_context_never_falls_back_to_static_channels(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data["sessionWebhook"] = (
+            "https://attacker.example/robot/sendBySession?session=secret"
+        )
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "all_failed")
+        self.assertEqual([item.channel for item in result.channel_results], ["__context__"])
+        mock_wechat.assert_not_called()
+
+    @mock.patch("src.notification.get_config")
     @mock.patch("requests.post")
     def test_dingtalk_context_never_sends_custom_bearer_token(
         self,

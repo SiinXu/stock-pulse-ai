@@ -574,7 +574,10 @@ class NotificationService(
 
     def should_broadcast_static_channels(self) -> bool:
         """Whether static notification channels should receive this dispatch."""
-        return not self._has_context_channel()
+        return not (
+            self._request_context is not None
+            and self._request_context.contextual_reply_only
+        )
 
     def _extract_dingtalk_session_webhook(self) -> Optional[str]:
         """从来源消息中提取钉钉会话 Webhook（用于 Stream 模式回复）"""
