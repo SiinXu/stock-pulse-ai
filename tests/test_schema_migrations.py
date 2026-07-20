@@ -17,6 +17,7 @@ import sqlite3
 import threading
 import time
 from typing import Callable, Iterable
+from unittest.mock import patch
 import warnings
 
 import pytest
@@ -3705,3 +3706,129 @@ def test_intelligence_unique_index_migration_is_noop_when_scoped_index_present(
         assert _sqlite_master_snapshot(db_path) == before_schema
     finally:
         engine.dispose()
+
+
+_STARTUP_DDL_KEYWORDS = frozenset({"CREATE", "ALTER", "DROP"})
+
+
+def _leading_sql_word(statement: str) -> str:
+    stripped = statement.lstrip()
+    if not stripped:
+        return ""
+    return stripped.split(None, 1)[0].upper()
+
+
+@contextmanager
+def _capture_startup_ddl_outside_migration_phases():
+    """Capture CREATE/ALTER/DROP statements executed during DatabaseManager
+    initialization, tracking whether each runs inside metadata create_all or the
+    ordered migration runner.
+
+    Startup may run DDL only inside `Base.metadata.create_all` (the fresh
+    baseline) and inside `apply_pending_within_transaction` (registered
+    migrations). Any DDL outside both phases means a runtime compatibility step
+    was re-introduced outside the registry. The yielded object also records every
+    DDL statement so a restart can be asserted to run none at all.
+    """
+    import src.storage as storage_module
+
+    phase = {"name": "startup"}
+    captured = {"stray": [], "all_ddl": []}
+    original_exec_driver = Connection.exec_driver_sql
+    original_execute = Connection.execute
+    original_create_all = storage_module.Base.metadata.create_all
+    original_apply = storage_module.apply_pending_within_transaction
+
+    def _record(statement) -> None:
+        keyword = _leading_sql_word(str(statement))
+        if keyword not in _STARTUP_DDL_KEYWORDS:
+            return
+        captured["all_ddl"].append((phase["name"], keyword))
+        if phase["name"] not in ("create_all", "migration_runner"):
+            captured["stray"].append(
+                (phase["name"], keyword, str(statement).strip()[:120])
+            )
+
+    def wrapped_exec_driver(self, statement, *args, **kwargs):
+        _record(statement)
+        return original_exec_driver(self, statement, *args, **kwargs)
+
+    def wrapped_execute(self, statement, *args, **kwargs):
+        _record(statement)
+        return original_execute(self, statement, *args, **kwargs)
+
+    def wrapped_create_all(*args, **kwargs):
+        phase["name"] = "create_all"
+        try:
+            return original_create_all(*args, **kwargs)
+        finally:
+            phase["name"] = "post_create_all"
+
+    def wrapped_apply(connection):
+        phase["name"] = "migration_runner"
+        try:
+            return original_apply(connection)
+        finally:
+            phase["name"] = "post_migration_runner"
+
+    with patch.object(
+        Connection, "exec_driver_sql", wrapped_exec_driver
+    ), patch.object(Connection, "execute", wrapped_execute), patch.object(
+        storage_module.Base.metadata, "create_all", wrapped_create_all
+    ), patch.object(
+        storage_module, "apply_pending_within_transaction", wrapped_apply
+    ):
+        yield captured
+
+
+def test_fresh_startup_runs_no_schema_ddl_outside_create_all_and_runner() -> None:
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+    assert captured["stray"] == []
+    # The capture is active and create_all runs real DDL, so an empty stray list
+    # is a genuine result rather than a broken instrumentation.
+    assert any(phase == "create_all" for phase, _ in captured["all_ddl"])
+
+
+def test_legacy_startup_runs_no_schema_ddl_outside_create_all_and_runner(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-startup-ddl.sqlite"
+    _load_sql_fixture(db_path, "v3_20_0.sql")
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url=_database_url(db_path))
+    assert captured["stray"] == []
+
+
+def test_restart_runs_no_schema_ddl_at_all(tmp_path: Path) -> None:
+    db_path = tmp_path / "restart-startup-ddl.sqlite"
+    DatabaseManager(db_url=_database_url(db_path))
+    DatabaseManager.reset_instance()
+
+    with _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url=_database_url(db_path))
+    # An already-migrated database performs no CREATE/ALTER/DROP on restart:
+    # create_all and every registered migration are no-ops.
+    assert captured["stray"] == []
+    assert captured["all_ddl"] == []
+
+
+def test_migration_verify_explains_fresh_and_legacy_databases(tmp_path: Path) -> None:
+    fresh = DatabaseManager(db_url="sqlite:///:memory:")
+    fresh_verification = MigrationRunner().verify(fresh._engine)
+    assert fresh_verification.success is True
+    assert fresh_verification.current_version == TARGET_VERSION
+    assert fresh_verification.pending_ids == ()
+    assert fresh_verification.unknown_ids == ()
+    assert fresh_verification.checksum_mismatches == ()
+    DatabaseManager.reset_instance()
+
+    db_path = tmp_path / "legacy-verify.sqlite"
+    _load_sql_fixture(db_path, "v3_20_0.sql")
+    legacy = DatabaseManager(db_url=_database_url(db_path))
+    legacy_verification = MigrationRunner().verify(legacy._engine)
+    assert legacy_verification.success is True
+    assert legacy_verification.current_version == TARGET_VERSION
+    assert legacy_verification.pending_ids == ()
+    assert legacy_verification.unknown_ids == ()
+    assert legacy_verification.checksum_mismatches == ()
