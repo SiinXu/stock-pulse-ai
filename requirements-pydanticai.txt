@@ -2,12 +2,32 @@
 #
 # NOT part of the default install: Native is the permanent default runtime and
 # has zero dependency on this file (see docs/architecture/ADR-001-agent-runtime.md).
-# Install only to exercise the opt-in PydanticAI POC path:
+# Install only to exercise the test/evidence PydanticAI POC path:
 #
 #   pip install -r requirements-pydanticai.txt
 #
-# 方案 B uses a custom PydanticAI Model that reuses StockPulse's in-process
-# LLMToolAdapter, so only the slim core is needed — this deliberately avoids the
-# provider model extras (openai/anthropic/google), which would pull tiktoken>=0.12
-# and conflict with StockPulse's tiktoken<0.12 pin (issue #537).
+# This file is the complete version-locked dependency closure for the slim POC
+# on the supported Python 3.11 CI matrix. Update the set atomically and validate
+# it with `pip check`; unlocked transitive resolution is not accepted evidence.
+# Provider extras remain excluded because they conflict with the product's
+# tiktoken<0.12 compatibility window (issue #537).
+annotated-types==0.7.0
+anyio==4.14.2
+certifi==2026.6.17
+genai-prices==0.0.71
+griffelib==2.1.0
+h11==0.16.0
+httpcore==1.0.9
+httpcore2==2.7.0
+httpx==0.28.1
+httpx2==2.7.0
+idna==3.18
+logfire-api==4.37.0
+opentelemetry-api==1.44.0
+pydantic==2.13.4
 pydantic-ai-slim==2.12.0
+pydantic-core==2.46.4
+pydantic-graph==2.12.0
+truststore==0.10.4
+typing-extensions==4.16.0
+typing-inspection==0.4.2

@@ -1,6 +1,6 @@
 # ADR-001: Agent Runtime 架构 - Native Only + vendor-neutral Runtime Contract
 
-- 状态: `Accepted / Amended by ADR-002`（2026-07-19 修订并执行 Native Only 裁决；同日 ADR-002 改判恢复实验 PydanticAI Runtime 为可选资产，D1 的“唯一可执行 Runtime”不再描述现状）
+- 状态: `Accepted / Amended by ADR-002`（2026-07-19 修订并执行 Native Only 裁决；同日 ADR-002 为测试/证据 POC 明确修订 D1，并有限覆盖 D5 的恢复禁令；D2/D3/D4 不变）
 - 首次批准: 2026-07-17
 - 最近修订: 2026-07-19
 - 决策者: Maintainer（SiinXu）
@@ -30,7 +30,7 @@ cross-runtime 测试和专用 CI，导致“唯一正式运行时”和实际维
 
 ## 2. Decision
 
-### D1: Native 是唯一可执行 Agent Runtime
+### D1: Native 是唯一可执行 Agent Runtime（由 ADR-002 修订）
 
 当前只有 Native 可执行实现。生产调用路径与保留的合同一致性路径分别为：
 
@@ -98,7 +98,7 @@ fixture。两个既有 degraded `success=true` 行为继续按 2026-07-17 裁决
 
 取消仍优先于 degraded success，取消执行不得产出伪成功。
 
-### D5: 未来框架必须重新提案
+### D5: 未来框架必须重新提案（由 ADR-002 有限覆盖）
 
 未来若评估任何外部 Agent 框架，必须从新的 ADR 和隔离证据开始，经本中立
 Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入点或 CI，也不得
@@ -109,6 +109,15 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 - source、Docker 与 Desktop 的依赖和打包影响；
 - Secret、prompt、reasoning、tool result 和原始异常不会泄漏；
 - 对单一配置、工具、Conversation、Usage 和 Provider trace 权威无侵入。
+
+ADR-002 是对本条的一次明确、有限覆盖：仅允许恢复 PydanticAI 2.12 的
+Single RUN 测试/证据 POC，不建立生产装配或用户 opt-in。维护者接受的恢复门槛是：
+中立 Contract 与冻结 conformance 子集继续通过；`start()` 提供可观察、可取消、
+可订阅和可等待的 live handle；可选依赖传递闭包精确锁定并由安装态 CI 执行
+`pip check`；Native 默认安装零 PydanticAI 依赖且无 factory/config/env selector；
+已收集的脱敏证据保持有效。真实 provider 收益、完整泄漏面、Desktop 多平台打包和
+双环境净增量仍未完成，因此继续阻断生产入口、默认 Runtime 或支持矩阵扩展。除该
+POC 外的新框架提案，以及把该 POC 提升为生产能力，仍须满足本条完整门槛并另立 ADR。
 
 ## 3. Consequences
 
@@ -150,4 +159,4 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 | 2026-07-17 | Accepted | 批准 Native 永久默认、中立 Contract、实验 Adapter POC 和 degraded 兼容语义 |
 | 2026-07-18 | Accepted | RF-07 因收益与 Desktop 证据不足裁决 `Native Only` |
 | 2026-07-19 | Accepted / Implemented | 删除实验 Adapter、依赖、注入点、cross-runtime 测试和专用 CI；保留并加固 Native 中立资产 |
-| 2026-07-19 | Amended | ADR-002 改判恢复实验 PydanticAI Runtime（`Continue Experimental`）：D1 的“唯一可执行 Runtime”与删除清单不再是现状；Native 永久默认、中立 Contract 与 D2/D3/D4/D5 语义不变 |
+| 2026-07-19 | Amended | ADR-002 恢复 PydanticAI Single RUN 测试/证据 POC：修订 D1，并按 ADR-002 记录的降低门槛有限覆盖 D5 的直接恢复禁令；Native 仍是唯一生产装配，D2/D3/D4 不变，生产化仍受 D5 完整门槛约束 |

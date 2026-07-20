@@ -15,9 +15,11 @@ Two contracts are asserted:
   ``AgentResult``.
 """
 
+import asyncio
 import os
 import sys
-from unittest.mock import patch
+import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -111,6 +113,84 @@ def _tool_then_final_model(tool_name: str, tool_args: dict, final_text: str):
     return _ToolCallingModel()
 
 
+def _blocking_model(started: threading.Event, release: threading.Event, output_text: str):
+    """Fake Model that stays inside one request until the test releases it."""
+    from pydantic_ai.messages import ModelResponse, TextPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _BlockingModel(Model):
+        @property
+        def model_name(self) -> str:
+            return "blocking-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            started.set()
+            while not release.is_set():
+                await asyncio.sleep(0.001)
+            return ModelResponse(
+                parts=[TextPart(content=output_text)],
+                usage=RequestUsage(input_tokens=1, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _BlockingModel()
+
+
+def _tool_then_blocking_final_model(
+    tool_name: str,
+    tool_args: dict,
+    final_text: str,
+    waiting: threading.Event,
+    release: threading.Event,
+):
+    """Emit one tool call, then block the final model turn."""
+    from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
+    from pydantic_ai.models import Model
+    from pydantic_ai.usage import RequestUsage
+
+    class _ToolThenBlockingModel(Model):
+        def __init__(self):
+            self.step = 0
+
+        @property
+        def model_name(self) -> str:
+            return "tool-blocking-fake"
+
+        @property
+        def system(self) -> str:
+            return "stockpulse"
+
+        async def request(self, messages, model_settings, model_request_parameters):
+            self.step += 1
+            if self.step == 1:
+                return ModelResponse(
+                    parts=[
+                        ToolCallPart(
+                            tool_name=tool_name,
+                            args=tool_args,
+                            tool_call_id="c1",
+                        )
+                    ],
+                    usage=RequestUsage(input_tokens=1, output_tokens=1),
+                    model_name=self.model_name,
+                )
+            waiting.set()
+            while not release.is_set():
+                await asyncio.sleep(0.001)
+            return ModelResponse(
+                parts=[TextPart(content=final_text)],
+                usage=RequestUsage(input_tokens=1, output_tokens=1),
+                model_name=self.model_name,
+            )
+
+    return _ToolThenBlockingModel()
+
+
 def _echo_registry() -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(
@@ -183,6 +263,96 @@ def test_run_without_dashboard_json_fails_closed():
     assert handle.result.success is False
     assert handle.result.dashboard is None
     assert "dashboard" in (handle.result.error or "").lower()
+
+
+def test_start_returns_live_running_handle_then_completes():
+    started = threading.Event()
+    release = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_model(started, release, '{"signal": "buy"}')
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.state is ExecutionState.RUNNING
+        assert handle.is_terminal is False
+        assert handle.wait(timeout=0.01) is False
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert handle.result.dashboard == {"signal": "buy"}
+
+
+def test_live_handle_cancellation_wins_after_active_request_returns():
+    started = threading.Event()
+    release = threading.Event()
+    adapter = PydanticAIRuntimeAdapter(
+        model=_blocking_model(started, release, '{"signal": "buy"}')
+    )
+
+    handle = adapter.start(_run_context("Analyze 600519"))
+    try:
+        assert started.wait(5)
+        assert handle.request_cancel() is True
+        assert handle.cancel_requested is True
+        assert handle.state is ExecutionState.RUNNING
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.CANCELLED
+    assert handle.result.success is False
+    assert handle.result.cancelled is True
+
+
+def test_live_handle_subscribes_to_tool_events_before_terminal():
+    waiting = threading.Event()
+    release = threading.Event()
+    callback = MagicMock()
+    session = BoundToolSession(
+        _echo_registry(),
+        execution_id="ex-live-events",
+        allowed_tools=["echo"],
+        granted_permissions=["test:read"],
+    )
+    adapter = PydanticAIRuntimeAdapter(
+        model=_tool_then_blocking_final_model(
+            "echo",
+            {"message": "hi"},
+            '{"signal": "hold"}',
+            waiting,
+            release,
+        ),
+        tool_session=session,
+    )
+
+    handle = adapter.start(
+        _run_context("Analyze 600519"), progress_callback=callback
+    )
+    try:
+        assert waiting.wait(5)
+        assert handle.state is ExecutionState.RUNNING
+        live_events = list(handle.subscribe(timeout=0.01))
+        assert [event.event_type for event in live_events] == [
+            "tool_start",
+            "tool_done",
+        ]
+    finally:
+        release.set()
+        handle.wait(5)
+        handle.close()
+
+    assert handle.state is ExecutionState.SUCCEEDED
+    assert [event.event_type for event in handle.events] == [
+        "tool_start",
+        "tool_done",
+    ]
+    assert callback.call_count == 2
 
 
 def test_chat_mode_is_unsupported():

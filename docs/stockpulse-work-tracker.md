@@ -1,8 +1,8 @@
 # StockPulse Work Tracker — Agent Runtime(AR)工作线
 
 - 状态:`Living`(每个 AR 阶段合入/裁决后更新)
-- 日期:2026-07-19（RT-02 历史证据边界校准）
-- 代码 baseline:`main@efb08302`
+- 日期:2026-07-19（RT-03 ADR 与运行时契约收敛）
+- 代码 baseline:`main@469a0308`（RT-03 PR #60 基线）
 - 历史计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Historical / Superseded`)
 - 权威决策:`docs/architecture/ADR-001-agent-runtime.md`
 - 历史修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Historical / Completed` 计划生命周期；证据为 `Partial`)
@@ -24,8 +24,8 @@
 | AR-PY-01 | Runtime Contract + Native Adapter | **Done** | 已随 PR #18 合入契约与 Native adapter;RF-02(PR #22,commit cc3a8e30)将 `execute()` 改造为运行中 `start() -> ExecutionHandle` 并深层冻结 `ExecutionContext`(`_deep_freeze`),关闭 AR-RF-01/02;缺口清零 |
 | AR-PY-02 | BoundToolSession | **Done** | 已随 PR #18 合入 `tool_session.py`(allowlist/权限/预算/deadline/审计/late-result fence);RF-03(PR #23,commit 4e0e820c;deadline 绝对单调化 9f4a7882)使 Native 经同一 `BoundToolSession`(`enforce_access_policy=False`)分发,消除第二套工具权威,关闭 AR-RF-03 |
 | AR-PY-03 | Lifecycle / typed events / 真实取消 | **Done** | 已随 PR #18 合入 `events.py` + `lifecycle.py`(versioned events + late-write fence + `classify_terminal_state` + `UsageRecorder`);RF-04(PR #25,commit 8ec4bdd4;changelog PR #27)以单一分类器统一全入口终态 write fence 与生命周期,关闭 AR-RF-07 |
-| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Reinstated / Experimental** | RF-05 曾完成隔离桥；RF-07 裁决 Native Only 后 2026-07-19 一度删除；同日维护者以 ADR-002 改判恢复 Adapter、toolset、可选依赖、注入点与 `pydanticai-installed` CI。Native 仍是唯一默认 Runtime，依赖保持可选 |
-| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Historical / Partial** | RF-06a 只证明 8 个精确 fixture 完全等价和 3 个精确 fixture 终态分类等价；RF-06b 只覆盖 provider-error 终端诊断。真实 provider、其它泄漏面、Desktop 和可复现依赖净增量未收集。cross-runtime 测试与专用 CI 已随实验实现删除，已证明的 Native 脱敏回归保留 |
+| AR-PY-04 | PydanticAI 隔离 POC(Spike + Adapter) | **Reinstated / Experimental** | RF-05 曾完成隔离桥；RF-07 裁决 Native Only 后 2026-07-19 一度删除；同日维护者以 ADR-002 改判恢复测试/证据 POC。仅允许 harness 显式构造，无生产 selector；`start()` 遵循 live handle 的观察/取消/订阅/等待契约。Native 仍是唯一生产装配，依赖保持可选 |
+| AR-PY-05 | Conformance / benchmark / 决策门禁 | **Historical / Partial** | RF-06a 只证明 8 个精确 fixture 完全等价和 3 个精确 fixture 终态分类等价；RF-06b 只覆盖 provider-error 终端诊断。cross-runtime 测试与 `pydanticai-installed` CI 已按显式范围恢复，可选传递闭包精确锁定并执行 `pip check`；真实 provider、其它泄漏面、Desktop 和双环境可复现依赖净增量仍未收集 |
 | AR-PY-06 | 有限产品化(条件阶段) | **Resolved / Amended (ADR-002)** | RF-07 于 2026-07-18 裁决 Native Only 并于 2026-07-19 实施；同日 ADR-002 改判为 `Continue Experimental`：恢复实验可执行面与专用 CI，但 Native 永久默认、无 runtime selector/fallback、不新增用户设置或公开 API |
 
 ## 3. 裁决记录
@@ -39,7 +39,7 @@
 | 2026-07-18 | RF-05 范围审批(recovery plan 审批点 2/3) | 维护者批准:CHAT/RESEARCH 冻结为 `unsupported_capability`、复用 native prompt 权威(`build_run_messages`)、usage 单点记录;首版 conformance 仅覆盖 Single RUN 支持矩阵 |
 | 2026-07-18 | RF-07 产品化裁决 | 维护者裁决 `Native Only`(recovery plan 默认):Native 永久默认、零 PydanticAI 依赖;实验 Runtime 休眠可删;`Continue Experimental` 因缺真实 benchmark 与 Desktop 证据未启用;见 `docs/architecture/pydanticai-runtime-adoption-decision.md`(`Accepted`) |
 | 2026-07-19 | Native Only 实施 | 删除实验 Adapter、toolset、可选依赖、注入点、cross-runtime 测试与专用 CI；保留 Native Contract、BoundToolSession、生命周期、事件、sanitizer 与 36 replay fixture |
-| 2026-07-19 | ADR-002 改判(Continue Experimental) | 维护者裁决恢复实验 PydanticAI Runtime 为可选资产：恢复 Adapter、toolset、`requirements-pydanticai.txt`、cross-runtime conformance(显式 fixture ID 允许清单,未知 `single_run` fixture fail closed)与 `pydanticai-installed` CI;Native 永久默认、零依赖可运行、无 runtime fallback、不新增用户设置或公开 API;证据状态不升级;见 `docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md` |
+| 2026-07-19 | ADR-002 改判(Continue Experimental) | 维护者裁决按明确降低的 ADR-001 D5 门槛恢复测试/证据 POC：恢复 Adapter、toolset、精确锁定的 `requirements-pydanticai.txt`、cross-runtime conformance(显式 fixture ID 允许清单,未知 `single_run` fixture fail closed)与 `pydanticai-installed` CI；无生产 selector，Native 是唯一生产装配；证据状态不升级；见 `docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md` |
 
 ## 4. 治理文档清单与状态
 
@@ -80,4 +80,4 @@
 | 2026-07-18 | RF-07 裁决(本 PR):维护者裁决 `Native Only`;决策报告 `Draft` -> `Accepted`;AR-PY-06 -> Resolved(Native Only);RF-00～RF-07 修复计划收尾 |
 | 2026-07-19 | Native Only 实施：实验 Runtime 的 Adapter、toolset、可选依赖、注入点、cross-runtime tests 与 `pydanticai-installed` CI 删除；AR-PY-04 -> Retired / Removed，AR-PY-06 -> Implemented |
 | 2026-07-19 | RT-02 证据治理：conformance 历史范围冻结为 8+3 个精确 fixture ID，删除不可复现依赖数字，明确 leak scan 与未收集证据边界；AR-PY-05 校准为 Historical / Partial |
-| 2026-07-19 | RT-03 恢复实验 Runtime(ADR-002)：按 RT-01 删除前基线恢复 Adapter/toolset/可选依赖/实验测试/conformance 与 `pydanticai-installed` CI；conformance 改为显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；AR-PY-04 -> Reinstated / Experimental，AR-PY-06 -> Resolved / Amended；AR-PY-05 保持 Historical / Partial；Native 默认与零依赖运行不变 |
+| 2026-07-19 | RT-03 恢复实验 Runtime(ADR-002)：恢复 Adapter/toolset/可选依赖/实验测试/conformance 与 `pydanticai-installed` CI；精确锁定完整可选依赖闭包并执行 `pip check`；PydanticAI `start()` 实现 live handle 的观察/取消/订阅/等待契约；明确只允许测试/证据 harness 直接构造且无生产 selector；conformance 使用显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；AR-PY-04 -> Reinstated / Experimental，AR-PY-06 -> Resolved / Amended；AR-PY-05 保持 Historical / Partial |
