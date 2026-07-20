@@ -68,7 +68,7 @@ describe('TaskPanel', () => {
     expect(screen.getByText('运行诊断')).toBeInTheDocument();
     expect(screen.getAllByText('trace-task-1')).toHaveLength(2);
     expect(screen.queryByText(/请求阶段:/)).not.toBeInTheDocument();
-    expect(container.querySelector('.home-panel-card')).toBeTruthy();
+    expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
   });
 
