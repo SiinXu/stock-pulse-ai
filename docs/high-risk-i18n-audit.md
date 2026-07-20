@@ -10,13 +10,13 @@ This document records the evidence boundary for StockPulse Web copy that can alt
 | Track | `TRACK-E2` |
 | Sequence | `33/34` |
 | Repository | `SiinXu/stock-pulse-ai` |
-| Merged-copy baseline | `origin/main@9d6ab2e1d7fc5fc156c358e70159ff52a268f32f` |
+| Merged-copy baseline | `origin/main@d760f9c4284e4b061a57d3d56984975d0dec7381` |
 | Audit date | 2026-07-20 |
 | Machine-readable evidence | `apps/dsa-web/scripts/high-risk-i18n-audit.json` |
 | Enforced command | `cd apps/dsa-web && npm run i18n:high-risk` |
 | Baseline verification | `cd apps/dsa-web && npm run i18n:high-risk -- --verify-baseline` |
 
-Only copy merged at the recorded baseline was audited. Open PR #94 was excluded; its diff does not edit an i18n resource or high-risk string, and its only E2 file overlap is the append-only `[Unreleased]` changelog. PRs #95 and #96 merged while the audit was in review; neither changed an i18n resource or high-risk string, so the baseline advanced without changing the audited source inventory. PR #90 was merged before the final baseline: its three localized `interrupted` task-state labels were reviewed and remain outside the six high-risk categories. Dependencies #51, #56, and #64 were merged before this audit.
+Only copy merged at the recorded baseline was audited. Open PRs #94, #98, and #99 were excluded; none edits an i18n resource or a high-risk Web string, and their only E2 file overlap is the append-only `[Unreleased]` changelog. PRs #95, #96, and #100 merged while the audit was in review; none changed an i18n resource or high-risk string, so the baseline advanced without changing the audited source inventory. PR #90 was merged before the final baseline: its three localized `interrupted` task-state labels were reviewed and remain outside the six high-risk categories. Dependencies #51, #56, and #64 were merged before this audit.
 
 ## Result
 
