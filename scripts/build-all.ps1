@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-Write-Host '=== Daily Stock Analysis Desktop Build ==='
+Write-Host '=== StockPulse Desktop Build ==='
 
 & "${PSScriptRoot}\build-backend.ps1"
 & "${PSScriptRoot}\build-desktop.ps1"

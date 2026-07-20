@@ -10,8 +10,9 @@
   ${endif}
 
   ; electron-builder's default NSIS template passes _?=$installationDir
-  ; without quotes. Default per-user installs live under "Daily Stock Analysis",
-  ; so old uninstallers can receive a split _? path and return code 2.
+  ; without quotes. StockPulse and legacy "Daily Stock Analysis" per-user
+  ; install paths can contain spaces, so old uninstallers can receive a split
+  ; _? path and return code 2.
   DetailPrint "Retrying old uninstaller with quoted _? installation directory."
   !insertmacro readReg $R6 "${ROOT_KEY}" "${UNINSTALL_REGISTRY_KEY}" UninstallString
   ${if} $R6 == ""

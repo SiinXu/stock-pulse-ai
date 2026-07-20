@@ -76,6 +76,7 @@ describe('AlertRuleList', () => {
   const onPageChange = vi.fn();
   const onToggleEnabled = vi.fn();
   const onDelete = vi.fn();
+  const onEdit = vi.fn();
   const onTest = vi.fn();
 
   beforeEach(() => {
@@ -97,6 +98,7 @@ describe('AlertRuleList', () => {
         onPageChange={onPageChange}
         onToggleEnabled={onToggleEnabled}
         onDelete={onDelete}
+        onEdit={onEdit}
         onTest={onTest}
         {...overrides}
       />,
@@ -119,6 +121,7 @@ describe('AlertRuleList', () => {
           onPageChange={onPageChange}
           onToggleEnabled={onToggleEnabled}
           onDelete={onDelete}
+          onEdit={onEdit}
           onTest={onTest}
           {...overrides}
         />
