@@ -361,7 +361,25 @@ def test_fallback_recorded_accepts_direct_structured_records(tmp_path: Path) -> 
         "        return object()\n"
         "    except Exception as exc:  # broad-exception: fallback_recorded - result exposes diagnostics.\n"
         "        result['diagnostic'] = type(exc).__name__\n"
-        "        return None\n",
+        "        return None\n"
+        "def failed_status(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - failed run is recorded.\n"
+        "        record_notification_run(status='failed', success=False)\n"
+        "        return source.cached()\n"
+        "def failed_flag(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - failed run is recorded.\n"
+        "        record_provider_run(failed=True)\n"
+        "        return source.cached()\n"
+        "def negative_ipc(source, child_conn):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - parent receives failure status.\n"
+        "        child_conn.send({'success': False})\n"
+        "        return source.cached()\n",
     )
 
     assert collect_violations(tmp_path, baseline) == ()

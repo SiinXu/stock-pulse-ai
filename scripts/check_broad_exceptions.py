@@ -48,7 +48,13 @@ DIAGNOSTIC_TERMS = frozenset(
         "failures",
     }
 )
-FAILURE_RECORD_TERMS = DIAGNOSTIC_TERMS | {"degraded", "fallback"}
+FAILURE_RECORD_TERMS = DIAGNOSTIC_TERMS | {
+    "degraded",
+    "fail",
+    "failed",
+    "fallback",
+}
+NEGATIVE_OUTCOME_TERMS = frozenset({"ok", "success", "successful"})
 IPC_OWNER_TERMS = frozenset({"channel", "conn", "connection", "ipc", "pipe"})
 IGNORED_AST_FIELDS = frozenset({"type_params"})
 _LEXICAL_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
@@ -317,8 +323,13 @@ def _value_has_failure_semantics(node: ast.AST) -> bool:
     if isinstance(node, ast.Dict):
         return any(
             key is not None
-            and _value_has_failure_semantics(key)
-            and not _is_empty_record_value(value)
+            and (
+                (
+                    _value_has_failure_semantics(key)
+                    and not _is_empty_record_value(value)
+                )
+                or _is_negative_outcome(key, value)
+            )
             for key, value in zip(node.keys, node.values)
         ) or any(_value_has_failure_semantics(value) for value in node.values)
     if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
@@ -326,11 +337,30 @@ def _value_has_failure_semantics(node: ast.AST) -> bool:
     return False
 
 
+def _is_negative_outcome(key: ast.AST, value: ast.AST) -> bool:
+    return (
+        isinstance(key, ast.Constant)
+        and isinstance(key.value, str)
+        and bool(_name_terms(key.value) & NEGATIVE_OUTCOME_TERMS)
+        and isinstance(value, ast.Constant)
+        and value.value is False
+    )
+
+
 def _keyword_records_failure(keyword: ast.keyword) -> bool:
     return (
         keyword.arg is not None
-        and bool(_name_terms(keyword.arg) & FAILURE_RECORD_TERMS)
-        and not _is_empty_record_value(keyword.value)
+        and (
+            (
+                bool(_name_terms(keyword.arg) & FAILURE_RECORD_TERMS)
+                and not _is_empty_record_value(keyword.value)
+            )
+            or (
+                bool(_name_terms(keyword.arg) & NEGATIVE_OUTCOME_TERMS)
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is False
+            )
+        )
     ) or _value_has_failure_semantics(keyword.value)
 
 
