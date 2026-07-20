@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   Bookmark,
@@ -38,7 +38,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, EmptyState, InlineAlert, Input, Select, Surface } from '../components/common';
+import { AppPage, Button, EmptyState, InlineAlert, Input, Modal, Select, Surface } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
@@ -526,7 +526,8 @@ const MiniSparkline: React.FC<{ score?: number | null; selected?: boolean }> = (
 
 const StockScreeningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
+  const configurationFormId = useId();
   const text = SCREENING_TEXT[language];
   const markets = useMemo(() => [{ id: 'cn', label: text.marketCn }], [text.marketCn]);
   const [restoredTask] = useState<PersistedScreenTask | null>(() => readPersistedScreenTask());
@@ -540,6 +541,8 @@ const StockScreeningPage: React.FC = () => {
   const [maxResults, setMaxResults] = useState(initialRunParameters.maxResults);
   const [maxResultsDraft, setMaxResultsDraft] = useState(String(initialRunParameters.maxResults));
   const [maxResultsError, setMaxResultsError] = useState('');
+  const [configurationOpen, setConfigurationOpen] = useState(false);
+  const [configurationError, setConfigurationError] = useState('');
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
@@ -945,16 +948,21 @@ const StockScreeningPage: React.FC = () => {
     setMaxResultsError('');
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleOpenConfiguration = () => {
+    setConfigurationError('');
+    setConfigurationOpen(true);
+  };
+
+  const handleSubmit = async (): Promise<boolean> => {
     const parsedMaxResults = Number(maxResultsDraft);
     if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
       setMaxResultsError(text.resultCountError);
       document.getElementById('screening-max-results')?.focus();
-      return;
+      return false;
     }
     setMaxResults(parsedMaxResults);
     setMaxResultsError('');
+    setConfigurationError('');
     setLoading(true);
     setError('');
     setScreenMeta(null);
@@ -962,7 +970,7 @@ const StockScreeningPage: React.FC = () => {
     setTaskMessage(text.submittingTask);
     try {
       const task = await alphasiftApi.startScreen({ market, strategy, maxResults: parsedMaxResults });
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) return false;
       persistScreenTask({
         taskId: task.taskId,
         market,
@@ -972,13 +980,26 @@ const StockScreeningPage: React.FC = () => {
       setActiveTaskId(task.taskId);
       setTaskProgress(0);
       setTaskMessage(formatTaskMessage(task, language));
+      return true;
     } catch (err) {
       if (mountedRef.current) {
+        const message = toApiErrorMessage(err, text.taskSubmitFailed, language);
         setCandidates([]);
         setLoading(false);
-        setError(toApiErrorMessage(err, text.taskSubmitFailed, language));
+        setConfigurationError(message);
+        setError(message);
       }
+      return false;
     }
+  };
+
+  const handleConfigurationSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isScreeningEnabled || loading) return;
+    void handleSubmit().then((started) => {
+      if (started) setConfigurationOpen(false);
+    });
   };
 
   return (
@@ -1275,116 +1296,116 @@ const StockScreeningPage: React.FC = () => {
         ) : null}
       </Surface>
 
-      <Surface as="section" level="interactive" padding="md">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <Surface as="section" level="interactive" padding="none" className="p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-foreground">{text.selectStrategy}</h2>
-            <p className="mt-1 text-xs text-secondary-text">{text.strategyDescription}</p>
+            <p className="mt-1 text-xs text-secondary-text">
+              {selectedStrategyDisplay?.description || text.strategyDescription}
+            </p>
           </div>
-          <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            {selectedStrategyTag}
-          </span>
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-          {loadingStrategies && strategies.length === 0 ? (
-            <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
-              {text.loadingStrategies}
-            </Surface>
-          ) : strategies.length === 0 ? (
-            <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
-              {strategyLoadError || text.strategiesUnavailable}
-            </Surface>
-          ) : (
-            <>
-              {loadingStrategies ? (
-                <p className="col-span-full text-sm text-secondary-text">{text.loadingStrategies}</p>
-              ) : null}
-              {strategyLoadError ? (
-                <p role="alert" className="col-span-full text-sm text-danger">{strategyLoadError}</p>
-              ) : null}
-              {strategies.map((item) => {
-              const selected = item.id === strategy;
-              const display = getStrategyDisplay(item, language);
-              return (
-                <button
-                  key={item.id}
-                  className={`min-h-28 rounded-lg border p-4 text-left transition-all ${
-                    selected
-                      ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.15),0_16px_36px_hsl(var(--primary)/0.12)]'
-                      : 'border-border/80 bg-surface/70 hover:border-primary/45 hover:bg-hover/70'
-                  }`}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleStrategyChange(item.id)}
-                >
-                  <span className="text-base font-semibold text-foreground">{display.name}</span>
-                  <span className="mt-2 block text-sm leading-6 text-secondary-text">{display.description}</span>
-                  <span className="mt-3 inline-flex text-xs font-semibold text-primary">
-                    {display.category}
-                  </span>
-                </button>
-              );
-              })}
-            </>
-          )}
-        </div>
-      </Surface>
-
-      <Surface as="section" level="interactive" padding="md">
-        <form onSubmit={(event) => void handleSubmit(event)} noValidate>
-        <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
-          {text.parameters}
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr_180px_auto] lg:items-end">
-          <Select
-            label={text.market}
-            value={market}
-            disabled={loading}
-            onChange={handleMarketChange}
-            options={markets.map((item) => ({ value: item.id, label: item.label }))}
-          />
-
-          <Input
-            label={text.strategyParameter}
-            className="bg-surface text-sm focus:border-primary"
-            value={strategy}
-            disabled={loading}
-            onChange={(event) => handleStrategyChange(event.target.value)}
-          />
-
-          <Input
-            id="screening-max-results"
-            label={text.resultCount}
-            className="bg-surface text-sm focus:border-primary"
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={maxResultsDraft}
-            error={maxResultsError}
-            disabled={loading}
-            onChange={(event) => handleMaxResultsChange(event.target.value)}
-          />
-
-          <div className="grid min-w-40">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+            <Select
+              value={strategy}
+              onChange={handleStrategyChange}
+              options={strategies.map((item) => ({
+                value: item.id,
+                label: getStrategyDisplay(item, language).name,
+              }))}
+              ariaLabel={text.selectStrategy}
+              placeholder={loadingStrategies ? text.loadingStrategies : text.strategiesUnavailable}
+              disabled={loading || loadingStrategies || strategies.length === 0}
+              className="w-full sm:w-72 [&>div]:w-full"
+            />
+            <span className="shrink-0 rounded-lg border border-primary/30 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+              {selectedStrategyTag}
+            </span>
             <Button
-              variant="primary"
-              size="primary"
-              isLoading={loading}
-              loadingText={text.screening}
-              disabled={!isScreeningEnabled || loading}
-              type="submit"
+              type="button"
+              variant="secondary"
+              size="compact"
+              onClick={handleOpenConfiguration}
             >
-              <Play className="h-4 w-4" />
-              {text.run}
+              <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              {text.parameters}
             </Button>
           </div>
         </div>
-        </form>
+        {strategyLoadError ? <p role="alert" className="mt-2 text-xs text-danger">{strategyLoadError}</p> : null}
       </Surface>
+
+      <Modal
+        isOpen={configurationOpen}
+        onClose={() => setConfigurationOpen(false)}
+        title={text.parameters}
+        description={selectedStrategyDisplay?.description || text.strategyDescription}
+        closeDisabled={loading}
+        footer={(
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="compact"
+              disabled={loading}
+              onClick={() => setConfigurationOpen(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="submit"
+              form={configurationFormId}
+              variant="primary"
+              size="compact"
+              disabled={!isScreeningEnabled || loading}
+              isLoading={loading}
+              loadingText={text.screening}
+            >
+              <Play className="h-3.5 w-3.5" aria-hidden="true" />
+              {text.run}
+            </Button>
+          </>
+        )}
+      >
+        {configurationError ? (
+          <InlineAlert
+            variant="danger"
+            title={text.callFailed}
+            message={configurationError}
+            className="mb-3"
+          />
+        ) : null}
+        <form id={configurationFormId} onSubmit={handleConfigurationSubmit} noValidate>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label={text.market}
+              value={market}
+              disabled={loading}
+              onChange={handleMarketChange}
+              options={markets.map((item) => ({ value: item.id, label: item.label }))}
+            />
+
+            <Input
+              label={text.strategyParameter}
+              value={strategy}
+              disabled={loading}
+              onChange={(event) => handleStrategyChange(event.target.value)}
+            />
+
+            <Input
+              id="screening-max-results"
+              label={text.resultCount}
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={maxResultsDraft}
+              error={maxResultsError}
+              disabled={loading}
+              onChange={(event) => handleMaxResultsChange(event.target.value)}
+            />
+          </div>
+        </form>
+      </Modal>
 
       <Surface as="section" level="interactive" padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

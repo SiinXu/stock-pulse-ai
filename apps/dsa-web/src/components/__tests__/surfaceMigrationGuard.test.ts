@@ -261,7 +261,7 @@ const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
   {
     file: '../../pages/StockScreeningPage.tsx',
     token: 'bg-surface',
-    count: 5,
+    count: 3,
     owner: 'TRACK-UI2',
     removeBy: 'UI-SCR01',
     replacement: 'A valid semantic surface level or bg-subtle.',
@@ -269,14 +269,6 @@ const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
   {
     file: '../../pages/StockScreeningPage.tsx',
     token: 'bg-surface/45',
-    count: 1,
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-SCR01',
-    replacement: 'A valid semantic surface level or bg-subtle.',
-  },
-  {
-    file: '../../pages/StockScreeningPage.tsx',
-    token: 'bg-surface/70',
     count: 1,
     owner: 'TRACK-UI2',
     removeBy: 'UI-SCR01',

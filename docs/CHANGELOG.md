@@ -229,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 多 Agent 新增内部低敏 runtime facts，区分 stage 前后 timeout/budget degradation 与 Pipeline termination；dashboard 改为单次 risk application 后按 post-risk signal 收尾，并清除模型伪造的保留解释字段，不新增公开 schema。
 - [改进] Web 报告输入数据块在现有低敏 overview 上补充三语异常影响、处理建议与安全诊断码，显式呈现缺少来源和无 reason 的降级状态，并区分本次 LLM 新闻输入与报告页独立加载的补充资讯；组件改用语义 `Surface`/`InlineAlert` 与无嵌套卡片的分隔行，输入/API 字段保持兼容。
 - [改进] Web 应用外壳用 typed descriptor 固化九项一级导航并保留 owner 选定的 framed/floating 全局 `main` 表面；1023px 及以下提供唯一共享导航 `IconButton`、完整品牌与可直接访问的 Profile dialog，主题/语言收进 Profile，导航走 Drawer；业务 `ResponsiveRail` 按 owner exception 在首个生产 consumer 前保留 768–1023px Navigation Drawer、更窄移动端与 1024–1279px 页内 disclosure、1280px 起持久显示的基础契约。1024–1279px 无显式偏好时默认 80px compact rail，保存的 80/240px 展开折叠选择在所有桌面断点保持有效。Drawer 仅在 primary same-window 路由激活时关闭，modifier/new-tab 保留原生行为；移动 route 只声明稳定 opener，由 `RouteFocusCoordinator` 按 history entry 捕获并在多轮 Back/Forward 恢复。icon-only 导航统一 labelled Tooltip，44px Profile/偏好/不收缩路由目标与可滚动短视口导航、双轴触摸可达横向内容、Profile 跨断点关闭/焦点交接、light/dark、reduced-motion 由组件和浏览器回归覆盖。
+- [改进] Web AlphaSift 选股页按 PR#35 恢复紧凑策略配置：策略卡片网格改为共享 `Select`，市场、策略参数和返回数量收纳到共享 `Modal`，策略容器恢复 `p-3` 密度；保留 URL/任务状态、自定义策略与结果清理语义，参数校验或提交失败时保留弹窗和输入，任务受理后关闭弹窗。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
