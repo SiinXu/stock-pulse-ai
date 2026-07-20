@@ -10,7 +10,7 @@ StockPulse Web 的界面语言与报告语言是两套独立语义。
 
 因此，英文界面查看中文报告时，报告正文可以保持中文，但复制、刷新、关闭、诊断和其它外围操作必须保持英文。
 
-金融术语的稳定语义、十语言推荐表达、不可翻译项、风险表达与审查流程集中在 [多语言金融术语指导](financial-terminology-guide.md)，它是十语言 UI 金融术语的**单一治理源**。新增或修改金融/风险文案、维护语言资源前先对照该文档。
+金融术语的稳定语义、十语言推荐表达、不可翻译项、风险表达与审查流程集中在 [多语言金融术语指导](financial-terminology-guide.md)，它是十语言 UI 金融术语的**单一治理源**。逐 key 来源、审查状态、产品源文案与候选修订分层、内部 code / 显示文案边界及机器快照见 [高风险 i18n 语义审计](high-risk-i18n-audit.md)。新增或修改金融、交易动作、认证、Credential、错误或免责声明文案前必须同时核对两者；没有真实母语金融 reviewer 时保持 `PENDING_NATIVE_REVIEW`。
 
 ## 翻译文件
 
@@ -57,6 +57,7 @@ Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的
 ```bash
 cd apps/dsa-web
 npm run i18n:resources
+npm run i18n:high-risk
 npm run test:i18n
 npm run test
 npx tsc -b
@@ -66,4 +67,6 @@ npm run test:smoke
 
 `npm run i18n:resources` 默认只读：它通过项目已有的 `esbuild` 在临时目录加载所有 `createUiLanguageRecord()` 源字典，检查英文稳定 key/源文案及 8 个新增语言资源的文件名、完整 key、非空值和插值参数，不需要在线翻译服务或本机专有路径。修改源文案或 key 后，运行 `npm run i18n:resources -- --write` 只会确定性重写 `src/i18n/translations/en.ts`；它不会生成或覆盖其它语言翻译。维护者仍需人工补齐并审查受影响语言，校验会持续失败直到全部资源重新一致。
 
-`test:i18n` 会检查全部十种界面语言的稳定 key、空翻译、NFC、插值参数、零宽字符/生成标记、重复 key，并扫描生产 TSX 中中英文用户可见的 JSX 文本/表达式、模板字符串、`aria-label`、`aria-description`、`alt`、`placeholder`、`title`、`label`、`message`、`description`、通知/错误 setter、toast 和 document title。扫描器会解析本地 `const` 的直接或间接引用（包括别名与嵌套解构）、对象属性、对象 spread 与 JSX spread，避免硬编码文案通过中间变量绕过检查；动态值和可变绑定不会被当作静态文案。允许项必须按具体文件、字符串、语境和用途精确登记，并保持仍被实际使用；禁止整目录或整文件忽略。Playwright 场景应使用独立、可读的 test 名称和关键断言，不得用循环或注释编号代替语义覆盖。
+`i18n:high-risk` 会从真实源字典和十语言 bundle 提取交易动作、风险、认证、Credential、错误和免责声明文案，核对 TypeScript 内部 code 与稳定显示 key 的分离关系，并锁定逐类、逐语言快照。它同时拒绝缺少来源、虚构审校状态或未经审计的高风险值漂移。快照与自动化通过不代表母语金融签核。
+
+`test:i18n` 会先执行资源校验与高风险语义守卫，再检查全部十种界面语言的稳定 key、空翻译、NFC、插值参数、零宽字符/生成标记、重复 key，并扫描生产 TSX 中中英文用户可见的 JSX 文本/表达式、模板字符串、`aria-label`、`aria-description`、`alt`、`placeholder`、`title`、`label`、`message`、`description`、通知/错误 setter、toast 和 document title。扫描器会解析本地 `const` 的直接或间接引用（包括别名与嵌套解构）、对象属性、对象 spread 与 JSX spread，避免硬编码文案通过中间变量绕过检查；动态值和可变绑定不会被当作静态文案。允许项必须按具体文件、字符串、语境和用途精确登记，并保持仍被实际使用；禁止整目录或整文件忽略。Playwright 场景应使用独立、可读的 test 名称和关键断言，不得用循环或注释编号代替语义覆盖。

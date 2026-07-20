@@ -81,13 +81,12 @@
 **翻译矩阵列的取证状态（重要，避免把未审校译文当成已验证/官方翻译）：**
 
 - `en` / `zh`：**权威**。直接取自产品源文案（`uiText.ts`、`locales/` 的 `en` / `zh`）。
-- `zh-TW`：取自产品 `translations/zh-TW.ts`，为可靠锚点。
-- `ja` / `ko` / `de` / `es` / `ms` / `fr` / `id`：为**当前产品内译文基线**，逐字取自 `apps/dsa-web/src/i18n/translations/*.ts`，作为审校起点提供，**均属待母语金融审校，不是官方或已验证翻译**。已发现明显漂移的概念在 `concept_id` 后标 `⚠`，具体问题见 §7。
+- `zh-TW` / `ja` / `ko` / `de` / `es` / `ms` / `fr` / `id`：为**当前产品内译文基线**，逐字取自 `apps/dsa-web/src/i18n/translations/*.ts`，作为审校起点提供，**均标为 `PENDING_NATIVE_REVIEW`，不是官方、已批准或已完成母语金融审校的翻译**。I18N-01 优先修订但仍待母语审校的概念在 `concept_id` 后标 `⚠`，具体证据见 §7 与 [高风险 i18n 审计](high-risk-i18n-audit.md)。
 - 插值占位符（如 `{value}`）逐字保留，各语言参数集合必须一致，不得翻译或增删。
 
 ## 6. 核心术语表
 
-> 标 `⚠` 的概念，其部分语言当前产品译文存在已知漂移，需优先母语金融审校，详见 [§7 已知翻译漂移](#7-已知翻译漂移需优先母语金融审校)。
+> 标 `⚠` 的概念已由 I18N-01 修订明显语义漂移，但候选译文仍需母语金融审校，详见 [§7 I18N-01 候选修订与待审状态](#7-i18n-01-候选修订与待审状态)。
 
 ### 6.1 市场与行情
 
@@ -117,9 +116,9 @@
 | `mkt_last_price` | Last price | 现价 | 現價 | 現在値 | 현재가 | Aktueller Kurs | Precio actual | Harga semasa | Cours actuel | Harga saat ini |
 | `mkt_change_percent` | Price change | 涨跌幅 | 漲跌幅 | 騰落率 | 등락률 | Kursänderung | Variación | Perubahan harga | Variation | Perubahan harga |
 | `mkt_market_value` | Market value | 市值 | 市值 | 市場価値 | 시장 가치 | Marktwert | Valor de mercado | Nilai pasaran | Valeur marchande | Nilai pasar |
-| `mkt_turnover_amount` ⚠ | Turnover | 成交额 | 成交金額 | 売買代金 | 거래대금 | Handelsvolumen | Importe negociado | Nilai dagangan | Montant négocié | Nilai transaksi |
-| `mkt_turnover_rate` ⚠ | Turnover | 换手率 | 週轉率 | 売買回転率 | 회전율 | Umschlagshäufigkeit | Rotación | Kadar pusing ganti dagangan | Taux de rotation | Tingkat perputaran |
-| `mkt_volume_spike` ⚠ | Volume spike | 成交量放大 | 成交量放大 | 音量の急増 | 볼륨 급증 | Lautstärkespitze | Pico de volumen | Lonjakan kelantangan | Pic de volume | Lonjakan volume |
+| `mkt_turnover_amount` ⚠ | Turnover value | 成交额 | 成交金額 | 売買代金 | 거래대금 | Handelswert | Importe negociado | Nilai dagangan | Montant négocié | Nilai transaksi |
+| `mkt_turnover_rate` ⚠ | Turnover rate | 换手率 | 週轉率 | 売買回転率 | 회전율 | Umschlagshäufigkeit | Rotación | Kadar pusing ganti dagangan | Taux de rotation | Tingkat perputaran |
+| `mkt_volume_spike` ⚠ | Volume spike | 成交量放大 | 成交量放大 | 出来高急増 | 거래량 급증 | Sprung im Handelsvolumen | Pico de volumen | Lonjakan volum dagangan | Pic du volume des transactions | Lonjakan volume perdagangan |
 | `mkt_price_cross` | Price crossing | 价格突破 | 價格穿越 | 価格の閾値クロス | 가격 임계값 교차 | Preisübergang | Cruce de precios | Lintasan harga | Franchissement des prix | Persilangan harga |
 | `mkt_fx_status` | FX status | 汇率状态 | 匯率狀態 | FX 状況 | FX 현황 | FX Status | FX Estado | Status FX | FX Statut | Status FX |
 
@@ -154,8 +153,8 @@
 | `ta_death_cross` | bearish cross | 死叉 | 死叉 | デッドクロス | 데드크로스 | bärische Kreuzung | Cruce bajista | persilangan menurun | Croisement baissier | persilangan bearish |
 | `ta_bullish` | Bullish | 看涨 | 看漲 | 強気 | 강세 | Bullisch | Alcista | Menaik harga | Haussier | Bullish |
 | `ta_bearish` | Bearish | 看跌 | 看跌 | 弱気 | 약세 | Bärisch | Bajista | Menurun | Baissier | Bearish |
-| `ta_heat` ⚠ | Heat | 热度 | 熱度 | 注目度 | 관심도 | Hitze | Calor | Haba | Chaleur | Panas |
-| `ta_leader` ⚠ | Leader | 龙头 | 龍頭 | リーダー | 리더 | Anführer | Líder | Pemimpin | Chef | Pemimpin |
+| `ta_heat` ⚠ | Theme interest | 热度 | 熱度 | 注目度 | 관심도 | Beliebtheit | Popularidad | Populariti | Popularité | Popularitas |
+| `ta_leader` ⚠ | Leading stock | 龙头 | 龍頭 | 牽引銘柄 | 주도주 | Führungsaktie | Valor líder | Saham peneraju | Valeur phare | Saham unggulan |
 
 ### 6.3 持仓与账户
 
@@ -193,9 +192,9 @@
 | `pf_account` | Account | 账户 | 賬戶 | アカウント | 계정 | Konto | Cuenta | Akaun | Compte | Akun |
 | `pf_positions` | Positions | 持仓明细 | 持倉明細 | ポジション | 보유 포지션 | Positionen | Posiciones | Pegangan | Positions | Posisi |
 | `pf_avg_cost` | Avg cost | 均价 | 平均成本 | 平均取得単価 | 평균 매입가 | Durchschnittlicher Einstandskurs | Precio medio de compra | Harga belian purata | Prix de revient moyen | Harga beli rata-rata |
-| `pf_cost_method` ⚠ | Cost method | 成本口径 | 成本口徑 | コストベースアプローチ | 비용 기반 접근법 | Kostenbasierter Ansatz | Enfoque basado en costes | Pendekatan berasaskan kos | Approche basée sur les coûts | Pendekatan berbasis biaya |
+| `pf_cost_method` ⚠ | Cost method | 成本口径 | 成本口徑 | 取得価額計算方法 | 취득원가 계산 방식 | Anschaffungskostenmethode | Método de cálculo del coste | Kaedah kos pemerolehan | Méthode de calcul du coût | Metode biaya perolehan |
 | `pf_fifo` | FIFO | 先进先出（FIFO） | 先進先出（FIFO） | FIFO | FIFO | FIFO | FIFO | FIFO | FIFO | FIFO |
-| `pf_avg_cost_basis` ⚠ | Average cost | 均价成本（AVG） | 均價成本（AVG） | 平均費用 | 평균 비용 | Durchschnittskosten | Coste medio | Kos purata | Coût moyen | Biaya rata-rata |
+| `pf_avg_cost_basis` ⚠ | Average cost | 均价成本（AVG） | 均價成本（AVG） | 平均取得価額 | 평균 매입단가 | Durchschnittskostenmethode | Método de coste medio | Kaedah kos purata | Méthode du coût moyen | Metode biaya rata-rata |
 | `pf_unrealized_pnl` | Unrealized P/L | 未实现盈亏 | 未實現盈虧 | 未実現損益 | 실현되지 않은 손익 | Nicht realisierter Gewinn/Verlust | P/L no realizado | Untung/rugi belum direalisasi | P/L non réalisé | Laba/rugi belum terealisasi |
 | `pf_return_pct` | Return | 收益率 | 報酬率 | 収益率 | 수익률 | Rendite | Rentabilidad | Pulangan | Rendement | Imbal hasil |
 | `pf_total_equity` | Total equity | 总权益 | 總權益 | 純資産 | 총자산 | Gesamteigenkapital | Patrimonio total | Jumlah ekuiti | Capitaux propres totaux | Total ekuitas |
@@ -204,7 +203,7 @@
 | `pf_sector_concentration` | Sector concentration | 行业集中度分布 | 行業集中度分佈 | セクター集中 | 부문 집중 | Sektorkonzentration | Concentración sectorial | Kepekatan sektor | Concentration sectorielle | Konsentrasi sektor |
 | `pf_max_drawdown` | Max drawdown | 最大回撤 | 最大回撤 | 最大ドローダウン | 최대 낙폭 | Maximaler Drawdown | Drawdown máximo | Susutan maksimum | Repli maximal | Drawdown maksimum |
 | `pf_current_drawdown` | Current drawdown | 当前回撤 | 目前回撤 | 現在のドローダウン | 현재 낙폭 | Aktueller Drawdown | Drawdown actual | Susutan semasa | Repli actuel | Drawdown saat ini |
-| `pf_side` ⚠ | Side | 买卖方向 | 買賣方向 | 売買区分 | 매매 구분 | Transaktionsrichtung | Tipo de operación | Bahagian | Sens de transaction | Sisi |
+| `pf_side` ⚠ | Trade side | 买卖方向 | 買賣方向 | 売買区分 | 매매 구분 | Handelsrichtung | Dirección de la operación | Arah dagangan | Sens de la transaction | Arah transaksi |
 | `pf_fee` | Fee | 手续费 | 手續費 | 手数料 | 수수료 | Gebühr | Tarifa | Yuran | Frais | Biaya |
 | `pf_cash_flow` | Cash flows | 资金流水 | 資金流水 | キャッシュフロー | 현금 흐름 | Cashflows | Flujos de caja | Aliran tunai | Flux de trésorerie | Arus kas |
 | `pf_corporate_action` | Corporate actions | 公司行为 | 公司行為 | 企業行動 | 기업 활동 | Gesellschaftsmaßnahmen | Acciones corporativas | Tindakan korporat | Actions sur les sociétés | Aksi korporasi |
@@ -279,15 +278,15 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `sig_ai_signals` | AI signals | AI 建议 | AI 建議 | AI信号 | AI 신호 | KI-Signale | Señales de IA | Isyarat AI | Signaux IA | Sinyal AI |
 | `sig_action` | Action | 动作 | 動作 | アクション | 조치 | Aktion | Acción | Tindakan | Action | Tindakan |
-| `sig_action_buy` | Buy | 买入 | 買入 | 買う | 구매 | Kauf | Compra | Beli | Acheter | Beli |
-| `sig_action_hold` | Hold | 持有 | 持有 | ホールド | 보유 | Halten | Mantener | Pegang | Conserver | Tahan |
-| `sig_action_sell` | Sell | 卖出 | 賣出 | 売却 | 매각 | Verkauf | Vender | Jual | Vendre | Jual |
+| `sig_action_buy` | Buy | 买入 | 買入 | 買い | 매수 | Kauf | Compra | Beli | Acheter | Beli |
+| `sig_action_hold` | Hold | 持有 | 持有 | 保有 | 보유 | Halten | Mantener | Pegang | Conserver | Tahan |
+| `sig_action_sell` | Sell | 卖出 | 賣出 | 売り | 매도 | Verkauf | Vender | Jual | Vendre | Jual |
 | `sig_action_add` | Add | 加仓 | 加碼 | 買い増し | 비중 확대 | Position aufstocken | Aumentar posición | Tambah pegangan | Renforcer la position | Tambah posisi |
 | `sig_action_reduce` | Reduce | 减仓 | 減碼 | ポジション縮小 | 비중 축소 | Position reduzieren | Reducir posición | Kurangkan pegangan | Réduire la position | Kurangi posisi |
 | `sig_action_watch` | Watch | 观望 | 觀望 | 様子見 | 관망 | Abwarten | Esperar | Tunggu dan lihat | Attendre | Tunggu |
-| `sig_action_avoid` ⚠ | Avoid | 回避 | 迴避 | 避けてください | 피하세요 | Vermeiden Sie | Evita | Elakkan | Évitez | Hindari |
-| `sig_confidence` ⚠ | Confidence | 置信度 | 置信度 | 信頼度 | 신뢰도 | Selbstvertrauen | Confianza | Keyakinan | Confiance | Keyakinan |
-| `sig_score` | Score | 评分 | 評分 | レーティング | 점수 | Bewertung | Clasificación | Penarafan | Classement | penilaian |
+| `sig_action_avoid` ⚠ | Avoid | 回避 | 迴避 | 見送り | 회피 | Meiden | Evitar | Elak | Éviter | Dihindari |
+| `sig_confidence` ⚠ | Confidence | 置信度 | 置信度 | 信頼度 | 신뢰도 | Konfidenz | Nivel de confianza | Tahap keyakinan | Niveau de confiance | Tingkat keyakinan |
+| `sig_score` ⚠ | Score | 评分 | 評分 | スコア | 점수 | Punktzahl | Puntuación | Skor | Score | Skor |
 | `sig_target_price` | Target price | 目标价 | 目標價 | 目標価格 | 목표 가격 | Zielpreis | Precio objetivo | Harga sasaran | Prix cible | Harga target |
 | `sig_stop_loss` | Stop loss | 止损 | 停損 | 損切り | 손절 | Stop-Loss | Límite de pérdidas | Henti rugi | Stop-loss | Batas rugi |
 | `sig_catalyst` | Catalyst | 催化 | 催化 | カタリスト | 촉매제 | Katalysator | Catalizador | Pemangkin | Catalyseur | Katalis |
@@ -320,14 +319,14 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `al_create_rule` | Create alert rule | 创建告警规则 | 建立告警規則 | アラートルールを作成する | 경고 규칙 생성 | Alarmregel erstellen | Crear regla de alerta | Cipta peraturan makluman | Règle de création d’alerte | Membuat aturan pemberitahuan |
 | `al_portfolio_drawdown` | Portfolio drawdown | 组合回撤 | 組合回撤 | ポートフォリオドローダウン | 포트폴리오 낙폭 | Portfolio-Drawdown | Drawdown de cartera | Susutan portfolio | Repli du portefeuille | Drawdown portofolio |
-| `al_severity_info` ⚠ | Info | 提示 | 提示 | ヒント | 팁 | Tipp | Propina | Petua | Conseil | Tip |
+| `al_severity_info` ⚠ | Info | 提示 | 提示 | 情報 | 정보 | Information | Información | Maklumat | Information | Informasi |
 | `al_severity_warning` | Warning | 警告 | 警告 | 警告 | 경고 | Warnung | Advertencia | Amaran | Avertissement | peringatan |
 | `al_severity_critical` | Critical | 严重 | 嚴重 | 重大 | 심각 | Kritisch | Crítica | Kritikal | Critique | Kritis |
-| `al_watchlist` ⚠ | Watchlist | 自选股 | 自選股 | 自己選択株 | 자가 선택 주식 | Selbst ausgewählte Aktien | Acciones autoseleccionadas | Saham pilihan sendiri | Actions auto-sélectionnées | Saham yang dipilih sendiri |
+| `al_watchlist` ⚠ | Watchlist | 自选股 | 自選股 | ウォッチリスト | 관심 종목 | Watchlist | Lista de seguimiento | Senarai pantau | Liste de suivi | Daftar pantauan |
 | `al_enabled` | Enabled | 已启用 | 已啟用 | 有効化 | 활성화됨 | Aktiviert | Habilitado | Didayakan | Activé | Diaktifkan |
-| `al_disabled` | Disabled | 已停用 | 未啟用 | 無効 | 비활성화 | Deaktiviert | Desactivado | Dilumpuhkan | Désactivé | Dinonaktifkan |
-| `al_cooldown` | Cooldown | 冷却 | 冷卻 | クールダウン | 쿨다운 | Abklingzeit | Tiempo de recarga | Tempoh bertenang | Temps de recharge | Jeda |
-| `al_trigger_history` ⚠ | Trigger history | 触发历史 | 觸發歷史 | トリガーの歴史 | 트리거 역사 | Auslösergeschichte | Historial de disparos | Mencetuskan sejarah | Historique des déclenchements | Riwayat pemicu |
+| `al_disabled` ⚠ | Disabled | 已停用 | 已停用 | 無効 | 비활성화 | Deaktiviert | Desactivado | Dilumpuhkan | Désactivé | Dinonaktifkan |
+| `al_cooldown` ⚠ | Cooldown | 冷却 | 冷卻時間 | 抑制期間 | 재알림 대기 시간 | Sperrfrist | Período de espera | Tempoh penangguhan | Délai de temporisation | Jeda notifikasi |
+| `al_trigger_history` ⚠ | Trigger history | 触发历史 | 觸發記錄 | トリガー履歴 | 트리거 기록 | Auslöseverlauf | Historial de activaciones | Rekod pencetus | Historique des déclenchements | Riwayat pemicu |
 | `al_notify_configured` | Configured | 已配置 | 已配置 | 構成済み | 구성 | Konfiguriert | Configurado | Dikonfigurasikan | Configuré | Dikonfigurasi |
 | `al_notify_unconfigured` | Not configured | 未配置 | 未配置 | 設定されていません | 설정 안 됨 | Nicht konfiguriert | No configurado | Tidak dikonfigurasikan | Non configuré | Tidak dikonfigurasi |
 
@@ -357,27 +356,21 @@
 | `ml_available_models` | Available models | 可用模型 | 可用模型 | 利用可能なモデル | 사용 가능한 모델 | Verfügbare Modelle | Modelos disponibles | Model yang tersedia | Modèles disponibles | Model yang tersedia |
 | `ml_test_connection` | Test connection | 测试连接 | 測試連線 | テスト接続 | 테스트 연결 | Testverbindung | Conexión de prueba | Sambungan ujian | Connexion d’essai | Uji koneksi |
 
-## 7. 已知翻译漂移（需优先母语金融审校）
+## 7. I18N-01 候选修订与待审状态
 
-以下是从当前 `translations/*.ts` 中直接观察到的语义漂移样本，均由本次调查发现，作为优先审校对象。它们说明为何键完整性测试（`test:i18n`）无法证明金融翻译准确、自然或不误导：测试只校验 key、非空值、插值参数一致，不校验金融语义。修正应在后续独立翻译 PR 中进行，本文档不改动运行时资源。
+I18N-01 已修订下表中的明显语义漂移，并通过高风险语义守卫锁定当前 key 集合与十语言 bundle 快照。修订值是基于产品契约、一手机构术语和自动化语义审查得到的**候选产品译文**，不是母语金融签核。除 `zh` / `en` 产品源文案外，八个翻译 bundle 仍统一标记为 `PENDING_NATIVE_REVIEW`；完整来源、基线 SHA、逐语言状态和 `before` / `recommended` 记录见 [High-risk i18n semantic audit](high-risk-i18n-audit.md) 与机器清单 `apps/dsa-web/scripts/high-risk-i18n-audit.json`。
 
-| `concept_id` | 受影响语言 | 当前产品译文 | 问题 | 修正方向 |
-| --- | --- | --- | --- | --- |
-| `mkt_volume_spike` | `ja` `de` `ms` | 音量の急増 / Lautstärkespitze / Lonjakan kelantangan | 把“成交量”误当音频音量 | 用金融成交量（出来高急増 / Volumenspitze 等） |
-| `mkt_turnover_amount` / `mkt_turnover_rate` | `en` | 两者 `en` 均为 “Turnover” | 成交额与换手率英文撞车，产生歧义 | 成交额用 “Turnover (value)”，换手率用 “Turnover rate” |
-| `ta_heat` | `de` `es` `fr` `ms` | Hitze / Calor / Chaleur / Haba | “热度/关注度”误当物理温度 | 用“人气/关注度”（Beliebtheit / Popularidad） |
-| `ta_leader` | `de` `fr` | Anführer / Chef | “龙头股”误当人物领袖 | 用“龙头股/领涨股”（Führungsaktie / valeur phare） |
-| `pf_cost_method` / `pf_avg_cost_basis` | `ja` `ko` `de` `es` `ms` `fr` `id` | “成本基础方法” / 平均費用 等 | 把成本核算法误当“成本基础”，均价成本误当“平均费用/开销” | 区分成本法（cost method）与平均取得单价 |
-| `pf_side` | `ms` `id` | Bahagian / Sisi | 买卖方向误当“部分/边” | 用“交易方向”（Arah transaksi / Jenis transaksi） |
-| `al_severity_info` | `es` `ja` `ko` | Propina / ヒント / 팁 | 告警级别“提示”误当小费/提示语 | 用信息级别（Información / 情報 / 정보） |
-| `al_watchlist` | `ja` `ko` `de` `es` `ms` `fr` `id` | “自己选择的股票”类冗长直译 | 未采用通行“自选股/关注列表”表达 | 用标准 Watchlist 对应词（Merkliste / Lista de seguimiento / Senarai pantau） |
-| `al_cooldown` | `es` `fr` `ms` | Tiempo de recarga / Temps de recharge / Tempoh bertenang | 偏游戏“充能/休息”语域 | 用中性“冷却期/抑制期” |
-| `al_trigger_history` | `ja` `ko` `de` | トリガーの歴史 / 트리거 역사 / Auslösergeschichte | “历史”误当宏大 history | 用“记录/履历”（履歴 / 기록 / Verlauf） |
-| `al_disabled` | `zh-TW` | 未啟用 | 与 `zh` 已停用 语义偏移（从未启用 vs 已停用） | 统一为“已停用”（已停用/已關閉） |
-| `sig_confidence` | `de` | Selbstvertrauen | 模型置信度误当心理“自信心” | 用“置信度/可信度”（Konfidenz / Zuverlässigkeit） |
-| `sig_action_avoid` | `ja` `ko` `de` `es` `fr` `id` | 避けてください / 피하세요 / Vermeiden Sie 等 | 名词化标签被译成祈使句 | 用名词标签“回避”（回避 / 회피 / Meiden） |
-| `sig_score` | `es` `fr` `id` | Clasificación / Classement / penilaian | 评分偏“排名”，且大小写不一致 | 用“评分/分值”（Puntuación / Score），统一首字母大小写 |
-| `mkt_a_share` | `en` | 告警区域用 “A-shares”，股票搜索用 “China” | `en` 源表达不一致 | 统一 `en` 表达（建议 “A-shares”） |
+| 概念组 | 旧值样本 | 当前候选语义 | 审查状态 |
+| --- | --- | --- | --- |
+| 成交量 / 成交额 / 换手率 | 音量の急増、Lautstärkespitze、两个 “Turnover” | 明确区分 trading volume、turnover value、turnover rate | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| 题材热度 / 龙头股 | Hitze、Calor、Chef、Anführer | 市场关注度与领涨个股，不指温度或人物 | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| 成本口径 / 买卖方向 | コストベースアプローチ、Bahagian、Sisi | 成本核算方法与 buy/sell transaction direction | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| 信号动作 / 置信度 / 评分 | 避けてください、Selbstvertrauen、Classement | 信息性状态标签、模型置信度、数值评分 | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| 告警提示 / 自选股 / 冷却 / 触发记录 | Propina、自己選択株、Temps de recharge、Auslösergeschichte | 信息级别、watchlist、抑制期、触发记录 | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| API key / provider key / CLI 登录状态 | API Legende、touches、teclas、缺失 provider-key 路径与断裂的凭据文件说明 | 区分 API key、legacy provider key、StockPulse 凭据访问和 CLI 自身登录状态 | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+| AlphaSift 风险提示 | 断裂机翻与责任主体不清 | 保留“研究/辅助判断”“不构成投资建议”“决策和结果由用户承担”三层 | 八个翻译 bundle 均 `PENDING_NATIVE_REVIEW` |
+
+仍未统一的低风险市场别名（例如股票搜索 `China` 与告警区域 `A-shares`）不在本次高风险修订范围内，继续作为后续产品命名收敛项；不得据此把本次候选翻译标为母语审校完成。
 
 ## 8. 报告语言术语（仅 `zh` / `en` / `ko`）
 
@@ -506,6 +499,7 @@
 ```bash
 cd apps/dsa-web
 npm run i18n:resources   # 校验源 key/源文案与八个新增语言资源
+npm run i18n:high-risk   # 校验高风险语义范围、证据状态、code/display 边界与快照
 npm run test:i18n        # 十语言 key/空值/插值/NFC/零宽字符/重复 key + 硬编码扫描
 # 依赖就绪时可再执行：
 npm run lint
@@ -513,11 +507,12 @@ npm run test
 npm run build
 ```
 
-> 本文档为 docs-only，不新增/修改运行时资源，因此 `i18n:resources` / `test:i18n` 结论不受本文档改动影响；它们用于后续按本指南**修改翻译资源**的 PR。
+> 仅修改本文档时不会改变运行时资源；I18N-01 及后续翻译 PR 同时修改 bundle 时，必须执行上述三项校验。自动化通过仍不能替代母语金融审校。
 
 ## 16. 相关文档
 
 - [Web 国际化开发约定](web-i18n.md) / [Web Internationalization Conventions](web-i18n_EN.md)
+- [High-risk i18n semantic audit](high-risk-i18n-audit.md)
 - [DecisionSignal 决策信号专题](decision-signals.md)
 - [实时告警中心](alerts.md)
 - [文档中心索引](INDEX.md)

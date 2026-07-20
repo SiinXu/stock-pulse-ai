@@ -1,0 +1,1083 @@
+{
+  "schemaVersion": 1,
+  "auditBaseline": {
+    "repository": "SiinXu/stock-pulse-ai",
+    "ref": "origin/main",
+    "commit": "59f49297cf744a93cfcd2286f0216f17c3ac546d",
+    "auditedAt": "2026-07-20",
+    "scope": "Only user-facing copy merged into main at the recorded commit was audited. Open pull requests were excluded.",
+    "openPullRequestsExcluded": [
+      94,
+      95,
+      96
+    ]
+  },
+  "languageReview": {
+    "zh": {
+      "status": "PRODUCT_SOURCE",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "zh-TW": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "en": {
+      "status": "PRODUCT_SOURCE",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ja": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ko": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "de": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "es": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ms": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "fr": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "id": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    }
+  },
+  "sources": [
+    {
+      "id": "stockpulse_product_contract",
+      "authority": "StockPulse merged source and domain contracts",
+      "url": null,
+      "accessedAt": "2026-07-20",
+      "scope": "Defines shipped display context, internal codes, source-language copy, and the distinction between UI language, report language, user content, and contract values."
+    },
+    {
+      "id": "stockpulse_financial_guide",
+      "authority": "StockPulse multilingual financial terminology guide",
+      "url": null,
+      "accessedAt": "2026-07-20",
+      "scope": "Defines product-specific financial concepts, prohibited claims, current translations, and recommended wording."
+    },
+    {
+      "id": "finra_order_types",
+      "authority": "Financial Industry Regulatory Authority",
+      "url": "https://www.finra.org/investors/investing/investment-products/stocks/order-types",
+      "accessedAt": "2026-07-20",
+      "scope": "Distinguishes buy, sell, limit, stop, and stop-loss actions and explains that order controls do not eliminate market or investment risk."
+    },
+    {
+      "id": "finra_rule_2210",
+      "authority": "Financial Industry Regulatory Authority",
+      "url": "https://www.finra.org/rules-guidance/rulebooks/finra-rules/2210",
+      "accessedAt": "2026-07-20",
+      "scope": "Provides a first-party reference for fair and balanced investment communications, buy/sell/hold recommendation terminology, and caution against implying future profitability."
+    },
+    {
+      "id": "hkex_glossary",
+      "authority": "Hong Kong Exchanges and Clearing",
+      "url": "https://www.hkex.com.hk/Global/Exchange/Glossary?sc_lang=en",
+      "accessedAt": "2026-07-20",
+      "scope": "Provides exchange terminology context for market turnover and related trading concepts."
+    },
+    {
+      "id": "nist_credential_glossary",
+      "authority": "National Institute of Standards and Technology",
+      "url": "https://csrc.nist.gov/glossary/term/credential",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines credential as evidence that binds identity or authority; supports keeping credential, password, and API-key display concepts distinct."
+    },
+    {
+      "id": "nist_sp800_63b",
+      "authority": "National Institute of Standards and Technology",
+      "url": "https://pages.nist.gov/800-63-4/sp800-63b.html",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines authenticator and password handling concepts, including retry limiting and secure authentication language."
+    },
+    {
+      "id": "rfc_9110_authentication",
+      "authority": "Internet Engineering Task Force",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html#name-401-unauthorized",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines HTTP authentication challenge and credential semantics; supports separating stable error codes from localized user guidance."
+    }
+  ],
+  "categories": [
+    {
+      "id": "trading_action",
+      "semanticBoundary": "Internal action enums remain stable contract values; localized labels describe informational signal or ledger states and must not be presented as guaranteed or personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "selectors": [
+        {
+          "prefix": "i18n.uiText.UI_TEXT.history.action"
+        },
+        {
+          "prefix": "locales.portfolio.PORTFOLIO_SIDE_LABELS."
+        },
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.decisionSignals.action",
+            "i18n.uiText.UI_TEXT.decisionSignals.confidence",
+            "i18n.uiText.UI_TEXT.decisionSignals.score",
+            "i18n.uiText.UI_TEXT.decisionSignals.stopLoss",
+            "i18n.uiText.UI_TEXT.decisionSignals.targetPrice",
+            "locales.portfolio.PORTFOLIO_TEXT.buy",
+            "locales.portfolio.PORTFOLIO_TEXT.sell",
+            "locales.portfolio.PORTFOLIO_TEXT.side"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 18,
+        "keySetSha256": "540793c729e5930866343eb5d15a652ff2de74e2df674434675651023bc0c648",
+        "bundleSha256": {
+          "zh": "0721b1cd32dea2ec33cd2b04cf74522d438028614c78d85d8dfed3806896dee8",
+          "zh-TW": "23b46c5b189e3f1e39a3c3b88b04d2d8ab76db590acd44c8436e8f744da73852",
+          "en": "0606312d21af93747a995e951e7d94df1d62adf6508121d807c5745539a1806a",
+          "ja": "5965dabcb714ff82ade68944d73e63841623575da656225ac1d3f59ce026b911",
+          "ko": "115e71310a33606bd9343859d045f8c9b39348d6084854d56c6595cc8c7af8d8",
+          "de": "2093f2ef1297aafd5240eb9ddce535678d61ddca4cf3f431fe29369dbd9642d1",
+          "es": "22c9961498d56faa54f6e3524ab782ba01510ad4ca98950a3178260e315266bb",
+          "ms": "f064d39e6d40aad13f0831821373d731d75d6e41bddf633ee74b22a1e2cecfb2",
+          "fr": "0bebc652f2511f8e3014a9ec9d31932ab70355f3aadeef73fc4b342f92e22089",
+          "id": "a3cf0145584c8ecf5990d47dbb948b96f778e9298904fd8c5b82f400d6b3216f"
+        }
+      }
+    },
+    {
+      "id": "risk",
+      "semanticBoundary": "Risk, volume, turnover, cost-method, watchlist, alert-severity, and model-score labels must preserve the product concept and must not imply certainty, physical volume, rank, or advice.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "selectors": [
+        {
+          "exact": [
+            "locales.alerts.ALERT_LIST_TEXT.childTargetCooldown",
+            "locales.alerts.ALERT_LIST_TEXT.cooldown",
+            "locales.alerts.ALERT_LIST_TEXT.deleteMessage",
+            "locales.alerts.ALERT_LIST_TEXT.disabled",
+            "locales.alerts.ALERT_SCOPE_LABELS.watchlist",
+            "locales.alerts.ALERT_SEVERITY_LABELS.info",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.0.label",
+            "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label",
+            "locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label",
+            "locales.alerts.ALERT_TRIGGER_TEXT.emptyTitle",
+            "locales.alerts.ALERT_TRIGGER_TEXT.loading",
+            "locales.alerts.ALERT_TRIGGER_TEXT.title",
+            "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label",
+            "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
+            "locales.portfolio.PORTFOLIO_TEXT.avg",
+            "locales.portfolio.PORTFOLIO_TEXT.costMethod",
+            "locales.portfolio.PORTFOLIO_TEXT.costMethodShort",
+            "locales.screening.SCREENING_TEXT.confidence",
+            "locales.screening.SCREENING_TEXT.heat",
+            "locales.screening.SCREENING_TEXT.leader",
+            "locales.screening.SCREENING_TEXT.score",
+            "locales.screening.SCREENING_TEXT.sectorThemeConfidence",
+            "locales.screening.SCREENING_TEXT.turnover",
+            "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
+            "utils.strategyDisplay.copy.bottom_volume.description",
+            "utils.strategyDisplay.copy.bottom_volume.name"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 26,
+        "keySetSha256": "c4dc3fac2322f39da6f37a0d1c0d2b95fea80762459f493c9db4243513f150f5",
+        "bundleSha256": {
+          "zh": "73621c6828b0d5ac6d5a8a9f8127cfda8714771a45d26d1cad93b8cb8cd1fc83",
+          "zh-TW": "be3e9dd8142e193a85d9aeb5b5c46133a1455308cb48be7647c3609389fe8c67",
+          "en": "208e0bae9aa87b739331b3f28092a097b5d2b71763e5313b43ec7da9acf10abe",
+          "ja": "b21a0c368d1ae22a0c122d3d709f681ec37a84d028b28dc7797e06a87079455c",
+          "ko": "f787f07979d6a29c74a5a2f54624b65f3581b298b129d248313af423b2224bd9",
+          "de": "ceff42feff78f7b64b3dcbc51516281edfc2ce14c8aaca652c3c04bfca9a0b7c",
+          "es": "582be7a9c0cceb9ed67c37d07207853d6fd928e7a0410b0402eaf28d3dceb2c4",
+          "ms": "595dc8436f97bf3130b7f2cc1daa8978a043c07e44d26ab9b6e9982ddcc84a62",
+          "fr": "4bbc6cf2f69c5a7163e55b016e517a93acf8c9ab2e210d846b19ec5bee7bc5d2",
+          "id": "1a128f335f0bdcef17e280180c5a45282bf7179c9d9457ebca222b75b2a39448"
+        }
+      }
+    },
+    {
+      "id": "authentication",
+      "semanticBoundary": "Authentication, login state, password setup, password change, and retry-limit messages describe the actual transport or session state without exposing a credential or conflating authentication with authorization.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "selectors": [
+        {
+          "prefix": "i18n.uiText.UI_TEXT.login."
+        },
+        {
+          "pattern": "^i18n\\.uiText\\.UI_TEXT\\.settings\\.(?:auth|changePassword)"
+        },
+        {
+          "pattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.(?:unauthorized|auth_disabled|password_required|current_required|password_mismatch|password_already_set|invalid_password|not_changeable|rate_limited)\\."
+        }
+      ],
+      "snapshot": {
+        "keyCount": 80,
+        "keySetSha256": "6e9d6509973fe765e9497499e6e6b8753f69ad8abbc041bcf1c21ddfe5c80d8d",
+        "bundleSha256": {
+          "zh": "e6a9b5987ccb50cccb69eb521f8a27e1a71d390935fcbf9fb9d389e5637eb8ba",
+          "zh-TW": "fa0fb414377408a6d4bba0b378f80da5ddea07d2c85dc23351469a926ebe63a4",
+          "en": "d9acc641895fc00ff85fe4c9446c155b6624b6a89f099ea74eb6fb853b4b5fdd",
+          "ja": "6c692cf7e03dd65cde8e6794593a8a7eab6f6c2db6fdb98368a7158b9394f418",
+          "ko": "8c15667b475605b8cb433f7f24cfd4641e9df917dd1624e89fa3661612c19727",
+          "de": "0c3b251c787790012b0676d73cffa71eb2b7ada8bcdc46cb67c63de8de801fe5",
+          "es": "f3d9f3ed9fc8bbd8d99cf89e02ea8c64a5ca789be7536a48bbfe8e5e250b2f67",
+          "ms": "604e81df07710a4b00a150077f2d2d3ae94cbe627b2f3eedab5000f346d5a17a",
+          "fr": "3252f78f1102c42c4cfd741368869e8e7d8bf0b45d5bb5698173226c9f54a86e",
+          "id": "c466886f578c1df7d6e9f17a1d85dc7337af813325f1ed65a549131109ed3333"
+        }
+      }
+    },
+    {
+      "id": "credential",
+      "semanticBoundary": "Credential is an identity concept; password, API key, runtime secret, and model-provider access are distinct display concepts. Secret values and internal reason codes remain untranslated contract data.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "selectors": [
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.settings.llmAccessDescription",
+            "locales.screening.SCREENING_TEXT.diagnosticMissingKey",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.AGENT_LITELLM_MODEL.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.notes.2",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_CONFIG.valueNotes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_CHANNELS.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENAI_BASE_URL.valueNotes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.anspire_llm.summary",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.provider_keys.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.usage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.search_api_keys.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.usage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.protocol.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.MAX_WORKERS.valueNotes.1",
+            "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth",
+            "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key",
+            "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected",
+            "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key",
+            "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.auth",
+            "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.invalid_config",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKey",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKeyOptional",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.chooseProviderDescription",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.localKeyOptional",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.multipleKeys",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.runtimeSecret",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKey",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyOptional",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyPlaceholder",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localKeyPlaceholder"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 36,
+        "keySetSha256": "b5159a6f0b81db514bf729d6b31df019598283c7db45f03af8ad836f8413bbac",
+        "bundleSha256": {
+          "zh": "4957d878089891177e516d37da222d3f7f5c091d5cc0cdbdb1f40533deb21ba0",
+          "zh-TW": "a7e20589becdada1dec4c84fe9681440280455982e1b370ad796d0fdf2f246af",
+          "en": "e7204214282551bb8887c047821992815975edfd1a0055ffd75a0ff871326703",
+          "ja": "3bed17929da113e6146d3013388dd8f58dcfb3b446cf54e57fda35c96919b098",
+          "ko": "e151645c241132cbc27e6a9685b5651dba8324156110d0ff200c743f12baee33",
+          "de": "364b2981d09938d3e7bc83fc68d761226944d36d412e56ffdae4809ad1038c2b",
+          "es": "cdced894d63531b7da26c22313f421f2652f0f43fc150b56f9ce83852a6ec122",
+          "ms": "ab3c721932015f6b004fa966a0258048b28bfc28c36d9ca01a3bd671b5cf3c93",
+          "fr": "eaa54ec28072b0618df217f291e9674f215040308dad89df590ae7116539b391",
+          "id": "3de46a31b82b9238fdb114e8d6036d76f3b58d26178d90275edebea78de3f7b0"
+        }
+      }
+    },
+    {
+      "id": "error",
+      "semanticBoundary": "Stable error and category codes remain internal contract values. Titles and messages are localized display mappings, while diagnostic details remain outside primary user copy.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "selectors": [
+        {
+          "prefix": "api.error."
+        }
+      ],
+      "snapshot": {
+        "keyCount": 102,
+        "keySetSha256": "4287240a10ec17357042d36e3ee87f20c7b737ff5ceb21b49e9efcb8637c7dfb",
+        "bundleSha256": {
+          "zh": "8bedc69089c9ace2ca4352e1ca288c0d605235bd7c1dd5936ca9ff37e2e24cf7",
+          "zh-TW": "d13d3b6525574d27cddbead82eb83d165f7fcb6249ac4a6e7cbe77ab76e2e597",
+          "en": "a66b9a4d6f8476059bdd85794734aab84707fd1b0417a26a22a386cc2b3f7879",
+          "ja": "6b33f93df60ad5fc762f07b55caed5acd8fb9f96189a126049af3f345ea5ca06",
+          "ko": "35427c5eb7f9650cf39c3abf567f7fd6172fbbf244b1848623a9d23a01e424d0",
+          "de": "cde7d44cb8a39025567814c358936f0d498ceeb19f1217c4601ddc7f553dbefd",
+          "es": "2269c0117368e41d2f0c02468829f815a8c9aa45e7d585e9293cb78c1ed4591b",
+          "ms": "3666f618891a8d1f54a73479be6cec1e2d574a33b03d6ff26c49fb71bdc71acd",
+          "fr": "d4ac3b18668e7d9fe7ca96a9a70b153d4888095d747fce469d8853a79a6b282c",
+          "id": "6621d232b7f72e26f1012ce13c91e386c1364fb48ff3a12ccbddb93277be089e"
+        }
+      }
+    },
+    {
+      "id": "disclaimer",
+      "semanticBoundary": "Experimental-screening notices retain all three layers: research and decision support only, not investment advice, and user responsibility for trading decisions and outcomes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "selectors": [
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.settings.alphaSiftRisk",
+            "locales.screening.SCREENING_TEXT.riskMessage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 3,
+        "keySetSha256": "ad4ade36b1c0350deea7aee017e579c7cc934245b0e1215e8ba8e939430ecef6",
+        "bundleSha256": {
+          "zh": "ff1c949bc2a60d6b698773c2beb9e9a80fa53a6e5176c5a82bc76563aa7d2c38",
+          "zh-TW": "e5b8e546c465cbb2e421a36563785e1e287538040957d56dbd37d4887071db35",
+          "en": "e347cfc32b35f28f773cc818e887c70967d0f860e235eafcab54783bc0211ddf",
+          "ja": "0b4996670f76806d75025a622436e2bfefa43c8d480233dfc25efc0d4a651de9",
+          "ko": "6ad1400f748c97688fe91b4ad6ff73d28b45fa1745cc1f36ec1d207dc0e56a7f",
+          "de": "fea335d3e8c155ab73a0477333ef80161ef8cf54c90565648528d0a1cbc43dfe",
+          "es": "29493337b459594b37f330200cad2963b90892c3c5ad3c079305e04097417ddf",
+          "ms": "0121cc007bce4a04517d3818c773b923a062b72517d4fac3162ea98e716376e2",
+          "fr": "3ab5eddc5a87370918a52182e8fb9b4a9386ff9a205528337774f6956091debd",
+          "id": "078c66aacfaede34bcc98882718c5328dbf8e5de094e552f666804cf16dbdd46"
+        }
+      }
+    }
+  ],
+  "contractBoundaries": [
+    {
+      "id": "decision_action",
+      "contractSource": "apps/dsa-web/src/types/analysis.ts DecisionAction",
+      "typeContract": {
+        "path": "src/types/analysis.ts",
+        "alias": "DecisionAction"
+      },
+      "internalCodes": [
+        "buy",
+        "add",
+        "hold",
+        "reduce",
+        "sell",
+        "watch",
+        "avoid",
+        "alert"
+      ],
+      "codeToDisplayKeys": {
+        "buy": [
+          "i18n.uiText.UI_TEXT.history.actionBuy"
+        ],
+        "add": [
+          "i18n.uiText.UI_TEXT.history.actionAdd"
+        ],
+        "hold": [
+          "i18n.uiText.UI_TEXT.history.actionHold"
+        ],
+        "reduce": [
+          "i18n.uiText.UI_TEXT.history.actionReduce"
+        ],
+        "sell": [
+          "i18n.uiText.UI_TEXT.history.actionSell"
+        ],
+        "watch": [
+          "i18n.uiText.UI_TEXT.history.actionWatch"
+        ],
+        "avoid": [
+          "i18n.uiText.UI_TEXT.history.actionAvoid"
+        ],
+        "alert": [
+          "i18n.uiText.UI_TEXT.history.actionAlert"
+        ]
+      }
+    },
+    {
+      "id": "portfolio_side",
+      "contractSource": "apps/dsa-web/src/types/portfolio.ts PortfolioSide",
+      "typeContract": {
+        "path": "src/types/portfolio.ts",
+        "alias": "PortfolioSide"
+      },
+      "internalCodes": [
+        "buy",
+        "sell"
+      ],
+      "codeToDisplayKeys": {
+        "buy": [
+          "locales.portfolio.PORTFOLIO_SIDE_LABELS.buy",
+          "locales.portfolio.PORTFOLIO_TEXT.buy"
+        ],
+        "sell": [
+          "locales.portfolio.PORTFOLIO_SIDE_LABELS.sell",
+          "locales.portfolio.PORTFOLIO_TEXT.sell"
+        ]
+      }
+    },
+    {
+      "id": "stable_api_error",
+      "contractSource": "apps/dsa-web/src/api/error.ts STABLE_ERROR_TEXT",
+      "translationCodePattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.([^.]+)\\.(?:title|message)$",
+      "internalCodes": [
+        "agent_chat_failed",
+        "agent_disabled",
+        "agent_research_failed",
+        "agent_stream_failed",
+        "agent_stream_timeout",
+        "alphasift_disabled",
+        "alphasift_screen_failed",
+        "alphasift_screen_task_not_found",
+        "alphasift_unavailable",
+        "analysis_failed",
+        "auth_disabled",
+        "config_conflict",
+        "config_version_conflict",
+        "conflict",
+        "current_required",
+        "duplicate_market_review",
+        "duplicate_task",
+        "env_backup_access_denied",
+        "idempotency_conflict",
+        "internal_error",
+        "invalid_import_file",
+        "invalid_params",
+        "invalid_password",
+        "no_channels",
+        "not_changeable",
+        "not_found",
+        "operation_id_mismatch",
+        "password_already_set",
+        "password_mismatch",
+        "password_required",
+        "portfolio_busy",
+        "portfolio_oversell",
+        "rate_limited",
+        "scheduler_busy",
+        "unauthorized",
+        "unsupported_alert_type",
+        "validation_error",
+        "validation_failed"
+      ],
+      "codeToDisplayKeys": {
+        "agent_chat_failed": ["api.error.STABLE_ERROR_TEXT.agent_chat_failed.title", "api.error.STABLE_ERROR_TEXT.agent_chat_failed.message"],
+        "agent_disabled": ["api.error.STABLE_ERROR_TEXT.agent_disabled.title", "api.error.STABLE_ERROR_TEXT.agent_disabled.message"],
+        "agent_research_failed": ["api.error.STABLE_ERROR_TEXT.agent_research_failed.title", "api.error.STABLE_ERROR_TEXT.agent_research_failed.message"],
+        "agent_stream_failed": ["api.error.STABLE_ERROR_TEXT.agent_stream_failed.title", "api.error.STABLE_ERROR_TEXT.agent_stream_failed.message"],
+        "agent_stream_timeout": ["api.error.STABLE_ERROR_TEXT.agent_stream_timeout.title", "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.message"],
+        "alphasift_disabled": ["api.error.STABLE_ERROR_TEXT.alphasift_disabled.title", "api.error.STABLE_ERROR_TEXT.alphasift_disabled.message"],
+        "alphasift_screen_failed": ["api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.title", "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.message"],
+        "alphasift_screen_task_not_found": ["api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.title", "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.message"],
+        "alphasift_unavailable": ["api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title", "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message"],
+        "analysis_failed": ["api.error.STABLE_ERROR_TEXT.analysis_failed.title", "api.error.STABLE_ERROR_TEXT.analysis_failed.message"],
+        "auth_disabled": ["api.error.STABLE_ERROR_TEXT.auth_disabled.title", "api.error.STABLE_ERROR_TEXT.auth_disabled.message"],
+        "config_conflict": ["api.error.STABLE_ERROR_TEXT.config_conflict.title", "api.error.STABLE_ERROR_TEXT.config_conflict.message"],
+        "config_version_conflict": ["api.error.STABLE_ERROR_TEXT.config_version_conflict.title", "api.error.STABLE_ERROR_TEXT.config_version_conflict.message"],
+        "conflict": ["api.error.STABLE_ERROR_TEXT.conflict.title", "api.error.STABLE_ERROR_TEXT.conflict.message"],
+        "current_required": ["api.error.STABLE_ERROR_TEXT.current_required.title", "api.error.STABLE_ERROR_TEXT.current_required.message"],
+        "duplicate_market_review": ["api.error.STABLE_ERROR_TEXT.duplicate_market_review.title", "api.error.STABLE_ERROR_TEXT.duplicate_market_review.message"],
+        "duplicate_task": ["api.error.STABLE_ERROR_TEXT.duplicate_task.title", "api.error.STABLE_ERROR_TEXT.duplicate_task.message"],
+        "env_backup_access_denied": ["api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title", "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"],
+        "idempotency_conflict": ["api.error.STABLE_ERROR_TEXT.idempotency_conflict.title", "api.error.STABLE_ERROR_TEXT.idempotency_conflict.message"],
+        "internal_error": ["api.error.STABLE_ERROR_TEXT.internal_error.title", "api.error.STABLE_ERROR_TEXT.internal_error.message"],
+        "invalid_import_file": ["api.error.STABLE_ERROR_TEXT.invalid_import_file.title", "api.error.STABLE_ERROR_TEXT.invalid_import_file.message"],
+        "invalid_params": ["api.error.STABLE_ERROR_TEXT.invalid_params.title", "api.error.STABLE_ERROR_TEXT.invalid_params.message"],
+        "invalid_password": ["api.error.STABLE_ERROR_TEXT.invalid_password.title", "api.error.STABLE_ERROR_TEXT.invalid_password.message"],
+        "no_channels": ["api.error.STABLE_ERROR_TEXT.no_channels.title", "api.error.STABLE_ERROR_TEXT.no_channels.message"],
+        "not_changeable": ["api.error.STABLE_ERROR_TEXT.not_changeable.title", "api.error.STABLE_ERROR_TEXT.not_changeable.message"],
+        "not_found": ["api.error.STABLE_ERROR_TEXT.not_found.title", "api.error.STABLE_ERROR_TEXT.not_found.message"],
+        "operation_id_mismatch": ["api.error.STABLE_ERROR_TEXT.operation_id_mismatch.title", "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.message"],
+        "password_already_set": ["api.error.STABLE_ERROR_TEXT.password_already_set.title", "api.error.STABLE_ERROR_TEXT.password_already_set.message"],
+        "password_mismatch": ["api.error.STABLE_ERROR_TEXT.password_mismatch.title", "api.error.STABLE_ERROR_TEXT.password_mismatch.message"],
+        "password_required": ["api.error.STABLE_ERROR_TEXT.password_required.title", "api.error.STABLE_ERROR_TEXT.password_required.message"],
+        "portfolio_busy": ["api.error.STABLE_ERROR_TEXT.portfolio_busy.title", "api.error.STABLE_ERROR_TEXT.portfolio_busy.message"],
+        "portfolio_oversell": ["api.error.STABLE_ERROR_TEXT.portfolio_oversell.title", "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message"],
+        "rate_limited": ["api.error.STABLE_ERROR_TEXT.rate_limited.title", "api.error.STABLE_ERROR_TEXT.rate_limited.message"],
+        "scheduler_busy": ["api.error.STABLE_ERROR_TEXT.scheduler_busy.title", "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"],
+        "unauthorized": ["api.error.STABLE_ERROR_TEXT.unauthorized.title", "api.error.STABLE_ERROR_TEXT.unauthorized.message"],
+        "unsupported_alert_type": ["api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title", "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message"],
+        "validation_error": ["api.error.STABLE_ERROR_TEXT.validation_error.title", "api.error.STABLE_ERROR_TEXT.validation_error.message"],
+        "validation_failed": ["api.error.STABLE_ERROR_TEXT.validation_failed.title", "api.error.STABLE_ERROR_TEXT.validation_failed.message"]
+      }
+    },
+    {
+      "id": "model_access_error_category",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_ERROR_LABELS",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_ERROR_LABELS\\.([^.]+)$",
+      "internalCodes": [
+        "auth",
+        "capability_unsupported",
+        "empty_response",
+        "format_error",
+        "invalid_config",
+        "model_not_found",
+        "network_error",
+        "quota",
+        "request_blocked",
+        "skipped",
+        "timeout",
+        "unsupported_protocol"
+      ],
+      "codeToDisplayKeys": {
+        "auth": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth"],
+        "capability_unsupported": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.capability_unsupported"],
+        "empty_response": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.empty_response"],
+        "format_error": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.format_error"],
+        "invalid_config": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.invalid_config"],
+        "model_not_found": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.model_not_found"],
+        "network_error": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.network_error"],
+        "quota": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.quota"],
+        "request_blocked": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.request_blocked"],
+        "skipped": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.skipped"],
+        "timeout": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.timeout"],
+        "unsupported_protocol": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.unsupported_protocol"]
+      }
+    },
+    {
+      "id": "model_access_issue",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_ISSUES",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_ISSUES\\.([^.]+)$",
+      "internalCodes": [
+        "contract_unknown",
+        "missing_api_key",
+        "missing_base_url",
+        "missing_extra_headers",
+        "missing_models",
+        "missing_protocol",
+        "missing_provider",
+        "name_invalid",
+        "name_required",
+        "schema_unavailable"
+      ],
+      "codeToDisplayKeys": {
+        "contract_unknown": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.contract_unknown"],
+        "missing_api_key": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key"],
+        "missing_base_url": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_base_url"],
+        "missing_extra_headers": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_extra_headers"],
+        "missing_models": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_models"],
+        "missing_protocol": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_protocol"],
+        "missing_provider": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_provider"],
+        "name_invalid": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_invalid"],
+        "name_required": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_required"],
+        "schema_unavailable": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.schema_unavailable"]
+      }
+    },
+    {
+      "id": "model_access_reason",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_REASON_HINTS",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_REASON_HINTS\\.([^.]+)$",
+      "internalCodes": [
+        "api_key_rejected",
+        "capability_unsupported",
+        "connection_refused",
+        "dns_error",
+        "insufficient_balance",
+        "missing_api_key",
+        "model_access_denied",
+        "provider_blocked",
+        "provider_prefix_mismatch",
+        "quota_exceeded",
+        "rate_limit",
+        "tls_error"
+      ],
+      "codeToDisplayKeys": {
+        "api_key_rejected": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected"],
+        "capability_unsupported": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.capability_unsupported"],
+        "connection_refused": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.connection_refused"],
+        "dns_error": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.dns_error"],
+        "insufficient_balance": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.insufficient_balance"],
+        "missing_api_key": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key"],
+        "model_access_denied": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.model_access_denied"],
+        "provider_blocked": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_blocked"],
+        "provider_prefix_mismatch": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_prefix_mismatch"],
+        "quota_exceeded": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.quota_exceeded"],
+        "rate_limit": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.rate_limit"],
+        "tls_error": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.tls_error"]
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "id": "volume_spike_uses_trading_volume",
+      "key": "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
+      "category": "risk",
+      "rationale": "The alert measures securities trading volume, not audio loudness. Candidate wording now carries an explicit market-volume meaning.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "音量の急増",
+        "ko": "볼륨 급증",
+        "de": "Lautstärkespitze",
+        "es": "Pico de volumen",
+        "ms": "Lonjakan kelantangan",
+        "fr": "Pic de volume",
+        "id": "Lonjakan volume"
+      },
+      "recommended": {
+        "ja": "出来高急増",
+        "ko": "거래량 급증",
+        "de": "Sprung im Handelsvolumen",
+        "es": "Pico del volumen de negociación",
+        "ms": "Lonjakan volum dagangan",
+        "fr": "Pic du volume des transactions",
+        "id": "Lonjakan volume perdagangan"
+      }
+    },
+    {
+      "id": "turnover_value_is_not_turnover_rate",
+      "key": "locales.screening.SCREENING_TEXT.turnover",
+      "category": "risk",
+      "rationale": "The screening field is traded monetary value, so the English source and German candidate must not use the same wording as share volume or turnover rate.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "en": "Turnover",
+        "de": "Handelsvolumen"
+      },
+      "recommended": {
+        "en": "Turnover value",
+        "de": "Handelswert"
+      }
+    },
+    {
+      "id": "turnover_rate_is_explicit",
+      "key": "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
+      "category": "risk",
+      "rationale": "The stock-trend field is a rate, not traded monetary value. The English source now names the rate explicitly.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "en": "Turnover"
+      },
+      "recommended": {
+        "en": "Turnover rate"
+      }
+    },
+    {
+      "id": "trade_side_has_transaction_context",
+      "key": "locales.portfolio.PORTFOLIO_TEXT.side",
+      "category": "trading_action",
+      "rationale": "The field selects buy or sell. The source and candidate labels now carry transaction context instead of a physical side or generic part.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types"
+      ],
+      "before": {
+        "en": "Side",
+        "de": "Transaktionsrichtung",
+        "es": "Tipo de operación",
+        "ms": "Bahagian",
+        "fr": "Sens de transaction",
+        "id": "Sisi"
+      },
+      "recommended": {
+        "en": "Trade side",
+        "de": "Handelsrichtung",
+        "es": "Dirección de la operación",
+        "ms": "Arah dagangan",
+        "fr": "Sens de la transaction",
+        "id": "Arah transaksi"
+      }
+    },
+    {
+      "id": "theme_interest_is_not_temperature",
+      "key": "locales.screening.SCREENING_TEXT.heat",
+      "category": "risk",
+      "rationale": "Theme heat measures market attention or popularity, not physical temperature.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "en": "Heat",
+        "de": "Hitze",
+        "es": "Calor",
+        "ms": "Haba",
+        "fr": "Chaleur",
+        "id": "Panas"
+      },
+      "recommended": {
+        "en": "Theme interest",
+        "de": "Beliebtheit",
+        "es": "Popularidad",
+        "ms": "Populariti",
+        "fr": "Popularité",
+        "id": "Popularitas"
+      }
+    },
+    {
+      "id": "leader_is_a_leading_stock",
+      "key": "locales.screening.SCREENING_TEXT.leader",
+      "category": "risk",
+      "rationale": "The field identifies the stock leading a theme, not a person or manager.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "en": "Leader",
+        "ja": "リーダー",
+        "ko": "리더",
+        "de": "Anführer",
+        "es": "Líder",
+        "ms": "Pemimpin",
+        "fr": "Chef",
+        "id": "Pemimpin"
+      },
+      "recommended": {
+        "en": "Leading stock",
+        "ja": "牽引銘柄",
+        "ko": "주도주",
+        "de": "Führungsaktie",
+        "es": "Valor líder",
+        "ms": "Saham peneraju",
+        "fr": "Valeur phare",
+        "id": "Saham unggulan"
+      }
+    },
+    {
+      "id": "confidence_is_model_confidence",
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.confidence",
+      "category": "trading_action",
+      "rationale": "Confidence is a model-signal confidence measure, not a person's self-confidence and not a guarantee.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "de": "Selbstvertrauen",
+        "es": "Confianza",
+        "ms": "Keyakinan",
+        "fr": "Confiance",
+        "id": "Keyakinan"
+      },
+      "recommended": {
+        "de": "Konfidenz",
+        "es": "Nivel de confianza",
+        "ms": "Tahap keyakinan",
+        "fr": "Niveau de confiance",
+        "id": "Tingkat keyakinan"
+      }
+    },
+    {
+      "id": "score_is_not_rank",
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.score",
+      "category": "trading_action",
+      "rationale": "The value is a signal score, not an ordinal ranking or external rating.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "ja": "レーティング",
+        "de": "Bewertung",
+        "es": "Clasificación",
+        "ms": "Penarafan",
+        "fr": "Classement",
+        "id": "penilaian"
+      },
+      "recommended": {
+        "ja": "スコア",
+        "de": "Punktzahl",
+        "es": "Puntuación",
+        "ms": "Skor",
+        "fr": "Score",
+        "id": "Skor"
+      }
+    },
+    {
+      "id": "avoid_is_a_signal_label",
+      "key": "i18n.uiText.UI_TEXT.history.actionAvoid",
+      "category": "trading_action",
+      "rationale": "The value labels an informational decision-signal state. Candidate wording removes explicit second-person commands where the language provides a neutral label form.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "避けてください",
+        "ko": "피하세요",
+        "de": "Vermeiden Sie",
+        "es": "Evita",
+        "ms": "Elakkan",
+        "fr": "Évitez",
+        "id": "Hindari"
+      },
+      "recommended": {
+        "ja": "見送り",
+        "ko": "회피",
+        "de": "Meiden",
+        "es": "Evitar",
+        "ms": "Elak",
+        "fr": "Éviter",
+        "id": "Dihindari"
+      }
+    },
+    {
+      "id": "expired_session_is_authentication_state",
+      "key": "api.error.STABLE_ERROR_TEXT.unauthorized.message",
+      "category": "authentication",
+      "rationale": "The display message describes an expired authenticated session and a sign-in recovery action; it does not expose the stable unauthorized code or imply an account-permission decision.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "zh-TW": "登入狀態已失效，請重新登入。",
+        "ja": "あなたのセッションは終了しました。もう一度サインインしてください。",
+        "de": "Deine Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+        "fr": "Votre session est expirée. Reconnecte-toi."
+      },
+      "recommended": {
+        "zh-TW": "登入工作階段已過期，請重新登入。",
+        "ja": "セッションの有効期限が切れました。もう一度ログインしてください。",
+        "de": "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+        "fr": "Votre session a expiré. Reconnectez-vous."
+      }
+    },
+    {
+      "id": "api_key_rejection_names_the_credential",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected",
+      "category": "credential",
+      "rationale": "The recovery hint must name the rejected API key and relevant access context, rather than translating key as a legend, keyboard key, or generic situation.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "before": {
+        "zh-TW": "服務商拒絕了當前 API 金鑰；請檢查金鑰、組織/專案許可權、區域和賬號狀態。",
+        "ja": "サービス提供者は現状を拒否しています API キー; キー、組織/プロジェクトの権限、地域、アカウントの状態を必ずご確認ください。",
+        "ko": "서비스 제공자들은 현재 상황을 거부했습니다 API 키; 키, 조직/프로젝트 권한, 지역, 계정 상태를 확인해 주세요.",
+        "de": "Dienstleister haben die aktuelle Situation abgelehnt API Schlüssel; Bitte überprüfen Sie den Schlüssel, Organisations-/Projektberechtigungen, Region und Kontostatus.",
+        "es": "Los proveedores de servicios han rechazado la situación actual API Clave; Por favor, revisa la clave, los permisos de la organización/proyecto, la región y el estado de la cuenta.",
+        "ms": "Penyedia perkhidmatan telah menolak keadaan semasa API Kunci; Sila semak kunci, kebenaran organisasi/projek, rantau dan status akaun.",
+        "fr": "Les prestataires de services ont rejeté la situation actuelle API Clé ; Veuillez vérifier la clé, les autorisations de l’organisation/projet, la région et le statut du compte.",
+        "id": "Penyedia layanan telah menolak situasi saat ini API Kunci; Silakan periksa kunci, izin organisasi/proyek, wilayah, dan status akun."
+      },
+      "recommended": {
+        "zh-TW": "服務商拒絕了目前的 API 金鑰；請檢查金鑰、組織或專案權限、區域及帳號狀態。",
+        "ja": "プロバイダーがこの API キーを拒否しました。キー、組織またはプロジェクトの権限、リージョン、アカウントの状態を確認してください。",
+        "ko": "제공자가 이 API 키를 거부했습니다. 키, 조직 또는 프로젝트 권한, 리전, 계정 상태를 확인하세요.",
+        "de": "Der Anbieter hat diesen API-Schlüssel abgelehnt. Prüfen Sie den Schlüssel, die Organisations- oder Projektberechtigungen, die Region und den Kontostatus.",
+        "es": "El proveedor rechazó esta clave API. Comprueba la clave, los permisos de la organización o del proyecto, la región y el estado de la cuenta.",
+        "ms": "Penyedia menolak kunci API ini. Semak kunci, kebenaran organisasi atau projek, rantau dan status akaun.",
+        "fr": "Le fournisseur a rejeté cette clé API. Vérifiez la clé, les autorisations de l’organisation ou du projet, la région et l’état du compte.",
+        "id": "Penyedia menolak kunci API ini. Periksa kunci, izin organisasi atau proyek, wilayah, dan status akun."
+      }
+    },
+    {
+      "id": "model_reachability_preserves_provider_key_path",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.AGENT_LITELLM_MODEL.notes.0",
+      "category": "credential",
+      "rationale": "Model reachability can come from an enabled channel, YAML routing, or a legacy provider key. Candidate wording preserves all three access paths and does not turn a provider key into an unrelated keyboard key.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "請確認該模型在已啟用的模型連線或高階路由配置中可用。",
+        "ja": "モデルが有効なチャネルを通じてアクセス可能であることを確認し、 YAML ルーティング、またはレガシープロバイダーキー。",
+        "ko": "모델이 활성화된 채널을 통해 접근 가능한지 확인하세요., YAML 라우팅 또는 레거시 제공업체 키.",
+        "de": "Stelle sicher, dass das Modell über aktivierte Kanäle erreichbar ist,YAML Routen, oder Legacy-Provider-Schlüssel.",
+        "es": "Asegúrate de que el modelo sea accesible a través de canales habilitados,YAML enrutamiento, o claves de proveedor heredados.",
+        "ms": "Pastikan model boleh dicapai melalui saluran yang didayakan,YAML penghalaan, atau kunci pembekal warisan.",
+        "fr": "Assurez-vous que le modèle est accessible via des canaux activés,YAML le routage, ou les clés de fournisseur héritées.",
+        "id": "Pastikan model dapat dijangkau melalui saluran yang diaktifkan,YAML perutean, atau kunci penyedia lama."
+      },
+      "recommended": {
+        "zh-TW": "請確認可透過已啟用的 Channels、YAML 路由或舊版 provider keys 存取該模型。",
+        "ja": "有効なチャネル、YAML ルーティング、または従来のプロバイダーキーからモデルにアクセスできることを確認してください。",
+        "ko": "활성화된 채널, YAML 라우팅 또는 레거시 공급자 키를 통해 모델에 접근할 수 있는지 확인하세요.",
+        "de": "Stellen Sie sicher, dass das Modell über aktivierte Kanäle, YAML-Routing oder Legacy-Provider-Schlüssel erreichbar ist.",
+        "es": "Asegúrate de que se pueda acceder al modelo mediante canales habilitados, enrutamiento YAML o claves de proveedor heredadas.",
+        "ms": "Pastikan model boleh dicapai melalui saluran yang didayakan, penghalaan YAML atau kunci penyedia legasi.",
+        "fr": "Assurez-vous que le modèle est accessible via les canaux activés, le routage YAML ou les clés de fournisseur héritées.",
+        "id": "Pastikan model dapat diakses melalui saluran yang diaktifkan, perutean YAML, atau kunci penyedia lama."
+      }
+    },
+    {
+      "id": "cli_login_state_is_not_stockpulse_credential_access",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.valueNotes.1",
+      "category": "credential",
+      "rationale": "The deployment warning must distinguish a CLI using its own login state from StockPulse reading the CLI's credential files. Broken word order obscured that security boundary.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "before": {
+        "ja": "Docker, クラウドサーバー、CIは自動的にローカルログイン状態を保持しません。 StockPulse 読まない Codex/Claude/OpenCode 認証ファイルですが、対応する CLI その本体はログイン状態を利用できます。",
+        "ko": "Docker, 클라우드 서버, CI는 자동으로 로컬 로그인 상태를 갖고 있지 않습니다. StockPulse 읽지 않는다 Codex/Claude/OpenCode 신원 증명 파일이지만, CLI 로그인 상태를 사용할 수 있습니다.",
+        "de": "Docker, Cloud-Server und CI haben nicht automatisch deinen lokalen Login-Status. StockPulse liest nicht Codex/Claude/OpenCode Zugangsdaten, aber die entsprechenden CLI Er selbst kann seinen Login-Status verwenden.",
+        "ms": "Docker, pelayan awan dan CI tidak mempunyai keadaan log masuk tempatan anda secara automatik. StockPulse tidak membaca Codex/Claude/OpenCode fail kelayakan, tetapi fail yang sepadan CLI sendiri boleh menggunakan keadaan log masuknya.",
+        "fr": "Docker, les serveurs cloud et les CI n’ont pas automatiquement l’état de connexion local. StockPulse ne se lit pas Codex/Claude/OpenCode les fichiers de références, mais les correspondants CLI lui-même peut utiliser son état de connexion.",
+        "id": "Docker, server cloud, dan CI tidak secara otomatis memiliki status login lokal Anda. StockPulse tidak membaca Codex/Claude/OpenCode kredensial, tetapi yang sesuai CLI sendiri dapat menggunakan status loginnya."
+      },
+      "recommended": {
+        "ja": "Docker、クラウドサーバー、CI には、ローカルのログイン状態が自動的には引き継がれません。StockPulse は Codex、Claude、OpenCode の認証情報ファイルを読み取りませんが、対応する CLI は自身のログイン状態を使用する場合があります。",
+        "ko": "Docker, 클라우드 서버 및 CI에는 로컬 로그인 상태가 자동으로 전달되지 않습니다. StockPulse는 Codex, Claude 또는 OpenCode의 자격 증명 파일을 읽지 않지만, 해당 CLI는 자체 로그인 상태를 사용할 수 있습니다.",
+        "de": "Docker, Cloud-Server und CI verfügen nicht automatisch über Ihren lokalen Anmeldestatus. StockPulse liest keine Dateien mit Anmeldedaten von Codex, Claude oder OpenCode; die jeweilige CLI kann jedoch ihren eigenen Anmeldestatus verwenden.",
+        "ms": "Docker, pelayan awan dan CI tidak mempunyai status log masuk setempat anda secara automatik. StockPulse tidak membaca fail kelayakan Codex, Claude atau OpenCode, tetapi CLI yang sepadan boleh menggunakan status log masuknya sendiri.",
+        "fr": "Docker, les serveurs cloud et la CI ne disposent pas automatiquement de votre état de connexion local. StockPulse ne lit pas les fichiers d’identifiants de Codex, Claude ou OpenCode, mais la CLI correspondante peut utiliser son propre état de connexion.",
+        "id": "Docker, server cloud, dan CI tidak secara otomatis memiliki status login lokal Anda. StockPulse tidak membaca file kredensial Codex, Claude, atau OpenCode, tetapi CLI terkait dapat menggunakan status loginnya sendiri."
+      }
+    },
+    {
+      "id": "litellm_config_priority_names_legacy_keys",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_CONFIG.valueNotes.0",
+      "category": "credential",
+      "rationale": "The priority note describes legacy provider keys, not keyboard keys, and must preserve that a valid model_list outranks both channels and the legacy key path.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "ja": "有効な model_list は Channels や旧形式のキーより優先されます。",
+        "ko": "유효한 model_list 채널과 레거시 키보다 우선순위가 높습니다.",
+        "de": "Eine gültige model_list hat eine höhere Priorität als Kanäle und Legacy-Schlüssel.",
+        "es": "Un válido model_list tiene mayor prioridad que los canales y las teclas heredadas.",
+        "ms": "A sah model_list mempunyai keutamaan yang lebih tinggi daripada saluran dan kunci warisan.",
+        "fr": "Un valide model_list A une priorité plus élevée que les canaux et les clés héritées.",
+        "id": "Valid model_list memiliki prioritas yang lebih tinggi daripada saluran dan kunci lama."
+      },
+      "recommended": {
+        "ja": "有効な model_list はチャネルや従来のプロバイダーキーより優先されます。",
+        "ko": "유효한 model_list는 채널 및 레거시 공급자 키보다 우선합니다.",
+        "de": "Eine gültige model_list hat eine höhere Priorität als Kanäle und Legacy-Provider-Schlüssel.",
+        "es": "Una model_list válida tiene prioridad sobre los canales y las claves de proveedor heredadas.",
+        "ms": "model_list yang sah mempunyai keutamaan lebih tinggi daripada saluran dan kunci penyedia legasi.",
+        "fr": "Une model_list valide est prioritaire sur les canaux et les clés de fournisseur héritées.",
+        "id": "model_list yang valid memiliki prioritas lebih tinggi daripada saluran dan kunci penyedia lama."
+      }
+    },
+    {
+      "id": "channels_and_legacy_keys_are_not_concurrent",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_CHANNELS.notes.0",
+      "category": "credential",
+      "rationale": "The note warns that the legacy provider-key path and Channels should not be expected to operate concurrently. Candidate wording preserves the configuration boundary and the meaning of key.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "不要把極簡 legacy key 和 Channels 混用後期待兩邊同時生效。",
+        "ja": "レガシーキーとチャネルが同時にアクティブになるとは期待しないでください。",
+        "ko": "레거시 키와 채널이 동시에 활성화되어 있을 거라고 기대하지 마세요.",
+        "de": "Erwarten Sie nicht, dass Legacy-Schlüssel und Kanäle gleichzeitig aktiv sind.",
+        "es": "No esperes que las teclas heredadas y los canales estén activos al mismo tiempo.",
+        "ms": "Jangan mengharapkan kunci dan Saluran legasi aktif pada masa yang sama.",
+        "fr": "Ne vous attendez pas à ce que les clés héritées et les canaux soient actifs en même temps.",
+        "id": "Jangan berharap kunci lama dan Saluran aktif secara bersamaan."
+      },
+      "recommended": {
+        "zh-TW": "不要預期舊版 provider keys 與 Channels 會同時生效。",
+        "ja": "従来のプロバイダーキーとチャネルが同時に有効になることを想定しないでください。",
+        "ko": "레거시 공급자 키와 채널이 동시에 활성화될 것이라고 가정하지 마세요.",
+        "de": "Gehen Sie nicht davon aus, dass Legacy-Provider-Schlüssel und Kanäle gleichzeitig aktiv sind.",
+        "es": "No esperes que las claves de proveedor heredadas y los canales estén activos al mismo tiempo.",
+        "ms": "Jangan anggap kunci penyedia legasi dan saluran akan aktif pada masa yang sama.",
+        "fr": "Ne supposez pas que les clés de fournisseur héritées et les canaux sont actifs simultanément.",
+        "id": "Jangan mengharapkan kunci penyedia lama dan saluran aktif secara bersamaan."
+      }
+    },
+    {
+      "id": "invalid_password_is_a_localized_error",
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_password.title",
+      "category": "error",
+      "rationale": "The localized title reports password-verification failure while the internal invalid_password code remains unchanged.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "es": "Fallido la verificación de contraseñas"
+      },
+      "recommended": {
+        "es": "Error de verificación de contraseña"
+      }
+    },
+    {
+      "id": "screening_notice_retains_three_risk_layers",
+      "key": "locales.screening.SCREENING_TEXT.riskMessage",
+      "category": "disclaimer",
+      "rationale": "Each candidate notice explicitly retains experimental/research scope, no-investment-advice language, and user responsibility for trading decisions and outcomes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "de": "AlphaSift Die Aktienauswahl befindet sich noch in der experimentellen Phase, und die Ergebnisse dienen nur Forschungs- und Urteilszwecken und stellen keine Anlageberatung dar; Handelsentscheidungen sowie Gewinn und Verlust liegen beim Nutzer.",
+        "es": "AlphaSift La selección de acciones aún está en fase experimental, y los resultados son solo para fines de investigación y juicio y no constituyen asesoramiento de inversión; Las decisiones de trading y las pérdidas y ganancias recaen en el usuario.",
+        "ms": "AlphaSift Pemilihan saham masih dalam peringkat percubaan, dan hasilnya adalah untuk tujuan penyelidikan dan pertimbangan sahaja dan bukan merupakan nasihat pelaburan; Keputusan perdagangan dan untung dan rugi ditanggung oleh pengguna.",
+        "fr": "AlphaSift La sélection des actions en est encore à l’étape expérimentale, et les résultats sont uniquement à des fins de recherche et de jugement et ne constituent pas un conseil en investissement ; Les décisions de trading ainsi que les profits et pertes sont supportés par l’utilisateur.",
+        "id": "AlphaSift Seleksi saham masih dalam tahap eksperimental, dan hasilnya hanya untuk tujuan penelitian dan penilaian dan bukan merupakan saran investasi; Keputusan perdagangan dan untung rugi ditanggung oleh pengguna."
+      },
+      "recommended": {
+        "de": "Das AlphaSift-Screening ist experimentell und dient ausschließlich der Recherche und Entscheidungsunterstützung. Es stellt keine Anlageberatung dar. Für Handelsentscheidungen sowie daraus entstehende Gewinne und Verluste sind Sie selbst verantwortlich.",
+        "es": "El análisis de AlphaSift es experimental y se ofrece únicamente con fines de investigación y apoyo a la toma de decisiones. No constituye asesoramiento de inversión. Usted es responsable de sus decisiones de negociación y de sus resultados.",
+        "ms": "Saringan AlphaSift bersifat percubaan dan hanya bertujuan untuk penyelidikan serta sokongan keputusan. Ia bukan nasihat pelaburan. Anda bertanggungjawab atas keputusan perdagangan dan hasilnya.",
+        "fr": "Le filtrage AlphaSift est expérimental et destiné uniquement à la recherche et à l’aide à la décision. Il ne constitue pas un conseil en investissement. Vous êtes responsable de vos décisions de trading et de leurs résultats.",
+        "id": "Penyaringan AlphaSift bersifat eksperimental dan hanya ditujukan untuk riset serta dukungan pengambilan keputusan. Ini bukan nasihat investasi. Anda bertanggung jawab atas keputusan perdagangan dan hasilnya."
+      }
+    }
+  ]
+}
