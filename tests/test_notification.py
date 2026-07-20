@@ -35,6 +35,7 @@ from src.notification_noise import reset_notification_noise_state
 from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType
 import requests
 
@@ -358,7 +359,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=True) as mock_reply, \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -379,7 +382,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             feishu_app_secret="app-secret",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_feishu_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_feishu_message())
+        )
 
         with mock.patch.object(service, "_send_feishu_stream_reply", return_value=False), \
              mock.patch.object(service, "send_to_feishu", return_value=True) as mock_webhook:
@@ -400,9 +405,11 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_dingtalk_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
 
-        with mock.patch.object(service, "_send_dingtalk_chunked", return_value=True) as mock_dingtalk, \
+        with mock.patch.object(service, "_send_dingtalk_session_chunked", return_value=True) as mock_dingtalk, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
             result = service.send_with_results("content", route_type="report")
 
@@ -413,6 +420,78 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_wechat.assert_not_called()
 
     @mock.patch("src.notification.get_config")
+    def test_rejected_dingtalk_context_never_falls_back_to_static_channels(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data["sessionWebhook"] = (
+            "https://attacker.example/robot/sendBySession?session=secret"
+        )
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertFalse(result.success)
+        self.assertEqual(result.status, "all_failed")
+        self.assertEqual([item.channel for item in result.channel_results], ["__context__"])
+        mock_wechat.assert_not_called()
+
+    @mock.patch("src.notification.get_config")
+    def test_missing_dingtalk_context_preserves_static_channel_routing(
+        self,
+        mock_get_config: mock.MagicMock,
+    ):
+        cfg = _make_config(wechat_webhook_url="https://wechat.example/hook")
+        mock_get_config.return_value = cfg
+        message = _make_dingtalk_message()
+        message.raw_data = {}
+        service = NotificationService(
+            request_context=to_analysis_request_context(message)
+        )
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:
+            result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.dispatched)
+        self.assertTrue(result.success)
+        self.assertEqual([item.channel for item in result.channel_results], ["wechat"])
+        mock_wechat.assert_called_once_with("content")
+
+    @mock.patch("src.notification.get_config")
+    @mock.patch("requests.post")
+    def test_dingtalk_context_never_sends_custom_bearer_token(
+        self,
+        mock_post: mock.MagicMock,
+        mock_get_config: mock.MagicMock,
+    ):
+        mock_get_config.return_value = _make_config(
+            custom_webhook_bearer_token="global-custom-secret",
+        )
+        mock_post.return_value = _make_response(200)
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_dingtalk_message())
+        )
+
+        result = service.send_with_results("content", route_type="report")
+
+        self.assertTrue(result.success)
+        self.assertNotIn("Authorization", mock_post.call_args.kwargs["headers"])
+        self.assertFalse(
+            service._send_dingtalk_session_chunked(
+                "https://attacker.example/robot/sendBySession?session=secret",
+                "content",
+            )
+        )
+        self.assertEqual(mock_post.call_count, 1)
+
+    @mock.patch("src.notification.get_config")
     def test_telegram_context_response_skips_static_webhook(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(
             telegram_bot_token="TOKEN",
@@ -420,7 +499,9 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             wechat_webhook_url="https://wechat.example/hook",
         )
         mock_get_config.return_value = cfg
-        service = NotificationService(source_message=_make_telegram_message())
+        service = NotificationService(
+            request_context=to_analysis_request_context(_make_telegram_message())
+        )
 
         with mock.patch.object(service, "send_to_telegram", return_value=True) as mock_telegram, \
              mock.patch.object(service, "send_to_wechat", return_value=True) as mock_wechat:

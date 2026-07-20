@@ -9,6 +9,7 @@ runtime channel detection to share.
 from __future__ import annotations
 
 from typing import Any, Mapping, Tuple
+from urllib.parse import parse_qsl, urlsplit
 
 
 FEISHU_WEBHOOK_ENV_GROUP: Tuple[str, ...] = ("FEISHU_WEBHOOK_URL",)
@@ -32,6 +33,28 @@ _FEISHU_STATIC_CONFIG_GROUPS: Tuple[Tuple[str, ...], ...] = (
     _FEISHU_WEBHOOK_CONFIG_GROUP,
     _FEISHU_APP_BOT_CONFIG_GROUP,
 )
+
+
+def is_dingtalk_session_webhook_url(value: Any) -> bool:
+    """Return whether a value is an official DingTalk session reply URL."""
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+        query = parse_qsl(parsed.query, keep_blank_values=True)
+    except ValueError:
+        return False
+    return (
+        parsed.scheme.lower() == "https"
+        and (parsed.hostname or "").rstrip(".").lower() == "oapi.dingtalk.com"
+        and port in (None, 443)
+        and parsed.username is None
+        and parsed.password is None
+        and parsed.path == "/robot/sendBySession"
+        and not parsed.fragment
+        and any(key == "session" and value for key, value in query)
+    )
 
 
 def _has_env_group(effective_map: Mapping[str, Any], group: Tuple[str, ...]) -> bool:

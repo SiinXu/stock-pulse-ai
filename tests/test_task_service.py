@@ -18,6 +18,7 @@ from tests.litellm_stub import ensure_litellm_stub
 ensure_litellm_stub()
 
 from src.analyzer import AnalysisResult
+from src.schemas.request_context import AnalysisRequestContext
 from src.services.task_service import TaskService
 
 
@@ -86,6 +87,26 @@ class TestTaskService(unittest.TestCase):
         self.assertEqual(result["code"], "005930.KS")
         self.assertIn("args", captured)
         self.assertEqual(captured["args"][1], "005930.KS")
+
+    def test_submit_analysis_passes_immutable_request_context_to_worker(self):
+        service = TaskService()
+        executor = MagicMock()
+        captured = {}
+
+        def capture_submit(*args, **kwargs):
+            captured["args"] = args
+            return "future"
+
+        executor.submit.side_effect = capture_submit
+        service._executor = executor
+        request_context = AnalysisRequestContext(
+            requester_platform="feishu",
+            requester_user_id="user-1",
+        )
+
+        service.submit_analysis("600519", request_context=request_context)
+
+        self.assertIs(captured["args"][4], request_context)
 
 
 if __name__ == "__main__":

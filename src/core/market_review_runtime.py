@@ -17,6 +17,7 @@ from src.llm.backend_registry import (
     resolve_generation_fallback_backend_id,
 )
 from src.llm.generation_backend import GenerationError
+from src.schemas.request_context import AnalysisRequestContext
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ def _get_config_generation_backend_error(config: Config) -> Optional[GenerationE
 
 def build_market_review_runtime(
     config: Config,
-    source_message: Optional[Any] = None,
+    request_context: Optional[AnalysisRequestContext] = None,
 ) -> Tuple[Any, Any, Any]:
     """
     Build shared NotificationService, GeminiAnalyzer and SearchService instances.
@@ -87,7 +88,7 @@ def build_market_review_runtime(
     from src.notification import NotificationService
     from src.search_service import SearchService
 
-    notifier = NotificationService(source_message=source_message)
+    notifier = NotificationService(request_context=request_context)
 
     search_service = None
     has_search_capability = getattr(config, "has_search_capability_enabled", None)

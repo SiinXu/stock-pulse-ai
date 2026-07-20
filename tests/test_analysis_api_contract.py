@@ -446,6 +446,24 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertIs(analyzer, analyzer_cls.return_value)
         self.assertIsNone(search_service)
 
+    def test_market_review_api_runtime_rejects_boundary_context_passthrough(self) -> None:
+        if analysis_endpoint_module is None:
+            self.skipTest("analysis endpoint helpers unavailable in this environment")
+
+        config = SimpleNamespace()
+        expected = (MagicMock(), MagicMock(), MagicMock())
+        with patch.object(
+            analysis_endpoint_module,
+            "_runtime_build_market_review_runtime",
+            return_value=expected,
+        ) as runtime_builder:
+            result = analysis_endpoint_module._build_market_review_runtime(config)
+            with self.assertRaises(TypeError):
+                analysis_endpoint_module._build_market_review_runtime(config, object())
+
+        self.assertIs(result, expected)
+        runtime_builder.assert_called_once_with(config)
+
     def test_run_market_review_background_returns_non_empty_result_payload(self) -> None:
         if analysis_endpoint_module is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
