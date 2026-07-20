@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
 - [改进] Web 任务面板（`TaskPanel`）收敛守卫债：移除根 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），保留 `overflow-hidden` 与 `${className}` 透传，设计守卫对应 allowlist 条目 token 收窄为仅 `dynamic:className`。`components/run-flow` 已普遍使用语义 `Button`/`IconButton`，其 `home-subpanel`/`home-accent-chip`/`home-spinner` 为原生元素上的真实定制样式（守卫不 flag），事件行点击包裹与运行流图节点为定制交互，均按现状保留。
 - [改进] Web 告警中心页（`AlertsPage`）编辑规则弹窗的加载占位统一走语义 `Loading`：将唯一遗留的 ad-hoc 加载文本 `<p>` 改用页面已引入的共享 `Loading`（compact `StatePanel`），与页内其余的 `Loading`/`EmptyState`/`ApiErrorAlert` 状态一致；加载文案与编辑行为不变。
 - [改进] Web 报告展示组件收敛守卫债：跨 `ReportOverview`/`ReportNews`/`ReportStrategy`/`ReportDetails`/`ReportDiagnostics`/`AnalysisContextSummary`/`MarketReviewReportView` 移除 15 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），并同步删除设计守卫里对应的本轨 allowlist 例外（`ReportOverview` 仍保留真实的 `home-insight-card`/`home-rail-card` 类及其 allowlist token）；`text-left`/`min-w-0` 等既有类不变。报告的 `home-insight-card`/`home-rail-card`/`home-report-hero`/`home-subpanel`/`home-accent-chip` 为真实定制视觉，其到 `Surface` 的收敛待可视化 QA，记为本轨后续。
