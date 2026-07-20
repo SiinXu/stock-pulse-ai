@@ -25,7 +25,12 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional
 
+from src.agent.dashboard_payload import (
+    has_reserved_explanation_field,
+    sanitize_agent_dashboard_payload,
+)
 from src.agent.llm_adapter import LLMToolAdapter, ToolCall
+from src.agent.protocols import StageFailureReason
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.agent.tools.execution import (
@@ -46,8 +51,10 @@ from src.utils.data_processing import normalize_report_signal_attribution
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "DashboardParseResult",
     "RunLoopResult",
     "parse_dashboard_json",
+    "parse_dashboard_json_result",
     "run_agent_loop",
     "serialize_tool_result",
     "try_parse_json",
@@ -96,6 +103,7 @@ class RunLoopResult:
     provider: str = ""
     models_used: List[str] = field(default_factory=list)
     error: Optional[str] = None
+    failure_reason: Optional[StageFailureReason] = None
     # Raw messages list at the end of the loop (callers may want to persist)
     messages: List[Dict[str, Any]] = field(default_factory=list)
     cancelled: bool = False
@@ -107,12 +115,26 @@ class RunLoopResult:
         return ", ".join(dict.fromkeys(m for m in self.models_used if m))
 
 
+@dataclass(frozen=True)
+class DashboardParseResult:
+    """Canonical dashboard plus deterministic sanitization metadata."""
+
+    payload: Dict[str, Any]
+    reserved_field_removed: bool = False
+
+
 # ============================================================
 # Helpers
 # ============================================================
 
 def parse_dashboard_json(content: str) -> Optional[Dict[str, Any]]:
-    """Extract and parse a Decision Dashboard JSON from agent text.
+    """Extract and parse a canonical Decision Dashboard JSON."""
+    result = parse_dashboard_json_result(content)
+    return result.payload if result is not None else None
+
+
+def parse_dashboard_json_result(content: str) -> Optional[DashboardParseResult]:
+    """Extract a dashboard and report whether a reserved field was removed.
 
     Tries multiple strategies:
     1. Markdown code blocks (```json ... ```)
@@ -131,24 +153,20 @@ def parse_dashboard_json(content: str) -> Optional[Dict[str, Any]]:
         for block in json_blocks:
             parsed = _try_parse_json(block)
             if parsed is not None:
-                normalize_report_signal_attribution(parsed)
-                return parsed
+                return _finalize_dashboard_parse_result(parsed)
             parsed = _try_repair_json(block, repair_json)
             if parsed is not None:
-                normalize_report_signal_attribution(parsed)
-                return parsed
+                return _finalize_dashboard_parse_result(parsed)
 
     # Strategy 2: raw parse
     parsed = _try_parse_json(content)
     if parsed is not None:
-        normalize_report_signal_attribution(parsed)
-        return parsed
+        return _finalize_dashboard_parse_result(parsed)
 
     # Strategy 3: json_repair on full content
     parsed = _try_repair_json(content, repair_json)
     if parsed is not None:
-        normalize_report_signal_attribution(parsed)
-        return parsed
+        return _finalize_dashboard_parse_result(parsed)
 
     # Strategy 4: brace-delimited
     brace_start = content.find("{")
@@ -157,15 +175,24 @@ def parse_dashboard_json(content: str) -> Optional[Dict[str, Any]]:
         candidate = content[brace_start : brace_end + 1]
         parsed = _try_parse_json(candidate)
         if parsed is not None:
-            normalize_report_signal_attribution(parsed)
-            return parsed
+            return _finalize_dashboard_parse_result(parsed)
         parsed = _try_repair_json(candidate, repair_json)
         if parsed is not None:
-            normalize_report_signal_attribution(parsed)
-            return parsed
+            return _finalize_dashboard_parse_result(parsed)
 
     logger.warning("Failed to parse dashboard JSON from agent response")
     return None
+
+
+def _finalize_dashboard_parse_result(payload: Dict[str, Any]) -> DashboardParseResult:
+    """Sanitize reserved fields before normal dashboard normalization."""
+    reserved_field_removed = has_reserved_explanation_field(payload)
+    sanitized = sanitize_agent_dashboard_payload(payload)
+    normalize_report_signal_attribution(sanitized)
+    return DashboardParseResult(
+        payload=sanitized,
+        reserved_field_removed=reserved_field_removed,
+    )
 
 
 def try_parse_json(text: str) -> Optional[Dict[str, Any]]:
@@ -280,6 +307,7 @@ def _build_timeout_result(
         provider=provider_used,
         models_used=models_used,
         error=f"Agent timed out after {elapsed:.2f}s (limit: {max_wall_clock_seconds:.2f}s)",
+        failure_reason=StageFailureReason.TIMEOUT,
         messages=messages,
         timed_out=True,
     )
@@ -333,6 +361,7 @@ def _build_budget_guard_result(
             "Agent step skipped due to insufficient budget: "
             f"{remaining_timeout_s:.2f}s remaining, minimum {min_step_budget_s:.1f}s required"
         ),
+        failure_reason=StageFailureReason.BUDGET_SKIP,
         messages=messages,
     )
 
@@ -652,6 +681,7 @@ def run_agent_loop(
                 provider=provider_used,
                 models_used=models_used,
                 error=final_content if is_error else None,
+                failure_reason=(StageFailureReason.STAGE_FAILURE if is_error else None),
                 messages=messages,
             ))
 
@@ -666,6 +696,7 @@ def run_agent_loop(
         provider=provider_used,
         models_used=models_used,
         error=f"Agent exceeded max steps ({max_steps}). Try increasing AGENT_MAX_STEPS if analysis tasks are complex.",
+        failure_reason=StageFailureReason.STAGE_FAILURE,
         messages=messages,
     ))
 
