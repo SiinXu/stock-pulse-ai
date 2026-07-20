@@ -94,6 +94,19 @@ test.describe('shared page and Router Patterns', () => {
     await expect(page.getByRole('link', { name: 'Detailed evidence' })).toBeHidden();
   });
 
+  test('retains control focus when Router query state changes on the same page', async ({ page }) => {
+    await openFixture(page, 1024, 768);
+    const queryControl = page.getByRole('button', { name: 'Update URL state' });
+    await queryControl.focus();
+    await queryControl.click();
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-fixture\.html\?view=compact$/);
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+    await expect(queryControl).toBeFocused();
+    await expect(page.getByRole('heading', { level: 1, name: 'Portfolio overview' })).not.toBeFocused();
+  });
+
   test('contains the rail and long content across all fixed viewports', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     for (const viewport of VIEWPORTS) {

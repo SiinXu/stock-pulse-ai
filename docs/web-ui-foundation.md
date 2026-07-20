@@ -189,10 +189,12 @@ translated labels or array indexes, provide stable focus markers.
 `RouteFocusCoordinator` is mounted once inside the data Router. A page may
 only call `useRouteFocusTarget({ routeId, headingRef, ready })`; it cannot pass
 a navigation type, location key, history entry, or trigger key. Direct load,
-refresh, and new-tab entry leave focus untouched. PUSH and REPLACE wait for a
-connected ready H1 before focusing it. POP restores one unique, rendered,
-focusable trigger for that history entry; duplicate, missing, disabled,
-hidden, stale, or unsuccessfully focused triggers fail closed to the ready
+refresh, and new-tab entry leave focus untouched. Cross-path PUSH and REPLACE
+wait for a connected ready H1 before focusing it. Cross-path POP restores one
+unique, rendered, focusable trigger for that history entry; duplicate,
+missing, disabled, hidden, stale, or unsuccessfully focused triggers fail
+closed to the ready H1. Same-path query/hash updates retain the active control;
+same-path POP may restore a unique stable trigger but never falls back to the
 H1. Entries are bounded in memory and contain strings only, never DOM refs,
 URL state, browser history state, `localStorage`, or `sessionStorage`.
 

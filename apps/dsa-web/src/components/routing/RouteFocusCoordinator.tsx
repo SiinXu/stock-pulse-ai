@@ -22,6 +22,7 @@ type PendingMarker = {
 type PendingTransition = {
   locationKey: string;
   navigationType: 'PUSH' | 'REPLACE' | 'POP';
+  pathnameChanged: boolean;
 };
 
 type RegisteredTarget = {
@@ -81,6 +82,7 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
   const location = useLocation();
   const navigationType = useNavigationType();
   const currentLocationKeyRef = useRef<string | null>(null);
+  const currentPathnameRef = useRef<string | null>(null);
   const entriesRef = useRef(new Map<string, RouteFocusEntry>());
   const pendingMarkerRef = useRef<PendingMarker | null>(null);
   const pendingTransitionRef = useRef<PendingTransition | null>(null);
@@ -130,6 +132,7 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
     const previousLocationKey = currentLocationKeyRef.current;
     if (previousLocationKey === null) {
       currentLocationKeyRef.current = location.key;
+      currentPathnameRef.current = location.pathname;
       clearPendingMarker();
       return;
     }
@@ -150,13 +153,16 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
       trimEntries(entriesRef.current);
     }
 
+    const pathnameChanged = currentPathnameRef.current !== location.pathname;
     currentLocationKeyRef.current = location.key;
+    currentPathnameRef.current = location.pathname;
     pendingTransitionRef.current = {
       locationKey: location.key,
       navigationType,
+      pathnameChanged,
     };
     clearPendingMarker();
-  }, [clearPendingMarker, location.key, navigationType]);
+  }, [clearPendingMarker, location.key, location.pathname, navigationType]);
 
   const register = useCallback<RouteFocusRegistration['register']>((target) => {
     const token = Symbol(target.routeId);
@@ -192,7 +198,10 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
           ? uniqueFocusableMarker(entry.focusKey)
           : null;
         if (restoreTarget) restoreTarget.focus({ preventScroll: true });
-        if (!restoreTarget || document.activeElement !== restoreTarget) {
+        if (
+          transition.pathnameChanged
+          && (!restoreTarget || document.activeElement !== restoreTarget)
+        ) {
           heading.focus({ preventScroll: true });
         }
         pendingTransitionRef.current = null;
