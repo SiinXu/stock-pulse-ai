@@ -54,8 +54,6 @@ class FrozenMapping(Mapping[Any, Any]):
 
 def deep_freeze(value: _T) -> _T:
     """Return an immutable, detached representation of supported structured data."""
-    if isinstance(value, FrozenMapping):
-        return value
     if isinstance(value, Mapping):
         return FrozenMapping(
             {
@@ -67,10 +65,9 @@ def deep_freeze(value: _T) -> _T:
         return tuple(deep_freeze(item) for item in value)
     if isinstance(value, (set, frozenset)):
         return frozenset(deep_freeze(item) for item in value)
-    if value is None or isinstance(value, (str, bytes, int, float, bool, Enum, date)):
+    if value is None or isinstance(value, Enum):
         return value
-    detached = copy.deepcopy(value)
-    if detached is value:
+    if type(value) in (str, bytes, int, float, bool, date, datetime):
         return value
     raise TypeError(f"Unsupported mutable task contract value: {type(value).__name__}")
 

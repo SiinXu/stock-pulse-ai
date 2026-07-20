@@ -41,6 +41,7 @@ from src.task_execution import (
     TaskStatus,
     TaskStatusEnum,
     TaskStreamOverflowError,
+    deep_freeze,
     deep_thaw,
 )
 from src.services.run_diagnostics import (
@@ -453,6 +454,7 @@ class AnalysisTaskQueue:
         self._task_idempotency_keys: Dict[str, str] = {}
         self._retry_reservations: Dict[str, _RetryReservation] = {}
         self._retry_children: Dict[str, str] = {}
+        self._task_lifecycle_pins: Dict[str, int] = {}
         self._streams = weakref.WeakValueDictionary()
         self._event_history: Dict[str, List[TaskEvent]] = {}
         self._suppressed_event_tasks = set()
@@ -504,6 +506,25 @@ class AnalysisTaskQueue:
     def _ensure_accepting_locked(self) -> None:
         if self._shutdown:
             raise TaskQueueShutdownError()
+
+    def _pin_task_locked(self, task_id: str) -> None:
+        """Prevent lifecycle cleanup while a lock-external operation owns a task."""
+        if task_id not in self._tasks:
+            raise TaskNotFoundError(task_id)
+        self._task_lifecycle_pins[task_id] = (
+            self._task_lifecycle_pins.get(task_id, 0) + 1
+        )
+
+    def _unpin_task_locked(self, task_id: str) -> bool:
+        """Release one lifecycle owner and report whether the last owner left."""
+        owners = self._task_lifecycle_pins.get(task_id, 0)
+        if owners <= 0:
+            raise RuntimeError(f"Task lifecycle pin is not owned: {task_id}")
+        if owners == 1:
+            del self._task_lifecycle_pins[task_id]
+            return True
+        self._task_lifecycle_pins[task_id] = owners - 1
+        return False
 
     def _snapshot_locked(self, task: TaskInfo) -> TaskSnapshot:
         """Build a neutral immutable snapshot while holding the data lock."""
@@ -557,7 +578,7 @@ class AnalysisTaskQueue:
             task_id=task.task_id,
             type=self._canonical_event_type(event_type, task),
             snapshot=self._snapshot_locked(task),
-            data=copy.deepcopy(data),
+            data=data,
             occurred_at=task.updated_at,
         )
         history = self._event_history.setdefault(task.task_id, [])
@@ -871,19 +892,70 @@ class AnalysisTaskQueue:
                 task.message_params = {}
                 self._broadcast_event("task_progress", task.to_dict())
             future = self._futures.get(task_id)
+            self._pin_task_locked(task_id)
 
-        cancelled_before_start = bool(future and future.cancel())
-        terminalized = False
-        with self._data_lock:
-            task = self._tasks.get(task_id)
-            if task is None:
-                raise TaskNotFoundError(task_id)
-            if cancelled_before_start and task.status == TaskStatus.CANCEL_REQUESTED:
-                terminalized = self._terminalize_locked(task, TaskStatus.CANCELLED)
-            snapshot = self._snapshot_locked(task)
-        if terminalized:
+        last_owner_left = False
+        try:
+            cancelled_before_start = bool(future and future.cancel())
+            with self._data_lock:
+                task = self._tasks[task_id]
+                if cancelled_before_start and task.status == TaskStatus.CANCEL_REQUESTED:
+                    self._terminalize_locked(task, TaskStatus.CANCELLED)
+                snapshot = self._snapshot_locked(task)
+        finally:
+            with self._data_lock:
+                last_owner_left = self._unpin_task_locked(task_id)
+        if last_owner_left:
             self._cleanup_old_tasks()
         return snapshot
+
+    def _submit_retry_child(
+        self,
+        parent_task_id: str,
+        reservation: _RetryReservation,
+        command: TaskCommand,
+    ) -> str:
+        """Atomically expose one reserved retry child and its parent ownership."""
+        child_task_id = reservation.child_task_id
+        if child_task_id is None:
+            raise RuntimeError("Retry reservation has no child task ID")
+
+        cleanup_after_submit = False
+        with self._data_lock:
+            current = self._retry_reservations.get(parent_task_id)
+            if current is not reservation:
+                if reservation.error is not None:
+                    raise reservation.error
+                raise TaskRetryNotAllowedError(parent_task_id)
+
+            staged_task_id, task, created = self._stage_command_locked(
+                command,
+                task_id=child_task_id,
+            )
+            if not created or staged_task_id != child_task_id:
+                raise RuntimeError("Retry child reservation was not created")
+
+            staged_task_ids = [child_task_id]
+            self._pin_task_locked(child_task_id)
+            self._suppress_task_events_locked(staged_task_ids)
+            try:
+                self._broadcast_event("task_created", task.to_dict())
+                self._submit_staged_commands_locked(staged_task_ids)
+                self._flush_task_events_locked(staged_task_ids)
+                self._retry_children[parent_task_id] = child_task_id
+                del self._retry_reservations[parent_task_id]
+                self._unpin_task_locked(child_task_id)
+                reservation.ready.set()
+                cleanup_after_submit = task.status.terminal
+            except BaseException:
+                self._discard_task_events_locked(staged_task_ids)
+                self._rollback_task_locked(child_task_id)
+                self._unpin_task_locked(child_task_id)
+                raise
+
+        if cleanup_after_submit:
+            self._cleanup_old_tasks()
+        return child_task_id
 
     def retry(self, task_id: str) -> str:
         """Retry a terminal task while coordinating concurrent callers."""
@@ -900,14 +972,16 @@ class AnalysisTaskQueue:
             }:
                 raise TaskRetryNotAllowedError(task_id)
             child_task_id = self._retry_children.get(task_id)
-            if child_task_id in self._tasks:
-                return child_task_id
+            if child_task_id is not None:
+                if child_task_id in self._tasks:
+                    return child_task_id
+                del self._retry_children[task_id]
             command = self._commands.get(task_id)
             if command is None or command.retry_factory is None:
                 raise TaskRetryUnsupportedError(task_id)
             reservation = self._retry_reservations.get(task_id)
             if reservation is None:
-                reservation = _RetryReservation()
+                reservation = _RetryReservation(child_task_id=uuid.uuid4().hex)
                 self._retry_reservations[task_id] = reservation
             else:
                 waiter = True
@@ -936,7 +1010,11 @@ class AnalysisTaskQueue:
                 none_is_success=command.none_is_success,
                 retry_factory=command.retry_factory,
             )
-            child_task_id = self.submit(child_command)
+            child_task_id = self._submit_retry_child(
+                task_id,
+                reservation,
+                child_command,
+            )
         except BaseException as exc:
             raised_error = exc
             with self._data_lock:
@@ -949,18 +1027,6 @@ class AnalysisTaskQueue:
                     raised_error = reservation.error
             raise raised_error
 
-        reservation_error: Optional[BaseException] = None
-        with self._data_lock:
-            current = self._retry_reservations.get(task_id)
-            if current is reservation:
-                reservation.child_task_id = child_task_id
-                self._retry_children[task_id] = child_task_id
-                del self._retry_reservations[task_id]
-                reservation.ready.set()
-            else:
-                reservation_error = reservation.error
-        if reservation_error is not None:
-            raise reservation_error
         return child_task_id
     
     def _build_analysis_command(
@@ -1449,7 +1515,7 @@ class AnalysisTaskQueue:
         detached_result = None
         result_ref = None
         if status == TaskStatus.COMPLETED:
-            detached_result = copy.deepcopy(result)
+            detached_result = deep_thaw(deep_freeze(result))
             result_ref = self._result_reference(detached_result)
 
         now = datetime.now()
@@ -1462,8 +1528,8 @@ class AnalysisTaskQueue:
             task.result = detached_result
             task.result_ref = result_ref
             task.error = None
-            if isinstance(result, dict):
-                task.stock_name = result.get("stock_name", task.stock_name)
+            if isinstance(detached_result, dict):
+                task.stock_name = detached_result.get("stock_name", task.stock_name)
             if task.kind == "stock_analysis":
                 task.message = "分析完成"
                 task.message_code = "task.analysis.completed"
@@ -1631,6 +1697,8 @@ class AnalysisTaskQueue:
                     for task in self._tasks.values()
                     if task.status.terminal
                     and task.task_id not in self._retry_reservations
+                    and task.task_id not in self._task_lifecycle_pins
+                    and task.task_id not in self._retry_children.values()
                     and task.task_id not in self._suppressed_event_tasks
                 ),
                 key=lambda task: task.created_at,
@@ -1768,7 +1836,9 @@ class AnalysisTaskQueue:
                 executor.shutdown(wait=False, cancel_futures=True)
             except TypeError:
                 executor.shutdown(wait=False)
-            logger.info("[TaskQueue] Thread pool shut down")
+            logger.info(
+                "[TaskQueue] Thread pool shutdown requested without waiting for active workers"
+            )
         self._cleanup_old_tasks()
 
 

@@ -68,7 +68,10 @@ type DismissedTask = {
 const dismissedTasks = new Map<string, DismissedTask>();
 
 const isTerminalTask = (task: Pick<TaskInfo, 'status'>): boolean =>
-  task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
+  task.status === 'completed'
+  || task.status === 'failed'
+  || task.status === 'cancelled'
+  || task.status === 'interrupted';
 
 const taskFingerprint = (task: TaskInfo): string =>
   [task.status, task.progress, task.completedAt ?? '', task.messageCode ?? ''].join('|');
@@ -1097,7 +1100,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const localRevisionAtRequest = activeTaskLocalRevision;
     try {
       const response = await analysisApi.getTasks({
-        status: 'pending,processing,cancel_requested,completed,failed,cancelled',
+        status: 'pending,processing,cancel_requested,completed,failed,cancelled,interrupted',
         limit: 100,
       });
       if (requestId !== activeTaskRequestSeq) {

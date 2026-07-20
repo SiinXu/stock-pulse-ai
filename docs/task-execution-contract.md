@@ -157,8 +157,15 @@ cancellation propagates after the stream is closed in `finally`.
 The queue accepts work only while its process-local executor is active. Graceful
 shutdown rejects new submissions and retries, marks every active task
 `interrupted`, wakes retry waiters, closes event streams after queued terminal
-events drain, cancels pending futures, and does not wait indefinitely for an
-uncooperative runner.
+events drain, cancels pending futures, and returns without synchronously waiting
+for active worker callables.
+
+`ThreadPoolExecutor.shutdown(wait=False)` makes the queue shutdown method return
+without waiting for active workers; it does not terminate running Python threads.
+CPython may still join those workers during interpreter exit. Command runners must
+therefore cooperate by polling `TaskRunContext.is_cancel_requested()` and return
+promptly when it becomes true. This process-local contract does not claim forced
+process termination for an uncooperative runner.
 
 This task does not add HTTP cancel/retry routes, an external broker, cross-process
 task sharing, or durable recovery after an ungraceful process loss. Deployment

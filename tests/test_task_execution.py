@@ -5,7 +5,8 @@ import asyncio
 import gc
 import sys
 import threading
-from concurrent.futures import Future
+import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
 from types import SimpleNamespace
 
@@ -18,6 +19,7 @@ from src.services.task_queue import (
 )
 from src.task_execution import (
     TaskCommand,
+    TaskEvent,
     TaskEventType,
     TaskExecutionPort,
     TaskIdempotencyConflictError,
@@ -93,6 +95,25 @@ class ClaimedExecutor(DeferredExecutor):
         return result
 
 
+class SelfCopyingMutable:
+    """Mutable test value that tries to defeat copy-based detachment."""
+
+    def __init__(self) -> None:
+        self.items = []
+
+    def __deepcopy__(self, memo):
+        del memo
+        return self
+
+
+class TransformingDeepcopyMutable:
+    """Unsupported value whose deepcopy result tries to look supported."""
+
+    def __deepcopy__(self, memo):
+        del memo
+        return {"escaped": True}
+
+
 @pytest.fixture
 def task_queue():
     original = AnalysisTaskQueue._instance
@@ -148,6 +169,42 @@ def test_command_and_snapshots_detach_mutable_values(task_queue) -> None:
     }
     with pytest.raises(FrozenInstanceError):
         snapshot.progress = 42
+
+
+def test_command_metadata_rejects_self_copying_custom_values() -> None:
+    with pytest.raises(TypeError, match="SelfCopyingMutable"):
+        make_command(
+            lambda _context: None,
+            metadata={"stock_code": "UNIT", "nested": SelfCopyingMutable()},
+            idempotency_fingerprint="explicit-fingerprint",
+        )
+
+
+def test_event_data_rejects_self_copying_custom_values(task_queue) -> None:
+    executor = DeferredExecutor()
+    task_queue._executor = executor
+    task_id = task_queue.submit(make_command(lambda _context: None))
+
+    with pytest.raises(TypeError, match="SelfCopyingMutable"):
+        TaskEvent(
+            sequence=1,
+            task_id=task_id,
+            type=TaskEventType.PROGRESS,
+            snapshot=task_queue.get(task_id),
+            data={"nested": SelfCopyingMutable()},
+        )
+
+
+def test_queue_event_data_validates_original_value_before_copying(task_queue) -> None:
+    executor = DeferredExecutor()
+    task_queue._executor = executor
+    task_id = task_queue.submit(make_command(lambda _context: None))
+
+    with pytest.raises(TypeError, match="TransformingDeepcopyMutable"):
+        task_queue._broadcast_event(
+            "task_progress",
+            {"task_id": task_id, "nested": TransformingDeepcopyMutable()},
+        )
 
 
 def test_idempotent_submit_reuses_owner_without_event_or_executor(task_queue) -> None:
@@ -279,6 +336,25 @@ def test_uncopyable_result_becomes_failed_without_completed_event(task_queue) ->
     assert [event.type for event in terminal_events] == [TaskEventType.FAILED]
 
 
+def test_nested_self_copying_result_becomes_failed_without_aliasing(task_queue) -> None:
+    shared = SelfCopyingMutable()
+    task_queue._executor = SynchronousExecutor()
+    task_id = task_queue.submit(
+        make_command(lambda _context: {"nested": {"shared": shared}})
+    )
+
+    assert task_queue.get(task_id).status == TaskStatus.FAILED
+    assert task_queue.get_task(task_id).result is None
+    shared.items.append("late mutation")
+    assert task_queue.get_task(task_id).result is None
+    terminal_events = [
+        event
+        for event in task_queue._event_history[task_id]
+        if event.terminal
+    ]
+    assert [event.type for event in terminal_events] == [TaskEventType.FAILED]
+
+
 def test_prestart_cancel_never_invokes_runner_and_rejects_late_updates(task_queue) -> None:
     executor = DeferredExecutor()
     task_queue._executor = executor
@@ -292,6 +368,7 @@ def test_prestart_cancel_never_invokes_runner_and_rejects_late_updates(task_queu
     assert invoked == []
     assert task_queue.update_task_progress(task_id, 50, "late") is None
     assert task_queue.append_task_flow_event(task_id, {"late": True}) is None
+    assert task_queue._task_lifecycle_pins == {}
     terminal_events = [event for event in task_queue._event_history[task_id] if event.terminal]
     assert [event.type for event in terminal_events] == [TaskEventType.CANCELLED]
 
@@ -312,6 +389,64 @@ def test_worker_claimed_prestart_cancel_runs_cleanup(task_queue) -> None:
     assert task_id not in task_queue._futures
     assert task_id not in task_queue._event_history
     assert task_id not in task_queue._task_idempotency_keys
+
+
+def test_concurrent_cancel_callers_keep_claimed_task_pinned_until_snapshots(
+    task_queue,
+) -> None:
+    cancel_lock = threading.Lock()
+    all_cancel_callers_entered = threading.Event()
+    release_cancel = threading.Event()
+    cancel_callers = 0
+
+    class BlockingCancelFuture(Future):
+        def cancel(self) -> bool:
+            nonlocal cancel_callers
+            with cancel_lock:
+                cancel_callers += 1
+                if cancel_callers == 2:
+                    all_cancel_callers_entered.set()
+            assert release_cancel.wait(timeout=2)
+            return False
+
+    class BlockingClaimedExecutor(ClaimedExecutor):
+        def submit(self, fn, *args, **kwargs):
+            future = BlockingCancelFuture()
+            future.set_running_or_notify_cancel()
+            self.calls.append((fn, args, kwargs, future))
+            return future
+
+    executor = BlockingClaimedExecutor()
+    task_queue._executor = executor
+    task_queue._max_history = 0
+    task_id = task_queue.submit(make_command(lambda _context: {"ok": True}))
+    snapshots = []
+    errors = []
+
+    def cancel() -> None:
+        try:
+            snapshots.append(task_queue.cancel(task_id))
+        except BaseException as exc:  # pragma: no cover - asserted below
+            errors.append(exc)
+
+    callers = [threading.Thread(target=cancel) for _ in range(2)]
+    for caller in callers:
+        caller.start()
+    try:
+        assert all_cancel_callers_entered.wait(timeout=2)
+        executor.run()
+        assert task_id in task_queue._tasks
+        assert task_queue._task_lifecycle_pins[task_id] == 2
+    finally:
+        release_cancel.set()
+        for caller in callers:
+            caller.join(timeout=2)
+
+    assert errors == []
+    assert len(snapshots) == 2
+    assert all(snapshot.status == TaskStatus.CANCELLED for snapshot in snapshots)
+    assert task_id not in task_queue._tasks
+    assert task_queue._task_lifecycle_pins == {}
 
 
 def test_cancel_wins_over_late_completion_with_one_terminal_event(task_queue) -> None:
@@ -342,8 +477,11 @@ def test_completed_task_rejects_retry(task_queue) -> None:
         task_queue.retry(task_id)
 
 
-def test_concurrent_retry_callers_share_factory_and_child(task_queue) -> None:
+def test_concurrent_retry_callers_share_child_under_synchronous_cleanup_pressure(
+    task_queue,
+) -> None:
     task_queue._executor = SynchronousExecutor()
+    task_queue._max_history = 1
     factory_entered = threading.Event()
     release_factory = threading.Event()
     factory_calls = []
@@ -395,6 +533,37 @@ def test_concurrent_retry_callers_share_factory_and_child(task_queue) -> None:
     assert child_command.idempotency_fingerprint == parent_command.idempotency_fingerprint
     assert child_command.idempotency_key != parent_command.idempotency_key
     assert task_queue.get(child_id).trace_id == child_id
+    assert parent_id not in task_queue._tasks
+    assert child_id in task_queue._tasks
+    assert task_queue._retry_children == {}
+    assert task_queue._task_lifecycle_pins == {}
+
+
+def test_retry_executor_failure_rolls_back_reserved_child_and_pin(task_queue) -> None:
+    class RejectingExecutor:
+        def submit(self, fn, *args, **kwargs):
+            del fn, args, kwargs
+            raise RuntimeError("executor unavailable")
+
+        def shutdown(self, wait=True, cancel_futures=False) -> None:
+            del wait, cancel_futures
+
+    task_queue._executor = SynchronousExecutor()
+    parent_id = task_queue.submit(
+        make_command(
+            lambda _context: (_ for _ in ()).throw(RuntimeError("failed")),
+            retry_factory=lambda: make_command(lambda _context: {"ok": True}),
+        )
+    )
+    task_queue._executor = RejectingExecutor()
+
+    with pytest.raises(RuntimeError, match="executor unavailable"):
+        task_queue.retry(parent_id)
+
+    assert set(task_queue._tasks) == {parent_id}
+    assert task_queue._retry_reservations == {}
+    assert task_queue._retry_children == {}
+    assert task_queue._task_lifecycle_pins == {}
 
 
 def test_shutdown_wakes_retry_owner_and_waiter_with_same_error(task_queue) -> None:
@@ -459,6 +628,7 @@ def test_retry_preserves_unrelated_dedupe_collision(task_queue) -> None:
         task_queue.retry(parent_id)
     assert exc_info.value.existing_task_id == unrelated_id
     assert parent_id not in task_queue._retry_reservations
+    assert task_queue._task_lifecycle_pins == {}
 
 
 def test_task_stream_replays_snapshot_times_out_and_reaches_terminal_eof(task_queue) -> None:
@@ -591,6 +761,39 @@ def test_shutdown_interrupts_tasks_exposes_error_and_closes_stream(task_queue) -
     assert executor.shutdown_calls == [(False, True)]
     with pytest.raises(TaskQueueShutdownError):
         task_queue.submit(make_command(lambda _context: None))
+
+
+def test_real_thread_pool_shutdown_returns_before_blocked_runner_exits(task_queue) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    cancellation_observations = []
+    task_queue._executor = ThreadPoolExecutor(
+        max_workers=1,
+        thread_name_prefix="task_shutdown_test_",
+    )
+
+    def run(context):
+        started.set()
+        assert release.wait(timeout=5)
+        cancellation_observations.append(context.is_cancel_requested())
+        return {"ok": True}
+
+    task_id = task_queue.submit(make_command(run))
+    future = task_queue._futures[task_id]
+    assert started.wait(timeout=2)
+
+    try:
+        before = time.monotonic()
+        task_queue.shutdown()
+        elapsed = time.monotonic() - before
+
+        assert elapsed < 1
+        assert task_queue.get(task_id).status == TaskStatus.INTERRUPTED
+    finally:
+        release.set()
+        future.result(timeout=2)
+
+    assert cancellation_observations == [True]
 
 
 def test_cleanup_removes_all_owner_indexes(task_queue) -> None:
