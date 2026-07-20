@@ -226,6 +226,11 @@ function findHistoryMutations(
   const findings: SourceFinding[] = [];
   const reportedMethods = new Map<ts.CallExpression, Set<HistoryMethod>>();
   const functionsBySymbol = new Map<ts.Symbol, ts.SignatureDeclaration>();
+  const symbolIds = new Map<ts.Symbol, number>();
+  const functionStateResults = new Map<
+    ts.SignatureDeclaration,
+    Map<string, ReadonlyMap<ts.Symbol, AliasValue>>
+  >();
 
   const symbolFor = (identifier: ts.Identifier): ts.Symbol | undefined => (
     checker.getSymbolAtLocation(identifier)
@@ -281,6 +286,19 @@ function findHistoryMutations(
     }
     return ts.isFunctionLike(current) ? current : undefined;
   };
+  const aliasStateKey = (aliases: ReadonlyMap<ts.Symbol, AliasValue>): string => (
+    Array.from(aliases, ([symbol, value]) => {
+      let id = symbolIds.get(symbol);
+      if (id === undefined) {
+        id = symbolIds.size;
+        symbolIds.set(symbol, id);
+      }
+      return [id, value] as const;
+    })
+      .sort(([left], [right]) => left - right)
+      .map(([id, value]) => `${id}:${value ?? 'none'}`)
+      .join('|')
+  );
   const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
     if (!name) return undefined;
     const text = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
@@ -289,11 +307,27 @@ function findHistoryMutations(
     return text === 'pushState' || text === 'replaceState' ? text : undefined;
   };
 
-  const scanScope = (
+  function scanFunction(
+    node: ts.SignatureDeclaration,
+    aliases: ReadonlyMap<ts.Symbol, AliasValue>,
+  ): ReadonlyMap<ts.Symbol, AliasValue> {
+    const stateKey = aliasStateKey(aliases);
+    const stateResults = functionStateResults.get(node) ?? new Map();
+    const cached = stateResults.get(stateKey);
+    if (cached) return cached;
+
+    const provisional = new Map(aliases);
+    stateResults.set(stateKey, provisional);
+    functionStateResults.set(node, stateResults);
+    const result = scanScope(node, aliases);
+    stateResults.set(stateKey, result);
+    return result;
+  }
+
+  function scanScope(
     scope: ts.Node,
     inheritedAliases: ReadonlyMap<ts.Symbol, AliasValue>,
-    activeFunctions: ReadonlySet<ts.SignatureDeclaration>,
-  ): void => {
+  ): Map<ts.Symbol, AliasValue> {
     const aliases = new Map(inheritedAliases);
     const deferredFunctions: ts.SignatureDeclaration[] = [];
     const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
@@ -344,10 +378,11 @@ function findHistoryMutations(
       }
       if (ts.isCallExpression(node)) {
         const invokedFunction = calledFunction(node.expression);
-        if (invokedFunction && !activeFunctions.has(invokedFunction)) {
-          const nextActiveFunctions = new Set(activeFunctions);
-          nextActiveFunctions.add(invokedFunction);
-          scanScope(invokedFunction, aliases, nextActiveFunctions);
+        if (invokedFunction) {
+          const result = scanFunction(invokedFunction, aliases);
+          for (const [symbol, value] of result) {
+            if (aliases.has(symbol)) aliases.set(symbol, value);
+          }
         }
         const method = historyMethodReference(node.expression, aliasFor);
         if (method) {
@@ -368,14 +403,12 @@ function findHistoryMutations(
 
     visit(scope);
     for (const deferredFunction of deferredFunctions) {
-      if (activeFunctions.has(deferredFunction)) continue;
-      const nextActiveFunctions = new Set(activeFunctions);
-      nextActiveFunctions.add(deferredFunction);
-      scanScope(deferredFunction, aliases, nextActiveFunctions);
+      scanFunction(deferredFunction, aliases);
     }
-  };
+    return aliases;
+  }
 
-  scanScope(sourceFile, new Map(), new Set());
+  scanScope(sourceFile, new Map());
   return findings.sort((left, right) => left.line - right.line || left.token.localeCompare(right.token));
 }
 
@@ -465,6 +498,49 @@ describe('page and Router pattern production guard', () => {
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 2, token: 'replaceState' },
       { file: '../../pages/ExamplePage.tsx', line: 10, token: 'replaceState' },
+    ]);
+  });
+
+  it('revisits recursive functions when alias state changes', () => {
+    const fixture = [
+      'let replace = () => undefined;',
+      'function mutate(depth: number) {',
+      '  replace({}, "", "?recursive=1");',
+      '  replace = window.history.replaceState.bind(window.history);',
+      '  if (depth) mutate(depth - 1);',
+      '}',
+      'mutate(1);',
+      'replace = () => undefined;',
+      'let push = () => undefined;',
+      'function first(depth: number) {',
+      '  push({}, "", "?mutual=1");',
+      '  push = window.history.pushState.bind(window.history);',
+      '  if (depth) second(depth - 1);',
+      '}',
+      'function second(depth: number) { first(depth); }',
+      'first(1);',
+      'push = () => undefined;',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 3, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 11, token: 'pushState' },
+    ]);
+  });
+
+  it('propagates outer alias changes from direct function calls', () => {
+    const fixture = [
+      'let replace = () => undefined;',
+      'function configure() { replace = window.history.replaceState.bind(window.history); }',
+      'function clear() { replace = () => undefined; }',
+      'configure();',
+      'replace({}, "", "?configured=1");',
+      'clear();',
+      'replace({}, "", "?cleared=1");',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 5, token: 'replaceState' },
     ]);
   });
 
