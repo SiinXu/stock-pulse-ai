@@ -4,6 +4,7 @@ import type React from 'react';
 import { forwardRef, useId, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { IconButton } from './IconButton';
 
 export interface ResponsiveRailProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   title: React.ReactNode;
@@ -64,19 +65,21 @@ export const ResponsiveRail = forwardRef<
           {title}
         </h2>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-        <button
-          type="button"
+        <IconButton
           aria-label={isOpen ? collapseLabel : expandLabel}
           aria-expanded={isOpen}
           aria-controls={contentId}
-          className="control-hit-target relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-transparent text-secondary-text transition-colors hover:bg-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 xl:hidden"
+          size="default"
+          variant="outline"
+          tooltip={false}
+          className="xl:hidden"
           onClick={() => setOpen(!isOpen)}
         >
           <ChevronDown
             aria-hidden="true"
             className={cn('h-4 w-4 transition-transform motion-reduce:transition-none', isOpen && 'rotate-180')}
           />
-        </button>
+        </IconButton>
       </header>
       <div
         id={contentId}

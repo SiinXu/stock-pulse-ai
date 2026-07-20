@@ -119,7 +119,7 @@ function findPatternOwnershipViolations(filename: string, source: string): Sourc
   return findings;
 }
 
-function historyMethod(node: ts.Expression): HistoryMethod | undefined {
+function directHistoryMethod(node: ts.Expression): HistoryMethod | undefined {
   if (ts.isIdentifier(node) && (node.text === 'pushState' || node.text === 'replaceState')) {
     return node.text;
   }
@@ -133,12 +133,61 @@ function historyMethod(node: ts.Expression): HistoryMethod | undefined {
   return undefined;
 }
 
+function historyMethodReference(
+  node: ts.Expression,
+  aliases: ReadonlyMap<string, HistoryMethod>,
+): HistoryMethod | undefined {
+  const direct = directHistoryMethod(node);
+  if (direct) return direct;
+  if (ts.isIdentifier(node)) return aliases.get(node.text);
+  if (
+    ts.isCallExpression(node)
+    && ts.isPropertyAccessExpression(node.expression)
+    && node.expression.name.text === 'bind'
+  ) {
+    return historyMethodReference(node.expression.expression, aliases);
+  }
+  if (
+    ts.isPropertyAccessExpression(node)
+    && (node.name.text === 'call' || node.name.text === 'apply')
+  ) {
+    return historyMethodReference(node.expression, aliases);
+  }
+  return undefined;
+}
+
+function collectHistoryAliases(sourceFile: ts.SourceFile): Map<string, HistoryMethod> {
+  const aliases = new Map<string, HistoryMethod>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) {
+      if (ts.isIdentifier(node.name) && node.initializer) {
+        const method = historyMethodReference(node.initializer, aliases);
+        if (method) aliases.set(node.name.text, method);
+      } else if (ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) {
+          if (!ts.isIdentifier(element.name)) continue;
+          const sourceName = element.propertyName && ts.isIdentifier(element.propertyName)
+            ? element.propertyName.text
+            : element.name.text;
+          if (sourceName === 'pushState' || sourceName === 'replaceState') {
+            aliases.set(element.name.text, sourceName);
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return aliases;
+}
+
 function findHistoryMutations(filename: string, source: string): SourceFinding[] {
   const sourceFile = parseSource(filename, source);
+  const aliases = collectHistoryAliases(sourceFile);
   const findings: SourceFinding[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
-      const method = historyMethod(node.expression);
+      const method = historyMethodReference(node.expression, aliases);
       if (method) {
         findings.push({
           file: filename,
@@ -189,14 +238,20 @@ describe('page and Router pattern production guard', () => {
       'const historyAlias = window.history;',
       'historyAlias.pushState({}, "", "?market=cn");',
       'historyAlias["replaceState"]({}, "", "?market=hk");',
-      'const { pushState } = historyAlias; pushState({}, "", "?market=us");',
+      'const replace = window.history.replaceState; replace({}, "", "?market=jp");',
+      'const { pushState: push } = historyAlias; push({}, "", "?market=us");',
+      'const boundReplace = historyAlias.replaceState.bind(historyAlias); boundReplace({}, "", "?market=sg");',
+      'historyAlias.pushState.call(historyAlias, {}, "", "?market=uk");',
     ].join('\n');
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 1, token: 'replaceState' },
       { file: '../../pages/ExamplePage.tsx', line: 3, token: 'pushState' },
       { file: '../../pages/ExamplePage.tsx', line: 4, token: 'replaceState' },
-      { file: '../../pages/ExamplePage.tsx', line: 5, token: 'pushState' },
+      { file: '../../pages/ExamplePage.tsx', line: 5, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 6, token: 'pushState' },
+      { file: '../../pages/ExamplePage.tsx', line: 7, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 8, token: 'pushState' },
     ]);
   });
 

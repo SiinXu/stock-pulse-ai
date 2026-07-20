@@ -145,7 +145,11 @@ export const RouteFocusCoordinator: React.FC<RouteFocusCoordinatorProps> = ({ ch
     if (navigationType === 'REPLACE') {
       entriesRef.current.delete(previousLocationKey);
       entriesRef.current.delete(location.key);
-    } else {
+    } else if (
+      navigationType !== 'POP'
+      || marker !== undefined
+      || !entriesRef.current.has(previousLocationKey)
+    ) {
       entriesRef.current.set(previousLocationKey, {
         locationKey: previousLocationKey,
         focusKey: marker,

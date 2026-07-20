@@ -47,27 +47,72 @@ test.describe('shared page and Router Patterns', () => {
     await expect(page.getByRole('tabpanel')).toContainText('Risk is elevated');
   });
 
-  test('focuses a pushed route heading and restores the desktop Link on Back', async ({ page }) => {
+  test('preserves the desktop opener through repeated Back and Forward navigation', async ({ page }) => {
     await openFixture(page, 1024, 768);
     await page.getByRole('link', { name: 'Detailed evidence' }).click();
-    await expect(page).toHaveURL(/\/e2e\/page-pattern-fixture\.html\/details$/);
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-details-fixture\.html$/);
     const detailsHeading = page.getByRole('heading', {
       level: 1,
       name: 'Detailed evidence and risk review for the current portfolio',
     });
     await expect(detailsHeading).toBeFocused();
 
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.goBack();
     await expect(page).toHaveURL(/\/e2e\/page-pattern-fixture\.html$/);
     await expect(page.getByRole('heading', { level: 1, name: 'Portfolio overview' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Detailed evidence' })).toBeFocused();
+
+    await page.goForward();
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-details-fixture\.html$/);
+    await expect(detailsHeading).toBeFocused();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-fixture\.html$/);
+    await expect(page.getByRole('link', { name: 'Detailed evidence' })).toBeFocused();
+  });
+
+  test('restores the details-page Back trigger on Forward', async ({ page }) => {
+    await openFixture(page, 1024, 768);
+    await page.getByRole('link', { name: 'Detailed evidence' }).click();
+    const backButton = page.getByRole('button', { name: 'Back' });
+    await backButton.click();
+    await expect(page.getByRole('link', { name: 'Detailed evidence' })).toBeFocused();
+
+    await page.goForward();
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-details-fixture\.html$/);
+    await expect(backButton).toBeFocused();
+  });
+
+  test('treats reload as direct entry and never persists route-focus metadata', async ({ page }) => {
+    await openFixture(page, 1024, 768);
+    await page.getByRole('link', { name: 'Detailed evidence' }).click();
+    const heading = page.getByRole('heading', {
+      level: 1,
+      name: 'Detailed evidence and risk review for the current portfolio',
+    });
+    await expect(heading).toBeFocused();
+
+    const persistedBeforeReload = await page.evaluate(() => ({
+      url: window.location.href,
+      historyState: JSON.stringify(window.history.state),
+      localStorage: JSON.stringify({ ...window.localStorage }),
+      sessionStorage: JSON.stringify({ ...window.sessionStorage }),
+    }));
+    for (const value of Object.values(persistedBeforeReload)) {
+      expect(value).not.toContain('page-pattern:');
+      expect(value).not.toContain('route-focus');
+    }
+
+    await page.reload();
+    await expect(heading).toBeVisible();
+    await expect(heading).not.toBeFocused();
   });
 
   test('uses native compact navigation and restores its focus on Back', async ({ page }) => {
     await openFixture(page, 390, 667);
     const compactNavigation = page.getByRole('combobox', { name: 'Workspace views' });
     await compactNavigation.selectOption('details');
-    await expect(page).toHaveURL(/\/e2e\/page-pattern-fixture\.html\/details$/);
+    await expect(page).toHaveURL(/\/e2e\/page-pattern-details-fixture\.html$/);
     await expect(page.getByRole('heading', {
       level: 1,
       name: 'Detailed evidence and risk review for the current portfolio',
