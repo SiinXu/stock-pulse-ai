@@ -46,6 +46,7 @@
   --ring: 118 50% 48%;
   --radius: 0.75rem;
   --radius-dot: 9999px;
+  --overlay-sheet-footer-toast-offset: 5rem;
   --settings-switch-on-start: 255 255 127;
   --settings-switch-on-end: 127 255 127;
   --settings-switch-off: 234 235 232;
@@ -583,6 +584,10 @@
     min-height: 2.75rem;
     transform: translate(-50%, -50%);
   }
+}
+
+body:has(> [data-overlay-root="sheet"]) > [data-overlay-root="toast"] {
+  bottom: calc(var(--overlay-sheet-footer-toast-offset) + env(safe-area-inset-bottom));
 }
 
 @layer components {

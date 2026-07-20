@@ -75,11 +75,6 @@ type ExactButtonAllowance = {
   removeBy: string;
   tokens: readonly string[];
 };
-type ExactSourceAllowance = {
-  line: number;
-  removeBy: string;
-  token: string;
-};
 const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/NotFoundPage.tsx', [{
     line: 34,
@@ -109,7 +104,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-
 const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1499,
+    line: 1500,
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
@@ -239,21 +234,11 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     removeBy: 'UI-R01',
     tokens: ['home-panel-card'],
   }]],
-  ['../settings/SettingsAlert.tsx', [{
-    line: 45,
-    removeBy: 'UI-F03',
-    tokens: ['dynamic:toastVariantStyles[variant]', 'dynamic:className'],
-  }]],
   ['../tasks/TaskPanel.tsx', [{
     line: 218,
     removeBy: 'UI-R03',
     tokens: ['home-panel-card', 'dynamic:className'],
   }]],
-]);
-const OVERLAY_Z_ALLOWLIST = new Map<string, readonly ExactSourceAllowance[]>([
-  ['../common/ToastViewport.tsx', [{ line: 11, removeBy: 'UI-F03B', token: 'z-50' }]],
-  ['../../pages/DecisionSignalsPage.tsx', [{ line: 1879, removeBy: 'UI-F03B', token: 'z-[60]' }]],
-  ['../../pages/SettingsPage.tsx', [{ line: 3471, removeBy: 'UI-F03B', token: 'z-50' }]],
 ]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
@@ -293,19 +278,6 @@ function isProductionSource(filename: string): boolean {
 
 function lineNumberAt(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
-}
-
-function isAllowedExactSourceToken(
-  allowlist: ReadonlyMap<string, readonly ExactSourceAllowance[]>,
-  filename: string,
-  source: string,
-  index: number,
-  token: string,
-): boolean {
-  const line = lineNumberAt(source, index);
-  return allowlist.get(filename)?.some((allowance) => (
-    allowance.line === line && allowance.token === token
-  )) ?? false;
 }
 
 function findCssBlockEnd(source: string, openBraceIndex: number): number {
@@ -738,6 +710,14 @@ const OVERLAY_COMPONENT_BANNED_PROPS: Record<string, ReadonlySet<string>> = {
     'className',
   ]),
   Modal: new Set([
+    'width',
+    'maxWidth',
+    'zIndex',
+    'className',
+    'bodyClassName',
+    'footerClassName',
+  ]),
+  Sheet: new Set([
     'width',
     'maxWidth',
     'zIndex',
@@ -2841,9 +2821,6 @@ function findProductionDesignViolations(
 
   for (const match of sourceWithoutComments.matchAll(OVERLAY_Z_UTILITY_PATTERN)) {
     const index = match.index ?? 0;
-    if (isAllowedExactSourceToken(OVERLAY_Z_ALLOWLIST, filename, source, index, match[0])) {
-      continue;
-    }
     violations.push({
       file: filename,
       line: lineNumberAt(source, index),
@@ -3279,32 +3256,13 @@ describe('production design guard', () => {
     }
   });
 
-  it('keeps temporary overlay z-index exceptions exact, consumable, and expiring', () => {
-    for (const [filename, allowances] of OVERLAY_Z_ALLOWLIST) {
-      const source = productionSources[filename];
-      expect(source, `${filename} must remain in the production scan`).toBeDefined();
-      const sourceLines = source.split('\n');
-      for (const { line, removeBy, token } of allowances) {
-        expect(line).toBeGreaterThan(0);
-        expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
-        expect(sourceLines[line - 1]).toContain(token);
-        const shiftedSource = `${'\n'.repeat(line)}<div className="${token}">Overlay</div>`;
-        expect(findProductionDesignViolations(filename, shiftedSource)).toEqual(
-          expect.arrayContaining([expect.objectContaining({
-            rule: 'overlay-z-index',
-            token,
-          })]),
-        );
-      }
-    }
-  });
-
   it('rejects arbitrary overlay component geometry and requires semantic Drawer variants', () => {
     for (const fixture of [
       productionDesignGuardFixtures.drawerWidthOverride,
       productionDesignGuardFixtures.drawerGeometrySpread,
       productionDesignGuardFixtures.drawerMissingVariant,
       productionDesignGuardFixtures.modalGeometryOverride,
+      productionDesignGuardFixtures.sheetGeometryOverride,
     ]) {
       expect(findProductionDesignViolations('fixture.tsx', fixture)).toEqual(
         expect.arrayContaining([expect.objectContaining({ rule: 'overlay-component-contract' })]),

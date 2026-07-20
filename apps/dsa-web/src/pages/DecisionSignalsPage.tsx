@@ -22,6 +22,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  ToastViewport,
 } from '../components/common';
 import {
   DecisionSignalCard,
@@ -1875,12 +1876,14 @@ const DecisionSignalsPage: React.FC = () => {
       </Drawer>
 
       {statusUpdating ? (
-        <InlineAlert
-          className="fixed bottom-5 right-5 z-[60] max-w-sm"
-          variant="info"
-          title={t('common.processing')}
-          message={t('decisionSignals.confirmStatusTitle')}
-        />
+        <ToastViewport>
+          <InlineAlert
+            className="pointer-events-auto ml-auto max-w-sm"
+            variant="info"
+            title={t('common.processing')}
+            message={t('decisionSignals.confirmStatusTitle')}
+          />
+        </ToastViewport>
       ) : null}
 
       <ConfirmDialog

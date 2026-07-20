@@ -7,7 +7,7 @@ import {
   RouterProvider,
   useLocation,
 } from 'react-router-dom';
-import { ApiErrorAlert, Shell } from './components/common';
+import { ApiErrorAlert, Shell, ToastProvider } from './components/common';
 import {
   PageLoadingFallback,
   RouteOutletBoundary,
@@ -131,7 +131,9 @@ const App: React.FC<{ initialUiLanguage?: UiLanguage }> = ({ initialUiLanguage }
 
   return (
     <UiLanguageProvider initialLanguage={initialUiLanguage}>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </UiLanguageProvider>
   );
 };
