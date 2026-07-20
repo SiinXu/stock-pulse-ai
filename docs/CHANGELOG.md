@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [新功能] Web Chat 新增显式“深度研究”模式：新增 typed `agentApi.research` 客户端与 Chat 内 Chat/深度研究模式开关，在同一页面就一个问题运行深度研究（问题 + 可选股票代码），同步执行、可取消（AbortController），错误/超时明确提示；结果含结论（Markdown 渲染）与子问题引用，并按会话持久化到 localStorage 实现刷新恢复（进行中的运行刷新后不可续跑，恢复为可重跑）；不新建 Research Hub。后端 research 为同步、无 task/SSE/会话落库，服务端持久化与乐观续跑记为 Non-goal。
 - [新功能] Web 持仓中心支持编辑账户：选中具体账户后打开“编辑账户”，复用账户表单的编辑模式修改名称、券商、市场与基准币，经 `PUT /api/v1/portfolio/accounts/{id}` 做真更新——保持 account ID、账本/持仓与幂等关联不变，不删除重建；成功后刷新并选中该账户。后端为 last-write-wins，无单账户 GET 与乐观并发锁，记为 Non-goal。
 - [改进] `intelligence_items` 的 legacy scope 值规范化与 legacy url 唯一约束到 scoped 复合唯一键的重建 startup 兼容步骤转为正式 migration `202607190004_intelligence_item_scope_values` + `202607190005_intelligence_item_unique_index`（两者耦合：回填必须先于重建，故合并交付并在 apply_pending 内按序执行）；05 用冻结的原始 SQL 把 legacy 表重建为模型 schema、去除 url 唯一并建 scoped 唯一键，仅在需要时重建、幂等。移除运行时 `_ensure_intelligence_item_scope_values` / `_ensure_intelligence_items_unique_index` / `_rebuild_intelligence_items_table` / `_ensure_intelligence_items_scoped_unique_index_once` DDL。至此启动路径不再执行任何业务 schema DDL 兼容步骤，只保留 `create_all` 与 baseline 记录登记。
 - [新功能] Web 告警中心支持编辑告警规则：复用现有规则表单的 edit 模式，点击规则行“编辑”后经 `GET /api/v1/alerts/rules/{id}` 拉取最新服务端值再播种（并发变更防护），保存经 `PATCH` 部分更新；保持 rule ID、启停状态与触发/冷却历史不变，成功后按当前分页刷新列表并提示，失败（如规则已被并发删除返回 404）时明确报错且不丢弃编辑内容。后端为 last-write-wins，乐观并发锁（version/etag）记为 Non-goal。

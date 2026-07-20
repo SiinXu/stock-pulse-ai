@@ -6,7 +6,8 @@ import { ChevronDown, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SegmentedControl, Switch, Tooltip, useClipboard } from '../components/common';
+import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { OVERLAY_Z } from '../components/common/overlayZ';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -212,6 +213,7 @@ const ChatPage: React.FC = () => {
   const [watchlistMessage, setWatchlistMessage] = useState<string | null>(null);
   const [activeStockCode, setActiveStockCode] = useState<string | null>(null);
   const [activeStockContext, setActiveStockContext] = useState<ActiveStockContext | null>(null);
+  const [chatMode, setChatMode] = useState<'chat' | 'research'>('chat');
   const activeStockContextRef = useRef<ActiveStockContext | null>(null);
   const watchlistMessageTimerRef = useRef<number | null>(null);
   const copyResetTimerRef = useRef<Partial<Record<string, number>>>({});
@@ -1220,6 +1222,17 @@ const ChatPage: React.FC = () => {
           <p className="text-secondary-text text-sm">
             {t('chat.description')}
           </p>
+          <div className="mt-1">
+            <SegmentedControl
+              value={chatMode}
+              onChange={(value) => setChatMode(value)}
+              ariaLabel={t('research.modeLabel')}
+              options={[
+                { value: 'chat', label: t('research.chatMode') },
+                { value: 'research', label: t('research.mode') },
+              ]}
+            />
+          </div>
           {sendToast ? (
             <InlineAlert
               variant={sendToast.type === 'success' ? 'success' : 'danger'}
@@ -1231,7 +1244,12 @@ const ChatPage: React.FC = () => {
           ) : null}
         </header>
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden border border-white/6 bg-card/78 glass-card">
+        {chatMode === 'research' ? (
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-auto border border-white/6 bg-card/78 glass-card p-4 md:p-6">
+            <DeepResearchPanel key={sessionId} sessionId={sessionId} />
+          </div>
+        ) : null}
+        <div className={chatMode === 'research' ? 'hidden' : 'relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden border border-white/6 bg-card/78 glass-card'}>
           {/* Messages */}
           <ScrollArea
             className="relative z-10 flex-1"

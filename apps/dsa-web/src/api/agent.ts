@@ -51,7 +51,33 @@ export interface ChatSessionMessage {
   params?: Record<string, unknown>;
 }
 
+export interface ResearchRequest {
+  question: string;
+  stockCode?: string;
+}
+
+export interface ResearchResponse {
+  success: boolean;
+  content: string;
+  sources: string[];
+  token_usage: number;
+  error?: string;
+}
+
 export const agentApi = {
+  // Deep Research is synchronous (no task id / SSE); it can take up to ~180s,
+  // so allow a long timeout and support cancellation via an AbortSignal.
+  async research(
+    payload: ResearchRequest,
+    options?: { signal?: AbortSignal },
+  ): Promise<ResearchResponse> {
+    const response = await apiClient.post<ResearchResponse>(
+      '/api/v1/agent/research',
+      { question: payload.question, stock_code: payload.stockCode },
+      { timeout: 200000, signal: options?.signal },
+    );
+    return response.data;
+  },
   async chat(payload: ChatRequest): Promise<ChatResponse> {
     const response = await apiClient.post<ChatResponse>('/api/v1/agent/chat', payload, {
       timeout: 120000,
