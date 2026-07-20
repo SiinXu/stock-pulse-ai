@@ -59,6 +59,7 @@ from src.llm.local_cli_backend import (
     MAX_LOCAL_CLI_TIMEOUT_SECONDS,
 )
 from src.llm import generation_params as llm_generation_params
+from src.llm.provider_catalog_data import get_provider_ids, get_static_provider
 from src.llm.hermes import (
     HERMES_DEFAULT_BASE_URL,
     HERMES_DEFAULT_MODEL,
@@ -2280,12 +2281,8 @@ class Config:
             provider_id = explicit_provider_id
             provider = None
             if provider_id:
-                from src.llm.provider_catalog import get_provider
-
-                provider = get_provider(provider_id)
+                provider = get_static_provider(provider_id)
             else:
-                from src.llm.provider_catalog import get_provider_ids
-
                 provider_ids = set(get_provider_ids())
                 provider_id = ch_lower if ch_lower in provider_ids and ch_lower != "custom" else "custom"
 
