@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Search, StopCircle } from 'lucide-react';
@@ -28,12 +28,20 @@ function loadRun(sessionId: string): ResearchRun | null {
   try {
     const raw = window.localStorage.getItem(storageKey(sessionId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ResearchRun;
+    const parsed = JSON.parse(raw) as Partial<ResearchRun>;
     if (!parsed || typeof parsed.question !== 'string') return null;
-    // A run persisted while 'running' cannot be resumed after a refresh (the
-    // synchronous request was lost), so restore it as re-runnable idle.
-    const status: ResearchStatus = parsed.status === 'running' ? 'idle' : parsed.status;
-    return { ...parsed, status };
+    // Whitelist the persisted status: a 'running' run cannot resume after a
+    // refresh (the synchronous request was lost) and any unknown value is
+    // treated as re-runnable idle rather than silently dropping content.
+    const status: ResearchStatus = parsed.status === 'done' || parsed.status === 'error' ? parsed.status : 'idle';
+    return {
+      question: parsed.question,
+      stockCode: typeof parsed.stockCode === 'string' ? parsed.stockCode : '',
+      status,
+      content: typeof parsed.content === 'string' ? parsed.content : undefined,
+      sources: Array.isArray(parsed.sources) ? parsed.sources.filter((item): item is string => typeof item === 'string') : undefined,
+      error: typeof parsed.error === 'string' ? parsed.error : undefined,
+    };
   } catch {
     return null;
   }
@@ -55,9 +63,12 @@ interface DeepResearchPanelProps {
 
 export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId }) => {
   const { t } = useUiLanguage();
-  const [run, setRun] = useState<ResearchRun | null>(() => loadRun(sessionId));
-  const [question, setQuestion] = useState(() => loadRun(sessionId)?.question ?? '');
-  const [stockCode, setStockCode] = useState(() => loadRun(sessionId)?.stockCode ?? '');
+  // The panel is remounted per session (keyed by sessionId in the parent), so
+  // this reads the persisted run once on mount.
+  const initialRun = useMemo(() => loadRun(sessionId), [sessionId]);
+  const [run, setRun] = useState<ResearchRun | null>(initialRun);
+  const [question, setQuestion] = useState(initialRun?.question ?? '');
+  const [stockCode, setStockCode] = useState(initialRun?.stockCode ?? '');
   const [error, setError] = useState<ParsedApiError | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runSeqRef = useRef(0);
@@ -106,8 +117,9 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
         persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'idle' });
         return;
       }
-      setError(getParsedApiError(err));
-      persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'error' });
+      const parsed = getParsedApiError(err);
+      setError(parsed);
+      persist({ question: trimmedQuestion, stockCode: trimmedStock, status: 'error', error: parsed.message });
     }
   }, [persist, question, running, stockCode, t]);
 
