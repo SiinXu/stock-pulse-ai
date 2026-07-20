@@ -324,11 +324,22 @@ class PipelineStageObservation:
     ) -> None:
         """Start a stage timer with a sanitized low-sensitivity input summary."""
         self.stage = stage
-        self.input_summary = _sanitize_stage_summary(input_summary)
         self.retryable = bool(retryable)
         self.started_at = datetime.now().isoformat()
         self._started_monotonic = time.monotonic()
         self._finished = False
+        self.input_summary: Dict[str, Any] = {}
+        try:
+            self.input_summary = _sanitize_stage_summary(input_summary)
+        except Exception as exc:  # broad-exception: fallback_recorded - Summary sanitization failures are logged and leave a safe empty summary.
+            log_safe_exception(
+                logger,
+                "Pipeline stage input summary sanitization failed",
+                exc,
+                error_code="pipeline_stage_input_sanitization_failed",
+                level=logging.WARNING,
+                context={"stage": stage},
+            )
 
     @property
     def finished(self) -> bool:

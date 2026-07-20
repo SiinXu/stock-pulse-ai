@@ -27,9 +27,11 @@ GET /api/v1/history/{record_id}/diagnostics
 
 - 阶段观测复用现有运行诊断上下文；无诊断上下文时为 no-op，记录或脱敏失败时 fail-open，不改变分析、持久化、渲染或通知控制流。
 - 摘要沿用诊断元数据的深度、数量与长度限制，并脱敏 credential、token、cookie、webhook、prompt、raw response、代理头和本地绝对路径；不保存原始行情、新闻、Prompt 或模型响应。
-- 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。
+- 批量入口为汇总报告建立独立 delivery trace，并把真实 `render` / `dispatch` 终态合并回每个结果的既有分析诊断；不会把批量延后执行误记为 skipped，也不会覆盖分析阶段记录。
+- 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。部分渠道已经送达时，在 PIPE-02 提供幂等 fence 前 `retryable=false`，避免重试复制已成功通知。
+- 本地报告的 `render` 终态包含文件输出结果；报告内容生成成功但文件写入失败时仍记录为 failed。
 - `pipeline_stage_runs` 是 `context_snapshot.diagnostics` 的可选追加字段，不修改数据库 schema、API 必填字段、配置项或既有 Run Flow 事件。
-- PIPE-01 只增加行为保持的观测。阶段 Result 拆分、persist/dispatch 幂等 fence 与可执行重试策略由 PIPE-02 负责；在此之前 `persist` 保守标为不可重试。
+- PIPE-01 只增加行为保持的观测。阶段 Result 拆分、persist/dispatch 幂等 fence 与可执行重试策略由 PIPE-02 负责；在此之前 `persist` 与已部分送达的 `dispatch` 保守标为不可重试。
 
 ## 运行流实时增量
 

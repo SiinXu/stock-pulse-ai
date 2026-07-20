@@ -17,6 +17,7 @@ import time
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import List, Dict, Any, Optional, Tuple, Callable
@@ -101,6 +102,10 @@ logger = logging.getLogger(__name__)
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
 _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD = threading.Lock()
 _DAILY_MARKET_CONTEXT_SERVICE_LOCK_INIT_GUARD = threading.Lock()
+_DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
+    "defer_pipeline_delivery_observation",
+    default=False,
+)
 
 
 def _symbol_scope_lookup_values(code: str, market: str) -> List[str]:
@@ -3177,6 +3182,122 @@ class StockAnalysisPipeline:
             payload["error_message_sanitized"] = sanitized_error
         return payload
 
+    def _activate_delivery_diagnostic_context(
+        self,
+        results: List[AnalysisResult],
+    ):
+        """Activate an isolated delivery trace when the caller has no context."""
+        if get_current_diagnostic_context() is not None:
+            return None
+        try:
+            first_result = results[0] if results else None
+            context_snapshot = (
+                getattr(first_result, "diagnostic_context_snapshot", None)
+                if first_result is not None
+                else None
+            )
+            existing_diagnostics = (
+                context_snapshot.get("diagnostics")
+                if isinstance(context_snapshot, dict)
+                else None
+            )
+            single_result = len(results) == 1
+            inherited_trace_id = (
+                existing_diagnostics.get("trace_id")
+                if single_result and isinstance(existing_diagnostics, dict)
+                else None
+            )
+            inherited_query_id = (
+                getattr(first_result, "query_id", None)
+                if single_result and first_result is not None
+                else None
+            )
+            delivery_id = (
+                getattr(self, "trace_id", None)
+                or getattr(self, "query_id", None)
+                or inherited_trace_id
+                or f"delivery_{uuid.uuid4().hex}"
+            )
+            return activate_run_diagnostic_context(
+                trace_id=delivery_id,
+                query_id=(
+                    getattr(self, "query_id", None)
+                    or inherited_query_id
+                    or delivery_id
+                ),
+                stock_code=(
+                    getattr(first_result, "code", None)
+                    if single_result and first_result is not None
+                    else None
+                ),
+                trigger_source=getattr(self, "query_source", None),
+                scope="pipeline_delivery",
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Delivery context failures are logged and leave delivery behavior unchanged.
+            log_safe_exception(
+                logger,
+                "Pipeline delivery diagnostic context activation failed",
+                exc,
+                error_code="pipeline_delivery_context_activation_failed",
+                level=logging.WARNING,
+                context={"result_count": len(results)},
+            )
+            return None
+
+    @staticmethod
+    def _merge_delivery_diagnostic_snapshot(
+        item: AnalysisResult,
+        delivery_snapshot: Dict[str, Any],
+        notification_run: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Merge delivery-only runs into one result without replacing analysis runs."""
+        raw_context_snapshot = getattr(item, "diagnostic_context_snapshot", None)
+        context_snapshot = (
+            dict(raw_context_snapshot)
+            if isinstance(raw_context_snapshot, dict)
+            else {}
+        )
+        raw_diagnostics = context_snapshot.get("diagnostics")
+        diagnostics = dict(raw_diagnostics) if isinstance(raw_diagnostics, dict) else {}
+        diagnostics.setdefault(
+            "trace_id",
+            getattr(item, "trace_id", None)
+            or getattr(item, "query_id", None)
+            or delivery_snapshot.get("trace_id"),
+        )
+        diagnostics.setdefault("query_id", getattr(item, "query_id", None))
+        diagnostics.setdefault("stock_code", getattr(item, "code", None))
+
+        for field_name in ("notification_runs", "pipeline_stage_runs"):
+            raw_existing_runs = diagnostics.get(field_name)
+            existing_runs = (
+                list(raw_existing_runs)
+                if isinstance(raw_existing_runs, list)
+                else []
+            )
+            if field_name == "notification_runs":
+                candidate_runs = (
+                    [notification_run] if notification_run is not None else []
+                )
+            else:
+                candidates = delivery_snapshot.get(field_name)
+                candidate_runs = (
+                    list(candidates) if isinstance(candidates, list) else []
+                )
+            for candidate in candidate_runs:
+                if not isinstance(candidate, dict):
+                    continue
+                payload = dict(candidate)
+                if field_name == "notification_runs" and not payload.get("trace_id"):
+                    payload["trace_id"] = delivery_snapshot.get("trace_id")
+                if payload not in existing_runs:
+                    existing_runs.append(payload)
+            diagnostics[field_name] = existing_runs
+
+        context_snapshot["diagnostics"] = diagnostics
+        item.diagnostic_context_snapshot = context_snapshot
+        return diagnostics
+
     def _refresh_saved_diagnostic_snapshot(
         self,
         *,
@@ -3195,6 +3316,41 @@ class StockAnalysisPipeline:
             return
 
         diagnostic_snapshot = current_diagnostic_snapshot()
+        target_results = list(results or ([] if result is None else [result]))
+        if diagnostic_snapshot is not None and (
+            results is not None
+            or diagnostic_snapshot.get("scope") == "pipeline_delivery"
+        ):
+            for item in target_results:
+                query_id = (
+                    getattr(item, "query_id", None)
+                    or getattr(self, "query_id", None)
+                )
+                if not query_id:
+                    continue
+                code = getattr(item, "code", None) or fallback_code
+                try:
+                    merged_diagnostics = self._merge_delivery_diagnostic_snapshot(
+                        item,
+                        diagnostic_snapshot,
+                        notification_run,
+                    )
+                    updater(
+                        query_id=query_id,
+                        code=code,
+                        diagnostics=merged_diagnostics,
+                    )
+                except Exception as exc:  # broad-exception: optional_metadata - Delivery diagnostics are best-effort and cannot change delivery outcomes.
+                    log_safe_exception(
+                        logger,
+                        "Delivery diagnostic snapshot update failed; continuing without the update",
+                        exc,
+                        error_code="pipeline_delivery_snapshot_update_failed",
+                        level=logging.WARNING,
+                        context={"query_id": query_id, "stock_code": code},
+                    )
+            return
+
         if diagnostic_snapshot is not None:
             query_id = (
                 diagnostic_snapshot.get("query_id")
@@ -3210,7 +3366,7 @@ class StockAnalysisPipeline:
                 return
             try:
                 updater(query_id=query_id, code=code, diagnostics=diagnostic_snapshot)
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: optional_metadata - Run diagnostics are best-effort and cannot change analysis outcomes.
                 log_safe_exception(
                     logger,
                     "Run diagnostic snapshot update failed; continuing without the update",
@@ -3224,7 +3380,6 @@ class StockAnalysisPipeline:
         if notification_run is None:
             return
 
-        target_results = list(results or ([] if result is None else [result]))
         for item in target_results:
             query_id = getattr(item, "query_id", None) or getattr(self, "query_id", None)
             if not query_id:
@@ -3236,7 +3391,7 @@ class StockAnalysisPipeline:
                     code=code,
                     notification_runs=[notification_run],
                 )
-            except Exception as exc:
+            except Exception as exc:  # broad-exception: optional_metadata - Notification diagnostics are best-effort and cannot change delivery outcomes.
                 log_safe_exception(
                     logger,
                     "Notification diagnostic snapshot update failed; continuing without the update",
@@ -3547,11 +3702,10 @@ class StockAnalysisPipeline:
         logger.info("========== Processing %s ==========", code)
 
         from src.services.history_loader import set_frozen_target_date, reset_frozen_target_date
-        frozen_td = self._resolve_resume_target_date(code, current_time=current_time)
-        token = set_frozen_target_date(frozen_td)
         effective_query_id = analysis_query_id or getattr(self, "query_id", None) or uuid.uuid4().hex
         effective_trace_id = getattr(self, "trace_id", None) or effective_query_id
         diag_token = None
+        frozen_target_token = None
         if get_current_diagnostic_context() is None:
             diag_token = activate_run_diagnostic_context(
                 trace_id=effective_trace_id,
@@ -3560,19 +3714,39 @@ class StockAnalysisPipeline:
                 trigger_source=getattr(self, "query_source", None),
             )
         try:
-            record_pipeline_stage(
-                stage="resolve",
-                status="success",
+            with observe_pipeline_stage(
+                "resolve",
                 input_summary={
                     "stock_code": code,
                     "query_source": getattr(self, "query_source", None),
                 },
-                output_summary={
-                    "query_id": effective_query_id,
-                    "target_date": frozen_td.isoformat(),
-                },
                 retryable=False,
+            ) as resolve_stage:
+                frozen_td = self._resolve_resume_target_date(
+                    code,
+                    current_time=current_time,
+                )
+                frozen_target_token = set_frozen_target_date(frozen_td)
+                resolve_stage.finish(
+                    status="success",
+                    output_summary={
+                        "query_id": effective_query_id,
+                        "target_date": frozen_td.isoformat(),
+                    },
+                    retryable=False,
+                )
+        except Exception:
+            record_missing_pipeline_stages_as_skipped(
+                PIPELINE_STAGE_NAMES,
+                input_summary={"stock_code": code},
+                reason="stock_resolution_failed",
             )
+            reset_run_diagnostic_context(diag_token)
+            if frozen_target_token is not None:
+                reset_frozen_target_date(frozen_target_token)
+            raise
+
+        try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
             # Step 1: 获取并保存数据
             with observe_pipeline_stage(
@@ -3647,7 +3821,10 @@ class StockAnalysisPipeline:
 
             missing_stage_count = 0
             if result and result.success:
-                if not single_stock_notify:
+                if (
+                    not single_stock_notify
+                    and not _DEFER_PIPELINE_DELIVERY_OBSERVATION.get()
+                ):
                     missing_stage_count = record_missing_pipeline_stages_as_skipped(
                         ("render", "dispatch"),
                         input_summary={"stock_code": code},
@@ -3691,7 +3868,20 @@ class StockAnalysisPipeline:
             return None
         finally:
             reset_run_diagnostic_context(diag_token)
-            reset_frozen_target_date(token)
+            if frozen_target_token is not None:
+                reset_frozen_target_date(frozen_target_token)
+
+    def _process_single_stock_for_batch(
+        self,
+        code: str,
+        **kwargs,
+    ) -> Optional[AnalysisResult]:
+        """Run one stock while deferring delivery observations to the batch trace."""
+        token = _DEFER_PIPELINE_DELIVERY_OBSERVATION.set(True)
+        try:
+            return self.process_single_stock(code, **kwargs)
+        finally:
+            _DEFER_PIPELINE_DELIVERY_OBSERVATION.reset(token)
     
     def run(
         self,
@@ -3795,7 +3985,7 @@ class StockAnalysisPipeline:
             # 提交任务
             future_to_code = {
                 executor.submit(
-                    self.process_single_stock,
+                    self._process_single_stock_for_batch,
                     code,
                     skip_analysis=dry_run,
                     single_stock_notify=False,
@@ -3814,11 +4004,17 @@ class StockAnalysisPipeline:
                     if result and result.success:
                         results.append(result)
                         if single_stock_notify and send_notification and not dry_run:
-                            self._send_single_stock_notification(
-                                result,
-                                report_type=report_type,
-                                fallback_code=code,
+                            delivery_diag_token = (
+                                self._activate_delivery_diagnostic_context([result])
                             )
+                            try:
+                                self._send_single_stock_notification(
+                                    result,
+                                    report_type=report_type,
+                                    fallback_code=code,
+                                )
+                            finally:
+                                reset_run_diagnostic_context(delivery_diag_token)
                     elif result and not result.success:
                         logger.warning(
                             "[%s] Unsuccessful analysis result excluded from aggregate output",
@@ -3875,63 +4071,74 @@ class StockAnalysisPipeline:
             elapsed_time,
         )
         
-        # 保存报告到本地文件（无论是否推送通知都保存）
-        if results and not dry_run:
-            self._save_local_report(results, report_type)
-        else:
-            record_pipeline_stage(
-                stage="render",
-                status="skipped",
-                input_summary={
-                    "result_count": len(results),
-                    "dry_run": dry_run,
-                    "report_type": report_type.value,
-                },
-                output_summary={
-                    "reason": "dry_run" if dry_run else "no_successful_results"
-                },
-                retryable=False,
-            )
-
-        if not (results and send_notification and not dry_run):
-            record_pipeline_stage(
-                stage="dispatch",
-                status="skipped",
-                input_summary={
-                    "result_count": len(results),
-                    "dry_run": dry_run,
-                    "send_notification": send_notification,
-                },
-                output_summary={
-                    "reason": (
-                        "dry_run"
-                        if dry_run
-                        else (
-                            "notification_disabled"
-                            if not send_notification
-                            else "no_successful_results"
-                        )
-                    )
-                },
-                retryable=False,
-            )
-
-        # 发送通知（单股推送模式下跳过汇总推送，避免重复）
-        if results and send_notification and not dry_run:
-            if single_stock_notify:
-                # 单股推送模式：只保存汇总报告，不再重复推送
-                logger.info(
-                    "Single-stock notification mode: skipping aggregate delivery and saving locally"
-                )
-                self._send_notifications(results, report_type, skip_push=True)
-            elif merge_notification:
-                # 合并模式（Issue #190）：仅保存，不推送，由 main 层合并个股+大盘后统一发送
-                logger.info(
-                    "Combined-delivery mode: deferring delivery until stock and market reports are merged"
-                )
-                self._send_notifications(results, report_type, skip_push=True)
+        delivery_diag_token = (
+            self._activate_delivery_diagnostic_context(results)
+            if results and not dry_run
+            else None
+        )
+        try:
+            # 保存报告到本地文件（无论是否推送通知都保存）
+            if results and not dry_run:
+                self._save_local_report(results, report_type)
+                self._refresh_saved_diagnostic_snapshot(results=results)
             else:
-                self._send_notifications(results, report_type)
+                record_pipeline_stage(
+                    stage="render",
+                    status="skipped",
+                    input_summary={
+                        "result_count": len(results),
+                        "dry_run": dry_run,
+                        "report_type": report_type.value,
+                    },
+                    output_summary={
+                        "reason": "dry_run" if dry_run else "no_successful_results"
+                    },
+                    retryable=False,
+                )
+
+            if not (results and send_notification and not dry_run):
+                record_pipeline_stage(
+                    stage="dispatch",
+                    status="skipped",
+                    input_summary={
+                        "result_count": len(results),
+                        "dry_run": dry_run,
+                        "send_notification": send_notification,
+                    },
+                    output_summary={
+                        "reason": (
+                            "dry_run"
+                            if dry_run
+                            else (
+                                "notification_disabled"
+                                if not send_notification
+                                else "no_successful_results"
+                            )
+                        )
+                    },
+                    retryable=False,
+                )
+                if results and not dry_run:
+                    self._refresh_saved_diagnostic_snapshot(results=results)
+
+            # 发送通知（单股推送模式下跳过汇总推送，避免重复）
+            if results and send_notification and not dry_run:
+                if single_stock_notify:
+                    # 单股推送模式：只保存汇总报告，不再重复推送
+                    logger.info(
+                        "Single-stock notification mode: skipping aggregate delivery and saving locally"
+                    )
+                    self._send_notifications(results, report_type, skip_push=True)
+                elif merge_notification:
+                    # 合并模式（Issue #190）：仅保存，不推送，由 main 层合并个股+大盘后统一发送
+                    logger.info(
+                        "Combined-delivery mode: deferring delivery until stock and market reports are merged"
+                    )
+                    self._send_notifications(results, report_type, skip_push=True)
+                else:
+                    self._send_notifications(results, report_type)
+        finally:
+            reset_run_diagnostic_context(delivery_diag_token)
         
         return results
 
@@ -4132,6 +4339,7 @@ class StockAnalysisPipeline:
         )
         try:
             report = self._generate_aggregate_report(results, report_type)
+            filepath = self.notifier.save_report_to_file(report)
             render_stage.finish(
                 status="success",
                 output_summary={
@@ -4139,10 +4347,10 @@ class StockAnalysisPipeline:
                         len(report) if isinstance(report, (str, bytes)) else None
                     ),
                     "route": "local_report",
+                    "report_saved": True,
                 },
                 retryable=False,
             )
-            filepath = self.notifier.save_report_to_file(report)
             logger.info("Decision dashboard saved: %s", filepath)
         except Exception as e:  # broad-exception: fallback_recorded - Local report failures are safely logged and do not change analysis results.
             if not render_stage.finished:
@@ -4171,6 +4379,8 @@ class StockAnalysisPipeline:
         """
         noise_decision = None
         noise_finalized = False
+        delivery_attempt_count = 0
+        delivery_failure_count = 0
         render_stage = observe_pipeline_stage(
             "render",
             input_summary={
@@ -4233,8 +4443,6 @@ class StockAnalysisPipeline:
             if self.notifier.is_available():
                 channels = self.notifier.get_available_channels()
                 channels = self.notifier.get_channels_for_route("report", channels=channels)
-                delivery_attempt_count = 0
-                delivery_failure_count = 0
 
                 def _send_channel_safely(
                     channel_label: str,
@@ -4279,9 +4487,29 @@ class StockAnalysisPipeline:
                         notification_run=notification_run,
                     )
 
+                context_route_available = False
+                has_context_channel = getattr(
+                    self.notifier,
+                    "_has_context_channel",
+                    None,
+                )
+                if callable(has_context_channel):
+                    try:
+                        context_route_available = bool(has_context_channel())
+                    except Exception as e:  # broad-exception: optional_metadata - Context-route availability only refines diagnostics and cannot block delivery.
+                        log_safe_exception(
+                            logger,
+                            "Context notification availability check failed",
+                            e,
+                            error_code="pipeline_context_notification_availability_failed",
+                            level=logging.WARNING,
+                        )
+
                 send_context = self.notifier.send_to_context(report)
                 if send_context:
                     _record_channel_result("__context__", True)
+                elif context_route_available:
+                    _record_channel_result("__context__", False)
 
                 should_broadcast_static = True
                 should_broadcast_static_func = getattr(
@@ -4292,7 +4520,7 @@ class StockAnalysisPipeline:
                 if callable(should_broadcast_static_func):
                     should_broadcast_static = bool(should_broadcast_static_func())
                 if not should_broadcast_static:
-                    if not send_context:
+                    if not send_context and not context_route_available:
                         _record_channel_result("__context__", False)
                     if send_context:
                         logger.info("Decision dashboard delivered")
@@ -4314,6 +4542,7 @@ class StockAnalysisPipeline:
                         ),
                         retryable=not send_context,
                     )
+                    self._refresh_saved_diagnostic_snapshot(results=results)
                     return
 
                 if channels and hasattr(self.notifier, "evaluate_noise_control"):
@@ -4743,8 +4972,9 @@ class StockAnalysisPipeline:
                             else None
                         )
                     ),
-                    retryable=dispatch_status in {"degraded", "failed"},
+                    retryable=dispatch_status == "failed",
                 )
+                self._refresh_saved_diagnostic_snapshot(results=results)
             else:
                 dispatch_stage.finish(
                     status="skipped",
@@ -4783,7 +5013,27 @@ class StockAnalysisPipeline:
                     retryable=False,
                 )
             elif dispatch_stage is not None and not dispatch_stage.finished:
-                dispatch_stage.finish(status="failed", error=e, retryable=True)
+                confirmed_delivery_count = max(
+                    0,
+                    delivery_attempt_count - delivery_failure_count,
+                )
+                dispatch_stage.finish(
+                    status=(
+                        "degraded" if confirmed_delivery_count else "failed"
+                    ),
+                    output_summary={
+                        "attempt_count": delivery_attempt_count,
+                        "failure_count": delivery_failure_count,
+                        "confirmed_delivery_count": confirmed_delivery_count,
+                    },
+                    degradation_reason=(
+                        "Dispatch failed after one or more deliveries succeeded."
+                        if confirmed_delivery_count
+                        else "Dispatch failed before any delivery was confirmed."
+                    ),
+                    error=e,
+                    retryable=not confirmed_delivery_count,
+                )
             notification_run = self._build_notification_run_snapshot(
                 channel="report",
                 status="failed",

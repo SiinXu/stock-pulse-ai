@@ -440,8 +440,6 @@
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_agent_analysis_context","caught":["Exception"],"digest":"c4686c4aec42c957014d0f838a178ed0af09ecb01a1bad8f260e7d082dd092e1"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_daily_market_context","caught":["Exception"],"digest":"d1647510b068fb4c8445096ac786b0caa5c0fdeea336ee4e2d06676aaaea661f"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_persisted_intelligence_context","caught":["Exception"],"digest":"414f5d80078642a37a110c69fafa6b3c2ec3cf982a28508caefe458fe835ec9f"},
-    {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._refresh_saved_diagnostic_snapshot","caught":["Exception"],"digest":"64ad6cc8339cf63e86d2c05dd06a6416e4bbcbfe93b97171364aadcca673d1e8"},
-    {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._refresh_saved_diagnostic_snapshot","caught":["Exception"],"digest":"d8eb2cc7aa77f2238af84145fb030987609ff1c53605d3df2d58447dcb5805da"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"0a2a40fbc07f69984ca63478d5b21f2a7342f9ed704199c1e24bebe0f2f7cfa9"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"559d4f722bf9127924c3ebf2d68f83c2f99bad60f636eff56f60b14a93384776"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._send_notifications._get_md2img_hint","caught":["Exception"],"digest":"d9384c973a83ea3825ebb876d9b612109f9a33667b8d310e1740a72e9ede9859"},
