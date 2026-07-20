@@ -28,7 +28,7 @@ describe('page skeleton Patterns', () => {
     const page = screen.getByLabelText('Workspace canvas');
     expect(page.tagName).toBe('DIV');
     expect(page).toHaveAttribute('data-pattern', 'app-page');
-    expect(page).not.toHaveClass('max-w-7xl');
+    expect(page).toHaveAttribute('data-page-width', 'full');
     expect(ref.current).toBe(page);
     expect(container.querySelectorAll('main')).toHaveLength(1);
   });

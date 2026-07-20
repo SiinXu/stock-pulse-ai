@@ -37,6 +37,13 @@ Shared patterns compose these primitives:
 | `AppliedFilterChips` | Presents applied filters as individually removable tokens with one clear-all command. |
 | `useFilterQueryState` | Keeps applied filters in Router search params, preserves unrelated params, keeps drafts local, and restores both after Back/Forward navigation. |
 | `DataTable` | Renders typed columns and native table semantics, controlled sorting, one task state, contained narrow-screen scrolling, and isolated row activation. |
+| `AppPage` / `WorkspacePage` | Provide the full-width page canvas and optional main/rail workspace grid beneath the Shell's single `main`. |
+| `PageHeader` / `Toolbar` | Provide one programmatically focusable H1 and one semantic command group without adding a decorative page surface. |
+| `ResponsiveRail` | Keeps contextual content visible at wide desktop and exposes one labelled disclosure at narrower breakpoints. |
+| `Tabs` / `TabPanel` | Implement same-page panel selection with associated tab/panel IDs and horizontal roving focus. |
+| `SummaryStrip` | Presents continuous summary metrics as one labelled definition list rather than a card grid. |
+| `WorkspaceNavigation` | Uses Router Links for sibling routes and a native compact select; route navigation never masquerades as Tabs. |
+| `RouteFocusCoordinator` / `useRouteFocusTarget` | Coordinate ready H1 focus after PUSH/REPLACE and stable trigger restoration after POP without exposing history metadata to pages. |
 
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
@@ -148,6 +155,53 @@ Existing raw tables remain exact, expiring page-track migrations:
 | `UI-P01` | `TRACK-UI2` | Portfolio positions |
 | `UI-SCR01` | `TRACK-UI2` | Screening results and stock history data |
 | `UI-S02` | `TRACK-UI3` | Settings AI overview matrix |
+
+## Page And Router Semantics
+
+The Shell already renders the application's sole `main` landmark, so
+`AppPage` remains a full-width `div` and exposes its semantic Pattern and width
+state through data attributes. It forwards native attributes and its ref.
+`WorkspacePage` composes this canvas with one primary content region and an
+optional contextual rail; neither component adds a Card or Surface boundary.
+
+`PageHeader` renders the page's one H1, forwards the H1 ref, and owns
+`tabIndex={-1}`. This lets the Router focus authority move focus after a
+same-window transition without adding the heading to normal Tab order.
+`Toolbar` owns `role="toolbar"` and command grouping but no glass/card visual.
+Callers provide localized titles, descriptions, action labels, and toolbar
+names.
+
+`ResponsiveRail` is an `aside` named by its visible H2. At `xl` it is visible
+and sticky within the workspace; below `xl` it becomes one native button
+disclosure with caller-provided expand/collapse names. Its compact open state
+is controlled or uncontrolled and never enters business URL state.
+`SummaryStrip` is one labelled definition list with stable metric IDs and
+semantic state tones; it does not create a row of nested cards.
+
+`Tabs` and `TabPanel` are reserved for mutually exclusive content under one
+page H1. They own tablist/tab/tabpanel association, disabled-item skipping,
+Left/Right/Home/End movement, and native Enter/Space activation. Sibling page
+routes use `WorkspaceNavigation` instead: desktop renders real Router Links
+with one `aria-current="page"`, while compact layouts render a labelled native
+select that hands the selected item back to the caller. Route item IDs, not
+translated labels or array indexes, provide stable focus markers.
+
+`RouteFocusCoordinator` is mounted once inside the data Router. A page may
+only call `useRouteFocusTarget({ routeId, headingRef, ready })`; it cannot pass
+a navigation type, location key, history entry, or trigger key. Direct load,
+refresh, and new-tab entry leave focus untouched. PUSH and REPLACE wait for a
+connected ready H1 before focusing it. POP restores one unique, rendered,
+focusable trigger for that history entry; duplicate, missing, disabled,
+hidden, stale, or unsuccessfully focused triggers fail closed to the ready
+H1. Entries are bounded in memory and contain strings only, never DOM refs,
+URL state, browser history state, `localStorage`, or `sessionStorage`.
+
+Business code must use React Router navigation APIs rather than direct
+`pushState` or `replaceState`. The production guard discovers calls through
+direct, aliased, computed, or destructured method access. Three legacy
+TRACK-UI2 calls remain expiring migrations located by file, method, and count,
+so unrelated line insertions cannot break the allowlist. Their owning page
+work items must remove the matching entry when they adopt Router query state.
 
 ## Surface Hierarchy
 
@@ -297,8 +351,9 @@ The AST-backed production design guard checks:
   exact call-site exceptions with a deletion work item.
 - Shared Filter/Query implementation names outside their declared
   `components/common` owners.
-- New direct `pushState` or `replaceState` calls. Three existing filter-page
-  calls remain exact line-level migration entries assigned to `TRACK-UI2`.
+- New direct `pushState` or `replaceState` calls, including aliased, computed,
+  and destructured access. Three existing filter-page calls remain exact
+  file/method/count migration entries assigned to `TRACK-UI2`.
 - Shared `DataTable` implementations outside its declared common owner, plus
   any new JSX / `createElement` raw table or page-local `role="table|grid"`
   substitute. Twelve existing raw tables remain exact line-level entries
@@ -353,6 +408,10 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   tokens as the complete replacement for the deferred glass/raw-white debt,
   deletes the unreferenced `dashboard-card` duplicate, and adds an expiring
   file/count migration guard. It does not migrate any business page.
+- `UI-F05` establishes the page skeleton, same-page Tabs, sibling-route
+  navigation, summary, responsive rail, and route-focus authority. It does not
+  migrate business pages or the Shell. Page tracks adopt the public Patterns
+  and `RouteFocusTarget` independently; `UI-N01` owns Shell/navigation layout.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
   raw controls are deleted.

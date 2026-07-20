@@ -17,6 +17,7 @@ export const AppPage = forwardRef<HTMLDivElement, AppPageProps>(({
       {...props}
       ref={ref}
       data-pattern="app-page"
+      data-page-width="full"
       className={cn('mx-auto min-h-full w-full max-w-none px-4 pb-8 pt-4 md:px-6 lg:px-8', className)}
     >
       {children}
