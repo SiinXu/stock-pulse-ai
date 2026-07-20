@@ -104,13 +104,7 @@ const STATE_SURFACE_COMPONENT_NAMES = [
 ] as const;
 const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*|\[(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|border-radius|box-shadow):)/;
 const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
-const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
-  ['../../pages/DecisionSignalsPage.tsx', [{
-    line: 1510,
-    removeBy: 'UI-D01',
-    tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
-  }]],
-]);
+const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([]);
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
     line,
@@ -3206,11 +3200,14 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
+    // The BUTTON_VISUAL_OVERRIDE_ALLOWLIST is now empty, so DecisionSignalsPage
+    // min-h-11 overrides are no longer exempt: both callers are flagged.
     const duplicateExactCaller = `${'\n'.repeat(1509)}<Button variant="secondary" className="min-h-11">First</Button><Button variant="secondary" className="min-h-11">Second</Button>`;
     expect(findProductionDesignViolations(
       '../../pages/DecisionSignalsPage.tsx',
       duplicateExactCaller,
     ).filter(({ rule }) => rule === 'button-visual-override')).toEqual([
+      expect.objectContaining({ rule: 'button-visual-override', token: 'min-h-11' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'min-h-11' }),
     ]);
     for (const allowances of [
