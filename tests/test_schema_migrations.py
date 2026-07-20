@@ -21,7 +21,7 @@ from unittest.mock import patch
 import warnings
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.pool import NullPool
 
@@ -3709,92 +3709,131 @@ def test_intelligence_unique_index_migration_is_noop_when_scoped_index_present(
 
 
 _STARTUP_DDL_KEYWORDS = frozenset({"CREATE", "ALTER", "DROP"})
+_HISTORICAL_STARTUP_FIXTURES = (
+    "v3_0_0.sql",
+    "v3_4_0.sql",
+    "v3_20_0.sql",
+    "v3_21_0.sql",
+    "v3_26_3.sql",
+)
 
 
 def _leading_sql_word(statement: str) -> str:
-    stripped = statement.lstrip()
-    if not stripped:
-        return ""
-    return stripped.split(None, 1)[0].upper()
+    index = 0
+    while index < len(statement):
+        while index < len(statement) and statement[index].isspace():
+            index += 1
+        if statement.startswith("--", index):
+            newline = statement.find("\n", index + 2)
+            index = len(statement) if newline < 0 else newline + 1
+            continue
+        if statement.startswith("/*", index):
+            closing = statement.find("*/", index + 2)
+            index = len(statement) if closing < 0 else closing + 2
+            continue
+        break
+
+    end = index
+    while end < len(statement) and (
+        statement[end].isalnum() or statement[end] == "_"
+    ):
+        end += 1
+    return statement[index:end].upper()
 
 
 @contextmanager
 def _capture_startup_ddl_outside_migration_phases():
     """Capture CREATE/ALTER/DROP statements executed during DatabaseManager
-    initialization, tracking whether each runs inside metadata create_all or the
-    ordered migration runner.
+    initialization, tracking whether each runs inside metadata create_all or an
+    individual registered migration upgrade.
 
     Startup may run DDL only inside `Base.metadata.create_all` (the fresh
-    baseline) and inside `apply_pending_within_transaction` (registered
-    migrations). Any DDL outside both phases means a runtime compatibility step
-    was re-introduced outside the registry. The yielded object also records every
-    DDL statement so a restart can be asserted to run none at all.
+    baseline) and a migration listed in the production registry. Any DDL outside
+    those phases means a runtime compatibility step was re-introduced outside the
+    registry. The yielded object also records every DDL statement so a restart
+    can be asserted to run none at all.
     """
     import src.storage as storage_module
 
     phase = {"name": "startup"}
     captured = {"stray": [], "all_ddl": []}
-    original_exec_driver = Connection.exec_driver_sql
-    original_execute = Connection.execute
+    traced_connections = []
+    registered_migration_phases = {
+        f"migration:{migration.id}" for migration in get_migrations()
+    }
     original_create_all = storage_module.Base.metadata.create_all
-    original_apply = storage_module.apply_pending_within_transaction
+    original_run_guarded_upgrade = MigrationRunner._run_guarded_upgrade
 
     def _record(statement) -> None:
         keyword = _leading_sql_word(str(statement))
         if keyword not in _STARTUP_DDL_KEYWORDS:
             return
         captured["all_ddl"].append((phase["name"], keyword))
-        if phase["name"] not in ("create_all", "migration_runner"):
+        if (
+            phase["name"] != "create_all"
+            and phase["name"] not in registered_migration_phases
+        ):
             captured["stray"].append(
                 (phase["name"], keyword, str(statement).strip()[:120])
             )
 
-    def wrapped_exec_driver(self, statement, *args, **kwargs):
-        _record(statement)
-        return original_exec_driver(self, statement, *args, **kwargs)
-
-    def wrapped_execute(self, statement, *args, **kwargs):
-        _record(statement)
-        return original_execute(self, statement, *args, **kwargs)
+    def install_sqlite_trace(dbapi_connection, _connection_record):
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            dbapi_connection.set_trace_callback(_record)
+            traced_connections.append(dbapi_connection)
 
     def wrapped_create_all(*args, **kwargs):
+        previous_phase = phase["name"]
         phase["name"] = "create_all"
         try:
             return original_create_all(*args, **kwargs)
         finally:
-            phase["name"] = "post_create_all"
+            phase["name"] = previous_phase
 
-    def wrapped_apply(connection):
-        phase["name"] = "migration_runner"
+    def wrapped_run_guarded_upgrade(self, connection, migration):
+        previous_phase = phase["name"]
+        phase["name"] = f"migration:{migration.id}"
         try:
-            return original_apply(connection)
+            return original_run_guarded_upgrade(self, connection, migration)
         finally:
-            phase["name"] = "post_migration_runner"
+            phase["name"] = previous_phase
 
-    with patch.object(
-        Connection, "exec_driver_sql", wrapped_exec_driver
-    ), patch.object(Connection, "execute", wrapped_execute), patch.object(
-        storage_module.Base.metadata, "create_all", wrapped_create_all
-    ), patch.object(
-        storage_module, "apply_pending_within_transaction", wrapped_apply
-    ):
-        yield captured
+    event.listen(Engine, "connect", install_sqlite_trace)
+    try:
+        with patch.object(
+            storage_module.Base.metadata, "create_all", wrapped_create_all
+        ), patch.object(
+            MigrationRunner, "_run_guarded_upgrade", wrapped_run_guarded_upgrade
+        ):
+            yield captured
+    finally:
+        event.remove(Engine, "connect", install_sqlite_trace)
+        for connection in traced_connections:
+            try:
+                connection.set_trace_callback(None)
+            except sqlite3.ProgrammingError:
+                pass
 
 
-def test_fresh_startup_runs_no_schema_ddl_outside_create_all_and_runner() -> None:
+def test_fresh_startup_runs_no_schema_ddl_outside_registered_phases() -> None:
     with _capture_startup_ddl_outside_migration_phases() as captured:
         DatabaseManager(db_url="sqlite:///:memory:")
     assert captured["stray"] == []
     # The capture is active and create_all runs real DDL, so an empty stray list
     # is a genuine result rather than a broken instrumentation.
     assert any(phase == "create_all" for phase, _ in captured["all_ddl"])
+    assert any(
+        phase.startswith("migration:") for phase, _ in captured["all_ddl"]
+    )
 
 
-def test_legacy_startup_runs_no_schema_ddl_outside_create_all_and_runner(
+@pytest.mark.parametrize("fixture_name", _HISTORICAL_STARTUP_FIXTURES)
+def test_legacy_startup_runs_no_schema_ddl_outside_registered_phases(
     tmp_path: Path,
+    fixture_name: str,
 ) -> None:
-    db_path = tmp_path / "legacy-startup-ddl.sqlite"
-    _load_sql_fixture(db_path, "v3_20_0.sql")
+    db_path = tmp_path / fixture_name.replace(".sql", "-startup-ddl.sqlite")
+    _load_sql_fixture(db_path, fixture_name)
     with _capture_startup_ddl_outside_migration_phases() as captured:
         DatabaseManager(db_url=_database_url(db_path))
     assert captured["stray"] == []
@@ -3813,7 +3852,29 @@ def test_restart_runs_no_schema_ddl_at_all(tmp_path: Path) -> None:
     assert captured["all_ddl"] == []
 
 
-def test_migration_verify_explains_fresh_and_legacy_databases(tmp_path: Path) -> None:
+def test_startup_ddl_guard_detects_unregistered_runner_ddl() -> None:
+    original_apply = MigrationRunner.apply_pending_within_transaction
+
+    def apply_with_unregistered_ddl(self, connection):
+        connection.connection.driver_connection.execute(
+            "/* unregistered startup compatibility step */\n"
+            "CREATE TABLE startup_ddl_guard_probe (id INTEGER PRIMARY KEY)"
+        )
+        return original_apply(self, connection)
+
+    with patch.object(
+        MigrationRunner,
+        "apply_pending_within_transaction",
+        apply_with_unregistered_ddl,
+    ), _capture_startup_ddl_outside_migration_phases() as captured:
+        DatabaseManager(db_url="sqlite:///:memory:")
+
+    assert len(captured["stray"]) == 1
+    assert captured["stray"][0][:2] == ("startup", "CREATE")
+    assert "startup_ddl_guard_probe" in captured["stray"][0][2]
+
+
+def test_migration_verify_explains_fresh_database() -> None:
     fresh = DatabaseManager(db_url="sqlite:///:memory:")
     fresh_verification = MigrationRunner().verify(fresh._engine)
     assert fresh_verification.success is True
@@ -3821,10 +3882,15 @@ def test_migration_verify_explains_fresh_and_legacy_databases(tmp_path: Path) ->
     assert fresh_verification.pending_ids == ()
     assert fresh_verification.unknown_ids == ()
     assert fresh_verification.checksum_mismatches == ()
-    DatabaseManager.reset_instance()
 
-    db_path = tmp_path / "legacy-verify.sqlite"
-    _load_sql_fixture(db_path, "v3_20_0.sql")
+
+@pytest.mark.parametrize("fixture_name", _HISTORICAL_STARTUP_FIXTURES)
+def test_migration_verify_explains_legacy_database(
+    tmp_path: Path,
+    fixture_name: str,
+) -> None:
+    db_path = tmp_path / fixture_name.replace(".sql", "-verify.sqlite")
+    _load_sql_fixture(db_path, fixture_name)
     legacy = DatabaseManager(db_url=_database_url(db_path))
     legacy_verification = MigrationRunner().verify(legacy._engine)
     assert legacy_verification.success is True
