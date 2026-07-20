@@ -110,11 +110,6 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
-  ['../../pages/StockScreeningPage.tsx', [{
-    line: 1375,
-    removeBy: 'UI-SCR01',
-    tokens: ['min-w-40'],
-  }]],
 ]);
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
