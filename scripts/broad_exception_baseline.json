@@ -2,7 +2,6 @@
   "version": 1,
   "deferred_files": {
     "main.py": "Open composition-root PR #83 owns this application entry point.",
-    "src/config.py": "Open ARCH-03B PR #72 owns this configuration module.",
     "src/storage.py": "Open composition-root PR #83 owns this storage integration module."
   },
   "legacy_handlers": [
@@ -404,6 +403,9 @@
     {"path":"src/analyzer.py","scope":"<module>.get_stock_name_multi_source","caught":["Exception"],"digest":"48cd13228e7eaccddd0dce1adf0fbd65353414c0a8aa2802802e9e062d260b21"},
     {"path":"src/analyzer.py","scope":"<module>.get_stock_name_multi_source","caught":["Exception"],"digest":"77fb842ca8d2dfa7a128ad092ab6667fff7a7bd7402a7093de7165e5f9342b23"},
     {"path":"src/analyzer.py","scope":"<module>.stabilize_decision_with_structure","caught":["Exception"],"digest":"e701960a65f374923583641994575be2e4f107e58d49d1c6d8a596313b39f2eb"},
+    {"path":"src/config.py","scope":"<module>.Config._get_env_file_value","caught":["Exception"],"digest":"a8f6dff4563eacb30360703526c134842e59b049bb799e95283ae784afa894e0"},
+    {"path":"src/config.py","scope":"<module>.Config._parse_litellm_yaml","caught":["Exception"],"digest":"7be9fecbd2ef953af12b19cd6d2e1fb8579f758d1daff5edb8ec708a61fc702b"},
+    {"path":"src/config.py","scope":"<module>.setup_env","caught":["Exception"],"digest":"b4134c270c5ee93a127d7d03edd1fbaf3a8cc7b86ecfe2d0456647dd429eecd4"},
     {"path":"src/core/market_review.py","scope":"<module>._persist_market_review_history","caught":["Exception"],"digest":"ecb466fac850f7ea2923c1960c9e2f5c2bfa398b3372c571b706c9283129eebf"},
     {"path":"src/core/market_review.py","scope":"<module>._refresh_market_review_history_diagnostics","caught":["Exception"],"digest":"b2e908cb68de31209f439062590443d440b80a5647b90b1e48bf590d3c75b724"},
     {"path":"src/core/market_review.py","scope":"<module>.run_market_review","caught":["Exception"],"digest":"d7d37cca9949b133cc5daad949dd9632e878e23f8ebb1b24625b394231cf1bb2"},
