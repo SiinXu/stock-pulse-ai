@@ -4075,7 +4075,7 @@ class StockAnalysisPipeline:
             else None
         )
         try:
-            # 保存报告到本地文件（无论是否推送通知都保存）
+            # Always save the report locally, independently of notification delivery.
             if results and not dry_run:
                 self._save_local_report(results, report_type)
                 self._refresh_saved_diagnostic_snapshot(results=results)
@@ -4119,16 +4119,16 @@ class StockAnalysisPipeline:
                 if results and not dry_run:
                     self._refresh_saved_diagnostic_snapshot(results=results)
 
-            # 发送通知（单股推送模式下跳过汇总推送，避免重复）
+            # Deliver notifications; single-stock mode skips duplicate aggregate delivery.
             if results and send_notification and not dry_run:
                 if single_stock_notify:
-                    # 单股推送模式：只保存汇总报告，不再重复推送
+                    # Save the aggregate report without delivering it again.
                     logger.info(
                         "Single-stock notification mode: skipping aggregate delivery and saving locally"
                     )
                     self._send_notifications(results, report_type, skip_push=True)
                 elif merge_notification:
-                    # 合并模式（Issue #190）：仅保存，不推送，由 main 层合并个股+大盘后统一发送
+                    # Issue #190: defer delivery until stock and market reports are combined.
                     logger.info(
                         "Combined-delivery mode: deferring delivery until stock and market reports are merged"
                     )
