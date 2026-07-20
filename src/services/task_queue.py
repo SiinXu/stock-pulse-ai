@@ -49,6 +49,7 @@ from src.services.run_diagnostics import (
     get_current_diagnostic_context,
     reset_run_diagnostic_context,
 )
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.analysis_metadata import SELECTION_SOURCES
 from src.utils.sanitize import (
     exception_chain_redaction_values,
@@ -1046,6 +1047,7 @@ class AnalysisTaskQueue:
         notify: bool,
         skills: Optional[List[str]],
         report_language: Optional[str],
+        request_context: Optional[AnalysisRequestContext] = None,
     ) -> TaskCommand:
         metadata = {
             "stock_code": stock_code,
@@ -1079,11 +1081,18 @@ class AnalysisTaskQueue:
                 notify=notify,
                 skills=copy.deepcopy(skills),
                 report_language=report_language,
+                request_context=request_context,
             )
+
+        # Carry the contextual reply targets through a closure instead of the
+        # frozen metadata: the DingTalk/Feishu/Telegram reply addresses must not
+        # enter task snapshots, SSE payloads, or the idempotency fingerprint.
+        def run(context: TaskRunContext) -> Optional[Dict[str, Any]]:
+            return self._run_analysis_command(context, request_context=request_context)
 
         return TaskCommand(
             kind="stock_analysis",
-            run=self._run_analysis_command,
+            run=run,
             metadata=metadata,
             dedupe_key=_dedupe_stock_code_key(stock_code),
             failure_error_code="analysis_failed",
@@ -1104,6 +1113,7 @@ class AnalysisTaskQueue:
         force_refresh: bool = False,
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
     ) -> TaskInfo:
         """
         Submit a single analysis task.
@@ -1116,6 +1126,8 @@ class AnalysisTaskQueue:
             report_type: Report type
             analysis_phase: Requested analysis phase override
             force_refresh: Whether to bypass cache
+            request_context: Optional requester provenance and contextual reply
+                targets used to push results back to the originating channel.
 
         Returns:
             TaskInfo: Accepted task information
@@ -1139,6 +1151,7 @@ class AnalysisTaskQueue:
             force_refresh=force_refresh,
             skills=skills,
             report_language=report_language,
+            request_context=request_context,
         )
         if duplicates:
             raise duplicates[0]
@@ -1158,12 +1171,15 @@ class AnalysisTaskQueue:
         notify: bool = True,
         skills: Optional[List[str]] = None,
         report_language: Optional[str] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
     ) -> Tuple[List[TaskInfo], List[DuplicateTaskError]]:
         """
         Submit analysis tasks in batch.
 
         - Duplicate stocks are skipped and recorded in duplicates.
         - If executor submission fails, the current batch is rolled back.
+        - ``request_context`` is shared by every command in the batch so Bot
+          submissions keep pushing results to the originating conversation.
         """
         self.validate_selection_source(selection_source)
 
@@ -1190,6 +1206,7 @@ class AnalysisTaskQueue:
                 notify=notify,
                 skills=copy.deepcopy(skills),
                 report_language=report_language,
+                request_context=request_context,
             )
             for stock_code in canonical_codes
         ]
@@ -1577,7 +1594,11 @@ class AnalysisTaskQueue:
         self._broadcast_event(event_type, task.to_dict())
         return True
 
-    def _run_analysis_command(self, context: TaskRunContext) -> Optional[Dict[str, Any]]:
+    def _run_analysis_command(
+        self,
+        context: TaskRunContext,
+        request_context: Optional[AnalysisRequestContext] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Adapt the existing stock analysis service to a neutral command runner."""
         from src.services.analysis_service import AnalysisService
 
@@ -1601,6 +1622,7 @@ class AnalysisTaskQueue:
             query_source=str(metadata.get("query_source") or "api"),
             portfolio_context=copy.deepcopy(metadata.get("portfolio_context")),
             report_language=metadata.get("report_language"),
+            request_context=request_context,
         )
         if result is None:
             raise RuntimeError(service.last_error or "分析返回空结果")

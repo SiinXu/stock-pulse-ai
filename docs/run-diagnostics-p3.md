@@ -17,6 +17,22 @@ GET /api/v1/history/{record_id}/diagnostics
 - 分析链路在保存历史后会补齐任务/Provider/LLM/通知诊断到 `context_snapshot.diagnostics`，历史诊断接口统一聚合为用户可读摘要。
 - 首页运行流面板复用同一 RunFlowSnapshot 契约展示 active task、completed report 与大盘复盘；active task 通过任务 SSE 的可选增量事件实时追加事件流，完成或断线后再 refetch 快照保证最终一致。
 
+## Pipeline 阶段观测
+
+运行诊断快照可选追加 `pipeline_stage_runs`，用于记录 Pipeline 的固定阶段边界：`resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch`。同一阶段可以有多条记录，例如日线准备与市场输入组装分别属于 `fetch`，本地报告与通知报告分别属于 `render`。
+
+每条阶段记录包含同一运行的 `trace_id`、脱敏后的 `input_summary` / `output_summary`、`started_at` / `ended_at`、`duration_ms`、`status`、`degraded`、`degradation_reason`、`retryable`，以及失败时可获得的 `error_type` / `error_message_sanitized`。状态固定为 `success`、`degraded`、`failed`、`skipped`；`degraded=true` 只对应 `status=degraded`。仅使用已落库情报等 fallback 会明确标为 degraded，不会伪装成新鲜证据成功。
+
+兼容与安全边界：
+
+- 阶段观测复用现有运行诊断上下文；无诊断上下文时为 no-op，记录或脱敏失败时 fail-open，不改变分析、持久化、渲染或通知控制流。
+- 摘要沿用诊断元数据的深度、数量与长度限制，并脱敏 credential、token、cookie、webhook、prompt、raw response、代理头和本地绝对路径；不保存原始行情、新闻、Prompt 或模型响应。
+- 批量入口为汇总报告建立独立 delivery trace，并把真实 `render` / `dispatch` 终态合并回每个结果的既有分析诊断；不会把批量延后执行误记为 skipped，也不会覆盖分析阶段记录。
+- 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。部分渠道已经送达时，在 PIPE-02 提供幂等 fence 前 `retryable=false`，避免重试复制已成功通知。
+- 本地报告的 `render` 终态包含文件输出结果；报告内容生成成功但文件写入失败时仍记录为 failed。
+- `pipeline_stage_runs` 是 `context_snapshot.diagnostics` 的可选追加字段，不修改数据库 schema、API 必填字段、配置项或既有 Run Flow 事件。
+- PIPE-01 只增加行为保持的观测。阶段 Result 拆分、persist/dispatch 幂等 fence 与可执行重试策略由 PIPE-02 负责；在此之前 `persist` 与已部分送达的 `dispatch` 保守标为不可重试。
+
 ## 运行流实时增量
 
 运行流增量不新增独立 SSE endpoint，继续复用：

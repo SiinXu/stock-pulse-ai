@@ -27,6 +27,7 @@ from bot.platforms.dingtalk_stream import (
 )
 from bot.platforms.discord import DiscordPlatform
 from bot.platforms.feishu_stream import FeishuReplyClient, FeishuStreamHandler
+from src.services.task_queue import DuplicateTaskError
 
 
 CANARY = "bot-canary-secret-c01"
@@ -158,20 +159,20 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
     caplog.set_level(logging.ERROR)
     message = _message("/fixture")
 
-    analysis_service = MagicMock()
-    analysis_service.submit_analysis.return_value = {
-        "success": False,
-        "error": SENSITIVE_DIAGNOSTIC,
-    }
+    task_queue = MagicMock()
+    task_queue.submit_task.side_effect = DuplicateTaskError(
+        "600519",
+        f"existing-{CANARY}",
+    )
     with patch(
-        "src.services.task_service.get_task_service",
-        return_value=analysis_service,
+        "src.services.task_queue.get_task_queue",
+        return_value=task_queue,
     ):
-        analysis_response = AnalyzeCommand().execute(message, ["600519"])
-    analysis_service.submit_analysis.side_effect = RuntimeError(SENSITIVE_DIAGNOSTIC)
+        analysis_duplicate_response = AnalyzeCommand().execute(message, ["600519"])
+    task_queue.submit_task.side_effect = RuntimeError(SENSITIVE_DIAGNOSTIC)
     with patch(
-        "src.services.task_service.get_task_service",
-        return_value=analysis_service,
+        "src.services.task_queue.get_task_queue",
+        return_value=task_queue,
     ):
         analysis_exception_response = AnalyzeCommand().execute(message, ["600519"])
 
@@ -215,7 +216,11 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
     ):
         strategies_response = StrategiesCommand().execute(message, [])
 
-    assert analysis_response.text == "❌ 错误：提交分析任务失败，请稍后重试"
+    assert analysis_duplicate_response.text == (
+        "⏳ **该股票正在分析中**\n\n"
+        "• 股票代码: `600519`\n\n"
+        "请等待当前分析完成后再试。"
+    )
     assert analysis_exception_response.text == "❌ 错误：分析失败，请稍后重试"
     assert history_response.text == "⚠️ 清除失败，请稍后重试。"
     assert history_detail_response.text == "⚠️ 获取会话详情失败，请稍后重试。"
@@ -223,7 +228,7 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
     assert research_response.text == "❌ Research failed. Please try again later."
     assert strategies_response.text == "⚠️ 获取策略列表失败，请稍后重试。"
     for response in (
-        analysis_response,
+        analysis_duplicate_response,
         analysis_exception_response,
         history_response,
         history_detail_response,
