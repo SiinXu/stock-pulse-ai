@@ -22,6 +22,12 @@ from src.migrations.versions.v202607190002_decision_signal_profile_schema import
 from src.migrations.versions.v202607190003_portfolio_idempotency_scope_schema import (
     MIGRATION as PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
 )
+from src.migrations.versions.v202607190004_intelligence_item_scope_values import (
+    MIGRATION as INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+)
+from src.migrations.versions.v202607190005_intelligence_item_unique_index import (
+    MIGRATION as INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -31,6 +37,8 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         LLM_USAGE_TELEMETRY_MIGRATION,
         DECISION_SIGNAL_PROFILE_MIGRATION,
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
     )
 )
 
