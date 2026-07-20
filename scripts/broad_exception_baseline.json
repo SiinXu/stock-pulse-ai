@@ -727,7 +727,6 @@
     {"path":"src/services/system_config_service.py","scope":"<module>.SystemConfigService.update","caught":["Exception"],"digest":"aa74578ba6119228f522a5aed1bcd1f1fa4c76e5b14bd2a819819a92727acfe4"},
     {"path":"src/services/task_queue.py","scope":"<module>.AnalysisTaskQueue.append_task_flow_event","caught":["Exception"],"digest":"cb41edee28b7283a2e9b938e4f89fcbba7429b6b563bd718470694b7eebb83bb"},
     {"path":"src/services/task_queue.py","scope":"<module>.get_task_queue","caught":["Exception"],"digest":"833604a7d81e7dae3703859a6b68701a9795a2699c40143cc8cb97b93d6faec8"},
-    {"path":"src/services/task_service.py","scope":"<module>.TaskService._run_analysis","caught":["Exception"],"digest":"a498a346799b2c5e0d71ccb247d25c755d8c9c07e4e40f681391bfa60e111b9c"},
     {"path":"src/storage.py","scope":"<module>.DatabaseManager.__init__","caught":["Exception"],"digest":"634c5dbee72e99d2e067d5ae9770309134f640928bf0ec60aac50ff7a0568148"},
     {"path":"src/storage.py","scope":"<module>.DatabaseManager._cleanup_engine","caught":["Exception"],"digest":"790a4ae9731942e0a2adcb5b4b516d7f9eebd7ac1eb3b4689b66806f82f6da1b"},
     {"path":"src/storage.py","scope":"<module>.DatabaseManager._enable_sqlite_wal_mode","caught":["Exception"],"digest":"e7dafc45e0e27556232d9be39a9f58c5c6d69293e26f215c0a39cbf5d4c6445f"},
