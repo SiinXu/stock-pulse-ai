@@ -3,13 +3,13 @@
   "auditBaseline": {
     "repository": "SiinXu/stock-pulse-ai",
     "ref": "origin/main",
-    "commit": "d760f9c4284e4b061a57d3d56984975d0dec7381",
+    "commit": "f080336626bf625759251350a2cfeb18af0e672e",
     "auditedAt": "2026-07-20",
     "scope": "Only user-facing copy merged into main at the recorded commit was audited. Open pull requests were excluded.",
     "openPullRequestsExcluded": [
-      94,
       98,
-      99
+      101,
+      102
     ]
   },
   "decisionEvidence": {
