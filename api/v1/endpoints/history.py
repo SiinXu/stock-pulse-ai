@@ -42,7 +42,11 @@ from src.report_language import (
     localize_trend_prediction,
     normalize_report_language,
 )
-from src.services.history_service import HistoryService, MarkdownReportGenerationError
+from src.services.history_service import (
+    HistoryService,
+    HistoryValidationError,
+    MarkdownReportGenerationError,
+)
 from src.schemas.decision_action import build_action_fields
 from src.utils.data_processing import (
     normalize_model_used,
@@ -61,7 +65,6 @@ from src.market_phase_summary import extract_market_phase_summary
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-_DELETE_BY_CODE_BATCH_SIZE = 10_000
 
 
 def _normalize_code_for_grouping(code: str) -> str:
@@ -253,34 +256,13 @@ def delete_history_by_code(
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> DeleteHistoryResponse:
     try:
-        candidates = HistoryService._history_code_filter_candidates(stock_code)
-        if not candidates:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "invalid_request", "message": "stock_code 不能为空"},
-            )
-
-        deleted = 0
-        while True:
-            records, _ = db_manager.get_analysis_history_paginated(
-                code=candidates,
-                limit=_DELETE_BY_CODE_BATCH_SIZE,
-            )
-            record_ids = [r.id for r in records if r.id is not None]
-            if not record_ids:
-                break
-
-            batch_deleted = db_manager.delete_analysis_history_records(record_ids)
-            if batch_deleted == 0:
-                raise RuntimeError("history deletion made no progress")
-            deleted += batch_deleted
-
-            if len(records) < _DELETE_BY_CODE_BATCH_SIZE:
-                break
-
+        deleted = HistoryService(db_manager).delete_history_by_code(stock_code)
         return DeleteHistoryResponse(deleted=deleted)
-    except HTTPException:
-        raise
+    except HistoryValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_request", "message": str(exc)},
+        )
     except Exception as e:
         log_safe_exception(
             logger,
