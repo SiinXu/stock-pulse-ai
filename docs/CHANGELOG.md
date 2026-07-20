@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
-- [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
 - [改进] Web 任务面板（`TaskPanel`）收敛守卫债：移除根 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），保留 `overflow-hidden` 与 `${className}` 透传，设计守卫对应 allowlist 条目 token 收窄为仅 `dynamic:className`。`components/run-flow` 已普遍使用语义 `Button`/`IconButton`，其 `home-subpanel`/`home-accent-chip`/`home-spinner` 为原生元素上的真实定制样式（守卫不 flag），事件行点击包裹与运行流图节点为定制交互，均按现状保留。
 - [改进] Web 告警中心页（`AlertsPage`）编辑规则弹窗的加载占位统一走语义 `Loading`：将唯一遗留的 ad-hoc 加载文本 `<p>` 改用页面已引入的共享 `Loading`（compact `StatePanel`），与页内其余的 `Loading`/`EmptyState`/`ApiErrorAlert` 状态一致；加载文案与编辑行为不变。
 - [改进] Web 报告展示组件收敛守卫债：跨 `ReportOverview`/`ReportNews`/`ReportStrategy`/`ReportDetails`/`ReportDiagnostics`/`AnalysisContextSummary`/`MarketReviewReportView` 移除 15 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），并同步删除设计守卫里对应的本轨 allowlist 例外（`ReportOverview` 仍保留真实的 `home-insight-card`/`home-rail-card` 类及其 allowlist token）；`text-left`/`min-w-0` 等既有类不变。报告的 `home-insight-card`/`home-rail-card`/`home-report-hero`/`home-subpanel`/`home-accent-chip` 为真实定制视觉，其到 `Surface` 的收敛待可视化 QA，记为本轨后续。
@@ -190,6 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
 - [改进] 历史记录按股票代码删除的代码变体解析、10,000 行分批与无进度保护收敛到 `HistoryService` / `AnalysisRepository`，API endpoint 只负责 HTTP 错误映射；每个级联删除批次保持原子、既有跨批 best-effort 语义不变，并新增 endpoint 事务边界静态守卫与失败回滚回归。
 - [改进] 下沉运行流程与通知上下文契约：API 保留兼容重导出，Bot 在异步边界前生成不可变请求快照，核心服务不再依赖 API Schema 或 Bot DTO；上下文回复目标按平台验证并隔离凭据，拒绝的目标继续抑制静态广播。
+- [chore] 解除 `config` / `provider_catalog` / `config_registry` 的 import 循环：将 provider 静态目录数据与无配置耦合的访问器（`_PROVIDERS`、`get_provider_ids`、新增 `get_static_provider`）下沉到新的叶子模块 `src/llm/provider_catalog_data.py`，`src.config` 改为模块级从叶子读取 provider 元数据、不再反向 import `provider_catalog`；`provider_catalog` 从叶子读取并 re-export `get_provider_ids`，凭据/base URL 富化仍留在 `provider_catalog`；纯结构调整、行为不变，另加 AST 回归守护。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
