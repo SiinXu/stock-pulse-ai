@@ -11,20 +11,10 @@
 """
 
 from typing import Optional, List, Any, Dict, Literal
-from enum import Enum
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from src.task_execution import TaskStatusEnum
 from src.utils.analysis_metadata import SELECTION_SOURCE_PATTERN
-
-
-class TaskStatusEnum(str, Enum):
-    """任务状态枚举"""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCEL_REQUESTED = "cancel_requested"
-    CANCELLED = "cancelled"
 
 
 AnalysisPhase = Literal["auto", "premarket", "intraday", "postmarket"]
