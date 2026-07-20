@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [新功能] Web Chat 新增显式“深度研究”模式：新增 typed `agentApi.research` 客户端与 Chat 内 Chat/深度研究模式开关，在同一页面就一个问题运行深度研究（问题 + 可选股票代码），同步执行、可取消（AbortController），错误/超时明确提示；结果含结论（Markdown 渲染）与子问题引用，并按会话持久化到 localStorage 实现刷新恢复（进行中的运行刷新后不可续跑，恢复为可重跑）；不新建 Research Hub。后端 research 为同步、无 task/SSE/会话落库，服务端持久化与乐观续跑记为 Non-goal。
 - [测试] 新增启动 DDL 守护回归测试：捕获 `DatabaseManager` 初始化期间的全部 `CREATE`/`ALTER`/`DROP`，断言它们只发生在 `metadata.create_all`（fresh baseline）或 `apply_pending_within_transaction`（已登记 migration）两个相位内，两相位之外的游离 schema DDL（重新引入的启动期 ensure）会被判失败；并断言已迁移库重启时不执行任何 DDL、`migration verify` 对 fresh 与 legacy 库均成功且解释到 target version。
 - [改进] Web 浮层基础统一使用语义层级：Navigation Drawer 固定为左侧 320px 导航面板，Detail Drawer 仅提供 480/576/640px 三档右侧宽度，调用方不能再覆写方向、宽度、遮罩或 z-index；Modal 与 Drawer 提供固定 header、可滚动 body 和可选 footer，Popover 在 Dialog 内就近 Portal，父 popup 不再把子 popup 的选项误判为外部点击，并保持 Escape、焦点循环、滚动锁和关闭后焦点恢复；AST 守卫阻止任意浮层几何、高位 z-index 与近全屏面板重新进入生产代码。
 - [新功能] Web 持仓中心支持编辑账户：选中具体账户后打开“编辑账户”，复用账户表单的编辑模式修改名称、券商、市场与基准币，经 `PUT /api/v1/portfolio/accounts/{id}` 做真更新——保持 account ID、账本/持仓与幂等关联不变，不删除重建；成功后刷新并选中该账户。后端为 last-write-wins，无单账户 GET 与乐观并发锁，记为 Non-goal。
