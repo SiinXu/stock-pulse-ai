@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [改进] Web 新增统一 Filter/Query 基础：`FilterBar`、响应式 `AdvancedFilterSheet`、可单项移除的 `AppliedFilterChips` 与 Router 驱动的 draft/applied 查询状态共同保证高级筛选渐进披露、无变化时禁用 Apply、保留无关 URL 参数，并支持刷新及前进/后退恢复；生产守卫阻止页面新增私有同名 Pattern 或直接调用 `pushState`/`replaceState`，现有三处旧筛选写法以精确迁移清单交由页面轨移除。
+- [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
 - [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
 - [改进] Web 新增统一的底部 Sheet 与 Toast 基础：筛选 Sheet 使用固定 header、单一滚动 body 和固定 footer，并复用 Dialog 的滚动锁、Escape、焦点循环与恢复；Toast 通过应用级 Provider、语义层级和保留 live region 在 Modal/Drawer/Sheet 打开时保持可见可读，设置与决策信号页不再维护私有高位 z-index。
 - [改进] Agent Runtime 按 ADR-002 恢复实验 PydanticAI Adapter、toolset、可选依赖清单与 `pydanticai-installed` 安装态 CI 门禁；cross-runtime conformance 改为显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；Native 保持永久默认、零 PydanticAI 依赖可运行、无 runtime fallback，且不新增用户设置或公开 API。
@@ -178,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [文档] 补充 macOS 未签名、未公证 DMG 被 Gatekeeper 拦截时的架构选择、安全排查与官方安装包临时放行步骤。
 - [新功能] Web AI 建议页支持确认保存基于历史报告快照重算的决策风格信号，以 created/existing/refreshed 区分新建、原样复用和既有记录续期或维度补齐，复用 profile-aware 去重与失效语义，将历史信号的创建时间、有效期和相反信号失效顺序锚定来源报告时间，并提供可审计 guardrail 提示与阻断。
 - [改进] Desktop 可见品牌、可执行文件、安装包与发布产物统一为 `StockPulse`，保留既有 `appId` / NSIS 安装身份；首次升级只迁移新目录中缺失的旧品牌用户数据与更新备份，打包版以单实例锁串行迁移，关键复制失败时清理本次部分结果并回退完整旧目录，旧数据继续保留用于回滚。
+- [改进] 历史记录按股票代码删除的代码变体解析、10,000 行分批与无进度保护收敛到 `HistoryService` / `AnalysisRepository`，API endpoint 只负责 HTTP 错误映射；每个级联删除批次保持原子、既有跨批 best-effort 语义不变，并新增 endpoint 事务边界静态守卫与失败回滚回归。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

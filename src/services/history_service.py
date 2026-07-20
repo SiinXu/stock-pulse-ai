@@ -17,6 +17,7 @@ from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 
 from src.config import get_config, resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
+from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
     get_bias_status_emoji,
     get_localized_stock_name,
@@ -66,6 +67,10 @@ class MarkdownReportGenerationError(Exception):
         super().__init__(self.message)
 
 
+class HistoryValidationError(ValueError):
+    """Raised when a history operation receives invalid user input."""
+
+
 class HistoryService:
     """
     History Query Service
@@ -81,6 +86,7 @@ class HistoryService:
             db_manager: Database manager (optional, defaults to singleton instance)
         """
         self.db = db_manager or DatabaseManager.get_instance()
+        self.repository = AnalysisRepository(self.db)
 
     @staticmethod
     def _serialize_created_at(value: Optional[datetime]) -> Optional[str]:
@@ -648,6 +654,13 @@ class HistoryService:
                        receives a proper 500 error instead of a silent success.
         """
         return self.db.delete_analysis_history_records(record_ids)
+
+    def delete_history_by_code(self, stock_code: str) -> int:
+        """Delete all history records for a stock code and its stored variants."""
+        candidates = self._history_code_filter_candidates(stock_code)
+        if not candidates:
+            raise HistoryValidationError("stock_code 不能为空")
+        return self.repository.delete_by_stock_codes(candidates)
 
     def get_news_intel(self, query_id: str, limit: int = 20) -> List[Dict[str, str]]:
         """
