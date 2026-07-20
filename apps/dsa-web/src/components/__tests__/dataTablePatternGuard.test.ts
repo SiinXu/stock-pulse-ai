@@ -39,7 +39,7 @@ const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
   { file: '../../pages/PortfolioPage.tsx', line: 1440, owner: 'TRACK-UI2', removeBy: 'UI-P01' },
   { file: '../../pages/StockDetailsPage.tsx', line: 397, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
   { file: '../../pages/StockScreeningPage.tsx', line: 1453, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
-  { file: '../../pages/TokenUsagePage.tsx', line: 284, owner: 'TRACK-UI1', removeBy: 'UI-U01' },
+  { file: '../../pages/TokenUsagePage.tsx', line: 281, owner: 'TRACK-UI1', removeBy: 'UI-U01' },
 ];
 
 type SourceFinding = {
