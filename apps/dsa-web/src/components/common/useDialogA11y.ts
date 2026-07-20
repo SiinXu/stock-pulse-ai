@@ -154,19 +154,23 @@ export function useDialogA11y({
         return;
       }
       if (event.key === 'Escape') {
-        // An open popup widget (Select / autocomplete) keeps focus on its
-        // trigger with aria-expanded="true"; let it consume Escape to close
-        // the popup instead of dismissing the whole dialog.
         const target = event.target instanceof HTMLElement ? event.target : null;
+        // Popup focus can remain on its trigger or elsewhere in the dialog
+        // (for example, a pointer-opened Tooltip). Let any popup owned by this
+        // dialog consume Escape before the dialog itself.
+        const ownedPopupOpen = container?.querySelector(
+          '[data-dialog-popup="true"], [aria-haspopup][aria-expanded="true"]',
+        );
         if (
-          target?.closest('[aria-haspopup][aria-expanded="true"]')
+          ownedPopupOpen
+          || target?.closest('[aria-haspopup][aria-expanded="true"]')
           || target?.closest('[data-dialog-popup="true"]')
         ) {
           return;
         }
+        event.preventDefault();
+        event.stopPropagation();
         if (closeOnEscapeRef.current && onEscapeRef.current) {
-          event.preventDefault();
-          event.stopPropagation();
           onEscapeRef.current();
         }
         return;

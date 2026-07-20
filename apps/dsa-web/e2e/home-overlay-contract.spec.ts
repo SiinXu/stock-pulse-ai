@@ -455,6 +455,28 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expectBodyOverflow(page, '');
   });
 
+  test('hovered Help consumes Escape while another Modal control owns focus', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    const opener = page.getByTestId('open-modal');
+    await opener.click();
+    const outerDialog = page.getByRole('dialog', { name: 'Outer modal' });
+    const focusedControl = outerDialog.getByTestId('open-confirm');
+    const helpTrigger = outerDialog.getByRole('button', { name: 'View Modal help configuration help' });
+    await focusedControl.focus();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(outerDialog).toBeVisible();
+    await expect(focusedControl).toBeFocused();
+    await expectBodyOverflow(page, 'hidden');
+    await page.keyboard.press('Escape');
+    await expect(outerDialog).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
   test('Help over Drawer closes without closing or isolating the drawer', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-drawer');
@@ -483,6 +505,7 @@ test.describe('Settings Help shared tooltip contract', () => {
 
   test('Detail Drawer exposes semantic slots and stays within its desktop width tier', async ({ page }) => {
     await openOverlayFixture(page, 1280);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     const opener = page.getByTestId('open-drawer');
     await opener.click();
     const drawer = page.getByRole('dialog', { name: 'Outer drawer' });
@@ -492,6 +515,14 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expect(drawer).toHaveAttribute('data-drawer-size', 'default');
     await expect(drawer.locator('[data-overlay-slot="header"]')).toContainText('Outer drawer');
     await expect(drawer.locator('[data-overlay-slot="body"]')).toContainText('Open confirmation');
+    const maxAnimationDuration = await drawer.evaluate((element) => Math.max(
+      0,
+      ...element.getAnimations().map((animation) => {
+        const duration = animation.effect?.getComputedTiming().duration;
+        return typeof duration === 'number' ? duration : Number.POSITIVE_INFINITY;
+      }),
+    ));
+    expect(maxAnimationDuration).toBeLessThanOrEqual(1);
     await drawer.evaluate(async (element) => {
       await Promise.all(element.getAnimations().map((animation) => animation.finished));
     });

@@ -7,6 +7,7 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { Modal } from '../Modal';
 import { Select } from '../Select';
+import { Tooltip } from '../Tooltip';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -56,6 +57,7 @@ describe('Modal escape behavior', () => {
 
   it('blocks backdrop, Escape, and close-button dismissal while closing is disabled', () => {
     const onClose = vi.fn();
+    const onPageEscape = vi.fn();
     render(
       <UiLanguageProvider>
         <Modal
@@ -73,12 +75,15 @@ describe('Modal escape behavior', () => {
     const dialog = screen.getByRole('dialog', { name: '保存中' });
     expect(dialog).toHaveAccessibleDescription('保存完成前不能关闭');
     const root = dialog.closest<HTMLElement>('[data-overlay-root]');
+    document.addEventListener('keydown', onPageEscape);
     fireEvent.click(root as HTMLElement);
     fireEvent.keyDown(dialog, { key: 'Escape' });
     fireEvent.click(within(dialog).getByRole('button'));
+    document.removeEventListener('keydown', onPageEscape);
 
     expect(within(dialog).getByRole('button')).toBeDisabled();
     expect(onClose).not.toHaveBeenCalled();
+    expect(onPageEscape).not.toHaveBeenCalled();
   });
 
   it('isolates the application while open and restores focus after closing', () => {
@@ -134,6 +139,59 @@ describe('Modal escape behavior', () => {
     fireEvent.keyDown(trigger, { key: 'Escape' });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a hovered Tooltip consume Escape when focus remains elsewhere in the modal', () => {
+    const onClose = vi.fn();
+    render(
+      <UiLanguageProvider>
+        <Modal isOpen onClose={onClose} title="Edit filters">
+          <button type="button">Keep focus</button>
+          <Tooltip content="Filter guidance">
+            <button type="button">Help</button>
+          </Tooltip>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const focusedControl = screen.getByRole('button', { name: 'Keep focus' });
+    const helpTrigger = screen.getByRole('button', { name: 'Help' });
+    focusedControl.focus();
+    fireEvent.mouseEnter(helpTrigger.parentElement as HTMLElement);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.keyDown(focusedControl, { key: 'Escape' });
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('closes only the topmost Tooltip when Escape starts from a lower trigger', () => {
+    const onClose = vi.fn();
+    render(
+      <UiLanguageProvider>
+        <Modal isOpen onClose={onClose} title="Edit filters">
+          <Tooltip content="First guidance">
+            <button type="button">First help</button>
+          </Tooltip>
+          <Tooltip content="Second guidance">
+            <button type="button">Second help</button>
+          </Tooltip>
+        </Modal>
+      </UiLanguageProvider>,
+    );
+
+    const firstTrigger = screen.getByRole('button', { name: 'First help' });
+    const secondTrigger = screen.getByRole('button', { name: 'Second help' });
+    fireEvent.focus(firstTrigger);
+    fireEvent.mouseEnter(secondTrigger.parentElement as HTMLElement);
+    expect(screen.getAllByRole('tooltip')).toHaveLength(2);
+
+    fireEvent.keyDown(firstTrigger, { key: 'Escape' });
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('First guidance');
+    expect(screen.queryByText('Second guidance')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('closes only the topmost surface when dialogs are stacked', () => {

@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
 import { useFixedPopup } from './useFixedPopup';
 
+const popoverStack: Array<React.RefObject<HTMLDivElement | null>> = [];
+
 interface PopoverRenderProps {
   open: boolean;
   close: () => void;
@@ -133,6 +135,15 @@ export const Popover = ({
   }, [contentRole, open, portalHost]);
 
   useEffect(() => {
+    if (!open || !portalHost) return undefined;
+    popoverStack.push(contentRef);
+    return () => {
+      const index = popoverStack.lastIndexOf(contentRef);
+      if (index >= 0) popoverStack.splice(index, 1);
+    };
+  }, [open, portalHost]);
+
+  useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target;
@@ -150,7 +161,15 @@ export const Popover = ({
       dismiss();
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (closeOnEscape && event.key === 'Escape') {
+      const nestedPopupOpen = contentRef.current?.querySelector(
+        '[data-dialog-popup="true"], [aria-haspopup][aria-expanded="true"]',
+      );
+      if (
+        closeOnEscape
+        && event.key === 'Escape'
+        && !nestedPopupOpen
+        && popoverStack[popoverStack.length - 1] === contentRef
+      ) {
         event.preventDefault();
         event.stopPropagation();
         close();

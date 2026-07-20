@@ -18,6 +18,8 @@ type TooltipStyle = {
   left: number;
 };
 
+const tooltipStack: Array<React.RefObject<HTMLSpanElement | null>> = [];
+
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
@@ -29,6 +31,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
   const tooltipId = useId();
+  const hasContent = Boolean(content);
   const [open, setOpen] = useState(false);
   const [resolvedSide, setResolvedSide] = useState<'top' | 'bottom'>(side);
   const [style, setStyle] = useState<TooltipStyle>({ top: 0, left: 0 });
@@ -98,6 +101,28 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [open, updatePosition]);
 
+  useEffect(() => {
+    if (!open || !hasContent) return undefined;
+    tooltipStack.push(tooltipRef);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape'
+        || tooltipStack[tooltipStack.length - 1] !== tooltipRef
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      const index = tooltipStack.lastIndexOf(tooltipRef);
+      if (index >= 0) tooltipStack.splice(index, 1);
+    };
+  }, [hasContent, open]);
+
   if (!content) {
     return <>{children}</>;
   }
@@ -120,7 +145,12 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => {
-          if (open && event.key === 'Escape') {
+          const topmostTooltip = tooltipStack[tooltipStack.length - 1];
+          if (
+            open
+            && event.key === 'Escape'
+            && (!topmostTooltip || topmostTooltip === tooltipRef)
+          ) {
             event.preventDefault();
             event.stopPropagation();
             setOpen(false);

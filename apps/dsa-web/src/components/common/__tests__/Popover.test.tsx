@@ -4,6 +4,7 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { Modal } from '../Modal';
 import { OVERLAY_Z } from '../overlayZ';
 import { Popover } from '../Popover';
+import { Select } from '../Select';
 
 describe('Popover', () => {
   it('opens from its trigger and closes on outside press', () => {
@@ -111,6 +112,67 @@ describe('Popover', () => {
     fireEvent.click(option);
 
     expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(outerMenu).toBeInTheDocument();
+  });
+
+  it('closes only the topmost popup on Escape', async () => {
+    render(
+      <Popover
+        defaultOpen
+        contentRole="menu"
+        ariaLabel="Profile settings"
+        trigger={() => <button type="button">Profile</button>}
+      >
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Language options"
+          trigger={() => <button type="button">Language</button>}
+        >
+          <button type="button" role="menuitem">English</button>
+        </Popover>
+      </Popover>,
+    );
+
+    const outerMenu = await screen.findByRole('menu', { name: 'Profile settings' });
+    const innerMenu = await screen.findByRole('menu', { name: 'Language options' });
+
+    fireEvent.keyDown(innerMenu, { key: 'Escape' });
+
+    expect(screen.queryByRole('menu', { name: 'Language options' })).not.toBeInTheDocument();
+    expect(outerMenu).toBeInTheDocument();
+  });
+
+  it('keeps the parent menu open when a nested Select consumes Escape', async () => {
+    render(
+      <UiLanguageProvider>
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Profile settings"
+          trigger={() => <button type="button">Profile</button>}
+        >
+          <Select
+            value="en"
+            onChange={() => undefined}
+            options={[
+              { value: 'en', label: 'English' },
+              { value: 'zh', label: 'Chinese' },
+            ]}
+            ariaLabel="Language"
+          />
+        </Popover>
+      </UiLanguageProvider>,
+    );
+
+    const outerMenu = await screen.findByRole('menu', { name: 'Profile settings' });
+    const selectTrigger = screen.getByRole('combobox', { name: 'Language' });
+    fireEvent.click(selectTrigger);
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+    fireEvent.keyDown(selectTrigger, { key: 'Escape' });
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(outerMenu).toBeInTheDocument();
   });
 });
