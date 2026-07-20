@@ -224,10 +224,63 @@ function findHistoryMutations(
 ): SourceFinding[] {
   const { sourceFile, checker } = boundSource;
   const findings: SourceFinding[] = [];
+  const reportedMethods = new Map<ts.CallExpression, Set<HistoryMethod>>();
+  const functionsBySymbol = new Map<ts.Symbol, ts.SignatureDeclaration>();
 
   const symbolFor = (identifier: ts.Identifier): ts.Symbol | undefined => (
     checker.getSymbolAtLocation(identifier)
   );
+  const unwrapExpression = (expression: ts.Expression): ts.Expression => {
+    let current = expression;
+    while (
+      ts.isParenthesizedExpression(current)
+      || ts.isAsExpression(current)
+      || ts.isTypeAssertionExpression(current)
+      || ts.isNonNullExpression(current)
+    ) {
+      current = current.expression;
+    }
+    return current;
+  };
+  const functionExpression = (expression: ts.Expression): ts.SignatureDeclaration | undefined => {
+    const current = unwrapExpression(expression);
+    return ts.isFunctionLike(current) ? current : undefined;
+  };
+  const registerFunction = (identifier: ts.Identifier, node: ts.SignatureDeclaration): void => {
+    const symbol = symbolFor(identifier);
+    if (symbol) functionsBySymbol.set(symbol, node);
+  };
+  const collectFunctions = (node: ts.Node): void => {
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
+      && node.name
+    ) {
+      registerFunction(node.name, node);
+    }
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const initializer = functionExpression(node.initializer);
+      if (initializer) registerFunction(node.name, initializer);
+    }
+    if (
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && ts.isIdentifier(node.left)
+    ) {
+      const assignedFunction = functionExpression(node.right);
+      if (assignedFunction) registerFunction(node.left, assignedFunction);
+    }
+    ts.forEachChild(node, collectFunctions);
+  };
+  collectFunctions(sourceFile);
+
+  const calledFunction = (expression: ts.Expression): ts.SignatureDeclaration | undefined => {
+    const current = unwrapExpression(expression);
+    if (ts.isIdentifier(current)) {
+      const symbol = symbolFor(current);
+      return symbol ? functionsBySymbol.get(symbol) : undefined;
+    }
+    return ts.isFunctionLike(current) ? current : undefined;
+  };
   const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
     if (!name) return undefined;
     const text = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
@@ -236,7 +289,11 @@ function findHistoryMutations(
     return text === 'pushState' || text === 'replaceState' ? text : undefined;
   };
 
-  const scanScope = (scope: ts.Node, inheritedAliases: ReadonlyMap<ts.Symbol, AliasValue>): void => {
+  const scanScope = (
+    scope: ts.Node,
+    inheritedAliases: ReadonlyMap<ts.Symbol, AliasValue>,
+    activeFunctions: ReadonlySet<ts.SignatureDeclaration>,
+  ): void => {
     const aliases = new Map(inheritedAliases);
     const deferredFunctions: ts.SignatureDeclaration[] = [];
     const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
@@ -286,13 +343,24 @@ function findHistoryMutations(
         }
       }
       if (ts.isCallExpression(node)) {
+        const invokedFunction = calledFunction(node.expression);
+        if (invokedFunction && !activeFunctions.has(invokedFunction)) {
+          const nextActiveFunctions = new Set(activeFunctions);
+          nextActiveFunctions.add(invokedFunction);
+          scanScope(invokedFunction, aliases, nextActiveFunctions);
+        }
         const method = historyMethodReference(node.expression, aliasFor);
         if (method) {
-          findings.push({
-            file: filename,
-            line: lineOf(sourceFile, node.expression),
-            token: method,
-          });
+          const methods = reportedMethods.get(node) ?? new Set<HistoryMethod>();
+          if (!methods.has(method)) {
+            methods.add(method);
+            reportedMethods.set(node, methods);
+            findings.push({
+              file: filename,
+              line: lineOf(sourceFile, node.expression),
+              token: method,
+            });
+          }
         }
       }
       ts.forEachChild(node, visit);
@@ -300,12 +368,15 @@ function findHistoryMutations(
 
     visit(scope);
     for (const deferredFunction of deferredFunctions) {
-      scanScope(deferredFunction, aliases);
+      if (activeFunctions.has(deferredFunction)) continue;
+      const nextActiveFunctions = new Set(activeFunctions);
+      nextActiveFunctions.add(deferredFunction);
+      scanScope(deferredFunction, aliases, nextActiveFunctions);
     }
   };
 
-  scanScope(sourceFile, new Map());
-  return findings.sort((left, right) => left.line - right.line);
+  scanScope(sourceFile, new Map(), new Set());
+  return findings.sort((left, right) => left.line - right.line || left.token.localeCompare(right.token));
 }
 
 function historyCountKey(file: string, method: string): string {
@@ -375,7 +446,7 @@ describe('page and Router pattern production guard', () => {
     ]);
   });
 
-  it('resolves deferred assignment aliases after their enclosing scope settles', () => {
+  it('resolves deferred aliases at their invocation points', () => {
     const fixture = [
       'let assignedReplace;',
       'function assignedMutation() { assignedReplace({}, "", "?market=us"); }',
@@ -385,10 +456,15 @@ describe('page and Router pattern production guard', () => {
       'function staleMutation() { staleReplace({}, "", "?market=fr"); }',
       'staleReplace = () => undefined;',
       'staleMutation();',
+      'let liveReplace = window.history.replaceState;',
+      'function liveMutation() { liveReplace({}, "", "?market=au"); }',
+      'liveMutation();',
+      'liveReplace = () => undefined;',
     ].join('\n');
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 2, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 10, token: 'replaceState' },
     ]);
   });
 
