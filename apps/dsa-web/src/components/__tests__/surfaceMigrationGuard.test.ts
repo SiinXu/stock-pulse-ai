@@ -6,7 +6,18 @@ import fs from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-const PRODUCTION_SOURCE_EXTENSIONS = new Set(['.css', '.html', '.js', '.jsx', '.ts', '.tsx']);
+const PRODUCTION_SOURCE_EXTENSIONS = new Set([
+  '.cjs',
+  '.css',
+  '.cts',
+  '.html',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.mts',
+  '.ts',
+  '.tsx',
+]);
 
 type DirectoryEntry = {
   name: string;
@@ -46,13 +57,13 @@ function isProductionSource(filename: string): boolean {
     && !/\.(?:test|spec)\.(?:[jt]sx?|css|html)$/.test(filename);
 }
 
-const rootStyleAndMarkup = (fs.readdirSync('.', { withFileTypes: true }) as DirectoryEntry[])
-  .filter((entry) => entry.isFile() && ['.css', '.html'].includes(sourceExtension(entry.name)))
+const rootSources = (fs.readdirSync('.', { withFileTypes: true }) as DirectoryEntry[])
+  .filter((entry) => entry.isFile() && PRODUCTION_SOURCE_EXTENSIONS.has(sourceExtension(entry.name)))
   .map((entry) => entry.name);
 const productionSourceFiles = [
   ...collectSourceFiles('src'),
   ...collectSourceFiles('public'),
-  ...rootStyleAndMarkup,
+  ...rootSources,
 ].filter(isProductionSource);
 const productionSources = Object.fromEntries(productionSourceFiles.map((filename) => (
   [guardFilename(filename), fs.readFileSync(filename, 'utf8')]
@@ -292,7 +303,7 @@ function parseSource(filename: string, source: string): ts.SourceFile {
     ? ts.ScriptKind.TSX
     : filename.endsWith('.jsx')
       ? ts.ScriptKind.JSX
-      : filename.endsWith('.js')
+      : /\.(?:cjs|js|mjs)$/.test(filename)
         ? ts.ScriptKind.JS
         : ts.ScriptKind.TS;
   return ts.createSourceFile(
@@ -434,6 +445,7 @@ describe('legacy surface migration guard', () => {
       .toBe(LEGACY_SURFACE_ALLOWANCES.length);
     expect(actual).not.toContainEqual(expect.objectContaining({ token: 'dashboard-card' }));
     expect(productionSources['../../../index.html']).toContain('<div id="root"></div>');
+    expect(productionSources['../../../vite.config.ts']).toContain('defineConfig');
     expect(Object.keys(productionSources).some((filename) => filename.endsWith('.css'))).toBe(true);
     for (const allowance of LEGACY_SURFACE_ALLOWANCES) {
       expect(allowance.owner).toMatch(/^(?:TRACK-UI[123]|UIUX-HARNESS)$/);
