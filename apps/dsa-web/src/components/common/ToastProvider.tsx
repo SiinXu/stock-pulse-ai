@@ -56,12 +56,15 @@ const ToastItem: React.FC<{
   onDismiss: (id: string) => void;
 }> = ({ toast, closeLabel, onDismiss }) => {
   const Icon = TOAST_ICONS[toast.tone];
+  const [isHovered, setIsHovered] = useState(false);
+  const [hasFocus, setHasFocus] = useState(false);
+  const isTimerPaused = isHovered || hasFocus;
 
   useEffect(() => {
-    if (toast.durationMs <= 0) return undefined;
+    if (toast.durationMs <= 0 || isTimerPaused) return undefined;
     const timeout = window.setTimeout(() => onDismiss(toast.id), toast.durationMs);
     return () => window.clearTimeout(timeout);
-  }, [onDismiss, toast.durationMs, toast.id]);
+  }, [isTimerPaused, onDismiss, toast.durationMs, toast.id]);
 
   return (
     <div
@@ -69,6 +72,14 @@ const ToastItem: React.FC<{
       aria-atomic="true"
       data-toast-id={toast.id}
       data-toast-tone={toast.tone}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onFocusCapture={() => setHasFocus(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setHasFocus(false);
+        }
+      }}
       className={cn(
         'pointer-events-auto flex min-w-0 items-start gap-3 rounded-lg border bg-elevated p-3 text-foreground shadow-soft-card-strong',
         TOAST_TONE_STYLES[toast.tone],

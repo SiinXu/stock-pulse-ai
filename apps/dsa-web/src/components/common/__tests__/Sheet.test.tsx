@@ -50,4 +50,36 @@ describe('FilterSheet', () => {
     expect(screen.queryByRole('dialog', { name: 'More filters' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('blocks form submission while Apply is disabled or already running', () => {
+    const onApply = vi.fn();
+    const renderSheet = (applyDisabled: boolean, isApplying: boolean) => (
+      <UiLanguageProvider>
+        <FilterSheet
+          isOpen
+          onClose={() => undefined}
+          title="More filters"
+          resetLabel="Reset"
+          applyLabel="View results"
+          onReset={() => undefined}
+          onApply={onApply}
+          applyDisabled={applyDisabled}
+          isApplying={isApplying}
+        >
+          <input aria-label="Keyword" />
+        </FilterSheet>
+      </UiLanguageProvider>
+    );
+
+    const { rerender } = render(renderSheet(true, false));
+    const form = screen.getByRole('dialog', { name: 'More filters' }).querySelector('form');
+    expect(form).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'View results' })).toBeDisabled();
+    fireEvent.submit(form!);
+    expect(onApply).not.toHaveBeenCalled();
+
+    rerender(renderSheet(false, true));
+    fireEvent.submit(form!);
+    expect(onApply).not.toHaveBeenCalled();
+  });
 });

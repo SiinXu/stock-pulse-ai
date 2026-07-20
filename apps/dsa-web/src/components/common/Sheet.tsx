@@ -129,6 +129,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   ...sheetProps
 }) => {
   const formId = useId();
+  const applyBlocked = applyDisabled || isApplying;
   return (
     <Sheet
       {...sheetProps}
@@ -149,7 +150,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
             form={formId}
             variant="primary"
             size="comfortable"
-            disabled={applyDisabled}
+            disabled={applyBlocked}
             isLoading={isApplying}
             loadingText={loadingLabel}
           >
@@ -163,6 +164,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
+          if (applyBlocked) return;
           onApply();
         }}
       >

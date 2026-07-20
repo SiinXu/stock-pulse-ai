@@ -1,8 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { Modal } from '../Modal';
 import { OVERLAY_Z } from '../overlayZ';
@@ -28,7 +28,25 @@ const Harness = () => {
   );
 };
 
+const TimedToastHarness = () => {
+  const { showToast } = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() => showToast({
+        title: 'Position updated',
+        durationMs: 1000,
+        action: { label: 'Undo', onClick: () => undefined },
+      })}
+    >
+      Show timed toast
+    </button>
+  );
+};
+
 describe('ToastProvider', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('keeps its live region outside dialog isolation on the authoritative layer', () => {
     render(
       <UiLanguageProvider>
@@ -48,5 +66,27 @@ describe('ToastProvider', () => {
     expect(viewport).not.toHaveAttribute('inert');
     expect(viewport).not.toHaveAttribute('aria-hidden');
     expect(screen.getByRole('dialog', { name: 'Report details' })).toBeVisible();
+  });
+
+  it('keeps an actionable toast available while keyboard focus is inside it', () => {
+    vi.useFakeTimers();
+    render(
+      <UiLanguageProvider>
+        <ToastProvider>
+          <TimedToastHarness />
+        </ToastProvider>
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show timed toast' }));
+    const toast = screen.getByRole('status');
+    const action = screen.getByRole('button', { name: 'Undo' });
+    fireEvent.focus(action);
+    act(() => vi.advanceTimersByTime(2000));
+    expect(toast).toBeVisible();
+
+    fireEvent.blur(action, { relatedTarget: null });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
