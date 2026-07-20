@@ -7,7 +7,7 @@ import { analysisApi, DuplicateTaskError } from '../api/analysis';
 import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Popover } from '../components/common';
+import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Modal, Popover } from '../components/common';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -1880,12 +1880,11 @@ const HomePage: React.FC = () => {
       ) : null}
 
       {runFlowDrawer.open ? (
-        <Drawer
+        <Modal
           isOpen={runFlowDrawer.open}
           onClose={closeRunFlowDrawer}
           title={t('runFlow.drawerTitle')}
-          variant="detail"
-          size="wide"
+          size="fullscreen"
         >
           <RunFlowPanel
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}
@@ -1893,7 +1892,7 @@ const HomePage: React.FC = () => {
             title={runFlowDrawer.title}
             onUnavailable={handleUnavailableRunFlow}
           />
-        </Drawer>
+        </Modal>
       ) : null}
 
     </div>

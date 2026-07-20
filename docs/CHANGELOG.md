@@ -220,6 +220,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Pipeline 八个阶段新增统一 typed Result 与线程安全重试 fence：未提交失败可重试，同一 query 下已确认的分析历史、本地报告和逐渠道通知会复用结果而不重复持久化或发送；legacy/Agent 共用持久化边界，公开返回值、报告内容、API、数据库 schema 与配置保持不变。
 - [新功能] 多策略证据契约计算层：新增 `StrategyEngine`（`src/agent/skills/engine.py`）对 skill 观点做确定性分拣、聚合、综合与冲突检测（方向对立/分值离散/高置信异议/调整矛盾），配套 `synthesis.py`、`protocols` 的策略信号标准化与 `aggregator` 的 `calculate`/`AggregationData`；orchestrator 在决策前统一经引擎处理，invalid 观点移入 `ctx.meta["invalid_opinions"]` 诊断、绝不回流证据链，并在 timeout/budget 早退路径保留诊断；`strategy_synthesis` 由引擎确定性写入 dashboard 载荷（覆盖 LLM 输出）。本片仅计算与接线，报告/通知/模板的本地化呈现随后续 PR。
 - [改进] Web 持仓中心页（`PortfolioPage`）持仓明细表从 legacy `<table>` 迁移到共享 `DataTable`：typed 列/行键、原生 caption/列/行语义与内置横向滚动区取代手搓表格，空态改用 DataTable 内建 `emptyState`；账户/代码/数量/均价/最新价（含价格来源与过期提示）/市值/未实现盈亏/收益率/组合信号/操作各列、盈亏语义色（`text-success`/`text-danger`）、右对齐与“分析”按钮不变。同步删除 `dataTablePatternGuard` 中 `TRACK-UI2` 的 `UI-P01` allowlist 例外，并按随表一并移除的 `border-white/10`、`border-white/5` 收敛 `surfaceMigrationGuard` 中本轨对应计数（2→1、4→3）；未新增 i18n 键。
+- [改进] Web 首页运行流程（RunFlow）覆盖层按 PR#35 由侧边 `Drawer` 改为居中 `Modal`：共享 `Modal` 新增向后兼容的 `fullscreen` 尺寸（`max-w-[96vw] max-h-[92dvh]`，经 tailwind-merge 覆盖基础 `max-h-[85dvh]`，现有 compact/default/wide 不变），RunFlow 拓扑面板改为近满屏居中弹窗、窄屏自动底部贴边；同步更新 RunFlow 覆盖层单测与 e2e 契约断言（抽屉→Modal、`关闭抽屉`→`关闭`）。RunFlow 数据与交互不变。
+<!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
 ## [3.26.3] - 2026-07-15

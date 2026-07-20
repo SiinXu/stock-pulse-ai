@@ -322,6 +322,33 @@ class _ConcurrentNoiseRetryNotifier(_AllFailedThenSuccessNotifier):
             self._noise_inflight = False
 
 
+class _PartialThenImageErrorNotifier(_RetryingAggregateNotifier):
+    """Commit one image channel before a retry fails during image rendering."""
+
+    _markdown_to_image_channels = [NotificationChannel.TELEGRAM.value]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.telegram_calls = 0
+
+    def get_available_channels(self):
+        return [NotificationChannel.TELEGRAM, NotificationChannel.GOTIFY]
+
+    def _should_use_image_for_channel(self, channel, image_bytes) -> bool:
+        _ = channel
+        return image_bytes is not None
+
+    def _send_telegram_photo(self, image_bytes) -> bool:
+        _ = image_bytes
+        self.telegram_calls += 1
+        return True
+
+    def send_to_telegram(self, report) -> bool:
+        _ = report
+        self.telegram_calls += 1
+        return True
+
+
 def test_delivery_reentry_increments_only_physical_attempts() -> None:
     """Advance keyed dispatch attempts while preserving a committed attempt."""
     pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -522,6 +549,49 @@ def test_concurrent_aggregate_reentry_waits_for_owner_outcome() -> None:
     assert pipeline.notifier.send_calls == 2
     assert pipeline.notifier.noise_releases == 1
     assert pipeline.notifier.noise_records == 1
+
+
+def test_partial_scope_survives_reentry_error_before_cached_channels() -> None:
+    """Keep a committed scope when retry setup fails before channel reuse."""
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = _PartialThenImageErrorNotifier()
+    pipeline.config = SimpleNamespace(stock_email_groups=[])
+    pipeline._generate_aggregate_report = MagicMock(return_value="aggregate-report")
+    pipeline._refresh_saved_diagnostic_snapshot = MagicMock()
+    results = [
+        SimpleNamespace(
+            code="600519",
+            query_id="query-aggregate-reentry-error",
+            success=True,
+        )
+    ]
+    static_scope = (
+        "aggregate_static_delivery",
+        pipeline._delivery_stage_key(
+            route="aggregate",
+            results=results,
+            report_type=ReportType.SIMPLE,
+        ),
+    )
+
+    with patch("src.md2img.markdown_to_image", return_value=b"image"):
+        pipeline._send_notifications(results, ReportType.SIMPLE)
+    assert pipeline._pipeline_stage_runner.scope_started(static_scope) is True
+
+    with patch(
+        "src.md2img.markdown_to_image",
+        side_effect=RuntimeError("image renderer unavailable"),
+    ):
+        pipeline._send_notifications(results, ReportType.SIMPLE)
+    assert pipeline._pipeline_stage_runner.scope_started(static_scope) is True
+
+    with patch("src.md2img.markdown_to_image", return_value=b"image"):
+        pipeline._send_notifications(results, ReportType.SIMPLE)
+
+    assert pipeline.notifier.noise_evaluations == 1
+    assert pipeline.notifier.telegram_calls == 1
+    assert pipeline.notifier.gotify_calls == 2
 
 
 def test_process_single_stock_returns_original_analysis_result() -> None:
