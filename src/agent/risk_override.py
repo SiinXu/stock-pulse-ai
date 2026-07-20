@@ -171,6 +171,7 @@ class RiskOverrideApplication:
     to_signal: Optional[DashboardDecisionSignal] = None
 
     def __post_init__(self) -> None:
+        """Normalize enum values and reject contradictory application facts."""
         object.__setattr__(self, "trigger", RiskTrigger(self.trigger))
         object.__setattr__(self, "reason", RiskApplicationReason(self.reason))
         object.__setattr__(

@@ -1811,6 +1811,7 @@ class AgentOrchestrator:
         warnings: List[str] = []
 
         def append_warning(value: Any) -> None:
+            """Append one non-empty warning unless an equivalent detail exists."""
             text = str(value or "").strip()
             if text and not any(text == item or text in item for item in warnings):
                 warnings.append(text)

@@ -52,6 +52,7 @@ class DegradedEvent:
     boundary: DegradationBoundary
 
     def __post_init__(self) -> None:
+        """Normalize and validate the stage, reason, and boundary values."""
         normalized_stage = str(self.stage or "").strip()
         if not normalized_stage:
             raise ValueError("degraded event requires a stage")
@@ -68,6 +69,7 @@ class PipelineTerminationFact:
     last_completed_stage: Optional[str] = None
 
     def __post_init__(self) -> None:
+        """Normalize the stage and enforce timeout-only termination facts."""
         normalized_reason = normalize_stage_failure_reason(self.reason)
         if normalized_reason != StageFailureReason.TIMEOUT:
             raise ValueError("pipeline termination currently supports timeout only")
@@ -97,6 +99,7 @@ def build_agent_runtime_facts(ctx: AgentContext) -> AgentRuntimeFacts:
 
 
 def _iter_base_agent_opinions(ctx: AgentContext):
+    """Yield low-sensitivity facts for independently executed opinions."""
     for opinion in ctx.opinions:
         if not _is_base_agent_opinion(opinion):
             continue
@@ -108,6 +111,7 @@ def _iter_base_agent_opinions(ctx: AgentContext):
 
 
 def _is_base_agent_opinion(opinion: AgentOpinion) -> bool:
+    """Exclude the final decision and synthesized consensus opinions."""
     from src.agent.skills.defaults import is_skill_consensus_name
 
     agent_name = str(opinion.agent_name or "").strip().lower()
@@ -115,6 +119,7 @@ def _is_base_agent_opinion(opinion: AgentOpinion) -> bool:
 
 
 def _iter_degraded_events(ctx: AgentContext):
+    """Yield valid, deduplicated degradation events from runtime metadata."""
     source = ctx.meta.get("degraded_events")
     if not isinstance(source, list):
         return
@@ -142,6 +147,7 @@ def _iter_degraded_events(ctx: AgentContext):
 
 
 def _pipeline_termination(ctx: AgentContext) -> Optional[PipelineTerminationFact]:
+    """Return the validated pipeline termination fact when one exists."""
     source = ctx.meta.get("pipeline_termination")
     if isinstance(source, PipelineTerminationFact):
         return source
@@ -157,6 +163,7 @@ def _pipeline_termination(ctx: AgentContext) -> Optional[PipelineTerminationFact
 
 
 def _risk_override_application(ctx: AgentContext) -> Optional[RiskOverrideApplication]:
+    """Return only a validated risk application stored by the orchestrator."""
     from src.agent.risk_override import RiskOverrideApplication
 
     application = ctx.meta.get("risk_override_application")
@@ -164,6 +171,7 @@ def _risk_override_application(ctx: AgentContext) -> Optional[RiskOverrideApplic
 
 
 def _normalize_opinion_signal(signal: Any) -> str:
+    """Normalize an opinion signal without exposing arbitrary model text."""
     if not isinstance(signal, str):
         return "hold"
     normalized = signal.strip().lower()
@@ -173,6 +181,7 @@ def _normalize_opinion_signal(signal: Any) -> str:
 
 
 def _effective_signal(agent_name: str, signal: Any) -> str:
+    """Apply conservative signal semantics to one base-agent opinion."""
     normalized = _normalize_opinion_signal(signal)
     if _is_risk_agent(agent_name) and normalized in _BULLISH_SIGNALS:
         return "hold"
@@ -180,10 +189,12 @@ def _effective_signal(agent_name: str, signal: Any) -> str:
 
 
 def _is_risk_agent(agent_name: str) -> bool:
+    """Return whether the normalized name identifies the risk agent."""
     return str(agent_name or "").strip().lower() in _RISK_AGENT_NAMES
 
 
 def _safe_confidence(confidence: Any) -> float:
+    """Clamp a confidence value to a two-decimal probability."""
     try:
         value = float(confidence)
     except (TypeError, ValueError):
