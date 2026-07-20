@@ -405,7 +405,17 @@ async function editConnectionAddModel(page: Page, id: string, model: string) {
   await expect(dialog).toBeHidden();
 }
 
-async function mockScreeningBase(page: Page) {
+async function mockScreeningBase(page: Page, strategies: JsonObject[] = [{
+  id: 'bull_trend',
+  name: '中文原始策略名',
+  name_zh: '多头趋势',
+  name_en: 'Bull Trend',
+  description: 'raw description',
+  description_zh: '捕捉多头趋势',
+  description_en: 'Capture established bullish trends',
+  category_zh: '趋势',
+  category_en: 'Trend',
+}]) {
   await page.route('**/api/v1/alphasift/status', (route) => fulfillJson(route, {
     enabled: true,
     available: true,
@@ -413,18 +423,8 @@ async function mockScreeningBase(page: Page) {
   }));
   await page.route('**/api/v1/alphasift/strategies', (route) => fulfillJson(route, {
     enabled: true,
-    strategy_count: 1,
-    strategies: [{
-      id: 'bull_trend',
-      name: '中文原始策略名',
-      name_zh: '多头趋势',
-      name_en: 'Bull Trend',
-      description: 'raw description',
-      description_zh: '捕捉多头趋势',
-      description_en: 'Capture established bullish trends',
-      category_zh: '趋势',
-      category_en: 'Trend',
-    }],
+    strategy_count: strategies.length,
+    strategies,
   }));
   await page.route('**/api/v1/alphasift/hotspots**', (route) => fulfillJson(route, {
     hotspots: [],
@@ -780,12 +780,54 @@ test.describe('infrastructure interaction acceptance matrix', () => {
   });
 
   test('13 Screening displays a built-in strategy by stable ID in English', async ({ page }) => {
-    await mockScreeningBase(page);
+    await mockScreeningBase(page, [
+      {
+        id: 'bull_trend',
+        name: '中文原始策略名',
+        name_zh: '多头趋势',
+        name_en: 'Bull Trend',
+        description: 'raw description',
+        description_zh: '捕捉多头趋势',
+        description_en: 'Capture established bullish trends',
+        category_zh: '趋势',
+        category_en: 'Trend',
+      },
+      {
+        id: 'dual_low',
+        name: '中文双低原始名',
+        name_en: 'Dual-low selection',
+        description: 'raw dual-low description',
+        description_en: 'Screens for candidates with relatively low price and valuation.',
+        category_en: 'Value',
+      },
+    ]);
     await login(page, 'en');
     await page.goto('/screening');
-    await expect(page.getByRole('button', { name: /Bull Trend/ })).toBeVisible();
+
+    const strategySelect = page.getByRole('combobox', { name: 'Select strategy' });
+    await expect(strategySelect).toHaveAttribute('data-value', 'dual_low');
+    await strategySelect.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await expect(strategySelect).toHaveAttribute('data-value', 'bull_trend');
     await expect(page.getByText('中文原始策略名', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Capture established bullish trends', { exact: true })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const parametersTrigger = page.getByRole('button', { name: 'Parameters' });
+    await parametersTrigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Parameters' });
+    await expect(dialog).toBeVisible();
+    const dialogBox = await dialog.boundingBox();
+    expect(dialogBox).not.toBeNull();
+    expect(dialogBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(391);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(parametersTrigger).toBeFocused();
   });
 
   test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
@@ -830,7 +872,8 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/screening');
     await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey)).toBeNull();
-    await page.getByRole('button', { name: '运行选股' }).click();
+    await page.getByRole('button', { name: '参数设置' }).click();
+    await page.getByLabel('返回数量').press('Enter');
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
     await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
