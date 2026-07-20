@@ -187,6 +187,8 @@ class PipelineStageRunner:
             Tuple[PipelineStageName, Hashable],
             PipelineStageResult[object],
         ] = {}
+        self._attempts: Dict[Tuple[PipelineStageName, Hashable], int] = {}
+        self._started_scopes: set[Hashable] = set()
         self._latest: Dict[PipelineStageName, PipelineStageResult[object]] = {}
 
     def record(self, result: PipelineStageResult[T]) -> PipelineStageResult[T]:
@@ -202,6 +204,21 @@ class PipelineStageRunner:
         """Return the latest result recorded for a stage."""
         with self._lock:
             return self._latest.get(PipelineStageName(stage))
+
+    def scope_started(self, scope_key: Hashable) -> bool:
+        """Return whether an effectful execution scope has started."""
+        with self._lock:
+            return scope_key in self._started_scopes
+
+    def mark_scope_started(self, scope_key: Hashable) -> None:
+        """Mark an effectful scope after its first-entry gate has passed."""
+        with self._lock:
+            self._started_scopes.add(scope_key)
+
+    def clear_scope_started(self, scope_key: Hashable) -> None:
+        """Clear a scope whose effectful operations all remained uncommitted."""
+        with self._lock:
+            self._started_scopes.discard(scope_key)
 
     def run(
         self,
@@ -236,11 +253,18 @@ class PipelineStageRunner:
             if cached is not None:
                 return self.record(replace(cached, reused=True))  # type: ignore[arg-type]
 
+            with self._lock:
+                effective_attempt = max(
+                    attempt,
+                    self._attempts.get(cache_key, 0) + 1,
+                )
+                self._attempts[cache_key] = effective_attempt
+
             result = self._invoke(
                 stage_name,
                 operation,
                 retryable=retryable,
-                attempt=attempt,
+                attempt=effective_attempt,
             )
             if result.side_effect_committed:
                 with self._lock:

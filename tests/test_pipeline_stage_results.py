@@ -8,8 +8,10 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from src.analyzer import AnalysisResult
+from src.config import Config
 from src.core.pipeline import StockAnalysisPipeline
 from src.core.pipeline_stage_results import (
     PipelineStageName,
@@ -18,7 +20,12 @@ from src.core.pipeline_stage_results import (
     PipelineStageStatus,
 )
 from src.enums import ReportType
-from src.notification import ChannelAttemptResult, NotificationDispatchResult
+from src.notification import (
+    ChannelAttemptResult,
+    NotificationChannel,
+    NotificationDispatchResult,
+    NotificationService,
+)
 from src.services.run_diagnostics import PIPELINE_STAGE_NAMES
 
 
@@ -126,11 +133,14 @@ def test_persist_retry_does_not_duplicate_committed_history() -> None:
 
     assert first.status == PipelineStageStatus.FAILED
     assert first.retryable is True
+    assert first.attempt == 1
     assert second.status == PipelineStageStatus.SUCCESS
+    assert second.attempt == 2
     assert second.side_effect_committed is True
     assert second.value is not None
     assert second.value.history_id == 41
     assert third.reused is True
+    assert third.attempt == 2
     assert third.value == second.value
     assert pipeline.db.save_analysis_history.call_count == 2
     assert snapshots.call_count == 2
@@ -214,6 +224,9 @@ class _RetryingAggregateNotifier(_AggregateNotifier):
     def __init__(self) -> None:
         super().__init__()
         self.gotify_calls = 0
+        self.noise_evaluations = 0
+        self.noise_records = 0
+        self.noise_releases = 0
 
     def get_available_channels(self):
         from src.notification import NotificationChannel
@@ -224,6 +237,69 @@ class _RetryingAggregateNotifier(_AggregateNotifier):
         _ = report
         self.gotify_calls += 1
         return self.gotify_calls > 1
+
+    def evaluate_noise_control(self, report, **kwargs):
+        _ = (report, kwargs)
+        self.noise_evaluations += 1
+        return SimpleNamespace(
+            should_send=self.noise_evaluations == 1,
+            reason_code="duplicate",
+            route_type="report",
+            severity="info",
+            message="duplicate report",
+        )
+
+    def record_noise_control(self, decision) -> None:
+        _ = decision
+        self.noise_records += 1
+
+    def release_noise_control(self, decision) -> None:
+        _ = decision
+        self.noise_releases += 1
+
+
+class _AllFailedThenSuccessNotifier(_RetryingAggregateNotifier):
+    """Re-enter the first-entry noise gate after an uncommitted failure."""
+
+    def get_available_channels(self):
+        return [NotificationChannel.NTFY]
+
+    def evaluate_noise_control(self, report, **kwargs):
+        _ = (report, kwargs)
+        self.noise_evaluations += 1
+        return SimpleNamespace(
+            should_send=True,
+            reason_code="allowed",
+            route_type="report",
+            severity="info",
+            message="",
+        )
+
+    def send_to_ntfy(self, report) -> bool:
+        _ = report
+        self.send_calls += 1
+        return self.send_calls > 1
+
+
+def test_delivery_reentry_increments_only_physical_attempts() -> None:
+    """Advance keyed dispatch attempts while preserving a committed attempt."""
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    outcomes = iter((False, True))
+    send = MagicMock(side_effect=lambda: next(outcomes))
+    key = ("aggregate", "simple", "ntfy", (("query", "600519"),))
+
+    first = pipeline._run_delivery_attempt(side_effect_key=key, send=send)
+    second = pipeline._run_delivery_attempt(side_effect_key=key, send=send)
+    third = pipeline._run_delivery_attempt(side_effect_key=key, send=send)
+
+    assert first.status == PipelineStageStatus.FAILED
+    assert first.attempt == 1
+    assert second.status == PipelineStageStatus.SUCCESS
+    assert second.attempt == 2
+    assert third.reused is True
+    assert third.attempt == 2
+    assert send.call_count == 2
 
 
 def test_dispatch_retry_preserves_output_without_duplicate_notification() -> None:
@@ -242,14 +318,15 @@ def test_dispatch_retry_preserves_output_without_duplicate_notification() -> Non
         success=True,
     )
 
-    first_output = pipeline._send_single_stock_notification(
-        result,
-        report_type=ReportType.SIMPLE,
-    )
-    second_output = pipeline._send_single_stock_notification(
-        result,
-        report_type=ReportType.SIMPLE,
-    )
+    with patch("src.core.pipeline.record_notification_run") as record_run:
+        first_output = pipeline._send_single_stock_notification(
+            result,
+            report_type=ReportType.SIMPLE,
+        )
+        second_output = pipeline._send_single_stock_notification(
+            result,
+            report_type=ReportType.SIMPLE,
+        )
 
     assert first_output is None
     assert second_output is None
@@ -258,6 +335,7 @@ def test_dispatch_retry_preserves_output_without_duplicate_notification() -> Non
         "report:600519:query-dispatch",
     ]
     assert pipeline.notifier.send_calls == 1
+    assert record_run.call_count == 2
     latest = pipeline._pipeline_stage_runner.latest(PipelineStageName.DISPATCH)
     assert latest is not None
     assert latest.status == PipelineStageStatus.DEGRADED
@@ -281,13 +359,15 @@ def test_aggregate_retry_does_not_repeat_successful_channel() -> None:
         )
     ]
 
-    first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
-    second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+    with patch("src.core.pipeline.record_notification_run") as record_run:
+        first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+        second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
 
     assert first_output is None
     assert second_output is None
     assert pipeline.notifier.send_calls == 1
     assert pipeline._generate_aggregate_report.call_count == 2
+    assert record_run.call_count == 1
     latest = pipeline._pipeline_stage_runner.latest(PipelineStageName.DISPATCH)
     assert latest is not None
     assert latest.status == PipelineStageStatus.SUCCESS
@@ -309,16 +389,48 @@ def test_aggregate_retry_only_reexecutes_uncommitted_channel() -> None:
         )
     ]
 
-    first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
-    second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+    with patch("src.core.pipeline.record_notification_run") as record_run:
+        first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+        second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
 
     assert first_output is None
     assert second_output is None
     assert pipeline.notifier.send_calls == 1
     assert pipeline.notifier.gotify_calls == 2
+    assert pipeline.notifier.noise_evaluations == 1
+    assert pipeline.notifier.noise_records == 1
+    assert pipeline.notifier.noise_releases == 0
+    assert record_run.call_count == 3
     latest = pipeline._pipeline_stage_runner.latest(PipelineStageName.DISPATCH)
     assert latest is not None
     assert latest.status == PipelineStageStatus.SUCCESS
+
+
+def test_all_failed_aggregate_rechecks_noise_gate_before_retry() -> None:
+    """Release an uncommitted scope and reacquire noise control on retry."""
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = _AllFailedThenSuccessNotifier()
+    pipeline.config = SimpleNamespace(stock_email_groups=[])
+    pipeline._generate_aggregate_report = MagicMock(return_value="aggregate-report")
+    pipeline._refresh_saved_diagnostic_snapshot = MagicMock()
+    results = [
+        SimpleNamespace(
+            code="600519",
+            query_id="query-aggregate-all-failed",
+            success=True,
+        )
+    ]
+
+    first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+    second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+
+    assert first_output is None
+    assert second_output is None
+    assert pipeline.notifier.send_calls == 2
+    assert pipeline.notifier.noise_evaluations == 2
+    assert pipeline.notifier.noise_releases == 1
+    assert pipeline.notifier.noise_records == 1
 
 
 def test_process_single_stock_returns_original_analysis_result() -> None:
@@ -353,3 +465,71 @@ def test_process_single_stock_returns_original_analysis_result() -> None:
     assert pipeline._get_pipeline_stage_runner().latest(
         PipelineStageName.FETCH
     ).value == (True, None)
+
+
+def test_real_report_content_is_identical_for_save_and_dispatch() -> None:
+    """Pass real aggregate Markdown through both output routes unchanged."""
+    config = Config(
+        stock_list=[],
+        report_language="en",
+        report_renderer_enabled=False,
+    )
+    result = AnalysisResult(
+        code="AAPL",
+        name="Apple",
+        sentiment_score=72,
+        trend_prediction="Bullish",
+        operation_advice="Hold",
+        analysis_summary="Stable outlook",
+        report_language="en",
+        query_id="query-output-equivalence",
+    )
+
+    with patch("src.notification.get_config", return_value=config):
+        notifier = NotificationService()
+        expected = notifier.generate_aggregate_report(
+            [result],
+            ReportType.SIMPLE,
+        )
+        notifier.save_report_to_file = MagicMock(
+            return_value="/tmp/output-equivalence.md"
+        )
+        notifier.is_available = MagicMock(return_value=True)
+        notifier.get_available_channels = MagicMock(
+            return_value=[NotificationChannel.NTFY]
+        )
+        notifier.get_channels_for_route = MagicMock(
+            side_effect=lambda route_type, *, channels: channels
+        )
+        notifier._has_context_channel = MagicMock(return_value=False)
+        notifier.send_to_context = MagicMock(return_value=False)
+        notifier.should_broadcast_static_channels = MagicMock(return_value=True)
+        notifier.evaluate_noise_control = MagicMock(
+            return_value=SimpleNamespace(
+                should_send=True,
+                reason_code="allowed",
+                route_type="report",
+                severity="info",
+                message="",
+            )
+        )
+        notifier.record_noise_control = MagicMock()
+        notifier.release_noise_control = MagicMock()
+        notifier.send_to_ntfy = MagicMock(return_value=True)
+
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline._pipeline_stage_runner = PipelineStageRunner()
+        pipeline.notifier = notifier
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        pipeline._refresh_saved_diagnostic_snapshot = MagicMock()
+
+        save_output = pipeline._save_local_report([result], ReportType.SIMPLE)
+        dispatch_output = pipeline._send_notifications(
+            [result],
+            ReportType.SIMPLE,
+        )
+
+    assert save_output is None
+    assert dispatch_output is None
+    notifier.save_report_to_file.assert_called_once_with(expected)
+    notifier.send_to_ntfy.assert_called_once_with(expected)

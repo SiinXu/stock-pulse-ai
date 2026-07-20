@@ -4733,6 +4733,10 @@ class StockAnalysisPipeline:
                     ),
                 )
                 dispatch_value = dispatch_execution.value or {}
+                cached_dispatch = dispatch_execution.reused
+                cached_failure_count = int(
+                    dispatch_value.get("delivery_failure_count") or 0
+                )
                 self._finish_pipeline_stage(
                     dispatch_stage,
                     dispatch_execution,
@@ -4744,14 +4748,20 @@ class StockAnalysisPipeline:
                             dispatch_value.get("dispatch_result_status") or None
                         ),
                         "attempt_count": (
-                            len(dispatch_value.get("channel_results") or [])
-                            or int(bool(dispatch_value.get("dispatched")))
+                            0
+                            if cached_dispatch
+                            else (
+                                len(dispatch_value.get("channel_results") or [])
+                                or int(bool(dispatch_value.get("dispatched")))
+                            )
                         ),
-                        "failure_count": dispatch_value.get(
-                            "delivery_failure_count",
-                            0,
+                        "failure_count": (
+                            0 if cached_dispatch else cached_failure_count
                         ),
-                        "reused": dispatch_execution.reused,
+                        "cached_failure_count": (
+                            cached_failure_count if cached_dispatch else 0
+                        ),
+                        "reused": cached_dispatch,
                     },
                 )
                 dispatch_execution.unwrap()
@@ -4766,7 +4776,12 @@ class StockAnalysisPipeline:
                     dispatch_value.get("delivery_failure_count") or 0
                 )
                 dispatch_status = dispatch_execution.status.value
-                if channel_results:
+                if cached_dispatch:
+                    self._refresh_saved_diagnostic_snapshot(
+                        result=result,
+                        fallback_code=fallback_code,
+                    )
+                elif channel_results:
                     for channel_result in channel_results:
                         channel_label = str(
                             getattr(channel_result, "channel", None) or "report"
@@ -4832,7 +4847,12 @@ class StockAnalysisPipeline:
                         fallback_code=fallback_code,
                         notification_run=notification_run,
                     )
-                if sent:
+                if cached_dispatch:
+                    logger.info(
+                        "[%s] Reused the confirmed single-stock dispatch outcome",
+                        stock_code,
+                    )
+                elif sent:
                     logger.info("[%s] Single-stock notification delivered", stock_code)
                 elif dispatch_status == "skipped":
                     logger.info("[%s] Single-stock notification skipped", stock_code)
@@ -4983,6 +5003,10 @@ class StockAnalysisPipeline:
         noise_finalized = False
         delivery_attempt_count = 0
         delivery_failure_count = 0
+        delivery_reused_count = 0
+        delivery_reused_channels: set[str] = set()
+        static_delivery_scope: Optional[Tuple[Any, ...]] = None
+        static_delivery_confirmed = False
         render_stage = observe_pipeline_stage(
             "render",
             input_summary={
@@ -5066,6 +5090,8 @@ class StockAnalysisPipeline:
                         ),
                         send=send_func,
                     )
+                    if delivery_result.reused:
+                        delivery_reused_channels.add(channel_label)
                     delivery_error = delivery_result.error
                     if isinstance(delivery_error, Exception):
                         log_safe_exception(
@@ -5088,6 +5114,14 @@ class StockAnalysisPipeline:
                     target_results: Optional[List[AnalysisResult]] = None,
                 ) -> None:
                     nonlocal delivery_attempt_count, delivery_failure_count
+                    nonlocal delivery_reused_count
+                    nonlocal static_delivery_confirmed
+                    if channel_label != "__context__" and success:
+                        static_delivery_confirmed = True
+                    if channel_label in delivery_reused_channels:
+                        delivery_reused_count += 1
+                        delivery_reused_channels.discard(channel_label)
+                        return
                     delivery_attempt_count += 1
                     if not success:
                         delivery_failure_count += 1
@@ -5136,6 +5170,8 @@ class StockAnalysisPipeline:
                     send=lambda: self.notifier.send_to_context(report),
                 )
                 send_context = bool(context_delivery.unwrap())
+                if context_delivery.reused:
+                    delivery_reused_channels.add("__context__")
                 if send_context:
                     _record_channel_result("__context__", True)
                 elif context_route_available:
@@ -5184,7 +5220,24 @@ class StockAnalysisPipeline:
                     self._refresh_saved_diagnostic_snapshot(results=results)
                     return
 
-                if channels and hasattr(self.notifier, "evaluate_noise_control"):
+                static_delivery_scope = (
+                    "aggregate_static_delivery",
+                    self._delivery_stage_key(
+                        route="aggregate",
+                        results=results,
+                        report_type=report_type,
+                    ),
+                )
+                static_delivery_reentry = (
+                    self._get_pipeline_stage_runner().scope_started(
+                        static_delivery_scope
+                    )
+                )
+                if (
+                    channels
+                    and not static_delivery_reentry
+                    and hasattr(self.notifier, "evaluate_noise_control")
+                ):
                     report_type_key = report_type.value if isinstance(report_type, ReportType) else str(report_type)
                     codes_key = ",".join(
                         sorted(str(getattr(result, "code", "") or "") for result in results)
@@ -5267,6 +5320,16 @@ class StockAnalysisPipeline:
                             noise_decision.severity,
                         )
                         return
+
+                if channels:
+                    self._get_pipeline_stage_runner().mark_scope_started(
+                        static_delivery_scope
+                    )
+                    if static_delivery_reentry:
+                        logger.debug(
+                            "Aggregate delivery re-entry bypassed the first-entry "
+                            "noise gate; per-channel fences remain authoritative"
+                        )
 
                 # Issue #455: Markdown 转图片（与 notification.send 逻辑一致）
                 from src.md2img import markdown_to_image
@@ -5605,6 +5668,13 @@ class StockAnalysisPipeline:
                 ):
                     self.notifier.release_noise_control(noise_decision)
                     noise_finalized = True
+                if (
+                    static_delivery_scope is not None
+                    and not static_delivery_confirmed
+                ):
+                    self._get_pipeline_stage_runner().clear_scope_started(
+                        static_delivery_scope
+                    )
                 if success:
                     logger.info("Decision dashboard delivered")
                 else:
@@ -5659,6 +5729,7 @@ class StockAnalysisPipeline:
                         "context_delivered": bool(send_context),
                         "attempt_count": delivery_attempt_count,
                         "failure_count": delivery_failure_count,
+                        "reused_count": delivery_reused_count,
                     },
                 )
                 self._refresh_saved_diagnostic_snapshot(results=results)
@@ -5714,7 +5785,7 @@ class StockAnalysisPipeline:
                 confirmed_delivery_count = max(
                     0,
                     delivery_attempt_count - delivery_failure_count,
-                )
+                ) + delivery_reused_count
                 failed_dispatch_result = (
                     PipelineStageResult.degraded(
                         PipelineStageName.DISPATCH,
@@ -5740,6 +5811,7 @@ class StockAnalysisPipeline:
                         "attempt_count": delivery_attempt_count,
                         "failure_count": delivery_failure_count,
                         "confirmed_delivery_count": confirmed_delivery_count,
+                        "reused_count": delivery_reused_count,
                     },
                 )
             notification_run = self._build_notification_run_snapshot(
@@ -5758,12 +5830,21 @@ class StockAnalysisPipeline:
                 results=results,
                 notification_run=notification_run,
             )
+            if noise_decision is not None and not noise_finalized:
+                if (
+                    static_delivery_confirmed
+                    and hasattr(self.notifier, "record_noise_control")
+                ):
+                    self.notifier.record_noise_control(noise_decision)
+                elif hasattr(self.notifier, "release_noise_control"):
+                    self.notifier.release_noise_control(noise_decision)
             if (
-                noise_decision is not None
-                and not noise_finalized
-                and hasattr(self.notifier, "release_noise_control")
+                static_delivery_scope is not None
+                and not static_delivery_confirmed
             ):
-                self.notifier.release_noise_control(noise_decision)
+                self._get_pipeline_stage_runner().clear_scope_started(
+                    static_delivery_scope
+                )
             log_safe_exception(
                 logger,
                 "Notification delivery failed",
