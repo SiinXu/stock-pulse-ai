@@ -69,7 +69,7 @@ export const ReportStrategy: React.FC<ReportStrategyProps> = ({ strategy, langua
   ];
 
   return (
-    <Card variant="bordered" padding="md" className="home-panel-card">
+    <Card variant="bordered" padding="md">
       <DashboardPanelHeader
         eyebrow={text.strategyPoints}
         title={text.sniperLevels}

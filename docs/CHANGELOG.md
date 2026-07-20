@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
+- [改进] Web 报告展示组件收敛守卫债：跨 `ReportOverview`/`ReportNews`/`ReportStrategy`/`ReportDetails`/`ReportDiagnostics`/`AnalysisContextSummary`/`MarketReviewReportView` 移除 15 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉），并同步删除设计守卫里对应的本轨 allowlist 例外（`ReportOverview` 仍保留真实的 `home-insight-card`/`home-rail-card` 类及其 allowlist token）；`text-left`/`min-w-0` 等既有类不变。报告的 `home-insight-card`/`home-rail-card`/`home-report-hero`/`home-subpanel`/`home-accent-chip` 为真实定制视觉，其到 `Surface` 的收敛待可视化 QA，记为本轨后续。
 - [改进] Web 历史趋势抽屉（`StockHistoryTrendDrawer`）收敛 ad-hoc 面板：移除 3 处 `Card` 上无 CSS 定义的死类 `home-panel-card`（零视觉，纯守卫债），并同步删除设计守卫里对应的本轨 allowlist 例外；页内 ad-hoc 指标卡片改用语义 `Surface`（`interactive` 档，圆角/内边距/数值不变，边框与底色对齐设计 token）。范围/查看报告按钮为保 44px 粗指针命中区暂不改用 `SegmentedControl`/`Button`，`glass-card` 列表面板的层级取舍待可视化 QA，均记为本轨后续。
 - [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
 - [改进] Web 回测页加载态统一走语义 `Loading`：性能侧栏与结果表两处 bespoke `backtest-spinner` 加载块改用共享 `Loading`（compact `StatePanel`），与页面既有的 `EmptyState`/`ApiErrorAlert` 空态/错误态一致；结果表加载文案、指标卡与数字涨跌语义色不变。
