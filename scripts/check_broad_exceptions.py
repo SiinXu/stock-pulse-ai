@@ -576,8 +576,6 @@ def _site_ancestry(
     current = node
     while link := parent_links.get(id(current)):
         parent = link.parent
-        if isinstance(parent, (*_LEXICAL_SCOPES, ast.Module)):
-            break
         ancestry.append(
             {
                 "context": _control_context(parent),
@@ -586,6 +584,8 @@ def _site_ancestry(
                 "kind": type(parent).__name__,
             }
         )
+        if isinstance(parent, (*_LEXICAL_SCOPES, ast.Module)):
+            break
         current = parent
     return tuple(reversed(ancestry))
 

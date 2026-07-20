@@ -652,6 +652,35 @@ def test_fingerprint_tracks_enclosing_control_flow(tmp_path: Path) -> None:
     assert baseline.read_text(encoding="utf-8") == original_baseline
 
 
+def test_fingerprint_tracks_lexical_statement_position(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    prepare()\n"
+        "    try:\n"
+        "        return work()\n"
+        "    except Exception:\n"
+        "        return None\n",
+    )
+    handler = scan_repository(tmp_path)[0]
+    _write_baseline(baseline, legacy_handlers=[handler.baseline_entry.as_json()])
+
+    module.write_text(
+        "def load():\n"
+        "    try:\n"
+        "        return work()\n"
+        "    except Exception:\n"
+        "        return None\n"
+        "    prepare()\n",
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+
+
 def test_fingerprint_ignores_python_version_ast_metadata() -> None:
     tree = ast.parse(
         "try:\n"
