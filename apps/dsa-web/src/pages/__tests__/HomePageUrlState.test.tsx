@@ -1335,7 +1335,7 @@ describe('HomePage URL state', () => {
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(analysisApi.getTaskFlow).toHaveBeenCalledWith('task-2');
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭抽屉' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     await waitFor(() => expect(screen.queryByTestId('run-flow-panel')).not.toBeInTheDocument());
     expect(router.state.location.search).toBe('?recordId=1&keep=yes');
 
@@ -1349,7 +1349,7 @@ describe('HomePage URL state', () => {
     expect(await screen.findByTestId('run-flow-panel')).toBeInTheDocument();
     expect(historyApi.getRecordFlow).toHaveBeenCalledWith(2);
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭抽屉' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     await waitFor(() => expect(router.state.location.search).toBe('?recordId=2'));
   });
 

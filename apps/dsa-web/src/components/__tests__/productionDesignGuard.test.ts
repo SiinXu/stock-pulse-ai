@@ -204,6 +204,11 @@ const CSS_BLUR_PATTERN = /\b(?:backdrop-filter|filter)\s*:\s*blur\(\s*(\d+(?:\.\
 const OVERLAY_Z_UTILITY_PATTERN = /(?:\bz-\[[^\]\r\n]+\]|\bz-(?:[5-9]\d|[1-9]\d{2,})\b)/g;
 const INLINE_Z_INDEX_PATTERN = /\bzIndex\s*(?::|=)\s*(?:\{\s*)?([^\s,}\r\n]+)/g;
 const NEAR_VIEWPORT_PANEL_PATTERN = /\b(?:max-)?w-\[(?:9\d|100)vw\]/g;
+// Owner-ruled (TRACK-UI4 L-04): the shared Modal `fullscreen` size restores PR#35's
+// near-fullscreen RunFlow overlay (`max-w-[96vw]`); scoped to the shared Modal primitive.
+const NEAR_VIEWPORT_PANEL_ALLOWLIST = new Map<string, readonly string[]>([
+  ['../common/Modal.tsx', ['max-w-[96vw]']],
+]);
 const MAX_RESTRAINED_BLUR_PX = 4;
 const CSS_RULE_PATTERN = /([^{}]+)\{([^{}]*)\}/g;
 const CSS_RADIUS_DECLARATION_PATTERN = /\bborder-radius\s*:\s*([^;{}\r\n]+)/i;
@@ -2791,6 +2796,9 @@ function findProductionDesignViolations(
 
   for (const match of sourceWithoutComments.matchAll(NEAR_VIEWPORT_PANEL_PATTERN)) {
     const index = match.index ?? 0;
+    if (NEAR_VIEWPORT_PANEL_ALLOWLIST.get(filename)?.includes(match[0])) {
+      continue;
+    }
     violations.push({
       file: filename,
       line: lineNumberAt(source, index),
