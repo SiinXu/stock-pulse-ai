@@ -209,6 +209,7 @@ const PortfolioPage: React.FC = () => {
   const [accountCreating, setAccountCreating] = useState(false);
   const [accountCreateError, setAccountCreateError] = useState<string | null>(null);
   const [accountCreateSuccess, setAccountCreateSuccess] = useState<string | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [accountForm, setAccountForm] = useState({
     name: '',
     broker: 'Demo',
@@ -919,6 +920,7 @@ const PortfolioPage: React.FC = () => {
       setPendingAccountDelete(null);
       setAccountDeleteError(null);
       setShowCreateAccount(false);
+      setEditingAccountId(null);
       await loadAccounts();
       setEventPage(1);
     } catch (err) {
@@ -995,6 +997,58 @@ const PortfolioPage: React.FC = () => {
     } finally {
       setAccountCreating(false);
     }
+  };
+
+  const handleEditAccountOpen = (account: PortfolioAccountItem) => {
+    setEditingAccountId(account.id);
+    setAccountForm({
+      name: account.name,
+      broker: account.broker ?? '',
+      market: account.market,
+      baseCurrency: account.baseCurrency,
+    });
+    setAccountCreateError(null);
+    setAccountCreateSuccess(null);
+    setShowCreateAccount(true);
+  };
+
+  const handleUpdateAccount = async () => {
+    if (editingAccountId == null) return;
+    const name = accountForm.name.trim();
+    if (!name) {
+      setAccountCreateError(text.accountNameRequired);
+      setAccountCreateSuccess(null);
+      return;
+    }
+    try {
+      setAccountCreating(true);
+      setAccountCreateError(null);
+      setAccountCreateSuccess(null);
+      // PUT is a true update that preserves the account id, ledger, holdings,
+      // and idempotency links (no delete + recreate).
+      const updated = await portfolioApi.updateAccount(editingAccountId, {
+        name,
+        broker: accountForm.broker.trim(),
+        market: accountForm.market,
+        baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
+      });
+      await loadAccounts();
+      setSelectedAccount(updated.id);
+      setShowCreateAccount(false);
+      setEditingAccountId(null);
+      setAccountCreateSuccess(text.accountUpdated);
+    } catch (err) {
+      setAccountCreateError(getParsedApiError(err, language).message || text.accountUpdateFailed);
+      setAccountCreateSuccess(null);
+    } finally {
+      setAccountCreating(false);
+    }
+  };
+
+  const handleAccountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingAccountId != null) void handleUpdateAccount();
+    else void handleCreateAccount(e);
   };
 
   const handleRefresh = async () => {
@@ -1148,12 +1202,26 @@ const PortfolioPage: React.FC = () => {
                   size="comfortable"
                   className="flex-1"
                   onClick={() => {
+                    setEditingAccountId(null);
+                    setAccountForm({ name: '', broker: 'Demo', market: accountForm.market, baseCurrency: accountForm.baseCurrency });
                     setShowCreateAccount(true);
                     setAccountCreateError(null);
                     setAccountCreateSuccess(null);
                   }}
                 >
                   {text.createAccount}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="comfortable"
+                  className="flex-1"
+                  disabled={!writableAccount || isLoading || fxRefreshing}
+                  onClick={() => {
+                    if (writableAccount) handleEditAccountOpen(writableAccount);
+                  }}
+                >
+                  {text.editAccount}
                 </Button>
                 <Button
                   type="button"
@@ -1193,6 +1261,7 @@ const PortfolioPage: React.FC = () => {
                 variant="secondary"
                 size="default"
                 onClick={() => {
+                  setEditingAccountId(null);
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
                   setAccountCreateSuccess(null);
@@ -1206,6 +1275,9 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
+      {accountCreateSuccess ? (
+        <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
       {riskWarning ? (
         <InlineAlert
           variant="warning"
@@ -1230,8 +1302,13 @@ const PortfolioPage: React.FC = () => {
 
       <Modal
         isOpen={showCreateAccount}
-        onClose={() => setShowCreateAccount(false)}
-        title={text.newAccount}
+        onClose={() => {
+          if (!accountCreating) {
+            setShowCreateAccount(false);
+            setEditingAccountId(null);
+          }
+        }}
+        title={editingAccountId != null ? text.editAccount : text.newAccount}
       >
           {!hasAccounts ? (
             <p className="mb-3 text-xs text-secondary">{text.createAutoSwitch}</p>
@@ -1245,16 +1322,7 @@ const PortfolioPage: React.FC = () => {
               message={accountCreateError}
             />
           ) : null}
-          {accountCreateSuccess ? (
-            <InlineAlert
-              variant="success"
-              size="compact"
-              className="mt-2"
-              title={text.createSuccess}
-              message={accountCreateSuccess}
-            />
-          ) : null}
-          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
+          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleAccountSubmit}>
             <Input
               label={text.accountName}
               placeholder={text.required}
@@ -1292,9 +1360,9 @@ const PortfolioPage: React.FC = () => {
               size="comfortable"
               className="md:col-span-2"
               isLoading={accountCreating}
-              loadingText={text.creatingAccount}
+              loadingText={editingAccountId != null ? text.savingAccount : text.creatingAccount}
             >
-              {text.createAccount}
+              {editingAccountId != null ? text.saveAccount : text.createAccount}
             </Button>
           </form>
       </Modal>

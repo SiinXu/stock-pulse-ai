@@ -4,6 +4,7 @@ import type { TaskAccepted } from '../types/analysis';
 import type {
   PortfolioAccountItem,
   PortfolioAccountCreateRequest,
+  PortfolioAccountUpdateRequest,
   PortfolioAccountListResponse,
   PortfolioCashLedgerCreateRequest,
   PortfolioCashLedgerListResponse,
@@ -121,6 +122,21 @@ export const portfolioApi = {
       base_currency: payload.baseCurrency,
       owner_id: payload.ownerId,
     });
+    return toCamelCase<PortfolioAccountItem>(response.data);
+  },
+
+  async updateAccount(accountId: number, payload: PortfolioAccountUpdateRequest): Promise<PortfolioAccountItem> {
+    const body: Record<string, unknown> = {};
+    if (payload.name !== undefined) body.name = payload.name;
+    if (payload.broker !== undefined) body.broker = payload.broker;
+    if (payload.market !== undefined) body.market = payload.market;
+    if (payload.baseCurrency !== undefined) body.base_currency = payload.baseCurrency;
+    if (payload.ownerId !== undefined) body.owner_id = payload.ownerId;
+    if (payload.isActive !== undefined) body.is_active = payload.isActive;
+    const response = await apiClient.put<Record<string, unknown>>(
+      `/api/v1/portfolio/accounts/${accountId}`,
+      body,
+    );
     return toCamelCase<PortfolioAccountItem>(response.data);
   },
 
