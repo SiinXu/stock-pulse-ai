@@ -640,6 +640,31 @@ class TestStrategyAggregator(unittest.TestCase):
 
 
 # ============================================================
+# SkillAgent.post_process
+# ============================================================
+
+class TestSkillAgentPostProcess(unittest.TestCase):
+    def test_missing_signal_reaches_strategy_diagnostics(self):
+        from src.agent.skills.engine import StrategyEngine
+        from src.agent.skills.skill_agent import SkillAgent
+
+        agent = SkillAgent.__new__(SkillAgent)
+        agent.skill_id = "test"
+        agent.agent_name = "skill_test"
+
+        opinion = agent.post_process(
+            AgentContext(),
+            json.dumps({"confidence": 0.9, "reasoning": "signal omitted"}),
+        )
+
+        self.assertIsNotNone(opinion)
+        self.assertIsNone(opinion.signal)
+        result = StrategyEngine().process([opinion])
+        self.assertEqual(result.invalid_count, 1)
+        self.assertEqual(result.invalid_records[0]["reason"], "missing_signal")
+
+
+# ============================================================
 # PortfolioAgent.post_process
 # ============================================================
 
@@ -1952,6 +1977,68 @@ class TestDecisionAgentChatMode(unittest.TestCase):
         self.assertIn("watch_conditions", prompt)
         self.assertIn("data_limitations", prompt)
         self.assertIn("confidence_level", prompt)
+
+    def test_decision_agent_prompt_renders_evidence_chain_and_invalid_diagnostics(self):
+        from src.agent.agents.decision_agent import DecisionAgent
+        from src.agent.orchestrator import AgentOrchestrator
+        from src.agent.skills.engine import StrategyEngine
+
+        agent = DecisionAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        orchestrator = AgentOrchestrator.__new__(AgentOrchestrator)
+        orchestrator.strategy_engine = StrategyEngine()
+        ctx = AgentContext(query="分析 600519", stock_code="600519")
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="skill_bull_trend",
+                signal="buy",
+                confidence=0.8,
+                reasoning="趋势偏强",
+                raw_data={"signal": "buy", "invalid_signal": False, "score_adjustment": 1},
+            )
+        )
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="skill_moon",
+                signal="moon",
+                confidence=0.91,
+                reasoning="invalid moon evidence",
+            )
+        )
+        ctx.add_opinion(
+            AgentOpinion(
+                agent_name="skill_none",
+                signal=None,
+                confidence=0.51,
+                reasoning="missing signal evidence",
+            )
+        )
+
+        orchestrator._run_strategy_engine(ctx)
+
+        message = agent.build_user_message(ctx)
+
+        self.assertIn("## Agent Opinions (Evidence Chain)", message)
+        self.assertIn("## Invalid Skill Opinions (Diagnostics only", message)
+        self.assertIn("2 skill opinion(s) were removed", message)
+        self.assertIn("data_limitations", message)
+        self.assertNotIn("skill_moon", message)
+        self.assertNotIn("skill_none", message)
+        self.assertNotIn("invalid moon evidence", message)
+        self.assertNotIn("missing signal evidence", message)
+        self.assertNotIn("0.91", message)
+        self.assertNotIn("0.51", message)
+
+    def test_decision_agent_prompt_omits_invalid_section_when_none(self):
+        from src.agent.agents.decision_agent import DecisionAgent
+
+        agent = DecisionAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        ctx = AgentContext(query="分析 600519", stock_code="600519")
+        ctx.add_opinion(AgentOpinion(agent_name="skill_bull_trend", signal="buy", confidence=0.8, reasoning="趋势偏强"))
+
+        message = agent.build_user_message(ctx)
+
+        self.assertIn("## Agent Opinions (Evidence Chain)", message)
+        self.assertNotIn("## Invalid Skill Opinions", message)
 
 
 class TestTechnicalAgentSkillPolicy(unittest.TestCase):

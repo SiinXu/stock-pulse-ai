@@ -969,6 +969,165 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("quote: stale", out)
 
     @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_renders_localized_text_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "等待确认"},
+                "strategy_synthesis": {
+                    "final_signal": "buy",
+                    "confidence": 0.8,
+                    "conflict_count": 1,
+                    "conflict_severity": "medium",
+                    "consensus_level": "medium",
+                    "summary_params": {
+                        "opinion_count": 2,
+                        "invalid_opinion_count": 1,
+                    },
+                    "supporting_skills": [{"skill_id": "bull_trend", "signal": "buy", "confidence": 0.8}],
+                    "opposing_skills": [{"skill_id": "hot_theme", "signal": "sell", "confidence": 0.75}],
+                    "conflicts": [
+                        {
+                            "conflict_type": "directional_opposition",
+                            "severity": "medium",
+                            "participants": ["bull_trend", "hot_theme"],
+                        }
+                    ],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("多策略综合", markdown)
+        self.assertIn("综合信号: 买入", markdown)
+        self.assertIn("默认多头趋势/买入/80%", markdown)
+        self.assertIn("另有 1 个策略解析失败", markdown)
+        self.assertNotIn("bull_trend", markdown)
+        self.assertIn("多策略综合", wechat)
+        self.assertIn("另有 1 个策略解析失败", wechat)
+
+    @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_uses_english_empty_labels_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="AAPL",
+            name="Apple",
+            sentiment_score=50,
+            trend_prediction="Sideways",
+            operation_advice="Hold",
+            report_language="en",
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for confirmation"},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "confidence": 0.0,
+                    "conflict_count": 0,
+                    "conflict_severity": "none",
+                    "consensus_level": "insufficient",
+                    "summary_params": {"opinion_count": 0},
+                    "supporting_skills": [],
+                    "opposing_skills": [],
+                    "conflicts": [],
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-20")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("Supporting Strategies: None", markdown)
+        self.assertIn("Opposing Strategies: None", markdown)
+        self.assertIn("Strategy Synthesis", wechat)
+        self.assertIn("Consensus Insufficient", wechat)
+        self.assertIn(
+            "Strategy synthesis from 0 strategies: final signal is Hold, "
+            "consensus level is Insufficient, with no detected conflicts.",
+            wechat,
+        )
+        self.assertNotIn("支持策略", markdown)
+        self.assertNotIn("多策略综合", wechat)
+
+    @mock.patch("src.notification.get_config")
+    def test_strategy_synthesis_legacy_shapes_are_safe_in_fallback_reports(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+
+        for malformed in ("bad-shape", ["bad-shape"], 42, True):
+            result = AnalysisResult(
+                code="600519",
+                name="贵州茅台",
+                sentiment_score=50,
+                trend_prediction="震荡",
+                operation_advice="观望",
+                report_language="zh",
+                dashboard={
+                    "core_conclusion": {"one_sentence": "测试"},
+                    "intelligence": {},
+                    "battle_plan": {},
+                    "strategy_synthesis": malformed,
+                },
+            )
+
+            markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+            wechat = service.generate_wechat_dashboard([result])
+
+            self.assertNotIn("多策略综合", markdown)
+            self.assertNotIn("多策略综合", wechat)
+
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="震荡",
+            operation_advice="观望",
+            report_language="zh",
+            dashboard={
+                "core_conclusion": {"one_sentence": "测试"},
+                "intelligence": {},
+                "battle_plan": {},
+                "strategy_synthesis": {
+                    "final_signal": "hold",
+                    "consensus_level": "insufficient",
+                    "conflict_severity": "none",
+                    "conflict_count": 0,
+                    "supporting_skills": "bad-shape",
+                    "opposing_skills": ["bad-shape"],
+                    "conflicts": [
+                        {
+                            "conflict_type": "directional_opposition",
+                            "severity": "medium",
+                            "participants": 7,
+                        }
+                    ],
+                    "summary_params": {"invalid_opinion_count": "3"},
+                },
+            },
+        )
+
+        markdown = service.generate_dashboard_report([result], report_date="2026-07-19")
+        wechat = service.generate_wechat_dashboard([result])
+
+        self.assertIn("另有 3 个策略解析失败", markdown)
+        self.assertIn("另有 3 个策略解析失败", wechat)
+        self.assertIn("策略方向出现对立", markdown)
+
+    @mock.patch("src.notification.get_config")
     def test_generate_dashboard_report_skips_context_only_phase_decision_default_renderer(
         self, mock_get_config: mock.MagicMock
     ):
