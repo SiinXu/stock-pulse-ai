@@ -18,10 +18,13 @@ import {
   EmptyState,
   InlineAlert,
   Input,
+  Loading,
   Modal,
   PageHeader,
   Pagination,
   Select,
+  StatCard,
+  Surface,
   ToastViewport,
 } from '../components/common';
 import {
@@ -1191,7 +1194,7 @@ const DecisionSignalsPage: React.FC = () => {
     const finalAction = typeof guardrail?.final_action === 'string' ? guardrail.final_action : null;
     const passed = typeof guardrail?.passed === 'boolean' ? guardrail.passed : null;
     return (
-      <div className="rounded-xl border border-border/60 bg-elevated/30 p-4">
+      <Surface level="interactive" padding="sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -1279,44 +1282,44 @@ const DecisionSignalsPage: React.FC = () => {
               />
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.action')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{actionLabels[preview.action]}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.score')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{preview.score ?? '-'}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.confidence')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{preview.confidence ?? '-'}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.horizon')}</p>
                 <p className="mt-1 text-sm font-semibold text-foreground">{preview.horizon ?? '-'}</p>
-              </div>
+              </Surface>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.entryRange')}</p>
                 <p className="mt-1 text-sm text-foreground">
                   {preview.entryLow || preview.entryHigh
                     ? `${preview.entryLow ?? '-'} ~ ${preview.entryHigh ?? '-'}`
                     : '-'}
                 </p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.stopLoss')}</p>
                 <p className="mt-1 text-sm text-foreground">{preview.stopLoss ?? '-'}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.targetPrice')}</p>
                 <p className="mt-1 text-sm text-foreground">{preview.targetPrice ?? '-'}</p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              </Surface>
+              <Surface level="interactive" padding="sm">
                 <p className="text-xs text-secondary-text">{t('decisionSignals.reassessRawFinal')}</p>
                 <p className="mt-1 text-sm text-foreground">{rawAction ?? '-'} {'->'} {finalAction ?? '-'}</p>
-              </div>
+              </Surface>
             </div>
             <div className="space-y-2 text-sm text-secondary-text">
               {passed === false ? (
@@ -1328,14 +1331,17 @@ const DecisionSignalsPage: React.FC = () => {
               {preview.watchConditions ? <p><span className="text-foreground">{t('decisionSignals.watchConditions')}:</span> {preview.watchConditions}</p> : null}
             </div>
             {reassessResponse?.warnings.length ? (
-              <div className="rounded-lg border border-warning/30 bg-warning/10 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-warning">{t('decisionSignals.reassessWarnings')}</p>
-                <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-secondary-text">
-                  {reassessResponse.warnings.map((warning, index) => (
-                    <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
-                  ))}
-                </ul>
-              </div>
+              <InlineAlert
+                variant="warning"
+                title={t('decisionSignals.reassessWarnings')}
+                message={(
+                  <ul className="list-disc space-y-1 pl-4">
+                    {reassessResponse.warnings.map((warning, index) => (
+                      <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
+                    ))}
+                  </ul>
+                )}
+              />
             ) : null}
             {passed === true ? (
               <div className="flex justify-end">
@@ -1356,16 +1362,20 @@ const DecisionSignalsPage: React.FC = () => {
           </div>
         ) : null}
         {persistedItem && reassessResponse?.warnings.length ? (
-          <div className="mt-3 rounded-lg border border-warning/30 bg-warning/10 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-warning">{t('decisionSignals.reassessWarnings')}</p>
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-secondary-text">
-              {reassessResponse.warnings.map((warning, index) => (
-                <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
-              ))}
-            </ul>
-          </div>
+          <InlineAlert
+            className="mt-3"
+            variant="warning"
+            title={t('decisionSignals.reassessWarnings')}
+            message={(
+              <ul className="list-disc space-y-1 pl-4">
+                {reassessResponse.warnings.map((warning, index) => (
+                  <li key={`${warning.code}-${index}`}>{warning.message || warning.code}</li>
+                ))}
+              </ul>
+            )}
+          />
         ) : null}
-      </div>
+      </Surface>
     );
   };
 
@@ -1612,29 +1622,33 @@ const DecisionSignalsPage: React.FC = () => {
               onAction={() => void loadOutcomeStats()}
             />
           ) : statsLoading ? (
-            <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
+            <Loading />
           ) : outcomeStats && outcomeStats.total > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
-                <p className="text-xs text-secondary-text">{t('decisionSignals.statsTotal')}</p>
-                <p className="mt-1 text-2xl font-semibold text-foreground">{outcomeStats.total}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
-                <p className="text-xs text-secondary-text">{t('decisionSignals.statsHitRate')}</p>
-                <p className="mt-1 text-2xl font-semibold text-success">{formatStatPercent(outcomeStats.hitRatePct)}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
-                <p className="text-xs text-secondary-text">{t('decisionSignals.outcome.hit')}</p>
-                <p className="mt-1 text-2xl font-semibold text-success">{outcomeStats.hit}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
-                <p className="text-xs text-secondary-text">{t('decisionSignals.outcome.miss')}</p>
-                <p className="mt-1 text-2xl font-semibold text-danger">{outcomeStats.miss}</p>
-              </div>
-              <div className="rounded-xl border border-border/60 bg-elevated/40 px-3 py-3">
-                <p className="text-xs text-secondary-text">{t('decisionSignals.outcome.unable')}</p>
-                <p className="mt-1 text-2xl font-semibold text-warning">{outcomeStats.unable}</p>
-              </div>
+              <StatCard
+                label={t('decisionSignals.statsTotal')}
+                value={outcomeStats.total}
+              />
+              <StatCard
+                tone="success"
+                label={t('decisionSignals.statsHitRate')}
+                value={<span className="text-success">{formatStatPercent(outcomeStats.hitRatePct)}</span>}
+              />
+              <StatCard
+                tone="success"
+                label={t('decisionSignals.outcome.hit')}
+                value={<span className="text-success">{outcomeStats.hit}</span>}
+              />
+              <StatCard
+                tone="danger"
+                label={t('decisionSignals.outcome.miss')}
+                value={<span className="text-danger">{outcomeStats.miss}</span>}
+              />
+              <StatCard
+                tone="warning"
+                label={t('decisionSignals.outcome.unable')}
+                value={<span className="text-warning">{outcomeStats.unable}</span>}
+              />
             </div>
           ) : (
             <EmptyState
@@ -1673,7 +1687,7 @@ const DecisionSignalsPage: React.FC = () => {
               icon={<Activity className="h-6 w-6" />}
             />
           ) : null}
-          {latestLoading ? <p className="mt-3 text-sm text-secondary-text">{t('common.loading')}...</p> : null}
+          {latestLoading ? <Loading className="mt-3" /> : null}
           {latestItems.length > 0 ? (
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {latestItems.map((item) => (
