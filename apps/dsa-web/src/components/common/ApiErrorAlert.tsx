@@ -1,6 +1,8 @@
 import type React from 'react';
 import { localizeParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { Alert } from './Alert';
+import { Button } from './Button';
 
 interface ApiErrorAlertProps {
   error: ParsedApiError;
@@ -23,26 +25,14 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
   const localizedError = localizeParsedApiError(error, language);
   const showDetails = localizedError.rawMessage.trim() && localizedError.rawMessage.trim() !== localizedError.message.trim();
 
-  return (
-    <div
-      className={`rounded-xl border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-4 py-3 text-[hsl(var(--color-danger-alert-text))] ${className}`}
-      role="alert"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">{localizedError.title}</p>
-          <p className="mt-1 text-xs opacity-90">{localizedError.message}</p>
-        </div>
-        {onDismiss ? (
-          <button
-            type="button"
-            className="min-h-11 min-w-11 shrink-0 rounded-lg border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-2 py-1 text-xs text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
-            onClick={onDismiss}
-          >
-            {dismissLabel ?? t('common.close')}
-          </button>
-        ) : null}
-      </div>
+  const action = actionLabel && onAction ? (
+    <Button type="button" variant="danger-subtle" size="compact" onClick={onAction}>
+      {actionLabel}
+    </Button>
+  ) : undefined;
+  const content = (
+    <>
+      <p>{localizedError.message}</p>
       {showDetails ? (
         <details className="mt-3 rounded-lg border border-subtle bg-surface-2 px-3 py-2">
           <summary className="flex min-h-11 cursor-pointer items-center text-xs text-[hsl(var(--color-danger-alert-text))] opacity-90">{t('common.details')}</summary>
@@ -51,15 +41,29 @@ export const ApiErrorAlert: React.FC<ApiErrorAlertProps> = ({
           </pre>
         </details>
       ) : null}
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          className="mt-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-[hsl(var(--color-danger-alert-border)/0.3)] bg-[hsl(var(--color-danger-alert-bg)/0.1)] px-3 py-1.5 text-xs font-medium text-[hsl(var(--color-danger-alert-text))] transition hover:bg-[hsl(var(--color-danger-alert-bg)/0.15)]"
-          onClick={onAction}
-        >
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
+    </>
+  );
+  return onDismiss ? (
+    <Alert
+      tone="danger"
+      urgent
+      title={localizedError.title}
+      className={className}
+      action={action}
+      dismissLabel={dismissLabel ?? t('common.close')}
+      onDismiss={onDismiss}
+    >
+      {content}
+    </Alert>
+  ) : (
+    <Alert
+      tone="danger"
+      urgent
+      title={localizedError.title}
+      className={className}
+      action={action}
+    >
+      {content}
+    </Alert>
   );
 };

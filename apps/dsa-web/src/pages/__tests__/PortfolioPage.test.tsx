@@ -40,6 +40,7 @@ const {
   parseCsvImport,
   commitCsvImport,
   createAccount,
+  updateAccount,
   deleteAccount,
   analyzePosition,
   listDecisionSignals,
@@ -62,6 +63,7 @@ const {
   parseCsvImport: vi.fn(),
   commitCsvImport: vi.fn(),
   createAccount: vi.fn(),
+  updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
   analyzePosition: vi.fn(),
   listDecisionSignals: vi.fn(),
@@ -94,6 +96,7 @@ vi.mock('../../api/portfolio', () => ({
     parseCsvImport,
     commitCsvImport,
     createAccount,
+    updateAccount,
     deleteAccount,
     analyzePosition,
   },
@@ -365,6 +368,25 @@ describe('PortfolioPage FX refresh', () => {
       </UiLanguageProvider>,
     );
   }
+
+  it('edits the selected account via a PUT that preserves the account id', async () => {
+    updateAccount.mockResolvedValue({ id: 1, name: 'Renamed', broker: 'Demo', market: 'us', baseCurrency: 'CNY', isActive: true });
+    render(<PortfolioPage />);
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    fireEvent.click(await screen.findByRole('button', { name: '编辑账户' }));
+
+    const nameInput = await screen.findByDisplayValue('Main');
+    fireEvent.change(nameInput, { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+
+    await waitFor(() => expect(updateAccount).toHaveBeenCalledWith(1, expect.objectContaining({
+      name: 'Renamed',
+      market: 'us',
+      baseCurrency: 'CNY',
+    })));
+  });
 
   it('uses fast portfolio valuation for page snapshot and risk loads', async () => {
     render(<PortfolioPage />);

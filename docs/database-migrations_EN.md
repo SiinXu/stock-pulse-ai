@@ -2,9 +2,9 @@
 
 [Chinese](database-migrations.md) | [English](database-migrations_EN.md)
 
-StockPulse uses an in-repository Python Migration Runner to manage SQLite schema evolution. The first phase does not introduce Alembic and does not replace the existing `Base.metadata.create_all()` or startup `_ensure_*` compatibility logic.
+StockPulse uses an in-repository Python Migration Runner to manage SQLite schema evolution. The first phase does not introduce Alembic and does not replace the existing `Base.metadata.create_all()` or startup `_ensure_*` compatibility logic all at once; instead it converts startup DDL into formal migrations one slice at a time.
 
-The current production registry target is `202607160001_migration_runner_registry`. This migration establishes additive metadata required by the ordered registry. It does not migrate Portfolio or other business fields.
+The current production registry target is `202607190005_intelligence_item_unique_index`. `202607160001_migration_runner_registry` establishes additive metadata required by the ordered registry; `202607190001`–`202607190005` convert the startup `_ensure_*` steps that previously backfilled the `llm_usage` telemetry columns, the `decision_signals` `decision_profile` column/indexes/backfill, the `portfolio_idempotency_records` scope columns/unique-index/normalization/guard-trigger, the `intelligence_items` legacy scope-value normalization, and the `intelligence_items` rebuild from legacy url uniqueness to the scoped composite unique key into formal migrations that repair legacy databases idempotently and are no-ops on fresh databases. Startup no longer runs any business schema DDL compatibility step.
 
 ## Core Contract
 
@@ -42,23 +42,22 @@ Production migrations are reviewed, trusted code shipped with the repository. Th
 create engine / install SQLite PRAGMAs / create Session factory
   -> BEGIN IMMEDIATE and preflight any existing registry
   -> Base.metadata.create_all()
-  -> existing _ensure_* compatibility and repair steps
-  -> prove and stamp a fresh/known legacy baseline
-  -> commit the serialized compatibility transaction
-  -> bootstrap or upgrade schema_migrations metadata
-  -> verify applied registry and checksums
-  -> apply pending migrations in registry order
+  -> remaining _ensure_* compatibility and repair steps
+  -> stamp a fresh/known legacy baseline
+  -> apply pending migrations in registry order within the same transaction
+  -> prove the fresh/known legacy baseline (schema shape and foreign keys)
+  -> commit the serialized initialization transaction
   -> mark DatabaseManager initialized
 ```
 
-Migrations finish synchronously inside `DatabaseManager` initialization and never continue as a background task. SQLite also serializes the `create_all + _ensure_* + baseline` compatibility phase under one database-level write lock and transaction, preventing two fresh processes from racing before they enter the runner. The first backend path that needs `DatabaseManager` returns only after migration finishes. On migration failure, `DatabaseManager` remains uninitialized. DDL/DML executed through the supported capability and the applied row share the runner-owned transaction and roll back together.
+Migrations finish synchronously inside `DatabaseManager` initialization and never continue as a background task. SQLite serializes the whole `create_all + baseline stamp + pending migrations + baseline proof` phase under one database-level write lock and transaction, preventing two fresh processes from racing to create tables and keeping the entire initialization atomic across the registry, schema, and baseline proof. Startup applies the ordered migrations inside that same write lock, so the baseline proof observes the fully repaired schema. Startup no longer runs any business schema DDL compatibility step: every `CREATE`/`ALTER`/`DROP` during initialization occurs only inside `metadata.create_all` (the fresh baseline) or the ordered migration runner, and a regression test captures those statements and rejects any stray schema DDL outside those two phases (a re-introduced startup ensure). The first backend path that needs `DatabaseManager` returns only after migration finishes. If any initialization step fails, `DatabaseManager` remains uninitialized; `create_all`, applied rows, and every DDL/DML statement in that transaction roll back together, leaving no half-migrated state.
 
 The general `/api/health` endpoint is not currently a database readiness probe, so a health response does not promise eager database initialization. This lazy boundary does not create a background migration: the first call that actually enters `DatabaseManager` still waits for the runner to succeed or fail completely.
 
 ## Transactions, Locking, and Concurrency
 
-- SQLite initialization first uses `BEGIN IMMEDIATE` to serialize `create_all + _ensure_* + baseline`. Each formal migration then obtains its own database-level write lock and reuses the application's existing busy timeout contract.
-- Each migration commits independently. Its DDL or DML and applied row share one transaction.
+- SQLite initialization uses one `BEGIN IMMEDIATE` to serialize `create_all + _ensure_* + baseline stamp + pending migrations + baseline proof` and reuses the application's existing busy timeout contract; startup applies the ordered migrations inside that write lock instead of taking a separate lock per migration.
+- On the startup path every pending migration's DDL or DML and applied row live inside the initialization transaction and commit or roll back once with it. The `apply_pending` engine entry point (reused by standalone diagnostics and tooling) still takes its own database-level write lock and commits per migration; both paths share the same guard, savepoint, and applied-row write logic.
 - An `upgrade` must execute synchronously and return `None`. Registration rejects known lazy functions and wrapper cycles. Any non-`None` runtime return fails closed with `migration_upgrade_invalid_return`. The runner first closes a natively closeable coroutine or generator and then rolls back the current transaction, so DDL or DML performed before the invalid return and the applied row are not committed.
 - The runner exclusively owns transaction control. An `upgrade` receives only the restricted SQL capability, whose public surface exposes no full `Connection`, engine, raw cursor, underlying DBAPI handle, `executescript`, `begin`, `commit`, `rollback`, savepoint, `close`, or `execution_options`. `execute` rejects arbitrary executables and sends one validated snapshot from an exact `TextClause` through the runner-owned driver path, preventing a SQLAlchemy statement callback or concurrent mutation from receiving the underlying connection or replacing that statement. When `upgrade` returns or raises, the runner publishes the revoked state first, rejects new calls and queued calls that have not obtained the connection, and waits for in-flight statements to finish inside the same transaction before writing the applied row. Any in-flight statement failure is latched as a migration failure. Forbidden attributes, arbitrary executables, non-builtin SQL strings, and helper-indirected transaction requests are likewise latched as capability violations, so catching their exceptions and returning `None` cannot produce a commit. DDL/DML previously executed through the capability rolls back with the applied row, and reusing a retained facade produces no additional database change. Explicit SQL `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, `SAVEPOINT`, and `RELEASE`, including forms preceded by comments, empty statements, or a BOM, is rejected before entering the real Connection. The random savepoint and transaction-state checks continue to verify runner ownership, while an existing caller-installed SQLite authorizer remains unchanged.
 - Later migrations do not run after the first failure.
@@ -75,14 +74,14 @@ A database is recognized as fresh only when inspection under the initialization 
 
 ### Historical Database
 
-A historical database validates any existing registry under the initialization lock, runs the existing `_ensure_*` compatibility steps, and then enters the ordered runner. The explicitly supported release boundaries are:
+A historical database validates any existing registry under the initialization lock, runs the existing `_ensure_*` compatibility steps, applies the ordered runner within the same transaction, and then proves the baseline. The explicitly supported release boundaries are:
 
 - `v3.0.0`, `v3.4.0`, and `v3.20.0`: without a registry, the database must match the corresponding fixed release profile.
 - `v3.21.0` and `v3.26.3`: the database must carry the known legacy baseline row; the checksum column may not exist yet.
 
 Each pre-baseline profile records a fixed source tag and commit and fully validates that release's required tables, ordered columns, SQLite type affinity, primary keys, `NOT NULL`, defaults, unique keys and collations, foreign keys, and `WITHOUT ROWID` / `STRICT` options. Partial or expression unique indexes, explicit `ON CONFLICT` policies, and known later-release tables are also part of the fail-closed boundary. Profiles are checked newest first, so an incomplete newer database cannot fall back to an older profile. Compatibility repair must then prove the complete current ORM baseline and pass `PRAGMA foreign_key_check` before a baseline row is written. A partial lookalike, missing constraint, wrong affinity, incomplete profile, or unrelated SQLite database fails closed and rolls back the complete compatibility transaction. Extra custom tables provide no profile evidence and cannot replace required tables. An unrecognized old database is never treated as fresh or stamped automatically; stop writers, make a complete backup, and have a maintainer establish its source version and an explicit migration path.
 
-The upgrade does not remove existing business tables, fields, or data. This phase deliberately retains `create_all + _ensure_*` as compatibility debt. Converting an existing ensure step into a formal migration requires a separate implementation slice.
+The upgrade does not remove existing business tables, fields, or data. The `llm_usage`, `decision_signals`, `portfolio_idempotency_records`, and `intelligence_items` startup compatibility steps are now the formal migrations `202607190001`–`202607190005`; startup no longer runs any business schema DDL compatibility step, keeping only `create_all` (fresh baseline table creation) and the baseline record stamp, and every other schema change must ship as a new dedicated migration.
 
 ## Status and Verification CLI
 

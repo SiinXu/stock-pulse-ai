@@ -14,9 +14,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from sqlalchemy.engine import Connection
-from sqlalchemy.exc import OperationalError
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from tests.litellm_stub import ensure_litellm_stub, remove_litellm_stub
@@ -1812,23 +1809,22 @@ class TestLLMUsageMigration(unittest.TestCase):
         missing = set(_LLM_USAGE_TELEMETRY_COLUMN_SQL) - columns
         self.assertFalse(missing, f"Missing telemetry columns: {sorted(missing)}")
 
-    @staticmethod
-    def _is_add_column_statement(statement: str, column: str) -> bool:
-        return (
-            "ALTER TABLE llm_usage ADD COLUMN" in statement
-            and f"ADD COLUMN {column} " in statement
-        )
-
     def test_existing_sqlite_table_gets_missing_columns_idempotently(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "legacy.sqlite"
             self._create_legacy_usage_db(db_path)
 
             DatabaseManager.reset_instance()
-            db = DatabaseManager(db_url=f"sqlite:///{db_path}")
-            db._ensure_llm_usage_telemetry_columns()
-
+            DatabaseManager(db_url=f"sqlite:///{db_path}")
             self._assert_all_telemetry_columns(db_path)
+            first_columns = self._usage_columns(db_path)
+
+            # A second initialization re-runs the registered migration as a
+            # no-op rather than re-issuing ALTER statements at startup.
+            DatabaseManager.reset_instance()
+            DatabaseManager(db_url=f"sqlite:///{db_path}")
+            self._assert_all_telemetry_columns(db_path)
+            self.assertEqual(self._usage_columns(db_path), first_columns)
 
     def test_existing_sqlite_table_gets_partial_missing_columns(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1858,96 +1854,6 @@ class TestLLMUsageMigration(unittest.TestCase):
             DatabaseManager.reset_instance()
             DatabaseManager(db_url=f"sqlite:///{db_path}")
 
-            self._assert_all_telemetry_columns(db_path)
-
-    def test_existing_sqlite_table_ignores_concurrent_duplicate_column(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "legacy.sqlite"
-            self._create_legacy_usage_db(db_path)
-
-            original_exec_driver_sql = Connection.exec_driver_sql
-            race_fired = {"value": False}
-
-            def flaky_exec_driver_sql(connection, statement, *args, **kwargs):
-                if (
-                    not race_fired["value"]
-                    and self._is_add_column_statement(statement, "provider_usage_json")
-                ):
-                    race_fired["value"] = True
-                    # Startup now holds BEGIN IMMEDIATE across compatibility
-                    # repairs, so a second connection cannot win this race. Keep
-                    # the duplicate-column recovery branch covered by forming
-                    # the observed schema state on the locked connection.
-                    original_exec_driver_sql(
-                        connection,
-                        "ALTER TABLE llm_usage ADD COLUMN provider_usage_json TEXT",
-                    )
-                    raise OperationalError(
-                        statement,
-                        {},
-                        sqlite3.OperationalError(
-                            "duplicate column name: provider_usage_json"
-                        ),
-                    )
-                return original_exec_driver_sql(
-                    connection,
-                    statement,
-                    *args,
-                    **kwargs,
-                )
-
-            DatabaseManager.reset_instance()
-            with patch.object(
-                Connection,
-                "exec_driver_sql",
-                new=flaky_exec_driver_sql,
-            ):
-                DatabaseManager(db_url=f"sqlite:///{db_path}")
-
-            self.assertTrue(race_fired["value"])
-            self._assert_all_telemetry_columns(db_path)
-
-    def test_existing_sqlite_table_retries_locked_column_backfill(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "legacy.sqlite"
-            self._create_legacy_usage_db(db_path)
-
-            original_exec_driver_sql = Connection.exec_driver_sql
-            lock_fired = {"value": False}
-
-            def flaky_exec_driver_sql(connection, statement, *args, **kwargs):
-                if (
-                    not lock_fired["value"]
-                    and self._is_add_column_statement(statement, "provider_usage_json")
-                ):
-                    lock_fired["value"] = True
-                    raise OperationalError(
-                        statement,
-                        {},
-                        sqlite3.OperationalError("database is locked"),
-                    )
-                return original_exec_driver_sql(
-                    connection,
-                    statement,
-                    *args,
-                    **kwargs,
-                )
-
-            DatabaseManager.reset_instance()
-            with patch.object(
-                Connection,
-                "exec_driver_sql",
-                new=flaky_exec_driver_sql,
-            ), patch("src.storage.time.sleep") as sleep_mock:
-                DatabaseManager(db_url=f"sqlite:///{db_path}")
-
-            self.assertTrue(lock_fired["value"])
-            storage_retry_sleeps = [
-                call_args
-                for call_args in sleep_mock.call_args_list
-                if call_args.args == (0.1,)
-            ]
-            self.assertEqual(len(storage_retry_sleeps), 1)
             self._assert_all_telemetry_columns(db_path)
 
 

@@ -73,6 +73,15 @@ import {
 } from '../components/settings/settingsInformationArchitecture';
 import { computeSectionStatus } from '../components/settings/settingsSectionStatus';
 import { keyBelongsToSection, placementForKey } from '../components/settings/settingsFieldPlacement';
+import {
+  type SettingsGroupSaveState,
+  type SettingsSaveStatus,
+  SETTINGS_AUTOSAVE_DEBOUNCE_MS,
+  classifyAiModelGate,
+  computeGroupFingerprint,
+  shouldMarkDirtyOnConflict,
+} from '../components/settings/autosaveMachine';
+import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import { WEB_BUILD_INFO } from '../utils/constants';
 import { decodeModelRef } from '../utils/modelRef';
 import { parseStockListValue } from '../utils/stockList';
@@ -110,15 +119,6 @@ type DesktopWindow = Window & {
     onUpdateStateChange?: (listener: (state: RawDesktopUpdateState) => void) => (() => void) | void;
   };
 };
-
-type SettingsSaveStatus = 'idle' | 'scheduled' | 'saving' | 'saved' | 'failed' | 'conflicted';
-
-interface SettingsGroupSaveState {
-  status: SettingsSaveStatus;
-  fingerprint: string;
-}
-
-const SETTINGS_AUTOSAVE_DEBOUNCE_MS = 700;
 
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
@@ -2153,36 +2153,36 @@ const SettingsPage: React.FC = () => {
       setGroupSaveState(group, { status: 'idle', fingerprint: '' });
       return;
     }
-    const fingerprint = JSON.stringify(items);
-    if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
-      setGroupSaveState(group, { status: 'scheduled', fingerprint });
-      return;
-    }
-    if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
-    }
-    if (group === 'ai_model' && !llmChannelDraftValid) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
-    }
-    const changesConnection = group === 'ai_model' && items.some((item) => (
-      item.key.toUpperCase() === 'LLM_CHANNELS'
-      || parseModelAccessFieldKey(item.key) !== null
-    ));
-    if (
-      changesConnection
-      && !connectionItemsRespectSchema(
-        items,
-        allValuesByKey,
-        rawValueKeys,
-        providerCatalog,
-        providerConnectionFields,
-        providerEmptyApiKeyHosts,
-      )
-    ) {
-      setGroupSaveState(group, { status: 'failed', fingerprint });
-      return;
+    const fingerprint = computeGroupFingerprint(items);
+    if (group === 'ai_model') {
+      const changesConnection = items.some((item) => (
+        item.key.toUpperCase() === 'LLM_CHANNELS'
+        || parseModelAccessFieldKey(item.key) !== null
+      ));
+      const blocked = classifyAiModelGate(
+        {
+          catalogLoading: isProviderCatalogLoading,
+          catalogError: Boolean(providerCatalogError),
+          schemaUnavailable: providerConnectionSchemaUnavailable,
+          channelDraftValid: llmChannelDraftValid,
+          changesConnection,
+          connectionRespectsSchema: changesConnection
+            ? connectionItemsRespectSchema(
+                items,
+                allValuesByKey,
+                rawValueKeys,
+                providerCatalog,
+                providerConnectionFields,
+                providerEmptyApiKeyHosts,
+              )
+            : true,
+        },
+        { checkConnection: true },
+      );
+      if (blocked) {
+        setGroupSaveState(group, { status: blocked, fingerprint });
+        return;
+      }
     }
 
     autosaveInFlightRef.current = group;
@@ -2222,25 +2222,46 @@ const SettingsPage: React.FC = () => {
     }
     const currentPendingGroups = pendingGroupsRef.current;
     if (isLoading || autosaveInFlightRef.current || conflictState || currentPendingGroups.size === 0) {
+      // Autosave is paused (initial load, another group in flight, or an
+      // unresolved version conflict). While a conflict blocks the write, groups
+      // with pending edits are explicitly `dirty` rather than left on a stale
+      // status; they return to `scheduled` once the conflict is resolved.
+      if (conflictState) {
+        for (const [group, items] of currentPendingGroups) {
+          const previous = groupSaveStatesRef.current[group];
+          if (!shouldMarkDirtyOnConflict(previous?.status)) {
+            continue;
+          }
+          const fingerprint = computeGroupFingerprint(items);
+          if (previous?.status !== 'dirty' || previous.fingerprint !== fingerprint) {
+            setGroupSaveState(group, { status: 'dirty', fingerprint });
+          }
+        }
+      }
       return undefined;
     }
 
     let nextGroup: string | null = null;
     for (const [group, items] of currentPendingGroups) {
-      const fingerprint = JSON.stringify(items);
-      if (group === 'ai_model' && (isProviderCatalogLoading || providerCatalogError)) {
-        setGroupSaveState(group, { status: 'scheduled', fingerprint });
-        continue;
-      }
-      if (group === 'ai_model' && providerConnectionSchemaUnavailable) {
-        setGroupSaveState(group, { status: 'failed', fingerprint });
-        continue;
+      const fingerprint = computeGroupFingerprint(items);
+      if (group === 'ai_model') {
+        const blocked = classifyAiModelGate(
+          {
+            catalogLoading: isProviderCatalogLoading,
+            catalogError: Boolean(providerCatalogError),
+            schemaUnavailable: providerConnectionSchemaUnavailable,
+            channelDraftValid: llmChannelDraftValid,
+            changesConnection: false,
+            connectionRespectsSchema: true,
+          },
+          { checkConnection: false },
+        );
+        if (blocked) {
+          setGroupSaveState(group, { status: blocked, fingerprint });
+          continue;
+        }
       }
       const previous = groupSaveStatesRef.current[group];
-      if (group === 'ai_model' && !llmChannelDraftValid) {
-        setGroupSaveState(group, { status: 'failed', fingerprint });
-        continue;
-      }
       if (
         previous
         && (previous.status === 'failed' || previous.status === 'conflicted')
@@ -2278,7 +2299,7 @@ const SettingsPage: React.FC = () => {
 
   const retryAutosaveGroup = useCallback((group: string) => {
     const items = pendingGroupsRef.current.get(group) ?? [];
-    setGroupSaveState(group, { status: 'scheduled', fingerprint: JSON.stringify(items) });
+    setGroupSaveState(group, { status: 'scheduled', fingerprint: computeGroupFingerprint(items) });
     void runGroupAutosave(group);
   }, [runGroupAutosave, setGroupSaveState]);
 
@@ -2586,13 +2607,13 @@ const SettingsPage: React.FC = () => {
     <EmptyState
       title={t('settings.currentCategoryEmptyTitle')}
       description={t('settings.currentCategoryEmptyDescription')}
-      className="settings-surface-panel settings-border-strong border-none bg-transparent shadow-none"
     />
   );
   const activeSaveGroup = activeCategory;
   const activeGroupDirtyCount = pendingGroups.get(activeSaveGroup)?.length ?? 0;
   const saveStatusLabel = (status: SettingsSaveStatus): string => {
     switch (status) {
+      case 'dirty': return settingsText.autosaveScheduled;
       case 'scheduled': return settingsText.autosaveScheduled;
       case 'saving': return settingsText.autosaveSaving;
       case 'saved': return settingsText.autosaveSaved;
@@ -3405,6 +3426,17 @@ const SettingsPage: React.FC = () => {
                 {activeConfigPanel}
               </SettingsPanelErrorBoundary>
             ) : activeConfigPanel}
+            {activeCategory === 'data_source' && activeSubCategory !== 'providers' ? (
+              <SettingsPanelErrorBoundary
+                title={t('settings.pageTitle')}
+                resetKey={`intelligence:${configVersion}`}
+                diagnosticHint={settingsPanelDiagnosticHint}
+              >
+                <div className="mt-2">
+                  <IntelligenceSourcesPanel />
+                </div>
+              </SettingsPanelErrorBoundary>
+            ) : null}
             {isAlertsSection && eventMonitorItems.length > 0 ? (
               <SettingsSectionCard
                 title={settingsText.eventMonitor}

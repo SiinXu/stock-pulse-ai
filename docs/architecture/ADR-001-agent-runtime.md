@@ -1,11 +1,12 @@
 # ADR-001: Agent Runtime 架构 - Native Only + vendor-neutral Runtime Contract
 
-- 状态: `Accepted`（2026-07-19 修订并执行 Native Only 裁决）
+- 状态: `Accepted / Amended by ADR-002`（2026-07-19 修订并执行 Native Only 裁决；同日 ADR-002 改判恢复实验 PydanticAI Runtime 为可选资产，D1 的“唯一可执行 Runtime”不再描述现状）
 - 首次批准: 2026-07-17
 - 最近修订: 2026-07-19
 - 决策者: Maintainer（SiinXu）
 - 实施基线: `main@b8983fc7`
 - 关联文档:
+  - `docs/architecture/ADR-002-pydanticai-runtime-reinstatement.md`（2026-07-19 改判：恢复实验 Runtime，Native 默认不变）
   - `docs/architecture/pydanticai-runtime-adoption-decision.md`（裁决证据与实施结果）
   - `docs/architecture/pydanticai-runtime-development-plan.md`（历史计划，已停止）
   - `docs/architecture/pydanticai-runtime-recovery-plan.md`（历史恢复计划，已停止）
@@ -149,3 +150,4 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 | 2026-07-17 | Accepted | 批准 Native 永久默认、中立 Contract、实验 Adapter POC 和 degraded 兼容语义 |
 | 2026-07-18 | Accepted | RF-07 因收益与 Desktop 证据不足裁决 `Native Only` |
 | 2026-07-19 | Accepted / Implemented | 删除实验 Adapter、依赖、注入点、cross-runtime 测试和专用 CI；保留并加固 Native 中立资产 |
+| 2026-07-19 | Amended | ADR-002 改判恢复实验 PydanticAI Runtime（`Continue Experimental`）：D1 的“唯一可执行 Runtime”与删除清单不再是现状；Native 永久默认、中立 Contract 与 D2/D3/D4/D5 语义不变 |

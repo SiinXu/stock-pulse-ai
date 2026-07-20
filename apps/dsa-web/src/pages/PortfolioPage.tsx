@@ -209,6 +209,7 @@ const PortfolioPage: React.FC = () => {
   const [accountCreating, setAccountCreating] = useState(false);
   const [accountCreateError, setAccountCreateError] = useState<string | null>(null);
   const [accountCreateSuccess, setAccountCreateSuccess] = useState<string | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [accountForm, setAccountForm] = useState({
     name: '',
     broker: 'Demo',
@@ -919,6 +920,7 @@ const PortfolioPage: React.FC = () => {
       setPendingAccountDelete(null);
       setAccountDeleteError(null);
       setShowCreateAccount(false);
+      setEditingAccountId(null);
       await loadAccounts();
       setEventPage(1);
     } catch (err) {
@@ -995,6 +997,58 @@ const PortfolioPage: React.FC = () => {
     } finally {
       setAccountCreating(false);
     }
+  };
+
+  const handleEditAccountOpen = (account: PortfolioAccountItem) => {
+    setEditingAccountId(account.id);
+    setAccountForm({
+      name: account.name,
+      broker: account.broker ?? '',
+      market: account.market,
+      baseCurrency: account.baseCurrency,
+    });
+    setAccountCreateError(null);
+    setAccountCreateSuccess(null);
+    setShowCreateAccount(true);
+  };
+
+  const handleUpdateAccount = async () => {
+    if (editingAccountId == null) return;
+    const name = accountForm.name.trim();
+    if (!name) {
+      setAccountCreateError(text.accountNameRequired);
+      setAccountCreateSuccess(null);
+      return;
+    }
+    try {
+      setAccountCreating(true);
+      setAccountCreateError(null);
+      setAccountCreateSuccess(null);
+      // PUT is a true update that preserves the account id, ledger, holdings,
+      // and idempotency links (no delete + recreate).
+      const updated = await portfolioApi.updateAccount(editingAccountId, {
+        name,
+        broker: accountForm.broker.trim(),
+        market: accountForm.market,
+        baseCurrency: accountForm.baseCurrency.trim() || 'CNY',
+      });
+      await loadAccounts();
+      setSelectedAccount(updated.id);
+      setShowCreateAccount(false);
+      setEditingAccountId(null);
+      setAccountCreateSuccess(text.accountUpdated);
+    } catch (err) {
+      setAccountCreateError(getParsedApiError(err, language).message || text.accountUpdateFailed);
+      setAccountCreateSuccess(null);
+    } finally {
+      setAccountCreating(false);
+    }
+  };
+
+  const handleAccountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingAccountId != null) void handleUpdateAccount();
+    else void handleCreateAccount(e);
   };
 
   const handleRefresh = async () => {
@@ -1148,12 +1202,26 @@ const PortfolioPage: React.FC = () => {
                   size="comfortable"
                   className="flex-1"
                   onClick={() => {
+                    setEditingAccountId(null);
+                    setAccountForm({ name: '', broker: 'Demo', market: accountForm.market, baseCurrency: accountForm.baseCurrency });
                     setShowCreateAccount(true);
                     setAccountCreateError(null);
                     setAccountCreateSuccess(null);
                   }}
                 >
                   {text.createAccount}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="comfortable"
+                  className="flex-1"
+                  disabled={!writableAccount || isLoading || fxRefreshing}
+                  onClick={() => {
+                    if (writableAccount) handleEditAccountOpen(writableAccount);
+                  }}
+                >
+                  {text.editAccount}
                 </Button>
                 <Button
                   type="button"
@@ -1185,7 +1253,7 @@ const PortfolioPage: React.FC = () => {
         ) : (
           <InlineAlert
             variant="warning"
-            className="rounded-lg px-3 py-2 text-xs shadow-none"
+            size="compact"
             message={text.noAccounts}
             action={(
               <Button
@@ -1193,6 +1261,7 @@ const PortfolioPage: React.FC = () => {
                 variant="secondary"
                 size="default"
                 onClick={() => {
+                  setEditingAccountId(null);
                   setShowCreateAccount(true);
                   setAccountCreateError(null);
                   setAccountCreateSuccess(null);
@@ -1206,6 +1275,9 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
+      {accountCreateSuccess ? (
+        <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
       {riskWarning ? (
         <InlineAlert
           variant="warning"
@@ -1230,8 +1302,13 @@ const PortfolioPage: React.FC = () => {
 
       <Modal
         isOpen={showCreateAccount}
-        onClose={() => setShowCreateAccount(false)}
-        title={text.newAccount}
+        onClose={() => {
+          if (!accountCreating) {
+            setShowCreateAccount(false);
+            setEditingAccountId(null);
+          }
+        }}
+        title={editingAccountId != null ? text.editAccount : text.newAccount}
       >
           {!hasAccounts ? (
             <p className="mb-3 text-xs text-secondary">{text.createAutoSwitch}</p>
@@ -1239,20 +1316,13 @@ const PortfolioPage: React.FC = () => {
           {accountCreateError ? (
             <InlineAlert
               variant="danger"
-              className="mt-2 rounded-lg px-2 py-1 text-xs shadow-none"
+              size="compact"
+              className="mt-2"
               title={text.createFailed}
               message={accountCreateError}
             />
           ) : null}
-          {accountCreateSuccess ? (
-            <InlineAlert
-              variant="success"
-              className="mt-2 rounded-lg px-2 py-1 text-xs shadow-none"
-              title={text.createSuccess}
-              message={accountCreateSuccess}
-            />
-          ) : null}
-          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleCreateAccount}>
+          <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleAccountSubmit}>
             <Input
               label={text.accountName}
               placeholder={text.required}
@@ -1290,9 +1360,9 @@ const PortfolioPage: React.FC = () => {
               size="comfortable"
               className="md:col-span-2"
               isLoading={accountCreating}
-              loadingText={text.creatingAccount}
+              loadingText={editingAccountId != null ? text.savingAccount : text.creatingAccount}
             >
-              {text.createAccount}
+              {editingAccountId != null ? text.saveAccount : text.createAccount}
             </Button>
           </form>
       </Modal>
@@ -1300,9 +1370,9 @@ const PortfolioPage: React.FC = () => {
       {snapshotQualityMessage ? (
         <InlineAlert
           variant="warning"
+          size="compact"
           title={text.snapshotPartialTitle}
           message={snapshotQualityMessage}
-          className="rounded-xl px-3 py-2 text-xs shadow-none"
         />
       ) : null}
 
@@ -1339,9 +1409,10 @@ const PortfolioPage: React.FC = () => {
           {fxRefreshFeedback ? (
             <InlineAlert
               variant={getFxRefreshFeedbackVariant(fxRefreshFeedback.tone)}
+              size="compact"
               title={text.fxRefreshResult}
               message={fxRefreshFeedback.text}
-              className="mt-3 rounded-xl px-3 py-2 text-xs shadow-none"
+              className="mt-3"
             />
           ) : null}
         </Card>
@@ -1356,16 +1427,17 @@ const PortfolioPage: React.FC = () => {
           {portfolioSignalsWarning ? (
             <InlineAlert
               variant="warning"
+              size="compact"
               title={t('decisionSignals.portfolioWarningTitle')}
               message={portfolioSignalsWarning}
-              className="mb-3 rounded-xl px-3 py-2 text-xs shadow-none"
+              className="mb-3"
             />
           ) : null}
           {positionRows.length === 0 ? (
             <EmptyState
               title={text.noPositionsTitle}
               description={text.noPositionsDescription}
-              className="border-none bg-transparent px-4 py-8 shadow-none"
+              compact
             />
           ) : (
             <div className="overflow-x-auto">
@@ -1472,7 +1544,7 @@ const PortfolioPage: React.FC = () => {
             <EmptyState
               title={text.noConcentrationTitle}
               description={text.noConcentrationDescription}
-              className="border-none bg-transparent px-4 py-10 shadow-none"
+              compact
             />
           )}
           <div className="mt-3 text-xs text-secondary space-y-1">
@@ -1486,7 +1558,7 @@ const PortfolioPage: React.FC = () => {
       {writeBlocked && hasAccounts ? (
         <InlineAlert
           variant="warning"
-          className="rounded-lg px-3 py-2 text-xs shadow-none"
+          size="compact"
           message={text.writeBlocked}
         />
       ) : null}
@@ -1703,7 +1775,7 @@ const PortfolioPage: React.FC = () => {
             {brokerLoadWarning ? (
               <InlineAlert
                 variant="warning"
-                className="rounded-lg px-2 py-1 text-xs shadow-none"
+                size="compact"
                 message={brokerLoadWarning}
               />
             ) : null}
@@ -1781,17 +1853,17 @@ const PortfolioPage: React.FC = () => {
             {csvParseResult ? (
               <InlineAlert
                 variant={getCsvParseVariant(csvParseResult)}
+                size="compact"
                 title={text.csvParseResult}
                 message={formatUiText(text.csvParseSummary, { valid: csvParseResult.recordCount, skipped: csvParseResult.skippedCount, errors: csvParseResult.errorCount })}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
             {csvCommitResult ? (
               <InlineAlert
                 variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
+                size="compact"
                 title={csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult}
                 message={formatUiText(text.csvCommitSummary, { mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite, inserted: csvCommitResult.insertedCount, duplicates: csvCommitResult.duplicateCount, failed: csvCommitResult.failedCount })}
-                className="rounded-lg px-3 py-2 text-xs shadow-none"
               />
             ) : null}
           </fieldset>
@@ -1955,7 +2027,7 @@ const PortfolioPage: React.FC = () => {
                     <EmptyState
                       title={text.noLedger}
                       description={text.noLedgerDescription}
-                      className="border-none bg-transparent px-3 py-6 shadow-none"
+                      compact
                     />
                   ) : null}
             </div>

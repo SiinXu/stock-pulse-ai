@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Guards for retired cross-runtime evidence and its documented limits."""
+"""Guards for the frozen cross-runtime evidence record and its documented limits."""
 
 import json
 import re
@@ -54,7 +54,7 @@ _HISTORICAL_CONFORMANCE_TABLE = {
         "历史 adapter 直接调用稳定返回 `unsupported_capability`，不计作 pass",
     ),
 }
-_RETIRED_EVIDENCE_PATHS = (
+_REINSTATED_EVIDENCE_PATHS = (
     "tests/agent/runtime/test_conformance.py",
     "tests/agent/runtime/test_conformance_replay.py",
     "tests/agent/runtime/test_conformance_leak_scan.py",
@@ -144,9 +144,11 @@ def test_dependency_footprint_does_not_claim_unreproducible_counts():
     assert "未保存可复现的双环境依赖快照" in decision
 
 
-def test_retired_evidence_paths_match_the_native_only_codebase():
-    for relative_path in _RETIRED_EVIDENCE_PATHS:
-        assert not (_REPOSITORY_ROOT / relative_path).exists()
+def test_reinstated_evidence_paths_exist():
+    # ADR-002 reinstated the cross-runtime conformance suite as executable
+    # assets; the frozen historical evidence tables above stay unchanged.
+    for relative_path in _REINSTATED_EVIDENCE_PATHS:
+        assert (_REPOSITORY_ROOT / relative_path).exists()
 
 
 def test_native_exception_evidence_is_executable_and_fail_closed():

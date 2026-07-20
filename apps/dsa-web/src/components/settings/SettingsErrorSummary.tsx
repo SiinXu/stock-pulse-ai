@@ -47,7 +47,6 @@ export const SettingsErrorSummary: React.FC<SettingsErrorSummaryProps> = ({
     <InlineAlert
       variant="danger"
       title={title}
-      className="rounded-2xl"
       message={(
         <ul className="mt-1 space-y-1.5">
           {entries.map((entry) => (

@@ -1,4 +1,17 @@
 import apiClient from './index';
+import { toCamelCase } from './utils';
+import type { StockHistoryResponse, StockQuote } from '../types/stocks';
+
+function toStockCodePath(stockCode: string): string {
+  const trimmed = stockCode.trim();
+  if (!trimmed) throw new Error('Stock code is required');
+  if (trimmed.includes('/')) {
+    throw new Error(
+      'Stock code cannot contain "/" because the backend route accepts a single path segment; use 600519, HK00700, or AAPL.',
+    );
+  }
+  return encodeURIComponent(trimmed);
+}
 
 export type ExtractItem = {
   code?: string | null;
@@ -13,6 +26,27 @@ export type ExtractFromImageResponse = {
 };
 
 export const stocksApi = {
+  async getQuote(stockCode: string): Promise<StockQuote> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${toStockCodePath(stockCode)}/quote`,
+    );
+    return toCamelCase<StockQuote>(response.data);
+  },
+
+  // The backend only implements daily candles; weekly/monthly are aggregated
+  // client-side, so this always requests the daily series.
+  async getDailyHistory(stockCode: string, days = 30): Promise<StockHistoryResponse> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${toStockCodePath(stockCode)}/history`,
+      { params: { period: 'daily', days } },
+    );
+    const data = toCamelCase<StockHistoryResponse>(response.data);
+    if (!Array.isArray(data.data)) {
+      throw new Error('Stock history response data must be an array');
+    }
+    return data;
+  },
+
   async extractFromImage(file: File): Promise<ExtractFromImageResponse> {
     const formData = new FormData();
     formData.append('file', file);

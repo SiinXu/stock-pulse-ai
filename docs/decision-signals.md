@@ -126,6 +126,7 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 Web 入口位于 `/decision-signals`：
 
 - 默认查询 `status=active`。
+- 页面顶部提供“创建信号”入口，打开手工创建抽屉：可录入基础字段（代码、名称、市场、动作、置信度、周期、市场阶段、风格）、交易计划（入场上/下沿、止损、目标价、失效条件、观察条件、过期日）和解释字段（理由、风险、催化、证据）。来源固定为 `source_type=manual`、`trigger_source=web_manual`，不会伪装成分析、Agent、告警或大盘复盘。抽屉内提供实时预览和客户端校验（必填股票代码/市场/动作，置信度限定 0–1，价格须为正，入场下沿不高于上沿）。提交前对规范化后的完整内容生成确定性 `web_manual:<hash>` trace_id，作为 source-less 手工信号的去重键：完全相同的草稿再次提交命中去重（`created=false`），任意字段变化即视为新信号（`created=true`）。创建 active 方向性信号可能触发服务端使同标的相反 active 信号失效，成功后刷新列表、统计与当前股票的 latest/时间线。草稿在关闭并重新打开抽屉后保留，去重命中或请求失败时保留，仅在创建成功后清空。
 - 页面顶部提供页面级“当前股票”主路径，独立于高级列表筛选。用户提交主股票、选择自动补全候选或点击候选 chip 后，latest active 与时间线共用同一个已应用股票上下文；只修改输入草稿不会触发 latest 或时间线查询。
 - 当前股票候选优先展示最近分析过的股票；如果没有历史候选，或历史候选加载失败，则降级展示股票索引中 active 且 popularity 较高的热门股票。候选只作为手动点击入口，页面加载时不会自动提交查询；历史和股票索引都不可用时仅显示无候选降级文案。
 - 当前股票上下文会显示已应用的代码、名称和可推导市场，并提供清空入口。清空会让 latest 与时间线回到引导态，不影响高级列表筛选或列表来源详情抽屉。
@@ -136,6 +137,7 @@ Web 入口位于 `/decision-signals`：
 - 时间线 status filter 只支持 `all` 与 `active`：`all` 不传 `status`，`active` 传 `status=active`。P1 不提供 terminal status filter，也不做前端 terminal 过滤。
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
+- 统计卡片内提供“运行后验”入口，按安全默认参数触发 `POST /api/v1/decision-signals/outcomes/run`：固定 `status=active`、`force=false`、`limit=100`，只补算 active 信号中缺失或可重试的 outcome，不会重算全部或强制覆盖，避免误触发大批量重算或反复请求数据源。触发前需二次确认；运行同步返回后展示 `evaluated`/`created`/`updated`/`skipped` 汇总与引擎版本，并把本次运行追加到“最近运行”会话列表（仅前端会话内保留，后端无运行历史）。运行期间禁用触发并由 in-flight 守卫防重复提交，失败时展示错误与 trace，成功后刷新后验统计。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
 - 卡片、详情、组合摘要和时间线统一以顶层 `action` 决定方向，并读取 `presentation` 的 confidence、summary、risk、timestamp；`presentation.action` 只作为同值派生镜像返回。时间线 rank、颜色和 tooltip 不再各自解释方向，排序与持仓等价代码匹配只按 canonical timestamp 选择最新信号。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
