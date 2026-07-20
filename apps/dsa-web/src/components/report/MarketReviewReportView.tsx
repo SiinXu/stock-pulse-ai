@@ -471,7 +471,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       {summary ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insightCards.map(({ icon: Icon, label, value }) => (
-            <Card key={label} variant="bordered" padding="sm" className="home-panel-card text-left">
+            <Card key={label} variant="bordered" padding="sm" className="text-left">
               <div className="flex items-start gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
@@ -487,7 +487,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {structuredMarketData.length > 0 ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -632,14 +632,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {isLoading ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <div className="home-spinner h-10 w-10 animate-spin border-[3px]" />
             <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>
       ) : error ? (
-        <Card variant="bordered" padding="md" className="home-panel-card text-left">
+        <Card variant="bordered" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <ApiErrorAlert error={error} className="w-full max-w-lg" />
           </div>
@@ -647,7 +647,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : (
         <div data-testid="market-review-report" className="space-y-4">
           {sections.map(({ id, title, content: sectionContent, icon: Icon }) => (
-            <Card key={id} variant="bordered" padding="md" className="home-panel-card text-left">
+            <Card key={id} variant="bordered" padding="md" className="text-left">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
