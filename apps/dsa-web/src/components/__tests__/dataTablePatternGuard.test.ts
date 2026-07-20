@@ -38,7 +38,7 @@ const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
   { file: '../../pages/BacktestPage.tsx', line: 771, owner: 'TRACK-UI2', removeBy: 'UI-BT01' },
   { file: '../../pages/PortfolioPage.tsx', line: 1440, owner: 'TRACK-UI2', removeBy: 'UI-P01' },
   { file: '../../pages/StockDetailsPage.tsx', line: 397, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
-  { file: '../../pages/StockScreeningPage.tsx', line: 1457, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
+  { file: '../../pages/StockScreeningPage.tsx', line: 1453, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
   { file: '../../pages/TokenUsagePage.tsx', line: 284, owner: 'TRACK-UI1', removeBy: 'UI-U01' },
 ];
 
@@ -114,7 +114,9 @@ function isCreateElementTable(node: ts.CallExpression): boolean {
 
 function semanticTableRole(node: ts.JsxOpeningLikeElement): string | undefined {
   const role = node.attributes.properties.find((property): property is ts.JsxAttribute => (
-    ts.isJsxAttribute(property) && property.name.text === 'role'
+    ts.isJsxAttribute(property)
+    && ts.isIdentifier(property.name)
+    && property.name.text === 'role'
   ));
   if (!role?.initializer || !ts.isStringLiteral(role.initializer)) return undefined;
   return role.initializer.text === 'table' || role.initializer.text === 'grid'
