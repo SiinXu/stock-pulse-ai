@@ -120,6 +120,36 @@ function PresentationSwapPage() {
       >
         Transient navigation link
       </Link>
+      <Link
+        to="/second"
+        data-route-focus-key="presentation:missing-return"
+        data-route-focus-return-key="presentation:missing-opener"
+      >
+        Missing return marker link
+      </Link>
+      <button type="button" data-route-focus-key="presentation:duplicate-opener">
+        First duplicate opener
+      </button>
+      <button type="button" data-route-focus-key="presentation:duplicate-opener">
+        Second duplicate opener
+      </button>
+      <Link
+        to="/second"
+        data-route-focus-key="presentation:duplicate-return"
+        data-route-focus-return-key="presentation:duplicate-opener"
+      >
+        Duplicate return marker link
+      </Link>
+      <button type="button" data-route-focus-key="">
+        Malformed empty marker
+      </button>
+      <Link
+        to="/second"
+        data-route-focus-key="presentation:empty-return"
+        data-route-focus-return-key=""
+      >
+        Empty return marker link
+      </Link>
     </RegisteredPage>
   );
 }
@@ -232,6 +262,24 @@ describe('RouteFocusCoordinator', () => {
 
     await waitFor(() => expect(
       screen.getByRole('button', { name: 'Persistent navigation opener' }),
+    ).toHaveFocus());
+  });
+
+  it.each([
+    'Missing return marker link',
+    'Duplicate return marker link',
+    'Empty return marker link',
+  ])('fails closed when %s does not name one persistent marker', async (linkName) => {
+    const router = renderRouter('/presentation');
+    fireEvent.click(screen.getByRole('link', { name: linkName }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+
+    await waitFor(() => expect(
+      screen.getByRole('heading', { name: 'Presentation page' }),
     ).toHaveFocus());
   });
 

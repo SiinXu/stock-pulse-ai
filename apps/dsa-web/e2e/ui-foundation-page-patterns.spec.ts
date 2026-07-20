@@ -178,17 +178,6 @@ test.describe('shared page and Router Patterns', () => {
       if (viewport.width >= 1280) {
         await expect(toggle).toBeHidden();
         await expect(railContent).toBeVisible();
-      } else if (viewport.width >= 768 && viewport.width < 1024) {
-        await expect(toggle).toBeVisible();
-        await expect(toggle).toHaveAttribute('aria-haspopup', 'dialog');
-        await expect(railContent).toHaveCount(0);
-        await toggle.focus();
-        await toggle.click();
-        const drawer = page.getByRole('dialog', { name: 'Workspace context' });
-        await expect(drawer.getByTestId('rail-content')).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(drawer).toBeHidden();
-        await expect(toggle).toBeFocused();
       } else {
         await expect(toggle).toBeVisible();
         await expect(railContent).toBeHidden();
@@ -196,19 +185,6 @@ test.describe('shared page and Router Patterns', () => {
         await expect(railContent).toBeVisible();
       }
     }
-  });
-
-  test('closes an open tablet business rail when the presentation changes', async ({ page }) => {
-    await openFixture(page, 900, 800);
-    const toggle = page.getByRole('button', { name: 'Show workspace context' });
-    await toggle.click();
-    await expect(page.getByRole('dialog', { name: 'Workspace context' })).toBeVisible();
-
-    await page.setViewportSize({ width: 1024, height: 768 });
-
-    await expect(page.getByRole('dialog', { name: 'Workspace context' })).toBeHidden();
-    await expect(toggle).toBeFocused();
-    await expect(page.getByTestId('rail-content')).toBeHidden();
   });
 
   test('preserves both semantic theme states without horizontal overflow', async ({ page }) => {

@@ -280,6 +280,13 @@ test.describe('application shell foundation', () => {
     const compactHome = sidebar.getByRole('link', { name: 'Home' });
     await compactHome.focus();
     await expect(page.getByRole('tooltip')).toHaveText('Home');
+    const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
+    expect(await compactNavigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
+      await compactNavigation.evaluate((element) => element.clientHeight),
+    );
+    for (const route of await compactNavigation.getByRole('link').all()) {
+      expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
     await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
     await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
