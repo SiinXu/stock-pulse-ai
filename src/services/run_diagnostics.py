@@ -10,8 +10,9 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -25,6 +26,18 @@ _CURRENT_CONTEXT: ContextVar[Optional["RunDiagnosticContext"]] = ContextVar(
     "run_diagnostic_context",
     default=None,
 )
+
+PIPELINE_STAGE_NAMES = (
+    "resolve",
+    "fetch",
+    "intelligence",
+    "context",
+    "analyze",
+    "persist",
+    "render",
+    "dispatch",
+)
+PIPELINE_STAGE_STATUSES = frozenset({"success", "degraded", "failed", "skipped"})
 
 _SECRET_REDACTIONS = (
     (
@@ -262,6 +275,129 @@ class HistoryRun:
 
 
 @dataclass
+class PipelineStageRun:
+    """One completed, skipped, or failed Pipeline stage observation."""
+
+    trace_id: str
+    stage: str
+    status: str
+    input_summary: Dict[str, Any]
+    duration_ms: int
+    degraded: bool
+    retryable: bool
+    started_at: str
+    ended_at: str
+    output_summary: Dict[str, Any] = field(default_factory=dict)
+    degradation_reason: Optional[str] = None
+    error_type: Optional[str] = None
+    error_message_sanitized: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a sanitized snapshot payload for persistence and diagnostics."""
+        payload = {
+            "trace_id": self.trace_id,
+            "stage": self.stage,
+            "status": self.status,
+            "input_summary": self.input_summary,
+            "output_summary": self.output_summary,
+            "duration_ms": self.duration_ms,
+            "degraded": self.degraded,
+            "degradation_reason": self.degradation_reason,
+            "retryable": self.retryable,
+            "error_type": self.error_type,
+            "error_message_sanitized": self.error_message_sanitized,
+            "started_at": self.started_at,
+            "ended_at": self.ended_at,
+        }
+        return {key: value for key, value in payload.items() if value is not None}
+
+
+class PipelineStageObservation:
+    """Measure one Pipeline stage without changing caller control flow."""
+
+    def __init__(
+        self,
+        stage: str,
+        *,
+        input_summary: Optional[Mapping[str, Any]] = None,
+        retryable: bool = False,
+    ) -> None:
+        """Start a stage timer with a sanitized low-sensitivity input summary."""
+        self.stage = stage
+        self.retryable = bool(retryable)
+        self.started_at = datetime.now().isoformat()
+        self._started_monotonic = time.monotonic()
+        self._finished = False
+        self.input_summary: Dict[str, Any] = {}
+        try:
+            self.input_summary = _sanitize_stage_summary(input_summary)
+        except Exception as exc:  # broad-exception: fallback_recorded - Summary sanitization failures are logged and leave a safe empty summary.
+            log_safe_exception(
+                logger,
+                "Pipeline stage input summary sanitization failed",
+                exc,
+                error_code="pipeline_stage_input_sanitization_failed",
+                level=logging.WARNING,
+                context={"stage": stage},
+            )
+
+    @property
+    def finished(self) -> bool:
+        """Return whether a terminal observation has already been recorded."""
+        return self._finished
+
+    def finish(
+        self,
+        *,
+        status: str = "success",
+        output_summary: Optional[Mapping[str, Any]] = None,
+        degradation_reason: Optional[Any] = None,
+        retryable: Optional[bool] = None,
+        error: Optional[BaseException] = None,
+    ) -> None:
+        """Record one terminal stage outcome exactly once."""
+        if self._finished:
+            return
+        self._finished = True
+        try:
+            record_pipeline_stage(
+                stage=self.stage,
+                status=status,
+                input_summary=self.input_summary,
+                output_summary=output_summary,
+                duration_ms=max(
+                    0,
+                    int((time.monotonic() - self._started_monotonic) * 1000),
+                ),
+                degradation_reason=degradation_reason,
+                retryable=self.retryable if retryable is None else bool(retryable),
+                error_type=type(error).__name__ if error is not None else None,
+                error_message=error,
+                started_at=self.started_at,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Observation failures are logged and cannot replace Pipeline outcomes.
+            log_safe_exception(
+                logger,
+                "Pipeline stage observation failed",
+                exc,
+                error_code="pipeline_stage_observation_failed",
+                level=logging.WARNING,
+                context={"stage": self.stage},
+            )
+
+    def __enter__(self) -> "PipelineStageObservation":
+        """Return this observation for explicit status completion."""
+        return self
+
+    def __exit__(self, exc_type, exc, traceback) -> bool:
+        """Record uncaught failures and never suppress the original exception."""
+        _ = (exc_type, traceback)
+        if not self._finished:
+            self.finish(status="failed" if exc is not None else "success", error=exc)
+        return False
+
+
+@dataclass
 class RunDiagnosticComponent:
     """User-facing status for one diagnostic component."""
 
@@ -329,6 +465,7 @@ class RunDiagnosticContext:
     llm_runs: List[LLMRun] = field(default_factory=list)
     notification_runs: List[NotificationRun] = field(default_factory=list)
     history_runs: List[HistoryRun] = field(default_factory=list)
+    pipeline_stage_runs: List[PipelineStageRun] = field(default_factory=list)
     event_sink: Optional[Callable[[Dict[str, Any]], None]] = None
     flow_event_index: int = 0
     provider_attempt_index_by_type: Dict[str, int] = field(default_factory=dict)
@@ -462,6 +599,10 @@ class RunDiagnosticContext:
         self.history_runs.append(history_run)
         self._emit_flow_event(_history_flow_event(self, history_run, len(self.history_runs)))
 
+    def record_pipeline_stage(self, stage_run: PipelineStageRun) -> None:
+        """Append a Pipeline stage without changing existing Run Flow events."""
+        self.pipeline_stage_runs.append(stage_run)
+
     def _emit_flow_event(self, event: Dict[str, Any]) -> None:
         if self.event_sink is None:
             return
@@ -493,6 +634,7 @@ class RunDiagnosticContext:
             "llm_runs": [run.to_dict() for run in self.llm_runs],
             "notification_runs": [run.to_dict() for run in self.notification_runs],
             "history_runs": [run.to_dict() for run in self.history_runs],
+            "pipeline_stage_runs": [run.to_dict() for run in self.pipeline_stage_runs],
         }
 
 
@@ -554,6 +696,118 @@ def current_diagnostic_snapshot() -> Optional[Dict[str, Any]]:
             trace_id=context.trace_id,
         )
         return None
+
+
+def _sanitize_stage_summary(value: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Return a bounded, sanitized mapping for stage inputs or outputs."""
+    if not isinstance(value, Mapping):
+        return {}
+    sanitized = sanitize_diagnostic_metadata(dict(value))
+    return dict(sanitized) if isinstance(sanitized, Mapping) else {}
+
+
+def observe_pipeline_stage(
+    stage: str,
+    *,
+    input_summary: Optional[Mapping[str, Any]] = None,
+    retryable: bool = False,
+) -> PipelineStageObservation:
+    """Start a fail-open observation for one fixed Pipeline stage."""
+    return PipelineStageObservation(
+        stage,
+        input_summary=input_summary,
+        retryable=retryable,
+    )
+
+
+def record_pipeline_stage(
+    *,
+    stage: str,
+    status: str,
+    input_summary: Optional[Mapping[str, Any]] = None,
+    output_summary: Optional[Mapping[str, Any]] = None,
+    duration_ms: int = 0,
+    degradation_reason: Optional[Any] = None,
+    retryable: bool = False,
+    error_type: Optional[str] = None,
+    error_message: Optional[Any] = None,
+    started_at: Optional[str] = None,
+) -> None:
+    """Append a sanitized Pipeline stage result without affecting callers."""
+    context = get_current_diagnostic_context()
+    if context is None:
+        return
+    try:
+        if stage not in PIPELINE_STAGE_NAMES:
+            raise ValueError(f"unsupported Pipeline stage: {stage}")
+        if status not in PIPELINE_STAGE_STATUSES:
+            raise ValueError(f"unsupported Pipeline stage status: {status}")
+        context.record_pipeline_stage(
+            PipelineStageRun(
+                trace_id=context.trace_id,
+                stage=stage,
+                status=status,
+                input_summary=_sanitize_stage_summary(input_summary),
+                output_summary=_sanitize_stage_summary(output_summary),
+                duration_ms=max(0, int(duration_ms)),
+                degraded=status == "degraded",
+                degradation_reason=sanitize_diagnostic_text(degradation_reason),
+                retryable=bool(retryable),
+                error_type=sanitize_diagnostic_text(error_type, max_length=120),
+                error_message_sanitized=sanitize_diagnostic_text(error_message),
+                started_at=started_at or datetime.now().isoformat(),
+                ended_at=datetime.now().isoformat(),
+            )
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - Diagnostic recording failures are safely logged and cannot affect analysis.
+        log_safe_exception(
+            logger,
+            "Pipeline stage diagnostic record failed",
+            exc,
+            error_code="pipeline_stage_diagnostic_record_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
+
+
+def record_missing_pipeline_stages_as_skipped(
+    stages: Iterable[str],
+    *,
+    input_summary: Optional[Mapping[str, Any]] = None,
+    reason: str,
+) -> int:
+    """Fill unobserved stage boundaries as skipped without duplicating records."""
+    context = get_current_diagnostic_context()
+    if context is None:
+        return 0
+    try:
+        recorded_stages = {run.stage for run in context.pipeline_stage_runs}
+        added_count = 0
+        for stage in stages:
+            if stage in recorded_stages:
+                continue
+            before_count = len(context.pipeline_stage_runs)
+            record_pipeline_stage(
+                stage=stage,
+                status="skipped",
+                input_summary=input_summary,
+                output_summary={"reason": reason},
+                retryable=False,
+            )
+            if len(context.pipeline_stage_runs) > before_count:
+                recorded_stages.add(stage)
+                added_count += 1
+        return added_count
+    except Exception as exc:  # broad-exception: fallback_recorded - Missing-stage diagnostics are logged and cannot affect Pipeline outcomes.
+        log_safe_exception(
+            logger,
+            "Pipeline skipped-stage diagnostic fill failed",
+            exc,
+            error_code="pipeline_skipped_stage_fill_failed",
+            level=logging.WARNING,
+            trace_id=context.trace_id,
+        )
+        return 0
 
 
 _DATA_TYPE_LABELS = {
