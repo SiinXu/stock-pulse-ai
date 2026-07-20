@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import ast
 import os
+import pathlib
 
 import pytest
 
@@ -624,3 +626,45 @@ def test_extract_and_persist_missing_price_plan_does_not_fabricate_fields(isolat
     assert item["entry_high"] is None
     assert item["stop_loss"] is None
     assert item["target_price"] is None
+
+
+def _module_import_targets(relative_path: str) -> set[str]:
+    """Return every module name imported by a source file (module- or function-level)."""
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    tree = ast.parse((repo_root / relative_path).read_text(encoding="utf-8"))
+    targets: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            targets.add(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                targets.add(alias.name)
+    return targets
+
+
+def test_service_does_not_import_extractor():
+    """Regression guard for the resolved decision_signal_service <-> extractor cycle.
+
+    The pure payload builder was sunk into the leaf module
+    ``decision_signal_payload``. The service must depend on that leaf, never back
+    on the extractor (even via a function-level import, which this AST scan also
+    catches).
+    """
+    targets = _module_import_targets("src/services/decision_signal_service.py")
+    assert "src.services.decision_signal_extractor" not in targets
+    assert "src.services.decision_signal_payload" in targets
+
+
+def test_decision_signal_payload_leaf_has_no_service_or_extractor_import():
+    targets = _module_import_targets("src/services/decision_signal_payload.py")
+    assert "src.services.decision_signal_service" not in targets
+    assert "src.services.decision_signal_extractor" not in targets
+
+
+def test_build_payload_reexported_from_extractor_is_leaf_function():
+    from src.services import decision_signal_extractor, decision_signal_payload
+
+    assert (
+        decision_signal_extractor.build_decision_signal_payload_from_report
+        is decision_signal_payload.build_decision_signal_payload_from_report
+    )
