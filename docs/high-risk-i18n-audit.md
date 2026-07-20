@@ -10,27 +10,28 @@ This document records the evidence boundary for StockPulse Web copy that can alt
 | Track | `TRACK-E2` |
 | Sequence | `33/34` |
 | Repository | `SiinXu/stock-pulse-ai` |
-| Merged-copy baseline | `origin/main@59f49297cf744a93cfcd2286f0216f17c3ac546d` |
+| Merged-copy baseline | `origin/main@9d6ab2e1d7fc5fc156c358e70159ff52a268f32f` |
 | Audit date | 2026-07-20 |
 | Machine-readable evidence | `apps/dsa-web/scripts/high-risk-i18n-audit.json` |
 | Enforced command | `cd apps/dsa-web && npm run i18n:high-risk` |
+| Baseline verification | `cd apps/dsa-web && npm run i18n:high-risk -- --verify-baseline` |
 
-Only copy merged at the recorded baseline was audited. Open PRs #94, #95, and #96 were excluded. Their current diffs do not edit an i18n resource or high-risk string; their only E2 file overlap is the append-only `[Unreleased]` changelog. PR #90 was merged before the final baseline: its three localized `interrupted` task-state labels were reviewed and remain outside the six high-risk categories. Dependencies #51, #56, and #64 were merged before this audit.
+Only copy merged at the recorded baseline was audited. Open PR #94 was excluded; its diff does not edit an i18n resource or high-risk string, and its only E2 file overlap is the append-only `[Unreleased]` changelog. PRs #95 and #96 merged while the audit was in review; neither changed an i18n resource or high-risk string, so the baseline advanced without changing the audited source inventory. PR #90 was merged before the final baseline: its three localized `interrupted` task-state labels were reviewed and remain outside the six high-risk categories. Dependencies #51, #56, and #64 were merged before this audit.
 
 ## Result
 
-The executable audit covers six required categories, ten UI locales, and 247 distinct stable translation keys. Category counts overlap where one string has more than one risk dimension.
+The executable audit covers six required categories, ten UI locales, and 301 distinct stable translation keys. Category counts overlap where one string has more than one risk dimension. Its 34 recorded decisions are protected by a manifest count and SHA-256 digest, so removing or changing decision evidence fails the normal guard even when candidate bundle snapshots remain unchanged.
 
 | Category | Stable keys | Boundary |
 | --- | ---: | --- |
 | Trading action | 18 | Decision-signal and portfolio action codes remain internal; labels are informational display states. |
-| Risk | 26 | Volume, turnover, score, confidence, cost method, watchlist, alert severity, cooldown, and related labels keep their product meaning. |
-| Authentication | 80 | Login, password, session, transport, password-change, and retry-limit copy states the actual authentication condition. |
-| Credential | 36 | Credential, password, API key, provider-key routing, CLI login state, and runtime secret remain distinct concepts. |
+| Risk | 66 | Volume, turnover, score, confidence, risk-agent veto, BIAS threshold, market-context guardrails, portfolio risk, alert severity, and strategy labels keep their product meaning. |
+| Authentication | 87 | Login, password, session, transport, password-change, retry-limit, and admin-auth settings copy states the actual authentication condition. |
+| Credential | 43 | Credential, password, API key, provider-key routing, CLI login state, runtime secret, and usage-telemetry HMAC secret remain distinct concepts. |
 | Error | 102 | Stable error codes remain contract values; localized title/message pairs are display copy. |
 | Disclaimer | 3 | Screening notices preserve research scope, no-investment-advice language, and user responsibility. |
 
-All currently shipped keys in these selectors are snapshotted per locale. Adding, removing, or changing an audited key fails `npm run i18n:high-risk` until the evidence and semantic decision are reviewed together.
+All currently shipped keys in these selectors are snapshotted per locale. Adding, removing, or changing an audited key fails `npm run i18n:high-risk` until the evidence and semantic decision are reviewed together. The explicit baseline mode also parses the recorded `en.ts` and translated bundles with the TypeScript AST, checks that the current branch merge-base is the recorded audit commit, and verifies every `before` value against that commit.
 
 ## Evidence status
 
@@ -77,13 +78,16 @@ Other `zh` / `en` high-risk source values were retained because they match the c
 | Alert semantics | `Propina`, `自己選択株`, `Temps de recharge`, `Auslösergeschichte` | Information severity, watchlist, suppression interval, and trigger record. |
 | API key and provider access | `API Legende`, `touches`, `teclas`, omitted routing paths, and broken credential-file warnings | API key/secret terminology, provider-key precedence, and the boundary between StockPulse and CLI login state. |
 | Authentication errors | Mixed formality and malformed password/session text | Consistent recovery text while retaining stable internal error codes. |
+| Risk-agent and BIAS controls | Translated `full/specialist` values, malformed risk-stage gates, generic tracking, and average-return wording | Literal mode values, explicit risk-stage gating, chase-risk warnings, and mean-reversion risk. |
+| Admin authentication | Sentence fragments that obscured login, persistence, and reset behavior | WebUI login scope, persisted auth data, refresh/restart behavior, and the exact reset command. |
+| Usage HMAC secret | Broken wording that conflated a telemetry secret, key, and generic usage | Message-fingerprint signing, no login-secret reuse, local generation, cross-deployment comparison, and key-version rotation. |
 | Screening disclaimer | Fragmented machine-translated clauses | Experimental/research scope, no investment advice, and user responsibility all remain explicit. |
 
 Exact `before` and `recommended` values for the highest-impact decisions are stored in the audit manifest. Per-category, per-locale SHA-256 snapshots cover the rest of the audited values.
 
 ## Display and code separation
 
-Localized strings are never business identifiers.
+Within the six audited contract inventories, localized display keys are distinct from business identifiers. This guard does not claim that every component-owned runtime fallback is already localized.
 
 | Contract | Internal values | Display mapping |
 | --- | --- | --- |
@@ -117,6 +121,7 @@ Run:
 cd apps/dsa-web
 npm run i18n:resources
 npm run i18n:high-risk
+npm run i18n:high-risk -- --verify-baseline
 npm run test:i18n
 ```
 
@@ -126,6 +131,8 @@ The high-risk guard fails on:
 - a translated locale mislabeled as product source;
 - a pending locale that names a native reviewer or review date;
 - unsupported approval language without the native-review evidence contract;
+- decision evidence whose count or SHA-256 digest no longer matches the recorded decisions;
+- a recorded `before` value that differs from the merge-base bundle when baseline verification is requested;
 - drift between TypeScript internal codes and stable display mappings;
 - an added, removed, or changed audited key without refreshed evidence;
 - a corrected high-impact value that no longer matches its recorded recommendation.
@@ -138,18 +145,22 @@ To review an intentional change, update the product source or candidate bundle f
 cd apps/dsa-web
 npm run i18n:resources -- --write
 npm run i18n:high-risk -- --print-snapshot
+npm run i18n:high-risk -- --verify-baseline
 ```
 
 Copy the reviewed snapshot into `high-risk-i18n-audit.json`, run the normal guard, and keep translated locales pending unless a real native financial reviewer is identified with a review date.
 
 ## Deferred to UIUX
 
-No open UI PR changed a high-risk string during the audit. Two component-embedded diagnostic fallbacks remain outside E2 file ownership and were not edited:
+No open UI PR changed a high-risk string during the audit. The following component-owned paths remain outside E2 file ownership and were not edited:
+
+- `components/decision-signals/DecisionSignalDisplay.tsx`: feedback `reasonCode` is rendered directly below the localized feedback label.
+- `pages/DecisionSignalsPage.tsx`: three reassessment warning lists render `warning.message || warning.code`, so an absent message exposes the internal warning code.
 
 - `pages/StockScreeningPage.tsx`: `Screening failed` is a legacy diagnostic fallback inside a stable `alphasift_screen_failed` error envelope; localized stable error copy remains the primary message.
 - `components/settings/SettingsPanelErrorBoundary.tsx`: `Unknown frontend runtime error` is a sanitized diagnostic summary fallback; localized title and recovery copy remain primary.
 
-These items should be moved behind stable locale keys by the UIUX owner when those component paths are next changed. They are not evidence that the high-risk bundles received native review.
+The first two paths need stable localized display mappings or a diagnostics-only presentation before the project can claim complete runtime code/display separation. All four items should be moved behind stable locale keys by the UIUX owner when those component paths are next changed. They are not evidence that the high-risk bundles received native review.
 
 ## Limitations
 

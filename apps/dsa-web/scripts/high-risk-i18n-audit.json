@@ -3,14 +3,16 @@
   "auditBaseline": {
     "repository": "SiinXu/stock-pulse-ai",
     "ref": "origin/main",
-    "commit": "59f49297cf744a93cfcd2286f0216f17c3ac546d",
+    "commit": "9d6ab2e1d7fc5fc156c358e70159ff52a268f32f",
     "auditedAt": "2026-07-20",
     "scope": "Only user-facing copy merged into main at the recorded commit was audited. Open pull requests were excluded.",
     "openPullRequestsExcluded": [
-      94,
-      95,
-      96
+      94
     ]
+  },
+  "decisionEvidence": {
+    "count": 34,
+    "sha256": "14a826de9bdb4d9195091d8b14cafe6803ce482ede111dd36c2138d226c4e10d"
   },
   "languageReview": {
     "zh": {
@@ -180,50 +182,84 @@
       ],
       "selectors": [
         {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE."
+        },
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD."
+        },
+        {
           "exact": [
+            "locales.alerts.ALERT_DIRECTION_LABELS.stopLossBreach",
+            "locales.alerts.ALERT_DIRECTION_LABELS.stopLossNear",
+            "locales.alerts.ALERT_FORM_TEXT.severity",
             "locales.alerts.ALERT_LIST_TEXT.childTargetCooldown",
             "locales.alerts.ALERT_LIST_TEXT.cooldown",
             "locales.alerts.ALERT_LIST_TEXT.deleteMessage",
             "locales.alerts.ALERT_LIST_TEXT.disabled",
             "locales.alerts.ALERT_SCOPE_LABELS.watchlist",
+            "locales.alerts.ALERT_SEVERITY_LABELS.critical",
             "locales.alerts.ALERT_SEVERITY_LABELS.info",
+            "locales.alerts.ALERT_SEVERITY_LABELS.warning",
             "locales.alerts.ALERT_SEVERITY_OPTIONS.0.label",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.1.label",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.2.label",
             "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label",
             "locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label",
             "locales.alerts.ALERT_TRIGGER_TEXT.emptyTitle",
             "locales.alerts.ALERT_TRIGGER_TEXT.loading",
             "locales.alerts.ALERT_TRIGGER_TEXT.title",
             "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label",
+            "locales.alerts.ALERT_TYPE_LABELS.portfolio_concentration",
+            "locales.alerts.ALERT_TYPE_LABELS.portfolio_drawdown",
             "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
             "locales.portfolio.PORTFOLIO_TEXT.avg",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskSignals",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskTotal",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskUnavailable",
             "locales.portfolio.PORTFOLIO_TEXT.costMethod",
             "locales.portfolio.PORTFOLIO_TEXT.costMethodShort",
+            "locales.portfolio.PORTFOLIO_TEXT.currentDrawdown",
+            "locales.portfolio.PORTFOLIO_TEXT.drawdownMonitor",
+            "locales.portfolio.PORTFOLIO_TEXT.maxDrawdown",
+            "locales.portfolio.PORTFOLIO_TEXT.noAiRiskSignals",
+            "locales.portfolio.PORTFOLIO_TEXT.noConcentrationDescription",
+            "locales.portfolio.PORTFOLIO_TEXT.noConcentrationTitle",
+            "locales.portfolio.PORTFOLIO_TEXT.positionConcentrationFallback",
+            "locales.portfolio.PORTFOLIO_TEXT.riskDegraded",
+            "locales.portfolio.PORTFOLIO_TEXT.riskFallback",
+            "locales.portfolio.PORTFOLIO_TEXT.sectorConcentration",
+            "locales.portfolio.PORTFOLIO_TEXT.stopLossWarning",
             "locales.screening.SCREENING_TEXT.confidence",
             "locales.screening.SCREENING_TEXT.heat",
             "locales.screening.SCREENING_TEXT.leader",
+            "locales.screening.SCREENING_TEXT.risk",
+            "locales.screening.SCREENING_TEXT.riskTags",
+            "locales.screening.SCREENING_TEXT.riskTitle",
             "locales.screening.SCREENING_TEXT.score",
             "locales.screening.SCREENING_TEXT.sectorThemeConfidence",
             "locales.screening.SCREENING_TEXT.turnover",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.market_review.valueNotes.2",
             "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
             "utils.strategyDisplay.copy.bottom_volume.description",
-            "utils.strategyDisplay.copy.bottom_volume.name"
+            "utils.strategyDisplay.copy.bottom_volume.name",
+            "utils.strategyDisplay.copy.event_driven.description"
           ]
         }
       ],
       "snapshot": {
-        "keyCount": 26,
-        "keySetSha256": "c4dc3fac2322f39da6f37a0d1c0d2b95fea80762459f493c9db4243513f150f5",
+        "keyCount": 66,
+        "keySetSha256": "b2fb58baa544ead5c1a0e5cdb97e47d539a1f648fbd2738b1cd145d8affa0205",
         "bundleSha256": {
-          "zh": "73621c6828b0d5ac6d5a8a9f8127cfda8714771a45d26d1cad93b8cb8cd1fc83",
-          "zh-TW": "be3e9dd8142e193a85d9aeb5b5c46133a1455308cb48be7647c3609389fe8c67",
-          "en": "208e0bae9aa87b739331b3f28092a097b5d2b71763e5313b43ec7da9acf10abe",
-          "ja": "b21a0c368d1ae22a0c122d3d709f681ec37a84d028b28dc7797e06a87079455c",
-          "ko": "f787f07979d6a29c74a5a2f54624b65f3581b298b129d248313af423b2224bd9",
-          "de": "ceff42feff78f7b64b3dcbc51516281edfc2ce14c8aaca652c3c04bfca9a0b7c",
-          "es": "582be7a9c0cceb9ed67c37d07207853d6fd928e7a0410b0402eaf28d3dceb2c4",
-          "ms": "595dc8436f97bf3130b7f2cc1daa8978a043c07e44d26ab9b6e9982ddcc84a62",
-          "fr": "4bbc6cf2f69c5a7163e55b016e517a93acf8c9ab2e210d846b19ec5bee7bc5d2",
-          "id": "1a128f335f0bdcef17e280180c5a45282bf7179c9d9457ebca222b75b2a39448"
+          "zh": "8b53c72b5f62e33eb3778a906cffbf90ff9c0ace68dfa10e65ddd9c86c6908f0",
+          "zh-TW": "7c1f4af9e76741d8192b41ffee27937bd7c316855a597e5a8327c40f6c5e84bd",
+          "en": "72424a75eee5566d2e5affae4fecd190e28a7f367a1cbac521528550b2b4b9f7",
+          "ja": "91ba4bc519f0d37f608f070b78157f55e1a6a3d18c1ca5a76abeb2315bc419ad",
+          "ko": "09259156f3a5c8508da5475f2b5811b087871cb1c72dfe30dad0ade926e267e1",
+          "de": "48a5b12a775db99013f4e3730d363bbf0c7fde7813d16f0bc1d7ebfa58469e25",
+          "es": "0e3ed9362c35042d660e88edd22ff5d5c75b20bc0257cdb644b9476e1b70e472",
+          "ms": "e57fd1d488535aaf46b10edd22b74ab78c6ce64f4f7d1670daf533f3f0be21b7",
+          "fr": "553a32991af67dda3bb5ff4d221a3d82ba20e84a5fe37b68ba7b687ff164f400",
+          "id": "1004164a5cf0504565f6df54ac3cad620af2c1875dbcfddc6b4788fc4ca992ed"
         }
       }
     },
@@ -241,6 +277,9 @@
           "prefix": "i18n.uiText.UI_TEXT.login."
         },
         {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED."
+        },
+        {
           "pattern": "^i18n\\.uiText\\.UI_TEXT\\.settings\\.(?:auth|changePassword)"
         },
         {
@@ -248,19 +287,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 80,
-        "keySetSha256": "6e9d6509973fe765e9497499e6e6b8753f69ad8abbc041bcf1c21ddfe5c80d8d",
+        "keyCount": 87,
+        "keySetSha256": "8d85e892027c06f15181d70b18f28d259f4537f4bd0e57544c2845f7ae1fb28c",
         "bundleSha256": {
-          "zh": "e6a9b5987ccb50cccb69eb521f8a27e1a71d390935fcbf9fb9d389e5637eb8ba",
-          "zh-TW": "fa0fb414377408a6d4bba0b378f80da5ddea07d2c85dc23351469a926ebe63a4",
-          "en": "d9acc641895fc00ff85fe4c9446c155b6624b6a89f099ea74eb6fb853b4b5fdd",
-          "ja": "6c692cf7e03dd65cde8e6794593a8a7eab6f6c2db6fdb98368a7158b9394f418",
-          "ko": "8c15667b475605b8cb433f7f24cfd4641e9df917dd1624e89fa3661612c19727",
-          "de": "0c3b251c787790012b0676d73cffa71eb2b7ada8bcdc46cb67c63de8de801fe5",
-          "es": "f3d9f3ed9fc8bbd8d99cf89e02ea8c64a5ca789be7536a48bbfe8e5e250b2f67",
-          "ms": "604e81df07710a4b00a150077f2d2d3ae94cbe627b2f3eedab5000f346d5a17a",
-          "fr": "3252f78f1102c42c4cfd741368869e8e7d8bf0b45d5bb5698173226c9f54a86e",
-          "id": "c466886f578c1df7d6e9f17a1d85dc7337af813325f1ed65a549131109ed3333"
+          "zh": "c6265221a5df29f92c7df0ddea6472264457bf4cd9ff61ae1e77502db959653b",
+          "zh-TW": "2c00574e0c5001bd350405714476479c28478b7df4453a68fd687fb3b7429cd7",
+          "en": "57657c8a1482429e1924cfb4ce07514847eaed4b25244c489be3aaf01cc6b2da",
+          "ja": "09bbaf0167a6a3075a0eafe531ea43e9b1c96af1042ee32f0adbaecb9063ac49",
+          "ko": "a29c3c8d5b7a2a97cc160a4fe91922656bd199755f479004b48c12f916051282",
+          "de": "6938fbaac7836439d5fac33ef84cf0a2666c08862322c77e2c6a51f7fa77c4ac",
+          "es": "20e2b4d82ff04e646a43519b384885e38d89431210c5613353f2ba1937dce444",
+          "ms": "196b34618fb29c44f92370f5984fb5631c39d9051203ec41fd63d58f5dda1e7a",
+          "fr": "dbd4a0876a6ba50c39c0a6776a9d4a7c7d9519c22a90a7a79e92c17c9e644789",
+          "id": "00cc8c720ade85b0b68e0e01aba81c396ad0f18dc70e1897fd5dd286a2d81279"
         }
       }
     },
@@ -273,6 +312,9 @@
         "nist_sp800_63b"
       ],
       "selectors": [
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET."
+        },
         {
           "exact": [
             "i18n.uiText.UI_TEXT.settings.llmAccessDescription",
@@ -315,19 +357,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 36,
-        "keySetSha256": "b5159a6f0b81db514bf729d6b31df019598283c7db45f03af8ad836f8413bbac",
+        "keyCount": 43,
+        "keySetSha256": "ee1768aab8ff28919388b2d87a91ad5afb4b9ece13c5994549a700eb415f17cd",
         "bundleSha256": {
-          "zh": "4957d878089891177e516d37da222d3f7f5c091d5cc0cdbdb1f40533deb21ba0",
-          "zh-TW": "a7e20589becdada1dec4c84fe9681440280455982e1b370ad796d0fdf2f246af",
-          "en": "e7204214282551bb8887c047821992815975edfd1a0055ffd75a0ff871326703",
-          "ja": "3bed17929da113e6146d3013388dd8f58dcfb3b446cf54e57fda35c96919b098",
-          "ko": "e151645c241132cbc27e6a9685b5651dba8324156110d0ff200c743f12baee33",
-          "de": "364b2981d09938d3e7bc83fc68d761226944d36d412e56ffdae4809ad1038c2b",
-          "es": "cdced894d63531b7da26c22313f421f2652f0f43fc150b56f9ce83852a6ec122",
-          "ms": "ab3c721932015f6b004fa966a0258048b28bfc28c36d9ca01a3bd671b5cf3c93",
-          "fr": "eaa54ec28072b0618df217f291e9674f215040308dad89df590ae7116539b391",
-          "id": "3de46a31b82b9238fdb114e8d6036d76f3b58d26178d90275edebea78de3f7b0"
+          "zh": "924d2fb635fb27d2e914d7006f7c991f90815d52551d1213c71456bed97517c8",
+          "zh-TW": "87dc384cdf09551142696acaaafe8cce6a8194dbe2a2f5aa885be12e544e3599",
+          "en": "17fd6c4101e43450c6c1c3641dddc9c5e7cf5128c4603503cb2435c30c99f1e3",
+          "ja": "c0c6aa84871dd1e2915e6dab8fe1c2222d2c07f0fc1ebe8da92e064515825bdd",
+          "ko": "7c061a81975b6bbf3e46b915c06eef35cf468192972f7a03c51841c714a92d3b",
+          "de": "1700dcda200fdcb61b6ce10a7fb95732210ef73a9ea7f08bcaa15aa8ed924f90",
+          "es": "122e2233c2df3160fe06fcad4e5bd7328f2b7d5012c263bd93946be6b1f0951b",
+          "ms": "938d606e074af47a29a6d0711ff89fa968026733ce0f4a009d0237d71420ffda",
+          "fr": "3223084ce609277b7f8dce5d6f075068c30995ccb321d0f59ddae88b6ebf50aa",
+          "id": "5a91f3f08f5ae8572024d09bdf337555b6c2311941405b1619396f37ae4f72c1"
         }
       }
     },
@@ -508,44 +550,158 @@
         "validation_failed"
       ],
       "codeToDisplayKeys": {
-        "agent_chat_failed": ["api.error.STABLE_ERROR_TEXT.agent_chat_failed.title", "api.error.STABLE_ERROR_TEXT.agent_chat_failed.message"],
-        "agent_disabled": ["api.error.STABLE_ERROR_TEXT.agent_disabled.title", "api.error.STABLE_ERROR_TEXT.agent_disabled.message"],
-        "agent_research_failed": ["api.error.STABLE_ERROR_TEXT.agent_research_failed.title", "api.error.STABLE_ERROR_TEXT.agent_research_failed.message"],
-        "agent_stream_failed": ["api.error.STABLE_ERROR_TEXT.agent_stream_failed.title", "api.error.STABLE_ERROR_TEXT.agent_stream_failed.message"],
-        "agent_stream_timeout": ["api.error.STABLE_ERROR_TEXT.agent_stream_timeout.title", "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.message"],
-        "alphasift_disabled": ["api.error.STABLE_ERROR_TEXT.alphasift_disabled.title", "api.error.STABLE_ERROR_TEXT.alphasift_disabled.message"],
-        "alphasift_screen_failed": ["api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.title", "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.message"],
-        "alphasift_screen_task_not_found": ["api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.title", "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.message"],
-        "alphasift_unavailable": ["api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title", "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message"],
-        "analysis_failed": ["api.error.STABLE_ERROR_TEXT.analysis_failed.title", "api.error.STABLE_ERROR_TEXT.analysis_failed.message"],
-        "auth_disabled": ["api.error.STABLE_ERROR_TEXT.auth_disabled.title", "api.error.STABLE_ERROR_TEXT.auth_disabled.message"],
-        "config_conflict": ["api.error.STABLE_ERROR_TEXT.config_conflict.title", "api.error.STABLE_ERROR_TEXT.config_conflict.message"],
-        "config_version_conflict": ["api.error.STABLE_ERROR_TEXT.config_version_conflict.title", "api.error.STABLE_ERROR_TEXT.config_version_conflict.message"],
-        "conflict": ["api.error.STABLE_ERROR_TEXT.conflict.title", "api.error.STABLE_ERROR_TEXT.conflict.message"],
-        "current_required": ["api.error.STABLE_ERROR_TEXT.current_required.title", "api.error.STABLE_ERROR_TEXT.current_required.message"],
-        "duplicate_market_review": ["api.error.STABLE_ERROR_TEXT.duplicate_market_review.title", "api.error.STABLE_ERROR_TEXT.duplicate_market_review.message"],
-        "duplicate_task": ["api.error.STABLE_ERROR_TEXT.duplicate_task.title", "api.error.STABLE_ERROR_TEXT.duplicate_task.message"],
-        "env_backup_access_denied": ["api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title", "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"],
-        "idempotency_conflict": ["api.error.STABLE_ERROR_TEXT.idempotency_conflict.title", "api.error.STABLE_ERROR_TEXT.idempotency_conflict.message"],
-        "internal_error": ["api.error.STABLE_ERROR_TEXT.internal_error.title", "api.error.STABLE_ERROR_TEXT.internal_error.message"],
-        "invalid_import_file": ["api.error.STABLE_ERROR_TEXT.invalid_import_file.title", "api.error.STABLE_ERROR_TEXT.invalid_import_file.message"],
-        "invalid_params": ["api.error.STABLE_ERROR_TEXT.invalid_params.title", "api.error.STABLE_ERROR_TEXT.invalid_params.message"],
-        "invalid_password": ["api.error.STABLE_ERROR_TEXT.invalid_password.title", "api.error.STABLE_ERROR_TEXT.invalid_password.message"],
-        "no_channels": ["api.error.STABLE_ERROR_TEXT.no_channels.title", "api.error.STABLE_ERROR_TEXT.no_channels.message"],
-        "not_changeable": ["api.error.STABLE_ERROR_TEXT.not_changeable.title", "api.error.STABLE_ERROR_TEXT.not_changeable.message"],
-        "not_found": ["api.error.STABLE_ERROR_TEXT.not_found.title", "api.error.STABLE_ERROR_TEXT.not_found.message"],
-        "operation_id_mismatch": ["api.error.STABLE_ERROR_TEXT.operation_id_mismatch.title", "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.message"],
-        "password_already_set": ["api.error.STABLE_ERROR_TEXT.password_already_set.title", "api.error.STABLE_ERROR_TEXT.password_already_set.message"],
-        "password_mismatch": ["api.error.STABLE_ERROR_TEXT.password_mismatch.title", "api.error.STABLE_ERROR_TEXT.password_mismatch.message"],
-        "password_required": ["api.error.STABLE_ERROR_TEXT.password_required.title", "api.error.STABLE_ERROR_TEXT.password_required.message"],
-        "portfolio_busy": ["api.error.STABLE_ERROR_TEXT.portfolio_busy.title", "api.error.STABLE_ERROR_TEXT.portfolio_busy.message"],
-        "portfolio_oversell": ["api.error.STABLE_ERROR_TEXT.portfolio_oversell.title", "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message"],
-        "rate_limited": ["api.error.STABLE_ERROR_TEXT.rate_limited.title", "api.error.STABLE_ERROR_TEXT.rate_limited.message"],
-        "scheduler_busy": ["api.error.STABLE_ERROR_TEXT.scheduler_busy.title", "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"],
-        "unauthorized": ["api.error.STABLE_ERROR_TEXT.unauthorized.title", "api.error.STABLE_ERROR_TEXT.unauthorized.message"],
-        "unsupported_alert_type": ["api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title", "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message"],
-        "validation_error": ["api.error.STABLE_ERROR_TEXT.validation_error.title", "api.error.STABLE_ERROR_TEXT.validation_error.message"],
-        "validation_failed": ["api.error.STABLE_ERROR_TEXT.validation_failed.title", "api.error.STABLE_ERROR_TEXT.validation_failed.message"]
+        "agent_chat_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_chat_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_chat_failed.message"
+        ],
+        "agent_disabled": [
+          "api.error.STABLE_ERROR_TEXT.agent_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.agent_disabled.message"
+        ],
+        "agent_research_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_research_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_research_failed.message"
+        ],
+        "agent_stream_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_stream_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_stream_failed.message"
+        ],
+        "agent_stream_timeout": [
+          "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.title",
+          "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.message"
+        ],
+        "alphasift_disabled": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_disabled.message"
+        ],
+        "alphasift_screen_failed": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.message"
+        ],
+        "alphasift_screen_task_not_found": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.message"
+        ],
+        "alphasift_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message"
+        ],
+        "analysis_failed": [
+          "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
+          "api.error.STABLE_ERROR_TEXT.analysis_failed.message"
+        ],
+        "auth_disabled": [
+          "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.auth_disabled.message"
+        ],
+        "config_conflict": [
+          "api.error.STABLE_ERROR_TEXT.config_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.config_conflict.message"
+        ],
+        "config_version_conflict": [
+          "api.error.STABLE_ERROR_TEXT.config_version_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.config_version_conflict.message"
+        ],
+        "conflict": [
+          "api.error.STABLE_ERROR_TEXT.conflict.title",
+          "api.error.STABLE_ERROR_TEXT.conflict.message"
+        ],
+        "current_required": [
+          "api.error.STABLE_ERROR_TEXT.current_required.title",
+          "api.error.STABLE_ERROR_TEXT.current_required.message"
+        ],
+        "duplicate_market_review": [
+          "api.error.STABLE_ERROR_TEXT.duplicate_market_review.title",
+          "api.error.STABLE_ERROR_TEXT.duplicate_market_review.message"
+        ],
+        "duplicate_task": [
+          "api.error.STABLE_ERROR_TEXT.duplicate_task.title",
+          "api.error.STABLE_ERROR_TEXT.duplicate_task.message"
+        ],
+        "env_backup_access_denied": [
+          "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
+          "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "idempotency_conflict": [
+          "api.error.STABLE_ERROR_TEXT.idempotency_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.idempotency_conflict.message"
+        ],
+        "internal_error": [
+          "api.error.STABLE_ERROR_TEXT.internal_error.title",
+          "api.error.STABLE_ERROR_TEXT.internal_error.message"
+        ],
+        "invalid_import_file": [
+          "api.error.STABLE_ERROR_TEXT.invalid_import_file.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_import_file.message"
+        ],
+        "invalid_params": [
+          "api.error.STABLE_ERROR_TEXT.invalid_params.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_params.message"
+        ],
+        "invalid_password": [
+          "api.error.STABLE_ERROR_TEXT.invalid_password.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_password.message"
+        ],
+        "no_channels": [
+          "api.error.STABLE_ERROR_TEXT.no_channels.title",
+          "api.error.STABLE_ERROR_TEXT.no_channels.message"
+        ],
+        "not_changeable": [
+          "api.error.STABLE_ERROR_TEXT.not_changeable.title",
+          "api.error.STABLE_ERROR_TEXT.not_changeable.message"
+        ],
+        "not_found": [
+          "api.error.STABLE_ERROR_TEXT.not_found.title",
+          "api.error.STABLE_ERROR_TEXT.not_found.message"
+        ],
+        "operation_id_mismatch": [
+          "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.title",
+          "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.message"
+        ],
+        "password_already_set": [
+          "api.error.STABLE_ERROR_TEXT.password_already_set.title",
+          "api.error.STABLE_ERROR_TEXT.password_already_set.message"
+        ],
+        "password_mismatch": [
+          "api.error.STABLE_ERROR_TEXT.password_mismatch.title",
+          "api.error.STABLE_ERROR_TEXT.password_mismatch.message"
+        ],
+        "password_required": [
+          "api.error.STABLE_ERROR_TEXT.password_required.title",
+          "api.error.STABLE_ERROR_TEXT.password_required.message"
+        ],
+        "portfolio_busy": [
+          "api.error.STABLE_ERROR_TEXT.portfolio_busy.title",
+          "api.error.STABLE_ERROR_TEXT.portfolio_busy.message"
+        ],
+        "portfolio_oversell": [
+          "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title",
+          "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message"
+        ],
+        "rate_limited": [
+          "api.error.STABLE_ERROR_TEXT.rate_limited.title",
+          "api.error.STABLE_ERROR_TEXT.rate_limited.message"
+        ],
+        "scheduler_busy": [
+          "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
+          "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"
+        ],
+        "unauthorized": [
+          "api.error.STABLE_ERROR_TEXT.unauthorized.title",
+          "api.error.STABLE_ERROR_TEXT.unauthorized.message"
+        ],
+        "unsupported_alert_type": [
+          "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title",
+          "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message"
+        ],
+        "validation_error": [
+          "api.error.STABLE_ERROR_TEXT.validation_error.title",
+          "api.error.STABLE_ERROR_TEXT.validation_error.message"
+        ],
+        "validation_failed": [
+          "api.error.STABLE_ERROR_TEXT.validation_failed.title",
+          "api.error.STABLE_ERROR_TEXT.validation_failed.message"
+        ]
       }
     },
     {
@@ -567,18 +723,42 @@
         "unsupported_protocol"
       ],
       "codeToDisplayKeys": {
-        "auth": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth"],
-        "capability_unsupported": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.capability_unsupported"],
-        "empty_response": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.empty_response"],
-        "format_error": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.format_error"],
-        "invalid_config": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.invalid_config"],
-        "model_not_found": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.model_not_found"],
-        "network_error": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.network_error"],
-        "quota": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.quota"],
-        "request_blocked": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.request_blocked"],
-        "skipped": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.skipped"],
-        "timeout": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.timeout"],
-        "unsupported_protocol": ["locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.unsupported_protocol"]
+        "auth": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth"
+        ],
+        "capability_unsupported": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.capability_unsupported"
+        ],
+        "empty_response": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.empty_response"
+        ],
+        "format_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.format_error"
+        ],
+        "invalid_config": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.invalid_config"
+        ],
+        "model_not_found": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.model_not_found"
+        ],
+        "network_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.network_error"
+        ],
+        "quota": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.quota"
+        ],
+        "request_blocked": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.request_blocked"
+        ],
+        "skipped": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.skipped"
+        ],
+        "timeout": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.timeout"
+        ],
+        "unsupported_protocol": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.unsupported_protocol"
+        ]
       }
     },
     {
@@ -598,16 +778,36 @@
         "schema_unavailable"
       ],
       "codeToDisplayKeys": {
-        "contract_unknown": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.contract_unknown"],
-        "missing_api_key": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key"],
-        "missing_base_url": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_base_url"],
-        "missing_extra_headers": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_extra_headers"],
-        "missing_models": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_models"],
-        "missing_protocol": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_protocol"],
-        "missing_provider": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_provider"],
-        "name_invalid": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_invalid"],
-        "name_required": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_required"],
-        "schema_unavailable": ["locales.settingsModelAccess.MODEL_ACCESS_ISSUES.schema_unavailable"]
+        "contract_unknown": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.contract_unknown"
+        ],
+        "missing_api_key": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key"
+        ],
+        "missing_base_url": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_base_url"
+        ],
+        "missing_extra_headers": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_extra_headers"
+        ],
+        "missing_models": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_models"
+        ],
+        "missing_protocol": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_protocol"
+        ],
+        "missing_provider": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_provider"
+        ],
+        "name_invalid": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_invalid"
+        ],
+        "name_required": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_required"
+        ],
+        "schema_unavailable": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.schema_unavailable"
+        ]
       }
     },
     {
@@ -629,18 +829,42 @@
         "tls_error"
       ],
       "codeToDisplayKeys": {
-        "api_key_rejected": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected"],
-        "capability_unsupported": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.capability_unsupported"],
-        "connection_refused": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.connection_refused"],
-        "dns_error": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.dns_error"],
-        "insufficient_balance": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.insufficient_balance"],
-        "missing_api_key": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key"],
-        "model_access_denied": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.model_access_denied"],
-        "provider_blocked": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_blocked"],
-        "provider_prefix_mismatch": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_prefix_mismatch"],
-        "quota_exceeded": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.quota_exceeded"],
-        "rate_limit": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.rate_limit"],
-        "tls_error": ["locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.tls_error"]
+        "api_key_rejected": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected"
+        ],
+        "capability_unsupported": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.capability_unsupported"
+        ],
+        "connection_refused": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.connection_refused"
+        ],
+        "dns_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.dns_error"
+        ],
+        "insufficient_balance": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.insufficient_balance"
+        ],
+        "missing_api_key": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key"
+        ],
+        "model_access_denied": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.model_access_denied"
+        ],
+        "provider_blocked": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_blocked"
+        ],
+        "provider_prefix_mismatch": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_prefix_mismatch"
+        ],
+        "quota_exceeded": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.quota_exceeded"
+        ],
+        "rate_limit": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.rate_limit"
+        ],
+        "tls_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.tls_error"
+        ]
       }
     }
   ],
@@ -1077,6 +1301,409 @@
         "ms": "Saringan AlphaSift bersifat percubaan dan hanya bertujuan untuk penyelidikan serta sokongan keputusan. Ia bukan nasihat pelaburan. Anda bertanggungjawab atas keputusan perdagangan dan hasilnya.",
         "fr": "Le filtrage AlphaSift est expérimental et destiné uniquement à la recherche et à l’aide à la décision. Il ne constitue pas un conseil en investissement. Vous êtes responsable de vos décisions de trading et de leurs résultats.",
         "id": "Penyaringan AlphaSift bersifat eksperimental dan hanya ditujukan untuk riset serta dukungan pengambilan keputusan. Ini bukan nasihat investasi. Anda bertanggung jawab atas keputusan perdagangan dan hasilnya."
+      }
+    },
+    {
+      "id": "risk_agent_modes_and_downgrade_actions_are_literal",
+      "category": "risk",
+      "rationale": "The risk-agent control must retain the literal full/specialist contract values and describe downgrading buy recommendations to hold or sell without changing those runtime modes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage",
+      "before": {
+        "ja": "有効化すると、フル/スペシャリストモードのリスクエージェントは買い推奨を保有または売却に下げることができます。",
+        "ko": "활성화되면 전면/전문가 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 강등할 수 있습니다.",
+        "de": "Wenn aktiviert, kann der Risikoagent im Voll-/Spezialistenmodus Kaufempfehlungen auf Halten oder Verkauf herunterstufen.",
+        "es": "Cuando está activado, el agente de riesgo en modo completo/especialista puede degradar las recomendaciones de compra para mantenerlas o venderlas.",
+        "ms": "Apabila didayakan, ejen risiko dalam mod penuh/pakar boleh menurunkan taraf cadangan beli untuk dipegang atau dijual.",
+        "fr": "Une fois activé, l’agent de risque en mode « full / spécialiste » peut rétrograder les recommandations d’achat pour les conserver ou les vendre.",
+        "id": "Saat diaktifkan, agen risiko dalam mode penuh/spesialis dapat menurunkan rekomendasi pembelian untuk ditahan atau dijual."
+      },
+      "recommended": {
+        "ja": "有効にすると、full/specialist モードのリスクエージェントは、買い推奨を保有または売却へ引き下げることができます。",
+        "ko": "활성화하면 full/specialist 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 하향 조정할 수 있습니다.",
+        "de": "Wenn aktiviert, kann der Risikoagent im Modus full/specialist Kaufempfehlungen auf Halten oder Verkaufen herabstufen.",
+        "es": "Cuando está activado, el agente de riesgo en modo full/specialist puede rebajar una recomendación de compra a mantener o vender.",
+        "ms": "Apabila didayakan, ejen risiko dalam mod full/specialist boleh menurunkan taraf cadangan beli kepada pegang atau jual.",
+        "fr": "Une fois activé, l’agent de risque en mode full/specialist peut abaisser une recommandation d’achat à conserver ou vendre.",
+        "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual."
+      }
+    },
+    {
+      "id": "risk_agent_veto_requires_the_risk_stage",
+      "category": "risk",
+      "rationale": "The value note must state that the veto is effective only when AGENT_ORCHESTRATOR_MODE includes the risk stage.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.valueNotes.0",
+      "before": {
+        "ja": "効果は AGENT_ORCHESTRATOR_MODE リスクステージも含まれます。",
+        "ko": "효과가 있을 때만 AGENT_ORCHESTRATOR_MODE 위험 단계 포함.",
+        "de": "Nur dann wirksam, wenn AGENT_ORCHESTRATOR_MODE Beinhaltet die Risikophase.",
+        "es": "Solo efectivo cuando AGENT_ORCHESTRATOR_MODE Incluye la etapa de riesgo."
+      },
+      "recommended": {
+        "ja": "AGENT_ORCHESTRATOR_MODE にリスクステージが含まれる場合にのみ有効です。",
+        "ko": "AGENT_ORCHESTRATOR_MODE에 위험 단계가 포함된 경우에만 적용됩니다.",
+        "de": "Nur wirksam, wenn AGENT_ORCHESTRATOR_MODE die Risikophase umfasst.",
+        "es": "Solo es efectivo cuando AGENT_ORCHESTRATOR_MODE incluye la etapa de riesgo."
+      }
+    },
+    {
+      "id": "risk_agent_veto_preserves_critical_flag_semantics",
+      "category": "risk",
+      "rationale": "The summary describes a risk-agent veto of buy signals triggered by critical risk indicators, not a generic objection or person-level action.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.summary",
+      "before": {
+        "fr": "Permet à l’agent des risques de veto aux signaux d’achat lorsque des drapeaux de risque critiques sont détectés."
+      },
+      "recommended": {
+        "fr": "Permet à l’agent de risque d’opposer son veto aux signaux d’achat lorsque des indicateurs de risque critiques sont détectés."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_controls_fingerprint_comparability",
+      "category": "credential",
+      "rationale": "The secret controls whether the three named HMAC fingerprint fields are comparable in llm_usage; it is not a model credential or provider key.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.impact.0",
+      "before": {
+        "ja": "比較可能性に影響を与える messages_hmac, system_message_hmac, 、および user_message_hmac において llm_usage.",
+        "ko": "의 비교 가능성에 영향을 미친다 messages_hmac, system_message_hmac, 그리고 user_message_hmac in llm_usage.",
+        "de": "Betrifft die Vergleichbarkeit von messages_hmac, system_message_hmac, und user_message_hmac in llm_usage."
+      },
+      "recommended": {
+        "ja": "llm_usage 内の messages_hmac、system_message_hmac、user_message_hmac の比較可能性に影響します。",
+        "ko": "llm_usage의 messages_hmac, system_message_hmac 및 user_message_hmac 비교 가능성에 영향을 줍니다.",
+        "de": "Beeinflusst die Vergleichbarkeit von messages_hmac, system_message_hmac und user_message_hmac in llm_usage."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_is_not_the_login_session_secret",
+      "category": "credential",
+      "rationale": "The security note must prohibit reusing the login-session secret and exposing the actual HMAC secret through source control, issues, logs, or screenshots.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.notes.0",
+      "before": {
+        "ja": "ログインセッションの秘密は使わないでください。また、本当のキーをバージョン管理、イシュー、ログ、スクリーンショットに提出しないでください。",
+        "ko": "로그인 세션 비밀을 사용하지 말고, 실제 키를 버전 관리, 이슈, 로그, 스크린샷에 제출하지 마세요.",
+        "de": "Verwenden Sie nicht das Login-Session-Geheimnis und senden Sie den echten Schlüssel nicht an die Versionskontrolle, Issues, Logs oder Screenshots.",
+        "es": "No uses el secreto de sesión de inicio de sesión, y no envíes la clave real al control de versiones, problemas, registros o capturas de pantalla.",
+        "ms": "Jangan gunakan rahsia sesi log masuk dan jangan serahkan kunci sebenar kepada kawalan versi, isu, log atau tangkapan skrin.",
+        "fr": "N’utilisez pas le secret de session de connexion, et ne soumettez pas la vraie clé au contrôle de version, aux problèmes, aux journaux ou aux captures d’écran.",
+        "id": "Jangan gunakan rahasia sesi login, dan jangan kirimkan kunci asli untuk kontrol versi, masalah, log, atau tangkapan layar."
+      },
+      "recommended": {
+        "ja": "ログインセッションのシークレットを再利用しないでください。また、実際の値をバージョン管理、Issue、ログ、スクリーンショットにコミットしたり公開したりしないでください。",
+        "ko": "로그인 세션 비밀 값을 재사용하지 말고, 실제 값을 버전 관리, 이슈, 로그 또는 스크린샷에 커밋하거나 노출하지 마세요.",
+        "de": "Verwenden Sie das Geheimnis der Anmeldesitzung nicht erneut und übertragen oder veröffentlichen Sie den echten Wert nicht in der Versionsverwaltung, in Issues, Logs oder Screenshots.",
+        "es": "No reutilices el secreto de la sesión de inicio de sesión ni confirmes o expongas el valor real en el control de versiones, incidencias, registros o capturas de pantalla.",
+        "ms": "Jangan guna semula rahsia sesi log masuk atau masukkan dan dedahkan nilai sebenar dalam kawalan versi, isu, log atau tangkapan skrin.",
+        "fr": "Ne réutilisez pas le secret de session de connexion et ne validez ni n’exposez la valeur réelle dans le contrôle de version, les issues, les journaux ou les captures d’écran.",
+        "id": "Jangan gunakan kembali rahasia sesi login atau masukkan dan ungkapkan nilai sebenarnya dalam kontrol versi, issue, log, atau tangkapan layar."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_signs_message_fingerprints",
+      "category": "credential",
+      "rationale": "The summary states that this secret signs message-level fingerprints for usage telemetry; it does not authenticate a user or authorize a provider request.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.summary",
+      "before": {
+        "ja": "メッセージレベルの記号 HMAC 指紋 LLM テレメトリーを活用してください。",
+        "ko": "신호 메시지 수준 HMAC 지문 LLM 텔레메트리를 사용하세요.",
+        "de": "Zeichen auf Nachrichtenebene HMAC Fingerabdrücke für LLM Nutzungstelemetrie.",
+        "es": "Señales a nivel de mensaje HMAC huellas dactilares para LLM Uso de telemetría.",
+        "ms": "Tanda-tanda peringkat mesej HMAC cap jari untuk LLM penggunaan telemetri.",
+        "fr": "Panneaux au niveau du message HMAC empreintes digitales pour LLM Utilisation de la télémétrie.",
+        "id": "Tanda tingkat pesan HMAC sidik jari untuk LLM penggunaan telemetri."
+      },
+      "recommended": {
+        "ja": "LLM 使用状況テレメトリ用に、メッセージ単位のフィンガープリントへ HMAC 署名します。",
+        "ko": "LLM 사용량 텔레메트리를 위해 메시지 수준 지문에 HMAC 서명을 적용합니다.",
+        "de": "Signiert HMAC-Fingerabdrücke auf Nachrichtenebene für die LLM-Nutzungstelemetrie.",
+        "es": "Firma huellas HMAC a nivel de mensaje para la telemetría de uso de LLM.",
+        "ms": "Menandatangani cap jari HMAC peringkat mesej untuk telemetri penggunaan LLM.",
+        "fr": "Signe les empreintes HMAC au niveau des messages pour la télémétrie d’utilisation des LLM.",
+        "id": "Menandatangani sidik jari HMAC tingkat pesan untuk telemetri penggunaan LLM."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_title_names_the_secret",
+      "category": "credential",
+      "rationale": "The title must name an HMAC secret used for LLM usage telemetry rather than an example, generic key, or usage instruction.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.title",
+      "before": {
+        "ja": "LLM 使用例 HMAC 秘密",
+        "ko": "LLM 사용 HMAC 비밀",
+        "de": "LLM Verwendung HMAC Geheimnis",
+        "es": "LLM Uso HMAC Secreto",
+        "ms": "LLM Kegunaan HMAC Rahsia",
+        "fr": "LLM Utilisation HMAC Secret",
+        "id": "LLM penggunaan HMAC Rahasia"
+      },
+      "recommended": {
+        "ja": "LLM 使用量 HMAC シークレット",
+        "ko": "LLM 사용량 HMAC 비밀 값",
+        "de": "HMAC-Geheimnis für LLM-Nutzung",
+        "es": "Secreto HMAC de uso de LLM",
+        "ms": "Rahsia HMAC penggunaan LLM",
+        "fr": "Secret HMAC d’utilisation des LLM",
+        "id": "Rahasia HMAC penggunaan LLM"
+      }
+    },
+    {
+      "id": "usage_hmac_secret_explains_generation_and_cross_deployment_scope",
+      "category": "credential",
+      "rationale": "The usage text preserves the secure default of a backend-generated local secret and limits manual configuration to intentional cross-deployment HMAC comparison with a high-entropy value.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.usage",
+      "before": {
+        "ja": "通常はこのファイルを空にしておき、バックエンドがローカルのシークレットファイルを作成します。配置が意図的に同等の配置を必要とする場合にのみ設定してください HMACs, 、そしてopenssl rand -hex 32のような高エントロピーランダムな値を用います。",
+        "ko": "보통은 비워두면 백엔드가 로컬 비밀 파일을 생성합니다. 배포가 의도적으로 유사 기능이 필요할 때만 설정하세요 HMACs, 그리고 openssl rand -hex 32와 같은 고엔트로피 무작위 값을 사용한다.",
+        "de": "Normalerweise lasse ich das leer, damit das Backend eine lokale geheime Datei erstellt. Setze es nur dann ein, wenn Deployments absichtlich vergleichbare Möglichkeiten benötigen HMACs, und verwenden Sie einen Hochentropie-Zufallswert wie OpenSSL Rand -Hex 32.",
+        "es": "Normalmente dejo esto vacío para que el backend cree un archivo secreto local. Configúralo solo cuando los despliegues necesiten intencionadamente comparables HMACs, y usar un valor aleatorio de alta entropía como openssl rand -hex 32.",
+        "ms": "Biasanya biarkan ini kosong supaya bahagian belakang mencipta fail rahsia tempatan. Tetapkannya hanya apabila penggunaan sengaja memerlukan setanding HMACs, dan menggunakan nilai rawak entropi tinggi seperti openssl rand -hex 32.",
+        "fr": "En général, je laisse ce fichier vide pour que le backend crée un fichier secret local. Ne le définissez que lorsque les déploiements ont intentionnellement besoin d’être comparables HMACs, et utiliser une valeur aléatoire à haute entropie telle que openssl rand -hex 32.",
+        "id": "Biasanya biarkan ini kosong sehingga backend membuat file rahasia lokal. Atur hanya ketika penyebaran yang sengaja membutuhkan sebanding HMACs, dan menggunakan nilai acak entropi tinggi seperti openssl rand -hex 32."
+      },
+      "recommended": {
+        "ja": "通常は空のままにし、バックエンドにローカルのシークレットファイルを作成させます。デプロイ間で HMAC を意図的に比較する必要がある場合にのみ設定し、openssl rand -hex 32 などで生成した高エントロピーのランダム値を使用してください。",
+        "ko": "일반적으로 비워 두면 백엔드가 로컬 비밀 파일을 생성합니다. 배포 간 HMAC을 의도적으로 비교해야 할 때만 설정하고 openssl rand -hex 32로 생성한 것과 같은 고엔트로피 난수 값을 사용하세요.",
+        "de": "Lassen Sie dieses Feld normalerweise leer, damit das Backend eine lokale Geheimnisdatei erstellt. Legen Sie es nur fest, wenn HMACs zwischen Bereitstellungen absichtlich vergleichbar sein müssen, und verwenden Sie einen zufälligen Wert mit hoher Entropie, etwa aus openssl rand -hex 32.",
+        "es": "Déjalo normalmente vacío para que el backend cree un archivo secreto local. Configúralo solo cuando sea necesario comparar HMAC entre despliegues de forma intencionada y usa un valor aleatorio de alta entropía, por ejemplo el generado con openssl rand -hex 32.",
+        "ms": "Biasanya biarkan kosong supaya backend mencipta fail rahsia setempat. Tetapkan hanya apabila HMAC antara penggunaan memang perlu dibandingkan, dan gunakan nilai rawak berentropi tinggi seperti yang dijana dengan openssl rand -hex 32.",
+        "fr": "Laissez généralement ce champ vide afin que le backend crée un fichier secret local. Définissez-le uniquement lorsque les HMAC doivent volontairement être comparables entre déploiements, et utilisez une valeur aléatoire à forte entropie, par exemple générée avec openssl rand -hex 32.",
+        "id": "Biasanya biarkan kosong agar backend membuat file rahasia lokal. Atur hanya jika HMAC antar-deployment memang perlu dibandingkan, dan gunakan nilai acak berentropi tinggi seperti yang dibuat dengan openssl rand -hex 32."
+      }
+    },
+    {
+      "id": "usage_hmac_rotation_updates_the_key_version",
+      "category": "credential",
+      "rationale": "The rotation note must require updating LLM_USAGE_HMAC_KEY_VERSION so fingerprints created under different secrets are not treated as comparable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.valueNotes.1",
+      "before": {
+        "ja": "回転する際は、更新も行ってください LLM_USAGE_HMAC_KEY_VERSION.",
+        "ko": "회전할 때도 업데이트하세요 LLM_USAGE_HMAC_KEY_VERSION.",
+        "de": "Beim Drehen solltest du auch aktualisieren LLM_USAGE_HMAC_KEY_VERSION.",
+        "fr": "En la faisant pivoter, mettez-la aussi à jour LLM_USAGE_HMAC_KEY_VERSION."
+      },
+      "recommended": {
+        "ja": "ローテーション時は LLM_USAGE_HMAC_KEY_VERSION も更新してください。",
+        "ko": "교체할 때 LLM_USAGE_HMAC_KEY_VERSION도 업데이트하세요.",
+        "de": "Aktualisieren Sie bei einer Rotation auch LLM_USAGE_HMAC_KEY_VERSION.",
+        "fr": "Lors de sa rotation, mettez également à jour LLM_USAGE_HMAC_KEY_VERSION."
+      }
+    },
+    {
+      "id": "bias_threshold_impacts_chase_risk_warnings",
+      "category": "risk",
+      "rationale": "The impact text concerns chasing a price move, moving-average deviation, and trading judgment; it must not read as generic tracking or physical distance.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.impact.0",
+      "before": {
+        "ja": "追いかけ、移動平均線の逸脱、取引アドバイスに関するテクニカル分析警告に影響します。",
+        "ko": "추격, 이동평균선 편차, 거래 조언에 관한 기술적 분석 경고에 영향을 미칩니다."
+      },
+      "recommended": {
+        "ja": "追い買い、移動平均線からの乖離、売買判断に関するテクニカル分析の警告に影響します。",
+        "ko": "추격 매수, 이동평균선 이격, 매매 판단에 관한 기술 분석 경고에 영향을 줍니다."
+      }
+    },
+    {
+      "id": "bias_threshold_balances_noise_and_chase_risk",
+      "category": "risk",
+      "rationale": "The note distinguishes excess warning noise at a low threshold from weakened chase-risk warnings at a high threshold.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.notes.0",
+      "before": {
+        "ja": "低すぎるとノイズの警告が発生します。高すぎると追跡リスク警報が弱まる。",
+        "ko": "너무 낮으면 시끄러운 경고음이 발생할 수 있습니다; 너무 높으면 추격 위험 경보가 약해질 수 있습니다.",
+        "de": "Zu niedrig kann laute Warnungen verursachen; Zu hoch kann die Chase-Risiko-Warnungen schwächen.",
+        "es": "Demasiado bajo puede añadir avisos ruidosos; Demasiado alto puede debilitar las alertas de riesgo de persecución."
+      },
+      "recommended": {
+        "ja": "低すぎると不要な警告が増え、高すぎると高値追いリスクの警告が弱まる可能性があります。",
+        "ko": "너무 낮으면 불필요한 경고가 늘고, 너무 높으면 추격 매수 위험 경고가 약해질 수 있습니다.",
+        "de": "Ein zu niedriger Wert kann unnötig viele Warnungen auslösen; ein zu hoher Wert kann Hinweise auf das Risiko des Hinterherlaufens abschwächen.",
+        "es": "Un valor demasiado bajo puede añadir avisos innecesarios; uno demasiado alto puede debilitar las alertas sobre el riesgo de perseguir subidas."
+      }
+    },
+    {
+      "id": "bias_threshold_warns_on_chasing_and_mean_reversion",
+      "category": "risk",
+      "rationale": "The usage text describes a percentage deviation from MA5 and two risk outcomes: warning against chasing and highlighting mean-reversion risk.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.usage",
+      "before": {
+        "ja": "パーセンテージを入力してください。価格の偏差がMA5の閾値を超えると、追跡を警告したり、平均回帰リスクを強調したりする報告が出ます。",
+        "ko": "백분율을 입력하세요. 가격 편차가 MA5에서 임계값을 초과할 경우, 보고서는 추격을 경고하거나 평균 회귀 위험을 강조할 수 있습니다.",
+        "de": "Geben Sie einen Prozentsatz ein. Wenn die Preisabweichung von MA5 die Schwelle überschreitet, können Berichte vor Chasing warnen oder das Risiko der Mittelwert-Rückkehr hervorheben.",
+        "es": "Introduce un porcentaje. Cuando la desviación de precio respecto a MA5 supera el umbral, los informes pueden advertir contra la persecución o destacar el riesgo de reversión media.",
+        "fr": "Entrez un pourcentage. Lorsque l’écart de prix par rapport au MA5 dépasse le seuil, les rapports peuvent mettre en garde contre la poursuite ou mettre en avant le risque de réversion moyenne.",
+        "id": "Masukkan persentase. Ketika penyimpangan harga dari MA5 melebihi ambang batas, laporan dapat memperingatkan terhadap pengejaran atau menyoroti risiko pengembalian rata-rata."
+      },
+      "recommended": {
+        "ja": "割合（%）を入力します。価格の MA5 からの乖離が閾値を超えると、レポートは高値追いを避けるよう警告したり、平均回帰リスクを示したりします。",
+        "ko": "백분율을 입력합니다. 가격의 MA5 이격이 임계값을 넘으면 보고서에서 추격 매수를 경고하거나 평균 회귀 위험을 강조할 수 있습니다.",
+        "de": "Geben Sie einen Prozentwert ein. Überschreitet die Abweichung des Kurses vom MA5 den Schwellenwert, können Berichte davor warnen, Kursen hinterherzulaufen, oder auf ein Mean-Reversion-Risiko hinweisen.",
+        "es": "Introduce un porcentaje. Cuando la desviación del precio respecto a MA5 supera el umbral, los informes pueden advertir contra perseguir subidas o destacar el riesgo de reversión a la media.",
+        "fr": "Entrez un pourcentage. Lorsque l’écart du prix par rapport à la MA5 dépasse le seuil, les rapports peuvent déconseiller de poursuivre la hausse ou signaler un risque de retour à la moyenne.",
+        "id": "Masukkan persentase. Ketika penyimpangan harga dari MA5 melebihi ambang batas, laporan dapat memperingatkan agar tidak mengejar kenaikan atau menyoroti risiko pembalikan menuju rata-rata."
+      }
+    },
+    {
+      "id": "admin_auth_impacts_login_settings_and_admin_operations",
+      "category": "authentication",
+      "rationale": "The control affects WebUI login, access to settings, and administrative operations; malformed fragments obscured that authentication boundary.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.impact.0",
+      "before": {
+        "ja": "影響 WebUI ログイン、設定、アクセス、管理操作。",
+        "ko": "영향 WebUI 로그인, 설정 접근, 관리자 조작.",
+        "de": "Auswirkungen WebUI Login, Einstellungszugriff und Admin-Operationen.",
+        "es": "Afectos WebUI inicio de sesión, ajustes de acceso y operaciones de administración.",
+        "ms": "Memberi kesan WebUI log masuk, akses tetapan dan operasi pentadbir.",
+        "fr": "Effets WebUI Connexion, Paramètres d’accès et opérations administratives.",
+        "id": "Mempengaruhi WebUI login, akses pengaturan, dan operasi admin."
+      },
+      "recommended": {
+        "ja": "WebUI のログイン、設定へのアクセス、管理者操作に影響します。",
+        "ko": "WebUI 로그인, 설정 접근 및 관리자 작업에 영향을 줍니다.",
+        "de": "Wirkt sich auf die WebUI-Anmeldung, den Zugriff auf Einstellungen und administrative Vorgänge aus.",
+        "es": "Afecta al inicio de sesión en la WebUI, al acceso a la configuración y a las operaciones administrativas.",
+        "ms": "Mempengaruhi log masuk WebUI, akses tetapan dan operasi pentadbir.",
+        "fr": "Affecte la connexion à la WebUI, l’accès aux paramètres et les opérations d’administration.",
+        "id": "Memengaruhi login WebUI, akses pengaturan, dan operasi administrator."
+      }
+    },
+    {
+      "id": "admin_auth_data_requires_deployment_persistence",
+      "category": "authentication",
+      "rationale": "The note requires authentication data to persist in the deployment environment and explains the refresh or restart needed after manual .env edits.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.notes.0",
+      "before": {
+        "ja": "認証データがデプロイ環境に永続化されていることを確認してください。マニュアル .env 編集にはプロセスの再起動か認証設定フローで状態を更新する必要があります。",
+        "ko": "배포 환경에서 인증 데이터가 보존되도록 하세요. 수동 .env 편집은 프로세스 재시작이나 인증 설정 플로우가 상태를 새로고침해야 합니다.",
+        "de": "Stellen Sie sicher, dass die Authentifizierungsdaten in der Bereitstellungsumgebung gespeichert werden. Manuell .env Bearbeitungen erfordern einen Neustart des Prozesses oder den Ablauf der Authentifizierungseinstellungen, um den Zustand zu aktualisieren.",
+        "es": "Asegúrate de que los datos de autenticación se mantengan en el entorno de despliegue. Manual .env Las ediciones requieren reiniciar el proceso o que la configuración de autenticación fluya para actualizar el estado.",
+        "ms": "Pastikan data pengesahan dikekalkan dalam persekitaran penggunaan. Buku Panduan .env Pengeditan memerlukan mulakan semula proses atau aliran tetapan pengesahan untuk menyegarkan semula keadaan.",
+        "fr": "Assurez-vous que les données d’authentification sont conservées dans l’environnement de déploiement. Manuel .env Les modifications nécessitent un redémarrage du processus ou que les paramètres d’authentification se rafraîchissent à l’état.",
+        "id": "Pastikan data aukasi dipertahankan di lingkungan penyebaran. Panduan .env Pengeditan memerlukan proses mulai ulang atau alur pengaturan autentikasi untuk menyegarkan status."
+      },
+      "recommended": {
+        "ja": "デプロイ環境で認証データが永続化されることを確認してください。.env を手動で編集した場合は、プロセスを再起動するか、認証設定フローで状態を更新する必要があります。",
+        "ko": "배포 환경에서 인증 데이터가 영구 저장되는지 확인하세요. .env 파일을 수동으로 수정한 경우 프로세스를 다시 시작하거나 인증 설정 흐름에서 상태를 새로 고쳐야 합니다.",
+        "de": "Stellen Sie sicher, dass Authentifizierungsdaten in der Bereitstellungsumgebung dauerhaft gespeichert werden. Nach manuellen Änderungen an .env muss der Prozess neu gestartet oder der Status über die Authentifizierungseinstellungen aktualisiert werden.",
+        "es": "Asegúrate de que los datos de autenticación persistan en el entorno de despliegue. Los cambios manuales en .env requieren reiniciar el proceso o actualizar el estado desde la configuración de autenticación.",
+        "ms": "Pastikan data pengesahan disimpan secara berterusan dalam persekitaran penggunaan. Perubahan manual pada .env memerlukan proses dimulakan semula atau keadaan disegarkan melalui tetapan pengesahan.",
+        "fr": "Assurez-vous que les données d’authentification sont persistées dans l’environnement de déploiement. Toute modification manuelle du fichier .env nécessite un redémarrage du processus ou une actualisation de l’état via les paramètres d’authentification.",
+        "id": "Pastikan data autentikasi disimpan secara persisten di lingkungan deployment. Perubahan manual pada .env memerlukan proses dimulai ulang atau status diperbarui melalui pengaturan autentikasi."
+      }
+    },
+    {
+      "id": "admin_auth_enables_webui_password_protection",
+      "category": "authentication",
+      "rationale": "The summary identifies administrator-password protection for WebUI instead of an incomplete activation fragment.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.summary",
+      "before": {
+        "ja": "管理者パスワード保護を有効にします WebUI.",
+        "ko": "관리자 비밀번호 보호 활성화 WebUI."
+      },
+      "recommended": {
+        "ja": "WebUI の管理者パスワード保護を有効にします。",
+        "ko": "WebUI에 관리자 비밀번호 보호를 활성화합니다."
+      }
+    },
+    {
+      "id": "admin_auth_uses_the_settings_flow_and_reset_command",
+      "category": "authentication",
+      "rationale": "The recovery text directs users to the WebUI authentication settings flow and preserves the exact reset command without splitting its arguments.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.usage",
+      "before": {
+        "ja": "通してください WebUI 認証設定の有効化または無効を入力; パスワードを忘れた場合は、python -m src.auth を実行してください。 reset_password。",
+        "ko": "통과해 주세요 WebUI 인증 설정 항목 활성화 또는 비활성화; 비밀번호를 잊으면 python -m src.auth를 실행할 수 있습니다. reset_password。"
+      },
+      "recommended": {
+        "ja": "WebUI の認証設定から有効または無効にします。必要に応じて python -m src.auth reset_password でパスワードをリセットしてください。",
+        "ko": "WebUI 인증 설정에서 이 기능을 활성화하거나 비활성화하세요. 필요한 경우 python -m src.auth reset_password로 비밀번호를 재설정하세요."
+      }
+    },
+    {
+      "id": "daily_market_context_controls_analysis_guardrails_not_report_generation",
+      "category": "risk",
+      "rationale": "Disabling DAILY_MARKET_CONTEXT_ENABLED keeps market-review reports running while stopping summary injection and its conservative effect on buy/add recommendations.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.market_review.valueNotes.2",
+      "before": {
+        "ja": "デフォルトで有効化 DAILY_MARKET_CONTEXT_ENABLED； そうしておこう false その後も市場レビューレポートを作成できますが、個別の株価分析では市場の概要を読み取ったり、買い・追加の推奨を緩和したりすることはできません。",
+        "ko": "기본적으로 활성화됨 DAILY_MARKET_CONTEXT_ENABLED； 그냥 두세요 false 시장 리뷰 보고서는 이후에 생성할 수 있지만, 개별 주식 분석은 시장 요약을 읽거나 매수/추가 추천을 완화하지 않습니다."
+      },
+      "recommended": {
+        "ja": "DAILY_MARKET_CONTEXT_ENABLED はデフォルトで有効です。false に設定すると、市場レビューレポートは引き続き生成されますが、その概要は個別銘柄の分析に挿入されず、買い・買い増し推奨を抑制しません。",
+        "ko": "DAILY_MARKET_CONTEXT_ENABLED는 기본적으로 활성화됩니다. false로 설정하면 시장 리뷰 보고서는 계속 생성되지만, 그 요약은 개별 종목 분석에 삽입되지 않으며 매수 또는 추가 매수 추천을 완화하지 않습니다."
       }
     }
   ]

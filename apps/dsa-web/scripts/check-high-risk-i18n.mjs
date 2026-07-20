@@ -1,18 +1,22 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import ts from 'typescript';
 
 const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(SCRIPT_DIRECTORY, '..');
+const REPOSITORY_ROOT = path.resolve(WEB_ROOT, '..', '..');
 const SOURCE_ROOT = path.join(WEB_ROOT, 'src');
 const TRANSLATIONS_DIRECTORY = path.join(SOURCE_ROOT, 'i18n', 'translations');
 const AUDIT_PATH = path.join(SCRIPT_DIRECTORY, 'high-risk-i18n-audit.json');
+const execFileAsync = promisify(execFile);
 const NON_TRANSLATABLE_PROPERTIES = new Set([
   'value',
   'filename',
@@ -36,7 +40,7 @@ const PENDING_STATUS = 'PENDING_NATIVE_REVIEW';
 const REVIEWED_STATUS = 'NATIVE_REVIEWED';
 
 const argumentsSet = new Set(process.argv.slice(2));
-const supportedArguments = new Set(['--print-snapshot']);
+const supportedArguments = new Set(['--print-snapshot', '--verify-baseline']);
 const unknownArguments = [...argumentsSet].filter((argument) => !supportedArguments.has(argument));
 
 if (unknownArguments.length > 0) {
@@ -44,6 +48,7 @@ if (unknownArguments.length > 0) {
 }
 
 const shouldPrintSnapshot = argumentsSet.has('--print-snapshot');
+const shouldVerifyBaseline = argumentsSet.has('--verify-baseline');
 const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'stockpulse-high-risk-i18n-'));
 let bundleSequence = 0;
 
@@ -57,6 +62,14 @@ function sha256(value) {
 
 function canonicalDigest(value) {
   return sha256(JSON.stringify(value));
+}
+
+async function runGit(argumentsList) {
+  const { stdout } = await execFileAsync('git', ['-C', REPOSITORY_ROOT, ...argumentsList], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return stdout.trimEnd();
 }
 
 function assertNonEmptyString(value, label) {
@@ -268,6 +281,21 @@ function validateAuditMetadata(audit, uiLanguages, additionalLanguages) {
   return sourceIds;
 }
 
+function validateDecisionEvidence(audit) {
+  if (!Number.isSafeInteger(audit.decisionEvidence?.count) || audit.decisionEvidence.count <= 0) {
+    fail('decisionEvidence.count must be a positive integer');
+  }
+  if (!/^[0-9a-f]{64}$/.test(audit.decisionEvidence?.sha256 ?? '')) {
+    fail('decisionEvidence.sha256 must be a SHA-256 digest');
+  }
+  if (audit.decisionEvidence.count !== audit.decisions?.length) {
+    fail('decision evidence count differs from the recorded decisions');
+  }
+  if (audit.decisionEvidence.sha256 !== canonicalDigest(audit.decisions)) {
+    fail('decision evidence changed; review the rationale and refresh its count/hash together');
+  }
+}
+
 function selectorMatches(key, selector, label) {
   const selectorKinds = ['exact', 'prefix', 'pattern'].filter((kind) => selector[kind] !== undefined);
   if (selectorKinds.length !== 1) fail(`${label} must contain exactly one selector kind`);
@@ -320,6 +348,105 @@ function validateDecisions(audit, bundles, uiLanguages, sourceIds) {
       }
       if (bundles[language][decision.key] !== decision.recommended[language]) {
         fail(`${decision.id} does not match the ${language} bundle at ${decision.key}`);
+      }
+    }
+  }
+}
+
+function unwrapExpression(expression) {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current)
+    || ts.isAsExpression(current)
+    || ts.isSatisfiesExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function extractExportedStringRecord(source, sourcePath, exportName) {
+  const sourceFile = ts.createSourceFile(
+    sourcePath,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  let declaration;
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    const isExported = ts.getModifiers(statement)?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
+    if (!isExported) continue;
+    declaration = statement.declarationList.declarations.find(
+      (candidate) => ts.isIdentifier(candidate.name) && candidate.name.text === exportName,
+    );
+    if (declaration) break;
+  }
+  const initializer = declaration?.initializer ? unwrapExpression(declaration.initializer) : undefined;
+  if (!initializer || !ts.isObjectLiteralExpression(initializer)) {
+    fail(`${sourcePath} must export ${exportName} as an object literal`);
+  }
+
+  const record = {};
+  for (const property of initializer.properties) {
+    if (!ts.isPropertyAssignment(property)) {
+      fail(`${sourcePath} ${exportName} must contain only property assignments`);
+    }
+    const propertyName = property.name;
+    if (!ts.isStringLiteral(propertyName) && !ts.isIdentifier(propertyName)) {
+      fail(`${sourcePath} ${exportName} contains an unsupported property name`);
+    }
+    const value = unwrapExpression(property.initializer);
+    if (!ts.isStringLiteral(value) && !ts.isNoSubstitutionTemplateLiteral(value)) {
+      fail(`${sourcePath} ${exportName}.${propertyName.text} must be a string literal`);
+    }
+    if (Object.hasOwn(record, propertyName.text)) {
+      fail(`${sourcePath} ${exportName} contains duplicate key ${propertyName.text}`);
+    }
+    record[propertyName.text] = value.text;
+  }
+  return record;
+}
+
+async function loadBaselineRecord(commit, language) {
+  const relativePath = `apps/dsa-web/src/i18n/translations/${language}.ts`;
+  const source = await runGit(['show', `${commit}:${relativePath}`]);
+  return extractExportedStringRecord(
+    source,
+    relativePath,
+    language === 'en' ? 'SOURCE_UI_TRANSLATIONS' : 'translations',
+  );
+}
+
+async function verifyDecisionBaseline(audit) {
+  const mergeBase = await runGit(['merge-base', 'HEAD', audit.auditBaseline.ref]);
+  if (mergeBase !== audit.auditBaseline.commit) {
+    fail(
+      `HEAD/${audit.auditBaseline.ref} merge-base ${mergeBase} differs from audit baseline ${audit.auditBaseline.commit}`,
+    );
+  }
+
+  const decisionLanguages = [...new Set(audit.decisions.flatMap(
+    (decision) => Object.keys(decision.before ?? {}),
+  ))].sort();
+  if (decisionLanguages.includes('zh')) {
+    fail('Baseline verification cannot use generated bundles for zh product-source decisions');
+  }
+  const baselineRecords = Object.fromEntries(await Promise.all(decisionLanguages.map(async (language) => [
+    language,
+    await loadBaselineRecord(audit.auditBaseline.commit, language),
+  ])));
+  for (const decision of audit.decisions) {
+    for (const [language, before] of Object.entries(decision.before)) {
+      const baselineValue = baselineRecords[language]?.[decision.key];
+      if (baselineValue !== before) {
+        fail(
+          `${decision.id}.before.${language} does not match ${audit.auditBaseline.commit}:${decision.key}; `
+            + `expected ${JSON.stringify(baselineValue)}, recorded ${JSON.stringify(before)}`,
+        );
       }
     }
   }
@@ -456,6 +583,7 @@ async function run() {
   const uiLanguages = [...languageModule.UI_LANGUAGES];
   const additionalLanguages = [...languageModule.ADDITIONAL_UI_LANGUAGES];
   const sourceIds = validateAuditMetadata(audit, uiLanguages, additionalLanguages);
+  validateDecisionEvidence(audit);
   const sourceBundles = await extractSourceBundles(uiLanguages);
   const generated = await loadGeneratedBundles(additionalLanguages);
   const allKeys = [...generated.UI_TRANSLATION_KEYS];
@@ -477,6 +605,12 @@ async function run() {
 
   await validateContractBoundaries(audit, allKeys, bundles, uiLanguages);
   validateDecisions(audit, bundles, uiLanguages, sourceIds);
+  if (shouldVerifyBaseline) {
+    await verifyDecisionBaseline(audit);
+    process.stdout.write(
+      `High-risk i18n baseline verified: ${audit.decisions.length} decisions against ${audit.auditBaseline.commit}.\n`,
+    );
+  }
   const snapshot = buildSnapshot(audit, bundles, uiLanguages, allKeys, sourceIds);
   if (shouldPrintSnapshot) {
     process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);

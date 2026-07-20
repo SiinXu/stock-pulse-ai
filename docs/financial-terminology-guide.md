@@ -499,7 +499,8 @@ I18N-01 已修订下表中的明显语义漂移，并通过高风险语义守卫
 ```bash
 cd apps/dsa-web
 npm run i18n:resources   # 校验源 key/源文案与八个新增语言资源
-npm run i18n:high-risk   # 校验高风险语义范围、证据状态、code/display 边界与快照
+npm run i18n:high-risk   # 校验高风险语义范围、decision 证据、code/display 边界与快照
+npm run i18n:high-risk -- --verify-baseline  # 用 TypeScript AST 核对 main 基线与全部 before 值
 npm run test:i18n        # 十语言 key/空值/插值/NFC/零宽字符/重复 key + 硬编码扫描
 # 依赖就绪时可再执行：
 npm run lint
