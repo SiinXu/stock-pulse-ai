@@ -1116,7 +1116,7 @@ describe('DecisionSignalsPage', () => {
 
     expect(await screen.findByText('最近分析')).toBeInTheDocument();
     const candidateButton = screen.getByRole('button', { name: /600519/ });
-    expect(candidateButton).toHaveAttribute('data-variant', 'outline');
+    expect(candidateButton).toHaveAttribute('data-control', 'selection-chip');
     fireEvent.click(candidateButton);
 
     await waitFor(() => {
