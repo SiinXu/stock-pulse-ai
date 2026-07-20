@@ -16,10 +16,15 @@ import {
 
 type SidebarNavProps = {
   collapsed?: boolean;
-  onNavigate?: (routeFocusKey?: string) => void;
+  onNavigate?: () => void;
   onToggleCollapse?: () => void;
   variant?: 'default' | 'rail';
   focusKeyPrefix?: string;
+  returnFocusKey?: string;
+  profileOpen?: boolean;
+  onProfileOpenChange?: (open: boolean) => void;
+  profileTriggerRef?: React.Ref<HTMLButtonElement>;
+  profilePresentation?: 'mobile' | 'desktop' | 'drawer';
 };
 
 export const SidebarNav: React.FC<SidebarNavProps> = ({
@@ -28,6 +33,11 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
   onToggleCollapse,
   variant = 'default',
   focusKeyPrefix = 'shell-nav',
+  returnFocusKey,
+  profileOpen,
+  onProfileOpenChange,
+  profileTriggerRef,
+  profilePresentation,
 }) => {
   const { authEnabled, logout } = useAuth();
   const { t } = useUiLanguage();
@@ -35,14 +45,14 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
   const openSearch = () => {
     navigate('/', { state: { focusStockSearch: true, focusToken: Date.now() } });
-    onNavigate?.(`${focusKeyPrefix}:search`);
+    onNavigate?.();
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
-    'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all motion-reduce:transition-none',
+    'group relative flex h-[var(--nav-item-height)] w-full shrink-0 items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all motion-reduce:transition-none',
     isRail
       ? 'justify-center gap-2.5 px-2'
       : collapsed
@@ -133,6 +143,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             onClick={openSearch}
             aria-label={t('layout.search')}
             data-route-focus-key={`${focusKeyPrefix}:search`}
+            data-route-focus-return-key={returnFocusKey}
             className="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground motion-reduce:transition-none"
           >
             <Search className="h-4 w-4" />
@@ -145,6 +156,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             onClick={openSearch}
             aria-label={t('layout.search')}
             data-route-focus-key={`${focusKeyPrefix}:search`}
+            data-route-focus-return-key={returnFocusKey}
             className="mb-3 flex min-h-11 w-full items-center rounded-lg border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
@@ -171,11 +183,12 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               end={exact}
               onClick={(event) => {
                 if (shouldDelegateCurrentDocumentNavigation(event)) {
-                  onNavigate?.(`${focusKeyPrefix}:${key}`);
+                  onNavigate?.();
                 }
               }}
               aria-label={label}
               data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              data-route-focus-return-key={returnFocusKey}
               className={({ isActive }) =>
                 cn(
                   itemInteractiveClass,
@@ -215,7 +228,13 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
       </nav>
 
-      <SidebarProfile collapsed={collapsed} />
+      <SidebarProfile
+        collapsed={collapsed}
+        open={profileOpen}
+        onOpenChange={onProfileOpenChange}
+        triggerRef={profileTriggerRef}
+        presentation={profilePresentation}
+      />
 
       {collapsed && logoutButton ? (
           <Tooltip content={t('layout.logout')} className={cn('w-full', isRail ? 'mt-1.5' : 'mt-5')}>

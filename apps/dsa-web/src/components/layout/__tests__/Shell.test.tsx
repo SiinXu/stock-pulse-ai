@@ -125,10 +125,14 @@ describe('Shell', () => {
     fireEvent.click(opener);
 
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
-    expect(opener).not.toHaveAttribute('data-route-focus-key');
+    expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
     expect(within(drawer).getByRole('link', { name: '问股' })).toHaveAttribute(
       'data-route-focus-key',
       'shell-nav-mobile:chat',
+    );
+    expect(within(drawer).getByRole('link', { name: '问股' })).toHaveAttribute(
+      'data-route-focus-return-key',
+      'shell:mobile-navigation',
     );
     fireEvent.keyDown(drawer, { key: 'Escape' });
 
@@ -136,15 +140,19 @@ describe('Shell', () => {
     expect(opener).toHaveFocus();
   });
 
-  it('moves the selected mobile route marker onto the persistent Drawer opener', () => {
+  it('keeps one stable opener while mobile routes declare it as their return target', () => {
     renderShell();
     const opener = screen.getByRole('button', { name: '打开导航菜单' });
     fireEvent.click(opener);
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
-    fireEvent.click(within(drawer).getByRole('link', { name: '首页' }));
+    const home = within(drawer).getByRole('link', { name: '首页' });
+
+    expect(home).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:home');
+    expect(home).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
+    fireEvent.click(home);
 
     expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
-    expect(opener).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:home');
+    expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
   });
 
   it('closes mobile navigation and moves focus to the active desktop route at the breakpoint', async () => {
@@ -168,6 +176,32 @@ describe('Shell', () => {
     act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
 
     await waitFor(() => expect(pageAction).toHaveFocus());
+  });
+
+  it('closes Profile across breakpoint changes and focuses the visible counterpart', async () => {
+    const { container } = renderShell();
+    const mobileProfile = container.querySelector<HTMLButtonElement>(
+      '[data-shell-profile-trigger="mobile"]',
+    );
+    const desktopProfile = container.querySelector<HTMLButtonElement>(
+      '[data-shell-profile-trigger="desktop"]',
+    );
+    expect(mobileProfile).not.toBeNull();
+    expect(desktopProfile).not.toBeNull();
+
+    fireEvent.click(mobileProfile!);
+    expect(screen.getByRole('dialog', { name: 'StockPulse' })).toBeInTheDocument();
+    act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, true));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'StockPulse' })).not.toBeInTheDocument());
+    await waitFor(() => expect(desktopProfile).toHaveFocus());
+
+    fireEvent.click(desktopProfile!);
+    expect(screen.getByRole('dialog', { name: 'StockPulse' })).toBeInTheDocument();
+    act(() => setMediaMatch(DESKTOP_SIDEBAR_QUERY, false));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'StockPulse' })).not.toBeInTheDocument());
+    await waitFor(() => expect(mobileProfile).toHaveFocus());
   });
 
   it('defaults to a compact rail at 1024-1279 and records an explicit expansion', () => {

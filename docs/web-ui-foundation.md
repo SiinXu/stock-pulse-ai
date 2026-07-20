@@ -181,6 +181,15 @@ Pattern owns Drawer width, focus entry, Escape, scroll lock, and restoration.
 `SummaryStrip` is one labelled definition list with stable metric IDs and
 semantic state tones; it does not create a row of nested cards.
 
+Owner exception (2026-07-20, final-closeout Harness): `ResponsiveRail`'s
+Drawer/disclosure behavior is intentionally retained before its first
+production page adoption because the owner explicitly requires this responsive
+foundation contract. Current consumers are fixtures and tests only; this is not
+recorded as production adoption. A page owner must consume this shared Pattern
+rather than create a parallel rail. If the product direction changes before
+that first consumer lands, revert the responsive behavior, fixture, and tests as
+one foundation unit.
+
 `Tabs` and `TabPanel` are reserved for mutually exclusive content under one
 page H1. They own tablist/tab/tabpanel association, disabled-item skipping,
 Left/Right/Home/End movement, and native Enter/Space activation. Sibling page
@@ -202,6 +211,11 @@ Same-path POP may restore a unique stable trigger but never falls back to the
 H1. Blocked navigation retains its trigger until the Router proceeds or resets
 the transition. Entries are bounded in memory and contain strings only, never
 DOM refs, URL state, browser history state, `localStorage`, or `sessionStorage`.
+When a responsive overlay trigger is transient, it may declare one unique,
+persistent `data-route-focus-return-key` counterpart. The coordinator validates,
+captures, stores, and restores that key per `location.key`; Shell and navigation
+components only render the two stable markers and never copy route metadata or
+rewrite the persistent key.
 
 Business code must use React Router navigation APIs rather than direct
 `pushState` or `replaceState`. The production guard discovers calls through
@@ -231,9 +245,10 @@ The responsive contract has three states:
   restores its opener. Only an unmodified primary same-window route activation
   closes the Drawer and delegates focus to the destination's ready H1;
   modifier, download, and new-context activation retain the current Drawer and
-  native browser behavior. The selected route marker transfers from the
-  transient Drawer to the persistent opener, so browser Back restores that
-  visible control rather than falling back to the source H1.
+  native browser behavior. Each transient Drawer route declares the one stable
+  mobile opener as its return target. `RouteFocusCoordinator` stores that target
+  per history entry, so repeated Back/Forward restores the visible opener without
+  Shell retaining or rewriting route metadata.
 - From 768px through 1023px, page-owned business navigation represented by a
   `ResponsiveRail` uses its own labelled Navigation Drawer. Below 768px it
   remains an inline disclosure, avoiding a second hamburger-style mobile menu.
@@ -253,11 +268,14 @@ sidebar when no route matches. A breakpoint change while the Drawer is closed
 does not move focus. Desktop and mobile navigation instances use distinct,
 stable route-focus marker prefixes so Router restoration never sees duplicate
 targets. The profile surface uses dialog semantics, moves focus into its first
-control, closes on Escape, and restores its trigger; it does not claim an
-incomplete menu keyboard model. Compact navigation controls use the shared
-labelled Tooltip, route rows and preference controls retain 44px targets, and
-the route list owns vertical scrolling so Profile and logout remain reachable
-at short viewport heights.
+control, closes on Escape, and restores its trigger; crossing the desktop
+breakpoint while Profile is open closes the old presentation and focuses the
+visible Profile counterpart. It does not claim an incomplete menu keyboard
+model. Compact navigation controls use the shared labelled Tooltip, route rows
+and preference controls retain 44px targets without flex shrinking, and the
+route list owns vertical scrolling so Profile and logout remain reachable at
+short viewport heights. The framed `main` permits native horizontal and vertical
+touch panning when page-owned content is wider than its viewport.
 
 ## Surface Hierarchy
 
@@ -364,10 +382,14 @@ The canonical visible tiers are:
 | `default` | 32px | Ordinary commands |
 | `comfortable` | 36px | Forms and regular submissions |
 | `primary` | 40px | The unique task CTA |
+| `navigation` | 44px | Shell, rail, and overlay navigation controls |
 
 `Button` defaults to `default`; `Input` defaults to `comfortable`; login inputs
 resolve to `primary`. `IconButton` supports `compact`, `default`, and
-`comfortable` visible squares.
+`comfortable` visible squares plus the 44px `navigation` square. The
+`navigation` tier is reserved for shell, rail, and overlay navigation controls
+whose visible target must remain 44px; it is not a general replacement for the
+smaller command tiers.
 
 When any available pointer is coarse, including on hybrid touchscreen devices,
 `Button` and `IconButton` use a transparent pseudo-element to provide at least a

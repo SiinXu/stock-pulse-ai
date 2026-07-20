@@ -13,6 +13,8 @@ type ShellProps = {
   children?: React.ReactNode;
 };
 
+type ProfilePresentation = 'mobile' | 'desktop' | 'drawer';
+
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'dsa-sidebar-collapsed';
 const DESKTOP_SIDEBAR_QUERY = '(min-width: 1024px)';
 const COMPACT_SIDEBAR_QUERY = '(min-width: 1024px) and (max-width: 1279px)';
@@ -41,7 +43,10 @@ function useMediaQuery(query: string): boolean {
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileOpenRef = useRef(false);
-  const [mobileRouteFocusKey, setMobileRouteFocusKey] = useState('shell:mobile-navigation');
+  const [profilePresentation, setProfilePresentation] = useState<ProfilePresentation | null>(null);
+  const profilePresentationRef = useRef<ProfilePresentation | null>(null);
+  const mobileProfileTriggerRef = useRef<HTMLButtonElement>(null);
+  const desktopProfileTriggerRef = useRef<HTMLButtonElement>(null);
   const [collapsedPreference, setCollapsedPreference] = useState<boolean | null>(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -58,10 +63,18 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
     setMobileOpen(nextOpen);
   }, []);
 
-  const closeMobileNavigation = useCallback((routeFocusKey?: string) => {
-    if (routeFocusKey) setMobileRouteFocusKey(routeFocusKey);
+  const closeMobileNavigation = useCallback(() => {
     setMobileNavigationOpen(false);
   }, [setMobileNavigationOpen]);
+
+  const updateProfilePresentation = useCallback((
+    presentation: ProfilePresentation,
+    open: boolean,
+  ) => {
+    const nextPresentation = open ? presentation : null;
+    profilePresentationRef.current = nextPresentation;
+    setProfilePresentation(nextPresentation);
+  }, []);
 
   const toggleCollapsed = () => {
     setCollapsedPreference((preference) => {
@@ -79,18 +92,32 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
     }
     const mediaQuery = window.matchMedia(DESKTOP_SIDEBAR_QUERY);
     let focusFrame: number | undefined;
-    const closeMobileNavigation = (event: MediaQueryListEvent) => {
-      if (!event.matches || !mobileOpenRef.current) return;
-      setMobileNavigationOpen(false);
+    const handlePresentationChange = (event: MediaQueryListEvent) => {
+      const navigationWasOpen = event.matches && mobileOpenRef.current;
+      const profileWasOpen = profilePresentationRef.current !== null;
+      if (navigationWasOpen) setMobileNavigationOpen(false);
+      if (profileWasOpen) {
+        profilePresentationRef.current = null;
+        setProfilePresentation(null);
+      }
+      if (!navigationWasOpen && !profileWasOpen) return;
+      if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
       focusFrame = window.requestAnimationFrame(() => {
+        if (profileWasOpen) {
+          const visibleProfile = event.matches
+            ? desktopProfileTriggerRef.current
+            : mobileProfileTriggerRef.current;
+          visibleProfile?.focus();
+          return;
+        }
         const sidebar = document.querySelector<HTMLElement>('[data-shell-sidebar]');
         const activeRoute = sidebar?.querySelector<HTMLElement>('a[aria-current="page"]');
         (activeRoute ?? sidebar)?.focus();
       });
     };
-    mediaQuery.addEventListener('change', closeMobileNavigation);
+    mediaQuery.addEventListener('change', handlePresentationChange);
     return () => {
-      mediaQuery.removeEventListener('change', closeMobileNavigation);
+      mediaQuery.removeEventListener('change', handlePresentationChange);
       if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
     };
   }, [setMobileNavigationOpen]);
@@ -107,7 +134,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             size="navigation"
             onClick={() => setMobileNavigationOpen(true)}
             aria-label={t('layout.openNav')}
-            data-route-focus-key={mobileOpen ? undefined : mobileRouteFocusKey}
+            data-route-focus-key="shell:mobile-navigation"
             className="bg-card shadow-soft-card"
           >
             <Menu aria-hidden="true" />
@@ -124,6 +151,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           placement="bottom"
           align="end"
           rootClassName="pointer-events-auto"
+          open={profilePresentation === 'mobile'}
+          onOpenChange={(open) => updateProfilePresentation('mobile', open)}
+          triggerRef={mobileProfileTriggerRef}
+          presentation="mobile"
         />
       </div>
 
@@ -143,12 +174,16 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             onToggleCollapse={toggleCollapsed}
             onNavigate={() => setMobileNavigationOpen(false)}
             focusKeyPrefix="shell-nav-desktop"
+            profileOpen={profilePresentation === 'desktop'}
+            onProfileOpenChange={(open) => updateProfilePresentation('desktop', open)}
+            profileTriggerRef={desktopProfileTriggerRef}
+            profilePresentation="desktop"
           />
         </aside>
 
         <main
           data-shell-main="true"
-          className="relative mt-14 mb-3 mx-3 flex min-h-0 min-w-0 flex-1 touch-pan-y flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
+          className="relative mt-14 mb-3 mx-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
         >
           {children ?? <Outlet />}
         </main>
@@ -164,6 +199,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           <SidebarNav
             onNavigate={closeMobileNavigation}
             focusKeyPrefix="shell-nav-mobile"
+            returnFocusKey="shell:mobile-navigation"
+            profileOpen={profilePresentation === 'drawer'}
+            onProfileOpenChange={(open) => updateProfilePresentation('drawer', open)}
+            profilePresentation="drawer"
           />
         </div>
       </Drawer>

@@ -13,6 +13,10 @@ interface SidebarProfileProps {
   placement?: 'top' | 'bottom';
   align?: 'start' | 'end';
   rootClassName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  triggerRef?: React.Ref<HTMLButtonElement>;
+  presentation?: 'mobile' | 'desktop' | 'drawer';
 }
 
 export const SidebarProfile: React.FC<SidebarProfileProps> = ({
@@ -20,6 +24,10 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
   placement = 'top',
   align = 'start',
   rootClassName,
+  open,
+  onOpenChange,
+  triggerRef,
+  presentation,
 }) => {
   const { t } = useUiLanguage();
   const panelId = useId();
@@ -28,6 +36,8 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
 
   return (
     <Popover
+      open={open}
+      onOpenChange={onOpenChange}
       rootClassName={cn(
         placement === 'top' && 'mt-2',
         collapsed ? 'self-center' : 'w-full',
@@ -44,30 +54,32 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({
       trigger={({ open, toggle }) => {
         const trigger = (
           <button
-          type="button"
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-controls={open ? panelId : undefined}
-          aria-label={t('layout.appFallbackTitle')}
-          data-state={open ? 'open' : 'closed'}
-          className={cn(
-            'flex items-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground',
-            'data-[state=open]:border-[var(--nav-active-border)] data-[state=open]:bg-[var(--nav-active-bg)] data-[state=open]:text-foreground',
-            collapsed ? 'h-11 w-11 justify-center' : 'h-12 w-full gap-2 px-2',
-          )}
-          onClick={toggle}
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
-            <UserRound className="h-4 w-4" aria-hidden="true" />
-          </span>
-          {!collapsed ? (
-            <>
-              <span className="min-w-0 flex-1 truncate text-left text-sm font-medium tracking-normal text-foreground">
-                {t('layout.appFallbackTitle')}
-              </span>
-              <ChevronUp className={cn('h-4 w-4 shrink-0 transition-transform', open ? '' : 'rotate-180')} aria-hidden="true" />
-            </>
-          ) : null}
+            ref={triggerRef}
+            type="button"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-controls={open ? panelId : undefined}
+            aria-label={t('layout.appFallbackTitle')}
+            data-shell-profile-trigger={presentation}
+            data-state={open ? 'open' : 'closed'}
+            className={cn(
+              'flex items-center rounded-lg border border-transparent text-secondary-text transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-foreground',
+              'data-[state=open]:border-[var(--nav-active-border)] data-[state=open]:bg-[var(--nav-active-bg)] data-[state=open]:text-foreground',
+              collapsed ? 'h-11 w-11 justify-center' : 'h-12 w-full gap-2 px-2',
+            )}
+            onClick={toggle}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
+              <UserRound className="h-4 w-4" aria-hidden="true" />
+            </span>
+            {!collapsed ? (
+              <>
+                <span className="min-w-0 flex-1 truncate text-left text-sm font-medium tracking-normal text-foreground">
+                  {t('layout.appFallbackTitle')}
+                </span>
+                <ChevronUp className={cn('h-4 w-4 shrink-0 transition-transform', open ? '' : 'rotate-180')} aria-hidden="true" />
+              </>
+            ) : null}
           </button>
         );
         return collapsed ? (

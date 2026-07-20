@@ -131,12 +131,14 @@ test.describe('application shell foundation', () => {
     await expect(heading).toBeFocused();
   });
 
-  test('delegates route focus to the H1 and restores the persistent mobile opener on Back', async ({ page }) => {
+  test('keeps per-entry mobile focus through three routes and repeated Back and Forward', async ({ page }) => {
     await openFixture(page, 390, 844);
-    await page.getByRole('button', { name: 'Open navigation' }).click();
+    const opener = page.getByRole('button', { name: 'Open navigation' });
+    await opener.click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
     const chatLink = drawer.getByRole('link', { name: 'Ask' });
     await expect(chatLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:chat');
+    await expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
     await chatLink.focus();
     await chatLink.click({ modifiers: ['Control'] });
     await expect(drawer).toBeVisible();
@@ -146,16 +148,34 @@ test.describe('application shell foundation', () => {
 
     await expect(drawer).toBeHidden();
     await expect(page).toHaveURL(/\/chat$/);
-    const heading = page.getByRole('heading', { level: 1, name: 'Route /chat' });
-    await expect(heading).toBeFocused();
-    await expect(page.getByRole('button', { name: 'Open navigation' })).toHaveAttribute(
-      'data-route-focus-key',
-      'shell-nav-mobile:chat',
-    );
+    await expect(page.getByRole('heading', { level: 1, name: 'Route /chat' })).toBeFocused();
+    await expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
+
+    await opener.click();
+    await drawer.getByRole('link', { name: 'Portfolio' }).click();
+    await expect(drawer).toBeHidden();
+    await expect(page).toHaveURL(/\/portfolio$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route /portfolio' })).toBeFocused();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(opener).toBeFocused();
 
     await page.goBack();
     await expect(page).toHaveURL(/\/e2e\/application-shell-fixture\.html$/);
-    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
+    await expect(opener).toBeFocused();
+
+    await page.goForward();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(opener).toBeFocused();
+
+    await page.goForward();
+    await expect(page).toHaveURL(/\/portfolio$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Route /portfolio' })).toBeFocused();
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(opener).toBeFocused();
   });
 
   test('keeps profile preferences directly reachable and restores trigger focus', async ({ page }) => {
@@ -178,6 +198,28 @@ test.describe('application shell foundation', () => {
       await expect(profileDialog).toBeHidden();
       await expect(profileTrigger).toBeFocused();
     }
+  });
+
+  test('closes Profile at the desktop breakpoint and focuses the visible counterpart', async ({ page }) => {
+    await openFixture(page, 390, 844);
+    const mobileProfile = page.locator('[data-shell-profile-trigger="mobile"]');
+    await mobileProfile.click();
+    const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
+    await expect(profileDialog).toBeVisible();
+    await expect(profileDialog.getByRole('button', { name: 'Toggle theme' })).toBeFocused();
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    const desktopProfile = page.locator('[data-shell-profile-trigger="desktop"]');
+    await expect(profileDialog).toBeHidden();
+    await expect(desktopProfile).toBeVisible();
+    await expect(desktopProfile).toBeFocused();
+
+    await desktopProfile.click();
+    await expect(profileDialog).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(profileDialog).toBeHidden();
+    await expect(mobileProfile).toBeVisible();
+    await expect(mobileProfile).toBeFocused();
   });
 
   test('keeps the framed shell coherent and wide content reachable in both themes and reduced motion', async ({ page }) => {
@@ -229,13 +271,24 @@ test.describe('application shell foundation', () => {
     await expectNoDocumentOverflow(page);
   });
 
-  test('keeps compact navigation controls reachable in a short viewport', async ({ page }) => {
+  test('keeps expanded and mobile route rows at 44px in a short viewport', async ({ page }) => {
     await openFixture(page, 1024, 480);
     const sidebar = page.locator('[data-shell-sidebar]');
+    const compactSearch = sidebar.getByRole('button', { name: 'Search' });
+    await compactSearch.focus();
+    await expect(page.getByRole('tooltip')).toHaveText('Search');
+    const compactHome = sidebar.getByRole('link', { name: 'Home' });
+    await compactHome.focus();
+    await expect(page.getByRole('tooltip')).toHaveText('Home');
+    await sidebar.getByRole('button', { name: 'Expand sidebar' }).click();
+    await expectSidebarWidth(sidebar, 240);
     const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     expect(await navigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await navigation.evaluate((element) => element.clientHeight),
     );
+    for (const route of await navigation.getByRole('link').all()) {
+      expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
 
     for (const control of [
       sidebar.getByRole('button', { name: 'Search' }),
@@ -259,10 +312,58 @@ test.describe('application shell foundation', () => {
 
     const search = sidebar.getByRole('button', { name: 'Search' });
     await search.focus();
-    await expect(page.getByRole('tooltip')).toHaveText('Search');
-    const home = navigation.getByRole('link', { name: 'Home' });
-    await home.focus();
-    await expect(page.getByRole('tooltip')).toHaveText('Home');
+    await expect(search).toBeFocused();
+    await expectNoDocumentOverflow(page);
+
+    await page.setViewportSize({ width: 390, height: 480 });
+    await page.getByRole('button', { name: 'Open navigation' }).click();
+    const drawer = page.getByRole('dialog', { name: 'Navigation' });
+    const mobileNavigation = drawer.getByRole('navigation', { name: 'Main navigation' });
+    expect(await mobileNavigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
+      await mobileNavigation.evaluate((element) => element.clientHeight),
+    );
+    for (const route of await mobileNavigation.getByRole('link').all()) {
+      expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+    const mobileSettings = mobileNavigation.getByRole('link', { name: 'Settings' });
+    await mobileSettings.scrollIntoViewIfNeeded();
+    await expect(mobileSettings).toBeVisible();
+    await expectNoDocumentOverflow(page);
+  });
+});
+
+test.describe('application shell touch panning', () => {
+  test.use({ hasTouch: true });
+
+  test('moves the mobile main scroll container with a horizontal touch gesture', async ({ page }) => {
+    await openFixture(page, 390, 844);
+    const main = page.locator('[data-shell-main]');
+    await expect(main).toHaveCSS('touch-action', 'auto');
+    expect(await main.evaluate((element) => element.scrollWidth)).toBeGreaterThan(
+      await main.evaluate((element) => element.clientWidth),
+    );
+    await main.evaluate((element) => { element.scrollLeft = 0; });
+
+    const box = await main.boundingBox();
+    expect(box).not.toBeNull();
+    const startX = box!.x + box!.width - 36;
+    const endX = box!.x + 44;
+    const y = box!.y + Math.min(260, box!.height / 2);
+    const session = await page.context().newCDPSession(page);
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: startX, y }],
+    });
+    for (let step = 1; step <= 6; step += 1) {
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: startX + ((endX - startX) * step) / 6, y }],
+      });
+    }
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await session.detach();
+
+    await expect.poll(() => main.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
     await expectNoDocumentOverflow(page);
   });
 });

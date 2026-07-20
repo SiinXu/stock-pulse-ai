@@ -107,6 +107,23 @@ function ReplacePage() {
   );
 }
 
+function PresentationSwapPage() {
+  return (
+    <RegisteredPage routeId="presentation" title="Presentation page">
+      <button type="button" data-route-focus-key="presentation:opener">
+        Persistent navigation opener
+      </button>
+      <Link
+        to="/second"
+        data-route-focus-key="presentation:transient-link"
+        data-route-focus-return-key="presentation:opener"
+      >
+        Transient navigation link
+      </Link>
+    </RegisteredPage>
+  );
+}
+
 function DeferredPage() {
   const [ready, setReady] = useState(false);
   return (
@@ -167,6 +184,7 @@ function renderRouter(
           element: <FirstPage markerMode={markerMode} blockNavigation={blockNavigation} />,
         },
         { path: '/replace', element: <ReplacePage /> },
+        { path: '/presentation', element: <PresentationSwapPage /> },
         { path: '/previous', element: <RegisteredPage routeId="previous" title="Previous page" /> },
         { path: '/second', element: <RegisteredPage routeId="second" title="Second page" /> },
         { path: '/deferred', element: <DeferredPage /> },
@@ -201,6 +219,20 @@ describe('RouteFocusCoordinator', () => {
     });
     const restoredOpener = await screen.findByRole('link', { name: 'Open second page' });
     await waitFor(() => expect(restoredOpener).toHaveFocus());
+  });
+
+  it('stores a declarative persistent counterpart for a transient route trigger', async () => {
+    const router = renderRouter('/presentation');
+    fireEvent.click(screen.getByRole('link', { name: 'Transient navigation link' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: 'Persistent navigation opener' }),
+    ).toHaveFocus());
   });
 
   it('preserves an entry opener through repeated Back and Forward POP navigation', async () => {

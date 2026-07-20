@@ -182,11 +182,16 @@ describe('SidebarNav', () => {
     const onNavigate = vi.fn();
     render(
       <MemoryRouter initialEntries={['/']}>
-        <SidebarNav onNavigate={onNavigate} focusKeyPrefix="shell-nav-mobile" />
+        <SidebarNav
+          onNavigate={onNavigate}
+          focusKeyPrefix="shell-nav-mobile"
+          returnFocusKey="shell:mobile-navigation"
+        />
       </MemoryRouter>,
     );
 
     const chatLink = screen.getByRole('link', { name: '问股' });
+    expect(chatLink).toHaveAttribute('data-route-focus-return-key', 'shell:mobile-navigation');
     const preventNativeNavigation = (event: MouseEvent) => event.preventDefault();
     document.addEventListener('click', preventNativeNavigation);
     try {
@@ -205,7 +210,7 @@ describe('SidebarNav', () => {
       document.removeEventListener('click', preventNativeNavigation);
     }
     expect(onNavigate).toHaveBeenCalledOnce();
-    expect(onNavigate).toHaveBeenCalledWith('shell-nav-mobile:chat');
+    expect(onNavigate).toHaveBeenCalledWith();
   });
 
   it('shows shared tooltips for compact icon-only navigation controls', async () => {
@@ -245,6 +250,7 @@ describe('SidebarNav', () => {
       'data-route-focus-key',
       'shell-nav-desktop:alerts',
     );
+    screen.getAllByRole('link').forEach((link) => expect(link).toHaveClass('shrink-0'));
 
     const markers = Array.from(document.querySelectorAll('[data-route-focus-key]'))
       .map((element) => element.getAttribute('data-route-focus-key'));
