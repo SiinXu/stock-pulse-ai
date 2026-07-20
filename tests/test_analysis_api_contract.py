@@ -1286,6 +1286,35 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         self.assertEqual(result, {"stock_code": "600519"})
         self.assertEqual(pipeline_cls.call_args.kwargs["analysis_skills"], request_skills)
 
+    def test_analysis_service_passes_request_context_to_pipeline(self) -> None:
+        from src.schemas.request_context import (
+            AnalysisRequestContext,
+            NotificationReplyTarget,
+        )
+
+        service = object.__new__(AnalysisService)
+        pipeline_instance = MagicMock()
+        pipeline_instance.process_single_stock.return_value = object()
+        request_context = AnalysisRequestContext(
+            requester_platform="feishu",
+            requester_chat_id="chat-1",
+            reply_targets=(NotificationReplyTarget("feishu", "chat-1"),),
+        )
+
+        with patch("src.config.get_config", return_value=SimpleNamespace()), \
+             patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance) as pipeline_cls, \
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
+            result = AnalysisService.analyze_stock(
+                service,
+                "600519",
+                report_type="full",
+                query_id="q1",
+                request_context=request_context,
+            )
+
+        self.assertEqual(result, {"stock_code": "600519"})
+        self.assertIs(pipeline_cls.call_args.kwargs["request_context"], request_context)
+
     def test_report_type_full_is_preserved_in_response_metadata(self) -> None:
         service = AnalysisService()
         pipeline_instance = MagicMock()
