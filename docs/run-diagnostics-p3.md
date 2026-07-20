@@ -78,6 +78,7 @@ GET /api/v1/history/{record_id}/flow
 ```
 
 - 两个接口返回同一 `RunFlowSnapshot` 契约。
+- 中立契约由 `src/schemas/run_flow.py` 持有；`api/v1/schemas/run_flow.py` 保留兼容导出，API 继续按原有字段与 OpenAPI schema 序列化。
 - active task 缺少 diagnostics 时返回 skeleton flow，不伪造 provider / LLM 事件。
 - active task 若已有 recent `flow_event`，snapshot 会返回这些真实事件，并可根据事件中的节点元数据补出临时节点。
 - completed history 优先从 `context_snapshot.diagnostics` 与 `analysis_context_pack_overview` 构建完整拓扑。

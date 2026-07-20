@@ -36,7 +36,7 @@ describe('ReportNews', () => {
     expect(screen.getByRole('link', { name: '跳转' })).toHaveClass('min-h-11', 'min-w-11');
     expect(screen.getByText('相关资讯/后续检索')).toBeVisible();
     expect(screen.getByText('来源：报告页补充资讯；是否用于分析以输入数据块为准。')).toBeVisible();
-    expect(container.querySelector('.home-panel-card')).toBeTruthy();
+    expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeTruthy();
 
     const refreshButton = screen.getByRole('button', { name: '刷新' });

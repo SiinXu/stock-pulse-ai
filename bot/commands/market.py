@@ -12,7 +12,9 @@ import threading
 from typing import Any, List, Optional
 
 from bot.commands.base import BotCommand
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, BotResponse
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,17 @@ class MarketCommand(BotCommand):
 
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
         """执行大盘复盘命令"""
+        try:
+            request_context = to_analysis_request_context(message)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[MarketCommand] Invalid market review request context",
+                exc,
+                error_code="bot_market_request_context_invalid",
+            )
+            return BotResponse.error_response("大盘复盘请求无效，请稍后重试")
+
         config = self._get_config()
         lock_token = self._try_acquire_market_review_lock(config)
         if lock_token is None:
@@ -57,7 +70,7 @@ class MarketCommand(BotCommand):
 
         thread = threading.Thread(
             target=self._run_market_review,
-            args=(message, config, lock_token),
+            args=(request_context, config, lock_token),
             daemon=True,
         )
         try:
@@ -123,7 +136,7 @@ class MarketCommand(BotCommand):
 
     def _run_market_review(
         self,
-        message: BotMessage,
+        request_context: AnalysisRequestContext,
         config,
         lock_token: Optional[Any],
     ) -> None:
@@ -132,7 +145,7 @@ class MarketCommand(BotCommand):
             override_region = self._compute_market_review_override_region(config)
             if override_region == "":
                 from src.notification import NotificationService
-                notifier = NotificationService(source_message=message)
+                notifier = NotificationService(request_context=request_context)
                 logger.info(
                     "[MarketCommand] Relevant markets are closed; skipping market review"
                 )
@@ -149,7 +162,7 @@ class MarketCommand(BotCommand):
 
             notifier, analyzer, search_service = build_market_review_runtime(
                 config,
-                source_message=message,
+                request_context=request_context,
             )
             review_report = run_market_review(
                 notifier=notifier,

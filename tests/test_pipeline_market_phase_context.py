@@ -64,7 +64,7 @@ def _make_pipeline(*, agent_mode: bool = False, save_context_snapshot: bool = Tr
         report_integrity_enabled=False,
         fundamental_stage_timeout_seconds=1,
     )
-    pipeline.source_message = None
+    pipeline.request_context = None
     pipeline.query_id = None
     pipeline.query_source = "system"
     pipeline.save_context_snapshot = save_context_snapshot
