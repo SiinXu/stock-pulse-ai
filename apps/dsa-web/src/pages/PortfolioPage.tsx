@@ -6,7 +6,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select, Surface } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -1175,7 +1175,7 @@ const PortfolioPage: React.FC = () => {
           </p>
         </div>
         {hasAccounts ? (
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+          <Surface level="interactive" padding="sm">
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px_280px] gap-2 items-end">
               <Select
                 label={text.accountView}
@@ -1195,12 +1195,11 @@ const PortfolioPage: React.FC = () => {
                   { value: 'avg', label: text.avg },
                 ]}
               />
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
                   variant="secondary"
                   size="comfortable"
-                  className="flex-1"
                   onClick={() => {
                     setEditingAccountId(null);
                     setAccountForm({ name: '', broker: 'Demo', market: accountForm.market, baseCurrency: accountForm.baseCurrency });
@@ -1215,7 +1214,6 @@ const PortfolioPage: React.FC = () => {
                   type="button"
                   variant="secondary"
                   size="comfortable"
-                  className="flex-1"
                   disabled={!writableAccount || isLoading || fxRefreshing}
                   onClick={() => {
                     if (writableAccount) handleEditAccountOpen(writableAccount);
@@ -1231,7 +1229,6 @@ const PortfolioPage: React.FC = () => {
                   size="comfortable"
                   isLoading={isLoading}
                   loadingText={text.refreshing}
-                  className="flex-1"
                 >
                   {text.refreshData}
                 </Button>
@@ -1243,13 +1240,12 @@ const PortfolioPage: React.FC = () => {
                   size="comfortable"
                   isLoading={accountDeleteLoading}
                   loadingText={text.deletingAccount}
-                  className="flex-1"
                 >
                   {text.deleteAccount}
                 </Button>
               </div>
             </div>
-          </div>
+          </Surface>
         ) : (
           <InlineAlert
             variant="warning"
@@ -1670,9 +1666,11 @@ const PortfolioPage: React.FC = () => {
             {tradeError ? (
               <ApiErrorAlert error={tradeError} onDismiss={() => setTradeError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
-              {text.submitTrade}
-            </Button>
+            <div className="grid grid-cols-1">
+              <Button type="submit" variant="secondary" size="comfortable" disabled={!writableAccountId} isLoading={tradeSubmitting} loadingText={text.submitting}>
+                {text.submitTrade}
+              </Button>
+            </div>
             </fieldset>
           </form>
       </Modal>
@@ -1707,9 +1705,11 @@ const PortfolioPage: React.FC = () => {
             {cashError ? (
               <ApiErrorAlert error={cashError} onDismiss={() => setCashError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
-              {text.submitCash}
-            </Button>
+            <div className="grid grid-cols-1">
+              <Button type="submit" variant="secondary" size="comfortable" disabled={!writableAccountId} isLoading={cashSubmitting} loadingText={text.submitting}>
+                {text.submitCash}
+              </Button>
+            </div>
             </fieldset>
           </form>
       </Modal>
@@ -1751,9 +1751,11 @@ const PortfolioPage: React.FC = () => {
             {corpError ? (
               <ApiErrorAlert error={corpError} onDismiss={() => setCorpError(null)} />
             ) : null}
-            <Button type="submit" variant="secondary" size="comfortable" className="w-full" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
-              {text.submitCorporate}
-            </Button>
+            <div className="grid grid-cols-1">
+              <Button type="submit" variant="secondary" size="comfortable" disabled={!writableAccountId} isLoading={corpSubmitting} loadingText={text.submitting}>
+                {text.submitCorporate}
+              </Button>
+            </div>
             </fieldset>
           </form>
       </Modal>
@@ -1838,11 +1840,11 @@ const PortfolioPage: React.FC = () => {
               containerClassName="min-h-11 text-xs text-secondary"
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
             />
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" size="comfortable" className="flex-1" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant="secondary" size="comfortable" disabled={!selectedBroker || !csvFile || csvCommitting} isLoading={csvParsing} loadingText={text.parsing} onClick={() => void handleParseCsv()}>
                 {text.parseFile}
               </Button>
-              <Button type="button" variant="secondary" size="comfortable" className="flex-1"
+              <Button type="button" variant="secondary" size="comfortable"
                 disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing} isLoading={csvCommitting} loadingText={text.submitting} onClick={() => void handleCommitCsv()}>
                 {text.commitImport}
               </Button>
