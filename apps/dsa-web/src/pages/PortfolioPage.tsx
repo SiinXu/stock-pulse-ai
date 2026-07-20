@@ -920,6 +920,7 @@ const PortfolioPage: React.FC = () => {
       setPendingAccountDelete(null);
       setAccountDeleteError(null);
       setShowCreateAccount(false);
+      setEditingAccountId(null);
       await loadAccounts();
       setEventPage(1);
     } catch (err) {
@@ -1274,6 +1275,9 @@ const PortfolioPage: React.FC = () => {
       </section>
 
       {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
+      {accountCreateSuccess ? (
+        <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
+      ) : null}
       {riskWarning ? (
         <InlineAlert
           variant="warning"
@@ -1316,15 +1320,6 @@ const PortfolioPage: React.FC = () => {
               className="mt-2"
               title={text.createFailed}
               message={accountCreateError}
-            />
-          ) : null}
-          {accountCreateSuccess ? (
-            <InlineAlert
-              variant="success"
-              size="compact"
-              className="mt-2"
-              title={text.createSuccess}
-              message={accountCreateSuccess}
             />
           ) : null}
           <form className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2" onSubmit={handleAccountSubmit}>
