@@ -80,7 +80,10 @@ describe('DecisionSignalCreateDrawer', () => {
 
   it('shows the fixed manual source and trigger', () => {
     render(<Harness />);
-    expect(screen.getByText(/Source fixed to Manual · web_manual/)).toBeTruthy();
+    expect(screen.getByText(/Source fixed to Manual · web_manual/).closest('[data-surface-level]'))
+      .toHaveAttribute('data-surface-level', 'section');
+    expect(screen.getByRole('heading', { name: 'Preview' }).closest('[data-surface-level]'))
+      .toHaveAttribute('data-surface-level', 'section');
   });
 
   it('blocks submit and surfaces required errors when the form is empty', () => {

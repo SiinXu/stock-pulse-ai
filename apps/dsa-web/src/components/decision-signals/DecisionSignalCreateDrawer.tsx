@@ -11,6 +11,7 @@ import {
   InlineAlert,
   Input,
   Select,
+  Surface,
   Textarea,
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -192,7 +193,7 @@ export const DecisionSignalCreateDrawer: React.FC<DecisionSignalCreateDrawerProp
       closeDisabled={submitting}
     >
       <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-elevated/30 px-3 py-2 text-xs text-secondary-text">
+        <Surface level="section" className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs text-secondary-text">
           <ShieldCheck className="h-4 w-4 text-primary" aria-hidden="true" />
           <span>
             {t('decisionSignals.create.sourceFixed', {
@@ -200,7 +201,7 @@ export const DecisionSignalCreateDrawer: React.FC<DecisionSignalCreateDrawerProp
               trigger: MANUAL_SIGNAL_TRIGGER_SOURCE,
             })}
           </span>
-        </div>
+        </Surface>
 
         <section className="space-y-3" aria-labelledby="manual-signal-basics">
           <h3 id="manual-signal-basics" className="text-sm font-semibold text-foreground">
@@ -374,7 +375,13 @@ export const DecisionSignalCreateDrawer: React.FC<DecisionSignalCreateDrawerProp
           />
         </section>
 
-        <section className="space-y-2 rounded-xl border border-border/60 bg-elevated/20 p-4" aria-labelledby="manual-signal-preview">
+        <Surface
+          as="section"
+          level="section"
+          padding="sm"
+          className="space-y-2"
+          aria-labelledby="manual-signal-preview"
+        >
           <h3 id="manual-signal-preview" className="text-sm font-semibold text-foreground">
             {t('decisionSignals.create.previewTitle')}
           </h3>
@@ -426,7 +433,7 @@ export const DecisionSignalCreateDrawer: React.FC<DecisionSignalCreateDrawerProp
           ) : (
             <p className="text-xs text-secondary-text">{t('decisionSignals.create.previewEmpty')}</p>
           )}
-        </section>
+        </Surface>
 
         {result ? (
           <InlineAlert
