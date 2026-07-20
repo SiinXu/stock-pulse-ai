@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayCircle } from 'lucide-react';
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, ConfirmDialog, InlineAlert } from '../common';
+import { ApiErrorAlert, Button, ConfirmDialog, InlineAlert, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type {
   DecisionSignalOutcomeRunRequest,
@@ -91,8 +91,11 @@ export const DecisionSignalOutcomeRunPanel: React.FC<DecisionSignalOutcomeRunPan
   }, [onCompleted]);
 
   return (
-    <section
-      className="mt-4 space-y-3 rounded-xl border border-border/60 bg-elevated/20 p-4"
+    <Surface
+      as="section"
+      level="interactive"
+      padding="sm"
+      className="mt-4 space-y-3"
       aria-labelledby="decision-signal-outcome-run"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -171,6 +174,6 @@ export const DecisionSignalOutcomeRunPanel: React.FC<DecisionSignalOutcomeRunPan
         onConfirm={() => void handleRun()}
         onCancel={() => setConfirmOpen(false)}
       />
-    </section>
+    </Surface>
   );
 };

@@ -47,6 +47,8 @@ describe('DecisionSignalOutcomeRunPanel', () => {
     renderPanel();
     expect(runButton()).toBeTruthy();
     expect(screen.getByText('No runs in this session yet.')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Outcome engine' }))
+      .toHaveAttribute('data-surface-level', 'interactive');
   });
 
   it('requires confirmation and does not run when cancelled', () => {

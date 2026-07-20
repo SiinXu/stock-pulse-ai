@@ -215,6 +215,8 @@ describe('DecisionSignalTimeline', () => {
     );
 
     expect(screen.getByText('风格: 进取')).toBeInTheDocument();
+    expect(screen.getByText('风格: 进取').closest('[data-surface-level]'))
+      .toHaveAttribute('data-surface-level', 'overlay');
   });
 
   it('renders explicit null profile as unknown instead of falling back to metadata', () => {

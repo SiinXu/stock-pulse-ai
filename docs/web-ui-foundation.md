@@ -107,9 +107,8 @@ CSS margin or flex gap must not be the only separation between spoken values.
 This control is not an applied filter, status token, Tab, SegmentedControl
 item, or icon tool. Applied values that activate removal continue to use
 `FilterChip`; page sections and rows use their corresponding Pattern. The
-multi-line Decision Signals candidate Button remains the exact `UI-D01` /
-`TRACK-UI2` migration entry until that page track adopts `SelectionChip` and
-deletes its Button geometry allowance.
+multi-line Decision Signals candidate Button migrated to `SelectionChip`
+under `UI-D01`; the page no longer owns a Button geometry allowance.
 
 ## DataTable Semantics
 
@@ -370,7 +369,6 @@ item:
 
 | Removal item | Execution owner | Temporary reason |
 | --- | --- | --- |
-| `UI-D01` | `TRACK-UI2` | Replace the multiline Decision Signals candidate Button with `SelectionChip`. |
 | `UI-P01` | `TRACK-UI2` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
 | `UI-R01` | `TRACK-UI1` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
 | `UI-R02` | `TRACK-UI1` | Remove report/history compatibility card classes during route-level reading and trend migration. |
@@ -404,8 +402,8 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   track deletes its exact raw-table allowance in the same change that adopts
   the shared Pattern; the final migration deletes the legacy allowance list.
 - `UI-DEF-01` establishes `SelectionChip` from the explicit TRACK-UI2 deferred
-  input. It does not migrate Decision Signals. `UI-D01` deletes its exact
-  Button geometry allowance when that page adopts the shared control.
+  input. `UI-D01` subsequently migrated Decision Signals to the shared control
+  and deleted its exact Button geometry allowance.
 - `UI-DEF-02` confirms the existing four Surface levels and semantic subtle
   tokens as the complete replacement for the deferred glass/raw-white debt,
   deletes the unreferenced `dashboard-card` duplicate, and adds an expiring

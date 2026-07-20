@@ -23,6 +23,7 @@ import {
   PageHeader,
   Pagination,
   Select,
+  SelectionChip,
   StatCard,
   Surface,
   ToastViewport,
@@ -1507,21 +1508,16 @@ const DecisionSignalsPage: React.FC = () => {
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {stockCandidates.map((candidate) => (
-                  <Button
+                  <SelectionChip
                     key={`${candidate.source}:${getCandidateKey(candidate)}`}
-                    type="button"
-                    variant="outline"
-                    size="comfortable"
-                    className="h-auto min-h-11 whitespace-normal rounded-lg bg-elevated/40 py-1.5 text-sm hover:border-primary/60 hover:text-primary"
+                    label={<span className="font-mono">{candidate.displayCode ?? candidate.code}</span>}
+                    description={candidate.name || undefined}
+                    metadata={candidate.market ? `/ ${candidate.market}` : undefined}
                     onClick={() => {
                       handleCandidateSelect(candidate);
                       setStockContextModalOpen(false);
                     }}
-                  >
-                    <span className="font-mono">{candidate.displayCode ?? candidate.code}</span>
-                    {candidate.name ? <span className="ml-1 text-secondary-text">{candidate.name}</span> : null}
-                    {candidate.market ? <span className="ml-1 text-muted-text">/ {candidate.market}</span> : null}
-                  </Button>
+                  />
                 ))}
               </div>
             </div>
