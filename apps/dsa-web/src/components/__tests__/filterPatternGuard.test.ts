@@ -42,7 +42,7 @@ const LEGACY_HISTORY_ALLOWANCES: readonly LegacyHistoryAllowance[] = [
   },
   {
     file: '../../pages/DecisionSignalsPage.tsx',
-    line: 253,
+    line: 256,
     method: 'replaceState',
     owner: 'TRACK-UI2',
     removeBy: 'UI-D01',
