@@ -33,14 +33,17 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent.chat_context import build_visible_chat_history
+from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.disagreement import build_agent_disagreement_summary
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.protocols import (
     AgentContext,
     AgentRunStats,
+    StageFailureReason,
     StageResult,
     StageStatus,
     normalize_decision_signal,
+    normalize_stage_failure_reason,
 )
 from src.agent.skills.engine import StrategyEngine, StrategyResultStatus
 from src.agent.public_contract import (
@@ -48,9 +51,20 @@ from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
     sanitize_agent_diagnostic,
 )
-from src.agent.risk_override import build_risk_override_plan
+from src.agent.risk_override import (
+    RiskOverrideApplication,
+    build_risk_override_application,
+    build_risk_override_plan,
+)
 from src.agent.runner import parse_dashboard_json
 from src.agent.runtime.contract import ExecutionState
+from src.agent.runtime_facts import (
+    AgentRuntimeFacts,
+    DegradationBoundary,
+    DegradedEvent,
+    PipelineTerminationFact,
+    build_agent_runtime_facts,
+)
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.stream_events import stream_event
@@ -67,6 +81,7 @@ logger = logging.getLogger(__name__)
 # Valid orchestrator modes (ordered by cost/depth)
 VALID_MODES = ("quick", "standard", "full", "specialist")
 NON_CRITICAL_BASE_STAGES = frozenset({"intel", "risk"})
+_PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
 
 
 @dataclass
@@ -83,6 +98,7 @@ class OrchestratorResult:
     model: str = ""
     error: Optional[str] = None
     stats: Optional[AgentRunStats] = None
+    runtime_facts: Optional[AgentRuntimeFacts] = None
     cancelled: bool = False
     timed_out: bool = False
 
@@ -188,6 +204,7 @@ class AgentOrchestrator:
             tool_calls_log=all_tool_calls,
             provider=provider,
             model=model,
+            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
             timed_out=True,
         )
 
@@ -233,6 +250,7 @@ class AgentOrchestrator:
             tool_calls_log=all_tool_calls,
             provider=stats.models_used[0] if stats.models_used else "",
             model=", ".join(stats.models_used),
+            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
         )
 
     def _build_cancelled_result(
@@ -241,6 +259,7 @@ class AgentOrchestrator:
         all_tool_calls: List[Dict[str, Any]],
         models_used: List[str],
         elapsed_s: float,
+        ctx: Optional[AgentContext] = None,
     ) -> OrchestratorResult:
         """Build a cancelled result.
 
@@ -262,6 +281,7 @@ class AgentOrchestrator:
             tool_calls_log=all_tool_calls,
             provider=stats.models_used[0] if stats.models_used else "",
             model=", ".join(stats.models_used),
+            runtime_facts=build_agent_runtime_facts(ctx) if ctx is not None else None,
             cancelled=True,
         )
 
@@ -386,6 +406,7 @@ class AgentOrchestrator:
             provider=orch_result.provider,
             model=orch_result.model,
             error=orch_result.error,
+            runtime_facts=orch_result.runtime_facts,
             cancelled=orch_result.cancelled,
             timed_out=orch_result.timed_out,
         )
@@ -483,6 +504,7 @@ class AgentOrchestrator:
             provider=orch_result.provider,
             model=orch_result.model,
             error=orch_result.error,
+            runtime_facts=orch_result.runtime_facts,
             cancelled=orch_result.cancelled,
             timed_out=orch_result.timed_out,
         )
@@ -526,7 +548,7 @@ class AgentOrchestrator:
             if cancelled_check is not None and cancelled_check():
                 logger.info("[Orchestrator] pipeline cancelled before stage '%s'", agent.agent_name)
                 return self._build_cancelled_result(
-                    stats, all_tool_calls, models_used, elapsed_s
+                    stats, all_tool_calls, models_used, elapsed_s, ctx=ctx
                 )
 
             remaining_budget = timeout_s - elapsed_s if timeout_s else None
@@ -546,6 +568,12 @@ class AgentOrchestrator:
             )
             if timeout_exhausted:
                 logger.error("[Orchestrator] pipeline timed out before stage '%s'", agent.agent_name)
+                self._record_degraded_event(
+                    ctx,
+                    stage=agent.agent_name,
+                    reason=StageFailureReason.TIMEOUT,
+                    boundary=DegradationBoundary.BEFORE_STAGE,
+                )
                 if progress_callback:
                     progress_callback(stream_event(
                         "pipeline_timeout",
@@ -571,6 +599,12 @@ class AgentOrchestrator:
                     agent.agent_name,
                     remaining_budget,
                     stage_min_budget_s,
+                )
+                self._record_degraded_event(
+                    ctx,
+                    stage=agent.agent_name,
+                    reason=StageFailureReason.BUDGET_SKIP,
+                    boundary=DegradationBoundary.BEFORE_STAGE,
                 )
                 if progress_callback:
                     progress_callback(stream_event(
@@ -659,37 +693,13 @@ class AgentOrchestrator:
             if cancelled_check is not None and cancelled_check():
                 logger.info("[Orchestrator] pipeline cancelled after stage '%s'", agent.agent_name)
                 return self._build_cancelled_result(
-                    stats, all_tool_calls, models_used, elapsed_s
-                )
-
-            if timeout_s and elapsed_s >= timeout_s:
-                logger.error("[Orchestrator] pipeline timed out after stage '%s'", agent.agent_name)
-                if progress_callback:
-                    progress_callback(stream_event(
-                        "pipeline_timeout",
-                        stage=agent.agent_name,
-                        elapsed=round(elapsed_s, 2),
-                        timeout=timeout_s,
-                    ))
-                if ctx is not None:
-                    self._apply_partition_fallback(ctx)
-                return self._build_timeout_result(
-                    stats,
-                    all_tool_calls,
-                    models_used,
-                    elapsed_s,
-                    timeout_s,
-                    ctx=ctx,
-                    parse_dashboard=parse_dashboard,
+                    stats, all_tool_calls, models_used, elapsed_s, ctx=ctx
                 )
 
             if ctx.meta.get("response_mode") == "chat" and agent.agent_name == "decision":
                 final_text = result.meta.get("raw_text")
                 if isinstance(final_text, str) and final_text.strip():
                     ctx.set_data("final_response_text", final_text.strip())
-
-            if result.success and agent.agent_name == "decision":
-                self._apply_risk_override(ctx)
 
             # Abort pipeline on critical failure.
             # Non-critical stages that degrade gracefully:
@@ -708,6 +718,7 @@ class AgentOrchestrator:
                         stats=stats,
                         total_tokens=stats.total_tokens,
                         tool_calls_log=all_tool_calls,
+                        runtime_facts=build_agent_runtime_facts(ctx),
                     )
                 else:
                     self._record_degraded_stage(ctx, agent.agent_name, result)
@@ -716,6 +727,38 @@ class AgentOrchestrator:
                         agent.agent_name,
                         sanitize_agent_diagnostic(result.error),
                     )
+
+            if timeout_s and elapsed_s >= timeout_s:
+                logger.error("[Orchestrator] pipeline timed out after stage '%s'", agent.agent_name)
+                last_completed_stage = next(
+                    (
+                        stage.stage_name
+                        for stage in reversed(stats.stage_results)
+                        if stage.status == StageStatus.COMPLETED
+                    ),
+                    None,
+                )
+                self._record_pipeline_termination(
+                    ctx,
+                    last_completed_stage=last_completed_stage,
+                )
+                if progress_callback:
+                    progress_callback(stream_event(
+                        "pipeline_timeout",
+                        stage=agent.agent_name,
+                        elapsed=round(elapsed_s, 2),
+                        timeout=timeout_s,
+                    ))
+                self._apply_partition_fallback(ctx)
+                return self._build_timeout_result(
+                    stats,
+                    all_tool_calls,
+                    models_used,
+                    elapsed_s,
+                    timeout_s,
+                    ctx=ctx,
+                    parse_dashboard=parse_dashboard,
+                )
 
             index += 1
 
@@ -741,6 +784,7 @@ class AgentOrchestrator:
                 model=model_str,
                 error="Failed to parse dashboard JSON from agent response",
                 stats=stats,
+                runtime_facts=build_agent_runtime_facts(ctx),
             )
 
         return OrchestratorResult(
@@ -753,6 +797,7 @@ class AgentOrchestrator:
             provider=provider,
             model=model_str,
             stats=stats,
+            runtime_facts=build_agent_runtime_facts(ctx),
         )
 
     # -----------------------------------------------------------------
@@ -981,6 +1026,54 @@ class AgentOrchestrator:
             "status": result.status.value,
             "non_critical": self._is_non_critical_stage(agent_name),
         })
+        self._record_degraded_event(
+            ctx,
+            stage=agent_name,
+            reason=normalize_stage_failure_reason(result.failure_reason),
+            boundary=DegradationBoundary.DURING_STAGE,
+        )
+
+    @staticmethod
+    def _record_degraded_event(
+        ctx: AgentContext,
+        *,
+        stage: str,
+        reason: Any,
+        boundary: DegradationBoundary,
+    ) -> None:
+        """Record one deduplicated fact for an incomplete stage."""
+        normalized = DegradedEvent(
+            stage=stage,
+            reason=reason,
+            boundary=boundary,
+        )
+        event = {
+            "stage": normalized.stage,
+            "reason": normalized.reason.value,
+            "boundary": normalized.boundary.value,
+        }
+        events = ctx.meta.setdefault("degraded_events", [])
+        if not isinstance(events, list):
+            events = []
+            ctx.meta["degraded_events"] = events
+        if event not in events:
+            events.append(event)
+
+    @staticmethod
+    def _record_pipeline_termination(
+        ctx: AgentContext,
+        *,
+        last_completed_stage: Optional[str],
+    ) -> None:
+        """Record a pipeline timeout without attributing it to a stage."""
+        termination = PipelineTerminationFact(
+            reason=StageFailureReason.TIMEOUT,
+            last_completed_stage=last_completed_stage,
+        )
+        ctx.meta["pipeline_termination"] = {
+            "reason": termination.reason.value,
+            "last_completed_stage": termination.last_completed_stage,
+        }
 
     def _is_non_critical_stage(self, agent_name: str) -> bool:
         """Return whether a failed stage should degrade instead of aborting."""
@@ -1081,7 +1174,7 @@ class AgentOrchestrator:
         if isinstance(final_raw, str) and final_raw.strip():
             return None, final_raw
         if isinstance(final_dashboard, dict):
-            dashboard = self._normalize_dashboard_payload(final_dashboard, ctx)
+            dashboard = self._finalize_dashboard_payload(final_dashboard, ctx)
             if dashboard is not None:
                 return dashboard, json.dumps(dashboard, ensure_ascii=False, indent=2)
         if ctx.opinions:
@@ -1094,38 +1187,71 @@ class AgentOrchestrator:
         final_dashboard: Any,
         final_raw: Any,
     ) -> Optional[Dict[str, Any]]:
-        """Return a normalized dashboard, or synthesize one from partial context."""
-        dashboard: Optional[Dict[str, Any]] = None
+        """Resolve one dashboard, apply risk once, then derive signal fields."""
+        candidate: Optional[Dict[str, Any]] = None
 
         if isinstance(final_dashboard, dict):
-            dashboard = self._normalize_dashboard_payload(final_dashboard, ctx)
+            candidate = final_dashboard
         elif isinstance(final_raw, str) and final_raw.strip():
             parsed = parse_dashboard_json(final_raw)
             if isinstance(parsed, dict):
-                dashboard = self._normalize_dashboard_payload(parsed, ctx)
+                candidate = parsed
 
-        if dashboard is None:
-            dashboard = self._normalize_dashboard_payload({}, ctx)
-
-        if dashboard is None:
+        prepared = self._prepare_dashboard_payload(candidate or {}, ctx)
+        if prepared is None:
             return None
 
-        ctx.set_data("final_dashboard", dashboard)
-        # Apply risk override (idempotent — safe to call even if already
-        # applied in _execute_pipeline after the decision stage).
+        ctx.set_data("final_dashboard", prepared)
         self._apply_risk_override(ctx)
-        overridden = ctx.get_data("final_dashboard")
-        if isinstance(overridden, dict):
-            return overridden
+        post_risk = ctx.get_data("final_dashboard")
+        if not isinstance(post_risk, dict):
+            return None
+
+        dashboard = self._finalize_dashboard_payload(post_risk, ctx)
+        if dashboard is None:
+            return None
+        ctx.set_data("final_dashboard", dashboard)
         return dashboard
 
-    def _normalize_dashboard_payload(
+    def _prepare_dashboard_payload(
         self,
         payload: Optional[Dict[str, Any]],
         ctx: AgentContext,
     ) -> Optional[Dict[str, Any]]:
-        """Normalize or synthesize the dashboard shape expected downstream."""
-        payload = dict(payload or {})
+        """Select a safe payload and canonical signal without deriving advice."""
+        prepared = sanitize_agent_dashboard_payload(dict(payload or {}))
+        meaningful_data_keys = (
+            "realtime_quote",
+            "daily_history",
+            "chip_distribution",
+            "trend_result",
+            "news_context",
+            "intel_opinion",
+            "fundamental_context",
+        )
+        has_meaningful_context = any(
+            ctx.get_data(key) is not None for key in meaningful_data_keys
+        )
+        if not prepared and not ctx.opinions and not has_meaningful_context:
+            return None
+
+        base_opinion = self._select_base_opinion(ctx)
+        ctx.meta[_PREPARED_DECISION_TYPE_INSERTED] = "decision_type" not in prepared
+        prepared["decision_type"] = normalize_decision_signal(
+            prepared.get("decision_type")
+            or (base_opinion.signal if base_opinion else "hold")
+        )
+        return prepared
+
+    def _finalize_dashboard_payload(
+        self,
+        payload: Optional[Dict[str, Any]],
+        ctx: AgentContext,
+    ) -> Optional[Dict[str, Any]]:
+        """Derive the downstream dashboard shape from the post-risk signal."""
+        payload = sanitize_agent_dashboard_payload(dict(payload or {}))
+        if ctx.meta.pop(_PREPARED_DECISION_TYPE_INSERTED, False):
+            payload.pop("decision_type", None)
         meaningful_data_keys = (
             "realtime_quote",
             "daily_history",
@@ -1140,8 +1266,15 @@ class AgentOrchestrator:
             return None
 
         base_opinion = self._select_base_opinion(ctx)
-        decision_type = normalize_decision_signal(
-            payload.get("decision_type") or (base_opinion.signal if base_opinion else "hold")
+        application = ctx.meta.get("risk_override_application")
+        risk_applied = isinstance(application, RiskOverrideApplication) and application.applied
+        decision_type = (
+            application.post_risk_signal.value
+            if risk_applied
+            else normalize_decision_signal(
+                payload.get("decision_type")
+                or (base_opinion.signal if base_opinion else "hold")
+            )
         )
         confidence = float(base_opinion.confidence if base_opinion is not None else 0.5)
         sentiment_score = payload.get("sentiment_score")
@@ -1149,6 +1282,8 @@ class AgentOrchestrator:
             sentiment_score = int(sentiment_score)
         except (TypeError, ValueError):
             sentiment_score = _estimate_sentiment_score(decision_type, confidence)
+        if risk_applied:
+            sentiment_score = _adjust_sentiment_score(sentiment_score, decision_type)
 
         dashboard_block = payload.get("dashboard")
         if not isinstance(dashboard_block, dict):
@@ -1183,6 +1318,13 @@ class AgentOrchestrator:
         )
         if not analysis_summary:
             analysis_summary = f"多 Agent 未生成完整仪表盘，当前按{_signal_to_operation(decision_type)}处理。"
+        if risk_applied:
+            transition_prefix = (
+                f"[风控下调: {application.from_signal.value} -> "
+                f"{application.post_risk_signal.value}]"
+            )
+            if not analysis_summary.startswith(transition_prefix):
+                analysis_summary = f"{transition_prefix} {analysis_summary}"
         analysis_summary = _truncate_text(analysis_summary, 220)
 
         trend_prediction = _first_non_empty_text(
@@ -1201,26 +1343,46 @@ class AgentOrchestrator:
                 trend_prediction = "待结合更多阶段结果确认"
 
         operation_advice_raw = payload.get("operation_advice")
-        operation_advice = _normalize_operation_advice_value(operation_advice_raw, decision_type)
+        if risk_applied:
+            pre_risk_advice = _normalize_operation_advice_value(
+                operation_advice_raw,
+                application.from_signal.value,
+            )
+            operation_advice = _adjust_operation_advice(
+                pre_risk_advice,
+                decision_type,
+            )
+        else:
+            operation_advice = _normalize_operation_advice_value(
+                operation_advice_raw,
+                decision_type,
+            )
 
         existing_position = core.get("position_advice")
-        position_advice = dict(existing_position) if isinstance(existing_position, dict) else {}
-        if isinstance(operation_advice_raw, dict):
-            no_position = _first_non_empty_text(
-                operation_advice_raw.get("no_position"),
-                operation_advice_raw.get("empty_position"),
+        if risk_applied:
+            position_advice = _post_risk_position_advice(decision_type)
+        else:
+            position_advice = (
+                dict(existing_position)
+                if isinstance(existing_position, dict)
+                else {}
             )
-            has_position = _first_non_empty_text(
-                operation_advice_raw.get("has_position"),
-                operation_advice_raw.get("holding_position"),
-            )
-            if no_position and "no_position" not in position_advice:
-                position_advice["no_position"] = no_position
-            if has_position and "has_position" not in position_advice:
-                position_advice["has_position"] = has_position
-        defaults = _default_position_advice(decision_type)
-        position_advice.setdefault("no_position", defaults["no_position"])
-        position_advice.setdefault("has_position", defaults["has_position"])
+            if isinstance(operation_advice_raw, dict):
+                no_position = _first_non_empty_text(
+                    operation_advice_raw.get("no_position"),
+                    operation_advice_raw.get("empty_position"),
+                )
+                has_position = _first_non_empty_text(
+                    operation_advice_raw.get("has_position"),
+                    operation_advice_raw.get("holding_position"),
+                )
+                if no_position and "no_position" not in position_advice:
+                    position_advice["no_position"] = no_position
+                if has_position and "has_position" not in position_advice:
+                    position_advice["has_position"] = has_position
+            defaults = _default_position_advice(decision_type)
+            position_advice.setdefault("no_position", defaults["no_position"])
+            position_advice.setdefault("has_position", defaults["has_position"])
 
         key_levels = self._collect_key_levels(ctx, payload, dashboard_block)
         sniper = battle.get("sniper_points")
@@ -1274,11 +1436,21 @@ class AgentOrchestrator:
         if latest_news and not intelligence.get("latest_news"):
             intelligence["latest_news"] = latest_news
 
-        if not core.get("one_sentence"):
-            core["one_sentence"] = _truncate_text(analysis_summary, 60)
+        one_sentence = _first_non_empty_text(
+            core.get("one_sentence"),
+            analysis_summary,
+        )
+        if risk_applied and not one_sentence.startswith(transition_prefix):
+            one_sentence = f"{transition_prefix} {one_sentence}"
+        core["one_sentence"] = _truncate_text(one_sentence, 60)
         if not core.get("time_sensitivity"):
             core["time_sensitivity"] = "本周内"
-        if not core.get("signal_type"):
+        if risk_applied:
+            core["signal_type"] = {
+                "hold": "🟡持有观望",
+                "sell": "🔴卖出信号",
+            }.get(decision_type, _signal_to_signal_type(decision_type))
+        elif not core.get("signal_type"):
             core["signal_type"] = _signal_to_signal_type(decision_type)
         core["position_advice"] = position_advice
 
@@ -1286,7 +1458,20 @@ class AgentOrchestrator:
         if "action_checklist" not in battle:
             battle["action_checklist"] = []
         position_strategy = battle.get("position_strategy")
-        if not isinstance(position_strategy, dict) or not position_strategy:
+        if risk_applied:
+            position_strategy = (
+                dict(position_strategy)
+                if isinstance(position_strategy, dict)
+                else {}
+            )
+            position_strategy["suggested_position"] = _default_position_size(decision_type)
+            position_strategy["entry_plan"] = position_advice["no_position"]
+            position_strategy.setdefault(
+                "risk_control",
+                f"止损参考 {sniper.get('stop_loss', '待补充')}",
+            )
+            battle["position_strategy"] = position_strategy
+        elif not isinstance(position_strategy, dict) or not position_strategy:
             battle["position_strategy"] = {
                 "suggested_position": _default_position_size(decision_type),
                 "entry_plan": position_advice["no_position"],
@@ -1326,6 +1511,19 @@ class AgentOrchestrator:
         )
         if not risk_warning:
             risk_warning = "暂无额外风险提示"
+        if risk_applied:
+            risk_opinion = self._latest_opinion(ctx, {"risk"})
+            risk_raw = (
+                risk_opinion.raw_data
+                if risk_opinion and isinstance(risk_opinion.raw_data, dict)
+                else {}
+            )
+            risk_warning = self._merge_risk_warning(
+                risk_warning,
+                risk_raw,
+                ctx.risk_flags,
+                decision_type,
+            )
 
         payload["stock_name"] = _first_non_empty_text(payload.get("stock_name"), ctx.stock_name, ctx.stock_code)
         payload["sentiment_score"] = sentiment_score
@@ -1337,6 +1535,13 @@ class AgentOrchestrator:
         payload["key_points"] = key_points
         payload["risk_warning"] = risk_warning
         payload["dashboard"] = dashboard_block
+        if risk_applied:
+            for opinion in reversed(ctx.opinions):
+                if opinion.agent_name == "decision":
+                    opinion.signal = decision_type
+                    opinion.reasoning = analysis_summary
+                    opinion.raw_data = payload
+                    break
         return payload
 
     def _collect_key_levels(
@@ -1549,75 +1754,33 @@ class AgentOrchestrator:
             tagged["dashboard"] = nested
         return tagged
 
-    def _apply_risk_override(self, ctx: AgentContext) -> None:
-        """Apply risk-agent veto/downgrade rules to the final dashboard.
-
-        Idempotent: skips if already applied in this pipeline run.
-        """
-        if ctx.get_data("risk_override_applied"):
-            return
-
+    def _apply_risk_override(self, ctx: AgentContext) -> Optional[RiskOverrideApplication]:
+        """Apply risk rules and retain their validated actual outcome."""
         dashboard = ctx.get_data("final_dashboard")
         if not isinstance(dashboard, dict):
-            return
+            return None
 
-        risk_opinion = next((op for op in reversed(ctx.opinions) if op.agent_name == "risk"), None)
-        risk_raw = risk_opinion.raw_data if risk_opinion and isinstance(risk_opinion.raw_data, dict) else {}
+        current_signal = normalize_decision_signal(dashboard.get("decision_type", "hold"))
+        existing = ctx.meta.get("risk_override_application")
+        if (
+            isinstance(existing, RiskOverrideApplication)
+            and existing.post_risk_signal.value == current_signal
+        ):
+            return existing
 
         plan = build_risk_override_plan(
             ctx,
-            current_signal=dashboard.get("decision_type", "hold"),
+            current_signal=current_signal,
             override_enabled=getattr(self.config, "agent_risk_override", True),
         )
-        if not plan.will_apply or plan.target_signal is None or plan.current_signal is None:
-            return
+        application = build_risk_override_application(plan)
+        ctx.meta["risk_override_application"] = application
+        if not application.applied:
+            return application
 
-        current_signal = plan.current_signal
-        new_signal = plan.target_signal
+        current_signal = application.from_signal.value
+        new_signal = application.to_signal.value
         dashboard["decision_type"] = new_signal
-        dashboard["risk_warning"] = self._merge_risk_warning(
-            dashboard.get("risk_warning"),
-            risk_raw,
-            ctx.risk_flags,
-            new_signal,
-        )
-
-        sentiment_score = dashboard.get("sentiment_score")
-        try:
-            score = int(sentiment_score)
-        except (TypeError, ValueError):
-            score = 50
-        dashboard["sentiment_score"] = _adjust_sentiment_score(score, new_signal)
-
-        operation_advice = dashboard.get("operation_advice")
-        if isinstance(operation_advice, str):
-            dashboard["operation_advice"] = _adjust_operation_advice(operation_advice, new_signal)
-
-        summary = dashboard.get("analysis_summary")
-        if isinstance(summary, str) and summary:
-            dashboard["analysis_summary"] = f"[风控下调: {current_signal} -> {new_signal}] {summary}"
-
-        dashboard_block = dashboard.get("dashboard")
-        if isinstance(dashboard_block, dict):
-            core = dashboard_block.get("core_conclusion")
-            if isinstance(core, dict):
-                signal_type = {
-                    "buy": "🟡持有观望",
-                    "hold": "🟡持有观望",
-                    "sell": "🔴卖出信号",
-                }.get(new_signal, "⚠️风险警告")
-                core["signal_type"] = signal_type
-                sentence = core.get("one_sentence")
-                if isinstance(sentence, str) and sentence:
-                    core["one_sentence"] = f"{sentence}（风控下调）"
-                position = core.get("position_advice")
-                if isinstance(position, dict):
-                    if new_signal == "hold":
-                        position["no_position"] = "风险未解除前先观望，等待更清晰的入场条件。"
-                        position["has_position"] = "谨慎持有并收紧止损，待风险缓解后再考虑加仓。"
-                    elif new_signal == "sell":
-                        position["no_position"] = "风险明显偏高，暂不新开仓。"
-                        position["has_position"] = "优先控制回撤，建议减仓或退出高风险仓位。"
 
         ctx.set_data("final_dashboard", dashboard)
         ctx.set_data("risk_override_applied", {
@@ -1627,14 +1790,6 @@ class AgentOrchestrator:
             "reason": plan.reason,
         })
 
-        for opinion in reversed(ctx.opinions):
-            if opinion.agent_name == "decision":
-                opinion.signal = new_signal
-                if isinstance(dashboard.get("analysis_summary"), str):
-                    opinion.reasoning = dashboard["analysis_summary"]
-                opinion.raw_data = dashboard
-                break
-
         logger.info(
             "[Orchestrator] risk override applied: %s -> %s (adjustment=%s, high_flag=%s)",
             current_signal,
@@ -1642,6 +1797,7 @@ class AgentOrchestrator:
             plan.adjustment or ("veto" if plan.veto_buy else "none"),
             plan.has_high_flag,
         )
+        return application
 
     @staticmethod
     def _merge_risk_warning(
@@ -1651,17 +1807,27 @@ class AgentOrchestrator:
         signal: str,
     ) -> str:
         """Build a concise risk warning after a forced downgrade."""
+        prefix = f"风控接管：最终信号已下调为 {signal}。"
         warnings: List[str] = []
+
+        def append_warning(value: Any) -> None:
+            """Append one non-empty warning unless an equivalent detail exists."""
+            text = str(value or "").strip()
+            if text and not any(text == item or text in item for item in warnings):
+                warnings.append(text)
+
         if isinstance(existing_warning, str) and existing_warning.strip():
-            warnings.append(existing_warning.strip())
+            existing = existing_warning.strip()
+            if existing.startswith(prefix):
+                existing = existing[len(prefix):].strip()
+            append_warning(existing)
         if isinstance(risk_raw.get("reasoning"), str) and risk_raw["reasoning"].strip():
-            warnings.append(risk_raw["reasoning"].strip())
+            append_warning(risk_raw["reasoning"])
         for flag in risk_flags[:3]:
             description = str(flag.get("description", "")).strip()
             severity = str(flag.get("severity", "")).lower()
             if description:
-                warnings.append(f"[{severity or 'risk'}] {description}")
-        prefix = f"风控接管：最终信号已下调为 {signal}。"
+                append_warning(f"[{severity or 'risk'}] {description}")
         merged = " ".join(dict.fromkeys([prefix] + warnings))
         return merged[:500]
 
@@ -1807,6 +1973,21 @@ def _default_position_advice(signal: str) -> Dict[str, str]:
         },
     }
     return mapping.get(signal, mapping["hold"])
+
+
+def _post_risk_position_advice(signal: str) -> Dict[str, str]:
+    """Return authoritative position advice after an applied risk transition."""
+    mapping = {
+        "hold": {
+            "no_position": "风险未解除前先观望，等待更清晰的入场条件。",
+            "has_position": "谨慎持有并收紧止损，待风险缓解后再考虑加仓。",
+        },
+        "sell": {
+            "no_position": "风险明显偏高，暂不新开仓。",
+            "has_position": "优先控制回撤，建议减仓或退出高风险仓位。",
+        },
+    }
+    return dict(mapping.get(signal, _default_position_advice(signal)))
 
 
 def _default_position_size(signal: str) -> str:
