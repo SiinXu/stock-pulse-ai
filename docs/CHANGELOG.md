@@ -218,6 +218,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Bot `/analyze` 迁移到统一任务执行权威：分析提交改走与 API/Web 同源的 `AnalysisTaskQueue`（共享 Task ID、按规范化股票代码去重、统一状态枚举与错误分类），并经闭包透传发起会话的回复上下文（不落入任务快照/SSE/幂等指纹）以保持结果推送目标等价；成功文案与推送行为不变，同一股票分析进行中的重复请求返回“正在分析中”提示而非并发重复触发。旧 `TaskService` 不再被 Bot 调用，其删除与单进程/interrupted 语义固化由后续 PR 收编。
 - [chore] 收编旧 `TaskService`：在 Bot analyze 迁移到统一权威后，删除平行的 `src/services/task_service.py` 单例、`src/services/__init__.py` 中的再导出与 `tests/test_task_service.py`（零生产调用面）；将单进程单一权威（`AnalysisTaskQueue` 为进程内单例，重复实例化返回同一权威、不复位任务状态）与 interrupted 终态判定（优雅关闭把每个非终态任务转 `interrupted`，中断后迟到的 completed/failed 按 first-terminal-wins 拒收、不复活任务）固化为 `docs/task-execution-contract.md` 的显式契约 + `tests/test_task_execution.py` 回归测试，并补充 Bot 语义章节（回复上下文经命令 runner 带外传递、不进入快照/SSE/幂等指纹）。行为不变，无新增用户可见能力。
 - [改进] Pipeline 八个阶段新增统一 typed Result 与线程安全重试 fence：未提交失败可重试，同一 query 下已确认的分析历史、本地报告和逐渠道通知会复用结果而不重复持久化或发送；legacy/Agent 共用持久化边界，公开返回值、报告内容、API、数据库 schema 与配置保持不变。
+- [新功能] 多策略证据契约计算层：新增 `StrategyEngine`（`src/agent/skills/engine.py`）对 skill 观点做确定性分拣、聚合、综合与冲突检测（方向对立/分值离散/高置信异议/调整矛盾），配套 `synthesis.py`、`protocols` 的策略信号标准化与 `aggregator` 的 `calculate`/`AggregationData`；orchestrator 在决策前统一经引擎处理，invalid 观点移入 `ctx.meta["invalid_opinions"]` 诊断、绝不回流证据链，并在 timeout/budget 早退路径保留诊断；`strategy_synthesis` 由引擎确定性写入 dashboard 载荷（覆盖 LLM 输出）。本片仅计算与接线，报告/通知/模板的本地化呈现随后续 PR。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
