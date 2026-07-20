@@ -371,11 +371,24 @@ describe('PortfolioPage FX refresh', () => {
 
   it('edits the selected account via a PUT that preserves the account id', async () => {
     updateAccount.mockResolvedValue({ id: 1, name: 'Renamed', broker: 'Demo', market: 'us', baseCurrency: 'CNY', isActive: true });
+    getSnapshot.mockImplementation(async ({ accountId }: { accountId?: number } = {}) => {
+      if (accountId === 1) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      return makeSnapshot({ accountId, fxStale: true });
+    });
     render(<PortfolioPage />);
     await waitForInitialLoad();
 
     chooseOption(screen.getAllByRole('combobox')[0], '1');
-    fireEvent.click(await screen.findByRole('button', { name: '编辑账户' }));
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+    const editButton = screen.getByRole('button', { name: '编辑账户' });
+    await waitFor(() => expect(editButton).toBeEnabled());
+    fireEvent.click(editButton);
 
     const nameInput = await screen.findByDisplayValue('Main');
     fireEvent.change(nameInput, { target: { value: 'Renamed' } });

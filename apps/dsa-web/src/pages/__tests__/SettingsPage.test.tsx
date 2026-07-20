@@ -3686,14 +3686,17 @@ describe('SettingsPage', () => {
 
   it('does not show a failed run as the last successful scheduler run', async () => {
     const configState = buildSystemConfigState();
-    getSchedulerStatus.mockResolvedValueOnce({
-      enabled: true,
-      running: false,
-      scheduleTimes: ['18:00'],
-      nextRunAt: null,
-      lastRunAt: '2026-06-21T17:00:00+08:00',
-      lastSuccessAt: null,
-      lastError: 'analysis failed',
+    getSchedulerStatus.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      return {
+        enabled: true,
+        running: false,
+        scheduleTimes: ['18:00'],
+        nextRunAt: null,
+        lastRunAt: '2026-06-21T17:00:00+08:00',
+        lastSuccessAt: null,
+        lastError: 'analysis failed',
+      };
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3743,20 +3746,25 @@ describe('SettingsPage', () => {
 
     render(<SettingsPage />);
 
-    expect(await screen.findByTestId('scheduler-last-success')).toHaveTextContent('-');
-    expect(screen.getByTestId('scheduler-last-error')).toHaveTextContent('analysis failed');
+    await waitFor(() => {
+      expect(screen.getByTestId('scheduler-last-success')).toHaveTextContent('-');
+      expect(screen.getByTestId('scheduler-last-error')).toHaveTextContent('analysis failed');
+    });
   });
 
   it('shows active runtime scheduler state even when saved schedule flag is false', async () => {
     const configState = buildSystemConfigState();
-    getSchedulerStatus.mockResolvedValueOnce({
-      enabled: true,
-      running: false,
-      scheduleTimes: ['18:00'],
-      nextRunAt: null,
-      lastRunAt: null,
-      lastSuccessAt: null,
-      lastError: null,
+    getSchedulerStatus.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      return {
+        enabled: true,
+        running: false,
+        scheduleTimes: ['18:00'],
+        nextRunAt: null,
+        lastRunAt: null,
+        lastSuccessAt: null,
+        lastError: null,
+      };
     });
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -3807,7 +3815,7 @@ describe('SettingsPage', () => {
     render(<SettingsPage />);
 
     const enabledSwitch = await screen.findByTestId('scheduler-enabled-switch');
-    expect(enabledSwitch).toBeChecked();
+    await waitFor(() => expect(enabledSwitch).toBeChecked());
 
     fireEvent.click(enabledSwitch);
 
