@@ -19,6 +19,8 @@ import {
   AppPage,
   Button,
   Card,
+  DataTable,
+  type DataTableColumn,
   EmptyState,
   Field,
   InlineAlert,
@@ -248,6 +250,15 @@ const StockDetailsPage: React.FC = () => {
 
   const quoteName = quote?.stockName?.trim();
 
+  const candleColumns: DataTableColumn<StockHistoryCandle>[] = [
+    { id: 'date', header: t('stocks.workspace.date'), cell: (candle) => <span className="font-mono">{candle.date}</span> },
+    { id: 'open', header: t('stocks.workspace.open'), cell: (candle) => formatNumber(candle.open) },
+    { id: 'high', header: t('stocks.workspace.high'), cell: (candle) => formatNumber(candle.high) },
+    { id: 'low', header: t('stocks.workspace.low'), cell: (candle) => formatNumber(candle.low) },
+    { id: 'close', header: t('stocks.workspace.close'), cell: (candle) => formatNumber(candle.close) },
+    { id: 'volume', header: t('stocks.workspace.volume'), cell: (candle) => formatNumber(candle.volume) },
+  ];
+
   return (
     <AppPage className="max-w-none">
       <div className="space-y-5">
@@ -394,32 +405,19 @@ const StockDetailsPage: React.FC = () => {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <div className="max-h-72 overflow-auto rounded-lg border border-border/60">
-                <table className="w-full text-left text-xs">
-                  <caption className="sr-only">{t('stocks.workspace.tableCaption', { code: canonicalCode })}</caption>
-                  <thead className="sticky top-0 bg-elevated/60 text-secondary-text">
-                    <tr>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.date')}</th>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.open')}</th>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.high')}</th>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.low')}</th>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.close')}</th>
-                      <th scope="col" className="px-3 py-2">{t('stocks.workspace.volume')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...displayCandles].reverse().map((candle) => (
-                      <tr key={candle.date} className="border-t border-border/40">
-                        <td className="px-3 py-1.5 font-mono">{candle.date}</td>
-                        <td className="px-3 py-1.5">{formatNumber(candle.open)}</td>
-                        <td className="px-3 py-1.5">{formatNumber(candle.high)}</td>
-                        <td className="px-3 py-1.5">{formatNumber(candle.low)}</td>
-                        <td className="px-3 py-1.5">{formatNumber(candle.close)}</td>
-                        <td className="px-3 py-1.5">{formatNumber(candle.volume)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="max-h-72 overflow-y-auto">
+                <DataTable<StockHistoryCandle>
+                  caption={t('stocks.workspace.tableCaption', { code: canonicalCode })}
+                  columns={candleColumns}
+                  rows={[...displayCandles].reverse()}
+                  getRowKey={(candle) => candle.date}
+                  emptyState={{
+                    title: t('stocks.workspace.historyEmptyTitle'),
+                    description: t('stocks.workspace.historyEmptyDescription'),
+                  }}
+                  density="compact"
+                  minWidth="content"
+                />
               </div>
               <InlineAlert variant="info" message={t('stocks.workspace.aggregationNote')} />
             </div>
