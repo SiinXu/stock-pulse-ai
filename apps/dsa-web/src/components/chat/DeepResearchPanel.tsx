@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { Search, StopCircle } from 'lucide-react';
 import { agentApi } from '../../api/agent';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { ApiErrorAlert, Button, Field, InlineAlert, Input, Textarea } from '../common';
+import { ApiErrorAlert, Button, Field, InlineAlert, Input, StatePanel, Surface, Textarea } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
 type ResearchStatus = 'idle' | 'running' | 'done' | 'error';
@@ -168,7 +168,7 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
       </form>
 
       {running ? (
-        <p className="text-sm text-secondary-text" role="status">{t('research.running')}</p>
+        <StatePanel state="loading" title={t('research.running')} titleAs="p" size="compact" />
       ) : null}
 
       {error ? <ApiErrorAlert error={error} /> : null}
@@ -179,27 +179,27 @@ export const DeepResearchPanel: React.FC<DeepResearchPanelProps> = ({ sessionId 
 
       {run && run.status === 'done' ? (
         <div className="space-y-4">
-          <div className="rounded-xl border border-border/60 bg-elevated/20 p-4">
+          <Surface level="interactive" className="p-4">
             <h3 className="mb-2 text-sm font-semibold text-foreground">{t('research.resultTitle')}</h3>
             <div className="prose prose-sm max-w-none text-sm text-foreground dark:prose-invert">
               <Markdown remarkPlugins={[remarkGfm]}>{run.content || ''}</Markdown>
             </div>
-          </div>
+          </Surface>
           {run.sources && run.sources.length > 0 ? (
-            <div className="rounded-xl border border-border/60 bg-elevated/20 p-4">
+            <Surface level="interactive" className="p-4">
               <h3 className="mb-2 text-sm font-semibold text-foreground">{t('research.referencesTitle')}</h3>
               <ol className="list-decimal space-y-1 pl-5 text-sm text-secondary-text">
                 {run.sources.map((source, index) => (
                   <li key={`${index}-${source}`}>{source}</li>
                 ))}
               </ol>
-            </div>
+            </Surface>
           ) : null}
         </div>
       ) : null}
 
       {!run || run.status === 'idle' ? (
-        <p className="text-sm text-secondary-text">{t('research.emptyHint')}</p>
+        <StatePanel state="empty" title={t('research.emptyHint')} titleAs="p" size="compact" />
       ) : null}
     </section>
   );
