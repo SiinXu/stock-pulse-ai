@@ -26,10 +26,10 @@ test.describe('login background treatment', () => {
           const root = document.querySelector<HTMLElement>('[data-testid="login-page"]');
           const gridLayer = document.querySelector<HTMLElement>('[data-testid="login-grid-background"]');
           const accentLayer = document.querySelector<HTMLElement>('[data-testid="login-accent-background"]');
-          const headings = Array.from(document.querySelectorAll<HTMLElement>('h1, h2'));
           if (!root || !gridLayer || !accentLayer) {
             throw new Error('Login background layers were not rendered');
           }
+          const headings = Array.from(root.querySelectorAll<HTMLElement>('h1, h2'));
 
           const probe = document.createElement('div');
           probe.style.backgroundColor = 'var(--login-bg-main)';
