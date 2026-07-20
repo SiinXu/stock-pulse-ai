@@ -164,6 +164,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
+          event.stopPropagation();
           if (applyBlocked) return;
           onApply();
         }}

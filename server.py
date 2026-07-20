@@ -20,6 +20,7 @@ Daily Stock Analysis - FastAPI 后端服务入口
 
 import logging
 
+from src.application_services import ApplicationServices, set_application_services
 from src.config import setup_env, get_config
 from src.logging_config import setup_logging
 
@@ -35,6 +36,10 @@ setup_logging(
     console_level=level,
     extra_quiet_loggers=['uvicorn', 'fastapi'],
 )
+
+# Establish the application composition root at the API startup layer so the
+# process-wide service singletons have a single owner before the app loads.
+set_application_services(ApplicationServices())
 
 # 从 api.app 导入应用实例
 from api.app import app  # noqa: E402
