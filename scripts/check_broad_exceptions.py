@@ -531,6 +531,7 @@ def _handler_digest(
         "finalbody": _stable_ast_dump(owner.finalbody),
         "handler": _stable_ast_dump(handler),
         "handler_index": handler_index,
+        "handlers": _stable_ast_dump(owner.handlers),
         "protected_body": _stable_ast_dump(owner.body),
         "try_kind": type(owner).__name__,
         "try_site_index": try_site_index,

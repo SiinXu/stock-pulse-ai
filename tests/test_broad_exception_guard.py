@@ -528,6 +528,34 @@ def test_fingerprint_tracks_handler_order_within_a_try(tmp_path: Path) -> None:
     assert {"new-broad-handler", "stale-baseline-entry"} <= rules
 
 
+def test_fingerprint_tracks_sibling_handler_coverage(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        return work()\n"
+        "    except ValueError:\n"
+        "        return 'invalid'\n"
+        "    except Exception:\n"
+        "        return None\n",
+    )
+    handler = scan_repository(tmp_path)[0]
+    _write_baseline(baseline, legacy_handlers=[handler.baseline_entry.as_json()])
+    original_baseline = baseline.read_text(encoding="utf-8")
+
+    module.write_text(
+        module.read_text(encoding="utf-8").replace("ValueError", "KeyError"),
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+    assert write_baseline(tmp_path, baseline) == 1
+    assert baseline.read_text(encoding="utf-8") == original_baseline
+
+
 def test_fingerprint_distinguishes_identical_try_sites(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
