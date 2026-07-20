@@ -107,25 +107,27 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
         })}
       </div>
 
-      <Modal
-        isOpen={Boolean(openProvider)}
-        onClose={() => setOpenProviderId(null)}
-        title={openProvider ? openProvider.label : undefined}
-        className="max-w-2xl"
-      >
-        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
-          {openProviderItems.map((item) => (
-            <SettingsField
-              key={item.key}
-              item={item}
-              value={item.value}
-              disabled={disabled}
-              onChange={onChange}
-              issues={issueByKey[item.key] || []}
-            />
-          ))}
-        </form>
-      </Modal>
+      {openProvider ? (
+        <Modal
+          isOpen
+          onClose={() => setOpenProviderId(null)}
+          title={openProvider.label}
+          size="wide"
+        >
+          <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
+            {openProviderItems.map((item) => (
+              <SettingsField
+                key={item.key}
+                item={item}
+                value={item.value}
+                disabled={disabled}
+                onChange={onChange}
+                issues={issueByKey[item.key] || []}
+              />
+            ))}
+          </form>
+        </Modal>
+      ) : null}
     </>
   );
 };

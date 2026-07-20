@@ -207,7 +207,7 @@ export const MultiSelectDropdown: React.FC<MultiSelectDropdownProps> = ({
           ref={popupRef}
           data-dialog-popup="true"
           style={popupStyle}
-          className="fixed z-50 flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
+          className="fixed flex w-max max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-elevated shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

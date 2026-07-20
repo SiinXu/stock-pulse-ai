@@ -839,7 +839,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
           </Button>
           <Popover
             contentRole="menu"
-            contentClassName="right-0 top-full z-20 mt-1 w-36 p-1"
+            placement="bottom"
+            align="end"
+            contentClassName="w-36 p-1"
             trigger={({ open, toggle }) => (
               <IconButton
                 type="button"
@@ -1572,7 +1574,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   }, [focusField, focusModels, focusStep, showManualModelInput, supportsDiscovery]);
 
   return (
-    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} className="max-w-xl">
+    <Modal isOpen onClose={onClose} title={mode === 'edit' ? text.editService : text.addService} size="wide">
       {!draft ? (
         <div className="space-y-3">
           <p className="text-sm text-secondary-text">{text.chooseProviderDescription}</p>

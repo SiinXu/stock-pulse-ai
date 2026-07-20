@@ -1830,7 +1830,8 @@ const DecisionSignalsPage: React.FC = () => {
         isOpen={Boolean(selected)}
         onClose={handleCloseSignal}
         title={t('decisionSignals.detailTitle')}
-        width="max-w-3xl"
+        variant="detail"
+        size="wide"
       >
         {selected ? (
           <div className="space-y-4">
