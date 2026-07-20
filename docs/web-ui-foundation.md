@@ -171,9 +171,13 @@ Callers provide localized titles, descriptions, action labels, and toolbar
 names.
 
 `ResponsiveRail` is an `aside` named by its visible H2. At `xl` it is visible
-and sticky within the workspace; below `xl` it becomes one native button
-disclosure with caller-provided expand/collapse names. Its compact open state
-is controlled or uncontrolled and never enters business URL state.
+and sticky within the workspace. From 1024px through 1279px and below 768px,
+it becomes one native button disclosure with caller-provided expand/collapse
+names. From 768px through 1023px, that same labelled trigger opens a shared
+Navigation Drawer, and leaving the tablet range closes any open rail before
+changing presentation. Its open state is controlled or uncontrolled and never
+enters business URL state. Callers provide a localized `drawerTitle`; the
+Pattern owns Drawer width, focus entry, Escape, scroll lock, and restoration.
 `SummaryStrip` is one labelled definition list with stable metric IDs and
 semantic state tones; it does not create a row of nested cards.
 
@@ -220,12 +224,19 @@ The responsive contract has three states:
   mobile header. Global navigation uses the Navigation `Drawer`; theme and
   language controls live inside the profile dialog rather than competing in
   the header. Closing with Escape or the close control restores the opener,
-  while route selection delegates focus to the destination's ready H1.
+  while route selection delegates focus to the destination's ready H1. The
+  route marker selected inside the transient Drawer transfers to the persistent
+  opener, so browser Back restores that visible control rather than falling
+  back to the source H1.
+- From 768px through 1023px, page-owned business navigation represented by a
+  `ResponsiveRail` uses its own labelled Navigation Drawer. Below 768px it
+  remains an inline disclosure, avoiding a second hamburger-style mobile menu.
 - From 1024px through 1279px, the global sidebar is a fixed 76px compact rail.
   This forced intermediate state does not overwrite the user's wider-desktop
   preference. A contextual `ResponsiveRail` remains in document flow and uses
-  its compact disclosure below `xl`, so it does not create a second permanent
-  sidebar at the constrained breakpoint.
+  its compact disclosure, so it does not create a second permanent sidebar at
+  the constrained breakpoint. Its fixed brand mark remains visible because
+  this forced rail has no expansion action.
 - At 1280px and wider, the global sidebar honors the persisted expanded or
   collapsed preference. The expanded state always displays the complete
   product name.

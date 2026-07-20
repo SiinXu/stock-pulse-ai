@@ -61,6 +61,9 @@ test.describe('application shell foundation', () => {
     await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'compact');
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeHidden();
     expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(76);
+    const compactBrand = sidebar.locator('[data-shell-brand-mark]');
+    await compactBrand.locator('..').hover();
+    await expect(compactBrand).toHaveCSS('opacity', '1');
     await expectNoDocumentOverflow(page);
 
     for (const { width, height } of [
@@ -108,7 +111,7 @@ test.describe('application shell foundation', () => {
     await expect(heading).toBeFocused();
   });
 
-  test('closes mobile navigation on route selection and delegates focus to the ready H1', async ({ page }) => {
+  test('delegates route focus to the H1 and restores the persistent mobile opener on Back', async ({ page }) => {
     await openFixture(page, 390, 844);
     await page.getByRole('button', { name: 'Open navigation' }).click();
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
@@ -120,6 +123,14 @@ test.describe('application shell foundation', () => {
     await expect(page).toHaveURL(/\/chat$/);
     const heading = page.getByRole('heading', { level: 1, name: 'Route /chat' });
     await expect(heading).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toHaveAttribute(
+      'data-route-focus-key',
+      'shell-nav-mobile:chat',
+    );
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/e2e\/application-shell-fixture\.html$/);
+    await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
   });
 
   test('uses dialog semantics for profile preferences and restores trigger focus', async ({ page }) => {
@@ -130,7 +141,8 @@ test.describe('application shell foundation', () => {
 
     const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
     await expect(profileDialog).toBeVisible();
-    await expect(profileDialog.getByRole('button', { name: 'Toggle theme' })).toBeVisible();
+    const themeTrigger = profileDialog.getByRole('button', { name: 'Toggle theme' });
+    await expect(themeTrigger).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(profileDialog).toBeHidden();
     await expect(profileTrigger).toBeFocused();
@@ -168,6 +180,7 @@ test.describe('application shell foundation', () => {
       () => main.evaluate((element) => getComputedStyle(element).backgroundColor),
     ).not.toBe(lightBackground);
     expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
+    await expect(page.locator('[data-shell-sidebar]')).toHaveCSS('transition-property', 'none');
     await expectNoDocumentOverflow(page);
   });
 });

@@ -113,6 +113,7 @@ describe('Shell', () => {
     fireEvent.click(opener);
 
     const drawer = screen.getByRole('dialog', { name: '导航菜单' });
+    expect(opener).not.toHaveAttribute('data-route-focus-key');
     expect(within(drawer).getByRole('link', { name: '问股' })).toHaveAttribute(
       'data-route-focus-key',
       'shell-nav-mobile:chat',
@@ -121,6 +122,17 @@ describe('Shell', () => {
 
     expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
+  });
+
+  it('moves the selected mobile route marker onto the persistent Drawer opener', () => {
+    renderShell();
+    const opener = screen.getByRole('button', { name: '打开导航菜单' });
+    fireEvent.click(opener);
+    const drawer = screen.getByRole('dialog', { name: '导航菜单' });
+    fireEvent.click(within(drawer).getByRole('link', { name: '首页' }));
+
+    expect(screen.queryByRole('dialog', { name: '导航菜单' })).not.toBeInTheDocument();
+    expect(opener).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:home');
   });
 
   it('closes mobile navigation and moves focus to the active desktop route at the breakpoint', async () => {

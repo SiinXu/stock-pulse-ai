@@ -12,7 +12,7 @@ import { APPLICATION_NAVIGATION_ITEMS } from './navigation';
 
 type SidebarNavProps = {
   collapsed?: boolean;
-  onNavigate?: () => void;
+  onNavigate?: (routeFocusKey?: string) => void;
   onToggleCollapse?: () => void;
   variant?: 'default' | 'rail';
   focusKeyPrefix?: string;
@@ -31,7 +31,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
 
   const openSearch = () => {
     navigate('/', { state: { focusStockSearch: true, focusToken: Date.now() } });
-    onNavigate?.();
+    onNavigate?.(`${focusKeyPrefix}:search`);
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -57,8 +57,17 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     <>
       {collapsed ? (
         <div className="mb-4 flex justify-center">
-          <div className="group relative h-11 w-11">
-            <div className="flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity group-hover:opacity-0">
+          <div
+            className={cn('relative h-11 w-11', onToggleCollapse && 'group')}
+            data-shell-brand-behavior={onToggleCollapse ? 'replaceable' : 'persistent'}
+          >
+            <div
+              data-shell-brand-mark="true"
+              className={cn(
+                'flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground transition-opacity motion-reduce:transition-none',
+                onToggleCollapse && 'group-hover:opacity-0',
+              )}
+            >
               <BarChart3 className="size-4.5" />
             </div>
             {onToggleCollapse ? (
@@ -128,7 +137,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               key={key}
               to={to}
               end={exact}
-              onClick={onNavigate}
+              onClick={() => onNavigate?.(`${focusKeyPrefix}:${key}`)}
               aria-label={label}
               data-route-focus-key={`${focusKeyPrefix}:${key}`}
               className={({ isActive }) =>

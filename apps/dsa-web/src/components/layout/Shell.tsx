@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Menu } from 'lucide-react';
 import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
@@ -39,7 +39,8 @@ function useMediaQuery(query: string): boolean {
 
 export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const mobileOpenRef = useRef(mobileOpen);
+  const mobileOpenRef = useRef(false);
+  const [mobileRouteFocusKey, setMobileRouteFocusKey] = useState('shell:mobile-navigation');
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -50,9 +51,15 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const compactSidebar = useMediaQuery(COMPACT_SIDEBAR_QUERY);
   const sidebarCollapsed = compactSidebar || collapsed;
 
-  useEffect(() => {
-    mobileOpenRef.current = mobileOpen;
-  }, [mobileOpen]);
+  const setMobileNavigationOpen = useCallback((nextOpen: boolean) => {
+    mobileOpenRef.current = nextOpen;
+    setMobileOpen(nextOpen);
+  }, []);
+
+  const closeMobileNavigation = useCallback((routeFocusKey?: string) => {
+    if (routeFocusKey) setMobileRouteFocusKey(routeFocusKey);
+    setMobileNavigationOpen(false);
+  }, [setMobileNavigationOpen]);
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -72,7 +79,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
     let focusFrame: number | undefined;
     const closeMobileNavigation = (event: MediaQueryListEvent) => {
       if (!event.matches || !mobileOpenRef.current) return;
-      setMobileOpen(false);
+      setMobileNavigationOpen(false);
       focusFrame = window.requestAnimationFrame(() => {
         const sidebar = document.querySelector<HTMLElement>('[data-shell-sidebar]');
         const activeRoute = sidebar?.querySelector<HTMLElement>('a[aria-current="page"]');
@@ -84,7 +91,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
       mediaQuery.removeEventListener('change', closeMobileNavigation);
       if (focusFrame !== undefined) window.cancelAnimationFrame(focusFrame);
     };
-  }, []);
+  }, [setMobileNavigationOpen]);
 
   return (
     <div className="h-dvh overflow-hidden bg-background text-foreground">
@@ -96,9 +103,9 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           <IconButton
             variant="outline"
             size="comfortable"
-            onClick={() => setMobileOpen(true)}
+            onClick={() => setMobileNavigationOpen(true)}
             aria-label={t('layout.openNav')}
-            data-route-focus-key="shell:mobile-navigation"
+            data-route-focus-key={mobileOpen ? undefined : mobileRouteFocusKey}
             tooltip={false}
           >
             <Menu aria-hidden="true" />
@@ -118,7 +125,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           data-shell-sidebar-mode={sidebarCollapsed ? 'compact' : 'expanded'}
           tabIndex={-1}
           className={cn(
-            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible border-r border-border bg-background px-2 py-4 transition-[width] duration-300 ease-out lg:flex lg:flex-col',
+            'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible border-r border-border bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
             sidebarCollapsed ? 'w-19' : 'w-57'
           )}
           aria-label={t('layout.desktopSidebar')}
@@ -126,7 +133,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           <SidebarNav
             collapsed={sidebarCollapsed}
             onToggleCollapse={compactSidebar ? undefined : toggleCollapsed}
-            onNavigate={() => setMobileOpen(false)}
+            onNavigate={() => setMobileNavigationOpen(false)}
             focusKeyPrefix="shell-nav-desktop"
           />
         </aside>
@@ -141,13 +148,13 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
       <Drawer
         isOpen={mobileOpen}
-        onClose={() => setMobileOpen(false)}
+        onClose={() => setMobileNavigationOpen(false)}
         title={t('layout.navMenu')}
         variant="navigation"
       >
         <div className="flex h-full flex-col">
           <SidebarNav
-            onNavigate={() => setMobileOpen(false)}
+            onNavigate={closeMobileNavigation}
             focusKeyPrefix="shell-nav-mobile"
           />
         </div>

@@ -61,6 +61,21 @@ describe('SidebarNav', () => {
     expect(screen.getByRole('button', { name: '搜索' })).toHaveClass('h-11', 'w-11');
   });
 
+  it('keeps the compact brand persistent when the rail cannot expand', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav collapsed />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector('[data-shell-brand-behavior]')).toHaveAttribute(
+      'data-shell-brand-behavior',
+      'persistent',
+    );
+    expect(container.querySelector('[data-shell-brand-mark]')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '展开侧边栏' })).not.toBeInTheDocument();
+  });
+
   it('keeps the screening navigation item discoverable while AlphaSift is disabled', () => {
     mockGetAlphaSiftStatus.mockResolvedValueOnce({ enabled: false, available: false, installSpecIsDefault: false });
 
