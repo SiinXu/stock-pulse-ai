@@ -166,6 +166,41 @@ classes such as grid placement and maximum width remain valid. A normal page
 should expose no more than two visible surface boundaries; headings, rows,
 whitespace, and dividers group content inside a section.
 
+There is no `glass` level or glass compatibility variant. The old
+`glass-card` selector is an opaque card implementation, not a blur effect, and
+must migrate to the existing hierarchy. A structural panel that owns actions
+or selection normally uses `interactive`; a non-interactive content grouping
+uses `section`. Layout-only overflow remains caller-owned because clipping is
+not an invariant of either level and can hide focus indicators or portalled
+content when applied indiscriminately.
+
+Nested fills and dividers use theme-aware foundation tokens instead of raw
+white alpha:
+
+| Legacy presentation | Semantic replacement |
+| --- | --- |
+| `glass-card` / `dashboard-card` | Choose `Surface level="section"` or `Surface level="interactive"`; never add a fifth level. |
+| `bg-white/N` | `bg-subtle-soft`, `bg-subtle`, or a state-specific semantic overlay token. |
+| `border-white/N` / `ring-white/N` | `border-subtle` / `ring-subtle`. |
+| `bg-surface` | Choose an existing Surface level or an existing token such as `bg-surface-1`, `bg-surface-2`, `bg-surface-3`, or `bg-subtle`; do not define the invalid alias. |
+
+`UI-DEF-02` intentionally adds no new visual prop: `Surface` and these existing
+tokens already express every deferred use. Its production guard freezes the
+remaining compatibility tokens by file and occurrence count, so unrelated
+line insertions do not break the migration inventory and either new debt or a
+completed migration requires an explicit inventory update.
+
+| Removal item | Execution owner | Remaining sources |
+| --- | --- | --- |
+| `UI-R01` | `TRACK-UI1` | Home and watchlist panels. |
+| `UI-R02` | `TRACK-UI1` | History list and stock rail. |
+| `UI-R03` | `TRACK-UI1` | Run Flow and task-state fills/rings. |
+| `UI-C01` | `TRACK-UI3` | Chat workspace panels, dividers, and nested fills. |
+| `UI-BT01` | `TRACK-UI2` | Backtest dividers. |
+| `UI-P01` | `TRACK-UI2` | Portfolio tables, event lists, and invalid surface alias. |
+| `UI-SCR01` | `TRACK-UI2` | Screening controls and table rows using the invalid surface alias. |
+| `UI-QA01` | `UIUX-HARNESS` | Delete the shared `glass-card` selector after its final page consumer migrates. |
+
 `Card` remains a compatibility adapter while domain pages migrate. Its
 `default` variant maps to the borderless `section` level; `bordered` and
 `gradient` map to `interactive`. New production code should choose `Surface`
@@ -267,6 +302,10 @@ The AST-backed production design guard checks:
   any new JSX / `createElement` raw table or page-local `role="table|grid"`
   substitute. Twelve existing raw tables remain exact line-level entries
   assigned to their page tracks and removal items.
+- New `glass-card` / `dashboard-card`, raw white-alpha background/border/ring
+  utilities, and the undefined `bg-surface` alias. Existing debt is frozen by
+  file and token count, with a page-track owner and deletion work item rather
+  than a brittle source line number.
 
 Temporary override exceptions record both exact tokens and their removal work
 item:
@@ -309,6 +348,10 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
 - `UI-DEF-01` establishes `SelectionChip` from the explicit TRACK-UI2 deferred
   input. It does not migrate Decision Signals. `UI-D01` deletes its exact
   Button geometry allowance when that page adopts the shared control.
+- `UI-DEF-02` confirms the existing four Surface levels and semantic subtle
+  tokens as the complete replacement for the deferred glass/raw-white debt,
+  deletes the unreferenced `dashboard-card` duplicate, and adds an expiring
+  file/count migration guard. It does not migrate any business page.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
   raw controls are deleted.

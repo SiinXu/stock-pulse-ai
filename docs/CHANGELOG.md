@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 固化共享 Surface 迁移契约：确认 `canvas`/`section`/`interactive`/`overlay` 四层与现有 subtle token 足以替代旧 `glass-card`、raw white-alpha 和无效 `bg-surface`，不新增 glass 层级；删除无生产消费者的 `dashboard-card` 重复样式，并以不依赖行号的“文件 + token 计数”守卫冻结其余 UI1/UI2/UI3 页面迁移债，双主题与九视口 fixture 验证语义边界、填充、分隔线、ring 和横向溢出。
 - [改进] Web 新增共享 `SelectionChip` 选择控件：保持原生非提交 button 与 ref/disabled/loading/键盘语义，loading 期间以 `aria-busy` 禁止重复激活，单行最小可见高度 36px、长标签自动换行增高，粗指针命中区独立扩展至 44px；持续选择可选用 `aria-pressed` 与稳定选中标识，一次性选择命令不伪造 pressed 状态。控件拒绝页面覆盖 height/width/padding/radius/flex 几何，并由生产守卫阻止私有同名实现；Decision Signals 旧候选 Button 仍由 `UI-D01`/`TRACK-UI2` 独立迁移并删除精确 allowlist。
 - [改进] Web 新增共享 `DataTable` 基础：typed columns/row keys、原生 caption/column/row 语义、受控 `aria-sort` 排序、唯一 empty/loading/error/retrying 状态、click/Enter/Space 行激活与嵌套控件事件隔离；窄屏使用命名且可聚焦的内部横向滚动区和稳定最小宽度，不造成文档横溢。生产守卫阻止复制 DataTable 或新增 raw table，现有 12 处旧表格按精确行绑定 UI1/UI2/UI3 迁移项。
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
