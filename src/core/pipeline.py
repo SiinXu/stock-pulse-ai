@@ -434,6 +434,7 @@ class StockAnalysisPipeline:
         stock_name = code
         active_stage: Optional[PipelineStageObservation] = None
         try:
+            daily_market_context_enabled = self._is_daily_market_context_enabled()
             active_stage = observe_pipeline_stage(
                 "fetch",
                 input_summary={
@@ -441,9 +442,7 @@ class StockAnalysisPipeline:
                     "operation": "assemble_market_inputs",
                     "realtime_enabled": bool(self.config.enable_realtime_quote),
                     "chip_enabled": bool(self.config.enable_chip_distribution),
-                    "daily_market_context_enabled": bool(
-                        getattr(self, "daily_market_context_enabled", True)
-                    ),
+                    "daily_market_context_enabled": daily_market_context_enabled,
                 },
                 retryable=True,
             )
@@ -677,6 +676,10 @@ class StockAnalysisPipeline:
                 )
                 or fundamental_status in {"failed", "partial", "missing"}
                 or trend_result is None
+                or (
+                    daily_market_context_enabled
+                    and daily_market_context is None
+                )
             )
             active_stage.finish(
                 status="degraded" if fetch_degraded else "success",
@@ -685,6 +688,7 @@ class StockAnalysisPipeline:
                     "chip_available": chip_data is not None,
                     "fundamental_status": fundamental_status or "available",
                     "trend_available": trend_result is not None,
+                    "daily_market_context_enabled": daily_market_context_enabled,
                     "daily_market_context_available": daily_market_context is not None,
                 },
                 degradation_reason=(
@@ -977,20 +981,27 @@ class StockAnalysisPipeline:
                 for count in (pack_counts.get(status),)
                 if isinstance(count, int) and not isinstance(count, bool)
             )
+            context_pack_available = bool(analysis_context_pack_summary)
             context_degraded = bool(
-                context_used_missing_fallback or degraded_block_count
+                not context_pack_available
+                or context_used_missing_fallback
+                or degraded_block_count
             )
             active_stage.finish(
                 status="degraded" if context_degraded else "success",
                 output_summary={
-                    "context_pack_available": bool(analysis_context_pack_summary),
+                    "context_pack_available": context_pack_available,
                     "degraded_block_count": degraded_block_count,
                     "historical_context_fallback": context_used_missing_fallback,
                 },
                 degradation_reason=(
-                    "ContextPack contains missing or fallback inputs."
-                    if context_degraded
-                    else None
+                    "ContextPack output generation was unavailable."
+                    if not context_pack_available
+                    else (
+                        "ContextPack contains missing or fallback inputs."
+                        if context_degraded
+                        else None
+                    )
                 ),
                 retryable=context_degraded,
             )
@@ -1900,17 +1911,24 @@ class StockAnalysisPipeline:
                 for count in (agent_pack_counts.get(status),)
                 if isinstance(count, int) and not isinstance(count, bool)
             )
-            agent_context_degraded = bool(agent_degraded_block_count)
+            agent_context_pack_available = bool(analysis_context_pack_summary)
+            agent_context_degraded = bool(
+                not agent_context_pack_available or agent_degraded_block_count
+            )
             active_stage.finish(
                 status="degraded" if agent_context_degraded else "success",
                 output_summary={
-                    "context_pack_available": bool(analysis_context_pack_summary),
+                    "context_pack_available": agent_context_pack_available,
                     "degraded_block_count": agent_degraded_block_count,
                 },
                 degradation_reason=(
-                    "Agent ContextPack contains missing or fallback inputs."
-                    if agent_context_degraded
-                    else None
+                    "Agent ContextPack output generation was unavailable."
+                    if not agent_context_pack_available
+                    else (
+                        "Agent ContextPack contains missing or fallback inputs."
+                        if agent_context_degraded
+                        else None
+                    )
                 ),
                 retryable=agent_context_degraded,
             )
@@ -2348,6 +2366,14 @@ class StockAnalysisPipeline:
 
         return context
 
+    def _is_daily_market_context_enabled(self) -> bool:
+        """Return whether stock analysis expects daily market context."""
+        return bool(
+            getattr(self, "daily_market_context_enabled", True) is True
+            and getattr(self.config, "daily_market_context_enabled", True) is True
+            and getattr(self.config, "market_review_enabled", None) is True
+        )
+
     def _load_daily_market_context(
         self,
         market: str,
@@ -2356,11 +2382,7 @@ class StockAnalysisPipeline:
         target_date: Optional[date] = None,
     ) -> Optional[DailyMarketContext]:
         """Load/generate today's market context when market review is explicitly enabled."""
-        if getattr(self, "daily_market_context_enabled", True) is not True:
-            return None
-        if getattr(self.config, "daily_market_context_enabled", True) is not True:
-            return None
-        if getattr(self.config, "market_review_enabled", None) is not True:
+        if not self._is_daily_market_context_enabled():
             return None
 
         try:
@@ -2386,7 +2408,7 @@ class StockAnalysisPipeline:
             if isinstance(current_query_id, str) and current_query_id.strip():
                 get_context_kwargs["current_query_id"] = current_query_id
             return service.get_context(**get_context_kwargs)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Daily context failure is safely logged before stock analysis continues without it.
             log_safe_exception(
                 logger,
                 "Daily market context load failed; continuing stock analysis",

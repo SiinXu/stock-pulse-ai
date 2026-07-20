@@ -437,7 +437,6 @@
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._get_concept_rankings_for_market","caught":["Exception"],"digest":"2c42539685047a5c31291b40e27fbbb0e84590e653a564d64a049d501f128035"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._get_concept_rankings_for_market","caught":["Exception"],"digest":"80a4d301d9fc6d2023fd369eae2893f6c6ad1a1be1a61d994414020da72326cd"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_agent_analysis_context","caught":["Exception"],"digest":"c4686c4aec42c957014d0f838a178ed0af09ecb01a1bad8f260e7d082dd092e1"},
-    {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_daily_market_context","caught":["Exception"],"digest":"d1647510b068fb4c8445096ac786b0caa5c0fdeea336ee4e2d06676aaaea661f"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._load_persisted_intelligence_context","caught":["Exception"],"digest":"414f5d80078642a37a110c69fafa6b3c2ec3cf982a28508caefe458fe835ec9f"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"0a2a40fbc07f69984ca63478d5b21f2a7342f9ed704199c1e24bebe0f2f7cfa9"},
     {"path":"src/core/pipeline.py","scope":"<module>.StockAnalysisPipeline._safe_to_dict","caught":["Exception"],"digest":"559d4f722bf9127924c3ebf2d68f83c2f99bad60f636eff56f60b14a93384776"},

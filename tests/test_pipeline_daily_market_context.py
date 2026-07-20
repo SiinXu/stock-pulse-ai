@@ -14,6 +14,11 @@ from src.analyzer import GeminiAnalyzer
 from src.core.pipeline import StockAnalysisPipeline
 from src.enums import ReportType
 from src.services.daily_market_context import DailyMarketContext
+from src.services.run_diagnostics import (
+    activate_run_diagnostic_context,
+    current_diagnostic_snapshot,
+    reset_run_diagnostic_context,
+)
 
 
 def _pipeline_config(*, daily_market_context_enabled: bool) -> SimpleNamespace:
@@ -241,7 +246,7 @@ def test_pipeline_initializes_daily_market_context_service_once_across_threads()
     assert service.get_context.call_count == worker_count
 
 
-def test_pipeline_uses_market_phase_effective_date_for_daily_market_context() -> None:
+def test_enabled_daily_context_unavailable_degrades_fetch_stage() -> None:
     pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
     phase_context = SimpleNamespace(
         effective_daily_bar_date=date(2026, 3, 26),
@@ -275,6 +280,7 @@ def test_pipeline_uses_market_phase_effective_date_for_daily_market_context() ->
     )
     pipeline.query_source = "system"
     pipeline.analysis_phase = "auto"
+    pipeline.analysis_skills = None
     pipeline.portfolio_context = None
     pipeline.fetcher_manager = MagicMock()
     pipeline.fetcher_manager.get_stock_name.return_value = "贵州茅台"
@@ -295,19 +301,34 @@ def test_pipeline_uses_market_phase_effective_date_for_daily_market_context() ->
     pipeline.search_service.is_available = False
     pipeline.search_service.news_window_days = 3
     pipeline._emit_progress = MagicMock()
-    pipeline._load_daily_market_context = MagicMock(return_value=_market_context())
+    pipeline._load_daily_market_context = MagicMock(return_value=None)
 
-    with patch("src.core.pipeline.build_market_phase_context", return_value=phase_context):
-        pipeline.analyze_stock(
-            "600519",
-            ReportType.SIMPLE,
-            "q-effective-date",
-        )
+    token = activate_run_diagnostic_context(trace_id="trace-daily-context-failure")
+    try:
+        with patch("src.core.pipeline.build_market_phase_context", return_value=phase_context):
+            pipeline.analyze_stock(
+                "600519",
+                ReportType.SIMPLE,
+                "q-effective-date",
+            )
+        diagnostic_snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
 
     pipeline._load_daily_market_context.assert_called_once_with(
         "cn",
         target_date=date(2026, 3, 26),
     )
+    assert diagnostic_snapshot is not None
+    fetch_run = next(
+        run
+        for run in diagnostic_snapshot["pipeline_stage_runs"]
+        if run["stage"] == "fetch"
+    )
+    assert fetch_run["status"] == "degraded"
+    assert fetch_run["retryable"] is True
+    assert fetch_run["output_summary"]["daily_market_context_enabled"] is True
+    assert fetch_run["output_summary"]["daily_market_context_available"] is False
 
 
 def test_pipeline_attaches_low_sensitive_market_context_to_enhanced_context() -> None:
