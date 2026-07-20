@@ -51,25 +51,25 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
         type="button"
         onClick={() => onClick(item.id)}
         aria-label={t('history.itemAria', { name: stockName, code: item.stockCode })}
-        className="min-w-0 flex-1 text-left p-2"
+        className="min-w-0 flex-1 text-left p-1.5"
       >
         <div className="relative z-10 flex items-center gap-2">
           {isMarketReview ? (
-            <div className="h-7 w-1 flex-shrink-0 rounded-full bg-warning" />
+            <div className="h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
           ) : sentimentColor ? (
             <div
-              className="w-1 h-7 rounded-full flex-shrink-0"
+              className="h-2 w-2 rounded-full flex-shrink-0"
               style={{
                 backgroundColor: sentimentColor,
               }}
             />
           ) : (
-            <div className="w-1 h-7 rounded-full flex-shrink-0 bg-subtle" />
+            <div className="h-2 w-2 rounded-full flex-shrink-0 bg-subtle" />
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <span className="block w-full truncate text-sm font-semibold text-foreground tracking-tight">
+                <span className="block w-full truncate text-sm font-semibold text-foreground">
                   {truncateStockName(stockName)}
                 </span>
               </div>
@@ -98,14 +98,14 @@ export const StockBarItemComponent: React.FC<StockBarItemProps> = ({
                 ) : null}
               </div>
             </div>
-            <div className="mt-1 flex items-center gap-2" data-testid="history-card-meta">
+            <div className="mt-0.5 flex items-center gap-1" data-testid="history-card-meta">
               {item.lastAnalysisTime && (
-                <span className="text-xs text-muted-text">
+                <span className="text-[0.6875rem] text-muted-text">
                   {formatDateTime(item.lastAnalysisTime, language)}
                 </span>
               )}
               {item.analysisCount > 1 && (
-                <span className="text-xs text-muted-text">
+                <span className="text-[0.6875rem] text-muted-text">
                   {t('history.analysisCount', { count: item.analysisCount })}
                 </span>
               )}
