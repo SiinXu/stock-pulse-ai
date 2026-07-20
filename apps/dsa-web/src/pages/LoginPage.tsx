@@ -78,7 +78,20 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]">
+    <div
+      data-testid="login-page"
+      className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[var(--login-bg-main)] px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]"
+    >
+      <div
+        aria-hidden="true"
+        data-testid="login-grid-background"
+        className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,hsl(var(--foreground)/0.045)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--foreground)/0.045)_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_65%_at_50%_50%,var(--mask-opaque)_55%,transparent_100%)]"
+      />
+      <div
+        aria-hidden="true"
+        data-testid="login-accent-background"
+        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_12%_18%,hsl(var(--primary)/0.12),transparent_32%),radial-gradient(circle_at_88%_82%,hsl(var(--primary)/0.08),transparent_36%)]"
+      />
       <div className="absolute right-4 top-4 z-30">
         <UiLanguageToggle />
       </div>
@@ -94,10 +107,10 @@ const LoginPage: React.FC = () => {
             <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--login-border-card)] bg-[var(--login-bg-main)]">
               <TrendingUp className="h-6 w-6 text-[var(--login-text-primary)]" aria-hidden="true" />
             </div>
-            <h1 className="mt-4 text-lg font-semibold tracking-tight text-[var(--login-text-primary)]">
+            <h1 className="mt-4 text-lg font-semibold text-[var(--login-text-primary)]">
               StockPulse
             </h1>
-            <h2 className="mt-5 text-2xl font-semibold tracking-tight text-[var(--login-text-primary)]">
+            <h2 className="mt-5 text-2xl font-semibold text-[var(--login-text-primary)]">
               {isFirstTime ? t('login.setupTitle') : t('login.adminLogin')}
             </h2>
             <p className="mt-2 text-sm text-[var(--login-text-secondary)]">
