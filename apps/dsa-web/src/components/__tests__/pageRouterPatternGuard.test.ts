@@ -233,9 +233,13 @@ function findHistoryMutations(
     const symbol = symbolFor(identifier);
     return symbol ? aliases.get(symbol) ?? undefined : undefined;
   };
-  const setAlias = (identifier: ts.Identifier, method: HistoryMethod | undefined): void => {
+  const setAlias = (identifier: ts.Identifier, method: HistoryMethod | undefined): boolean => {
     const symbol = symbolFor(identifier);
-    if (symbol) aliases.set(symbol, method ?? null);
+    if (!symbol) return false;
+    const next = method ?? null;
+    if (aliases.has(symbol) && aliases.get(symbol) === next) return false;
+    aliases.set(symbol, next);
+    return true;
   };
   const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
     if (!name) return undefined;
@@ -254,19 +258,42 @@ function findHistoryMutations(
     }
   };
 
+  const applyVariableDeclaration = (node: ts.VariableDeclaration): boolean => {
+    if (ts.isIdentifier(node.name)) {
+      return setAlias(
+        node.name,
+        node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
+      );
+    }
+    let changed = false;
+    if (ts.isObjectBindingPattern(node.name)) {
+      for (const element of node.name.elements) {
+        if (!ts.isIdentifier(element.name)) continue;
+        changed = setAlias(element.name, propertyMethod(element.propertyName ?? element.name)) || changed;
+      }
+    }
+    return changed;
+  };
+
+  const declarations: ts.VariableDeclaration[] = [];
+  const collectDeclarations = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node)) declarations.push(node);
+    ts.forEachChild(node, collectDeclarations);
+  };
+  collectDeclarations(sourceFile);
+
+  // Resolve declaration initializers before visiting deferred function bodies.
+  for (let pass = 0; pass <= declarations.length; pass += 1) {
+    let changed = false;
+    for (const declaration of declarations) {
+      changed = applyVariableDeclaration(declaration) || changed;
+    }
+    if (!changed) break;
+  }
+
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node)) {
-      if (ts.isIdentifier(node.name)) {
-        setAlias(
-          node.name,
-          node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
-        );
-      } else if (ts.isObjectBindingPattern(node.name)) {
-        for (const element of node.name.elements) {
-          if (!ts.isIdentifier(element.name)) continue;
-          setAlias(element.name, propertyMethod(element.propertyName ?? element.name));
-        }
-      }
+      applyVariableDeclaration(node);
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
       const left = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
@@ -332,6 +359,7 @@ describe('page and Router pattern production guard', () => {
       'const { pushState: push } = historyAlias; push({}, "", "?market=us");',
       'const boundReplace = historyAlias.replaceState.bind(historyAlias); boundReplace({}, "", "?market=sg");',
       'historyAlias.pushState.call(historyAlias, {}, "", "?market=uk");',
+      'historyAlias.replaceState.apply(historyAlias, [{}, "", "?market=au"]);',
     ].join('\n');
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
@@ -342,6 +370,19 @@ describe('page and Router pattern production guard', () => {
       { file: '../../pages/ExamplePage.tsx', line: 6, token: 'pushState' },
       { file: '../../pages/ExamplePage.tsx', line: 7, token: 'replaceState' },
       { file: '../../pages/ExamplePage.tsx', line: 8, token: 'pushState' },
+      { file: '../../pages/ExamplePage.tsx', line: 9, token: 'replaceState' },
+    ]);
+  });
+
+  it('detects an alias referenced before its declaration is visited', () => {
+    const fixture = [
+      'function mutate() { replace({}, "", "?market=us"); }',
+      'const replace = window.history.replaceState;',
+      'mutate();',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 1, token: 'replaceState' },
     ]);
   });
 
