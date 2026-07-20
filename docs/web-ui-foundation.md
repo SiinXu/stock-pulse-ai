@@ -206,6 +206,39 @@ TRACK-UI2 calls remain expiring migrations located by file, method, and count,
 so unrelated line insertions cannot break the allowlist. Their owning page
 work items must remove the matching entry when they adopt Router query state.
 
+## Application Shell And Navigation
+
+`Shell` owns the application's single `main` landmark and global navigation.
+The main canvas is full bleed on `background` and does not add an outer Card,
+border, radius, or shadow around page content. The typed application navigation
+descriptor preserves the nine approved flat routes; Research, More, or another
+top-level destination requires a separate information-architecture decision.
+
+The responsive contract has three states:
+
+- Below 1024px, one shared `IconButton` and the complete product name form the
+  mobile header. Global navigation uses the Navigation `Drawer`; theme and
+  language controls live inside the profile dialog rather than competing in
+  the header. Closing with Escape or the close control restores the opener,
+  while route selection delegates focus to the destination's ready H1.
+- From 1024px through 1279px, the global sidebar is a fixed 76px compact rail.
+  This forced intermediate state does not overwrite the user's wider-desktop
+  preference. A contextual `ResponsiveRail` remains in document flow and uses
+  its compact disclosure below `xl`, so it does not create a second permanent
+  sidebar at the constrained breakpoint.
+- At 1280px and wider, the global sidebar honors the persisted expanded or
+  collapsed preference. The expanded state always displays the complete
+  product name.
+
+If an open mobile Drawer crosses into the desktop breakpoint, the shell closes
+it and moves focus to the current desktop route, or to the labelled desktop
+sidebar when no route matches. A breakpoint change while the Drawer is closed
+does not move focus. Desktop and mobile navigation instances use distinct,
+stable route-focus marker prefixes so Router restoration never sees duplicate
+targets. The profile surface uses dialog semantics, moves focus into its first
+control, closes on Escape, and restores its trigger; it does not claim an
+incomplete menu keyboard model.
+
 ## Surface Hierarchy
 
 | Level | Purpose | Visible boundary |
