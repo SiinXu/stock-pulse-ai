@@ -168,18 +168,19 @@ whitespace, and dividers group content inside a section.
 
 There is no `glass` level or glass compatibility variant. The old
 `glass-card` selector is an opaque card implementation, not a blur effect, and
-must migrate to the existing hierarchy. A structural panel that owns actions
-or selection normally uses `interactive`; a non-interactive content grouping
-uses `section`. Layout-only overflow remains caller-owned because clipping is
-not an invariant of either level and can hide focus indicators or portalled
-content when applied indiscriminately.
+must migrate to the existing hierarchy. A flat page or message workspace stays
+`canvas`; a non-interactive content grouping uses `section`; and a structural
+panel that owns actions or selection normally uses `interactive`. Layout-only
+overflow remains caller-owned because clipping is not an invariant of any
+level and can hide focus indicators or portalled content when applied
+indiscriminately.
 
 Nested fills and dividers use theme-aware foundation tokens instead of raw
 white alpha:
 
 | Legacy presentation | Semantic replacement |
 | --- | --- |
-| `glass-card` / `dashboard-card` | Choose `Surface level="section"` or `Surface level="interactive"`; never add a fifth level. |
+| `glass-card` / `dashboard-card` | Choose `Surface level="canvas"`, `Surface level="section"`, or `Surface level="interactive"` from the content semantics; never add a fifth level. |
 | `bg-white/N` | `bg-subtle-soft`, `bg-subtle`, or a state-specific semantic overlay token. |
 | `border-white/N` / `ring-white/N` | `border-subtle` / `ring-subtle`. |
 | `bg-surface` | Choose an existing Surface level or an existing token such as `bg-surface-1`, `bg-surface-2`, `bg-surface-3`, or `bg-subtle`; do not define the invalid alias. |

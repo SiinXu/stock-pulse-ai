@@ -6,22 +6,57 @@ import fs from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-const productionTs = import.meta.glob('../../**/*.ts', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
-const productionTsx = import.meta.glob('../../**/*.tsx', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
-const productionSources: Record<string, string> = {
-  ...productionTs,
-  ...productionTsx,
-  '../../App.css': fs.readFileSync('src/App.css', 'utf8'),
-  '../../index.css': fs.readFileSync('src/index.css', 'utf8'),
+const PRODUCTION_SOURCE_EXTENSIONS = new Set(['.css', '.html', '.js', '.jsx', '.ts', '.tsx']);
+
+type DirectoryEntry = {
+  name: string;
+  isDirectory: () => boolean;
+  isFile: () => boolean;
 };
+
+function sourceExtension(filename: string): string {
+  const extensionIndex = filename.lastIndexOf('.');
+  return extensionIndex === -1 ? '' : filename.slice(extensionIndex);
+}
+
+function collectSourceFiles(root: string): string[] {
+  if (!fs.existsSync(root)) return [];
+  const entries = fs.readdirSync(root, { withFileTypes: true }) as DirectoryEntry[];
+  return entries.flatMap((entry) => {
+    const filename = `${root}/${entry.name}`;
+    if (entry.isDirectory()) return collectSourceFiles(filename);
+    return PRODUCTION_SOURCE_EXTENSIONS.has(sourceExtension(entry.name)) ? [filename] : [];
+  });
+}
+
+function guardFilename(filename: string): string {
+  if (filename.startsWith('src/components/')) {
+    return `../${filename.slice('src/components/'.length)}`;
+  }
+  if (filename.startsWith('src/')) {
+    return `../../${filename.slice('src/'.length)}`;
+  }
+  return `../../../${filename}`;
+}
+
+function isProductionSource(filename: string): boolean {
+  return !filename.includes('/__tests__/')
+    && !filename.includes('/fixtures/')
+    && !filename.includes('/generated/')
+    && !/\.(?:test|spec)\.(?:[jt]sx?|css|html)$/.test(filename);
+}
+
+const rootStyleAndMarkup = (fs.readdirSync('.', { withFileTypes: true }) as DirectoryEntry[])
+  .filter((entry) => entry.isFile() && ['.css', '.html'].includes(sourceExtension(entry.name)))
+  .map((entry) => entry.name);
+const productionSourceFiles = [
+  ...collectSourceFiles('src'),
+  ...collectSourceFiles('public'),
+  ...rootStyleAndMarkup,
+].filter(isProductionSource);
+const productionSources = Object.fromEntries(productionSourceFiles.map((filename) => (
+  [guardFilename(filename), fs.readFileSync(filename, 'utf8')]
+)));
 
 type MigrationOwner = 'TRACK-UI1' | 'TRACK-UI2' | 'TRACK-UI3' | 'UIUX-HARNESS';
 
@@ -32,6 +67,11 @@ type LegacySurfaceAllowance = {
   owner: MigrationOwner;
   removeBy: string;
   replacement: string;
+  contexts?: readonly {
+    occurrence: number;
+    nearby: string;
+    replacement: string;
+  }[];
 };
 
 const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
@@ -161,7 +201,19 @@ const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
     count: 2,
     owner: 'TRACK-UI3',
     removeBy: 'UI-C01',
-    replacement: 'Surface level="interactive" with layout-only overflow classes.',
+    replacement: 'Map each panel by task semantics; do not preserve one card treatment for both.',
+    contexts: [
+      {
+        occurrence: 1,
+        nearby: 'DeepResearchPanel',
+        replacement: 'Surface level="interactive" for the independent Research task panel.',
+      },
+      {
+        occurrence: 2,
+        nearby: 'chat-message-scroll',
+        replacement: 'Surface level="canvas" for the flat message canvas.',
+      },
+    ],
   },
   {
     file: '../../pages/HomePage.tsx',
@@ -235,20 +287,20 @@ type SurfaceDebtInventory = {
 
 const LEGACY_SURFACE_TOKEN_PATTERN = /(?<![a-zA-Z0-9_-])(?:glass-card|dashboard-card|bg-surface(?:\/[a-zA-Z0-9.[\]%-]+)?|(?:bg|border|ring)-white\/[a-zA-Z0-9.[\]%-]+)(?![a-zA-Z0-9_-])/g;
 
-function isProductionSource(filename: string): boolean {
-  return !filename.includes('/__tests__/')
-    && !filename.includes('/fixtures/')
-    && !filename.includes('/generated/')
-    && !/\.(?:test|spec)\.[jt]sx?$/.test(filename);
-}
-
 function parseSource(filename: string, source: string): ts.SourceFile {
+  const scriptKind = filename.endsWith('.tsx')
+    ? ts.ScriptKind.TSX
+    : filename.endsWith('.jsx')
+      ? ts.ScriptKind.JSX
+      : filename.endsWith('.js')
+        ? ts.ScriptKind.JS
+        : ts.ScriptKind.TS;
   return ts.createSourceFile(
     filename,
     source,
     ts.ScriptTarget.Latest,
     true,
-    filename.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    scriptKind,
   );
 }
 
@@ -265,8 +317,10 @@ function templateChunkText(node: ts.Node): string | undefined {
 }
 
 function findLegacySurfaceDebt(filename: string, source: string): SurfaceDebtFinding[] {
-  if (filename.endsWith('.css')) {
-    const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (filename.endsWith('.css') || filename.endsWith('.html')) {
+    const withoutComments = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
     return Array.from(withoutComments.matchAll(LEGACY_SURFACE_TOKEN_PATTERN), (match) => ({
       file: filename,
       line: withoutComments.slice(0, match.index ?? 0).split('\n').length,
@@ -310,9 +364,19 @@ function inventory(findings: readonly SurfaceDebtFinding[]): SurfaceDebtInventor
 }
 
 function allowanceInventory(): SurfaceDebtInventory[] {
-  return LEGACY_SURFACE_ALLOWANCES
-    .map(({ file, token, count }) => ({ file, token, count }))
-    .sort((left, right) => left.file.localeCompare(right.file) || left.token.localeCompare(right.token));
+  return inventory(LEGACY_SURFACE_ALLOWANCES.flatMap(({ file, token, count }) => (
+    Array.from({ length: count }, () => ({ file, token, line: 0 }))
+  )));
+}
+
+function tokenOffsets(source: string, token: string): number[] {
+  const offsets: number[] = [];
+  let offset = source.indexOf(token);
+  while (offset !== -1) {
+    offsets.push(offset);
+    offset = source.indexOf(token, offset + token.length);
+  }
+  return offsets;
 }
 
 describe('legacy surface migration guard', () => {
@@ -342,6 +406,16 @@ describe('legacy surface migration guard', () => {
       .toEqual(['dashboard-card', 'glass-card']);
   });
 
+  it('detects debt in the production HTML entry without scanning comments', () => {
+    const source = [
+      '<!-- <main class="glass-card">Old example</main> -->',
+      '<main class="bg-white/5 border-white/10">Content</main>',
+    ].join('\n');
+
+    expect(findLegacySurfaceDebt('../../../fixture.html', source).map(({ token }) => token))
+      .toEqual(['bg-white/5', 'border-white/10']);
+  });
+
   it('keeps the migration inventory stable when unrelated lines move', () => {
     const legacy = "const panel = 'glass-card border-white/5';";
     const shifted = `${Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join('\n')}\n${legacy}`;
@@ -352,13 +426,15 @@ describe('legacy surface migration guard', () => {
 
   it('freezes every remaining debt token by file and count with an expiring owner', () => {
     const actual = inventory(Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename))
       .flatMap(([filename, source]) => findLegacySurfaceDebt(filename, source)));
     const allowed = allowanceInventory();
 
     expect(actual).toEqual(allowed);
-    expect(new Set(allowed.map(({ file, token }) => `${file}:${token}`)).size).toBe(allowed.length);
+    expect(new Set(LEGACY_SURFACE_ALLOWANCES.map(({ file, token }) => `${file}:${token}`)).size)
+      .toBe(LEGACY_SURFACE_ALLOWANCES.length);
     expect(actual).not.toContainEqual(expect.objectContaining({ token: 'dashboard-card' }));
+    expect(productionSources['../../../index.html']).toContain('<div id="root"></div>');
+    expect(Object.keys(productionSources).some((filename) => filename.endsWith('.css'))).toBe(true);
     for (const allowance of LEGACY_SURFACE_ALLOWANCES) {
       expect(allowance.owner).toMatch(/^(?:TRACK-UI[123]|UIUX-HARNESS)$/);
       expect(allowance.removeBy).toMatch(/^UI-[A-Z0-9]+$/);
@@ -366,6 +442,18 @@ describe('legacy surface migration guard', () => {
       expect(allowance.count).toBeGreaterThan(0);
       expect(productionSources[allowance.file], `${allowance.file} must remain in the production scan`)
         .toBeDefined();
+      if (allowance.contexts) {
+        expect(allowance.contexts).toHaveLength(allowance.count);
+        const source = productionSources[allowance.file];
+        const offsets = tokenOffsets(source, allowance.token);
+        for (const context of allowance.contexts) {
+          expect(context.occurrence).toBeGreaterThan(0);
+          expect(context.replacement.length).toBeGreaterThan(0);
+          const offset = offsets[context.occurrence - 1];
+          expect(offset).toBeDefined();
+          expect(source.slice(offset, offset + 800)).toContain(context.nearby);
+        }
+      }
     }
   });
 });

@@ -17,7 +17,7 @@ const VIEWPORTS = [
 async function openFixture(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto('/e2e/surface-contract-fixture.html');
-  await expect(page.getByRole('heading', { level: 1, name: 'Semantic surface hierarchy' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Token usage' })).toBeVisible();
 }
 
 async function expectNoDocumentOverflow(page: Page, label: string): Promise<void> {
@@ -45,40 +45,50 @@ async function themeTokenStyles(page: Page): Promise<{
   });
 }
 
+async function surfaceBoundaries(page: Page) {
+  return page.evaluate(() => Object.fromEntries(
+    ['canvas', 'section', 'interactive', 'overlay'].map((level) => {
+      const style = getComputedStyle(document.querySelector(`[data-testid="surface-${level}"]`)!);
+      return [level, {
+        backgroundColor: style.backgroundColor,
+        borderTopWidth: style.borderTopWidth,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+      }];
+    }),
+  ));
+}
+
+function expectSurfaceBoundaryContract(boundaries: Awaited<ReturnType<typeof surfaceBoundaries>>): void {
+  expect(boundaries.canvas).toEqual({
+    backgroundColor: 'rgba(0, 0, 0, 0)',
+    borderTopWidth: '0px',
+    borderRadius: '0px',
+    boxShadow: 'none',
+  });
+  expect(boundaries.section.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+  expect(boundaries.section.borderTopWidth).toBe('0px');
+  expect(boundaries.section.boxShadow).toBe('none');
+  expect(boundaries.interactive.borderTopWidth).toBe('1px');
+  expect(boundaries.interactive.boxShadow).toBe('none');
+  expect(boundaries.overlay.borderTopWidth).toBe('1px');
+  expect(boundaries.overlay.boxShadow).not.toBe('none');
+}
+
 test.describe('shared Surface migration contract', () => {
-  test('keeps the four semantic levels visually distinct without a glass level', async ({ page }) => {
+  test('keeps the four semantic levels visually distinct in both themes without a glass level', async ({ page }) => {
     await openFixture(page, 1024, 768);
 
-    for (const level of ['canvas', 'section', 'interactive', 'overlay'] as const) {
-      await expect(page.getByTestId(`surface-${level}`)).toHaveAttribute('data-surface-level', level);
+    for (const theme of ['light', 'dark'] as const) {
+      await page.evaluate((value) => localStorage.setItem('theme', value), theme);
+      await page.reload();
+      await expect(page.locator('html')).toHaveClass(new RegExp(`(?:^|\\s)${theme}(?:\\s|$)`));
+      for (const level of ['canvas', 'section', 'interactive', 'overlay'] as const) {
+        await expect(page.getByTestId(`surface-${level}`)).toHaveAttribute('data-surface-level', level);
+      }
+      await expect(page.locator('[data-surface-level="glass"]')).toHaveCount(0);
+      expectSurfaceBoundaryContract(await surfaceBoundaries(page));
     }
-    await expect(page.locator('[data-surface-level="glass"]')).toHaveCount(0);
-
-    const boundaries = await page.evaluate(() => Object.fromEntries(
-      ['canvas', 'section', 'interactive', 'overlay'].map((level) => {
-        const style = getComputedStyle(document.querySelector(`[data-testid="surface-${level}"]`)!);
-        return [level, {
-          backgroundColor: style.backgroundColor,
-          borderTopWidth: style.borderTopWidth,
-          borderRadius: style.borderRadius,
-          boxShadow: style.boxShadow,
-        }];
-      }),
-    ));
-
-    expect(boundaries.canvas).toEqual({
-      backgroundColor: 'rgba(0, 0, 0, 0)',
-      borderTopWidth: '0px',
-      borderRadius: '0px',
-      boxShadow: 'none',
-    });
-    expect(boundaries.section.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
-    expect(boundaries.section.borderTopWidth).toBe('0px');
-    expect(boundaries.section.boxShadow).toBe('none');
-    expect(boundaries.interactive.borderTopWidth).toBe('1px');
-    expect(boundaries.interactive.boxShadow).toBe('none');
-    expect(boundaries.overlay.borderTopWidth).toBe('1px');
-    expect(boundaries.overlay.boxShadow).not.toBe('none');
   });
 
   test('resolves semantic fill, divider, and ring tokens in both themes', async ({ page }) => {
