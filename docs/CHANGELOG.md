@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] Web 固化共享 Surface 迁移契约：确认 `canvas`/`section`/`interactive`/`overlay` 四层与现有 subtle token 足以替代旧 `glass-card`、raw white-alpha 和无效 `bg-surface`，不新增 glass 层级；删除无生产消费者的 `dashboard-card` 重复样式，并以不依赖行号的“文件 + token 计数”守卫冻结其余 UI1/UI2/UI3 页面迁移债，双主题与九视口 fixture 验证语义边界、填充、分隔线、ring 和横向溢出。
+- [改进] Pipeline 新增 `resolve`、`fetch`、`intelligence`、`context`、`analyze`、`persist`、`render`、`dispatch` 阶段诊断，统一记录脱敏输入/输出摘要、trace、耗时、状态、降级与 retryability；观测失败保持 fail-open，通知失败与分析结果分离，既有行为、数据库结构和配置不变。
 - [改进] Web 新增共享 `SelectionChip` 选择控件：保持原生非提交 button 与 ref/disabled/loading/键盘语义，loading 期间以 `aria-busy` 禁止重复激活，单行最小可见高度 36px、长标签自动换行增高，粗指针命中区独立扩展至 44px；持续选择可选用 `aria-pressed` 与稳定选中标识，一次性选择命令不伪造 pressed 状态。控件拒绝页面覆盖 height/width/padding/radius/flex 几何，并由生产守卫阻止私有同名实现；Decision Signals 旧候选 Button 仍由 `UI-D01`/`TRACK-UI2` 独立迁移并删除精确 allowlist。
 - [改进] Web 新增共享 `DataTable` 基础：typed columns/row keys、原生 caption/column/row 语义、受控 `aria-sort` 排序、唯一 empty/loading/error/retrying 状态、click/Enter/Space 行激活与嵌套控件事件隔离；窄屏使用命名且可聚焦的内部横向滚动区和稳定最小宽度，不造成文档横溢。生产守卫阻止复制 DataTable 或新增 raw table，现有 12 处旧表格按精确行绑定 UI1/UI2/UI3 迁移项。
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
@@ -205,7 +207,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
 - [改进] Web 自选/工作区面板（`HomeStockWorkspace`）的批量分析状态提示统一走语义 `InlineAlert`：移除手搓的 `variant→className` 映射（`statusClassName`）与 ad-hoc 状态 `<div>`，改用共享 `InlineAlert`（compact，`danger`/`warning`/`success` 语义色并补 `role`/`aria-live`）；加载/空/错误态此前已用 `DashboardStateBlock`。自选头部 5 处 `bg-base/35` 半透明 tile 与共享 `glass-card` 面板属基础层玻璃视觉（跨轨复用），保持 cyan/purple/glow 干净并记 Deferred to UIUX。批量分析行为与文案不变。
 - [改进] Web 历史记录条目（`StockBarItem`）与持仓页（`PortfolioPage`）概览统计按 PR#35 恢复紧凑密度/排版：条目内边距 `p-2`→`p-1.5`、情绪指示由竖条恢复为圆点（`h-7 w-1`→`h-2 w-2`）、标题去 `tracking-tight`、meta 行距与时间戳字号收紧（`mt-1/gap-2`→`mt-0.5/gap-1`、`text-xs`→`text-[0.6875rem]`）；持仓概览三项统计数字 `text-xl`→`text-2xl`、标签 `text-xs`→`text-sm`。仅密度/排版微调，保留 `home-history-item` 卡片载体与 44px 删除触控目标，行为与数据不变。
-- [改进] Web 告警中心三处 legacy `<table>`（规则列表 `AlertRuleList`、触发历史 `AlertTriggerHistory`、告警页通知尝试记录表）迁移到共享 `DataTable`：typed 列/行键、原生 caption/列/行语义与统一的 empty/loading 状态面板取代手搓 `<table>` 及并列的 `Loading`/`EmptyState` 分支，规则列表在有数据刷新时保留原有低透明度覆盖态；同步删除 `dataTablePatternGuard` 中 `TRACK-UI2` 的三条 `UI-A01` allowlist 例外，守卫回归更少豁免。列、语义色、分页、筛选与业务行为不变，未新增 i18n 键。
+
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

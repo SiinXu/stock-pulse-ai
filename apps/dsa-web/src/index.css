@@ -1031,15 +1031,6 @@ a {
   box-shadow: var(--shadow-soft-card);
 }
 
-.dashboard-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  box-shadow: var(--shadow-soft-card);
-}
-
 .page-drawer-overlay {
   background-color: var(--page-drawer-overlay-bg);
 }

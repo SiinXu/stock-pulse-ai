@@ -1,0 +1,3285 @@
+{
+  "schemaVersion": 1,
+  "auditBaseline": {
+    "repository": "SiinXu/stock-pulse-ai",
+    "ref": "origin/main",
+    "commit": "f080336626bf625759251350a2cfeb18af0e672e",
+    "auditedAt": "2026-07-20",
+    "scope": "Only user-facing copy merged into main at the recorded commit was audited. Open pull requests were excluded.",
+    "openPullRequestsExcluded": [
+      98,
+      101,
+      102
+    ]
+  },
+  "decisionEvidence": {
+    "count": 93,
+    "sha256": "9184e96f9468bf9478e16a7257228bfefb46acaaf0db327a1d96f4a14534d064",
+    "localeValueCount": 501,
+    "revisionSha256": "9ed8682934cd9f7c865d662af7a7a75b04c22a2818a9a6a500bee0e67cede780"
+  },
+  "languageReview": {
+    "zh": {
+      "status": "PRODUCT_SOURCE",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "zh-TW": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "en": {
+      "status": "PRODUCT_SOURCE",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ja": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ko": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "de": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "es": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "ms": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "fr": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    },
+    "id": {
+      "status": "PENDING_NATIVE_REVIEW",
+      "reviewer": null,
+      "reviewedAt": null
+    }
+  },
+  "sources": [
+    {
+      "id": "stockpulse_product_contract",
+      "authority": "StockPulse merged source and domain contracts",
+      "url": null,
+      "accessedAt": "2026-07-20",
+      "scope": "Defines shipped display context, internal codes, source-language copy, and the distinction between UI language, report language, user content, and contract values."
+    },
+    {
+      "id": "stockpulse_financial_guide",
+      "authority": "StockPulse multilingual financial terminology guide",
+      "url": null,
+      "accessedAt": "2026-07-20",
+      "scope": "Defines product-specific financial concepts, prohibited claims, current translations, and recommended wording."
+    },
+    {
+      "id": "finra_order_types",
+      "authority": "Financial Industry Regulatory Authority",
+      "url": "https://www.finra.org/investors/investing/investment-products/stocks/order-types",
+      "accessedAt": "2026-07-20",
+      "scope": "Distinguishes buy, sell, limit, stop, and stop-loss actions and explains that order controls do not eliminate market or investment risk."
+    },
+    {
+      "id": "finra_rule_2210",
+      "authority": "Financial Industry Regulatory Authority",
+      "url": "https://www.finra.org/rules-guidance/rulebooks/finra-rules/2210",
+      "accessedAt": "2026-07-20",
+      "scope": "Provides a first-party reference for fair and balanced investment communications, buy/sell/hold recommendation terminology, and caution against implying future profitability."
+    },
+    {
+      "id": "hkex_glossary",
+      "authority": "Hong Kong Exchanges and Clearing",
+      "url": "https://www.hkex.com.hk/Global/Exchange/Glossary?sc_lang=en",
+      "accessedAt": "2026-07-20",
+      "scope": "Provides exchange terminology context for market turnover and related trading concepts."
+    },
+    {
+      "id": "nist_credential_glossary",
+      "authority": "National Institute of Standards and Technology",
+      "url": "https://csrc.nist.gov/glossary/term/credential",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines credential as evidence that binds identity or authority; supports keeping credential, password, and API-key display concepts distinct."
+    },
+    {
+      "id": "nist_sp800_63b",
+      "authority": "National Institute of Standards and Technology",
+      "url": "https://pages.nist.gov/800-63-4/sp800-63b.html",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines authenticator and password handling concepts, including retry limiting and secure authentication language."
+    },
+    {
+      "id": "rfc_9110_authentication",
+      "authority": "Internet Engineering Task Force",
+      "url": "https://www.rfc-editor.org/rfc/rfc9110.html#name-401-unauthorized",
+      "accessedAt": "2026-07-20",
+      "scope": "Defines HTTP authentication challenge and credential semantics; supports separating stable error codes from localized user guidance."
+    }
+  ],
+  "categories": [
+    {
+      "id": "trading_action",
+      "semanticBoundary": "Internal action enums remain stable contract values; localized labels describe informational signal or ledger states and must not be presented as guaranteed or personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "selectors": [
+        {
+          "prefix": "i18n.uiText.UI_TEXT.history.action"
+        },
+        {
+          "prefix": "locales.portfolio.PORTFOLIO_SIDE_LABELS."
+        },
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.decisionSignals.action",
+            "i18n.uiText.UI_TEXT.decisionSignals.confidence",
+            "i18n.uiText.UI_TEXT.decisionSignals.score",
+            "i18n.uiText.UI_TEXT.decisionSignals.stopLoss",
+            "i18n.uiText.UI_TEXT.decisionSignals.targetPrice",
+            "locales.portfolio.PORTFOLIO_TEXT.buy",
+            "locales.portfolio.PORTFOLIO_TEXT.sell",
+            "locales.portfolio.PORTFOLIO_TEXT.side"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 18,
+        "keySetSha256": "540793c729e5930866343eb5d15a652ff2de74e2df674434675651023bc0c648",
+        "bundleSha256": {
+          "zh": "0721b1cd32dea2ec33cd2b04cf74522d438028614c78d85d8dfed3806896dee8",
+          "zh-TW": "23b46c5b189e3f1e39a3c3b88b04d2d8ab76db590acd44c8436e8f744da73852",
+          "en": "0606312d21af93747a995e951e7d94df1d62adf6508121d807c5745539a1806a",
+          "ja": "5965dabcb714ff82ade68944d73e63841623575da656225ac1d3f59ce026b911",
+          "ko": "115e71310a33606bd9343859d045f8c9b39348d6084854d56c6595cc8c7af8d8",
+          "de": "2093f2ef1297aafd5240eb9ddce535678d61ddca4cf3f431fe29369dbd9642d1",
+          "es": "22c9961498d56faa54f6e3524ab782ba01510ad4ca98950a3178260e315266bb",
+          "ms": "f064d39e6d40aad13f0831821373d731d75d6e41bddf633ee74b22a1e2cecfb2",
+          "fr": "0bebc652f2511f8e3014a9ec9d31932ab70355f3aadeef73fc4b342f92e22089",
+          "id": "a3cf0145584c8ecf5990d47dbb948b96f778e9298904fd8c5b82f400d6b3216f"
+        }
+      }
+    },
+    {
+      "id": "risk",
+      "semanticBoundary": "Risk, volume, turnover, cost-method, watchlist, alert-severity, and model-score labels must preserve the product concept and must not imply certainty, physical volume, rank, or advice.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "selectors": [
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE."
+        },
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE."
+        },
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD."
+        },
+        {
+          "exact": [
+            "locales.alerts.ALERT_DIRECTION_LABELS.stopLossBreach",
+            "locales.alerts.ALERT_DIRECTION_LABELS.stopLossNear",
+            "locales.alerts.ALERT_FORM_TEXT.severity",
+            "locales.alerts.ALERT_LIST_TEXT.childTargetCooldown",
+            "locales.alerts.ALERT_LIST_TEXT.cooldown",
+            "locales.alerts.ALERT_LIST_TEXT.deleteMessage",
+            "locales.alerts.ALERT_LIST_TEXT.disabled",
+            "locales.alerts.ALERT_SCOPE_LABELS.watchlist",
+            "locales.alerts.ALERT_SEVERITY_LABELS.critical",
+            "locales.alerts.ALERT_SEVERITY_LABELS.info",
+            "locales.alerts.ALERT_SEVERITY_LABELS.warning",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.0.label",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.1.label",
+            "locales.alerts.ALERT_SEVERITY_OPTIONS.2.label",
+            "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label",
+            "locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label",
+            "locales.alerts.ALERT_TRIGGER_TEXT.emptyTitle",
+            "locales.alerts.ALERT_TRIGGER_TEXT.loading",
+            "locales.alerts.ALERT_TRIGGER_TEXT.title",
+            "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label",
+            "locales.alerts.ALERT_TYPE_LABELS.portfolio_concentration",
+            "locales.alerts.ALERT_TYPE_LABELS.portfolio_drawdown",
+            "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
+            "locales.portfolio.PORTFOLIO_TEXT.avg",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskSignals",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskTotal",
+            "locales.portfolio.PORTFOLIO_TEXT.aiRiskUnavailable",
+            "locales.portfolio.PORTFOLIO_TEXT.costMethod",
+            "locales.portfolio.PORTFOLIO_TEXT.costMethodShort",
+            "locales.portfolio.PORTFOLIO_TEXT.currentDrawdown",
+            "locales.portfolio.PORTFOLIO_TEXT.drawdownMonitor",
+            "locales.portfolio.PORTFOLIO_TEXT.maxDrawdown",
+            "locales.portfolio.PORTFOLIO_TEXT.noAiRiskSignals",
+            "locales.portfolio.PORTFOLIO_TEXT.noConcentrationDescription",
+            "locales.portfolio.PORTFOLIO_TEXT.noConcentrationTitle",
+            "locales.portfolio.PORTFOLIO_TEXT.positionConcentrationFallback",
+            "locales.portfolio.PORTFOLIO_TEXT.riskDegraded",
+            "locales.portfolio.PORTFOLIO_TEXT.riskFallback",
+            "locales.portfolio.PORTFOLIO_TEXT.sectorConcentration",
+            "locales.portfolio.PORTFOLIO_TEXT.stopLossWarning",
+            "locales.screening.SCREENING_TEXT.confidence",
+            "locales.screening.SCREENING_TEXT.heat",
+            "locales.screening.SCREENING_TEXT.leader",
+            "locales.screening.SCREENING_TEXT.risk",
+            "locales.screening.SCREENING_TEXT.riskTags",
+            "locales.screening.SCREENING_TEXT.riskTitle",
+            "locales.screening.SCREENING_TEXT.score",
+            "locales.screening.SCREENING_TEXT.sectorThemeConfidence",
+            "locales.screening.SCREENING_TEXT.turnover",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.market_review.valueNotes.2",
+            "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
+            "utils.strategyDisplay.copy.bottom_volume.description",
+            "utils.strategyDisplay.copy.bottom_volume.name",
+            "utils.strategyDisplay.copy.event_driven.description"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 73,
+        "keySetSha256": "f8f3bfe20e1a597361ebd75e72e33cc57ddc561256c19d8ddd825276b2f21182",
+        "bundleSha256": {
+          "zh": "fb1efe0edc4f8eb5ed62409c92ebc2159dc54d6ecd637adbf6f8331c48ce1942",
+          "zh-TW": "013ae134cf1707a8d57c0ddbdb1fbb2fe3b2349d357d4d789858c30b3e742549",
+          "en": "ac500405f7af2a5983280ea4d644887ba8e4ccd7c9272b036b1e7709e389afa4",
+          "ja": "d06cb516f303ecf5c1becef28512087be4216fc39705af8c124ef22d39b86df2",
+          "ko": "49f1ad0d8d74b64c3355ab978e0762c9d49da32ff7daa0b827e2c8c5072c7fcd",
+          "de": "b5767457045d7f446210d55bb4acc29cd22fb1821aaffda76ede354113abfaf2",
+          "es": "54c97b819fc1b8999e36a63c16e21975a60af99cc2481da907067fbe3f3a4a25",
+          "ms": "db2a8be3903750cdbe17fd5abe6cb5de269ce940acfd662046918ac36ff0084a",
+          "fr": "e2e2f5c34e3efa6f589d0273251dbd4dc7e0d45971a413d3b4c74b067e983ff1",
+          "id": "806193e4d3cae82a164175f5d95e075248db21b532f15f2107dddb2b77d12b2b"
+        }
+      }
+    },
+    {
+      "id": "authentication",
+      "semanticBoundary": "Authentication, login state, password setup, password change, and retry-limit messages describe the actual transport or session state without exposing a credential or conflating authentication with authorization.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "selectors": [
+        {
+          "prefix": "i18n.uiText.UI_TEXT.login."
+        },
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED."
+        },
+        {
+          "pattern": "^i18n\\.uiText\\.UI_TEXT\\.settings\\.(?:auth|changePassword)"
+        },
+        {
+          "pattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.(?:unauthorized|auth_disabled|password_required|current_required|password_mismatch|password_already_set|invalid_password|not_changeable|rate_limited)\\."
+        }
+      ],
+      "snapshot": {
+        "keyCount": 87,
+        "keySetSha256": "8d85e892027c06f15181d70b18f28d259f4537f4bd0e57544c2845f7ae1fb28c",
+        "bundleSha256": {
+          "zh": "c6265221a5df29f92c7df0ddea6472264457bf4cd9ff61ae1e77502db959653b",
+          "zh-TW": "2c00574e0c5001bd350405714476479c28478b7df4453a68fd687fb3b7429cd7",
+          "en": "57657c8a1482429e1924cfb4ce07514847eaed4b25244c489be3aaf01cc6b2da",
+          "ja": "09bbaf0167a6a3075a0eafe531ea43e9b1c96af1042ee32f0adbaecb9063ac49",
+          "ko": "a29c3c8d5b7a2a97cc160a4fe91922656bd199755f479004b48c12f916051282",
+          "de": "6938fbaac7836439d5fac33ef84cf0a2666c08862322c77e2c6a51f7fa77c4ac",
+          "es": "20e2b4d82ff04e646a43519b384885e38d89431210c5613353f2ba1937dce444",
+          "ms": "196b34618fb29c44f92370f5984fb5631c39d9051203ec41fd63d58f5dda1e7a",
+          "fr": "dbd4a0876a6ba50c39c0a6776a9d4a7c7d9519c22a90a7a79e92c17c9e644789",
+          "id": "00cc8c720ade85b0b68e0e01aba81c396ad0f18dc70e1897fd5dd286a2d81279"
+        }
+      }
+    },
+    {
+      "id": "credential",
+      "semanticBoundary": "Credential is an identity concept; password, API key, runtime secret, and model-provider access are distinct display concepts. Secret values and internal reason codes remain untranslated contract data.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "selectors": [
+        {
+          "prefix": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET."
+        },
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.settings.llmAccessDescription",
+            "locales.screening.SCREENING_TEXT.diagnosticMissingKey",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.AGENT_LITELLM_MODEL.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.notes.2",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_CONFIG.valueNotes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_CHANNELS.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL.valueNotes.1",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENAI_BASE_URL.valueNotes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.anspire_llm.summary",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.provider_keys.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.usage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.search_api_keys.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.title",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.usage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.protocol.notes.0",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.MAX_WORKERS.valueNotes.1",
+            "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth",
+            "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key",
+            "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected",
+            "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key",
+            "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.auth",
+            "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.invalid_config",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKey",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.apiKeyOptional",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.chooseProviderDescription",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.localKeyOptional",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.multipleKeys",
+            "locales.settingsModelAccess.MODEL_ACCESS_TEXT.runtimeSecret",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKey",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyOptional",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyPlaceholder",
+            "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localKeyPlaceholder"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 43,
+        "keySetSha256": "ee1768aab8ff28919388b2d87a91ad5afb4b9ece13c5994549a700eb415f17cd",
+        "bundleSha256": {
+          "zh": "924d2fb635fb27d2e914d7006f7c991f90815d52551d1213c71456bed97517c8",
+          "zh-TW": "87dc384cdf09551142696acaaafe8cce6a8194dbe2a2f5aa885be12e544e3599",
+          "en": "17fd6c4101e43450c6c1c3641dddc9c5e7cf5128c4603503cb2435c30c99f1e3",
+          "ja": "c0c6aa84871dd1e2915e6dab8fe1c2222d2c07f0fc1ebe8da92e064515825bdd",
+          "ko": "7c061a81975b6bbf3e46b915c06eef35cf468192972f7a03c51841c714a92d3b",
+          "de": "1700dcda200fdcb61b6ce10a7fb95732210ef73a9ea7f08bcaa15aa8ed924f90",
+          "es": "122e2233c2df3160fe06fcad4e5bd7328f2b7d5012c263bd93946be6b1f0951b",
+          "ms": "938d606e074af47a29a6d0711ff89fa968026733ce0f4a009d0237d71420ffda",
+          "fr": "3223084ce609277b7f8dce5d6f075068c30995ccb321d0f59ddae88b6ebf50aa",
+          "id": "5a91f3f08f5ae8572024d09bdf337555b6c2311941405b1619396f37ae4f72c1"
+        }
+      }
+    },
+    {
+      "id": "error",
+      "semanticBoundary": "Stable error and category codes remain internal contract values. Titles and messages are localized display mappings, while diagnostic details remain outside primary user copy.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "selectors": [
+        {
+          "prefix": "api.error."
+        }
+      ],
+      "snapshot": {
+        "keyCount": 102,
+        "keySetSha256": "4287240a10ec17357042d36e3ee87f20c7b737ff5ceb21b49e9efcb8637c7dfb",
+        "bundleSha256": {
+          "zh": "8bedc69089c9ace2ca4352e1ca288c0d605235bd7c1dd5936ca9ff37e2e24cf7",
+          "zh-TW": "d13d3b6525574d27cddbead82eb83d165f7fcb6249ac4a6e7cbe77ab76e2e597",
+          "en": "a66b9a4d6f8476059bdd85794734aab84707fd1b0417a26a22a386cc2b3f7879",
+          "ja": "6b33f93df60ad5fc762f07b55caed5acd8fb9f96189a126049af3f345ea5ca06",
+          "ko": "35427c5eb7f9650cf39c3abf567f7fd6172fbbf244b1848623a9d23a01e424d0",
+          "de": "cde7d44cb8a39025567814c358936f0d498ceeb19f1217c4601ddc7f553dbefd",
+          "es": "2269c0117368e41d2f0c02468829f815a8c9aa45e7d585e9293cb78c1ed4591b",
+          "ms": "3666f618891a8d1f54a73479be6cec1e2d574a33b03d6ff26c49fb71bdc71acd",
+          "fr": "d4ac3b18668e7d9fe7ca96a9a70b153d4888095d747fce469d8853a79a6b282c",
+          "id": "6621d232b7f72e26f1012ce13c91e386c1364fb48ff3a12ccbddb93277be089e"
+        }
+      }
+    },
+    {
+      "id": "disclaimer",
+      "semanticBoundary": "Experimental-screening notices retain all three layers: research and decision support only, not investment advice, and user responsibility for trading decisions and outcomes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "selectors": [
+        {
+          "exact": [
+            "i18n.uiText.UI_TEXT.settings.alphaSiftRisk",
+            "locales.screening.SCREENING_TEXT.riskMessage",
+            "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.ALPHASIFT_ENABLED.valueNotes.1"
+          ]
+        }
+      ],
+      "snapshot": {
+        "keyCount": 3,
+        "keySetSha256": "ad4ade36b1c0350deea7aee017e579c7cc934245b0e1215e8ba8e939430ecef6",
+        "bundleSha256": {
+          "zh": "ff1c949bc2a60d6b698773c2beb9e9a80fa53a6e5176c5a82bc76563aa7d2c38",
+          "zh-TW": "e5b8e546c465cbb2e421a36563785e1e287538040957d56dbd37d4887071db35",
+          "en": "e347cfc32b35f28f773cc818e887c70967d0f860e235eafcab54783bc0211ddf",
+          "ja": "0b4996670f76806d75025a622436e2bfefa43c8d480233dfc25efc0d4a651de9",
+          "ko": "6ad1400f748c97688fe91b4ad6ff73d28b45fa1745cc1f36ec1d207dc0e56a7f",
+          "de": "fea335d3e8c155ab73a0477333ef80161ef8cf54c90565648528d0a1cbc43dfe",
+          "es": "29493337b459594b37f330200cad2963b90892c3c5ad3c079305e04097417ddf",
+          "ms": "0121cc007bce4a04517d3818c773b923a062b72517d4fac3162ea98e716376e2",
+          "fr": "3ab5eddc5a87370918a52182e8fb9b4a9386ff9a205528337774f6956091debd",
+          "id": "078c66aacfaede34bcc98882718c5328dbf8e5de094e552f666804cf16dbdd46"
+        }
+      }
+    }
+  ],
+  "contractBoundaries": [
+    {
+      "id": "decision_action",
+      "contractSource": "apps/dsa-web/src/types/analysis.ts DecisionAction",
+      "typeContract": {
+        "path": "src/types/analysis.ts",
+        "alias": "DecisionAction"
+      },
+      "internalCodes": [
+        "buy",
+        "add",
+        "hold",
+        "reduce",
+        "sell",
+        "watch",
+        "avoid",
+        "alert"
+      ],
+      "codeToDisplayKeys": {
+        "buy": [
+          "i18n.uiText.UI_TEXT.history.actionBuy"
+        ],
+        "add": [
+          "i18n.uiText.UI_TEXT.history.actionAdd"
+        ],
+        "hold": [
+          "i18n.uiText.UI_TEXT.history.actionHold"
+        ],
+        "reduce": [
+          "i18n.uiText.UI_TEXT.history.actionReduce"
+        ],
+        "sell": [
+          "i18n.uiText.UI_TEXT.history.actionSell"
+        ],
+        "watch": [
+          "i18n.uiText.UI_TEXT.history.actionWatch"
+        ],
+        "avoid": [
+          "i18n.uiText.UI_TEXT.history.actionAvoid"
+        ],
+        "alert": [
+          "i18n.uiText.UI_TEXT.history.actionAlert"
+        ]
+      }
+    },
+    {
+      "id": "portfolio_side",
+      "contractSource": "apps/dsa-web/src/types/portfolio.ts PortfolioSide",
+      "typeContract": {
+        "path": "src/types/portfolio.ts",
+        "alias": "PortfolioSide"
+      },
+      "internalCodes": [
+        "buy",
+        "sell"
+      ],
+      "codeToDisplayKeys": {
+        "buy": [
+          "locales.portfolio.PORTFOLIO_SIDE_LABELS.buy",
+          "locales.portfolio.PORTFOLIO_TEXT.buy"
+        ],
+        "sell": [
+          "locales.portfolio.PORTFOLIO_SIDE_LABELS.sell",
+          "locales.portfolio.PORTFOLIO_TEXT.sell"
+        ]
+      }
+    },
+    {
+      "id": "stable_api_error",
+      "contractSource": "apps/dsa-web/src/api/error.ts STABLE_ERROR_TEXT",
+      "translationCodePattern": "^api\\.error\\.STABLE_ERROR_TEXT\\.([^.]+)\\.(?:title|message)$",
+      "internalCodes": [
+        "agent_chat_failed",
+        "agent_disabled",
+        "agent_research_failed",
+        "agent_stream_failed",
+        "agent_stream_timeout",
+        "alphasift_disabled",
+        "alphasift_screen_failed",
+        "alphasift_screen_task_not_found",
+        "alphasift_unavailable",
+        "analysis_failed",
+        "auth_disabled",
+        "config_conflict",
+        "config_version_conflict",
+        "conflict",
+        "current_required",
+        "duplicate_market_review",
+        "duplicate_task",
+        "env_backup_access_denied",
+        "idempotency_conflict",
+        "internal_error",
+        "invalid_import_file",
+        "invalid_params",
+        "invalid_password",
+        "no_channels",
+        "not_changeable",
+        "not_found",
+        "operation_id_mismatch",
+        "password_already_set",
+        "password_mismatch",
+        "password_required",
+        "portfolio_busy",
+        "portfolio_oversell",
+        "rate_limited",
+        "scheduler_busy",
+        "unauthorized",
+        "unsupported_alert_type",
+        "validation_error",
+        "validation_failed"
+      ],
+      "codeToDisplayKeys": {
+        "agent_chat_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_chat_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_chat_failed.message"
+        ],
+        "agent_disabled": [
+          "api.error.STABLE_ERROR_TEXT.agent_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.agent_disabled.message"
+        ],
+        "agent_research_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_research_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_research_failed.message"
+        ],
+        "agent_stream_failed": [
+          "api.error.STABLE_ERROR_TEXT.agent_stream_failed.title",
+          "api.error.STABLE_ERROR_TEXT.agent_stream_failed.message"
+        ],
+        "agent_stream_timeout": [
+          "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.title",
+          "api.error.STABLE_ERROR_TEXT.agent_stream_timeout.message"
+        ],
+        "alphasift_disabled": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_disabled.message"
+        ],
+        "alphasift_screen_failed": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_failed.message"
+        ],
+        "alphasift_screen_task_not_found": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_screen_task_not_found.message"
+        ],
+        "alphasift_unavailable": [
+          "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.title",
+          "api.error.STABLE_ERROR_TEXT.alphasift_unavailable.message"
+        ],
+        "analysis_failed": [
+          "api.error.STABLE_ERROR_TEXT.analysis_failed.title",
+          "api.error.STABLE_ERROR_TEXT.analysis_failed.message"
+        ],
+        "auth_disabled": [
+          "api.error.STABLE_ERROR_TEXT.auth_disabled.title",
+          "api.error.STABLE_ERROR_TEXT.auth_disabled.message"
+        ],
+        "config_conflict": [
+          "api.error.STABLE_ERROR_TEXT.config_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.config_conflict.message"
+        ],
+        "config_version_conflict": [
+          "api.error.STABLE_ERROR_TEXT.config_version_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.config_version_conflict.message"
+        ],
+        "conflict": [
+          "api.error.STABLE_ERROR_TEXT.conflict.title",
+          "api.error.STABLE_ERROR_TEXT.conflict.message"
+        ],
+        "current_required": [
+          "api.error.STABLE_ERROR_TEXT.current_required.title",
+          "api.error.STABLE_ERROR_TEXT.current_required.message"
+        ],
+        "duplicate_market_review": [
+          "api.error.STABLE_ERROR_TEXT.duplicate_market_review.title",
+          "api.error.STABLE_ERROR_TEXT.duplicate_market_review.message"
+        ],
+        "duplicate_task": [
+          "api.error.STABLE_ERROR_TEXT.duplicate_task.title",
+          "api.error.STABLE_ERROR_TEXT.duplicate_task.message"
+        ],
+        "env_backup_access_denied": [
+          "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.title",
+          "api.error.STABLE_ERROR_TEXT.env_backup_access_denied.message"
+        ],
+        "idempotency_conflict": [
+          "api.error.STABLE_ERROR_TEXT.idempotency_conflict.title",
+          "api.error.STABLE_ERROR_TEXT.idempotency_conflict.message"
+        ],
+        "internal_error": [
+          "api.error.STABLE_ERROR_TEXT.internal_error.title",
+          "api.error.STABLE_ERROR_TEXT.internal_error.message"
+        ],
+        "invalid_import_file": [
+          "api.error.STABLE_ERROR_TEXT.invalid_import_file.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_import_file.message"
+        ],
+        "invalid_params": [
+          "api.error.STABLE_ERROR_TEXT.invalid_params.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_params.message"
+        ],
+        "invalid_password": [
+          "api.error.STABLE_ERROR_TEXT.invalid_password.title",
+          "api.error.STABLE_ERROR_TEXT.invalid_password.message"
+        ],
+        "no_channels": [
+          "api.error.STABLE_ERROR_TEXT.no_channels.title",
+          "api.error.STABLE_ERROR_TEXT.no_channels.message"
+        ],
+        "not_changeable": [
+          "api.error.STABLE_ERROR_TEXT.not_changeable.title",
+          "api.error.STABLE_ERROR_TEXT.not_changeable.message"
+        ],
+        "not_found": [
+          "api.error.STABLE_ERROR_TEXT.not_found.title",
+          "api.error.STABLE_ERROR_TEXT.not_found.message"
+        ],
+        "operation_id_mismatch": [
+          "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.title",
+          "api.error.STABLE_ERROR_TEXT.operation_id_mismatch.message"
+        ],
+        "password_already_set": [
+          "api.error.STABLE_ERROR_TEXT.password_already_set.title",
+          "api.error.STABLE_ERROR_TEXT.password_already_set.message"
+        ],
+        "password_mismatch": [
+          "api.error.STABLE_ERROR_TEXT.password_mismatch.title",
+          "api.error.STABLE_ERROR_TEXT.password_mismatch.message"
+        ],
+        "password_required": [
+          "api.error.STABLE_ERROR_TEXT.password_required.title",
+          "api.error.STABLE_ERROR_TEXT.password_required.message"
+        ],
+        "portfolio_busy": [
+          "api.error.STABLE_ERROR_TEXT.portfolio_busy.title",
+          "api.error.STABLE_ERROR_TEXT.portfolio_busy.message"
+        ],
+        "portfolio_oversell": [
+          "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title",
+          "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message"
+        ],
+        "rate_limited": [
+          "api.error.STABLE_ERROR_TEXT.rate_limited.title",
+          "api.error.STABLE_ERROR_TEXT.rate_limited.message"
+        ],
+        "scheduler_busy": [
+          "api.error.STABLE_ERROR_TEXT.scheduler_busy.title",
+          "api.error.STABLE_ERROR_TEXT.scheduler_busy.message"
+        ],
+        "unauthorized": [
+          "api.error.STABLE_ERROR_TEXT.unauthorized.title",
+          "api.error.STABLE_ERROR_TEXT.unauthorized.message"
+        ],
+        "unsupported_alert_type": [
+          "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.title",
+          "api.error.STABLE_ERROR_TEXT.unsupported_alert_type.message"
+        ],
+        "validation_error": [
+          "api.error.STABLE_ERROR_TEXT.validation_error.title",
+          "api.error.STABLE_ERROR_TEXT.validation_error.message"
+        ],
+        "validation_failed": [
+          "api.error.STABLE_ERROR_TEXT.validation_failed.title",
+          "api.error.STABLE_ERROR_TEXT.validation_failed.message"
+        ]
+      }
+    },
+    {
+      "id": "model_access_error_category",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_ERROR_LABELS",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_ERROR_LABELS\\.([^.]+)$",
+      "internalCodes": [
+        "auth",
+        "capability_unsupported",
+        "empty_response",
+        "format_error",
+        "invalid_config",
+        "model_not_found",
+        "network_error",
+        "quota",
+        "request_blocked",
+        "skipped",
+        "timeout",
+        "unsupported_protocol"
+      ],
+      "codeToDisplayKeys": {
+        "auth": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth"
+        ],
+        "capability_unsupported": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.capability_unsupported"
+        ],
+        "empty_response": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.empty_response"
+        ],
+        "format_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.format_error"
+        ],
+        "invalid_config": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.invalid_config"
+        ],
+        "model_not_found": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.model_not_found"
+        ],
+        "network_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.network_error"
+        ],
+        "quota": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.quota"
+        ],
+        "request_blocked": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.request_blocked"
+        ],
+        "skipped": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.skipped"
+        ],
+        "timeout": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.timeout"
+        ],
+        "unsupported_protocol": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.unsupported_protocol"
+        ]
+      }
+    },
+    {
+      "id": "model_access_issue",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_ISSUES",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_ISSUES\\.([^.]+)$",
+      "internalCodes": [
+        "contract_unknown",
+        "missing_api_key",
+        "missing_base_url",
+        "missing_extra_headers",
+        "missing_models",
+        "missing_protocol",
+        "missing_provider",
+        "name_invalid",
+        "name_required",
+        "schema_unavailable"
+      ],
+      "codeToDisplayKeys": {
+        "contract_unknown": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.contract_unknown"
+        ],
+        "missing_api_key": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key"
+        ],
+        "missing_base_url": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_base_url"
+        ],
+        "missing_extra_headers": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_extra_headers"
+        ],
+        "missing_models": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_models"
+        ],
+        "missing_protocol": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_protocol"
+        ],
+        "missing_provider": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_provider"
+        ],
+        "name_invalid": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_invalid"
+        ],
+        "name_required": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_required"
+        ],
+        "schema_unavailable": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.schema_unavailable"
+        ]
+      }
+    },
+    {
+      "id": "model_access_reason",
+      "contractSource": "apps/dsa-web/src/locales/settingsModelAccess.ts MODEL_ACCESS_REASON_HINTS",
+      "translationCodePattern": "^locales\\.settingsModelAccess\\.MODEL_ACCESS_REASON_HINTS\\.([^.]+)$",
+      "internalCodes": [
+        "api_key_rejected",
+        "capability_unsupported",
+        "connection_refused",
+        "dns_error",
+        "insufficient_balance",
+        "missing_api_key",
+        "model_access_denied",
+        "provider_blocked",
+        "provider_prefix_mismatch",
+        "quota_exceeded",
+        "rate_limit",
+        "tls_error"
+      ],
+      "codeToDisplayKeys": {
+        "api_key_rejected": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected"
+        ],
+        "capability_unsupported": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.capability_unsupported"
+        ],
+        "connection_refused": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.connection_refused"
+        ],
+        "dns_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.dns_error"
+        ],
+        "insufficient_balance": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.insufficient_balance"
+        ],
+        "missing_api_key": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key"
+        ],
+        "model_access_denied": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.model_access_denied"
+        ],
+        "provider_blocked": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_blocked"
+        ],
+        "provider_prefix_mismatch": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.provider_prefix_mismatch"
+        ],
+        "quota_exceeded": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.quota_exceeded"
+        ],
+        "rate_limit": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.rate_limit"
+        ],
+        "tls_error": [
+          "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.tls_error"
+        ]
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "id": "volume_spike_uses_trading_volume",
+      "key": "locales.alerts.ALERT_TYPE_LABELS.volume_spike",
+      "category": "risk",
+      "rationale": "The alert measures securities trading volume, not audio loudness. Candidate wording now carries an explicit market-volume meaning.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "音量の急増",
+        "ko": "볼륨 급증",
+        "de": "Lautstärkespitze",
+        "es": "Pico de volumen",
+        "ms": "Lonjakan kelantangan",
+        "fr": "Pic de volume",
+        "id": "Lonjakan volume"
+      },
+      "recommended": {
+        "ja": "出来高急増",
+        "ko": "거래량 급증",
+        "de": "Sprung im Handelsvolumen",
+        "es": "Pico del volumen de negociación",
+        "ms": "Lonjakan volum dagangan",
+        "fr": "Pic du volume des transactions",
+        "id": "Lonjakan volume perdagangan"
+      }
+    },
+    {
+      "id": "turnover_value_is_not_turnover_rate",
+      "key": "locales.screening.SCREENING_TEXT.turnover",
+      "category": "risk",
+      "rationale": "The screening field is traded monetary value, so the English source and German candidate must not use the same wording as share volume or turnover rate.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "en": "Turnover",
+        "de": "Handelsvolumen"
+      },
+      "recommended": {
+        "en": "Turnover value",
+        "de": "Handelswert"
+      }
+    },
+    {
+      "id": "turnover_rate_is_explicit",
+      "key": "i18n.uiText.UI_TEXT.stockTrend.turnoverRate",
+      "category": "risk",
+      "rationale": "The stock-trend field is a rate, not traded monetary value. The English source now names the rate explicitly.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "hkex_glossary"
+      ],
+      "before": {
+        "en": "Turnover"
+      },
+      "recommended": {
+        "en": "Turnover rate"
+      }
+    },
+    {
+      "id": "trade_side_has_transaction_context",
+      "key": "locales.portfolio.PORTFOLIO_TEXT.side",
+      "category": "trading_action",
+      "rationale": "The field selects buy or sell. The source and candidate labels now carry transaction context instead of a physical side or generic part.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types"
+      ],
+      "before": {
+        "en": "Side",
+        "de": "Transaktionsrichtung",
+        "es": "Tipo de operación",
+        "ms": "Bahagian",
+        "fr": "Sens de transaction",
+        "id": "Sisi"
+      },
+      "recommended": {
+        "en": "Trade side",
+        "de": "Handelsrichtung",
+        "es": "Dirección de la operación",
+        "ms": "Arah dagangan",
+        "fr": "Sens de la transaction",
+        "id": "Arah transaksi"
+      }
+    },
+    {
+      "id": "theme_interest_is_not_temperature",
+      "key": "locales.screening.SCREENING_TEXT.heat",
+      "category": "risk",
+      "rationale": "Theme heat measures market attention or popularity, not physical temperature.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "en": "Heat",
+        "de": "Hitze",
+        "es": "Calor",
+        "ms": "Haba",
+        "fr": "Chaleur",
+        "id": "Panas"
+      },
+      "recommended": {
+        "en": "Theme interest",
+        "de": "Beliebtheit",
+        "es": "Popularidad",
+        "ms": "Populariti",
+        "fr": "Popularité",
+        "id": "Popularitas"
+      }
+    },
+    {
+      "id": "leader_is_a_leading_stock",
+      "key": "locales.screening.SCREENING_TEXT.leader",
+      "category": "risk",
+      "rationale": "The field identifies the stock leading a theme, not a person or manager.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "en": "Leader",
+        "ja": "リーダー",
+        "ko": "리더",
+        "de": "Anführer",
+        "es": "Líder",
+        "ms": "Pemimpin",
+        "fr": "Chef",
+        "id": "Pemimpin"
+      },
+      "recommended": {
+        "en": "Leading stock",
+        "ja": "牽引銘柄",
+        "ko": "주도주",
+        "de": "Führungsaktie",
+        "es": "Valor líder",
+        "ms": "Saham peneraju",
+        "fr": "Valeur phare",
+        "id": "Saham unggulan"
+      }
+    },
+    {
+      "id": "confidence_is_model_confidence",
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.confidence",
+      "category": "trading_action",
+      "rationale": "Confidence is a model-signal confidence measure, not a person's self-confidence and not a guarantee.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "de": "Selbstvertrauen",
+        "es": "Confianza",
+        "ms": "Keyakinan",
+        "fr": "Confiance",
+        "id": "Keyakinan"
+      },
+      "recommended": {
+        "de": "Konfidenz",
+        "es": "Nivel de confianza",
+        "ms": "Tahap keyakinan",
+        "fr": "Niveau de confiance",
+        "id": "Tingkat keyakinan"
+      }
+    },
+    {
+      "id": "score_is_not_rank",
+      "key": "i18n.uiText.UI_TEXT.decisionSignals.score",
+      "category": "trading_action",
+      "rationale": "The value is a signal score, not an ordinal ranking or external rating.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "before": {
+        "ja": "レーティング",
+        "de": "Bewertung",
+        "es": "Clasificación",
+        "ms": "Penarafan",
+        "fr": "Classement",
+        "id": "penilaian"
+      },
+      "recommended": {
+        "ja": "スコア",
+        "de": "Punktzahl",
+        "es": "Puntuación",
+        "ms": "Skor",
+        "fr": "Score",
+        "id": "Skor"
+      }
+    },
+    {
+      "id": "avoid_is_a_signal_label",
+      "key": "i18n.uiText.UI_TEXT.history.actionAvoid",
+      "category": "trading_action",
+      "rationale": "The value labels an informational decision-signal state. Candidate wording removes explicit second-person commands where the language provides a neutral label form.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "避けてください",
+        "ko": "피하세요",
+        "de": "Vermeiden Sie",
+        "es": "Evita",
+        "ms": "Elakkan",
+        "fr": "Évitez",
+        "id": "Hindari"
+      },
+      "recommended": {
+        "ja": "見送り",
+        "ko": "회피",
+        "de": "Meiden",
+        "es": "Evitar",
+        "ms": "Elak",
+        "fr": "Éviter",
+        "id": "Dihindari"
+      }
+    },
+    {
+      "id": "expired_session_is_authentication_state",
+      "key": "api.error.STABLE_ERROR_TEXT.unauthorized.message",
+      "category": "authentication",
+      "rationale": "The display message describes an expired authenticated session and a sign-in recovery action; it does not expose the stable unauthorized code or imply an account-permission decision.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "zh-TW": "登入狀態已失效，請重新登入。",
+        "ja": "あなたのセッションは終了しました。もう一度サインインしてください。",
+        "de": "Deine Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+        "fr": "Votre session est expirée. Reconnecte-toi."
+      },
+      "recommended": {
+        "zh-TW": "登入工作階段已過期，請重新登入。",
+        "ja": "セッションの有効期限が切れました。もう一度ログインしてください。",
+        "de": "Ihre Sitzung ist abgelaufen. Melden Sie sich erneut an.",
+        "fr": "Votre session a expiré. Reconnectez-vous."
+      }
+    },
+    {
+      "id": "api_key_rejection_names_the_credential",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.api_key_rejected",
+      "category": "credential",
+      "rationale": "The recovery hint must name the rejected API key and relevant access context, rather than translating key as a legend, keyboard key, or generic situation.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "before": {
+        "zh-TW": "服務商拒絕了當前 API 金鑰；請檢查金鑰、組織/專案許可權、區域和賬號狀態。",
+        "ja": "サービス提供者は現状を拒否しています API キー; キー、組織/プロジェクトの権限、地域、アカウントの状態を必ずご確認ください。",
+        "ko": "서비스 제공자들은 현재 상황을 거부했습니다 API 키; 키, 조직/프로젝트 권한, 지역, 계정 상태를 확인해 주세요.",
+        "de": "Dienstleister haben die aktuelle Situation abgelehnt API Schlüssel; Bitte überprüfen Sie den Schlüssel, Organisations-/Projektberechtigungen, Region und Kontostatus.",
+        "es": "Los proveedores de servicios han rechazado la situación actual API Clave; Por favor, revisa la clave, los permisos de la organización/proyecto, la región y el estado de la cuenta.",
+        "ms": "Penyedia perkhidmatan telah menolak keadaan semasa API Kunci; Sila semak kunci, kebenaran organisasi/projek, rantau dan status akaun.",
+        "fr": "Les prestataires de services ont rejeté la situation actuelle API Clé ; Veuillez vérifier la clé, les autorisations de l’organisation/projet, la région et le statut du compte.",
+        "id": "Penyedia layanan telah menolak situasi saat ini API Kunci; Silakan periksa kunci, izin organisasi/proyek, wilayah, dan status akun."
+      },
+      "recommended": {
+        "zh-TW": "服務商拒絕了目前的 API 金鑰；請檢查金鑰、組織或專案權限、區域及帳號狀態。",
+        "ja": "プロバイダーがこの API キーを拒否しました。キー、組織またはプロジェクトの権限、リージョン、アカウントの状態を確認してください。",
+        "ko": "제공자가 이 API 키를 거부했습니다. 키, 조직 또는 프로젝트 권한, 리전, 계정 상태를 확인하세요.",
+        "de": "Der Anbieter hat diesen API-Schlüssel abgelehnt. Prüfen Sie den Schlüssel, die Organisations- oder Projektberechtigungen, die Region und den Kontostatus.",
+        "es": "El proveedor rechazó esta clave API. Comprueba la clave, los permisos de la organización o del proyecto, la región y el estado de la cuenta.",
+        "ms": "Penyedia menolak kunci API ini. Semak kunci, kebenaran organisasi atau projek, rantau dan status akaun.",
+        "fr": "Le fournisseur a rejeté cette clé API. Vérifiez la clé, les autorisations de l’organisation ou du projet, la région et l’état du compte.",
+        "id": "Penyedia menolak kunci API ini. Periksa kunci, izin organisasi atau proyek, wilayah, dan status akun."
+      }
+    },
+    {
+      "id": "model_reachability_preserves_provider_key_path",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.AGENT_LITELLM_MODEL.notes.0",
+      "category": "credential",
+      "rationale": "Model reachability can come from an enabled channel, YAML routing, or a legacy provider key. Candidate wording preserves all three access paths and does not turn a provider key into an unrelated keyboard key.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "請確認該模型在已啟用的模型連線或高階路由配置中可用。",
+        "ja": "モデルが有効なチャネルを通じてアクセス可能であることを確認し、 YAML ルーティング、またはレガシープロバイダーキー。",
+        "ko": "모델이 활성화된 채널을 통해 접근 가능한지 확인하세요., YAML 라우팅 또는 레거시 제공업체 키.",
+        "de": "Stelle sicher, dass das Modell über aktivierte Kanäle erreichbar ist,YAML Routen, oder Legacy-Provider-Schlüssel.",
+        "es": "Asegúrate de que el modelo sea accesible a través de canales habilitados,YAML enrutamiento, o claves de proveedor heredados.",
+        "ms": "Pastikan model boleh dicapai melalui saluran yang didayakan,YAML penghalaan, atau kunci pembekal warisan.",
+        "fr": "Assurez-vous que le modèle est accessible via des canaux activés,YAML le routage, ou les clés de fournisseur héritées.",
+        "id": "Pastikan model dapat dijangkau melalui saluran yang diaktifkan,YAML perutean, atau kunci penyedia lama."
+      },
+      "recommended": {
+        "zh-TW": "請確認可透過已啟用的 Channels、YAML 路由或舊版 provider keys 存取該模型。",
+        "ja": "有効なチャネル、YAML ルーティング、または従来のプロバイダーキーからモデルにアクセスできることを確認してください。",
+        "ko": "활성화된 채널, YAML 라우팅 또는 레거시 공급자 키를 통해 모델에 접근할 수 있는지 확인하세요.",
+        "de": "Stellen Sie sicher, dass das Modell über aktivierte Kanäle, YAML-Routing oder Legacy-Provider-Schlüssel erreichbar ist.",
+        "es": "Asegúrate de que se pueda acceder al modelo mediante canales habilitados, enrutamiento YAML o claves de proveedor heredadas.",
+        "ms": "Pastikan model boleh dicapai melalui saluran yang didayakan, penghalaan YAML atau kunci penyedia legasi.",
+        "fr": "Assurez-vous que le modèle est accessible via les canaux activés, le routage YAML ou les clés de fournisseur héritées.",
+        "id": "Pastikan model dapat diakses melalui saluran yang diaktifkan, perutean YAML, atau kunci penyedia lama."
+      }
+    },
+    {
+      "id": "cli_login_state_is_not_stockpulse_credential_access",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.valueNotes.1",
+      "category": "credential",
+      "rationale": "The deployment warning must distinguish a CLI using its own login state from StockPulse reading the CLI's credential files. Broken word order obscured that security boundary.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "before": {
+        "ja": "Docker, クラウドサーバー、CIは自動的にローカルログイン状態を保持しません。 StockPulse 読まない Codex/Claude/OpenCode 認証ファイルですが、対応する CLI その本体はログイン状態を利用できます。",
+        "ko": "Docker, 클라우드 서버, CI는 자동으로 로컬 로그인 상태를 갖고 있지 않습니다. StockPulse 읽지 않는다 Codex/Claude/OpenCode 신원 증명 파일이지만, CLI 로그인 상태를 사용할 수 있습니다.",
+        "de": "Docker, Cloud-Server und CI haben nicht automatisch deinen lokalen Login-Status. StockPulse liest nicht Codex/Claude/OpenCode Zugangsdaten, aber die entsprechenden CLI Er selbst kann seinen Login-Status verwenden.",
+        "ms": "Docker, pelayan awan dan CI tidak mempunyai keadaan log masuk tempatan anda secara automatik. StockPulse tidak membaca Codex/Claude/OpenCode fail kelayakan, tetapi fail yang sepadan CLI sendiri boleh menggunakan keadaan log masuknya.",
+        "fr": "Docker, les serveurs cloud et les CI n’ont pas automatiquement l’état de connexion local. StockPulse ne se lit pas Codex/Claude/OpenCode les fichiers de références, mais les correspondants CLI lui-même peut utiliser son état de connexion.",
+        "id": "Docker, server cloud, dan CI tidak secara otomatis memiliki status login lokal Anda. StockPulse tidak membaca Codex/Claude/OpenCode kredensial, tetapi yang sesuai CLI sendiri dapat menggunakan status loginnya."
+      },
+      "recommended": {
+        "ja": "Docker、クラウドサーバー、CI には、ローカルのログイン状態が自動的には引き継がれません。StockPulse は Codex、Claude、OpenCode の認証情報ファイルを読み取りませんが、対応する CLI は自身のログイン状態を使用する場合があります。",
+        "ko": "Docker, 클라우드 서버 및 CI에는 로컬 로그인 상태가 자동으로 전달되지 않습니다. StockPulse는 Codex, Claude 또는 OpenCode의 자격 증명 파일을 읽지 않지만, 해당 CLI는 자체 로그인 상태를 사용할 수 있습니다.",
+        "de": "Docker, Cloud-Server und CI verfügen nicht automatisch über Ihren lokalen Anmeldestatus. StockPulse liest keine Dateien mit Anmeldedaten von Codex, Claude oder OpenCode; die jeweilige CLI kann jedoch ihren eigenen Anmeldestatus verwenden.",
+        "ms": "Docker, pelayan awan dan CI tidak mempunyai status log masuk setempat anda secara automatik. StockPulse tidak membaca fail kelayakan Codex, Claude atau OpenCode, tetapi CLI yang sepadan boleh menggunakan status log masuknya sendiri.",
+        "fr": "Docker, les serveurs cloud et la CI ne disposent pas automatiquement de votre état de connexion local. StockPulse ne lit pas les fichiers d’identifiants de Codex, Claude ou OpenCode, mais la CLI correspondante peut utiliser son propre état de connexion.",
+        "id": "Docker, server cloud, dan CI tidak secara otomatis memiliki status login lokal Anda. StockPulse tidak membaca file kredensial Codex, Claude, atau OpenCode, tetapi CLI terkait dapat menggunakan status loginnya sendiri."
+      }
+    },
+    {
+      "id": "litellm_config_priority_names_legacy_keys",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_CONFIG.valueNotes.0",
+      "category": "credential",
+      "rationale": "The priority note describes legacy provider keys, not keyboard keys, and must preserve that a valid model_list outranks both channels and the legacy key path.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "ja": "有効な model_list は Channels や旧形式のキーより優先されます。",
+        "ko": "유효한 model_list 채널과 레거시 키보다 우선순위가 높습니다.",
+        "de": "Eine gültige model_list hat eine höhere Priorität als Kanäle und Legacy-Schlüssel.",
+        "es": "Un válido model_list tiene mayor prioridad que los canales y las teclas heredadas.",
+        "ms": "A sah model_list mempunyai keutamaan yang lebih tinggi daripada saluran dan kunci warisan.",
+        "fr": "Un valide model_list A une priorité plus élevée que les canaux et les clés héritées.",
+        "id": "Valid model_list memiliki prioritas yang lebih tinggi daripada saluran dan kunci lama."
+      },
+      "recommended": {
+        "ja": "有効な model_list はチャネルや従来のプロバイダーキーより優先されます。",
+        "ko": "유효한 model_list는 채널 및 레거시 공급자 키보다 우선합니다.",
+        "de": "Eine gültige model_list hat eine höhere Priorität als Kanäle und Legacy-Provider-Schlüssel.",
+        "es": "Una model_list válida tiene prioridad sobre los canales y las claves de proveedor heredadas.",
+        "ms": "model_list yang sah mempunyai keutamaan lebih tinggi daripada saluran dan kunci penyedia legasi.",
+        "fr": "Une model_list valide est prioritaire sur les canaux et les clés de fournisseur héritées.",
+        "id": "model_list yang valid memiliki prioritas lebih tinggi daripada saluran dan kunci penyedia lama."
+      }
+    },
+    {
+      "id": "channels_and_legacy_keys_are_not_concurrent",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_CHANNELS.notes.0",
+      "category": "credential",
+      "rationale": "The note warns that the legacy provider-key path and Channels should not be expected to operate concurrently. Candidate wording preserves the configuration boundary and the meaning of key.",
+      "sourceIds": [
+        "stockpulse_product_contract"
+      ],
+      "before": {
+        "zh-TW": "不要把極簡 legacy key 和 Channels 混用後期待兩邊同時生效。",
+        "ja": "レガシーキーとチャネルが同時にアクティブになるとは期待しないでください。",
+        "ko": "레거시 키와 채널이 동시에 활성화되어 있을 거라고 기대하지 마세요.",
+        "de": "Erwarten Sie nicht, dass Legacy-Schlüssel und Kanäle gleichzeitig aktiv sind.",
+        "es": "No esperes que las teclas heredadas y los canales estén activos al mismo tiempo.",
+        "ms": "Jangan mengharapkan kunci dan Saluran legasi aktif pada masa yang sama.",
+        "fr": "Ne vous attendez pas à ce que les clés héritées et les canaux soient actifs en même temps.",
+        "id": "Jangan berharap kunci lama dan Saluran aktif secara bersamaan."
+      },
+      "recommended": {
+        "zh-TW": "不要預期舊版 provider keys 與 Channels 會同時生效。",
+        "ja": "従来のプロバイダーキーとチャネルが同時に有効になることを想定しないでください。",
+        "ko": "레거시 공급자 키와 채널이 동시에 활성화될 것이라고 가정하지 마세요.",
+        "de": "Gehen Sie nicht davon aus, dass Legacy-Provider-Schlüssel und Kanäle gleichzeitig aktiv sind.",
+        "es": "No esperes que las claves de proveedor heredadas y los canales estén activos al mismo tiempo.",
+        "ms": "Jangan anggap kunci penyedia legasi dan saluran akan aktif pada masa yang sama.",
+        "fr": "Ne supposez pas que les clés de fournisseur héritées et les canaux sont actifs simultanément.",
+        "id": "Jangan mengharapkan kunci penyedia lama dan saluran aktif secara bersamaan."
+      }
+    },
+    {
+      "id": "invalid_password_is_a_localized_error",
+      "key": "api.error.STABLE_ERROR_TEXT.invalid_password.title",
+      "category": "error",
+      "rationale": "The localized title reports password-verification failure while the internal invalid_password code remains unchanged.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "es": "Fallido la verificación de contraseñas"
+      },
+      "recommended": {
+        "es": "Error de verificación de contraseña"
+      }
+    },
+    {
+      "id": "screening_notice_retains_three_risk_layers",
+      "key": "locales.screening.SCREENING_TEXT.riskMessage",
+      "category": "disclaimer",
+      "rationale": "Each candidate notice explicitly retains experimental/research scope, no-investment-advice language, and user responsibility for trading decisions and outcomes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "de": "AlphaSift Die Aktienauswahl befindet sich noch in der experimentellen Phase, und die Ergebnisse dienen nur Forschungs- und Urteilszwecken und stellen keine Anlageberatung dar; Handelsentscheidungen sowie Gewinn und Verlust liegen beim Nutzer.",
+        "es": "AlphaSift La selección de acciones aún está en fase experimental, y los resultados son solo para fines de investigación y juicio y no constituyen asesoramiento de inversión; Las decisiones de trading y las pérdidas y ganancias recaen en el usuario.",
+        "ms": "AlphaSift Pemilihan saham masih dalam peringkat percubaan, dan hasilnya adalah untuk tujuan penyelidikan dan pertimbangan sahaja dan bukan merupakan nasihat pelaburan; Keputusan perdagangan dan untung dan rugi ditanggung oleh pengguna.",
+        "fr": "AlphaSift La sélection des actions en est encore à l’étape expérimentale, et les résultats sont uniquement à des fins de recherche et de jugement et ne constituent pas un conseil en investissement ; Les décisions de trading ainsi que les profits et pertes sont supportés par l’utilisateur.",
+        "id": "AlphaSift Seleksi saham masih dalam tahap eksperimental, dan hasilnya hanya untuk tujuan penelitian dan penilaian dan bukan merupakan saran investasi; Keputusan perdagangan dan untung rugi ditanggung oleh pengguna."
+      },
+      "recommended": {
+        "de": "Das AlphaSift-Screening ist experimentell und dient ausschließlich der Recherche und Entscheidungsunterstützung. Es stellt keine Anlageberatung dar. Für Handelsentscheidungen sowie daraus entstehende Gewinne und Verluste sind Sie selbst verantwortlich.",
+        "es": "El análisis de AlphaSift es experimental y se ofrece únicamente con fines de investigación y apoyo a la toma de decisiones. No constituye asesoramiento de inversión. Usted es responsable de sus decisiones de negociación y de sus resultados.",
+        "ms": "Saringan AlphaSift bersifat percubaan dan hanya bertujuan untuk penyelidikan serta sokongan keputusan. Ia bukan nasihat pelaburan. Anda bertanggungjawab atas keputusan perdagangan dan hasilnya.",
+        "fr": "Le filtrage AlphaSift est expérimental et destiné uniquement à la recherche et à l’aide à la décision. Il ne constitue pas un conseil en investissement. Vous êtes responsable de vos décisions de trading et de leurs résultats.",
+        "id": "Penyaringan AlphaSift bersifat eksperimental dan hanya ditujukan untuk riset serta dukungan pengambilan keputusan. Ini bukan nasihat investasi. Anda bertanggung jawab atas keputusan perdagangan dan hasilnya."
+      }
+    },
+    {
+      "id": "risk_agent_modes_and_downgrade_actions_are_literal",
+      "category": "risk",
+      "rationale": "The risk-agent control must retain the literal full/specialist contract values and describe downgrading buy recommendations to hold or sell without changing those runtime modes.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.usage",
+      "before": {
+        "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為觀望或賣出。",
+        "ja": "有効化すると、フル/スペシャリストモードのリスクエージェントは買い推奨を保有または売却に下げることができます。",
+        "ko": "활성화되면 전면/전문가 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 강등할 수 있습니다.",
+        "de": "Wenn aktiviert, kann der Risikoagent im Voll-/Spezialistenmodus Kaufempfehlungen auf Halten oder Verkauf herunterstufen.",
+        "es": "Cuando está activado, el agente de riesgo en modo completo/especialista puede degradar las recomendaciones de compra para mantenerlas o venderlas.",
+        "ms": "Apabila didayakan, ejen risiko dalam mod penuh/pakar boleh menurunkan taraf cadangan beli untuk dipegang atau dijual.",
+        "fr": "Une fois activé, l’agent de risque en mode « full / spécialiste » peut rétrograder les recommandations d’achat pour les conserver ou les vendre.",
+        "id": "Saat diaktifkan, agen risiko dalam mode penuh/spesialis dapat menurunkan rekomendasi pembelian untuk ditahan atau dijual."
+      },
+      "recommended": {
+        "zh-TW": "開啟後，full/specialist 模式中的風險 Agent 可將買入建議降級為持有或賣出。",
+        "ja": "有効にすると、full/specialist モードのリスクエージェントは、買い推奨を保有または売却へ引き下げることができます。",
+        "ko": "활성화하면 full/specialist 모드의 리스크 에이전트가 매수 추천을 보유 또는 매도로 하향 조정할 수 있습니다.",
+        "de": "Wenn aktiviert, kann der Risikoagent im Modus full/specialist Kaufempfehlungen auf Halten oder Verkaufen herabstufen.",
+        "es": "Cuando está activado, el agente de riesgo en modo full/specialist puede rebajar una recomendación de compra a mantener o vender.",
+        "ms": "Apabila didayakan, ejen risiko dalam mod full/specialist boleh menurunkan taraf cadangan beli kepada pegang atau jual.",
+        "fr": "Une fois activé, l’agent de risque en mode full/specialist peut abaisser une recommandation d’achat à conserver ou vendre.",
+        "id": "Saat diaktifkan, agen risiko dalam mode full/specialist dapat menurunkan rekomendasi beli menjadi tahan atau jual."
+      }
+    },
+    {
+      "id": "risk_agent_veto_requires_the_risk_stage",
+      "category": "risk",
+      "rationale": "The value note must state that the veto is effective only when AGENT_ORCHESTRATOR_MODE includes the risk stage.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.valueNotes.0",
+      "before": {
+        "ja": "効果は AGENT_ORCHESTRATOR_MODE リスクステージも含まれます。",
+        "ko": "효과가 있을 때만 AGENT_ORCHESTRATOR_MODE 위험 단계 포함.",
+        "de": "Nur dann wirksam, wenn AGENT_ORCHESTRATOR_MODE Beinhaltet die Risikophase.",
+        "es": "Solo efectivo cuando AGENT_ORCHESTRATOR_MODE Incluye la etapa de riesgo."
+      },
+      "recommended": {
+        "ja": "AGENT_ORCHESTRATOR_MODE にリスクステージが含まれる場合にのみ有効です。",
+        "ko": "AGENT_ORCHESTRATOR_MODE에 위험 단계가 포함된 경우에만 적용됩니다.",
+        "de": "Nur wirksam, wenn AGENT_ORCHESTRATOR_MODE die Risikophase umfasst.",
+        "es": "Solo es efectivo cuando AGENT_ORCHESTRATOR_MODE incluye la etapa de riesgo."
+      }
+    },
+    {
+      "id": "risk_agent_veto_preserves_critical_flag_semantics",
+      "category": "risk",
+      "rationale": "The summary describes a risk-agent veto of buy signals triggered by critical risk indicators, not a generic objection or person-level action.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_RISK_OVERRIDE.summary",
+      "before": {
+        "fr": "Permet à l’agent des risques de veto aux signaux d’achat lorsque des drapeaux de risque critiques sont détectés."
+      },
+      "recommended": {
+        "fr": "Permet à l’agent de risque d’opposer son veto aux signaux d’achat lorsque des indicateurs de risque critiques sont détectés."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_controls_fingerprint_comparability",
+      "category": "credential",
+      "rationale": "The secret controls whether the three named HMAC fingerprint fields are comparable in llm_usage; it is not a model credential or provider key.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.impact.0",
+      "before": {
+        "ja": "比較可能性に影響を与える messages_hmac, system_message_hmac, 、および user_message_hmac において llm_usage.",
+        "ko": "의 비교 가능성에 영향을 미친다 messages_hmac, system_message_hmac, 그리고 user_message_hmac in llm_usage.",
+        "de": "Betrifft die Vergleichbarkeit von messages_hmac, system_message_hmac, und user_message_hmac in llm_usage."
+      },
+      "recommended": {
+        "ja": "llm_usage 内の messages_hmac、system_message_hmac、user_message_hmac の比較可能性に影響します。",
+        "ko": "llm_usage의 messages_hmac, system_message_hmac 및 user_message_hmac 비교 가능성에 영향을 줍니다.",
+        "de": "Beeinflusst die Vergleichbarkeit von messages_hmac, system_message_hmac und user_message_hmac in llm_usage."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_is_not_the_login_session_secret",
+      "category": "credential",
+      "rationale": "The security note must prohibit reusing the login-session secret and exposing the actual HMAC secret through source control, issues, logs, or screenshots.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.notes.0",
+      "before": {
+        "ja": "ログインセッションの秘密は使わないでください。また、本当のキーをバージョン管理、イシュー、ログ、スクリーンショットに提出しないでください。",
+        "ko": "로그인 세션 비밀을 사용하지 말고, 실제 키를 버전 관리, 이슈, 로그, 스크린샷에 제출하지 마세요.",
+        "de": "Verwenden Sie nicht das Login-Session-Geheimnis und senden Sie den echten Schlüssel nicht an die Versionskontrolle, Issues, Logs oder Screenshots.",
+        "es": "No uses el secreto de sesión de inicio de sesión, y no envíes la clave real al control de versiones, problemas, registros o capturas de pantalla.",
+        "ms": "Jangan gunakan rahsia sesi log masuk dan jangan serahkan kunci sebenar kepada kawalan versi, isu, log atau tangkapan skrin.",
+        "fr": "N’utilisez pas le secret de session de connexion, et ne soumettez pas la vraie clé au contrôle de version, aux problèmes, aux journaux ou aux captures d’écran.",
+        "id": "Jangan gunakan rahasia sesi login, dan jangan kirimkan kunci asli untuk kontrol versi, masalah, log, atau tangkapan layar."
+      },
+      "recommended": {
+        "ja": "ログインセッションのシークレットを再利用しないでください。また、実際の値をバージョン管理、Issue、ログ、スクリーンショットにコミットしたり公開したりしないでください。",
+        "ko": "로그인 세션 비밀 값을 재사용하지 말고, 실제 값을 버전 관리, 이슈, 로그 또는 스크린샷에 커밋하거나 노출하지 마세요.",
+        "de": "Verwenden Sie das Geheimnis der Anmeldesitzung nicht erneut und übertragen oder veröffentlichen Sie den echten Wert nicht in der Versionsverwaltung, in Issues, Logs oder Screenshots.",
+        "es": "No reutilices el secreto de la sesión de inicio de sesión ni confirmes o expongas el valor real en el control de versiones, incidencias, registros o capturas de pantalla.",
+        "ms": "Jangan guna semula rahsia sesi log masuk atau masukkan dan dedahkan nilai sebenar dalam kawalan versi, isu, log atau tangkapan skrin.",
+        "fr": "Ne réutilisez pas le secret de session de connexion et ne validez ni n’exposez la valeur réelle dans le contrôle de version, les issues, les journaux ou les captures d’écran.",
+        "id": "Jangan gunakan kembali rahasia sesi login atau masukkan dan ungkapkan nilai sebenarnya dalam kontrol versi, issue, log, atau tangkapan layar."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_signs_message_fingerprints",
+      "category": "credential",
+      "rationale": "The summary states that this secret signs message-level fingerprints for usage telemetry; it does not authenticate a user or authorize a provider request.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.summary",
+      "before": {
+        "ja": "メッセージレベルの記号 HMAC 指紋 LLM テレメトリーを活用してください。",
+        "ko": "신호 메시지 수준 HMAC 지문 LLM 텔레메트리를 사용하세요.",
+        "de": "Zeichen auf Nachrichtenebene HMAC Fingerabdrücke für LLM Nutzungstelemetrie.",
+        "es": "Señales a nivel de mensaje HMAC huellas dactilares para LLM Uso de telemetría.",
+        "ms": "Tanda-tanda peringkat mesej HMAC cap jari untuk LLM penggunaan telemetri.",
+        "fr": "Panneaux au niveau du message HMAC empreintes digitales pour LLM Utilisation de la télémétrie.",
+        "id": "Tanda tingkat pesan HMAC sidik jari untuk LLM penggunaan telemetri."
+      },
+      "recommended": {
+        "ja": "LLM 使用状況テレメトリ用に、メッセージ単位のフィンガープリントへ HMAC 署名します。",
+        "ko": "LLM 사용량 텔레메트리를 위해 메시지 수준 지문에 HMAC 서명을 적용합니다.",
+        "de": "Signiert HMAC-Fingerabdrücke auf Nachrichtenebene für die LLM-Nutzungstelemetrie.",
+        "es": "Firma huellas HMAC a nivel de mensaje para la telemetría de uso de LLM.",
+        "ms": "Menandatangani cap jari HMAC peringkat mesej untuk telemetri penggunaan LLM.",
+        "fr": "Signe les empreintes HMAC au niveau des messages pour la télémétrie d’utilisation des LLM.",
+        "id": "Menandatangani sidik jari HMAC tingkat pesan untuk telemetri penggunaan LLM."
+      }
+    },
+    {
+      "id": "usage_hmac_secret_title_names_the_secret",
+      "category": "credential",
+      "rationale": "The title must name an HMAC secret used for LLM usage telemetry rather than an example, generic key, or usage instruction.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.title",
+      "before": {
+        "ja": "LLM 使用例 HMAC 秘密",
+        "ko": "LLM 사용 HMAC 비밀",
+        "de": "LLM Verwendung HMAC Geheimnis",
+        "es": "LLM Uso HMAC Secreto",
+        "ms": "LLM Kegunaan HMAC Rahsia",
+        "fr": "LLM Utilisation HMAC Secret",
+        "id": "LLM penggunaan HMAC Rahasia"
+      },
+      "recommended": {
+        "ja": "LLM 使用量 HMAC シークレット",
+        "ko": "LLM 사용량 HMAC 비밀 값",
+        "de": "HMAC-Geheimnis für LLM-Nutzung",
+        "es": "Secreto HMAC de uso de LLM",
+        "ms": "Rahsia HMAC penggunaan LLM",
+        "fr": "Secret HMAC d’utilisation des LLM",
+        "id": "Rahasia HMAC penggunaan LLM"
+      }
+    },
+    {
+      "id": "usage_hmac_secret_explains_generation_and_cross_deployment_scope",
+      "category": "credential",
+      "rationale": "The usage text preserves the secure default of a backend-generated local secret and limits manual configuration to intentional cross-deployment HMAC comparison with a high-entropy value.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.usage",
+      "before": {
+        "ja": "通常はこのファイルを空にしておき、バックエンドがローカルのシークレットファイルを作成します。配置が意図的に同等の配置を必要とする場合にのみ設定してください HMACs, 、そしてopenssl rand -hex 32のような高エントロピーランダムな値を用います。",
+        "ko": "보통은 비워두면 백엔드가 로컬 비밀 파일을 생성합니다. 배포가 의도적으로 유사 기능이 필요할 때만 설정하세요 HMACs, 그리고 openssl rand -hex 32와 같은 고엔트로피 무작위 값을 사용한다.",
+        "de": "Normalerweise lasse ich das leer, damit das Backend eine lokale geheime Datei erstellt. Setze es nur dann ein, wenn Deployments absichtlich vergleichbare Möglichkeiten benötigen HMACs, und verwenden Sie einen Hochentropie-Zufallswert wie OpenSSL Rand -Hex 32.",
+        "es": "Normalmente dejo esto vacío para que el backend cree un archivo secreto local. Configúralo solo cuando los despliegues necesiten intencionadamente comparables HMACs, y usar un valor aleatorio de alta entropía como openssl rand -hex 32.",
+        "ms": "Biasanya biarkan ini kosong supaya bahagian belakang mencipta fail rahsia tempatan. Tetapkannya hanya apabila penggunaan sengaja memerlukan setanding HMACs, dan menggunakan nilai rawak entropi tinggi seperti openssl rand -hex 32.",
+        "fr": "En général, je laisse ce fichier vide pour que le backend crée un fichier secret local. Ne le définissez que lorsque les déploiements ont intentionnellement besoin d’être comparables HMACs, et utiliser une valeur aléatoire à haute entropie telle que openssl rand -hex 32.",
+        "id": "Biasanya biarkan ini kosong sehingga backend membuat file rahasia lokal. Atur hanya ketika penyebaran yang sengaja membutuhkan sebanding HMACs, dan menggunakan nilai acak entropi tinggi seperti openssl rand -hex 32."
+      },
+      "recommended": {
+        "ja": "通常は空のままにし、バックエンドにローカルのシークレットファイルを作成させます。デプロイ間で HMAC を意図的に比較する必要がある場合にのみ設定し、openssl rand -hex 32 などで生成した高エントロピーのランダム値を使用してください。",
+        "ko": "일반적으로 비워 두면 백엔드가 로컬 비밀 파일을 생성합니다. 배포 간 HMAC을 의도적으로 비교해야 할 때만 설정하고 openssl rand -hex 32로 생성한 것과 같은 고엔트로피 난수 값을 사용하세요.",
+        "de": "Lassen Sie dieses Feld normalerweise leer, damit das Backend eine lokale Geheimnisdatei erstellt. Legen Sie es nur fest, wenn HMACs zwischen Bereitstellungen absichtlich vergleichbar sein müssen, und verwenden Sie einen zufälligen Wert mit hoher Entropie, etwa aus openssl rand -hex 32.",
+        "es": "Déjalo normalmente vacío para que el backend cree un archivo secreto local. Configúralo solo cuando sea necesario comparar HMAC entre despliegues de forma intencionada y usa un valor aleatorio de alta entropía, por ejemplo el generado con openssl rand -hex 32.",
+        "ms": "Biasanya biarkan kosong supaya backend mencipta fail rahsia setempat. Tetapkan hanya apabila HMAC antara penggunaan memang perlu dibandingkan, dan gunakan nilai rawak berentropi tinggi seperti yang dijana dengan openssl rand -hex 32.",
+        "fr": "Laissez généralement ce champ vide afin que le backend crée un fichier secret local. Définissez-le uniquement lorsque les HMAC doivent volontairement être comparables entre déploiements, et utilisez une valeur aléatoire à forte entropie, par exemple générée avec openssl rand -hex 32.",
+        "id": "Biasanya biarkan kosong agar backend membuat file rahasia lokal. Atur hanya jika HMAC antar-deployment memang perlu dibandingkan, dan gunakan nilai acak berentropi tinggi seperti yang dibuat dengan openssl rand -hex 32."
+      }
+    },
+    {
+      "id": "usage_hmac_rotation_updates_the_key_version",
+      "category": "credential",
+      "rationale": "The rotation note must require updating LLM_USAGE_HMAC_KEY_VERSION so fingerprints created under different secrets are not treated as comparable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_USAGE_HMAC_SECRET.valueNotes.1",
+      "before": {
+        "ja": "回転する際は、更新も行ってください LLM_USAGE_HMAC_KEY_VERSION.",
+        "ko": "회전할 때도 업데이트하세요 LLM_USAGE_HMAC_KEY_VERSION.",
+        "de": "Beim Drehen solltest du auch aktualisieren LLM_USAGE_HMAC_KEY_VERSION.",
+        "fr": "En la faisant pivoter, mettez-la aussi à jour LLM_USAGE_HMAC_KEY_VERSION."
+      },
+      "recommended": {
+        "ja": "ローテーション時は LLM_USAGE_HMAC_KEY_VERSION も更新してください。",
+        "ko": "교체할 때 LLM_USAGE_HMAC_KEY_VERSION도 업데이트하세요.",
+        "de": "Aktualisieren Sie bei einer Rotation auch LLM_USAGE_HMAC_KEY_VERSION.",
+        "fr": "Lors de sa rotation, mettez également à jour LLM_USAGE_HMAC_KEY_VERSION."
+      }
+    },
+    {
+      "id": "bias_threshold_impacts_chase_risk_warnings",
+      "category": "risk",
+      "rationale": "The impact text concerns chasing a price move, moving-average deviation, and trading judgment; it must not read as generic tracking or physical distance.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.impact.0",
+      "before": {
+        "ja": "追いかけ、移動平均線の逸脱、取引アドバイスに関するテクニカル分析警告に影響します。",
+        "ko": "추격, 이동평균선 편차, 거래 조언에 관한 기술적 분석 경고에 영향을 미칩니다."
+      },
+      "recommended": {
+        "ja": "追い買い、移動平均線からの乖離、売買判断に関するテクニカル分析の警告に影響します。",
+        "ko": "추격 매수, 이동평균선 이격, 매매 판단에 관한 기술 분석 경고에 영향을 줍니다."
+      }
+    },
+    {
+      "id": "bias_threshold_balances_noise_and_chase_risk",
+      "category": "risk",
+      "rationale": "The note distinguishes excess warning noise at a low threshold from weakened chase-risk warnings at a high threshold.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.notes.0",
+      "before": {
+        "ja": "低すぎるとノイズの警告が発生します。高すぎると追跡リスク警報が弱まる。",
+        "ko": "너무 낮으면 시끄러운 경고음이 발생할 수 있습니다; 너무 높으면 추격 위험 경보가 약해질 수 있습니다.",
+        "de": "Zu niedrig kann laute Warnungen verursachen; Zu hoch kann die Chase-Risiko-Warnungen schwächen.",
+        "es": "Demasiado bajo puede añadir avisos ruidosos; Demasiado alto puede debilitar las alertas de riesgo de persecución."
+      },
+      "recommended": {
+        "ja": "低すぎると不要な警告が増え、高すぎると高値追いリスクの警告が弱まる可能性があります。",
+        "ko": "너무 낮으면 불필요한 경고가 늘고, 너무 높으면 추격 매수 위험 경고가 약해질 수 있습니다.",
+        "de": "Ein zu niedriger Wert kann unnötig viele Warnungen auslösen; ein zu hoher Wert kann Hinweise auf das Risiko des Hinterherlaufens abschwächen.",
+        "es": "Un valor demasiado bajo puede añadir avisos innecesarios; uno demasiado alto puede debilitar las alertas sobre el riesgo de perseguir subidas."
+      }
+    },
+    {
+      "id": "bias_threshold_warns_on_chasing_and_mean_reversion",
+      "category": "risk",
+      "rationale": "The usage text describes a percentage deviation from MA5 and two risk outcomes: warning against chasing and highlighting mean-reversion risk.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.BIAS_THRESHOLD.usage",
+      "before": {
+        "ja": "パーセンテージを入力してください。価格の偏差がMA5の閾値を超えると、追跡を警告したり、平均回帰リスクを強調したりする報告が出ます。",
+        "ko": "백분율을 입력하세요. 가격 편차가 MA5에서 임계값을 초과할 경우, 보고서는 추격을 경고하거나 평균 회귀 위험을 강조할 수 있습니다.",
+        "de": "Geben Sie einen Prozentsatz ein. Wenn die Preisabweichung von MA5 die Schwelle überschreitet, können Berichte vor Chasing warnen oder das Risiko der Mittelwert-Rückkehr hervorheben.",
+        "es": "Introduce un porcentaje. Cuando la desviación de precio respecto a MA5 supera el umbral, los informes pueden advertir contra la persecución o destacar el riesgo de reversión media.",
+        "fr": "Entrez un pourcentage. Lorsque l’écart de prix par rapport au MA5 dépasse le seuil, les rapports peuvent mettre en garde contre la poursuite ou mettre en avant le risque de réversion moyenne.",
+        "id": "Masukkan persentase. Ketika penyimpangan harga dari MA5 melebihi ambang batas, laporan dapat memperingatkan terhadap pengejaran atau menyoroti risiko pengembalian rata-rata."
+      },
+      "recommended": {
+        "ja": "割合（%）を入力します。価格の MA5 からの乖離が閾値を超えると、レポートは高値追いを避けるよう警告したり、平均回帰リスクを示したりします。",
+        "ko": "백분율을 입력합니다. 가격의 MA5 이격이 임계값을 넘으면 보고서에서 추격 매수를 경고하거나 평균 회귀 위험을 강조할 수 있습니다.",
+        "de": "Geben Sie einen Prozentwert ein. Überschreitet die Abweichung des Kurses vom MA5 den Schwellenwert, können Berichte davor warnen, Kursen hinterherzulaufen, oder auf ein Mean-Reversion-Risiko hinweisen.",
+        "es": "Introduce un porcentaje. Cuando la desviación del precio respecto a MA5 supera el umbral, los informes pueden advertir contra perseguir subidas o destacar el riesgo de reversión a la media.",
+        "fr": "Entrez un pourcentage. Lorsque l’écart du prix par rapport à la MA5 dépasse le seuil, les rapports peuvent déconseiller de poursuivre la hausse ou signaler un risque de retour à la moyenne.",
+        "id": "Masukkan persentase. Ketika penyimpangan harga dari MA5 melebihi ambang batas, laporan dapat memperingatkan agar tidak mengejar kenaikan atau menyoroti risiko pembalikan menuju rata-rata."
+      }
+    },
+    {
+      "id": "admin_auth_impacts_login_settings_and_admin_operations",
+      "category": "authentication",
+      "rationale": "The control affects WebUI login, access to settings, and administrative operations; malformed fragments obscured that authentication boundary.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.impact.0",
+      "before": {
+        "ja": "影響 WebUI ログイン、設定、アクセス、管理操作。",
+        "ko": "영향 WebUI 로그인, 설정 접근, 관리자 조작.",
+        "de": "Auswirkungen WebUI Login, Einstellungszugriff und Admin-Operationen.",
+        "es": "Afectos WebUI inicio de sesión, ajustes de acceso y operaciones de administración.",
+        "ms": "Memberi kesan WebUI log masuk, akses tetapan dan operasi pentadbir.",
+        "fr": "Effets WebUI Connexion, Paramètres d’accès et opérations administratives.",
+        "id": "Mempengaruhi WebUI login, akses pengaturan, dan operasi admin."
+      },
+      "recommended": {
+        "ja": "WebUI のログイン、設定へのアクセス、管理者操作に影響します。",
+        "ko": "WebUI 로그인, 설정 접근 및 관리자 작업에 영향을 줍니다.",
+        "de": "Wirkt sich auf die WebUI-Anmeldung, den Zugriff auf Einstellungen und administrative Vorgänge aus.",
+        "es": "Afecta al inicio de sesión en la WebUI, al acceso a la configuración y a las operaciones administrativas.",
+        "ms": "Mempengaruhi log masuk WebUI, akses tetapan dan operasi pentadbir.",
+        "fr": "Affecte la connexion à la WebUI, l’accès aux paramètres et les opérations d’administration.",
+        "id": "Memengaruhi login WebUI, akses pengaturan, dan operasi administrator."
+      }
+    },
+    {
+      "id": "admin_auth_data_requires_deployment_persistence",
+      "category": "authentication",
+      "rationale": "The note requires authentication data to persist in the deployment environment and explains the refresh or restart needed after manual .env edits.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.notes.0",
+      "before": {
+        "ja": "認証データがデプロイ環境に永続化されていることを確認してください。マニュアル .env 編集にはプロセスの再起動か認証設定フローで状態を更新する必要があります。",
+        "ko": "배포 환경에서 인증 데이터가 보존되도록 하세요. 수동 .env 편집은 프로세스 재시작이나 인증 설정 플로우가 상태를 새로고침해야 합니다.",
+        "de": "Stellen Sie sicher, dass die Authentifizierungsdaten in der Bereitstellungsumgebung gespeichert werden. Manuell .env Bearbeitungen erfordern einen Neustart des Prozesses oder den Ablauf der Authentifizierungseinstellungen, um den Zustand zu aktualisieren.",
+        "es": "Asegúrate de que los datos de autenticación se mantengan en el entorno de despliegue. Manual .env Las ediciones requieren reiniciar el proceso o que la configuración de autenticación fluya para actualizar el estado.",
+        "ms": "Pastikan data pengesahan dikekalkan dalam persekitaran penggunaan. Buku Panduan .env Pengeditan memerlukan mulakan semula proses atau aliran tetapan pengesahan untuk menyegarkan semula keadaan.",
+        "fr": "Assurez-vous que les données d’authentification sont conservées dans l’environnement de déploiement. Manuel .env Les modifications nécessitent un redémarrage du processus ou que les paramètres d’authentification se rafraîchissent à l’état.",
+        "id": "Pastikan data aukasi dipertahankan di lingkungan penyebaran. Panduan .env Pengeditan memerlukan proses mulai ulang atau alur pengaturan autentikasi untuk menyegarkan status."
+      },
+      "recommended": {
+        "ja": "デプロイ環境で認証データが永続化されることを確認してください。.env を手動で編集した場合は、プロセスを再起動するか、認証設定フローで状態を更新する必要があります。",
+        "ko": "배포 환경에서 인증 데이터가 영구 저장되는지 확인하세요. .env 파일을 수동으로 수정한 경우 프로세스를 다시 시작하거나 인증 설정 흐름에서 상태를 새로 고쳐야 합니다.",
+        "de": "Stellen Sie sicher, dass Authentifizierungsdaten in der Bereitstellungsumgebung dauerhaft gespeichert werden. Nach manuellen Änderungen an .env muss der Prozess neu gestartet oder der Status über die Authentifizierungseinstellungen aktualisiert werden.",
+        "es": "Asegúrate de que los datos de autenticación persistan en el entorno de despliegue. Los cambios manuales en .env requieren reiniciar el proceso o actualizar el estado desde la configuración de autenticación.",
+        "ms": "Pastikan data pengesahan disimpan secara berterusan dalam persekitaran penggunaan. Perubahan manual pada .env memerlukan proses dimulakan semula atau keadaan disegarkan melalui tetapan pengesahan.",
+        "fr": "Assurez-vous que les données d’authentification sont persistées dans l’environnement de déploiement. Toute modification manuelle du fichier .env nécessite un redémarrage du processus ou une actualisation de l’état via les paramètres d’authentification.",
+        "id": "Pastikan data autentikasi disimpan secara persisten di lingkungan deployment. Perubahan manual pada .env memerlukan proses dimulai ulang atau status diperbarui melalui pengaturan autentikasi."
+      }
+    },
+    {
+      "id": "admin_auth_enables_webui_password_protection",
+      "category": "authentication",
+      "rationale": "The summary identifies administrator-password protection for WebUI instead of an incomplete activation fragment.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.summary",
+      "before": {
+        "ja": "管理者パスワード保護を有効にします WebUI.",
+        "ko": "관리자 비밀번호 보호 활성화 WebUI."
+      },
+      "recommended": {
+        "ja": "WebUI の管理者パスワード保護を有効にします。",
+        "ko": "WebUI에 관리자 비밀번호 보호를 활성화합니다."
+      }
+    },
+    {
+      "id": "admin_auth_uses_the_settings_flow_and_reset_command",
+      "category": "authentication",
+      "rationale": "The recovery text directs users to the WebUI authentication settings flow and preserves the exact reset command without splitting its arguments.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.ADMIN_AUTH_ENABLED.usage",
+      "before": {
+        "ja": "通してください WebUI 認証設定の有効化または無効を入力; パスワードを忘れた場合は、python -m src.auth を実行してください。 reset_password。",
+        "ko": "통과해 주세요 WebUI 인증 설정 항목 활성화 또는 비활성화; 비밀번호를 잊으면 python -m src.auth를 실행할 수 있습니다. reset_password。"
+      },
+      "recommended": {
+        "ja": "WebUI の認証設定から有効または無効にします。必要に応じて python -m src.auth reset_password でパスワードをリセットしてください。",
+        "ko": "WebUI 인증 설정에서 이 기능을 활성화하거나 비활성화하세요. 필요한 경우 python -m src.auth reset_password로 비밀번호를 재설정하세요."
+      }
+    },
+    {
+      "id": "daily_market_context_controls_analysis_guardrails_not_report_generation",
+      "category": "risk",
+      "rationale": "Disabling DAILY_MARKET_CONTEXT_ENABLED keeps market-review reports running while stopping summary injection and its conservative effect on buy/add recommendations.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_rule_2210"
+      ],
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.market_review.valueNotes.2",
+      "before": {
+        "ja": "デフォルトで有効化 DAILY_MARKET_CONTEXT_ENABLED； そうしておこう false その後も市場レビューレポートを作成できますが、個別の株価分析では市場の概要を読み取ったり、買い・追加の推奨を緩和したりすることはできません。",
+        "ko": "기본적으로 활성화됨 DAILY_MARKET_CONTEXT_ENABLED； 그냥 두세요 false 시장 리뷰 보고서는 이후에 생성할 수 있지만, 개별 주식 분석은 시장 요약을 읽거나 매수/추가 추천을 완화하지 않습니다."
+      },
+      "recommended": {
+        "ja": "DAILY_MARKET_CONTEXT_ENABLED はデフォルトで有効です。false に設定すると、市場レビューレポートは引き続き生成されますが、その概要は個別銘柄の分析に挿入されず、買い・買い増し推奨を抑制しません。",
+        "ko": "DAILY_MARKET_CONTEXT_ENABLED는 기본적으로 활성화됩니다. false로 설정하면 시장 리뷰 보고서는 계속 생성되지만, 그 요약은 개별 종목 분석에 삽입되지 않으며 매수 또는 추가 매수 추천을 완화하지 않습니다."
+      }
+    },
+    {
+      "id": "complete_revision_f16339f7d8f0",
+      "key": "api.error.STABLE_ERROR_TEXT.password_required.message",
+      "category": "error",
+      "rationale": "Records the complete baseline-to-candidate error revision while keeping the stable error code separate from localized title and recovery copy.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "de": "Gib das erforderliche Passwort ein und versuche es erneut."
+      },
+      "recommended": {
+        "de": "Geben Sie das erforderliche Passwort ein und versuchen Sie es erneut."
+      }
+    },
+    {
+      "id": "complete_revision_7b974bd73af9",
+      "key": "api.error.STABLE_ERROR_TEXT.rate_limited.message",
+      "category": "error",
+      "rationale": "Records the complete baseline-to-candidate error revision while keeping the stable error code separate from localized title and recovery copy.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "ja": "少し待ってからもう一度試してみて。",
+        "de": "Warte einen Moment und versuche es erneut.",
+        "fr": "Attends un instant et essaie à nouveau."
+      },
+      "recommended": {
+        "ja": "しばらく待ってから、もう一度お試しください。",
+        "de": "Warten Sie einen Moment und versuchen Sie es erneut.",
+        "fr": "Patientez un instant, puis réessayez."
+      }
+    },
+    {
+      "id": "complete_revision_d1824688f53f",
+      "key": "api.error.STABLE_ERROR_TEXT.rate_limited.title",
+      "category": "error",
+      "rationale": "Records the complete baseline-to-candidate error revision while keeping the stable error code separate from localized title and recovery copy.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "ja": "試みが多すぎた"
+      },
+      "recommended": {
+        "ja": "試行回数が多すぎます"
+      }
+    },
+    {
+      "id": "complete_revision_785865f9fe75",
+      "key": "i18n.uiText.UI_TEXT.history.actionAlert",
+      "category": "trading_action",
+      "rationale": "Records the complete baseline-to-candidate action-label revision so informational trading states remain distinct from internal action values and personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "警告",
+        "ko": "경고",
+        "id": "peringatan"
+      },
+      "recommended": {
+        "ja": "注意",
+        "ko": "주의",
+        "id": "Peringatan"
+      }
+    },
+    {
+      "id": "complete_revision_8dca72329d68",
+      "key": "i18n.uiText.UI_TEXT.history.actionBuy",
+      "category": "trading_action",
+      "rationale": "Records the complete baseline-to-candidate action-label revision so informational trading states remain distinct from internal action values and personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "買う",
+        "ko": "구매"
+      },
+      "recommended": {
+        "ja": "買い",
+        "ko": "매수"
+      }
+    },
+    {
+      "id": "complete_revision_b0304e457f98",
+      "key": "i18n.uiText.UI_TEXT.history.actionHold",
+      "category": "trading_action",
+      "rationale": "Records the complete baseline-to-candidate action-label revision so informational trading states remain distinct from internal action values and personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "ホールド"
+      },
+      "recommended": {
+        "ja": "保有"
+      }
+    },
+    {
+      "id": "complete_revision_d580618cb03a",
+      "key": "i18n.uiText.UI_TEXT.history.actionSell",
+      "category": "trading_action",
+      "rationale": "Records the complete baseline-to-candidate action-label revision so informational trading states remain distinct from internal action values and personalized instructions.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "finra_rule_2210"
+      ],
+      "before": {
+        "ja": "売却",
+        "ko": "매각"
+      },
+      "recommended": {
+        "ja": "売り",
+        "ko": "매도"
+      }
+    },
+    {
+      "id": "complete_revision_77c89f710287",
+      "key": "i18n.uiText.UI_TEXT.login.loginDescription",
+      "category": "authentication",
+      "rationale": "Records the complete baseline-to-candidate authentication revision so login, password, session, and recovery states remain distinct and traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b",
+        "rfc_9110_authentication"
+      ],
+      "before": {
+        "ms": "Bukti kelayakan yang sah diperlukan untuk mengakses ruang kerja keputusan StockPulse."
+      },
+      "recommended": {
+        "ms": "Maklumat pengesahan yang sah diperlukan untuk mengakses ruang kerja keputusan StockPulse."
+      }
+    },
+    {
+      "id": "complete_revision_a55e9e24cf16",
+      "key": "i18n.uiText.UI_TEXT.settings.llmAccessDescription",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "モデル接続、基本URLの管理、 API キー、プライマリモデル、フォールバックモデル。",
+        "ko": "모델 연결, 기본 URL 관리,API 키, 기본 모델, 그리고 대체 모델.",
+        "de": "Modellverbindungen verwalten, Basis-URLs,API Schlüssel, Primärmodelle und Rückfallmodelle.",
+        "es": "Gestionar conexiones de modelos, URLs base,API llaves, modelos principales y modelos de respaldo.",
+        "ms": "Urus sambungan model, URL asas,API kekunci, model utama dan model sandaran.",
+        "fr": "Gérer les connexions des modèles, les URL de base,API les clés, les modèles primaires et les modèles de secours.",
+        "id": "Mengelola koneksi model, URL dasar,API kunci, model utama, dan model penggantian."
+      },
+      "recommended": {
+        "ja": "モデル接続、ベース URL、API キー、プライマリモデル、フォールバックモデルを管理します。",
+        "ko": "모델 연결, 기본 URL, API 키, 기본 모델 및 대체 모델을 관리합니다.",
+        "de": "Modellverbindungen, Basis-URLs, API-Schlüssel, Primärmodelle und Fallback-Modelle verwalten.",
+        "es": "Gestiona las conexiones de modelos, las URL base, las claves API, los modelos principales y los modelos de respaldo.",
+        "ms": "Urus sambungan model, URL asas, kunci API, model utama dan model sandaran.",
+        "fr": "Gérez les connexions aux modèles, les URL de base, les clés API, les modèles principaux et les modèles de secours.",
+        "id": "Kelola koneksi model, URL dasar, kunci API, model utama, dan model cadangan."
+      }
+    },
+    {
+      "id": "complete_revision_90be4dad3dd3",
+      "key": "locales.alerts.ALERT_LIST_TEXT.childTargetCooldown",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "子目標見觸發歷史",
+        "ja": "ターゲットごとのクールダウンはトリガー履歴に記録されています",
+        "ko": "대상별 쿨타임은 트리거 히스토리에 포함되어 있습니다",
+        "de": "Die Abklingzeiten pro Ziel liegen in der Auslöserhistorie",
+        "es": "Los tiempos de recarga por objetivo están en el historial de disparos",
+        "ms": "Cooldown setiap sasaran berada dalam sejarah pencetus",
+        "fr": "Les temps de recharge par cible figurent dans l’historique des déclencheurs",
+        "id": "Cooldown per target ada dalam riwayat pemicu"
+      },
+      "recommended": {
+        "zh-TW": "各子目標的冷卻時間請見觸發記錄",
+        "ja": "ターゲットごとの抑制期間はトリガー履歴に記録されています",
+        "ko": "대상별 재알림 대기 시간은 트리거 기록에서 확인할 수 있습니다",
+        "de": "Zielspezifische Sperrfristen stehen im Auslöseverlauf.",
+        "es": "Los períodos de espera por objetivo aparecen en el historial de activaciones.",
+        "ms": "Tempoh penangguhan bagi setiap sasaran terdapat dalam rekod pencetus.",
+        "fr": "Les délais de temporisation par cible figurent dans l’historique des déclenchements.",
+        "id": "Jeda notifikasi per target tercatat dalam riwayat pemicu."
+      }
+    },
+    {
+      "id": "complete_revision_cc6945344572",
+      "key": "locales.alerts.ALERT_LIST_TEXT.cooldown",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "冷卻",
+        "ja": "クールダウン",
+        "ko": "쿨다운",
+        "de": "Abklingzeit",
+        "es": "Tiempo de recarga",
+        "ms": "Tempoh bertenang",
+        "fr": "Temps de recharge",
+        "id": "Jeda"
+      },
+      "recommended": {
+        "zh-TW": "冷卻時間",
+        "ja": "抑制期間",
+        "ko": "재알림 대기 시간",
+        "de": "Sperrfrist",
+        "es": "Período de espera",
+        "ms": "Tempoh penangguhan",
+        "fr": "Délai de temporisation",
+        "id": "Jeda notifikasi"
+      }
+    },
+    {
+      "id": "complete_revision_48e1dc337934",
+      "key": "locales.alerts.ALERT_LIST_TEXT.deleteMessage",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "確認刪除「{name}」嗎？該操作不會刪除已有觸發歷史。",
+        "de": "\"{name}\" löschen? Die vorhandene Auslösergeschichte wird gespeichert.",
+        "es": "¿Eliminar \"{name}\"? Se conservará el historial de disparos existente.",
+        "ms": "Padamkan \"{name}\"? Sejarah pencetus sedia ada akan disimpan."
+      },
+      "recommended": {
+        "zh-TW": "確認刪除「{name}」嗎？現有觸發記錄將會保留。",
+        "de": "\"{name}\" löschen? Der vorhandene Auslöseverlauf bleibt erhalten.",
+        "es": "¿Eliminar \"{name}\"? Se conservará el historial de activaciones existente.",
+        "ms": "Padam \"{name}\"? Rekod pencetus sedia ada akan dikekalkan."
+      }
+    },
+    {
+      "id": "complete_revision_d815162e5dc4",
+      "key": "locales.alerts.ALERT_LIST_TEXT.disabled",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "未啟用"
+      },
+      "recommended": {
+        "zh-TW": "已停用"
+      }
+    },
+    {
+      "id": "complete_revision_c21d32503975",
+      "key": "locales.alerts.ALERT_SCOPE_LABELS.watchlist",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "自己選択株",
+        "ko": "자가 선택 주식",
+        "de": "Selbst ausgewählte Aktien",
+        "es": "Acciones autoseleccionadas",
+        "ms": "Saham pilihan sendiri",
+        "fr": "Actions auto-sélectionnées",
+        "id": "Saham yang dipilih sendiri"
+      },
+      "recommended": {
+        "ja": "ウォッチリスト",
+        "ko": "관심 종목",
+        "de": "Watchlist",
+        "es": "Lista de seguimiento",
+        "ms": "Senarai pantau",
+        "fr": "Liste de suivi",
+        "id": "Daftar pantauan"
+      }
+    },
+    {
+      "id": "complete_revision_cbadb00eee55",
+      "key": "locales.alerts.ALERT_SEVERITY_LABELS.info",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "ヒント",
+        "ko": "팁",
+        "de": "Tipp",
+        "es": "Propina",
+        "ms": "Petua",
+        "fr": "Conseil",
+        "id": "Tip"
+      },
+      "recommended": {
+        "ja": "情報",
+        "ko": "정보",
+        "de": "Information",
+        "es": "Información",
+        "ms": "Maklumat",
+        "fr": "Information",
+        "id": "Informasi"
+      }
+    },
+    {
+      "id": "complete_revision_4cdcfb9a65df",
+      "key": "locales.alerts.ALERT_SEVERITY_OPTIONS.0.label",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "ヒント",
+        "ko": "팁",
+        "de": "Tipp",
+        "es": "Propina",
+        "ms": "Petua",
+        "fr": "Conseil",
+        "id": "Tip"
+      },
+      "recommended": {
+        "ja": "情報",
+        "ko": "정보",
+        "de": "Information",
+        "es": "Información",
+        "ms": "Maklumat",
+        "fr": "Information",
+        "id": "Informasi"
+      }
+    },
+    {
+      "id": "complete_revision_bc0f7b35b301",
+      "key": "locales.alerts.ALERT_SYMBOL_TYPE_OPTIONS.2.label",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "音量の急増",
+        "ko": "볼륨 급증",
+        "de": "Lautstärkespitze",
+        "es": "Pico de volumen",
+        "ms": "Lonjakan kelantangan",
+        "fr": "Pic de volume",
+        "id": "Lonjakan volume"
+      },
+      "recommended": {
+        "ja": "出来高急増",
+        "ko": "거래량 급증",
+        "de": "Sprung im Handelsvolumen",
+        "es": "Pico del volumen de negociación",
+        "ms": "Lonjakan volum dagangan",
+        "fr": "Pic du volume des transactions",
+        "id": "Lonjakan volume perdagangan"
+      }
+    },
+    {
+      "id": "complete_revision_ad21e97d17c0",
+      "key": "locales.alerts.ALERT_TARGET_SCOPE_OPTIONS.1.label",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "自己選択株",
+        "ko": "자가 선택 주식",
+        "de": "Selbst ausgewählte Aktien",
+        "es": "Acciones autoseleccionadas",
+        "ms": "Saham pilihan sendiri",
+        "fr": "Actions auto-sélectionnées",
+        "id": "Saham yang dipilih sendiri"
+      },
+      "recommended": {
+        "ja": "ウォッチリスト",
+        "ko": "관심 종목",
+        "de": "Watchlist",
+        "es": "Lista de seguimiento",
+        "ms": "Senarai pantau",
+        "fr": "Liste de suivi",
+        "id": "Daftar pantauan"
+      }
+    },
+    {
+      "id": "complete_revision_eb4a8ba41a28",
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.emptyTitle",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "暫無觸發歷史",
+        "ko": "트리거 이력이 없습니다",
+        "de": "Keine Auslösergeschichte",
+        "es": "Sin historial de disparadores",
+        "ms": "Tiada sejarah pencetus"
+      },
+      "recommended": {
+        "zh-TW": "暫無觸發記錄",
+        "ko": "트리거 기록이 없습니다",
+        "de": "Kein Auslöseverlauf",
+        "es": "Sin historial de activaciones",
+        "ms": "Tiada rekod pencetus"
+      }
+    },
+    {
+      "id": "complete_revision_c64d0638bc3d",
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.loading",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "正在載入觸發歷史",
+        "de": "Lade-Trigger-Geschichte",
+        "ms": "Memuatkan sejarah pencetus"
+      },
+      "recommended": {
+        "zh-TW": "正在載入觸發記錄",
+        "de": "Auslöseverlauf wird geladen",
+        "ms": "Memuatkan rekod pencetus"
+      }
+    },
+    {
+      "id": "complete_revision_bac984475922",
+      "key": "locales.alerts.ALERT_TRIGGER_TEXT.title",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "zh-TW": "觸發歷史",
+        "ja": "トリガーの歴史",
+        "ko": "트리거 역사",
+        "de": "Auslösergeschichte",
+        "es": "Historial de disparos",
+        "ms": "Mencetuskan sejarah"
+      },
+      "recommended": {
+        "zh-TW": "觸發記錄",
+        "ja": "トリガー履歴",
+        "ko": "트리거 기록",
+        "de": "Auslöseverlauf",
+        "es": "Historial de activaciones",
+        "ms": "Rekod pencetus"
+      }
+    },
+    {
+      "id": "complete_revision_aeb0e9023746",
+      "key": "locales.alerts.ALERT_TYPE_FILTER_OPTIONS.3.label",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "音量の急増",
+        "ko": "볼륨 급증",
+        "de": "Lautstärkespitze",
+        "es": "Pico de volumen",
+        "ms": "Lonjakan kelantangan",
+        "fr": "Pic de volume",
+        "id": "Lonjakan volume"
+      },
+      "recommended": {
+        "ja": "出来高急増",
+        "ko": "거래량 급증",
+        "de": "Sprung im Handelsvolumen",
+        "es": "Pico del volumen de negociación",
+        "ms": "Lonjakan volum dagangan",
+        "fr": "Pic du volume des transactions",
+        "id": "Lonjakan volume perdagangan"
+      }
+    },
+    {
+      "id": "complete_revision_af76ea880d20",
+      "key": "locales.portfolio.PORTFOLIO_TEXT.avg",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "平均費用",
+        "ko": "평균 비용",
+        "de": "Durchschnittskosten",
+        "es": "Coste medio",
+        "ms": "Kos purata",
+        "fr": "Coût moyen",
+        "id": "Biaya rata-rata"
+      },
+      "recommended": {
+        "ja": "平均取得価額",
+        "ko": "평균 매입단가",
+        "de": "Durchschnittskostenmethode",
+        "es": "Método de coste medio",
+        "ms": "Kaedah kos purata",
+        "fr": "Méthode du coût moyen",
+        "id": "Metode biaya rata-rata"
+      }
+    },
+    {
+      "id": "complete_revision_af20bba0f26e",
+      "key": "locales.portfolio.PORTFOLIO_TEXT.costMethod",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "コストベースアプローチ",
+        "ko": "비용 기반 접근법",
+        "de": "Kostenbasierter Ansatz",
+        "es": "Enfoque basado en costes",
+        "ms": "Pendekatan berasaskan kos",
+        "fr": "Approche basée sur les coûts",
+        "id": "Pendekatan berbasis biaya"
+      },
+      "recommended": {
+        "ja": "取得価額計算方法",
+        "ko": "취득원가 계산 방식",
+        "de": "Anschaffungskostenmethode",
+        "es": "Método de cálculo del coste",
+        "ms": "Kaedah kos pemerolehan",
+        "fr": "Méthode de calcul du coût",
+        "id": "Metode biaya perolehan"
+      }
+    },
+    {
+      "id": "complete_revision_42f4dbf18c14",
+      "key": "locales.screening.SCREENING_TEXT.confidence",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "de": "Selbstvertrauen {value}",
+        "es": "Confianza {value}",
+        "ms": "Keyakinan {value}",
+        "fr": "Confiance {value}",
+        "id": "Keyakinan {value}"
+      },
+      "recommended": {
+        "de": "Konfidenz {value}",
+        "es": "Nivel de confianza {value}",
+        "ms": "Tahap keyakinan {value}",
+        "fr": "Niveau de confiance {value}",
+        "id": "Tingkat keyakinan {value}"
+      }
+    },
+    {
+      "id": "complete_revision_9fde279b321d",
+      "key": "locales.screening.SCREENING_TEXT.diagnosticMissingKey",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "缺少可用 LLM API Key",
+        "de": "Nicht brauchbar LLM API Legende",
+        "es": "No es utilizable LLM API Clave",
+        "ms": "Tidak boleh digunakan LLM API Kunci",
+        "fr": "Pas utilisable LLM API Clé",
+        "id": "Tidak dapat digunakan LLM API kunci"
+      },
+      "recommended": {
+        "zh-TW": "沒有可用的 LLM API 金鑰",
+        "de": "Kein verwendbarer LLM-API-Schlüssel",
+        "es": "No hay una clave API de LLM utilizable",
+        "ms": "Tiada kunci API LLM yang boleh digunakan",
+        "fr": "Aucune clé API LLM utilisable",
+        "id": "Tidak ada kunci API LLM yang dapat digunakan"
+      }
+    },
+    {
+      "id": "complete_revision_d0d406ad5b64",
+      "key": "locales.screening.SCREENING_TEXT.score",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "レーティング",
+        "ko": "등급",
+        "de": "Bewertung",
+        "es": "Clasificación",
+        "ms": "Penarafan",
+        "fr": "Classement",
+        "id": "penilaian"
+      },
+      "recommended": {
+        "ja": "スコア",
+        "ko": "점수",
+        "de": "Punktzahl",
+        "es": "Puntuación",
+        "ms": "Skor",
+        "fr": "Score",
+        "id": "Skor"
+      }
+    },
+    {
+      "id": "complete_revision_2a8174319075",
+      "key": "locales.screening.SCREENING_TEXT.sectorThemeConfidence",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "de": "Sektor {sector}· Thema {theme}· Selbstvertrauen {confidence}",
+        "es": "Sector {sector}· Tema {theme}· Confianza {confidence}",
+        "ms": "Sektor {sector}· Tema {theme}· Keyakinan {confidence}",
+        "fr": "Secteur {sector}· Thème {theme}· Confiance {confidence}",
+        "id": "Sektor {sector}· Tema {theme}· Keyakinan {confidence}"
+      },
+      "recommended": {
+        "de": "Sektor {sector} · Thema {theme} · Konfidenz {confidence}",
+        "es": "Sector {sector} · Tema {theme} · Nivel de confianza {confidence}",
+        "ms": "Sektor {sector} · Tema {theme} · Tahap keyakinan {confidence}",
+        "fr": "Secteur {sector} · Thème {theme} · Niveau de confiance {confidence}",
+        "id": "Sektor {sector} · Tema {theme} · Tingkat keyakinan {confidence}"
+      }
+    },
+    {
+      "id": "complete_revision_7957d3a64d8f",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.notes.0",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "このフィールドは、 AGENT_ARCH=multi.",
+        "ko": "이 필드는 오직 AGENT_ARCH=multi."
+      },
+      "recommended": {
+        "ja": "この項目は AGENT_ARCH=multi の場合にのみ有効です。",
+        "ko": "이 항목은 AGENT_ARCH=multi일 때만 적용됩니다."
+      }
+    },
+    {
+      "id": "complete_revision_dd7ffa89da3d",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.summary",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "効果は AGENT_ARCH=multi.パイプラインに含まれるサブエージェントを制御します。",
+        "ko": "효과가 있을 때만 AGENT_ARCH=multi. 파이프라인에 포함된 하위 에이전트를 제어합니다."
+      },
+      "recommended": {
+        "ja": "AGENT_ARCH=multi の場合にのみ有効で、パイプラインに含めるサブエージェントを制御します。",
+        "ko": "AGENT_ARCH=multi일 때만 적용되며, 파이프라인에 포함할 하위 에이전트를 제어합니다."
+      }
+    },
+    {
+      "id": "complete_revision_a56b762d93d0",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.usage",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "quick: tech→decision;standard: tech→intel→decision;full: tech→intel→risk→decision;specialist: full+ 戦略ごとのエージェント数。",
+        "ko": "quick: tech→decision;standard: tech→intel→decision;full: 기술→정보→위험→결정;specialist: full+ 전략별 에이전트.",
+        "de": "quick: Tech→Entscheidung;standard: Tech→Intel→Entscheidung;full: Tech→Intel→Risk→Entscheidung;specialist: full+ Agenten pro Strategie.",
+        "es": "quick: Tech→decision;standard: decisión → tecnología→intel;full: decisión → tecnología→intel→inteligencia;specialist: full+ agentes por estrategia.",
+        "fr": "quick: Décision → technologie ;standard: décision technologique→intel→ ;full: décision →→ risque →  intelligence ;specialist: full+ par agent de stratégie."
+      },
+      "recommended": {
+        "ja": "quick: tech→decision、standard: tech→intel→decision、full: tech→intel→risk→decision、specialist: full + 戦略ごとの専用エージェント。",
+        "ko": "quick: tech→decision; standard: tech→intel→decision; full: tech→intel→risk→decision; specialist: full + 전략별 전담 에이전트.",
+        "de": "quick: tech→decision; standard: tech→intel→decision; full: tech→intel→risk→decision; specialist: full + ein Agent pro Strategie.",
+        "es": "quick: tech→decision; standard: tech→intel→decision; full: tech→intel→risk→decision; specialist: full + un agente por estrategia.",
+        "fr": "quick: tech→decision ; standard: tech→intel→decision ; full: tech→intel→risk→decision ; specialist: full + un agent par stratégie."
+      }
+    },
+    {
+      "id": "complete_revision_5f6f28d124c0",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.valueNotes.1",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "specialist モードは各戦略ごとに専用のエージェントを開始します。",
+        "ko": "specialist 모드는 각 전략마다 전담 에이전트를 시작합니다.",
+        "de": "specialist Der Modus startet für jede Strategie einen eigenen Agenten.",
+        "es": "specialist El modo inicia un Agente dedicado para cada estrategia.",
+        "fr": "specialist Le mode lance un Agent dédié pour chaque stratégie."
+      },
+      "recommended": {
+        "ja": "specialist モードでは、各戦略専用のエージェントが起動します。",
+        "ko": "specialist 모드에서는 각 전략별 전담 에이전트가 시작됩니다.",
+        "de": "Im Modus specialist wird für jede Strategie ein eigener Agent gestartet.",
+        "es": "El modo specialist inicia un agente dedicado para cada estrategia.",
+        "fr": "Le mode specialist lance un agent dédié pour chaque stratégie."
+      }
+    },
+    {
+      "id": "complete_revision_914ae2d5a7b8",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.GENERATION_BACKEND.notes.2",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "預設模型配置會繼續使用現有 API Key、模型連線和備用模型設定。",
+        "ja": "デフォルトのモデル設定は既存のものを使い続けます API キー、モデル接続、フォールバックモデル設定。",
+        "ko": "기본 모델 설정은 기존 모델을 계속 사용합니다 API 키, 모델 연결, 그리고 대체 모델 설정.",
+        "de": "Die Standardmodelleinstellungen verwenden weiterhin deine bestehenden API Schlüssel, Modellverbindungen und Fallback-Modelleinstellungen.",
+        "ms": "Tetapan model lalai terus menggunakan anda yang sedia ada API kekunci, sambungan model dan tetapan model sandaran.",
+        "fr": "Les paramètres par défaut du modèle continuent d’utiliser vos paramètres existants API touches, connexions de modèles et réglages de secours de secours.",
+        "id": "Pengaturan model default terus menggunakan API kunci, koneksi model, dan pengaturan model fallback."
+      },
+      "recommended": {
+        "zh-TW": "預設模型設定會繼續使用現有的 API 金鑰、模型連線與備用模型設定。",
+        "ja": "デフォルトのモデル設定では、既存の API キー、モデル接続、フォールバックモデル設定が引き続き使用されます。",
+        "ko": "기본 모델 설정은 기존 API 키, 모델 연결 및 대체 모델 설정을 계속 사용합니다.",
+        "de": "Die Standardmodelleinstellungen verwenden weiterhin Ihre vorhandenen API-Schlüssel, Modellverbindungen und Fallback-Modelleinstellungen.",
+        "ms": "Tetapan model lalai terus menggunakan kunci API, sambungan model dan tetapan model sandaran sedia ada.",
+        "fr": "Les paramètres de modèle par défaut continuent d’utiliser vos clés API, vos connexions aux modèles et vos paramètres de modèles de secours existants.",
+        "id": "Pengaturan model default tetap menggunakan kunci API, koneksi model, dan pengaturan model cadangan yang ada."
+      }
+    },
+    {
+      "id": "complete_revision_54180af80ac0",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.notes.0",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "若模型名稱缺少 provider 前綴，LiteLLM 可能無法判斷要使用哪個 API Key。",
+        "ja": "プロバイダーの接頭辞がなければ、 LiteLLM どちらか分からないかもしれません API 使う鍵。",
+        "ko": "제공자 접두사가 없으면,LiteLLM 어떤 것인지 모를 수도 있습니다 API 사용할 수 있는 열쇠.",
+        "de": "Ohne Provider-Präfix,LiteLLM Vielleicht weiß ich nicht, was API Schlüssel zur Benutzung.",
+        "es": "Sin un prefijo de proveedor,LiteLLM puede que no sepa cuál API clave para usar.",
+        "ms": "Tanpa awalan pembekal,LiteLLM mungkin tidak tahu yang mana API kunci untuk digunakan.",
+        "fr": "Sans préfixe fournisseur,LiteLLM peuvent ne pas savoir lesquels API Clé à utiliser.",
+        "id": "Tanpa awalan penyedia,LiteLLM mungkin tidak tahu mana API kunci untuk digunakan."
+      },
+      "recommended": {
+        "zh-TW": "若模型名稱缺少 provider 前綴，LiteLLM 可能無法判斷要使用哪個 API 金鑰。",
+        "ja": "プロバイダーのプレフィックスがない場合、LiteLLM は使用する API キーを判断できないことがあります。",
+        "ko": "제공자 접두사가 없으면 LiteLLM이 사용할 API 키를 판단하지 못할 수 있습니다.",
+        "de": "Ohne Anbieterpräfix kann LiteLLM möglicherweise nicht bestimmen, welcher API-Schlüssel verwendet werden soll.",
+        "es": "Sin un prefijo de proveedor, LiteLLM puede no saber qué clave API utilizar.",
+        "ms": "Tanpa awalan penyedia, LiteLLM mungkin tidak dapat menentukan kunci API yang hendak digunakan.",
+        "fr": "Sans préfixe de fournisseur, LiteLLM peut ne pas savoir quelle clé API utiliser.",
+        "id": "Tanpa awalan penyedia, LiteLLM mungkin tidak dapat menentukan kunci API yang akan digunakan."
+      }
+    },
+    {
+      "id": "complete_revision_d716b8c9d4f5",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LITELLM_MODEL.valueNotes.1",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "空の場合、システムは利用可能なモデルを推定しようとします API キーやチャンネル。",
+        "ko": "비어 있을 때, 시스템은 가능한 모델에서 추론을 시도합니다 API 키나 채널.",
+        "de": "Im leeren Zustand versucht das System, ein Modell aus dem verfügbaren Modell abzuleiten API Schlüssel oder Kanäle.",
+        "es": "Cuando está vacío, el sistema intenta inferir un modelo a partir de disponible API Claves o canales.",
+        "ms": "Apabila kosong, sistem cuba membuat kesimpulan model daripada tersedia API kekunci atau saluran.",
+        "fr": "Lorsqu’il est vide, le système tente d’inférer un modèle à partir de disponible API Clés ou canaux.",
+        "id": "Saat kosong, sistem mencoba menyimpulkan model dari yang tersedia API tombol atau saluran."
+      },
+      "recommended": {
+        "ja": "空欄の場合、システムは利用可能な API キーまたは接続からモデルを推定します。",
+        "ko": "비어 있으면 시스템이 사용 가능한 API 키 또는 채널에서 모델을 추론합니다.",
+        "de": "Wenn das Feld leer ist, versucht das System, ein Modell aus verfügbaren API-Schlüsseln oder Kanälen abzuleiten.",
+        "es": "Cuando está vacío, el sistema intenta inferir un modelo a partir de las claves API o los canales disponibles.",
+        "ms": "Jika kosong, sistem cuba menentukan model daripada kunci API atau saluran yang tersedia.",
+        "fr": "Lorsque ce champ est vide, le système tente de déduire un modèle à partir des clés API ou des canaux disponibles.",
+        "id": "Jika kosong, sistem mencoba menentukan model dari kunci API atau kanal yang tersedia."
+      }
+    },
+    {
+      "id": "complete_revision_ae79e5ea8e2f",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.LLM_PROMPT_CACHE_DIAGNOSTICS_LEVEL.valueNotes.1",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "debug 可增加 HMAC-derived route/cache diagnostics 和 matched caps id，但仍不包含 raw prompt、request body、message content、webhook 或 API key。",
+        "ja": "debug 含まれることがあります HMAC-導出ルート/キャッシュ診断とキャップIDの一致ですが、生のプロンプト、リクエスト本体、メッセージ内容、ウェブフックなどは除外しています。 API 鍵。",
+        "ko": "debug 포함될 수 있습니다 HMAC-파생된 경로/캐시 진단과 대문자 ID를 매칭하지만, 여전히 원시 프롬프트, 요청 본문, 메시지 내용, 웹훅 등은 제외합니다. API 열쇠.",
+        "fr": "debug peut inclure HMAC- dérive des diagnostics de route/cache et correspond aux identifiants majuscules, mais exclut toujours les invites brutes, les corps de requêtes, le contenu des messages, les webhooks, et API Les clés.",
+        "id": "debug dapat mencakup HMAC-diagnostik rute/cache turunan dan id caps yang cocok, tetapi masih mengecualikan perintah mentah, isi permintaan, konten pesan, webhook, dan API kunci."
+      },
+      "recommended": {
+        "zh-TW": "debug 可包含由 HMAC 衍生的路由/快取診斷與符合的 caps ID，但仍排除原始提示詞、請求內容、訊息內容、Webhook 與 API 金鑰。",
+        "ja": "debug には、HMAC から派生したルート/キャッシュ診断と一致した caps ID が含まれる場合がありますが、生のプロンプト、リクエスト本文、メッセージ内容、Webhook、API キーは引き続き除外されます。",
+        "ko": "debug에는 HMAC에서 파생된 경로/캐시 진단과 일치한 caps ID가 포함될 수 있지만 원본 프롬프트, 요청 본문, 메시지 내용, 웹훅 및 API 키는 계속 제외됩니다.",
+        "fr": "debug peut inclure des diagnostics de route/cache dérivés de HMAC et le caps ID correspondant, mais exclut toujours les prompts bruts, les corps de requête, le contenu des messages, les webhooks et les clés API.",
+        "id": "debug dapat mencakup diagnostik rute/cache yang diturunkan dari HMAC dan caps ID yang cocok, tetapi tetap mengecualikan prompt mentah, isi permintaan, isi pesan, webhook, dan kunci API."
+      }
+    },
+    {
+      "id": "complete_revision_02ca964173d5",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.OPENAI_BASE_URL.valueNotes.0",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "Base URL 必須與 API Key 所屬服務匹配。",
+        "ja": "基本URLは API キープロバイダー。",
+        "ko": "기본 URL은 반드시 다음 조건과 일치해야 합니다. API 핵심 제공자.",
+        "de": "Die Basis-URL muss mit der API Schlüsselanbieter.",
+        "es": "La URL base debe coincidir con la API Proveedor de llaves.",
+        "ms": "URL Asas mesti sepadan dengan API pembekal utama.",
+        "fr": "L’URL de base doit correspondre à la API Fournisseur clé.",
+        "id": "URL dasar harus cocok dengan API penyedia kunci."
+      },
+      "recommended": {
+        "zh-TW": "Base URL 必須與 API 金鑰所屬的服務商相符。",
+        "ja": "ベース URL は API キーのプロバイダーと一致している必要があります。",
+        "ko": "기본 URL은 API 키 제공자와 일치해야 합니다.",
+        "de": "Die Basis-URL muss zum Anbieter des API-Schlüssels passen.",
+        "es": "La URL base debe corresponder al proveedor de la clave API.",
+        "ms": "URL asas mesti sepadan dengan penyedia kunci API.",
+        "fr": "L’URL de base doit correspondre au fournisseur de la clé API.",
+        "id": "URL dasar harus sesuai dengan penyedia kunci API."
+      }
+    },
+    {
+      "id": "complete_revision_de4c459ef3c6",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.anspire_llm.summary",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "使用 Anspire API Key 作為 OpenAI-compatible 模型閘道器的相容入口。",
+        "ja": "用途 Anspire API 互換キーとして OpenAI-スタイル LLM ゲートウェイ。",
+        "ko": "용도 Anspire API 키가 호환되는 형태로 OpenAI-스타일 LLM 관문.",
+        "de": "Verwendung Anspire API Keys als kompatible OpenAI-Stil LLM Tor.",
+        "es": "Usos Anspire API Claves como compatible OpenAI-estilo LLM Gateway.",
+        "ms": "Kegunaan Anspire API kekunci sebagai kekunci yang serasi OpenAI-gaya LLM pintu masuk.",
+        "fr": "Utilisations Anspire API Clés en tant que compatible OpenAI-style LLM Portail.",
+        "id": "penggunaan Anspire API sebagai kunci yang kompatibel OpenAI-gaya LLM gerbang."
+      },
+      "recommended": {
+        "zh-TW": "使用 Anspire API 金鑰連線至 OpenAI 相容的 LLM 閘道器。",
+        "ja": "Anspire API キーを使用し、OpenAI 互換の LLM ゲートウェイとして接続します。",
+        "ko": "Anspire API 키를 사용하여 OpenAI 호환 LLM 게이트웨이에 연결합니다.",
+        "de": "Verwendet Anspire-API-Schlüssel für ein OpenAI-kompatibles LLM-Gateway.",
+        "es": "Utiliza claves API de Anspire como puerta de enlace LLM compatible con OpenAI.",
+        "ms": "Menggunakan kunci API Anspire sebagai gerbang LLM yang serasi dengan OpenAI.",
+        "fr": "Utilise les clés API Anspire comme passerelle LLM compatible avec OpenAI.",
+        "id": "Menggunakan kunci API Anspire sebagai gateway LLM yang kompatibel dengan OpenAI."
+      }
+    },
+    {
+      "id": "complete_revision_0df4702ccb20",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.provider_keys.title",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "模型服務 API Key",
+        "ja": "提供者 API キー",
+        "de": "Anbieter API Legende",
+        "es": "Proveedor API Clave",
+        "ms": "Pembekal API Kunci",
+        "fr": "Fournisseur API Clé",
+        "id": "Penyedia API Kunci"
+      },
+      "recommended": {
+        "zh-TW": "模型服務商 API 金鑰",
+        "ja": "プロバイダー API キー",
+        "de": "Anbieter-API-Schlüssel",
+        "es": "Clave API del proveedor",
+        "ms": "Kunci API penyedia",
+        "fr": "Clé API du fournisseur",
+        "id": "Kunci API penyedia"
+      }
+    },
+    {
+      "id": "complete_revision_ffc293b1dad4",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.title",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "TickFlow API Key",
+        "de": "TickFlow API Legende",
+        "es": "TickFlow API Clave",
+        "ms": "TickFlow API Kunci",
+        "fr": "TickFlow API Clé",
+        "id": "TickFlow API Kunci"
+      },
+      "recommended": {
+        "zh-TW": "TickFlow API 金鑰",
+        "de": "TickFlow-API-Schlüssel",
+        "es": "Clave API de TickFlow",
+        "ms": "Kunci API TickFlow",
+        "fr": "Clé API TickFlow",
+        "id": "Kunci API TickFlow"
+      }
+    },
+    {
+      "id": "complete_revision_9ddff50ba2de",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.TICKFLOW_API_KEY.usage",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "在 TickFlow 獲取 API Key 後填入；未配置時系統會繼續使用其他可用資料來源和降級路徑。",
+        "ja": "Paste a TickFlow API 鍵はここだ。空になると、システムは他のデータソースやフォールバックパスと連携して進みます。",
+        "ko": "붙여넣어 TickFlow API 열쇠가 여기 있어. 비어 있으면 시스템은 다른 데이터 소스와 백업 경로로 계속 이어집니다.",
+        "de": "Paste a ein TickFlow API Schlüssel hier. Wenn das System leer ist, fährt es mit anderen Datenquellen und Rückfallpfaden fort.",
+        "es": "Pasta TickFlow API Aquí es clave. Cuando está vacío, el sistema continúa con otras fuentes de datos y rutas de respaldo.",
+        "ms": "Tampal a TickFlow API kunci di sini. Apabila kosong, sistem diteruskan dengan sumber data lain dan laluan sandaran.",
+        "fr": "Collez un TickFlow API Clé ici. Lorsqu’il est vide, le système continue avec d’autres sources de données et chemins de secours.",
+        "id": "Tempel TickFlow API kunci di sini. Saat kosong, sistem melanjutkan dengan sumber data dan jalur penggantian lainnya."
+      },
+      "recommended": {
+        "zh-TW": "請在此貼上 TickFlow API 金鑰。留空時，系統會繼續使用其他資料來源與降級路徑。",
+        "ja": "TickFlow API キーをここに貼り付けます。空欄の場合、システムは他のデータソースとフォールバック経路を引き続き使用します。",
+        "ko": "여기에 TickFlow API 키를 붙여 넣으세요. 비워 두면 시스템이 다른 데이터 소스와 대체 경로를 계속 사용합니다.",
+        "de": "Fügen Sie hier einen TickFlow-API-Schlüssel ein. Wenn das Feld leer ist, verwendet das System weiterhin andere Datenquellen und Fallback-Pfade.",
+        "es": "Pega aquí una clave API de TickFlow. Si se deja vacía, el sistema continúa con otras fuentes de datos y rutas alternativas.",
+        "ms": "Tampal kunci API TickFlow di sini. Jika dibiarkan kosong, sistem terus menggunakan sumber data dan laluan sandaran lain.",
+        "fr": "Collez ici une clé API TickFlow. Si le champ est vide, le système continue avec d’autres sources de données et chemins de secours.",
+        "id": "Tempelkan kunci API TickFlow di sini. Jika dibiarkan kosong, sistem tetap menggunakan sumber data dan jalur cadangan lain."
+      }
+    },
+    {
+      "id": "complete_revision_8d5d45375b0e",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.data_source.search_api_keys.title",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "搜尋服務 API Key",
+        "ja": "検索 API 鍵",
+        "ko": "검색 API 키",
+        "de": "Suche API Schlüssel",
+        "es": "Búsqueda API Teclas",
+        "ms": "Carian API Kekunci",
+        "fr": "Recherche API Clés",
+        "id": "Pencarian API Kunci"
+      },
+      "recommended": {
+        "zh-TW": "搜尋服務 API 金鑰",
+        "ja": "検索サービス API キー",
+        "ko": "검색 서비스 API 키",
+        "de": "API-Schlüssel für Suchdienste",
+        "es": "Claves API de búsqueda",
+        "ms": "Kunci API carian",
+        "fr": "Clés API de recherche",
+        "id": "Kunci API pencarian"
+      }
+    },
+    {
+      "id": "complete_revision_87ffd164412a",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.title",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "de": "API Legende",
+        "es": "API Clave",
+        "ms": "API Kunci",
+        "fr": "API Clé",
+        "id": "API Kunci"
+      },
+      "recommended": {
+        "de": "API-Schlüssel",
+        "es": "Clave API",
+        "ms": "Kunci API",
+        "fr": "Clé API",
+        "id": "Kunci API"
+      }
+    },
+    {
+      "id": "complete_revision_4c2db4ad8d76",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.api_key.usage",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "1つのキーを直接使うか、英語のコンマで区切った複数のキーを使うか。",
+        "ko": "한 개의 키를 직접 사용하거나, 영어 쉼표로 구분한 여러 개의 키를 사용하세요.",
+        "de": "Verwenden Sie eine Taste direkt oder mehrere Schlüssel, getrennt durch englische Kommas.",
+        "es": "Usa una tecla directamente, o varias teclas separadas por comas en inglés.",
+        "ms": "Gunakan satu kekunci secara langsung, atau berbilang kekunci yang dipisahkan oleh koma Inggeris.",
+        "fr": "Utilisez une touche directement, ou plusieurs touches séparées par des virgules anglaises.",
+        "id": "Gunakan satu tombol secara langsung, atau beberapa tombol yang dipisahkan oleh koma bahasa Inggris."
+      },
+      "recommended": {
+        "ja": "1 つの API キーを直接入力するか、複数の API キーを半角カンマで区切って入力します。",
+        "ko": "API 키 하나를 직접 입력하거나 여러 API 키를 영문 쉼표로 구분해 입력하세요.",
+        "de": "Verwenden Sie einen API-Schlüssel direkt oder trennen Sie mehrere API-Schlüssel durch englische Kommas.",
+        "es": "Usa una clave API directamente o separa varias claves API con comas inglesas.",
+        "ms": "Gunakan satu kunci API secara langsung atau pisahkan beberapa kunci API dengan koma Inggeris.",
+        "fr": "Utilisez directement une clé API ou séparez plusieurs clés API par des virgules anglaises.",
+        "id": "Gunakan satu kunci API secara langsung atau pisahkan beberapa kunci API dengan koma Inggris."
+      }
+    },
+    {
+      "id": "complete_revision_5b6e0ee8eef5",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.llm_channel.protocol.notes.0",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "de": "Protokoll, Basis-URL und API Der Schlüssel muss demselben Dienst gehören.",
+        "es": "Protocolo, URL base y API La clave debe pertenecer al mismo servicio.",
+        "ms": "Protokol, URL Asas, dan API Kunci mestilah milik perkhidmatan yang sama.",
+        "fr": "Protocole, URL de base, et API La clé doit appartenir au même service.",
+        "id": "Protokol, URL Dasar, dan API Kunci harus milik layanan yang sama."
+      },
+      "recommended": {
+        "de": "Protokoll, Basis-URL und API-Schlüssel müssen zum selben Dienst gehören.",
+        "es": "El protocolo, la URL base y la clave API deben pertenecer al mismo servicio.",
+        "ms": "Protokol, URL asas dan kunci API mesti milik perkhidmatan yang sama.",
+        "fr": "Le protocole, l’URL de base et la clé API doivent appartenir au même service.",
+        "id": "Protokol, URL dasar, dan kunci API harus berasal dari layanan yang sama."
+      }
+    },
+    {
+      "id": "complete_revision_ee8ac11fdf38",
+      "key": "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.MAX_WORKERS.valueNotes.1",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "受限於 API Key 配額和網路頻寬。",
+        "ja": "制限事項 API キーノルマとネットワーク帯域幅。",
+        "ko": "제한 API 핵심 할당량과 네트워크 대역폭.",
+        "de": "Begrenzt durch API Schlüsselquoten und Netzwerkbandbreite.",
+        "es": "Limitado por API cuotas clave y ancho de banda de red.",
+        "ms": "Terhad oleh API kuota utama dan lebar jalur rangkaian.",
+        "fr": "Limité par API quotas clés et bande passante réseau.",
+        "id": "Dibatasi oleh API kuota utama dan bandwidth jaringan."
+      },
+      "recommended": {
+        "zh-TW": "受 API 金鑰配額與網路頻寬限制。",
+        "ja": "API キーのクォータとネットワーク帯域幅によって制限されます。",
+        "ko": "API 키 할당량과 네트워크 대역폭의 제한을 받습니다.",
+        "de": "Begrenzt durch API-Schlüsselkontingente und Netzwerkbandbreite.",
+        "es": "Limitado por las cuotas de las claves API y el ancho de banda de red.",
+        "ms": "Terhad oleh kuota kunci API dan lebar jalur rangkaian.",
+        "fr": "Limité par les quotas des clés API et la bande passante réseau.",
+        "id": "Dibatasi oleh kuota kunci API dan bandwidth jaringan."
+      }
+    },
+    {
+      "id": "complete_revision_a0f9b8eed435",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_ERROR_LABELS.auth",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "es": "Fallido en la autenticación",
+        "fr": "Authentification échouée"
+      },
+      "recommended": {
+        "es": "Error de autenticación",
+        "fr": "Échec de l’authentification"
+      }
+    },
+    {
+      "id": "complete_revision_dfb9c6ce7b5c",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_api_key",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "de": "API Schlüssel ist erforderlich",
+        "es": "API se requiere llave",
+        "ms": "API kunci diperlukan",
+        "fr": "API Clé est requise",
+        "id": "API kunci diperlukan"
+      },
+      "recommended": {
+        "de": "API-Schlüssel erforderlich",
+        "es": "Se requiere una clave API",
+        "ms": "Kunci API diperlukan",
+        "fr": "Clé API requise",
+        "id": "Kunci API diperlukan"
+      }
+    },
+    {
+      "id": "complete_revision_7a333ff6a06a",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_REASON_HINTS.missing_api_key",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "es": "Introduce al menos una válida API clave antes de probar.",
+        "ms": "Masukkan sekurang-kurangnya satu yang sah API kunci sebelum ujian.",
+        "fr": "Inscrivez-en au moins un valide API Avant le test.",
+        "id": "Masukkan setidaknya satu yang valid API kunci sebelum pengujian."
+      },
+      "recommended": {
+        "es": "Introduce al menos una clave API válida antes de probar la conexión.",
+        "ms": "Masukkan sekurang-kurangnya satu kunci API yang sah sebelum menguji sambungan.",
+        "fr": "Saisissez au moins une clé API valide avant de tester la connexion.",
+        "id": "Masukkan setidaknya satu kunci API yang valid sebelum menguji koneksi."
+      }
+    },
+    {
+      "id": "complete_revision_68a691f4dd1a",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.localKeyOptional",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "地域サービスではこの空白を残す場合があります",
+        "ko": "지역 서비스는 이를 비워둘 수 있습니다",
+        "de": "Lokale Dienste lassen dies möglicherweise leer",
+        "es": "Los servicios locales pueden dejar esto en blanco",
+        "ms": "Perkhidmatan tempatan boleh membiarkan ini kosong",
+        "fr": "Les services locaux peuvent laisser ce message vide",
+        "id": "Layanan lokal dapat mengosongkan ini"
+      },
+      "recommended": {
+        "ja": "ローカルサービスでは空欄にできます",
+        "ko": "로컬 서비스는 비워 둘 수 있습니다",
+        "de": "Bei lokalen Diensten kann dieses Feld leer bleiben",
+        "es": "Los servicios locales pueden dejar este campo vacío",
+        "ms": "Perkhidmatan tempatan boleh membiarkan medan ini kosong",
+        "fr": "Les services locaux peuvent laisser ce champ vide",
+        "id": "Layanan lokal dapat membiarkan bidang ini kosong"
+      }
+    },
+    {
+      "id": "complete_revision_9701db50ac0a",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TEXT.multipleKeys",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "支援多個金鑰，用逗號分隔",
+        "ja": "複数のキーをコンマで区切る",
+        "ko": "여러 키는 쉼표로 구분",
+        "de": "Trenne mehrere Schlüssel mit Kommas",
+        "es": "Separar varias teclas con comas",
+        "ms": "Pisahkan berbilang kekunci dengan koma",
+        "fr": "Séparer plusieurs touches avec des virgules",
+        "id": "Pisahkan beberapa tombol dengan koma"
+      },
+      "recommended": {
+        "zh-TW": "以逗號分隔多個 API 金鑰",
+        "ja": "複数の API キーはカンマで区切ってください",
+        "ko": "여러 API 키는 쉼표로 구분하세요",
+        "de": "Mehrere API-Schlüssel durch Kommas trennen",
+        "es": "Separa varias claves API con comas",
+        "ms": "Pisahkan berbilang kunci API dengan koma",
+        "fr": "Séparez plusieurs clés API par des virgules",
+        "id": "Pisahkan beberapa kunci API dengan koma"
+      }
+    },
+    {
+      "id": "complete_revision_8373633ab99a",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.auth",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "請檢查 API 金鑰是否正確、是否有多餘空格，以及當前連線是否需要額外組織/專案許可權。",
+        "ja": "確認してください API キーが正しいか、余分なスペースがあるか、現在の接続が追加の組織権限やプロジェクト権限を必要としているかを確認してください。",
+        "ko": "확인해 주세요 API 키가 올바른지, 여분의 공간이 있는지, 현재 연결이 추가적인 조직 권한이나 프로젝트 권한이 필요한지 확인하세요.",
+        "de": "Bitte überprüfen Sie API Überprüfen Sie, ob der Schlüssel korrekt ist, ob es zusätzliche Leerzeichen gibt und ob die aktuelle Verbindung zusätzliche Organisations- oder Projektberechtigungen benötigt.",
+        "es": "Por favor, comprueba API Comprueba si la clave es correcta, si hay espacios extra y si la conexión actual requiere permisos organizativos o de proyecto adicionales.",
+        "ms": "Sila semak API Semak sama ada kunci itu betul, jika terdapat ruang tambahan dan sama ada sambungan semasa memerlukan keizinan organisasi/projek tambahan.",
+        "fr": "Veuillez vérifier API Vérifiez si la clé est correcte, s’il y a des espaces supplémentaires, et si la connexion actuelle nécessite des autorisations organisationnelles ou de projet supplémentaires.",
+        "id": "Silakan periksa API Periksa apakah kuncinya benar, apakah ada ruang tambahan, dan apakah koneksi saat ini memerlukan izin organisasi/proyek tambahan."
+      },
+      "recommended": {
+        "zh-TW": "請檢查 API 金鑰、前後空白，以及是否需要額外的組織或專案權限。",
+        "ja": "API キー、前後の空白、必要な組織またはプロジェクトのアクセス権を確認してください。",
+        "ko": "API 키, 앞뒤 공백, 필요한 조직 또는 프로젝트 접근 권한을 확인하세요.",
+        "de": "Prüfen Sie den API-Schlüssel, umgebende Leerzeichen und erforderliche Organisations- oder Projektberechtigungen.",
+        "es": "Comprueba la clave API, los espacios al principio o al final y los permisos necesarios de la organización o del proyecto.",
+        "ms": "Semak kunci API, ruang kosong di awal atau akhir, serta akses organisasi atau projek yang diperlukan.",
+        "fr": "Vérifiez la clé API, les espaces avant ou après, ainsi que les accès requis à l’organisation ou au projet.",
+        "id": "Periksa kunci API, spasi di awal atau akhir, serta akses organisasi atau proyek yang diperlukan."
+      }
+    },
+    {
+      "id": "complete_revision_ab41935d1a24",
+      "key": "locales.settingsModelAccess.MODEL_ACCESS_TROUBLESHOOTING.invalid_config",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "zh-TW": "先補齊協議、服務地址、API 金鑰和模型配置，再執行一鍵測試。",
+        "ja": "プロトコルを完成させ、ベースURLを、 API テスト前のキーおよびモデル構成。",
+        "ko": "프로토콜을 완성하고, 기본 URL,API 테스트 전에 키와 모델 구성을 작성했습니다.",
+        "de": "Protokoll abschließen, Basis-URL,API Schlüssel- und Modellkonfiguration vor dem Test.",
+        "es": "Completar el protocolo, URL base,API clave, y configuración del modelo antes de la prueba.",
+        "ms": "Lengkapkan protokol, URL asas,API kunci, dan konfigurasi model sebelum ujian.",
+        "fr": "Compléter le protocole, URL de base,API Clé, et la configuration du modèle avant les tests.",
+        "id": "Lengkapi protokol, URL dasar,API key, dan konfigurasi model sebelum pengujian."
+      },
+      "recommended": {
+        "zh-TW": "測試前請先完成協議、服務地址、API 金鑰與模型設定。",
+        "ja": "テストする前に、プロトコル、ベース URL、API キー、モデル設定を完了してください。",
+        "ko": "테스트하기 전에 프로토콜, 기본 URL, API 키 및 모델 구성을 완료하세요.",
+        "de": "Vervollständigen Sie vor dem Test Protokoll, Basis-URL, API-Schlüssel und Modellkonfiguration.",
+        "es": "Completa el protocolo, la URL base, la clave API y la configuración del modelo antes de realizar la prueba.",
+        "ms": "Lengkapkan protokol, URL asas, kunci API dan konfigurasi model sebelum menguji.",
+        "fr": "Renseignez le protocole, l’URL de base, la clé API et la configuration du modèle avant le test.",
+        "id": "Lengkapi protokol, URL dasar, kunci API, dan konfigurasi model sebelum menguji."
+      }
+    },
+    {
+      "id": "complete_revision_ecbe5b4d5661",
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKey",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "de": "API Legende",
+        "es": "API Clave",
+        "ms": "API Kunci",
+        "fr": "API Clé",
+        "id": "API kunci"
+      },
+      "recommended": {
+        "de": "API-Schlüssel",
+        "es": "Clave API",
+        "ms": "Kunci API",
+        "fr": "Clé API",
+        "id": "Kunci API"
+      }
+    },
+    {
+      "id": "complete_revision_5a6a2f1de827",
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyOptional",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "API キー(任意)",
+        "de": "API Schlüssel (optional)",
+        "es": "API clave (opcional)",
+        "ms": "API kunci (pilihan)",
+        "fr": "API Clé (optionnelle)",
+        "id": "API kunci (opsional)"
+      },
+      "recommended": {
+        "ja": "API キー（任意）",
+        "de": "API-Schlüssel (optional)",
+        "es": "Clave API (opcional)",
+        "ms": "Kunci API (pilihan)",
+        "fr": "Clé API (optionnelle)",
+        "id": "Kunci API (opsional)"
+      }
+    },
+    {
+      "id": "complete_revision_61c710107893",
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.apiKeyPlaceholder",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "ここで提供者が登場します API キー",
+        "ko": "여기서 제공자가 등장합니다 API 키",
+        "de": "Hier kommt der Anbieter ins Spiel API Legende",
+        "es": "Entra en escena el proveedor API Clave",
+        "ms": "Masukkan pembekal API Kunci",
+        "fr": "Voici le prestataire API Clé",
+        "id": "Masukkan penyedia API kunci"
+      },
+      "recommended": {
+        "ja": "プロバイダーの API キーを入力",
+        "ko": "제공자의 API 키 입력",
+        "de": "API-Schlüssel des Anbieters eingeben",
+        "es": "Introduce la clave API del proveedor",
+        "ms": "Masukkan kunci API penyedia",
+        "fr": "Saisissez la clé API du fournisseur",
+        "id": "Masukkan kunci API penyedia"
+      }
+    },
+    {
+      "id": "complete_revision_753878efca9e",
+      "key": "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localKeyPlaceholder",
+      "category": "credential",
+      "rationale": "Records the complete baseline-to-candidate credential revision so passwords, API keys, provider access, runtime secrets, and login state remain distinct.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "nist_credential_glossary",
+        "nist_sp800_63b"
+      ],
+      "before": {
+        "ja": "地域サービスではこの空白を残す場合があります",
+        "ko": "지역 서비스는 이를 비워둘 수 있습니다",
+        "de": "Lokale Dienste lassen dies möglicherweise leer",
+        "es": "Los servicios locales pueden dejar esto en blanco",
+        "ms": "Perkhidmatan tempatan boleh membiarkan ini kosong",
+        "fr": "Les services locaux peuvent laisser ce message vide",
+        "id": "Layanan lokal dapat mengosongkan ini"
+      },
+      "recommended": {
+        "ja": "ローカルサービスでは空欄にできます",
+        "ko": "로컬 서비스는 비워 둘 수 있습니다",
+        "de": "Bei lokalen Diensten kann dieses Feld leer bleiben",
+        "es": "Los servicios locales pueden dejar este campo vacío",
+        "ms": "Perkhidmatan tempatan boleh membiarkan medan ini kosong",
+        "fr": "Les services locaux peuvent laisser ce champ vide",
+        "id": "Layanan lokal dapat membiarkan bidang ini kosong"
+      }
+    },
+    {
+      "id": "complete_revision_b8ed9b3a13d9",
+      "key": "utils.strategyDisplay.copy.bottom_volume.description",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "長期的な減少の後、潜在的な底辺付近でボリュームの拡大を検知します。",
+        "de": "Erkennt die Volumenerweiterung nahe einem potenziellen Tiefpunkt nach einem längeren Rückgang.",
+        "es": "Detecta la expansión de volumen cerca de un posible fondo tras una caída prolongada.",
+        "ms": "Mengesan pengembangan volum berhampiran bahagian bawah yang berpotensi selepas penurunan yang berpanjangan.",
+        "fr": "Détecte l’expansion volumique près d’un fond potentiel après une baisse prolongée.",
+        "id": "Mendeteksi ekspansi volume di dekat dasar potensial setelah penurunan yang berkepanjangan."
+      },
+      "recommended": {
+        "ja": "長期的な下落後、底値圏付近で出来高が増加する動きを検出します。",
+        "de": "Erkennt nach einem längeren Rückgang einen Anstieg des Handelsvolumens nahe einem möglichen Tiefpunkt.",
+        "es": "Detecta un aumento del volumen de negociación cerca de un posible mínimo tras una caída prolongada.",
+        "ms": "Mengesan peningkatan volum dagangan berhampiran paras dasar yang berpotensi selepas penurunan berpanjangan.",
+        "fr": "Détecte une hausse du volume des transactions près d’un point bas potentiel après une baisse prolongée.",
+        "id": "Mendeteksi peningkatan volume perdagangan di dekat area bawah potensial setelah penurunan berkepanjangan."
+      }
+    },
+    {
+      "id": "complete_revision_80f1229ba5fa",
+      "key": "utils.strategyDisplay.copy.bottom_volume.name",
+      "category": "risk",
+      "rationale": "Records the complete baseline-to-candidate revision under the documented financial-risk boundary so market, signal, alert, and strategy meaning remains traceable.",
+      "sourceIds": [
+        "stockpulse_product_contract",
+        "stockpulse_financial_guide",
+        "finra_order_types",
+        "hkex_glossary"
+      ],
+      "before": {
+        "ja": "ボトムボリュームサージ",
+        "ko": "하단 볼륨 급증",
+        "de": "Volumenspitze am Boden",
+        "es": "Pico de volumen inferior",
+        "ms": "Lonjakan kelantangan bawah",
+        "fr": "Pic de volume inférieur",
+        "id": "Lonjakan volume bawah"
+      },
+      "recommended": {
+        "ja": "底値圏での出来高急増",
+        "ko": "바닥권 거래량 급증",
+        "de": "Handelsvolumenanstieg am Tiefpunkt",
+        "es": "Aumento del volumen de negociación en zona de mínimos",
+        "ms": "Lonjakan volum dagangan berhampiran dasar",
+        "fr": "Hausse du volume des transactions près d’un point bas",
+        "id": "Lonjakan volume perdagangan di area bawah"
+      }
+    }
+  ]
+}
