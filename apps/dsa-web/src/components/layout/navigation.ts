@@ -1,3 +1,4 @@
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
@@ -20,6 +21,22 @@ export type ApplicationNavigationItem = {
   exact?: boolean;
   badge?: 'completion';
 };
+
+export function shouldDelegateCurrentDocumentNavigation(
+  event: ReactMouseEvent<HTMLAnchorElement>,
+): boolean {
+  const target = event.currentTarget.getAttribute('target');
+  return (
+    !event.defaultPrevented
+    && event.button === 0
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.shiftKey
+    && !event.altKey
+    && (!target || target === '_self')
+    && !event.currentTarget.hasAttribute('download')
+  );
+}
 
 // Current flat routes remain canonical until an approved IA tuple replaces them.
 export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] = [

@@ -5,6 +5,7 @@ import { Outlet } from 'react-router-dom';
 import { Drawer } from '../common/Drawer';
 import { IconButton } from '../common/IconButton';
 import { SidebarNav } from './SidebarNav';
+import { SidebarProfile } from './SidebarProfile';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 
@@ -41,15 +42,16 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const mobileOpenRef = useRef(false);
   const [mobileRouteFocusKey, setMobileRouteFocusKey] = useState('shell:mobile-navigation');
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
+  const [collapsedPreference, setCollapsedPreference] = useState<boolean | null>(() => {
     if (typeof window === 'undefined') {
-      return false;
+      return null;
     }
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1';
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+    return stored === null ? null : stored === '1';
   });
   const { t } = useUiLanguage();
   const compactSidebar = useMediaQuery(COMPACT_SIDEBAR_QUERY);
-  const sidebarCollapsed = compactSidebar || collapsed;
+  const sidebarCollapsed = collapsedPreference ?? compactSidebar;
 
   const setMobileNavigationOpen = useCallback((nextOpen: boolean) => {
     mobileOpenRef.current = nextOpen;
@@ -62,8 +64,8 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   }, [setMobileNavigationOpen]);
 
   const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
+    setCollapsedPreference((preference) => {
+      const next = !(preference ?? compactSidebar);
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, next ? '1' : '0');
       }
@@ -102,21 +104,27 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         <span className="pointer-events-auto">
           <IconButton
             variant="outline"
-            size="comfortable"
+            size="navigation"
             onClick={() => setMobileNavigationOpen(true)}
             aria-label={t('layout.openNav')}
             data-route-focus-key={mobileOpen ? undefined : mobileRouteFocusKey}
-            tooltip={false}
+            className="bg-card shadow-soft-card"
           >
             <Menu aria-hidden="true" />
           </IconButton>
         </span>
         <span
           data-shell-mobile-brand="true"
-          className="min-w-0 truncate text-base font-semibold text-foreground"
+          className="min-w-0 flex-1 truncate text-base font-semibold text-foreground"
         >
           {t('layout.appFallbackTitle')}
         </span>
+        <SidebarProfile
+          collapsed
+          placement="bottom"
+          align="end"
+          rootClassName="pointer-events-auto"
+        />
       </div>
 
       <div className="mx-auto flex h-dvh w-full overflow-hidden">
@@ -126,13 +134,13 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           tabIndex={-1}
           className={cn(
             'sticky top-0 z-40 hidden h-dvh shrink-0 self-start overflow-visible border-r border-border bg-background px-2 py-4 transition-[width] duration-300 ease-out motion-reduce:transition-none lg:flex lg:flex-col',
-            sidebarCollapsed ? 'w-19' : 'w-57'
+            sidebarCollapsed ? 'w-20' : 'w-60'
           )}
           aria-label={t('layout.desktopSidebar')}
         >
           <SidebarNav
             collapsed={sidebarCollapsed}
-            onToggleCollapse={compactSidebar ? undefined : toggleCollapsed}
+            onToggleCollapse={toggleCollapsed}
             onNavigate={() => setMobileNavigationOpen(false)}
             focusKeyPrefix="shell-nav-desktop"
           />
@@ -140,7 +148,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
 
         <main
           data-shell-main="true"
-          className="relative flex min-h-0 min-w-0 flex-1 touch-pan-y flex-col overflow-x-hidden overflow-y-auto bg-background pt-14 lg:pt-0"
+          className="relative mt-14 mb-3 mx-3 flex min-h-0 min-w-0 flex-1 touch-pan-y flex-col overflow-y-auto rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
         >
           {children ?? <Outlet />}
         </main>

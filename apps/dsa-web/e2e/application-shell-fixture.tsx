@@ -42,10 +42,16 @@ function FixturePage() {
           <section key={label} className="min-w-0 border-t border-border pt-3">
             <h2 className="text-sm font-semibold text-foreground">{label}</h2>
             <p className="mt-1 break-words text-sm text-secondary-text">
-              Shell content remains readable without an outer framed card or horizontal clipping.
+              Shell content remains readable inside the global framed surface without horizontal clipping.
             </p>
           </section>
         ))}
+      </div>
+      <div
+        data-testid="shell-wide-content"
+        className="mt-6 w-[72rem] border-t border-border pt-3 text-sm text-secondary-text"
+      >
+        Wide deterministic content remains reachable through the main scroll container.
       </div>
     </section>
   );

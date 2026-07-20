@@ -93,9 +93,8 @@ export const ResponsiveRail = forwardRef<
             aria-label={isOpen ? collapseLabel : expandLabel}
             aria-expanded={isOpen}
             aria-controls={isTablet && !isOpen ? undefined : contentId}
-            size="default"
+            size="navigation"
             variant="outline"
-            tooltip={false}
             aria-haspopup={isTablet ? 'dialog' : undefined}
             className={isTablet ? undefined : 'md:hidden lg:inline-flex xl:hidden'}
             onClick={() => setOpen(!isOpen)}

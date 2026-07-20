@@ -19,7 +19,7 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 | --- | --- |
 | `Button` | Requires an explicit intent, forwards the native button ref, and exposes semantic variant and size state. |
 | `SelectionChip` | Provides a compact text-led selection command that grows for multi-line content without caller-owned geometry. |
-| `IconButton` | Requires an accessible name, provides an optional tooltip, and separates its visible icon surface from its coarse-pointer hit target. |
+| `IconButton` | Requires an accessible name, provides an optional tooltip, separates its visible icon surface from its coarse-pointer hit target, and owns the 44px `navigation` size used by shell and rail controls. |
 | `Input` | Forwards the native input ref, owns label/hint/error wiring, and uses a focusable coarse-pointer frame around the visible input. |
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
 | `Textarea` | Reuses `Field`, forwards the native textarea ref, and owns invalid/description semantics. |
@@ -213,33 +213,39 @@ work items must remove the matching entry when they adopt Router query state.
 ## Application Shell And Navigation
 
 `Shell` owns the application's single `main` landmark and global navigation.
-The main canvas is full bleed on `background` and does not add an outer Card,
-border, radius, or shadow around page content. The typed application navigation
-descriptor preserves the nine approved flat routes; Research, More, or another
-top-level destination requires a separate information-architecture decision.
+The global `main` retains the owner-selected framed/floating surface: one card
+background, border, radius, shadow, and responsive outer gutter around page
+content. Wide page content remains reachable through the `main` scroll
+container instead of being clipped or widening the document. UI-N01 does not
+replace or reinterpret the separately owned UI4 L-09 target. The typed
+application navigation descriptor preserves the nine approved flat routes;
+Research, More, or another top-level destination requires a separate
+information-architecture decision.
 
 The responsive contract has three states:
 
-- Below 1024px, one shared `IconButton` and the complete product name form the
-  mobile header. Global navigation uses the Navigation `Drawer`; theme and
-  language controls live inside the profile dialog rather than competing in
-  the header. Closing with Escape or the close control restores the opener,
-  while route selection delegates focus to the destination's ready H1. The
-  route marker selected inside the transient Drawer transfers to the persistent
-  opener, so browser Back restores that visible control rather than falling
-  back to the source H1.
+- Below 1024px, one shared navigation `IconButton`, the complete product name,
+  and one directly reachable compact Profile trigger form the mobile header.
+  Theme and language controls live inside the Profile dialog. Global navigation
+  uses the Navigation `Drawer`; closing with Escape or the close control
+  restores its opener. Only an unmodified primary same-window route activation
+  closes the Drawer and delegates focus to the destination's ready H1;
+  modifier, download, and new-context activation retain the current Drawer and
+  native browser behavior. The selected route marker transfers from the
+  transient Drawer to the persistent opener, so browser Back restores that
+  visible control rather than falling back to the source H1.
 - From 768px through 1023px, page-owned business navigation represented by a
   `ResponsiveRail` uses its own labelled Navigation Drawer. Below 768px it
   remains an inline disclosure, avoiding a second hamburger-style mobile menu.
-- From 1024px through 1279px, the global sidebar is a fixed 76px compact rail.
-  This forced intermediate state does not overwrite the user's wider-desktop
-  preference. A contextual `ResponsiveRail` remains in document flow and uses
-  its compact disclosure, so it does not create a second permanent sidebar at
-  the constrained breakpoint. Its fixed brand mark remains visible because
-  this forced rail has no expansion action.
-- At 1280px and wider, the global sidebar honors the persisted expanded or
-  collapsed preference. The expanded state always displays the complete
-  product name.
+- From 1024px through 1279px, the global sidebar defaults to an 80px compact
+  rail when the user has not chosen a state. A saved expanded or collapsed
+  preference remains authoritative at this breakpoint, and the rail always
+  provides the corresponding 44px toggle. A contextual `ResponsiveRail`
+  remains in document flow and uses its compact disclosure, so it does not
+  create a second permanent sidebar at the constrained breakpoint.
+- At 1280px and wider, the global sidebar uses the same persisted preference,
+  defaulting to its 240px expanded state. The expanded state always displays
+  the complete product name.
 
 If an open mobile Drawer crosses into the desktop breakpoint, the shell closes
 it and moves focus to the current desktop route, or to the labelled desktop
@@ -248,7 +254,10 @@ does not move focus. Desktop and mobile navigation instances use distinct,
 stable route-focus marker prefixes so Router restoration never sees duplicate
 targets. The profile surface uses dialog semantics, moves focus into its first
 control, closes on Escape, and restores its trigger; it does not claim an
-incomplete menu keyboard model.
+incomplete menu keyboard model. Compact navigation controls use the shared
+labelled Tooltip, route rows and preference controls retain 44px targets, and
+the route list owns vertical scrolling so Profile and logout remain reachable
+at short viewport heights.
 
 ## Surface Hierarchy
 

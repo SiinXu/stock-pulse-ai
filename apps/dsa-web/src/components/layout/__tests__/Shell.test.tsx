@@ -86,29 +86,41 @@ describe('Shell', () => {
 
     expect(screen.getByRole('link', { name: '问股' })).toBeInTheDocument();
     expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'StockPulse' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
-  it('uses an unframed application main instead of an outer card surface', () => {
+  it('retains the owner-selected framed main without clipping horizontal content', () => {
     renderShell();
 
     const main = screen.getByRole('main');
     expect(main).toHaveAttribute('data-shell-main', 'true');
+    expect(main).toHaveClass('rounded-xl', 'border', 'border-border', 'bg-card', 'shadow-soft-card');
+    expect(main).toHaveClass('overflow-y-auto');
+    expect(main).not.toHaveClass('overflow-x-hidden');
   });
 
-  it('keeps one mobile navigation control, the full brand, and restores focus after Escape', () => {
+  it('keeps one mobile navigation opener, direct profile access, and restores focus after Escape', async () => {
     const { container } = renderShell();
 
     const mobileHeader = container.querySelector('[data-shell-mobile-header]');
     expect(mobileHeader).not.toBeNull();
-    expect(within(mobileHeader as HTMLElement).getAllByRole('button')).toHaveLength(1);
+    expect(within(mobileHeader as HTMLElement).getAllByRole('button')).toHaveLength(2);
     expect(within(mobileHeader as HTMLElement).getByText('StockPulse')).toBeInTheDocument();
     const openers = screen.getAllByRole('button', { name: '打开导航菜单' });
     expect(openers).toHaveLength(1);
     const opener = openers[0];
     expect(opener).toHaveAttribute('data-control', 'icon-button');
+    expect(opener).toHaveClass('h-11', 'w-11');
     expect(opener).toHaveAttribute('data-route-focus-key', 'shell:mobile-navigation');
+    const profile = within(mobileHeader as HTMLElement).getByRole('button', { name: 'StockPulse' });
+    expect(profile).toHaveClass('h-11', 'w-11');
+    fireEvent.click(profile);
+    const profileDialog = screen.getByRole('dialog', { name: 'StockPulse' });
+    await waitFor(() => expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toHaveFocus());
+    fireEvent.keyDown(profileDialog, { key: 'Escape' });
+    await waitFor(() => expect(profile).toHaveFocus());
+
     opener.focus();
     fireEvent.click(opener);
 
@@ -158,18 +170,36 @@ describe('Shell', () => {
     await waitFor(() => expect(pageAction).toHaveFocus());
   });
 
-  it('forces a stable compact rail at 1024-1279 without overwriting the saved preference', () => {
+  it('defaults to a compact rail at 1024-1279 and records an explicit expansion', () => {
     setMediaMatch(COMPACT_SIDEBAR_QUERY, true);
-    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, '0');
     const { container } = renderShell();
 
     expect(container.querySelector('[data-shell-sidebar]')).toHaveAttribute(
       'data-shell-sidebar-mode',
       'compact',
     );
-    expect(screen.queryByRole('button', { name: '展开侧边栏' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '展开侧边栏' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '折叠侧边栏' })).not.toBeInTheDocument();
+    expect(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '展开侧边栏' }));
+    expect(container.querySelector('[data-shell-sidebar]')).toHaveAttribute(
+      'data-shell-sidebar-mode',
+      'expanded',
+    );
     expect(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe('0');
+  });
+
+  it('honors an explicit expanded preference at the compact desktop breakpoint', () => {
+    setMediaMatch(COMPACT_SIDEBAR_QUERY, true);
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, '0');
+    const { container } = renderShell();
+
+    expect(container.querySelector('[data-shell-sidebar]')).toHaveAttribute(
+      'data-shell-sidebar-mode',
+      'expanded',
+    );
+    expect(screen.getByRole('button', { name: '折叠侧边栏' })).toBeInTheDocument();
   });
 
   it('restores the persisted desktop expansion control outside the compact range', () => {

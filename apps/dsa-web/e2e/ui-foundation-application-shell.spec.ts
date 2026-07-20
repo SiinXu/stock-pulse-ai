@@ -32,14 +32,19 @@ test.describe('application shell foundation', () => {
       await openFixture(page, width, height);
       const mobileHeader = page.locator('[data-shell-mobile-header]');
       const opener = page.getByRole('button', { name: 'Open navigation' });
-      await expect(mobileHeader.getByRole('button')).toHaveCount(1);
+      await expect(mobileHeader.getByRole('button')).toHaveCount(2);
       await expect(mobileHeader.getByText('StockPulse', { exact: true })).toBeVisible();
+      const profile = mobileHeader.getByRole('button', { name: 'StockPulse' });
+      await expect(profile).toBeVisible();
+      expect((await profile.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await expect(opener).toHaveCount(1);
       await expect(opener).toBeVisible();
+      expect((await opener.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await expect(page.locator('[data-shell-sidebar]')).toBeHidden();
       await expectNoDocumentOverflow(page);
 
       await opener.focus();
+      await expect(page.getByRole('tooltip')).toHaveText('Open navigation');
       await opener.click();
       const drawer = page.getByRole('dialog', { name: 'Navigation' });
       await expect(drawer).toBeVisible();
@@ -60,10 +65,16 @@ test.describe('application shell foundation', () => {
     await expect(sidebar).toBeVisible();
     await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'compact');
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeHidden();
-    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(76);
+    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(80);
     const compactBrand = sidebar.locator('[data-shell-brand-mark]');
     await compactBrand.locator('..').hover();
-    await expect(compactBrand).toHaveCSS('opacity', '1');
+    await expect(compactBrand).toHaveCSS('opacity', '0');
+    const expand = sidebar.getByRole('button', { name: 'Expand sidebar' });
+    await expect(expand).toHaveCSS('opacity', '1');
+    await expand.click();
+    await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'expanded');
+    expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(240);
+    expect(await page.evaluate(() => localStorage.getItem('dsa-sidebar-collapsed'))).toBe('0');
     await expectNoDocumentOverflow(page);
 
     for (const { width, height } of [
@@ -72,6 +83,7 @@ test.describe('application shell foundation', () => {
     ]) {
       await openFixture(page, width, height);
       await expect(sidebar).toHaveAttribute('data-shell-sidebar-mode', 'expanded');
+      expect(Math.round((await sidebar.boundingBox())?.width ?? 0)).toBe(240);
       await expect(sidebar.getByText('StockPulse', { exact: true }).first()).toBeVisible();
       await expectNoDocumentOverflow(page);
     }
@@ -117,6 +129,11 @@ test.describe('application shell foundation', () => {
     const drawer = page.getByRole('dialog', { name: 'Navigation' });
     const chatLink = drawer.getByRole('link', { name: 'Ask' });
     await expect(chatLink).toHaveAttribute('data-route-focus-key', 'shell-nav-mobile:chat');
+    await chatLink.focus();
+    await chatLink.click({ modifiers: ['Control'] });
+    await expect(drawer).toBeVisible();
+    await expect(page).toHaveURL(/\/e2e\/application-shell-fixture\.html$/);
+    await expect(chatLink).toBeFocused();
     await chatLink.click();
 
     await expect(drawer).toBeHidden();
@@ -133,22 +150,29 @@ test.describe('application shell foundation', () => {
     await expect(page.getByRole('button', { name: 'Open navigation' })).toBeFocused();
   });
 
-  test('uses dialog semantics for profile preferences and restores trigger focus', async ({ page }) => {
-    await openFixture(page, 1440, 900);
-    const profileTrigger = page.getByRole('button', { name: 'StockPulse' });
-    await expect(profileTrigger).toHaveAttribute('aria-haspopup', 'dialog');
-    await profileTrigger.click();
+  test('keeps profile preferences directly reachable and restores trigger focus', async ({ page }) => {
+    for (const { width, height } of [
+      { width: 390, height: 844 },
+      { width: 1440, height: 900 },
+    ]) {
+      await openFixture(page, width, height);
+      const profileTrigger = page.getByRole('button', { name: 'StockPulse' }).filter({ visible: true });
+      await expect(profileTrigger).toHaveCount(1);
+      await expect(profileTrigger).toHaveAttribute('aria-haspopup', 'dialog');
+      await profileTrigger.click();
 
-    const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
-    await expect(profileDialog).toBeVisible();
-    const themeTrigger = profileDialog.getByRole('button', { name: 'Toggle theme' });
-    await expect(themeTrigger).toBeFocused();
-    await page.keyboard.press('Escape');
-    await expect(profileDialog).toBeHidden();
-    await expect(profileTrigger).toBeFocused();
+      const profileDialog = page.getByRole('dialog', { name: 'StockPulse' });
+      await expect(profileDialog).toBeVisible();
+      const themeTrigger = profileDialog.getByRole('button', { name: 'Toggle theme' });
+      await expect(themeTrigger).toBeFocused();
+      expect((await themeTrigger.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await page.keyboard.press('Escape');
+      await expect(profileDialog).toBeHidden();
+      await expect(profileTrigger).toBeFocused();
+    }
   });
 
-  test('keeps the full-bleed shell coherent in light, dark, and reduced motion', async ({ page }) => {
+  test('keeps the framed shell coherent and wide content reachable in both themes and reduced motion', async ({ page }) => {
     await page.addInitScript(() => window.localStorage.setItem('theme', 'light'));
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openFixture(page, 1024, 768);
@@ -160,12 +184,14 @@ test.describe('application shell foundation', () => {
         borderRadius: style.borderRadius,
         borderTopWidth: style.borderTopWidth,
         boxShadow: style.boxShadow,
+        overflowX: style.overflowX,
       };
-    })).toEqual({
-      borderRadius: '0px',
-      borderTopWidth: '0px',
-      boxShadow: 'none',
-    });
+    })).toEqual(expect.objectContaining({
+      borderTopWidth: '1px',
+      overflowX: 'auto',
+    }));
+    await expect(main).not.toHaveCSS('border-radius', '0px');
+    await expect(main).not.toHaveCSS('box-shadow', 'none');
     await expect(page.locator('html')).toHaveClass(/light/);
 
     const lightBackground = await main.evaluate((element) => getComputedStyle(element).backgroundColor);
@@ -181,6 +207,54 @@ test.describe('application shell foundation', () => {
     ).not.toBe(lightBackground);
     expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(true);
     await expect(page.locator('[data-shell-sidebar]')).toHaveCSS('transition-property', 'none');
+    await expect(page.locator('[data-shell-brand-mark]')).toHaveCSS('transition-property', 'none');
+    const scrollState = await main.evaluate((element) => {
+      element.scrollLeft = 240;
+      return {
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        scrollLeft: element.scrollLeft,
+      };
+    });
+    expect(scrollState.scrollWidth).toBeGreaterThan(scrollState.clientWidth);
+    expect(scrollState.scrollLeft).toBeGreaterThan(0);
+    await expectNoDocumentOverflow(page);
+  });
+
+  test('keeps compact navigation controls reachable in a short viewport', async ({ page }) => {
+    await openFixture(page, 1024, 480);
+    const sidebar = page.locator('[data-shell-sidebar]');
+    const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
+    expect(await navigation.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
+      await navigation.evaluate((element) => element.clientHeight),
+    );
+
+    for (const control of [
+      sidebar.getByRole('button', { name: 'Search' }),
+      sidebar.getByRole('button', { name: 'StockPulse' }),
+      sidebar.getByRole('button', { name: 'Log out' }),
+    ]) {
+      await expect(control).toBeVisible();
+      expect((await control.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    const settings = navigation.getByRole('link', { name: 'Settings' });
+    await settings.scrollIntoViewIfNeeded();
+    const navigationBox = await navigation.boundingBox();
+    const settingsBox = await settings.boundingBox();
+    expect(settingsBox).not.toBeNull();
+    expect(navigationBox).not.toBeNull();
+    expect(settingsBox!.y).toBeGreaterThanOrEqual(navigationBox!.y - 1);
+    expect(settingsBox!.y + settingsBox!.height).toBeLessThanOrEqual(
+      navigationBox!.y + navigationBox!.height + 1,
+    );
+
+    const search = sidebar.getByRole('button', { name: 'Search' });
+    await search.focus();
+    await expect(page.getByRole('tooltip')).toHaveText('Search');
+    const home = navigation.getByRole('link', { name: 'Home' });
+    await home.focus();
+    await expect(page.getByRole('tooltip')).toHaveText('Home');
     await expectNoDocumentOverflow(page);
   });
 });

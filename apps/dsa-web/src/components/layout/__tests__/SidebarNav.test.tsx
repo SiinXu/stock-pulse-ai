@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { SidebarNav } from '../SidebarNav';
@@ -59,6 +59,7 @@ describe('SidebarNav', () => {
 
     expect(screen.getByRole('button', { name: '展开侧边栏' })).toHaveClass('h-11', 'w-11');
     expect(screen.getByRole('button', { name: '搜索' })).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: 'StockPulse' })).toHaveClass('h-11', 'w-11');
   });
 
   it('keeps the compact brand persistent when the rail cannot expand', () => {
@@ -164,13 +165,65 @@ describe('SidebarNav', () => {
     fireEvent.click(profileTrigger);
     const profileDialog = screen.getByRole('dialog', { name: 'StockPulse' });
     expect(mockThemeToggle).toHaveBeenCalledWith(
-      expect.objectContaining({ menuLayout: 'horizontal', wrapperClassName: 'w-full' }),
+      expect.objectContaining({
+        menuLayout: 'horizontal',
+        wrapperClassName: 'w-full',
+        triggerClassName: expect.stringContaining('h-11'),
+      }),
     );
     expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toBeInTheDocument();
     const languageControl = within(profileDialog).getByTestId('ui-language-selector');
     expect(within(languageControl).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
     fireEvent.click(within(languageControl).getByRole('combobox'));
     expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('keeps modifier activation in the current navigation surface', () => {
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav onNavigate={onNavigate} focusKeyPrefix="shell-nav-mobile" />
+      </MemoryRouter>,
+    );
+
+    const chatLink = screen.getByRole('link', { name: '问股' });
+    const preventNativeNavigation = (event: MouseEvent) => event.preventDefault();
+    document.addEventListener('click', preventNativeNavigation);
+    try {
+      for (const modifier of [
+        { metaKey: true },
+        { ctrlKey: true },
+        { shiftKey: true },
+        { altKey: true },
+      ]) {
+        fireEvent.click(chatLink, modifier);
+      }
+      expect(onNavigate).not.toHaveBeenCalled();
+
+      fireEvent.click(chatLink);
+    } finally {
+      document.removeEventListener('click', preventNativeNavigation);
+    }
+    expect(onNavigate).toHaveBeenCalledOnce();
+    expect(onNavigate).toHaveBeenCalledWith('shell-nav-mobile:chat');
+  });
+
+  it('shows shared tooltips for compact icon-only navigation controls', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav collapsed onToggleCollapse={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    const search = screen.getByRole('button', { name: '搜索' });
+    search.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('搜索');
+    search.blur();
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+
+    const home = screen.getByRole('link', { name: '首页' });
+    home.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('首页');
   });
 
   it('renders stable, unique route focus markers from the navigation descriptor', () => {
