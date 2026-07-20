@@ -392,7 +392,7 @@ const AlertsPage: React.FC = () => {
     {
       id: 'latency',
       header: text.latency,
-      cell: (notification) => (notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`),
+      cell: (notification) => <>{notification.latencyMs == null ? '--' : `${notification.latencyMs}ms`}</>,
     },
     {
       id: 'time',
