@@ -118,7 +118,7 @@
 | `mkt_market_value` | Market value | 市值 | 市值 | 市場価値 | 시장 가치 | Marktwert | Valor de mercado | Nilai pasaran | Valeur marchande | Nilai pasar |
 | `mkt_turnover_amount` ⚠ | Turnover value | 成交额 | 成交金額 | 売買代金 | 거래대금 | Handelswert | Importe negociado | Nilai dagangan | Montant négocié | Nilai transaksi |
 | `mkt_turnover_rate` ⚠ | Turnover rate | 换手率 | 週轉率 | 売買回転率 | 회전율 | Umschlagshäufigkeit | Rotación | Kadar pusing ganti dagangan | Taux de rotation | Tingkat perputaran |
-| `mkt_volume_spike` ⚠ | Volume spike | 成交量放大 | 成交量放大 | 出来高急増 | 거래량 급증 | Sprung im Handelsvolumen | Pico de volumen | Lonjakan volum dagangan | Pic du volume des transactions | Lonjakan volume perdagangan |
+| `mkt_volume_spike` ⚠ | Volume spike | 成交量放大 | 成交量放大 | 出来高急増 | 거래량 급증 | Sprung im Handelsvolumen | Pico del volumen de negociación | Lonjakan volum dagangan | Pic du volume des transactions | Lonjakan volume perdagangan |
 | `mkt_price_cross` | Price crossing | 价格突破 | 價格穿越 | 価格の閾値クロス | 가격 임계값 교차 | Preisübergang | Cruce de precios | Lintasan harga | Franchissement des prix | Persilangan harga |
 | `mkt_fx_status` | FX status | 汇率状态 | 匯率狀態 | FX 状況 | FX 현황 | FX Status | FX Estado | Status FX | FX Statut | Status FX |
 
