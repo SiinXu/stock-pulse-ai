@@ -32,6 +32,8 @@ from src.migrations.legacy_profiles import (
 )
 from src.migrations.registry import (
     DECISION_SIGNAL_PROFILE_MIGRATION,
+    INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
     LEGACY_BASELINE_MIGRATION,
     LLM_USAGE_TELEMETRY_MIGRATION,
     PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
@@ -416,6 +418,8 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         LLM_USAGE_TELEMETRY_MIGRATION.id,
         DECISION_SIGNAL_PROFILE_MIGRATION.id,
         PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)
@@ -3498,3 +3502,206 @@ def test_portfolio_idempotency_migration_applies_once_under_two_engines(
             (PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION.id,),
         ).fetchone()[0]
     assert applied_count == 1
+
+
+_INTELLIGENCE_REGISTRY = (
+    LEGACY_BASELINE_MIGRATION,
+    REGISTRY_METADATA_MIGRATION,
+    LLM_USAGE_TELEMETRY_MIGRATION,
+    DECISION_SIGNAL_PROFILE_MIGRATION,
+    PORTFOLIO_IDEMPOTENCY_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_SCOPE_MIGRATION,
+    INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION,
+)
+_INTEL_SCOPED_UNIQUE_COLUMNS = ["source_id", "url", "scope_type", "scope_value", "market"]
+_LEGACY_INTELLIGENCE_SOURCES_DDL = (
+    "CREATE TABLE intelligence_sources ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, url TEXT NOT NULL)"
+)
+_LEGACY_INTELLIGENCE_ITEMS_DDL = (
+    "CREATE TABLE intelligence_items ("
+    "id INTEGER PRIMARY KEY AUTOINCREMENT, source_id INTEGER, source_name TEXT, "
+    "source_type TEXT NOT NULL DEFAULT 'rss', title TEXT NOT NULL, summary TEXT, "
+    "url TEXT NOT NULL, source TEXT, published_at DATETIME, fetched_at DATETIME, "
+    "scope_type TEXT NOT NULL DEFAULT 'market', scope_value TEXT, "
+    "market TEXT NOT NULL DEFAULT 'cn', raw_payload TEXT)"
+)
+
+
+def _engine_with_registry_before_intelligence_migrations(path: Path) -> Engine:
+    """Stamp the migrations before the pending intelligence scope migrations."""
+    engine = create_engine(_database_url(path))
+    stamped = {
+        INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+        INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+    }
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE schema_migrations ("
+            "version VARCHAR(64) NOT NULL PRIMARY KEY, "
+            "description VARCHAR(255) NOT NULL, "
+            "applied_at DATETIME NOT NULL, "
+            "checksum VARCHAR(64))"
+        )
+        for migration in _INTELLIGENCE_REGISTRY:
+            if migration.id in stamped:
+                continue
+            connection.exec_driver_sql(
+                "INSERT INTO schema_migrations "
+                "(version, description, applied_at, checksum) VALUES (?, ?, ?, ?)",
+                (
+                    migration.id,
+                    migration.description,
+                    "2099-01-01 00:00:00",
+                    migration.checksum,
+                ),
+            )
+    return engine
+
+
+def _seed_legacy_intelligence(connection) -> None:
+    connection.exec_driver_sql(_LEGACY_INTELLIGENCE_SOURCES_DDL)
+    connection.exec_driver_sql(_LEGACY_INTELLIGENCE_ITEMS_DDL)
+    connection.exec_driver_sql(
+        "CREATE UNIQUE INDEX uix_intelligence_item_url_legacy ON intelligence_items(url)"
+    )
+    connection.exec_driver_sql(
+        "INSERT INTO intelligence_sources (name, url) VALUES ('legacy', 'https://x/rss')"
+    )
+    connection.exec_driver_sql(
+        "INSERT INTO intelligence_items "
+        "(source_id, source_type, title, url, scope_type, scope_value, market) VALUES "
+        "(1, 'rss', 'A', 'https://x/a', 'market', NULL, 'cn'), "
+        "(1, 'rss', 'B', 'https://x/b', 'market', '', 'cn')"
+    )
+
+
+def _intel_unique_index_columns(db_path: Path) -> dict:
+    with sqlite3.connect(db_path) as connection:
+        result = {}
+        for row in connection.execute(
+            "PRAGMA index_list(intelligence_items)"
+        ).fetchall():
+            if int(row[2]) != 1:
+                continue
+            columns = [
+                str(info[2])
+                for info in connection.execute(
+                    f'PRAGMA index_xinfo("{row[1]}")'
+                ).fetchall()
+                if info[2] is not None
+            ]
+            result[str(row[1])] = columns
+    return result
+
+
+def test_intelligence_migrations_backfill_scope_and_rebuild_unique_index(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "legacy-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            _seed_legacy_intelligence(connection)
+
+        result = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (
+            INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+            INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+        )
+
+        with sqlite3.connect(db_path) as connection:
+            scopes = connection.execute(
+                "SELECT scope_value FROM intelligence_items ORDER BY id"
+            ).fetchall()
+            count = connection.execute(
+                "SELECT COUNT(*) FROM intelligence_items"
+            ).fetchone()[0]
+            temp_tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name LIKE 'intelligence_items%tmp%'"
+            ).fetchall()
+        # Null and blank scopes are normalized before the rebuild copies rows.
+        assert scopes == [("__dsa_null_scope__",), ("__dsa_null_scope__",)]
+        assert count == 2
+        assert temp_tables == []
+
+        unique_indexes = _intel_unique_index_columns(db_path)
+        assert "uix_intelligence_item_url_legacy" not in unique_indexes
+        assert unique_indexes.get("uix_intel_item_scope") == _INTEL_SCOPED_UNIQUE_COLUMNS
+
+        first_schema = _sqlite_master_snapshot(db_path)
+        assert MigrationRunner(_INTELLIGENCE_REGISTRY).verify(engine).success is True
+        rerun = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert rerun.success is True
+        assert rerun.executed_ids == ()
+        assert _sqlite_master_snapshot(db_path) == first_schema
+    finally:
+        engine.dispose()
+
+
+def test_intelligence_unique_index_migration_rolls_back_rebuild_on_write_failure(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "rollback-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            _seed_legacy_intelligence(connection)
+        before_unique = _intel_unique_index_columns(db_path)
+
+        class AppliedInsertFailureRunner(MigrationRunner):
+            def _insert_applied(self, connection: Connection, migration: Migration) -> None:
+                if migration.id == INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id:
+                    raise RuntimeError("injected applied insert failure")
+                super()._insert_applied(connection, migration)
+
+        result = AppliedInsertFailureRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+
+        assert result.success is False
+        assert result.failure_code == "applied_registry_write_failed"
+        assert result.failed_migration_id == INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id
+        # The rebuild rolls back with the applied row: the legacy url uniqueness
+        # is still present and no scoped index leaked.
+        after_unique = _intel_unique_index_columns(db_path)
+        assert "uix_intelligence_item_url_legacy" in after_unique
+        assert "uix_intel_item_scope" not in after_unique
+        assert after_unique == before_unique
+        assert INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id not in _applied_ids(engine)
+        with sqlite3.connect(db_path) as connection:
+            temp_tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name LIKE 'intelligence_items%tmp%'"
+            ).fetchall()
+        assert temp_tables == []
+    finally:
+        engine.dispose()
+
+
+def test_intelligence_unique_index_migration_is_noop_when_scoped_index_present(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "modern-intelligence.sqlite"
+    engine = _engine_with_registry_before_intelligence_migrations(db_path)
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(_LEGACY_INTELLIGENCE_SOURCES_DDL)
+            connection.exec_driver_sql(_LEGACY_INTELLIGENCE_ITEMS_DDL)
+            connection.exec_driver_sql(
+                "CREATE UNIQUE INDEX uix_intel_item_scope ON intelligence_items "
+                "(source_id, url, scope_type, scope_value, market)"
+            )
+        before_schema = _sqlite_master_snapshot(db_path)
+
+        result = MigrationRunner(_INTELLIGENCE_REGISTRY).apply_pending(engine)
+        assert result.success is True
+        assert result.executed_ids == (
+            INTELLIGENCE_ITEM_SCOPE_MIGRATION.id,
+            INTELLIGENCE_ITEM_UNIQUE_INDEX_MIGRATION.id,
+        )
+        # The unique-index migration finds the scoped index already present and
+        # does not rebuild the table.
+        assert _sqlite_master_snapshot(db_path) == before_schema
+    finally:
+        engine.dispose()
