@@ -3186,9 +3186,7 @@ class StockAnalysisPipeline:
         self,
         results: List[AnalysisResult],
     ):
-        """Activate an isolated delivery trace when the caller has no context."""
-        if get_current_diagnostic_context() is not None:
-            return None
+        """Activate an isolated delivery trace nested under any caller context."""
         try:
             first_result = results[0] if results else None
             context_snapshot = (
@@ -4244,41 +4242,181 @@ class StockAnalysisPipeline:
                     },
                     retryable=True,
                 )
-                sent = self.notifier.send(
-                    report_content,
-                    email_stock_codes=[stock_code],
-                    route_type="report",
-                    severity="info",
-                    dedup_key=f"report:single:{stock_code}:{report_type.value}",
-                    cooldown_key=f"report:single:{stock_code}:{report_type.value}",
-                )
-                dispatch_stage.finish(
-                    status="success" if sent else "failed",
-                    output_summary={"delivered": sent, "route": "report"},
-                    degradation_reason=(
-                        "Notification delivery returned an unsuccessful result."
-                        if not sent
-                        else None
+                send_kwargs = {
+                    "email_stock_codes": [stock_code],
+                    "route_type": "report",
+                    "severity": "info",
+                    "dedup_key": (
+                        f"report:single:{stock_code}:{report_type.value}"
                     ),
-                    retryable=not sent,
+                    "cooldown_key": (
+                        f"report:single:{stock_code}:{report_type.value}"
+                    ),
+                }
+                notifier_type_method = getattr(
+                    type(self.notifier),
+                    "send_with_results",
+                    None,
                 )
-                notification_run = self._build_notification_run_snapshot(
-                    channel="report",
-                    status="success" if sent else "failed",
-                    success=sent,
+                notifier_instance_values = getattr(
+                    self.notifier,
+                    "__dict__",
+                    {},
                 )
-                record_notification_run(
-                    channel="report",
-                    status="success" if sent else "failed",
-                    success=sent,
+                send_with_results = (
+                    getattr(self.notifier, "send_with_results", None)
+                    if callable(notifier_type_method)
+                    else notifier_instance_values.get("send_with_results")
                 )
-                self._refresh_saved_diagnostic_snapshot(
-                    result=result,
-                    fallback_code=fallback_code,
-                    notification_run=notification_run,
+
+                dispatch_result = None
+                channel_results: List[Any] = []
+                dispatch_result_status = ""
+                dispatched = False
+                if callable(send_with_results):
+                    dispatch_result = send_with_results(report_content, **send_kwargs)
+                    raw_channel_results = getattr(
+                        dispatch_result,
+                        "channel_results",
+                        None,
+                    )
+                    if isinstance(raw_channel_results, (list, tuple)):
+                        channel_results = list(raw_channel_results)
+                    dispatch_result_status = str(
+                        getattr(dispatch_result, "status", "") or ""
+                    ).strip().lower()
+                    sent = bool(getattr(dispatch_result, "success", False))
+                    dispatched = bool(
+                        getattr(dispatch_result, "dispatched", False)
+                    )
+                else:
+                    sent = bool(self.notifier.send(report_content, **send_kwargs))
+                    dispatched = True
+
+                delivery_failure_count = (
+                    sum(
+                        not bool(getattr(item, "success", False))
+                        for item in channel_results
+                    )
+                    if channel_results
+                    else int(dispatched and not sent)
                 )
+                if (
+                    dispatch_result_status == "partial_failed"
+                    or (sent and delivery_failure_count)
+                ):
+                    dispatch_status = "degraded"
+                elif sent or dispatch_result_status == "sent":
+                    dispatch_status = "success"
+                elif dispatch_result_status in {
+                    "noise_suppressed",
+                    "no_channel",
+                }:
+                    dispatch_status = "skipped"
+                else:
+                    dispatch_status = "failed"
+
+                dispatch_retryable = False
+                if dispatch_status == "failed":
+                    dispatch_retryable = (
+                        any(
+                            bool(getattr(item, "retryable", True))
+                            for item in channel_results
+                        )
+                        if channel_results
+                        else True
+                    )
+                dispatch_stage.finish(
+                    status=dispatch_status,
+                    output_summary={
+                        "delivered": sent,
+                        "dispatched": dispatched,
+                        "route": "report",
+                        "dispatch_status": dispatch_result_status or None,
+                        "attempt_count": len(channel_results) or int(dispatched),
+                        "failure_count": delivery_failure_count,
+                    },
+                    degradation_reason=(
+                        "Some notification deliveries failed after at least one delivery succeeded."
+                        if dispatch_status == "degraded"
+                        else (
+                            "All attempted notification deliveries failed."
+                            if dispatch_status == "failed"
+                            else None
+                        )
+                    ),
+                    retryable=dispatch_retryable,
+                )
+                if channel_results:
+                    for channel_result in channel_results:
+                        channel_label = str(
+                            getattr(channel_result, "channel", None) or "report"
+                        )
+                        channel_success = bool(
+                            getattr(channel_result, "success", False)
+                        )
+                        channel_error = (
+                            getattr(channel_result, "diagnostics", None)
+                            or getattr(channel_result, "error_code", None)
+                        )
+                        notification_run = self._build_notification_run_snapshot(
+                            channel=channel_label,
+                            status="success" if channel_success else "failed",
+                            success=channel_success,
+                            error_message=channel_error,
+                        )
+                        record_notification_run(
+                            channel=channel_label,
+                            status="success" if channel_success else "failed",
+                            success=channel_success,
+                            error_message=channel_error,
+                        )
+                        self._refresh_saved_diagnostic_snapshot(
+                            result=result,
+                            fallback_code=fallback_code,
+                            notification_run=notification_run,
+                        )
+                else:
+                    notification_status = (
+                        "success"
+                        if dispatch_status in {"success", "degraded"}
+                        else (
+                            "skipped"
+                            if dispatch_status == "skipped"
+                            else "failed"
+                        )
+                    )
+                    notification_run = self._build_notification_run_snapshot(
+                        channel="report",
+                        status=notification_status,
+                        success=sent,
+                        attempts=int(dispatched),
+                        error_message=(
+                            getattr(dispatch_result, "message", None)
+                            if dispatch_result is not None
+                            else None
+                        ),
+                    )
+                    record_notification_run(
+                        channel="report",
+                        status=notification_status,
+                        success=sent,
+                        attempts=int(dispatched),
+                        error_message=(
+                            getattr(dispatch_result, "message", None)
+                            if dispatch_result is not None
+                            else None
+                        ),
+                    )
+                    self._refresh_saved_diagnostic_snapshot(
+                        result=result,
+                        fallback_code=fallback_code,
+                        notification_run=notification_run,
+                    )
                 if sent:
                     logger.info("[%s] Single-stock notification delivered", stock_code)
+                elif dispatch_status == "skipped":
+                    logger.info("[%s] Single-stock notification skipped", stock_code)
                 else:
                     logger.warning("[%s] Single-stock notification delivery failed", stock_code)
             except Exception as e:  # broad-exception: fallback_recorded - Notification failures are recorded and safely logged without changing analysis success.
@@ -4559,13 +4697,32 @@ class StockAnalysisPipeline:
                         cooldown_key=noise_key,
                     )
                     if not noise_decision.should_send:
+                        if send_context:
+                            suppressed_dispatch_status = "success"
+                            suppressed_retryable = False
+                            suppressed_reason = None
+                        elif context_route_available:
+                            suppressed_dispatch_status = "failed"
+                            suppressed_retryable = True
+                            suppressed_reason = (
+                                "Context-reply delivery failed and static channels "
+                                "were suppressed by noise control."
+                            )
+                        else:
+                            suppressed_dispatch_status = "skipped"
+                            suppressed_retryable = False
+                            suppressed_reason = None
                         dispatch_stage.finish(
-                            status="skipped",
+                            status=suppressed_dispatch_status,
                             output_summary={
                                 "reason": "noise_control",
                                 "reason_code": noise_decision.reason_code,
+                                "context_delivered": bool(send_context),
+                                "context_attempted": context_route_available,
+                                "static_suppressed": True,
                             },
-                            retryable=False,
+                            degradation_reason=suppressed_reason,
+                            retryable=suppressed_retryable,
                         )
                         notification_run = self._build_notification_run_snapshot(
                             channel="report",

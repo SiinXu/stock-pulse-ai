@@ -321,6 +321,44 @@ class _FailedNotifier:
         return False
 
 
+class _PartialStructuredNotifier:
+    """Notifier exposing one successful and one failed static channel."""
+
+    def is_available(self) -> bool:
+        """Expose configured report channels."""
+        return True
+
+    def generate_single_stock_report(self, result) -> str:
+        """Return a deterministic rendered report."""
+        _ = result
+        return "rendered report"
+
+    def send_with_results(self, content: str, **kwargs):
+        """Return the authoritative per-channel delivery result."""
+        from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+        _ = (content, kwargs)
+        return NotificationDispatchResult(
+            dispatched=True,
+            success=True,
+            status="partial_failed",
+            channel_results=[
+                ChannelAttemptResult(channel="email", success=True),
+                ChannelAttemptResult(
+                    channel="ntfy",
+                    success=False,
+                    error_code="send_failed",
+                    retryable=True,
+                ),
+            ],
+        )
+
+    def send(self, content: str, **kwargs) -> bool:
+        """Reject use of the lossy compatibility API."""
+        _ = (content, kwargs)
+        raise AssertionError("send() must not collapse structured results")
+
+
 def test_notification_failure_is_dispatch_failure_not_analysis_failure() -> None:
     """Keep a successful analysis intact when the dispatch stage fails."""
     from src.core.pipeline import StockAnalysisPipeline
@@ -348,6 +386,107 @@ def test_notification_failure_is_dispatch_failure_not_analysis_failure() -> None
         ("render", "success"),
         ("dispatch", "failed"),
     ]
+    assert stage_runs[-1]["output_summary"]["attempt_count"] == 1
+    assert stage_runs[-1]["output_summary"]["failure_count"] == 1
+    assert stage_runs[-1]["retryable"] is True
+
+
+def test_single_stock_partial_dispatch_is_degraded_and_not_retryable() -> None:
+    """Preserve partial multi-channel results without retrying delivered channels."""
+    from src.core.pipeline import StockAnalysisPipeline
+    from src.enums import ReportType
+
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline.notifier = _PartialStructuredNotifier()
+    pipeline.save_context_snapshot = False
+    result = SimpleNamespace(code="600519", query_id="query-stage", success=True)
+    token = activate_run_diagnostic_context(trace_id="trace-partial-single")
+    try:
+        pipeline._send_single_stock_notification(result, ReportType.SIMPLE)
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert snapshot is not None
+    dispatch_run = snapshot["pipeline_stage_runs"][-1]
+    assert dispatch_run["stage"] == "dispatch"
+    assert dispatch_run["status"] == "degraded"
+    assert dispatch_run["retryable"] is False
+    assert dispatch_run["output_summary"]["dispatch_status"] == "partial_failed"
+    assert dispatch_run["output_summary"]["attempt_count"] == 2
+    assert dispatch_run["output_summary"]["failure_count"] == 1
+    assert [
+        (run["channel"], run["status"])
+        for run in snapshot["notification_runs"]
+    ] == [("email", "success"), ("ntfy", "failed")]
+    assert result.success is True
+
+
+@pytest.mark.parametrize(
+    (
+        "dispatch_result",
+        "expected_status",
+        "expected_retryable",
+    ),
+    (
+        (SimpleNamespace(
+            dispatched=True,
+            success=True,
+            status="sent",
+            channel_results=[SimpleNamespace(channel="email", success=True)],
+        ), "success", False),
+        (SimpleNamespace(
+            dispatched=True,
+            success=False,
+            status="all_failed",
+            channel_results=[
+                SimpleNamespace(
+                    channel="email",
+                    success=False,
+                    retryable=True,
+                    error_code="send_failed",
+                )
+            ],
+        ), "failed", True),
+        (SimpleNamespace(
+            dispatched=False,
+            success=False,
+            status="noise_suppressed",
+            channel_results=[],
+        ), "skipped", False),
+        (SimpleNamespace(
+            dispatched=False,
+            success=False,
+            status="no_channel",
+            channel_results=[],
+        ), "skipped", False),
+    ),
+)
+def test_single_stock_structured_dispatch_status_mapping(
+    dispatch_result,
+    expected_status: str,
+    expected_retryable: bool,
+) -> None:
+    """Map the notifier's structured terminal contract into Pipeline status."""
+    from src.core.pipeline import StockAnalysisPipeline
+    from src.enums import ReportType
+
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline.notifier = _PartialStructuredNotifier()
+    pipeline.notifier.send_with_results = MagicMock(return_value=dispatch_result)
+    pipeline.save_context_snapshot = False
+    result = SimpleNamespace(code="600519", query_id="query-stage", success=True)
+    token = activate_run_diagnostic_context(trace_id="trace-structured-single")
+    try:
+        pipeline._send_single_stock_notification(result, ReportType.SIMPLE)
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert snapshot is not None
+    dispatch_run = snapshot["pipeline_stage_runs"][-1]
+    assert dispatch_run["status"] == expected_status
+    assert dispatch_run["retryable"] is expected_retryable
 
 
 def test_local_report_save_failure_marks_render_failed() -> None:
@@ -448,6 +587,75 @@ def test_delivery_snapshot_merge_preserves_analysis_and_final_dispatch() -> None
         ]["pipeline_stage_runs"][-1]["stage"]
         == "dispatch"
     )
+
+
+def test_delivery_context_is_nested_without_mutating_outer_trace() -> None:
+    """Keep batch delivery runs out of an unrelated caller diagnostic context."""
+    from src.core.pipeline import StockAnalysisPipeline
+
+    result = SimpleNamespace(
+        code="600519",
+        query_id="stock-query",
+        diagnostic_context_snapshot={
+            "diagnostics": {
+                "trace_id": "stock-trace",
+                "query_id": "stock-query",
+                "stock_code": "600519",
+                "pipeline_stage_runs": [
+                    {
+                        "trace_id": "stock-trace",
+                        "stage": "analyze",
+                        "status": "success",
+                    }
+                ],
+                "notification_runs": [],
+            }
+        },
+    )
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline.save_context_snapshot = True
+    pipeline.db = MagicMock()
+    pipeline.query_id = None
+    pipeline.trace_id = None
+    pipeline.query_source = "cli"
+
+    outer_token = activate_run_diagnostic_context(
+        trace_id="outer-trace",
+        query_id="outer-query",
+        scope="request",
+    )
+    try:
+        record_pipeline_stage(stage="fetch", status="success")
+        outer_before = current_diagnostic_snapshot()
+        delivery_token = pipeline._activate_delivery_diagnostic_context([result])
+        try:
+            delivery_context = get_current_diagnostic_context()
+            assert delivery_context is not None
+            assert delivery_context.scope == "pipeline_delivery"
+            record_pipeline_stage(stage="render", status="success")
+            record_pipeline_stage(stage="dispatch", status="success")
+            pipeline._refresh_saved_diagnostic_snapshot(results=[result])
+        finally:
+            reset_run_diagnostic_context(delivery_token)
+        outer_after = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(outer_token)
+
+    assert outer_after == outer_before
+    assert [
+        run["stage"]
+        for run in result.diagnostic_context_snapshot["diagnostics"][
+            "pipeline_stage_runs"
+        ]
+    ] == ["analyze", "render", "dispatch"]
+    persisted = pipeline.db.update_analysis_history_diagnostics.call_args.kwargs[
+        "diagnostics"
+    ]
+    assert [run["stage"] for run in persisted["pipeline_stage_runs"]] == [
+        "analyze",
+        "render",
+        "dispatch",
+    ]
 
 
 def test_delivery_snapshot_keeps_targeted_notification_runs_isolated() -> None:
@@ -651,6 +859,110 @@ class _PartialDeliveryNotifier:
         """Deliver through the static route."""
         _ = report
         return True
+
+
+class _NoiseSuppressedNotifier:
+    """Notifier with configurable context delivery before static suppression."""
+
+    _markdown_to_image_channels: set[str] = set()
+    _markdown_to_image_max_chars = 15000
+
+    def __init__(self, *, context_available: bool, context_success: bool) -> None:
+        self.context_available = context_available
+        self.context_success = context_success
+
+    def generate_aggregate_report(self, results, report_type) -> str:
+        """Return deterministic aggregate content."""
+        _ = (results, report_type)
+        return "aggregate report"
+
+    def is_available(self) -> bool:
+        """Expose one static channel subject to noise control."""
+        return True
+
+    def get_available_channels(self):
+        """Return one configured static channel."""
+        from src.notification import NotificationChannel
+
+        return [NotificationChannel.NTFY]
+
+    def get_channels_for_route(self, route_type, channels=None):
+        """Keep the supplied report-route channels."""
+        _ = route_type
+        return list(channels or [])
+
+    def _has_context_channel(self) -> bool:
+        """Report whether contextual delivery was configured."""
+        return self.context_available
+
+    def send_to_context(self, report) -> bool:
+        """Return the configured contextual outcome."""
+        _ = report
+        return self.context_success
+
+    def should_broadcast_static_channels(self) -> bool:
+        """Continue to static route evaluation."""
+        return True
+
+    def evaluate_noise_control(self, report, **kwargs):
+        """Suppress static delivery after context delivery is evaluated."""
+        _ = (report, kwargs)
+        return SimpleNamespace(
+            should_send=False,
+            reason_code="duplicate",
+            route_type="report",
+            severity="info",
+            message="duplicate report",
+        )
+
+
+@pytest.mark.parametrize(
+    ("context_available", "context_success", "expected_status", "retryable"),
+    (
+        (True, True, "success", False),
+        (True, False, "failed", True),
+        (False, False, "skipped", False),
+    ),
+)
+def test_noise_suppression_preserves_context_delivery_outcome(
+    context_available: bool,
+    context_success: bool,
+    expected_status: str,
+    retryable: bool,
+) -> None:
+    """Classify dispatch from context outcome when static routes are suppressed."""
+    from src.core.pipeline import StockAnalysisPipeline
+    from src.enums import ReportType
+
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline.notifier = _NoiseSuppressedNotifier(
+        context_available=context_available,
+        context_success=context_success,
+    )
+    pipeline.config = SimpleNamespace(stock_email_groups=[])
+    pipeline.save_context_snapshot = False
+    token = activate_run_diagnostic_context(trace_id="trace-noise-context")
+    try:
+        pipeline._send_notifications(
+            [SimpleNamespace(code="600519")],
+            ReportType.SIMPLE,
+        )
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert snapshot is not None
+    dispatch_run = snapshot["pipeline_stage_runs"][-1]
+    assert dispatch_run["stage"] == "dispatch"
+    assert dispatch_run["status"] == expected_status
+    assert dispatch_run["retryable"] is retryable
+    assert dispatch_run["output_summary"] == {
+        "reason": "noise_control",
+        "reason_code": "duplicate",
+        "context_delivered": context_success,
+        "context_attempted": context_available,
+        "static_suppressed": True,
+    }
 
 
 def test_partial_dispatch_is_degraded_and_not_retryable() -> None:
