@@ -13,7 +13,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react';
-import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, Select, StatusDot } from '../common';
+import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput, Select, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
@@ -333,7 +333,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   }
 
   return workspaceShell(
-    <aside className="glass-card flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Surface as="aside" level="interactive" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="space-y-3 border-b border-subtle px-4 py-4">
         {activeTab === 'watchlist' ? (
           <>
@@ -514,7 +514,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
           </Button>
         </div>
       ) : null}
-    </aside>,
+    </Surface>,
   );
 };
 

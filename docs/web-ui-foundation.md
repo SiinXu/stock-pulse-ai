@@ -141,19 +141,24 @@ nested `button`, link, input, label, select, textarea, summary,
 row navigation cannot fire together with an edit, menu, link, or form control.
 Disabled rows leave the activation tab sequence and expose `aria-disabled`.
 
-Existing raw tables remain exact, expiring page-track migrations:
+Optional controlled detail rows require both `isRowDetailVisible` and
+`renderRowDetail`. `DataTable` owns the sibling row, full-column span, density,
+semantic detail fill, stable optional ID, and accessible optional row label;
+the caller owns business content and the command that controls visibility.
+That command must expose `aria-expanded` and `aria-controls` when it targets a
+stable detail-row ID.
 
-| Removal item | Execution owner | Current table sources |
-| --- | --- | --- |
-| `UI-R01` | `TRACK-UI1` | Market Review report table |
-| `UI-R02` | `TRACK-UI1` | Stock history trend table |
-| `UI-R03` | `TRACK-UI1` | Run Flow node-detail table |
-| `UI-U01` | `TRACK-UI1` | Token Usage recent calls |
-| `UI-A01` | `TRACK-UI2` | Alert rules, trigger history, and alert-event tables |
-| `UI-BT01` | `TRACK-UI2` | Backtest results |
-| `UI-P01` | `TRACK-UI2` | Portfolio positions |
-| `UI-SCR01` | `TRACK-UI2` | Screening results and stock history data |
-| `UI-S02` | `TRACK-UI3` | Settings AI overview matrix |
+Five embedded raw tables remain tracked by stable file/token/count inventory.
+They are owned by `UIUX-HARNESS` and may be removed only when their concrete
+shared-Pattern prerequisite is available:
+
+| Current table source | Removal prerequisite |
+| --- | --- |
+| Stock history trend | Selected-row presentation and percentage/fixed-layout columns without caller geometry overrides. |
+| Market Review report | Embedded unframed report-table mode without a nested Surface inside the report Card. |
+| Run Flow node details | Embedded unframed compact mode for an overlay detail panel. |
+| Settings AI overview matrix | Settings-border ownership and stable per-task row test IDs through `DataTable`. |
+| Token Usage recent calls | Embedded `DataTable` inside the existing `Section` without a nested card, preserving the no-calls state. |
 
 ## Page And Router Semantics
 
@@ -208,10 +213,9 @@ stable markers and never copy route metadata or rewrite the persistent key.
 
 Business code must use React Router navigation APIs rather than direct
 `pushState` or `replaceState`. The production guard discovers calls through
-direct, aliased, computed, or destructured method access. Three legacy
-TRACK-UI2 calls remain expiring migrations located by file, method, and count,
-so unrelated line insertions cannot break the allowlist. Their owning page
-work items must remove the matching entry when they adopt Router query state.
+direct, aliased, computed, or destructured method access. The production
+allowance list is empty: same-page query canonicalization uses Router replace
+navigation and preserves unrelated query parameters and hash state.
 
 ## Application Shell And Navigation
 
@@ -298,21 +302,10 @@ white alpha:
 | `bg-surface` | Choose an existing Surface level or an existing token such as `bg-surface-1`, `bg-surface-2`, `bg-surface-3`, or `bg-subtle`; do not define the invalid alias. |
 
 `UI-DEF-02` intentionally adds no new visual prop: `Surface` and these existing
-tokens already express every deferred use. Its production guard freezes the
-remaining compatibility tokens by file and occurrence count, so unrelated
-line insertions do not break the migration inventory and either new debt or a
-completed migration requires an explicit inventory update.
-
-| Removal item | Execution owner | Remaining sources |
-| --- | --- | --- |
-| `UI-R01` | `TRACK-UI1` | Home and watchlist panels. |
-| `UI-R02` | `TRACK-UI1` | History list and stock rail. |
-| `UI-R03` | `TRACK-UI1` | Run Flow and task-state fills/rings. |
-| `UI-C01` | `TRACK-UI3` | Chat workspace panels, dividers, and nested fills. |
-| `UI-BT01` | `TRACK-UI2` | Backtest dividers. |
-| `UI-P01` | `TRACK-UI2` | Portfolio tables, event lists, and invalid surface alias. |
-| `UI-SCR01` | `TRACK-UI2` | Screening controls and table rows using the invalid surface alias. |
-| `UI-QA01` | `UIUX-HARNESS` | Delete the shared `glass-card` selector after its final page consumer migrates. |
+tokens express the audited uses. The production allowance list is empty and
+the guard rejects every `glass-card` / `dashboard-card`, raw white-alpha fill,
+border/ring, and invalid `bg-surface` alias. The compatibility `glass-card`
+selector has been deleted after its final consumers migrated.
 
 `Card` remains a compatibility adapter while domain pages migrate. Its
 `default` variant maps to the borderless `section` level; `bordered` and
@@ -393,9 +386,8 @@ do not replace the primitive contract.
 The AST-backed production design guard checks:
 
 - Button style-map soft rounding and the 28/32/36/40px tiers.
-- Legacy `xsm`/`sm`/`md`/`lg` Button sizes in both the shared style map and
-  aliased or namespaced callers.
-- `size="xl"` usage against an exact allowlist.
+- Legacy `xsm`/`sm`/`md`/`lg`/`xl` Button sizes in both the shared style map
+  and aliased or namespaced callers; no legacy-size allowlist remains.
 - Icon- or symbol-only shared `Button` callers that must use `IconButton`.
 - Static and unresolved Button visual overrides, including `size-*` and
   arbitrary geometry properties, against exact call-site exceptions.
@@ -413,31 +405,20 @@ The AST-backed production design guard checks:
   exact call-site exceptions with a deletion work item.
 - Shared Filter/Query implementation names outside their declared
   `components/common` owners.
-- New direct `pushState` or `replaceState` calls, including aliased, computed,
-  and destructured access. Three existing filter-page calls remain exact
-  file/method/count migration entries assigned to `TRACK-UI2`.
+- Direct `pushState` or `replaceState` calls, including aliased, computed, and
+  destructured access; the production allowance list is empty.
 - Shared `DataTable` implementations outside its declared common owner, plus
   any new JSX / `createElement` raw table or page-local `role="table|grid"`
-  substitute. Twelve existing raw tables remain exact line-level entries
-  assigned to their page tracks and removal items.
-- New `glass-card` / `dashboard-card`, raw white-alpha background/border/ring
-  utilities, and the undefined `bg-surface` alias. Existing debt is frozen by
-  file and token count, with a page-track owner and deletion work item rather
-  than a brittle source line number.
+  substitute. Five retained raw tables use stable file/token/count inventory
+  and the concrete shared-Pattern prerequisites listed above.
+- Every `glass-card` / `dashboard-card`, raw white-alpha
+  background/border/ring utility, and undefined `bg-surface` alias; the
+  production allowance list is empty.
 
-Temporary override exceptions record both exact tokens and their removal work
-item:
-
-| Removal item | Execution owner | Temporary reason |
-| --- | --- | --- |
-| `UI-P01` | `TRACK-UI2` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
-| `UI-R01` | `TRACK-UI1` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
-| `UI-R02` | `TRACK-UI1` | Remove report/history compatibility card classes during route-level reading and trend migration. |
-| `UI-R03` | `TRACK-UI1` | Move TaskPanel layout and visual ownership into the route-level Run Flow workspace. |
-| `UI-SCR01` | `TRACK-UI2` | Replace the Stock Screening loading-width shim with stable task-action layout. |
-
-The sole temporary `size="xl"` caller is the NotFound recovery CTA; `UI-QA01`
-must re-evaluate and remove that compatibility entry when legacy cleanup lands.
+The Button visual-override allowlist is empty. Retained state-surface
+exceptions are limited to shared compatibility adapters plus the audited
+report/task consumers; each records exact tokens, owner `UIUX-HARNESS`, and a
+concrete `removeWhen` condition. No page-track `removeBy` entry remains.
 
 ## Migration And Deletion
 
@@ -445,30 +426,29 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   removes Button icon sizing, and enables the production guards.
 - `UI-F01B` migrated `xsm`/`sm`/`md`/`lg` call sites to canonical semantic size
   names and deleted those compatibility aliases from `ButtonSize` and
-  `BUTTON_SIZE_STYLES`; the production guard prevents their reintroduction.
+  `BUTTON_SIZE_STYLES`; `UI-QA01` removed the final `xl` caller and alias. The
+  production guard prevents every legacy size from being reintroduced.
 - `UI-F02` establishes `Surface`, `Section`, `StatePanel`, and `Alert`; maps
   `Card`, `SectionCard`, `EmptyState`, `InlineAlert`, `Loading`,
   `ApiErrorAlert`, `DashboardStateBlock`, `StatCard`, and
   `SettingsSectionCard` through compatibility adapters; and uses Token Usage
   as the first complete state consumer. Each domain work item replaces its
   compatibility calls with the authoritative API when it owns that page.
-- `UI-F04A` establishes `FilterBar`, `AdvancedFilterSheet`,
-  `AppliedFilterChips`, `FilterChip`, and `useFilterQueryState`. It does not
-  migrate a business page: `TRACK-UI2` owns Decision Signals (`UI-D01`),
-  Backtest (`UI-BT01`), and Stock Screening (`UI-SCR01`) and must delete each
-  exact direct-history allowance in the same change that adopts the Router
-  query contract.
-- `UI-F04B` establishes the typed `DataTable`, state, sorting, row-event, and
-  contained-scroll contracts. It does not migrate a business page. Each page
-  track deletes its exact raw-table allowance in the same change that adopts
-  the shared Pattern; the final migration deletes the legacy allowance list.
+- `UI-F04A` established `FilterBar`, `AdvancedFilterSheet`,
+  `AppliedFilterChips`, `FilterChip`, and `useFilterQueryState`. Page tracks
+  adopted the shared Patterns; `UI-QA01` moved the remaining Decision Signals,
+  Backtest, and Stock Screening query writes to Router replace navigation and
+  deleted the direct-history allowance list.
+- `UI-F04B` established the typed `DataTable`, state, sorting, row-event, and
+  contained-scroll contracts. Page tracks adopted the shared Pattern;
+  `UI-QA01` added controlled detail rows for Stock Screening and retained only
+  the five embedded-table prerequisites listed above.
 - `UI-DEF-01` establishes `SelectionChip` from the explicit TRACK-UI2 deferred
   input. `UI-D01` subsequently migrated Decision Signals to the shared control
   and deleted its exact Button geometry allowance.
-- `UI-DEF-02` confirms the existing four Surface levels and semantic subtle
-  tokens as the complete replacement for the deferred glass/raw-white debt,
-  deletes the unreferenced `dashboard-card` duplicate, and adds an expiring
-  file/count migration guard. It does not migrate any business page.
+- `UI-DEF-02` established the four Surface levels and semantic subtle tokens as
+  the complete replacement for glass/raw-white debt. `UI-QA01` completed the
+  remaining business-page migration and changed its guard to a zero-debt rule.
 - `UI-F05` establishes the page skeleton, same-page Tabs, sibling-route
   navigation, summary, responsive rail, and route-focus authority. It does not
   migrate business pages or the Shell. Page tracks adopt the public Patterns
@@ -476,10 +456,9 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
   raw controls are deleted.
-- `UI-QA01` removes expired allowlist entries and deletes a compatibility
-  adapter only after its final production consumer has migrated; it also
-  verifies that no duplicate primitive, state, alert, or surface implementation
-  remains.
+- `UI-QA01` removes expired allowlist entries and compatibility adapters only
+  after their final production consumers migrate; retained compatibility APIs
+  carry a concrete `UIUX-HARNESS` removal prerequisite.
 
 Tests should assert role, accessible name, native state, semantic variant/size,
 and behavior. Tailwind classes such as `h-11` or `rounded-full` are not product

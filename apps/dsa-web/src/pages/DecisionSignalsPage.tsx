@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, BarChart3, PlusCircle, RefreshCw, Search, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
@@ -247,19 +248,21 @@ function getInitialTimelineFilters(search = typeof window === 'undefined' ? '' :
   };
 }
 
-function updateDecisionSignalSearchParams(values: Record<string, string | number | null | undefined>): void {
-  if (typeof window === 'undefined') return;
+type DecisionSignalSearchValues = Record<string, string | number | null | undefined>;
+
+function getDecisionSignalLocation(values: DecisionSignalSearchValues): string | null {
+  if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   Object.entries(values).forEach(([key, value]) => {
     if (value === null || value === undefined || value === '') url.searchParams.delete(key);
     else url.searchParams.set(key, String(value));
   });
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function syncListSearchParams(filters: ListFilters, page: number): void {
+function getListSearchValues(filters: ListFilters, page: number): DecisionSignalSearchValues {
   const sourceReportId = parseSourceReportId(filters.sourceReportId);
-  updateDecisionSignalSearchParams({
+  return {
     sourceReportId,
     source_report_id: null,
     market: sourceReportId ? null : filters.market,
@@ -269,22 +272,22 @@ function syncListSearchParams(filters: ListFilters, page: number): void {
     source: sourceReportId ? null : filters.sourceType,
     status: sourceReportId || filters.status === DEFAULT_LIST_FILTERS.status ? null : filters.status || 'all',
     page: page > 1 ? page : null,
-  });
+  };
 }
 
-function syncTimelineSearchParams(filters: TimelineFilters): void {
-  updateDecisionSignalSearchParams({
+function getTimelineSearchValues(filters: TimelineFilters): DecisionSignalSearchValues {
+  return {
     timelineMarket: filters.market,
     timelineRange: filters.range === DEFAULT_TIMELINE_FILTERS.range ? null : filters.range,
     timelineStatus: filters.status === DEFAULT_TIMELINE_FILTERS.status ? null : filters.status,
     timelineProfile: filters.decisionProfile,
-  });
+  };
 }
 
 // Reflect the current-stock scope in the URL (without a new history entry) so
 // the page can be shared/refreshed and restore the same stock.
-function syncStockSearchParam(code: string | null): void {
-  updateDecisionSignalSearchParams({ stock: code });
+function getStockSearchValues(code: string | null): DecisionSignalSearchValues {
+  return { stock: code };
 }
 
 function toListParams(filters: ListFilters, page: number): DecisionSignalListParams {
@@ -488,7 +491,21 @@ function formatStatPercent(value: number | null | undefined): string {
 }
 
 const DecisionSignalsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { t } = useUiLanguage();
+  const updateDecisionSignalSearchParams = useCallback((values: DecisionSignalSearchValues) => {
+    const location = getDecisionSignalLocation(values);
+    if (location) navigate(location, { replace: true });
+  }, [navigate]);
+  const syncListSearchParams = useCallback((filters: ListFilters, nextPage: number) => {
+    updateDecisionSignalSearchParams(getListSearchValues(filters, nextPage));
+  }, [updateDecisionSignalSearchParams]);
+  const syncTimelineSearchParams = useCallback((filters: TimelineFilters) => {
+    updateDecisionSignalSearchParams(getTimelineSearchValues(filters));
+  }, [updateDecisionSignalSearchParams]);
+  const syncStockSearchParam = useCallback((code: string | null) => {
+    updateDecisionSignalSearchParams(getStockSearchValues(code));
+  }, [updateDecisionSignalSearchParams]);
   const actionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
   const { index: stockIndex } = useStockIndex();
   const [filters, setFilters] = useState<ListFilters>(() => getInitialFilters());
@@ -565,14 +582,14 @@ const DecisionSignalsPage: React.FC = () => {
     pendingSelectedSignalIdRef.current = null;
     setSelected({ source, item });
     updateDecisionSignalSearchParams({ signal: item.id });
-  }, []);
+  }, [updateDecisionSignalSearchParams]);
 
   const handleCloseSignal = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
     setStatusError(null);
     setSelected(null);
     updateDecisionSignalSearchParams({ signal: null });
-  }, []);
+  }, [updateDecisionSignalSearchParams]);
 
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
@@ -657,7 +674,7 @@ const DecisionSignalsPage: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [appliedFilters, takePendingSelection]);
+  }, [appliedFilters, syncListSearchParams, takePendingSelection]);
 
   const loadSignals = useCallback(async () => {
     await loadSignalsForPage(page);
@@ -719,7 +736,7 @@ const DecisionSignalsPage: React.FC = () => {
     if (pendingSelectedSignalIdRef.current === null) {
       updateDecisionSignalSearchParams({ signal: selected?.item.id ?? null });
     }
-  }, [selected?.item.id]);
+  }, [selected?.item.id, updateDecisionSignalSearchParams]);
 
   useEffect(() => {
     selectedSignalIdRef.current = selected?.item.id ?? null;
@@ -917,7 +934,7 @@ const DecisionSignalsPage: React.FC = () => {
         setTimelineLoading(false);
       }
     }
-  }, [takePendingSelection]);
+  }, [syncTimelineSearchParams, takePendingSelection]);
 
   const handlePersistReassess = useCallback(async () => {
     const preview = reassessResponse?.preview;
@@ -1016,7 +1033,7 @@ const DecisionSignalsPage: React.FC = () => {
     syncStockSearchParam(nextContext.code);
     void loadLatestForContext(nextContext);
     void loadTimelineForContext(nextContext, nextTimeline.filters);
-  }, [activeStockContext, loadLatestForContext, loadTimelineForContext, timelineFilters]);
+  }, [activeStockContext, loadLatestForContext, loadTimelineForContext, syncStockSearchParam, timelineFilters]);
 
   const handleStockSubmit = useCallback((
     code: string,
@@ -1054,7 +1071,7 @@ const DecisionSignalsPage: React.FC = () => {
     syncStockSearchParam(null);
     resetLatestView();
     resetTimelineView();
-  }, [resetLatestView, resetTimelineView]);
+  }, [resetLatestView, resetTimelineView, syncStockSearchParam]);
 
   // Restore the current-stock scope from the URL once on mount so a shared or
   // refreshed link reopens the same stock context.

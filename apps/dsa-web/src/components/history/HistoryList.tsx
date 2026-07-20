@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useRef, useCallback, useEffect, useId } from 'react';
 import type { HistoryItem } from '../../types/analysis';
-import { Badge, Button, Checkbox, ScrollArea } from '../common';
+import { Badge, Button, Checkbox, ScrollArea, Surface } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { HistoryListItem } from './HistoryListItem';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -90,8 +90,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   }, [someVisibleSelected]);
 
   return (
-    <aside className={`glass-card overflow-hidden flex flex-col ${className}`}>
-      <ScrollArea
+    <div className={className}>
+      <Surface as="aside" level="interactive" className="flex h-full flex-col overflow-hidden">
+        <ScrollArea
         viewportRef={scrollContainerRef}
         viewportClassName="p-4"
         testId="home-history-list-scroll"
@@ -188,7 +189,8 @@ export const HistoryList: React.FC<HistoryListProps> = ({
             )}
           </div>
         )}
-      </ScrollArea>
-    </aside>
+        </ScrollArea>
+      </Surface>
+    </div>
   );
 };

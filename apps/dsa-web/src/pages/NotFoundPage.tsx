@@ -34,7 +34,7 @@ const NotFoundPage: React.FC = () => {
       <Button
         type="button"
         variant="primary"
-        size="xl"
+        size="primary"
         onClick={() => navigate('/')}
       >
         <Home className="h-4 w-4" />

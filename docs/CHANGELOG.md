@@ -232,6 +232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [改进] Web 应用外壳用 typed descriptor 固化九项一级导航并保留 owner 选定的 framed/floating 全局 `main` 表面；1023px 及以下提供唯一共享导航 `IconButton`、完整品牌与可直接访问的 Profile dialog，主题/语言收进 Profile，导航走 Drawer；1024–1279px 无显式偏好时默认 80px compact rail，保存的 80/240px 展开折叠选择在所有桌面断点保持有效。Drawer 仅在 primary same-window 路由激活时关闭，modifier/new-tab 保留原生行为；移动 route 只声明稳定 opener，由 `RouteFocusCoordinator` 按 history entry 捕获并在多轮 Back/Forward 恢复。icon-only 导航统一 labelled Tooltip，44px Profile/偏好/不收缩路由目标与可滚动短视口导航、双轴触摸可达横向内容、Profile 跨断点关闭/焦点交接、light/dark、reduced-motion 由组件和浏览器回归覆盖。
 - [修复] Web 应用外壳收敛 Router 焦点与响应式基础契约：`RouteFocusCoordinator` 对临时 Drawer route 的空、缺失或重复 persistent opener alias 统一 fail closed，compact 导航 Tooltip wrapper 禁止 flex 压缩以守住 44px 路由目标；同步撤回无生产 consumer 的 `ResponsiveRail` tablet Drawer API、fixture 与文档声明，避免基础层提前扩张。
 - [改进] Web 登录页恢复 24px 背景网格与两处径向主题光层，根画布继续使用专属 `--login-bg-main` token，并移除品牌与认证标题的紧缩字距；认证、传输状态、i18n、响应式和可访问行为不变。
+- [改进] Web UIUX 最终审计完成：共享 `DataTable` 新增受控 detail-row 契约并迁移 AlphaSift 十列结果表，保留默认展开且补齐 `aria-expanded`/`aria-controls`；Backtest、Decision Signals 与 Screening 查询更新统一改走 React Router replace；剩余 `glass-card`、raw white-alpha 和无效 `bg-surface` 消费全部迁到语义 Surface/token 后删除兼容 CSS 与 surface allowlist；raw-table 债改用稳定文件/token/计数及具体移除前提，过期 `removeBy` 清零，NotFound 改用 `primary` Button 并删除 `xl` 兼容档。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

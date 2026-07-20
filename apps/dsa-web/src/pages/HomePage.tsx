@@ -1565,7 +1565,7 @@ const HomePage: React.FC = () => {
               <Checkbox
                 checked={notify}
                 onChange={(event) => setNotify(event.target.checked)}
-                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-surface/60 px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
+                containerClassName="h-9 flex-shrink-0 gap-1.5 rounded-lg border border-subtle bg-subtle px-2 text-xs text-secondary-text transition-colors hover:border-subtle-hover hover:text-foreground"
                 label={<span className="text-xs font-normal text-secondary-text">{t('home.notify')}</span>}
               />
               <Button

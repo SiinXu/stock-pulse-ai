@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Checkbox, ConfirmDialog, IconButton, InlineAlert, ScrollArea } from '../common';
+import { Badge, Checkbox, ConfirmDialog, IconButton, InlineAlert, ScrollArea, Surface } from '../common';
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBarItemComponent } from './StockBarItem';
 import type { StockBarItem as StockBarItemType } from '../../types/analysis';
@@ -107,8 +107,9 @@ export const StockBar: React.FC<StockBarProps> = ({
   })();
 
   return (
-    <aside className={`glass-card overflow-hidden flex flex-col ${className}`}>
-      <ScrollArea
+    <div className={className}>
+      <Surface as="aside" level="interactive" className="flex h-full flex-col overflow-hidden">
+        <ScrollArea
         viewportClassName="p-4"
         testId="home-stock-bar-scroll"
       >
@@ -215,15 +216,16 @@ export const StockBar: React.FC<StockBarProps> = ({
         )}
       </ScrollArea>
 
-      <ConfirmDialog
-        isOpen={confirmCodes !== null}
-        title={t('history.deleteConfirmTitle')}
-        message={confirmMessage}
-        confirmText={t('common.delete')}
-        isDanger
-        onConfirm={() => void handleConfirmDelete()}
-        onCancel={() => setConfirmCodes(null)}
-      />
-    </aside>
+        <ConfirmDialog
+          isOpen={confirmCodes !== null}
+          title={t('history.deleteConfirmTitle')}
+          message={confirmMessage}
+          confirmText={t('common.delete')}
+          isDanger
+          onConfirm={() => void handleConfirmDelete()}
+          onCancel={() => setConfirmCodes(null)}
+        />
+      </Surface>
+    </div>
   );
 };

@@ -18,28 +18,62 @@ const productionSources = { ...productionTs, ...productionTsx };
 
 const DATA_TABLE_OWNER = '../common/DataTable.tsx';
 
-type PageTrack = 'TRACK-UI1' | 'TRACK-UI2' | 'TRACK-UI3';
-
 type LegacyTableAllowance = {
   file: string;
-  line: number;
-  owner: PageTrack;
-  removeBy: string;
+  token: 'table';
+  count: number;
+  owner: 'UIUX-HARNESS';
+  removeWhen: string;
 };
 
 const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
-  { file: '../history/StockHistoryTrendDrawer.tsx', line: 297, owner: 'TRACK-UI1', removeBy: 'UI-R02' },
-  { file: '../report/MarketReviewReportView.tsx', line: 536, owner: 'TRACK-UI1', removeBy: 'UI-R01' },
-  { file: '../run-flow/RunFlowNodeDetails.tsx', line: 261, owner: 'TRACK-UI1', removeBy: 'UI-R03' },
-  { file: '../settings/AiOverviewMatrix.tsx', line: 57, owner: 'TRACK-UI3', removeBy: 'UI-S02' },
-  { file: '../../pages/StockScreeningPage.tsx', line: 1474, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
-  { file: '../../pages/TokenUsagePage.tsx', line: 281, owner: 'TRACK-UI1', removeBy: 'UI-U01' },
+  {
+    file: '../history/StockHistoryTrendDrawer.tsx',
+    token: 'table',
+    count: 1,
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'DataTable supports selected-row presentation and percentage/fixed-layout columns without caller geometry overrides.',
+  },
+  {
+    file: '../report/MarketReviewReportView.tsx',
+    token: 'table',
+    count: 1,
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'DataTable supports an embedded unframed report-table mode without nesting a Surface inside the report Card.',
+  },
+  {
+    file: '../run-flow/RunFlowNodeDetails.tsx',
+    token: 'table',
+    count: 1,
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'DataTable supports an embedded unframed compact mode for overlay detail panels.',
+  },
+  {
+    file: '../settings/AiOverviewMatrix.tsx',
+    token: 'table',
+    count: 1,
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'The settings matrix can preserve settings-border ownership and stable per-task row test IDs through DataTable.',
+  },
+  {
+    file: '../../pages/TokenUsagePage.tsx',
+    token: 'table',
+    count: 1,
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'Recent calls can use an embedded DataTable inside Section without a nested card and preserve the no-calls state.',
+  },
 ];
 
 type SourceFinding = {
   file: string;
   line: number;
   token: string;
+};
+
+type TableDebtInventory = {
+  file: string;
+  token: string;
+  count: number;
 };
 
 function isProductionSource(filename: string): boolean {
@@ -142,8 +176,20 @@ function findRawTables(filename: string, source: string): SourceFinding[] {
   return findings;
 }
 
-function findingKey(finding: SourceFinding): string {
-  return `${finding.file}:${finding.line}:${finding.token}`;
+function inventory(findings: readonly SourceFinding[]): TableDebtInventory[] {
+  const counts = new Map<string, TableDebtInventory>();
+  for (const finding of findings) {
+    const key = `${finding.file}\u0000${finding.token}`;
+    const current = counts.get(key);
+    counts.set(key, {
+      file: finding.file,
+      token: finding.token,
+      count: (current?.count ?? 0) + 1,
+    });
+  }
+  return Array.from(counts.values()).sort((left, right) => (
+    left.file.localeCompare(right.file) || left.token.localeCompare(right.token)
+  ));
 }
 
 describe('DataTable production guard', () => {
@@ -182,24 +228,32 @@ describe('DataTable production guard', () => {
     ]);
   });
 
-  it('keeps legacy raw tables exact, consumable, and assigned to page tracks', () => {
-    const actual = Object.entries(productionSources)
+  it('keeps the raw-table inventory stable when unrelated lines move', () => {
+    const legacy = 'const result = <table><tbody /></table>;';
+    const shifted = `${Array.from({ length: 400 }, (_, index) => `const value${index} = ${index};`).join('\n')}\n${legacy}`;
+
+    expect(inventory(findRawTables('../../pages/ExamplePage.tsx', shifted)))
+      .toEqual(inventory(findRawTables('../../pages/ExamplePage.tsx', legacy)));
+  });
+
+  it('keeps legacy raw tables exact, consumable, and assigned to concrete prerequisites', () => {
+    const actual = inventory(Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename) && filename !== DATA_TABLE_OWNER)
-      .flatMap(([filename, source]) => findRawTables(filename, source))
-      .map(findingKey)
-      .sort();
+      .flatMap(([filename, source]) => findRawTables(filename, source)));
     const allowed = LEGACY_TABLE_ALLOWANCES
-      .map(({ file, line }) => findingKey({ file, line, token: 'table' }))
-      .sort();
+      .map(({ file, token, count }) => ({ file, token, count }))
+      .sort((left, right) => left.file.localeCompare(right.file) || left.token.localeCompare(right.token));
 
     expect(actual).toEqual(allowed);
-    expect(new Set(allowed).size).toBe(allowed.length);
+    expect(new Set(allowed.map(({ file, token }) => `${file}:${token}`)).size).toBe(allowed.length);
     for (const allowance of LEGACY_TABLE_ALLOWANCES) {
-      expect(allowance.owner).toMatch(/^TRACK-UI[123]$/);
-      expect(allowance.removeBy).toMatch(/^UI-[A-Z0-9]+$/);
+      expect(allowance.owner).toBe('UIUX-HARNESS');
+      expect(allowance.removeWhen.trim().length).toBeGreaterThan(0);
+      expect(allowance.count).toBeGreaterThan(0);
       const source = productionSources[allowance.file];
       expect(source, `${allowance.file} must remain in the production scan`).toBeDefined();
-      expect(source.split('\n')[allowance.line - 1]).toContain('<table');
+      expect(findRawTables(allowance.file, source).filter(({ token }) => token === allowance.token))
+        .toHaveLength(allowance.count);
     }
   });
 });

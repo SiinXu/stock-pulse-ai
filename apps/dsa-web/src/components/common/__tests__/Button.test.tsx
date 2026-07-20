@@ -15,9 +15,9 @@ describe('Button', () => {
     >();
   });
 
-  it('exposes only semantic sizes plus the exact xl compatibility tier', () => {
+  it('exposes only semantic size tiers', () => {
     expectTypeOf<ButtonSize>().toEqualTypeOf<
-      'compact' | 'default' | 'comfortable' | 'primary' | 'xl'
+      'compact' | 'default' | 'comfortable' | 'primary'
     >();
   });
 
@@ -42,7 +42,6 @@ describe('Button', () => {
     'default',
     'comfortable',
     'primary',
-    'xl',
   ] as const)(
     'exposes the selected %s size without changing its accessible name',
     (size) => {

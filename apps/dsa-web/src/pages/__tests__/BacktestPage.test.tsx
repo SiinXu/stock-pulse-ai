@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
@@ -114,17 +115,27 @@ beforeEach(() => {
 });
 
 describe('BacktestPage', () => {
+  function renderPage() {
+    return render(
+      <BrowserRouter>
+        <BacktestPage />
+      </BrowserRouter>,
+    );
+  }
+
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     render(
-      <UiLanguageProvider>
-        <BacktestPage />
-      </UiLanguageProvider>,
+      <BrowserRouter>
+        <UiLanguageProvider>
+          <BacktestPage />
+        </UiLanguageProvider>
+      </BrowserRouter>,
     );
   }
 
   it('renders shared surface inputs and prediction tracking outputs', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -173,7 +184,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -225,7 +236,7 @@ describe('BacktestPage', () => {
       ],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     const codeCell = await screen.findByText('600519');
     const resultRow = codeCell.closest('tr');
@@ -270,7 +281,8 @@ describe('BacktestPage', () => {
   });
 
   it('filters results with stock code, window, phase, and analysis date range when clicking Filter', async () => {
-    render(<BacktestPage />);
+    window.history.replaceState({}, '', '/backtest?ref=dashboard#results');
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -308,10 +320,12 @@ describe('BacktestPage', () => {
         analysisPhase: 'intraday',
       });
     });
+    expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
+    expect(window.location.hash).toBe('#results');
   });
 
   it('applies the phase filter immediately without waiting for Filter or Run', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     fireEvent.change(filterInput, { target: { value: 'aapl' } });
@@ -344,7 +358,7 @@ describe('BacktestPage', () => {
       message: '未找到符合条件的历史分析记录',
       diagnostics: { emptyReason: 'no_matching_analysis' },
     });
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -392,7 +406,7 @@ describe('BacktestPage', () => {
   });
 
   it('rejects an empty evaluation window before running a backtest', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     const filterInput = await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）');
     const windowInput = screen.getByPlaceholderText('10');
@@ -412,7 +426,7 @@ describe('BacktestPage', () => {
   });
 
   it('switches to next-day validation with the 1D shortcut', async () => {
-    render(<BacktestPage />);
+    renderPage();
 
     await screen.findByText('600519');
     const oneDayButton = screen.getByRole('button', { name: '1 日验证' });
@@ -474,7 +488,7 @@ describe('BacktestPage', () => {
       items: [{ ...baseResultItem, code: 'AAPL', stockName: 'Apple' }],
     });
 
-    render(<BacktestPage />);
+    renderPage();
 
     expect(await screen.findByPlaceholderText('按股票代码筛选（留空表示全部）')).toHaveValue('AAPL');
     expect(screen.getByPlaceholderText('10')).toHaveValue(20);
@@ -499,7 +513,7 @@ describe('BacktestPage', () => {
     let resolveOldPerformance!: (value: typeof basePerformance) => void;
     let resolveNewPerformance!: (value: typeof basePerformance) => void;
 
-    render(<BacktestPage />);
+    renderPage();
     await screen.findByText('600519');
     mockGetResults
       .mockImplementationOnce(() => new Promise((resolve) => { resolveOldResults = resolve; }))
@@ -544,7 +558,7 @@ describe('BacktestPage', () => {
     mockGetOverallPerformance.mockImplementationOnce(() => new Promise((resolve) => {
       resolvePerformance = resolve;
     }));
-    const { unmount } = render(<BacktestPage />);
+    const { unmount } = renderPage();
     await waitFor(() => expect(mockGetOverallPerformance).toHaveBeenCalledTimes(1));
     unmount();
 

@@ -745,8 +745,8 @@ export const RunFlowGraph: React.FC<RunFlowGraphProps> = ({
             const nodeStateClass = selected
               ? 'border-primary/85 bg-primary/8 shadow-lg ring-2 ring-primary/25'
               : compact
-                ? 'border-subtle/70 bg-base/70 ring-1 ring-white/5'
-                : 'border-subtle/80 bg-elevated/92 ring-1 ring-white/5';
+                ? 'border-subtle/70 bg-base/70 ring-1 ring-subtle'
+                : 'border-subtle/80 bg-elevated/92 ring-1 ring-subtle';
             const nodeDensityClass = compact
               ? 'px-2.5 py-2 shadow-none hover:shadow-soft-card'
               : 'px-3 py-2 shadow-soft-card hover:shadow-lg';

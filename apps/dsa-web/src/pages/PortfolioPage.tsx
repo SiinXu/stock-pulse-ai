@@ -1837,7 +1837,7 @@ const PortfolioPage: React.FC = () => {
                     }} />
                 </label>
                 {csvFile ? (
-                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-surface px-2 py-1.5">
+                  <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-subtle-soft px-2 py-1.5">
                     <span className="min-w-0 flex-1 truncate text-xs text-foreground">{csvFile.name}</span>
                     <span className="shrink-0 text-xs text-muted-text">
                       {formatUiText(fileText.size, { size: Math.max(0.1, csvFile.size / 1024).toFixed(1) })}
@@ -1986,9 +1986,9 @@ const PortfolioPage: React.FC = () => {
                 onDismiss={() => setEventError(null)}
               />
             ) : null}
-            <div className="max-h-64 overflow-auto rounded-lg border border-white/10 p-2">
+            <div className="max-h-64 overflow-auto rounded-lg border border-subtle p-2">
               {eventType === 'trade' && tradeEvents.map((item) => (
-                <div key={`t-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`t-${item.id}`} className="flex items-start justify-between gap-3 border-b border-subtle py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {formatUiText(text.tradeRow, { date: item.tradeDate, side: formatSideLabel(item.side, language), symbol: item.symbol, quantity: item.quantity, price: item.price })}
                   </div>
@@ -2010,7 +2010,7 @@ const PortfolioPage: React.FC = () => {
                 </div>
               ))}
               {eventType === 'cash' && cashEvents.map((item) => (
-                <div key={`c-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`c-${item.id}`} className="flex items-start justify-between gap-3 border-b border-subtle py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {item.eventDate} {formatCashDirectionLabel(item.direction, language)} {item.amount} {item.currency}
                   </div>
@@ -2032,7 +2032,7 @@ const PortfolioPage: React.FC = () => {
                 </div>
               ))}
               {eventType === 'corporate' && corporateEvents.map((item) => (
-                <div key={`ca-${item.id}`} className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-xs text-secondary">
+                <div key={`ca-${item.id}`} className="flex items-start justify-between gap-3 border-b border-subtle py-2 text-xs text-secondary">
                   <div className="min-w-0">
                     {item.effectiveDate} {formatCorporateActionLabel(item.actionType, language)} {item.symbol}
                   </div>

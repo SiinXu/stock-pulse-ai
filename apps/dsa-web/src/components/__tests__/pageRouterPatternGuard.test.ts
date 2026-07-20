@@ -31,37 +31,6 @@ const PAGE_PATTERN_OWNERS = new Map<string, string>([
 ]);
 
 type HistoryMethod = 'pushState' | 'replaceState';
-type LegacyHistoryAllowance = {
-  file: string;
-  method: HistoryMethod;
-  count: number;
-  owner: 'TRACK-UI1' | 'TRACK-UI2' | 'TRACK-UI3';
-  removeBy: string;
-};
-
-const LEGACY_HISTORY_ALLOWANCES: readonly LegacyHistoryAllowance[] = [
-  {
-    file: '../../pages/BacktestPage.tsx',
-    method: 'replaceState',
-    count: 1,
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-BT01',
-  },
-  {
-    file: '../../pages/DecisionSignalsPage.tsx',
-    method: 'replaceState',
-    count: 1,
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-D01',
-  },
-  {
-    file: '../../pages/StockScreeningPage.tsx',
-    method: 'replaceState',
-    count: 1,
-    owner: 'TRACK-UI2',
-    removeBy: 'UI-SCR01',
-  },
-];
 
 type SourceFinding = {
   file: string;
@@ -470,10 +439,6 @@ function findHistoryMutations(
   return findings.sort((left, right) => left.line - right.line || left.token.localeCompare(right.token));
 }
 
-function historyCountKey(file: string, method: string): string {
-  return `${file}:${method}`;
-}
-
 describe('page and Router pattern production guard', () => {
   it('rejects page-local copies of shared page Patterns', () => {
     const fixture = [
@@ -680,7 +645,7 @@ describe('page and Router pattern production guard', () => {
     ]);
   });
 
-  it('allows only the exact file/method/count migration inventory without line pinning', () => {
+  it('rejects every direct production history mutation', () => {
     const productionEntries = Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename));
     const boundSources = createBoundSourceFiles(productionEntries);
@@ -689,21 +654,7 @@ describe('page and Router pattern production guard', () => {
       if (!boundSource) throw new Error(`Page Router guard lost ${filename}.`);
       return findHistoryMutations(filename, source, boundSource);
     });
-    const actualCounts = new Map<string, number>();
-    for (const finding of actual) {
-      const key = historyCountKey(finding.file, finding.token);
-      actualCounts.set(key, (actualCounts.get(key) ?? 0) + 1);
-    }
-    const allowedCounts = new Map(
-      LEGACY_HISTORY_ALLOWANCES.map(({ file, method, count }) => [historyCountKey(file, method), count]),
-    );
-
-    expect([...actualCounts.entries()].sort()).toEqual([...allowedCounts.entries()].sort());
-    for (const allowance of LEGACY_HISTORY_ALLOWANCES) {
-      expect(allowance.owner).toMatch(/^TRACK-UI[123]$/);
-      expect(allowance.removeBy).toMatch(/^UI-[A-Z0-9]+$/);
-      expect(productionSources[allowance.file], `${allowance.file} must remain in the production scan`).toBeDefined();
-    }
+    expect(actual).toEqual([]);
   });
 
   it('keeps route-focus metadata memory-only and outside public target input', () => {

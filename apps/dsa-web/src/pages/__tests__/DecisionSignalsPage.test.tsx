@@ -1,5 +1,6 @@
 import type React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   decisionSignalsApi,
@@ -348,9 +349,11 @@ const persistedReassessResponse: DecisionSignalReassessResponse = {
 
 function renderPage() {
   return render(
-    <UiLanguageProvider>
-      <DecisionSignalsPage />
-    </UiLanguageProvider>,
+    <BrowserRouter>
+      <UiLanguageProvider>
+        <DecisionSignalsPage />
+      </UiLanguageProvider>
+    </BrowserRouter>,
   );
 }
 
@@ -1979,6 +1982,7 @@ describe('DecisionSignalsPage', () => {
   });
 
   it('writes the current stock to the URL and removes it on clear', async () => {
+    window.history.pushState({}, '', '/decision-signals?ref=dashboard#timeline');
     renderPage();
     await screen.findByText('贵州茅台');
 
@@ -1986,6 +1990,8 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).get('stock')).toBe('600519');
     });
+    expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
+    expect(window.location.hash).toBe('#timeline');
 
     // The clear control lives inside the modal, which submit closed.
     openStockContextModal();
@@ -1993,6 +1999,8 @@ describe('DecisionSignalsPage', () => {
     await waitFor(() => {
       expect(new URLSearchParams(window.location.search).get('stock')).toBeNull();
     });
+    expect(new URLSearchParams(window.location.search).get('ref')).toBe('dashboard');
+    expect(window.location.hash).toBe('#timeline');
   });
 
   it('restores list filters and pagination from the URL', async () => {
