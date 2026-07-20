@@ -13,7 +13,9 @@ import uuid
 from typing import List
 
 from bot.commands.base import BotCommand
+from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, BotResponse
+from src.schemas.request_context import AnalysisRequestContext
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -87,7 +89,7 @@ class BatchCommand(BotCommand):
         # 在后台线程中执行分析
         thread = threading.Thread(
             target=self._run_batch_analysis,
-            args=(stock_list, message),
+            args=(stock_list, to_analysis_request_context(message)),
             daemon=True
         )
         thread.start()
@@ -100,7 +102,11 @@ class BatchCommand(BotCommand):
             f"分析完成后将自动推送汇总报告。"
         )
     
-    def _run_batch_analysis(self, stock_list: List[str], message: BotMessage) -> None:
+    def _run_batch_analysis(
+        self,
+        stock_list: List[str],
+        request_context: AnalysisRequestContext,
+    ) -> None:
         """后台执行批量分析"""
         try:
             from src.config import get_config
@@ -111,7 +117,7 @@ class BatchCommand(BotCommand):
             # 创建分析管道
             pipeline = StockAnalysisPipeline(
                 config=config,
-                source_message=message,
+                request_context=request_context,
                 query_id=uuid.uuid4().hex,
                 query_source="bot"
             )

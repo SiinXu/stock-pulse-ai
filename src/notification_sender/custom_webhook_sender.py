@@ -9,12 +9,13 @@ import logging
 import json
 import time
 from string import Template
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes, slice_at_max_bytes
+from src.notification_contracts import is_dingtalk_session_webhook_url
 from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 
 
@@ -173,6 +174,25 @@ class CustomWebhookSender:
             return True
         logger.error(f"自定义 Webhook 推送失败: HTTP {response.status_code}")
         logger.debug(f"响应内容: {response.text[:200]}")
+        return False
+
+    def _post_context_webhook(self, url: str, payload: dict, timeout: int = 30) -> bool:
+        """Post an ephemeral reply without custom-webhook credentials."""
+        headers = {
+            'Content-Type': 'application/json; charset=utf-8',
+            'User-Agent': 'StockAnalysis/1.0',
+        }
+        body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        response = requests.post(
+            url,
+            data=body,
+            headers=headers,
+            timeout=timeout,
+            verify=self._webhook_verify_ssl,
+        )
+        if response.status_code == 200:
+            return True
+        logger.error("Context webhook delivery failed: HTTP %s", response.status_code)
         return False
 
     def test_custom_webhooks(self, content: str, *, timeout_seconds: float = 20.0) -> List[Dict[str, Any]]:
@@ -364,6 +384,40 @@ class CustomWebhookSender:
         return payload
     
     def _send_dingtalk_chunked(self, url: str, content: str, max_bytes: int = 20000) -> bool:
+        """Send configured custom-webhook chunks with configured credentials."""
+        return self._send_dingtalk_chunks(
+            url,
+            content,
+            max_bytes=max_bytes,
+            post_payload=self._post_custom_webhook,
+        )
+
+    def _send_dingtalk_session_chunked(
+        self,
+        url: str,
+        content: str,
+        max_bytes: int = 20000,
+    ) -> bool:
+        """Send DingTalk session chunks without custom-webhook credentials."""
+        if not is_dingtalk_session_webhook_url(url):
+            logger.warning("Rejected an invalid DingTalk session reply target")
+            return False
+        return self._send_dingtalk_chunks(
+            url,
+            content,
+            max_bytes=max_bytes,
+            post_payload=self._post_context_webhook,
+        )
+
+    def _send_dingtalk_chunks(
+        self,
+        url: str,
+        content: str,
+        *,
+        max_bytes: int,
+        post_payload: Callable[[str, dict, int], bool],
+    ) -> bool:
+        """Send DingTalk-compatible payload chunks through the supplied poster."""
         import time as _time
 
         # 为 payload 开销预留空间，避免 body 超限
@@ -391,7 +445,7 @@ class CustomWebhookSender:
                 hard_budget = max(200, budget - (body_bytes - max_bytes) - 200)
                 payload["markdown"]["text"], _ = slice_at_max_bytes(payload["markdown"]["text"], hard_budget)
 
-            if self._post_custom_webhook(url, payload, timeout=30):
+            if post_payload(url, payload, 30):
                 ok += 1
             else:
                 logger.error(f"钉钉分批发送失败: 第 {idx+1}/{total} 批")
