@@ -118,9 +118,13 @@ function semanticTableRole(node: ts.JsxOpeningLikeElement): string | undefined {
     && ts.isIdentifier(property.name)
     && property.name.text === 'role'
   ));
-  if (!role?.initializer || !ts.isStringLiteral(role.initializer)) return undefined;
-  return role.initializer.text === 'table' || role.initializer.text === 'grid'
-    ? role.initializer.text
+  if (!role?.initializer) return undefined;
+  const expression = ts.isJsxExpression(role.initializer)
+    ? role.initializer.expression
+    : role.initializer;
+  if (!expression || !ts.isStringLiteralLike(expression)) return undefined;
+  return expression.text === 'table' || expression.text === 'grid'
+    ? expression.text
     : undefined;
 }
 
@@ -171,12 +175,16 @@ describe('DataTable production guard', () => {
       "const second = createElement('table', null);",
       "const third = React.createElement('table', null);",
       'const fourth = <div role="grid" />;',
+      "const fifth = <div role={'table'} />;",
+      'const sixth = <div role={`grid`} />;',
     ].join('\n');
     expect(findRawTables('../../pages/ExamplePage.tsx', source)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 1, token: 'table' },
       { file: '../../pages/ExamplePage.tsx', line: 2, token: 'table' },
       { file: '../../pages/ExamplePage.tsx', line: 3, token: 'table' },
       { file: '../../pages/ExamplePage.tsx', line: 4, token: 'role=grid' },
+      { file: '../../pages/ExamplePage.tsx', line: 5, token: 'role=table' },
+      { file: '../../pages/ExamplePage.tsx', line: 6, token: 'role=grid' },
     ]);
   });
 
