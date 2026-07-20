@@ -331,6 +331,7 @@ function findHistoryMutations(
   ): ScanState {
     const aliases = new Map(inheritedAliases);
     const functions = new Map(inheritedFunctions);
+    const ownedSymbols = new Set<ts.Symbol>();
     const deferredFunctions: ts.SignatureDeclaration[] = [];
     const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
       const symbol = symbolFor(identifier);
@@ -352,16 +353,30 @@ function findHistoryMutations(
       node: ts.SignatureDeclaration,
     ): void => {
       const symbol = symbolFor(identifier);
-      if (symbol) functions.set(symbol, node);
+      if (symbol) {
+        ownedSymbols.add(symbol);
+        functions.set(symbol, node);
+      }
     };
-    const collectHoistedFunctions = (node: ts.Node): void => {
+    const isVarDeclaration = (node: ts.VariableDeclaration): boolean => (
+      ts.isVariableDeclarationList(node.parent)
+      && (node.parent.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) === 0
+    );
+    const collectHoistedBindings = (node: ts.Node): void => {
       if (node !== scope && ts.isFunctionLike(node)) {
         if (ts.isFunctionDeclaration(node) && node.name) {
           registerHoistedFunction(node.name, node);
         }
         return;
       }
-      ts.forEachChild(node, collectHoistedFunctions);
+      if (ts.isVariableDeclaration(node) && isVarDeclaration(node) && ts.isIdentifier(node.name)) {
+        const symbol = symbolFor(node.name);
+        if (symbol) {
+          ownedSymbols.add(symbol);
+          if (!aliases.has(symbol)) aliases.set(symbol, null);
+        }
+      }
+      ts.forEachChild(node, collectHoistedBindings);
     };
     if (
       (ts.isFunctionDeclaration(scope) || ts.isFunctionExpression(scope))
@@ -369,7 +384,7 @@ function findHistoryMutations(
     ) {
       registerHoistedFunction(scope.name, scope);
     }
-    collectHoistedFunctions(scope);
+    collectHoistedBindings(scope);
     const applyObjectAssignment = (object: ts.ObjectLiteralExpression): void => {
       for (const property of object.properties) {
         if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) {
@@ -381,6 +396,9 @@ function findHistoryMutations(
     };
     const applyVariableDeclaration = (node: ts.VariableDeclaration): void => {
       if (ts.isIdentifier(node.name)) {
+        const symbol = symbolFor(node.name);
+        if (symbol) ownedSymbols.add(symbol);
+        if (isVarDeclaration(node) && !node.initializer) return;
         setAlias(
           node.name,
           node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
@@ -413,12 +431,12 @@ function findHistoryMutations(
       if (ts.isCallExpression(node)) {
         const invokedFunction = functionBinding(node.expression, functions);
         if (invokedFunction) {
-          const callerFunctionSymbols = Array.from(functions.keys());
+          const callerOwnedSymbols = Array.from(ownedSymbols);
           const result = scanFunction(invokedFunction, aliases, functions);
           for (const [symbol, value] of result.aliases) {
             if (aliases.has(symbol)) aliases.set(symbol, value);
           }
-          for (const symbol of callerFunctionSymbols) {
+          for (const symbol of callerOwnedSymbols) {
             const binding = result.functions.get(symbol);
             if (binding) functions.set(symbol, binding);
             else functions.delete(symbol);
@@ -599,6 +617,26 @@ describe('page and Router pattern production guard', () => {
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 7, token: 'replaceState' },
+    ]);
+  });
+
+  it('preserves callee assignments across hoisted var declarations', () => {
+    const fixture = [
+      'function configure() { replace = window.history.replaceState.bind(window.history); }',
+      'configure();',
+      'var replace;',
+      'replace!({}, "", "?configured=1");',
+      'function install() { runner = () => { push = window.history.pushState.bind(window.history); }; }',
+      'install();',
+      'var runner;',
+      'var push;',
+      'runner!();',
+      'push!({}, "", "?installed=1");',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 4, token: 'replaceState' },
+      { file: '../../pages/ExamplePage.tsx', line: 10, token: 'pushState' },
     ]);
   });
 
