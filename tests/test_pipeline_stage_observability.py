@@ -965,8 +965,8 @@ def test_noise_suppression_preserves_context_delivery_outcome(
     }
 
 
-def test_partial_dispatch_is_degraded_and_not_retryable() -> None:
-    """Avoid retrying already-delivered channels before PIPE-02 idempotency fences."""
+def test_partial_dispatch_is_degraded_and_retryable_with_channel_fences() -> None:
+    """Retry only uncommitted channels after PIPE-02 installs per-channel fences."""
     from src.core.pipeline import StockAnalysisPipeline
     from src.enums import ReportType
 
@@ -989,6 +989,6 @@ def test_partial_dispatch_is_degraded_and_not_retryable() -> None:
     assert dispatch_run["stage"] == "dispatch"
     assert dispatch_run["status"] == "degraded"
     assert dispatch_run["degraded"] is True
-    assert dispatch_run["retryable"] is False
+    assert dispatch_run["retryable"] is True
     assert dispatch_run["output_summary"]["attempt_count"] == 2
     assert dispatch_run["output_summary"]["failure_count"] == 1

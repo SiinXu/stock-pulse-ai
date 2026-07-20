@@ -281,6 +281,47 @@ class _AllFailedThenSuccessNotifier(_RetryingAggregateNotifier):
         return self.send_calls > 1
 
 
+class _ConcurrentNoiseRetryNotifier(_AllFailedThenSuccessNotifier):
+    """Model an in-flight noise reservation during concurrent re-entry."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.first_gate_entered = threading.Event()
+        self.second_started = threading.Event()
+        self._noise_lock = threading.Lock()
+        self._noise_inflight = False
+
+    def evaluate_noise_control(self, report, **kwargs):
+        _ = (report, kwargs)
+        with self._noise_lock:
+            self.noise_evaluations += 1
+            should_send = not self._noise_inflight
+            if should_send:
+                self._noise_inflight = True
+        if should_send:
+            self.first_gate_entered.set()
+            assert self.second_started.wait(timeout=2)
+        return SimpleNamespace(
+            should_send=should_send,
+            reason_code="allowed" if should_send else "inflight",
+            route_type="report",
+            severity="info",
+            message="",
+        )
+
+    def record_noise_control(self, decision) -> None:
+        _ = decision
+        with self._noise_lock:
+            self.noise_records += 1
+            self._noise_inflight = False
+
+    def release_noise_control(self, decision) -> None:
+        _ = decision
+        with self._noise_lock:
+            self.noise_releases += 1
+            self._noise_inflight = False
+
+
 def test_delivery_reentry_increments_only_physical_attempts() -> None:
     """Advance keyed dispatch attempts while preserving a committed attempt."""
     pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -323,6 +364,9 @@ def test_dispatch_retry_preserves_output_without_duplicate_notification() -> Non
             result,
             report_type=ReportType.SIMPLE,
         )
+        first_dispatch = pipeline._pipeline_stage_runner.latest(
+            PipelineStageName.DISPATCH
+        )
         second_output = pipeline._send_single_stock_notification(
             result,
             report_type=ReportType.SIMPLE,
@@ -336,6 +380,9 @@ def test_dispatch_retry_preserves_output_without_duplicate_notification() -> Non
     ]
     assert pipeline.notifier.send_calls == 1
     assert record_run.call_count == 2
+    assert first_dispatch is not None
+    assert first_dispatch.side_effect_committed is True
+    assert first_dispatch.retryable is False
     latest = pipeline._pipeline_stage_runner.latest(PipelineStageName.DISPATCH)
     assert latest is not None
     assert latest.status == PipelineStageStatus.DEGRADED
@@ -391,6 +438,9 @@ def test_aggregate_retry_only_reexecutes_uncommitted_channel() -> None:
 
     with patch("src.core.pipeline.record_notification_run") as record_run:
         first_output = pipeline._send_notifications(results, ReportType.SIMPLE)
+        first_dispatch = pipeline._pipeline_stage_runner.latest(
+            PipelineStageName.DISPATCH
+        )
         second_output = pipeline._send_notifications(results, ReportType.SIMPLE)
 
     assert first_output is None
@@ -401,6 +451,10 @@ def test_aggregate_retry_only_reexecutes_uncommitted_channel() -> None:
     assert pipeline.notifier.noise_records == 1
     assert pipeline.notifier.noise_releases == 0
     assert record_run.call_count == 3
+    assert first_dispatch is not None
+    assert first_dispatch.status == PipelineStageStatus.DEGRADED
+    assert first_dispatch.side_effect_committed is True
+    assert first_dispatch.retryable is True
     latest = pipeline._pipeline_stage_runner.latest(PipelineStageName.DISPATCH)
     assert latest is not None
     assert latest.status == PipelineStageStatus.SUCCESS
@@ -429,6 +483,43 @@ def test_all_failed_aggregate_rechecks_noise_gate_before_retry() -> None:
     assert second_output is None
     assert pipeline.notifier.send_calls == 2
     assert pipeline.notifier.noise_evaluations == 2
+    assert pipeline.notifier.noise_releases == 1
+    assert pipeline.notifier.noise_records == 1
+
+
+def test_concurrent_aggregate_reentry_waits_for_owner_outcome() -> None:
+    """Wait out an owner's failed reservation before evaluating the retry gate."""
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._pipeline_stage_runner = PipelineStageRunner()
+    pipeline.notifier = _ConcurrentNoiseRetryNotifier()
+    pipeline.config = SimpleNamespace(stock_email_groups=[])
+    pipeline._generate_aggregate_report = MagicMock(return_value="aggregate-report")
+    pipeline._refresh_saved_diagnostic_snapshot = MagicMock()
+    results = [
+        SimpleNamespace(
+            code="600519",
+            query_id="query-aggregate-concurrent",
+            success=True,
+        )
+    ]
+
+    def _waiter() -> None:
+        pipeline.notifier.second_started.set()
+        return pipeline._send_notifications(results, ReportType.SIMPLE)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        owner = executor.submit(
+            pipeline._send_notifications,
+            results,
+            ReportType.SIMPLE,
+        )
+        assert pipeline.notifier.first_gate_entered.wait(timeout=2)
+        waiter = executor.submit(_waiter)
+        outputs = [owner.result(timeout=3), waiter.result(timeout=3)]
+
+    assert outputs == [None, None]
+    assert pipeline.notifier.noise_evaluations == 2
+    assert pipeline.notifier.send_calls == 2
     assert pipeline.notifier.noise_releases == 1
     assert pipeline.notifier.noise_records == 1
 
@@ -469,6 +560,11 @@ def test_process_single_stock_returns_original_analysis_result() -> None:
 
 def test_real_report_content_is_identical_for_save_and_dispatch() -> None:
     """Pass real aggregate Markdown through both output routes unchanged."""
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 7, 20, 12, 0, 0, tzinfo=tz)
+
     config = Config(
         stock_list=[],
         report_language="en",
@@ -485,7 +581,10 @@ def test_real_report_content_is_identical_for_save_and_dispatch() -> None:
         query_id="query-output-equivalence",
     )
 
-    with patch("src.notification.get_config", return_value=config):
+    with patch("src.notification.datetime", _FrozenDateTime), patch(
+        "src.notification.get_config",
+        return_value=config,
+    ):
         notifier = NotificationService()
         expected = notifier.generate_aggregate_report(
             [result],

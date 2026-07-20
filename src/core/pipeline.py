@@ -17,6 +17,7 @@ import time
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import ExitStack
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -4707,6 +4708,7 @@ class StockAnalysisPipeline:
                                 "Some notification deliveries failed after at "
                                 "least one delivery succeeded."
                             ),
+                            retryable=False,
                             side_effect_committed=True,
                         )
                     if dispatch_status == PipelineStageStatus.SKIPPED:
@@ -5007,6 +5009,7 @@ class StockAnalysisPipeline:
         delivery_reused_channels: set[str] = set()
         static_delivery_scope: Optional[Tuple[Any, ...]] = None
         static_delivery_confirmed = False
+        static_scope_guards = ExitStack()
         render_stage = observe_pipeline_stage(
             "render",
             input_summary={
@@ -5228,108 +5231,123 @@ class StockAnalysisPipeline:
                         report_type=report_type,
                     ),
                 )
-                static_delivery_reentry = (
-                    self._get_pipeline_stage_runner().scope_started(
-                        static_delivery_scope
-                    )
-                )
-                if (
-                    channels
-                    and not static_delivery_reentry
-                    and hasattr(self.notifier, "evaluate_noise_control")
-                ):
-                    report_type_key = report_type.value if isinstance(report_type, ReportType) else str(report_type)
-                    codes_key = ",".join(
-                        sorted(str(getattr(result, "code", "") or "") for result in results)
-                    )
-                    noise_key = f"report:aggregate:{report_type_key}:{codes_key}"
-                    noise_decision = self.notifier.evaluate_noise_control(
-                        report,
-                        route_type="report",
-                        severity="info",
-                        dedup_key=noise_key,
-                        cooldown_key=noise_key,
-                    )
-                    if not noise_decision.should_send:
-                        if send_context:
-                            suppressed_dispatch_status = "success"
-                            suppressed_retryable = False
-                            suppressed_reason = None
-                        elif context_route_available:
-                            suppressed_dispatch_status = "failed"
-                            suppressed_retryable = True
-                            suppressed_reason = (
-                                "Context-reply delivery failed and static channels "
-                                "were suppressed by noise control."
-                            )
-                        else:
-                            suppressed_dispatch_status = "skipped"
-                            suppressed_retryable = False
-                            suppressed_reason = None
-                        if suppressed_dispatch_status == "success":
-                            suppressed_result = PipelineStageResult.success(
-                                PipelineStageName.DISPATCH,
-                                True,
-                                side_effect_committed=bool(send_context),
-                            )
-                        elif suppressed_dispatch_status == "failed":
-                            suppressed_result = PipelineStageResult.failed(
-                                PipelineStageName.DISPATCH,
-                                value=False,
-                                retryable=suppressed_retryable,
-                                reason=suppressed_reason,
-                            )
-                        else:
-                            suppressed_result = PipelineStageResult.skipped(
-                                PipelineStageName.DISPATCH,
-                                reason="noise_control",
-                                value=False,
-                            )
-                        self._finish_pipeline_stage(
-                            dispatch_stage,
-                            suppressed_result,
-                            output_summary={
-                                "reason": "noise_control",
-                                "reason_code": noise_decision.reason_code,
-                                "context_delivered": bool(send_context),
-                                "context_attempted": context_route_available,
-                                "static_suppressed": True,
-                            },
-                        )
-                        notification_run = self._build_notification_run_snapshot(
-                            channel="report",
-                            status="skipped",
-                            success=False,
-                            attempts=0,
-                        )
-                        record_notification_run(
-                            channel="report",
-                            status="skipped",
-                            success=False,
-                            attempts=0,
-                        )
-                        self._refresh_saved_diagnostic_snapshot(
-                            results=results,
-                            notification_run=notification_run,
-                        )
-                        logger.info(
-                            "Notification suppressed by noise control: reason_code=%s "
-                            "route_type=%s severity=%s",
-                            noise_decision.reason_code,
-                            noise_decision.route_type,
-                            noise_decision.severity,
-                        )
-                        return
-
+                static_delivery_entered = True
+                static_delivery_reentry = False
                 if channels:
-                    self._get_pipeline_stage_runner().mark_scope_started(
+                    stage_runner = self._get_pipeline_stage_runner()
+                    static_scope_guards.enter_context(
+                        stage_runner.scope_guard(static_delivery_scope)
+                    )
+                    static_delivery_reentry = stage_runner.scope_started(
                         static_delivery_scope
                     )
-                    if static_delivery_reentry:
-                        logger.debug(
-                            "Aggregate delivery re-entry bypassed the first-entry "
-                            "noise gate; per-channel fences remain authoritative"
+                    if (
+                        not static_delivery_reentry
+                        and hasattr(self.notifier, "evaluate_noise_control")
+                    ):
+                        report_type_key = (
+                            report_type.value
+                            if isinstance(report_type, ReportType)
+                            else str(report_type)
                         )
+                        codes_key = ",".join(
+                            sorted(
+                                str(getattr(result, "code", "") or "")
+                                for result in results
+                            )
+                        )
+                        noise_key = (
+                            f"report:aggregate:{report_type_key}:{codes_key}"
+                        )
+                        noise_decision = self.notifier.evaluate_noise_control(
+                            report,
+                            route_type="report",
+                            severity="info",
+                            dedup_key=noise_key,
+                            cooldown_key=noise_key,
+                        )
+                        static_delivery_entered = bool(
+                            noise_decision.should_send
+                        )
+                    if static_delivery_entered and not static_delivery_reentry:
+                        stage_runner.mark_scope_started(static_delivery_scope)
+
+                if not static_delivery_entered:
+                    if send_context:
+                        suppressed_dispatch_status = "success"
+                        suppressed_retryable = False
+                        suppressed_reason = None
+                    elif context_route_available:
+                        suppressed_dispatch_status = "failed"
+                        suppressed_retryable = True
+                        suppressed_reason = (
+                            "Context-reply delivery failed and static channels "
+                            "were suppressed by noise control."
+                        )
+                    else:
+                        suppressed_dispatch_status = "skipped"
+                        suppressed_retryable = False
+                        suppressed_reason = None
+                    if suppressed_dispatch_status == "success":
+                        suppressed_result = PipelineStageResult.success(
+                            PipelineStageName.DISPATCH,
+                            True,
+                            side_effect_committed=bool(send_context),
+                        )
+                    elif suppressed_dispatch_status == "failed":
+                        suppressed_result = PipelineStageResult.failed(
+                            PipelineStageName.DISPATCH,
+                            value=False,
+                            retryable=suppressed_retryable,
+                            reason=suppressed_reason,
+                        )
+                    else:
+                        suppressed_result = PipelineStageResult.skipped(
+                            PipelineStageName.DISPATCH,
+                            reason="noise_control",
+                            value=False,
+                        )
+                    self._finish_pipeline_stage(
+                        dispatch_stage,
+                        suppressed_result,
+                        output_summary={
+                            "reason": "noise_control",
+                            "reason_code": noise_decision.reason_code,
+                            "context_delivered": bool(send_context),
+                            "context_attempted": context_route_available,
+                            "static_suppressed": True,
+                        },
+                    )
+                    notification_run = self._build_notification_run_snapshot(
+                        channel="report",
+                        status="skipped",
+                        success=False,
+                        attempts=0,
+                    )
+                    record_notification_run(
+                        channel="report",
+                        status="skipped",
+                        success=False,
+                        attempts=0,
+                    )
+                    self._refresh_saved_diagnostic_snapshot(
+                        results=results,
+                        notification_run=notification_run,
+                    )
+                    logger.info(
+                        "Notification suppressed by noise control: reason_code=%s "
+                        "route_type=%s severity=%s",
+                        noise_decision.reason_code,
+                        noise_decision.route_type,
+                        noise_decision.severity,
+                    )
+                    return
+
+                if static_delivery_reentry:
+                    logger.debug(
+                        "Aggregate delivery re-entry bypassed the first-entry "
+                        "noise gate; per-channel fences remain authoritative"
+                    )
 
                 # Issue #455: Markdown 转图片（与 notification.send 逻辑一致）
                 from src.md2img import markdown_to_image
@@ -5851,6 +5869,8 @@ class StockAnalysisPipeline:
                 e,
                 error_code="pipeline_notification_delivery_failed",
             )
+        finally:
+            static_scope_guards.close()
 
     def _generate_aggregate_report(
         self,

@@ -4,9 +4,21 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, Hashable, Optional, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Hashable,
+    Iterator,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from src.utils.sanitize import log_safe_exception
 
@@ -72,7 +84,11 @@ class PipelineStageResult(Generic[T]):
             object.__setattr__(self, "status", PipelineStageStatus(self.status))
         if self.attempt < 1:
             raise ValueError("Pipeline stage attempt must be at least 1")
-        if self.side_effect_committed and self.retryable:
+        if (
+            self.status == PipelineStageStatus.SUCCESS
+            and self.side_effect_committed
+            and self.retryable
+        ):
             object.__setattr__(self, "retryable", False)
 
     @property
@@ -183,6 +199,7 @@ class PipelineStageRunner:
             Tuple[PipelineStageName, Hashable],
             threading.Lock,
         ] = {}
+        self._scope_locks: Dict[Hashable, threading.Lock] = {}
         self._committed: Dict[
             Tuple[PipelineStageName, Hashable],
             PipelineStageResult[object],
@@ -204,6 +221,17 @@ class PipelineStageRunner:
         """Return the latest result recorded for a stage."""
         with self._lock:
             return self._latest.get(PipelineStageName(stage))
+
+    @contextmanager
+    def scope_guard(self, scope_key: Hashable) -> Iterator[None]:
+        """Serialize a complete effectful scope, including its first-entry gate."""
+        with self._lock:
+            scope_lock = self._scope_locks.setdefault(
+                scope_key,
+                threading.Lock(),
+            )
+        with scope_lock:
+            yield
 
     def scope_started(self, scope_key: Hashable) -> bool:
         """Return whether an effectful execution scope has started."""
@@ -279,7 +307,7 @@ class PipelineStageRunner:
         side_effect_key: Optional[Hashable] = None,
     ) -> PipelineStageResult[T]:
         """Retry an eligible result without replaying a committed side effect."""
-        if previous.side_effect_committed:
+        if previous.side_effect_committed and not previous.retryable:
             return self.record(replace(previous, reused=True))
         if not previous.retryable:
             return self.record(previous)
