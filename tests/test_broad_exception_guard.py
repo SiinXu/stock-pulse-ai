@@ -184,6 +184,25 @@ def test_propagation_and_logged_typed_mapping_need_no_baseline(tmp_path: Path) -
     assert collect_violations(tmp_path, baseline) == ()
 
 
+def test_nested_handler_escape_is_not_treated_as_propagation(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        try:\n"
+        "            object()\n"
+        "        except ValueError:\n"
+        "            return None\n"
+        "        raise\n",
+    )
+
+    assert "new-broad-handler" in _rules(tmp_path, baseline)
+
+
 def test_unlogged_typed_mapping_remains_legacy_debt(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
@@ -199,6 +218,40 @@ def test_unlogged_typed_mapping_remains_legacy_debt(tmp_path: Path) -> None:
     )
 
     assert "new-broad-handler" in _rules(tmp_path, baseline)
+
+
+def test_typed_mapping_requires_a_direct_safe_log_and_exception_factory(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "class DomainError(Exception):\n"
+        "    pass\n"
+        "def conditional_log(flag):\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        if flag:\n"
+        "            logger.error('mapped failure')\n"
+        "        raise DomainError()\n"
+        "def fake_logger_owner():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        catalogger.error('mapped failure')\n"
+        "        raise DomainError()\n"
+        "def raised_logger_call():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        logger.error('mapped failure')\n"
+        "        raise logger.error('not an exception factory')\n",
+    )
+
+    violations = collect_violations(tmp_path, baseline)
+    assert sum(item.rule == "new-broad-handler" for item in violations) == 3
 
 
 def test_logged_non_exception_raise_remains_legacy_debt(tmp_path: Path) -> None:
@@ -237,7 +290,77 @@ def test_yield_before_final_raise_is_not_treated_as_propagation(tmp_path: Path) 
     assert "new-broad-handler" in _rules(tmp_path, baseline)
 
 
-def test_outer_fingerprint_ignores_nested_handler_body_changes(tmp_path: Path) -> None:
+def test_fallback_recorded_accepts_direct_structured_records(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "def provider(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - provider run stores fallback details.\n"
+        "        record_provider_run(error=type(exc).__name__, fallback_from='primary', fallback_to='cache')\n"
+        "        return source.cached()\n"
+        "def future_result(future):\n"
+        "    try:\n"
+        "        return object()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - future exposes the failure.\n"
+        "        future.set_exception(exc)\n"
+        "        return None\n"
+        "def child_process(child_conn):\n"
+        "    try:\n"
+        "        return object()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - parent receives the failure.\n"
+        "        child_conn.send({'error': type(exc).__name__})\n"
+        "        return None\n"
+        "def holder(state):\n"
+        "    try:\n"
+        "        return object()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - state retains the failure.\n"
+        "        state.last_error = type(exc).__name__\n"
+        "        return None\n"
+        "def diagnostics(result):\n"
+        "    try:\n"
+        "        return object()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - result exposes diagnostics.\n"
+        "        result['diagnostic'] = type(exc).__name__\n"
+        "        return None\n",
+    )
+
+    assert collect_violations(tmp_path, baseline) == ()
+
+
+def test_fallback_record_must_be_direct_and_observable(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "def conditional(source, should_record):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        if should_record:\n"
+        "            record_provider_run(error=type(exc).__name__)\n"
+        "        return source.cached()\n"
+        "def local_only(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception as exc:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        error = type(exc).__name__\n"
+        "        return source.cached()\n"
+        "def unreachable(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        return source.cached()\n"
+        "        logger.error('unreachable fallback')\n",
+    )
+
+    violations = collect_violations(tmp_path, baseline)
+    assert sum(item.rule == "unrecorded-fallback" for item in violations) == 3
+
+
+def test_outer_fingerprint_tracks_nested_handler_body_changes(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -260,7 +383,99 @@ def test_outer_fingerprint_ignores_nested_handler_body_changes(tmp_path: Path) -
         .replace("return None", "return 'missing'"),
         encoding="utf-8",
     )
-    assert _rules(tmp_path, baseline) == {"orphan-marker"}
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "orphan-marker", "stale-baseline-entry"} <= rules
+
+
+def test_fingerprint_tracks_protected_operations_and_refuses_replacement(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        return read_cache()\n"
+        "    except Exception:\n"
+        "        return None\n",
+    )
+    handler = scan_repository(tmp_path)[0]
+    _write_baseline(baseline, legacy_handlers=[handler.baseline_entry.as_json()])
+    original_baseline = baseline.read_text(encoding="utf-8")
+
+    module.write_text(
+        module.read_text(encoding="utf-8").replace(
+            "        return read_cache()\n",
+            "        charge_customer()\n        return read_cache()\n",
+        ),
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+    assert write_baseline(tmp_path, baseline) == 1
+    assert baseline.read_text(encoding="utf-8") == original_baseline
+
+
+def test_fingerprint_tracks_handler_order_within_a_try(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        return object()\n"
+        "    except Exception:\n"
+        "        return 'first'\n"
+        "    except Exception:\n"
+        "        return 'second'\n",
+    )
+    entries = sorted(handler.baseline_entry for handler in scan_repository(tmp_path))
+    _write_baseline(
+        baseline,
+        legacy_handlers=[entry.as_json() for entry in entries],
+    )
+
+    module.write_text(
+        module.read_text(encoding="utf-8")
+        .replace("return 'first'", "return 'temporary'")
+        .replace("return 'second'", "return 'first'")
+        .replace("return 'temporary'", "return 'second'"),
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+
+
+def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        return primary()\n"
+        "    except Exception:\n"
+        "        return None\n"
+        "    try:\n"
+        "        return secondary()\n"
+        "    except ValueError:\n"
+        "        return None\n",
+    )
+    handler = scan_repository(tmp_path)[0]
+    _write_baseline(baseline, legacy_handlers=[handler.baseline_entry.as_json()])
+
+    module.write_text(
+        module.read_text(encoding="utf-8")
+        .replace("except Exception", "except TemporaryError")
+        .replace("except ValueError", "except Exception"),
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
 
 
 def test_baseline_fingerprint_ignores_line_only_changes_and_rejects_stale_debt(
@@ -333,6 +548,21 @@ def test_tuple_and_bare_handlers_are_in_scope(tmp_path: Path) -> None:
 
     violations = collect_violations(tmp_path, baseline)
     assert sum(item.rule == "new-broad-handler" for item in violations) == 2
+
+
+def test_exception_group_handlers_are_in_scope(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "def handle(group, errors):\n"
+        "    try:\n"
+        "        raise group\n"
+        "    except* Exception:\n"
+        "        errors.append('failed')\n",
+    )
+
+    assert "new-broad-handler" in _rules(tmp_path, baseline)
 
 
 def test_deferred_files_require_live_handlers_and_reasons(tmp_path: Path) -> None:

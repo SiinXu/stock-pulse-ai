@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import copy
 import hashlib
 import io
 import json
@@ -36,6 +35,20 @@ LOGGER_METHODS = frozenset(
     {"debug", "info", "warning", "warn", "error", "exception", "critical", "log"}
 )
 SAFE_LOG_FUNCTIONS = frozenset({"log_safe_exception", "safe_before_sleep_log"})
+TYPED_EXCEPTION_FACTORIES = frozenset({"api_error"})
+DIAGNOSTIC_TERMS = frozenset(
+    {
+        "diagnostic",
+        "diagnostics",
+        "error",
+        "errors",
+        "exception",
+        "exceptions",
+        "failure",
+        "failures",
+    }
+)
+IPC_OWNER_TERMS = frozenset({"channel", "conn", "connection", "ipc", "pipe"})
 _LEXICAL_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
 _LOCAL_HANDLER_BOUNDARIES = (*_LEXICAL_SCOPES, ast.ExceptHandler)
 
@@ -79,6 +92,7 @@ class BroadHandler:
     catches_base_exception: bool
     has_local_pass: bool
     has_safe_log: bool
+    has_recording_evidence: bool
     propagates: bool
     maps_typed_error: bool
 
@@ -194,11 +208,23 @@ def _marker_for_handler(
 
 
 def _walk_local_nodes(statements: Iterable[ast.stmt]) -> Iterator[ast.AST]:
+    yield from _walk_nodes(statements, boundaries=_LOCAL_HANDLER_BOUNDARIES)
+
+
+def _walk_control_flow_nodes(statements: Iterable[ast.stmt]) -> Iterator[ast.AST]:
+    yield from _walk_nodes(statements, boundaries=_LEXICAL_SCOPES)
+
+
+def _walk_nodes(
+    statements: Iterable[ast.stmt],
+    *,
+    boundaries: tuple[type[ast.AST], ...],
+) -> Iterator[ast.AST]:
     stack: list[ast.AST] = list(reversed(tuple(statements)))
     while stack:
         node = stack.pop()
         yield node
-        if isinstance(node, _LOCAL_HANDLER_BOUNDARIES):
+        if isinstance(node, boundaries):
             continue
         stack.extend(reversed(tuple(ast.iter_child_nodes(node))))
 
@@ -222,15 +248,113 @@ def _attribute_owner_text(node: ast.AST) -> str:
     return ".".join(reversed(parts)).lower()
 
 
+def _name_terms(value: str) -> set[str]:
+    snake_case = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
+    return {
+        item
+        for item in re.split(r"[^a-z0-9]+", snake_case.lower())
+        if item
+    }
+
+
+def _is_logger_owner(node: ast.AST) -> bool:
+    owner = _attribute_owner_text(node)
+    if not owner:
+        return False
+    terminal = owner.rsplit(".", maxsplit=1)[-1]
+    return (
+        terminal in {"logger", "logging", "_logger"}
+        or terminal.startswith("logger_")
+        or terminal.endswith("_logger")
+    )
+
+
 def _is_safe_log_call(call: ast.Call) -> bool:
     name = _call_name(call)
     if name in SAFE_LOG_FUNCTIONS:
         return True
     if name not in LOGGER_METHODS or not isinstance(call.func, ast.Attribute):
         return False
-    return "logger" in _attribute_owner_text(call.func.value) or (
-        isinstance(call.func.value, ast.Name) and call.func.value.id == "logging"
+    return _is_logger_owner(call.func.value)
+
+
+def _direct_call(statement: ast.stmt) -> ast.Call | None:
+    if not isinstance(statement, ast.Expr):
+        return None
+    value = statement.value
+    if isinstance(value, ast.Await):
+        value = value.value
+    return value if isinstance(value, ast.Call) else None
+
+
+def _is_safe_log_statement(statement: ast.stmt) -> bool:
+    call = _direct_call(statement)
+    return call is not None and _is_safe_log_call(call)
+
+
+def _is_ipc_send(call: ast.Call) -> bool:
+    if (
+        _call_name(call) != "send"
+        or not isinstance(call.func, ast.Attribute)
+    ):
+        return False
+    return bool(
+        _name_terms(_attribute_owner_text(call.func.value)) & IPC_OWNER_TERMS
     )
+
+
+def _is_structured_record_call(call: ast.Call) -> bool:
+    name = _call_name(call)
+    return (
+        name.startswith("record_")
+        or name == "set_exception"
+        or _is_ipc_send(call)
+    )
+
+
+def _target_has_diagnostic_term(target: ast.AST) -> bool:
+    if isinstance(target, ast.Attribute):
+        return bool(_name_terms(target.attr) & DIAGNOSTIC_TERMS)
+    if isinstance(target, ast.Subscript):
+        owner_has_term = bool(
+            _name_terms(_attribute_owner_text(target.value)) & DIAGNOSTIC_TERMS
+        )
+        slice_value = target.slice
+        if isinstance(slice_value, ast.Constant) and isinstance(slice_value.value, str):
+            return owner_has_term or bool(
+                _name_terms(slice_value.value) & DIAGNOSTIC_TERMS
+            )
+        return owner_has_term
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return any(_target_has_diagnostic_term(item) for item in target.elts)
+    return False
+
+
+def _is_diagnostic_assignment(statement: ast.stmt) -> bool:
+    if isinstance(statement, ast.Assign):
+        return any(_target_has_diagnostic_term(target) for target in statement.targets)
+    if isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
+        return _target_has_diagnostic_term(statement.target)
+    return False
+
+
+def _is_recording_statement(statement: ast.stmt) -> bool:
+    call = _direct_call(statement)
+    if call is not None:
+        return _is_safe_log_call(call) or _is_structured_record_call(call)
+    return _is_diagnostic_assignment(statement)
+
+
+def _has_reachable_recording_statement(statements: Sequence[ast.stmt]) -> bool:
+    has_prior_fallback_escape = False
+    for statement in statements:
+        if _is_recording_statement(statement) and not has_prior_fallback_escape:
+            return True
+        statement_nodes = tuple(_walk_control_flow_nodes((statement,)))
+        has_prior_fallback_escape = (
+            has_prior_fallback_escape or _has_control_flow_escape(statement_nodes)
+        )
+    return False
 
 
 def _has_control_flow_escape(nodes: Sequence[ast.AST]) -> bool:
@@ -241,26 +365,27 @@ def _has_control_flow_escape(nodes: Sequence[ast.AST]) -> bool:
 
 
 def _looks_like_typed_exception(node: ast.AST) -> bool:
-    if isinstance(node, ast.Call):
-        node = node.func
-    if isinstance(node, ast.Name):
-        name = node.id
-    elif isinstance(node, ast.Attribute):
-        name = node.attr
+    if not isinstance(node, ast.Call):
+        return False
+    constructor = node.func
+    if isinstance(constructor, ast.Name):
+        name = constructor.id
+        if name in TYPED_EXCEPTION_FACTORIES:
+            return True
+    elif isinstance(constructor, ast.Attribute):
+        name = constructor.attr
     else:
         return False
-    lowered = name.lower()
-    return lowered.endswith("error") or lowered.endswith("exception")
+    return name.endswith("Error") or name.endswith("Exception")
 
 
 def _raise_kind(
     handler: ast.ExceptHandler,
-    nodes: Sequence[ast.AST],
-    has_safe_log: bool,
+    control_flow_nodes: Sequence[ast.AST],
 ) -> tuple[bool, bool]:
     if not handler.body or not isinstance(handler.body[-1], ast.Raise):
         return False, False
-    if _has_control_flow_escape(nodes):
+    if _has_control_flow_escape(control_flow_nodes):
         return False, False
     final_raise = handler.body[-1]
     if final_raise.exc is None:
@@ -271,26 +396,29 @@ def _raise_kind(
         and final_raise.exc.id == handler.name
     ):
         return True, False
-    return False, has_safe_log and _looks_like_typed_exception(final_raise.exc)
-
-
-class _NestedHandlerNormalizer(ast.NodeTransformer):
-    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> ast.ExceptHandler:  # noqa: N802
-        return ast.ExceptHandler(type=None, name=None, body=[])
-
-
-def _handler_digest(handler: ast.ExceptHandler) -> str:
-    normalizer = _NestedHandlerNormalizer()
-    normalized = ast.ExceptHandler(
-        type=copy.deepcopy(handler.type),
-        name=handler.name,
-        body=[
-            normalizer.visit(copy.deepcopy(statement))
-            for statement in handler.body
-        ],
+    has_direct_safe_log = any(
+        _is_safe_log_statement(statement)
+        for statement in handler.body[:-1]
     )
+    return False, has_direct_safe_log and _looks_like_typed_exception(final_raise.exc)
+
+
+def _handler_digest(
+    owner: ast.Try | ast.TryStar,
+    handler_index: int,
+    handler: ast.ExceptHandler,
+) -> str:
+    payload = {
+        "handler": ast.dump(handler, include_attributes=False),
+        "handler_index": handler_index,
+        "protected_body": ast.dump(
+            ast.Module(body=owner.body, type_ignores=[]),
+            include_attributes=False,
+        ),
+        "try_kind": type(owner).__name__,
+    }
     return hashlib.sha256(
-        ast.dump(normalized, include_attributes=False).encode("utf-8")
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
 
 
@@ -321,19 +449,21 @@ class _HandlerVisitor(ast.NodeVisitor):
         self.generic_visit(node)
         self._scope.pop()
 
-    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:  # noqa: N802
+    def _record_handler(
+        self,
+        owner: ast.Try | ast.TryStar,
+        handler_index: int,
+        node: ast.ExceptHandler,
+    ) -> None:
         caught = _broad_exception_names(node.type)
         if caught:
             local_nodes = tuple(_walk_local_nodes(node.body))
+            control_flow_nodes = tuple(_walk_control_flow_nodes(node.body))
             has_safe_log = any(
-                isinstance(item, ast.Call) and _is_safe_log_call(item)
-                for item in local_nodes
+                _is_safe_log_statement(statement) for statement in node.body
             )
-            propagates, maps_typed_error = _raise_kind(
-                node,
-                local_nodes,
-                has_safe_log,
-            )
+            has_recording_evidence = _has_reachable_recording_statement(node.body)
+            propagates, maps_typed_error = _raise_kind(node, control_flow_nodes)
             marker, marker_error = _marker_for_handler(node, self.comments)
             self.handlers.append(
                 BroadHandler(
@@ -345,16 +475,30 @@ class _HandlerVisitor(ast.NodeVisitor):
                     ),
                     scope=".".join(self._scope),
                     caught=caught,
-                    digest=_handler_digest(node),
+                    digest=_handler_digest(owner, handler_index, node),
                     marker=marker,
                     marker_error=marker_error,
                     catches_base_exception=("BaseException" in caught or "bare" in caught),
                     has_local_pass=any(isinstance(item, ast.Pass) for item in local_nodes),
                     has_safe_log=has_safe_log,
+                    has_recording_evidence=has_recording_evidence,
                     propagates=propagates,
                     maps_typed_error=maps_typed_error,
                 )
             )
+
+    def _visit_try(self, node: ast.Try | ast.TryStar) -> None:
+        for handler_index, handler in enumerate(node.handlers):
+            self._record_handler(node, handler_index, handler)
+        self.generic_visit(node)
+
+    def visit_Try(self, node: ast.Try) -> None:  # noqa: N802
+        self._visit_try(node)
+
+    def visit_TryStar(self, node: ast.TryStar) -> None:  # noqa: N802
+        self._visit_try(node)
+
+    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:  # noqa: N802
         self.generic_visit(node)
 
 
@@ -463,13 +607,17 @@ def _policy_violations(handler: BroadHandler) -> list[Violation]:
                 "BaseException/bare pass requires an explicit cleanup classification and reason",
             )
         )
-    if marker and marker.category == "fallback_recorded" and not handler.has_safe_log:
+    if (
+        marker
+        and marker.category == "fallback_recorded"
+        and not handler.has_recording_evidence
+    ):
         violations.append(
             Violation(
                 handler.path,
                 handler.line,
                 "unrecorded-fallback",
-                "fallback_recorded requires a safe logger call in the handler",
+                "fallback_recorded requires a direct safe log or structured record statement",
             )
         )
     return violations
