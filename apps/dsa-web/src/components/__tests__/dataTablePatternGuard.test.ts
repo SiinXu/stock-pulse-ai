@@ -32,7 +32,7 @@ const LEGACY_TABLE_ALLOWANCES: readonly LegacyTableAllowance[] = [
   { file: '../report/MarketReviewReportView.tsx', line: 536, owner: 'TRACK-UI1', removeBy: 'UI-R01' },
   { file: '../run-flow/RunFlowNodeDetails.tsx', line: 261, owner: 'TRACK-UI1', removeBy: 'UI-R03' },
   { file: '../settings/AiOverviewMatrix.tsx', line: 57, owner: 'TRACK-UI3', removeBy: 'UI-S02' },
-  { file: '../../pages/StockScreeningPage.tsx', line: 1457, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
+  { file: '../../pages/StockScreeningPage.tsx', line: 1474, owner: 'TRACK-UI2', removeBy: 'UI-SCR01' },
   { file: '../../pages/TokenUsagePage.tsx', line: 281, owner: 'TRACK-UI1', removeBy: 'UI-U01' },
 ];
 

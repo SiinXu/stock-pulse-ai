@@ -542,6 +542,7 @@ const StockScreeningPage: React.FC = () => {
   const [maxResultsDraft, setMaxResultsDraft] = useState(String(initialRunParameters.maxResults));
   const [maxResultsError, setMaxResultsError] = useState('');
   const [configurationOpen, setConfigurationOpen] = useState(false);
+  const [configurationError, setConfigurationError] = useState('');
   const [candidates, setCandidates] = useState<AlphaSiftCandidate[]>([]);
   const [hotspots, setHotspots] = useState<AlphaSiftHotspot[]>([]);
   const [hotspotsUpdatedAt, setHotspotsUpdatedAt] = useState<string | null>(null);
@@ -947,6 +948,11 @@ const StockScreeningPage: React.FC = () => {
     setMaxResultsError('');
   };
 
+  const handleOpenConfiguration = () => {
+    setConfigurationError('');
+    setConfigurationOpen(true);
+  };
+
   const handleSubmit = async (): Promise<boolean> => {
     const parsedMaxResults = Number(maxResultsDraft);
     if (!Number.isInteger(parsedMaxResults) || parsedMaxResults < 1 || parsedMaxResults > 100) {
@@ -956,6 +962,7 @@ const StockScreeningPage: React.FC = () => {
     }
     setMaxResults(parsedMaxResults);
     setMaxResultsError('');
+    setConfigurationError('');
     setLoading(true);
     setError('');
     setScreenMeta(null);
@@ -976,9 +983,11 @@ const StockScreeningPage: React.FC = () => {
       return true;
     } catch (err) {
       if (mountedRef.current) {
+        const message = toApiErrorMessage(err, text.taskSubmitFailed, language);
         setCandidates([]);
         setLoading(false);
-        setError(toApiErrorMessage(err, text.taskSubmitFailed, language));
+        setConfigurationError(message);
+        setError(message);
       }
       return false;
     }
@@ -1315,7 +1324,7 @@ const StockScreeningPage: React.FC = () => {
               type="button"
               variant="secondary"
               size="compact"
-              onClick={() => setConfigurationOpen(true)}
+              onClick={handleOpenConfiguration}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
               {text.parameters}
@@ -1357,6 +1366,14 @@ const StockScreeningPage: React.FC = () => {
           </>
         )}
       >
+        {configurationError ? (
+          <InlineAlert
+            variant="danger"
+            title={text.callFailed}
+            message={configurationError}
+            className="mb-3"
+          />
+        ) : null}
         <form id={configurationFormId} onSubmit={handleConfigurationSubmit} noValidate>
           <div className="grid gap-3 sm:grid-cols-2">
             <Select

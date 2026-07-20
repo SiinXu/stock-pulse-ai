@@ -832,6 +832,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
 
   test('14 Screening restores a successful task and reports a subsequent failed task through the shared task contract', async ({ page }) => {
     await mockScreeningBase(page);
+    let submissionAttempts = 0;
     await page.route('**/api/v1/alphasift/screen/tasks/restore-success', (route) => fulfillJson(route, {
       task_id: 'restore-success',
       status: 'completed',
@@ -851,6 +852,15 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.route('**/api/v1/alphasift/screen/tasks', async (route) => {
       if (route.request().method() !== 'POST') {
         await route.fallback();
+        return;
+      }
+      submissionAttempts += 1;
+      if (submissionAttempts === 1) {
+        await fulfillJson(route, {
+          error: 'alphasift_screen_failed',
+          message: 'raw task submission failure',
+          params: {},
+        }, 503);
         return;
       }
       await fulfillJson(route, {
@@ -873,9 +883,17 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey)).toBeNull();
     await page.getByRole('button', { name: '参数设置' }).click();
-    await page.getByLabel('返回数量').press('Enter');
+    const dialog = page.getByRole('dialog', { name: '参数设置' });
+    await dialog.getByLabel('返回数量').press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/外部行情或模型服务不可用，请稍后重试。/)).toBeVisible();
+    await expect(dialog.getByText('raw task submission failure', { exact: true })).toHaveCount(0);
+
+    await dialog.getByLabel('返回数量').press('Enter');
+    await expect(dialog).toBeHidden();
     await expect(page.getByText('外部行情或模型服务不可用，请稍后重试。', { exact: true })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('raw backend failure', { exact: true })).toHaveCount(0);
+    expect(submissionAttempts).toBe(2);
     await expect(page.getByText('RESTORED', { exact: true })).toHaveCount(0);
   });
 

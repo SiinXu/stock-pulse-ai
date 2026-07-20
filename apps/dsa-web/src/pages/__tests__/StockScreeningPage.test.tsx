@@ -896,10 +896,11 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /运行选股/ }));
 
     await waitFor(() => expect(startScreenTask).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('dialog', { name: '参数设置' })).toBeInTheDocument();
-    expect(screen.getByLabelText('策略参数')).toHaveValue('custom_strategy_alpha');
-    expect(await screen.findByText(/请求未能完成，请稍后重试。/)).toBeInTheDocument();
-    expect(screen.queryByText(/raw task submission failure/)).not.toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: '参数设置' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('策略参数')).toHaveValue('custom_strategy_alpha');
+    expect(within(dialog).getByText(/请求未能完成，请稍后重试。/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/raw task submission failure/)).not.toBeInTheDocument();
   });
 
   it('localizes built-in strategy copy by stable id in English UI mode', async () => {
