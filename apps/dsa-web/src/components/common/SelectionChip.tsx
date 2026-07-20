@@ -1,18 +1,19 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Check } from 'lucide-react';
+import { Check, LoaderCircle } from 'lucide-react';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface SelectionChipProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
-  'aria-pressed' | 'children' | 'className' | 'style' | 'type'
+  'aria-busy' | 'aria-pressed' | 'children' | 'className' | 'style' | 'type'
 > {
   label: ReactNode;
   description?: ReactNode;
   metadata?: ReactNode;
   /** Supply only when the selected state persists after activation. */
   selected?: boolean;
+  isLoading?: boolean;
 }
 
 /** Compact text-led selection command whose visible surface may grow to multiple lines. */
@@ -21,14 +22,19 @@ export const SelectionChip = forwardRef<HTMLButtonElement, SelectionChipProps>((
   description,
   metadata,
   selected,
+  isLoading = false,
+  disabled,
   ...buttonProps
 }, ref) => (
   <button
     {...buttonProps}
     ref={ref}
     type="button"
+    aria-busy={isLoading || undefined}
     aria-pressed={selected}
+    disabled={disabled || isLoading}
     data-control="selection-chip"
+    data-loading={isLoading ? 'true' : undefined}
     data-selected={selected === undefined ? undefined : String(selected)}
     className={cn(
       'control-hit-target relative inline-flex min-h-9 min-w-0 max-w-full cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-medium leading-5 whitespace-normal',
@@ -55,9 +61,19 @@ export const SelectionChip = forwardRef<HTMLButtonElement, SelectionChipProps>((
         </>
       )}
     </span>
-    {selected === undefined ? null : (
+    {selected === undefined && !isLoading ? null : (
       <span className="flex h-4 w-4 shrink-0 items-center justify-center" aria-hidden="true">
-        <Check className={cn('h-3.5 w-3.5', selected ? 'opacity-100' : 'opacity-0')} />
+        {isLoading ? (
+          <LoaderCircle
+            className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+            data-indicator="loading"
+          />
+        ) : (
+          <Check
+            className={cn('h-3.5 w-3.5', selected ? 'opacity-100' : 'opacity-0')}
+            data-indicator="selected"
+          />
+        )}
       </span>
     )}
   </button>

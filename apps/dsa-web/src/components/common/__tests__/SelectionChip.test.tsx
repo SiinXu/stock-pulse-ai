@@ -10,10 +10,12 @@ describe('SelectionChip', () => {
     type HasClassName = 'className' extends keyof SelectionChipProps ? true : false;
     type HasStyle = 'style' extends keyof SelectionChipProps ? true : false;
     type HasType = 'type' extends keyof SelectionChipProps ? true : false;
+    type HasAriaBusy = 'aria-busy' extends keyof SelectionChipProps ? true : false;
 
     expectTypeOf<HasClassName>().toEqualTypeOf<false>();
     expectTypeOf<HasStyle>().toEqualTypeOf<false>();
     expectTypeOf<HasType>().toEqualTypeOf<false>();
+    expectTypeOf<HasAriaBusy>().toEqualTypeOf<false>();
   });
 
   it('forwards its ref and remains a non-submitting native button', () => {
@@ -72,5 +74,26 @@ describe('SelectionChip', () => {
     expect(chip).toBeDisabled();
     fireEvent.click(chip);
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('owns a non-activating loading state without changing the accessible name', () => {
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <SelectionChip isLoading onClick={onSelect} label="Synchronize candidate" />,
+    );
+
+    const chip = screen.getByRole('button', { name: 'Synchronize candidate' });
+    expect(chip).toBeDisabled();
+    expect(chip).toHaveAttribute('aria-busy', 'true');
+    expect(chip).toHaveAttribute('data-loading', 'true');
+    expect(chip.querySelector('[data-indicator="loading"]')).not.toBeNull();
+    fireEvent.click(chip);
+    expect(onSelect).not.toHaveBeenCalled();
+
+    rerender(<SelectionChip onClick={onSelect} label="Synchronize candidate" />);
+    expect(chip).toBeEnabled();
+    expect(chip).not.toHaveAttribute('aria-busy');
+    expect(chip).not.toHaveAttribute('data-loading');
+    expect(chip.querySelector('[data-indicator="loading"]')).toBeNull();
   });
 });

@@ -79,12 +79,18 @@ content needs another line. The coarse-pointer pseudo-element provides the
 44x44px effective target without forcing every single-line choice to show a
 44px background.
 
+While `isLoading` is true, the primitive exposes `aria-busy`, prevents native
+activation, and replaces the trailing state indicator with a spinner that
+stops animating under reduced motion without changing the accessible name.
+The primitive owns `aria-busy`; callers continue to own business-specific
+progress messaging outside the control when additional context is required.
+
 Callers omit `selected` for one-shot selection or navigation commands. When a
 selection remains current after activation, callers supply `selected`; the
 primitive then exposes `aria-pressed`, stable selected/unselected icon space,
 and semantic selected styling. `SelectionChip` does not accept `className`,
-`style`, `type`, or caller-owned `aria-pressed`, so its height, padding,
-rounding, width and state cannot drift by page.
+`style`, `type`, caller-owned `aria-busy`, or caller-owned `aria-pressed`, so
+its height, padding, rounding, width and state cannot drift by page.
 
 The generic `label`, `description`, and `metadata` slots insert real text
 separators before applying visual spacing and semantic text tones. This keeps

@@ -16,6 +16,7 @@ type Candidate = {
   name: string;
   market: string;
   disabled?: boolean;
+  loading?: boolean;
 };
 
 const CANDIDATES: readonly Candidate[] = [
@@ -28,6 +29,7 @@ const CANDIDATES: readonly Candidate[] = [
     market: 'NYSE',
   },
   { id: '600519', code: '600519', name: 'Kweichow Moutai Company Limited', market: 'SSE' },
+  { id: 'loading', code: 'SYNCING', name: 'Refreshing candidate data', market: 'GLOBAL', loading: true },
   { id: 'disabled', code: 'PRIVATE', name: 'Unavailable candidate', market: 'PRIVATE', disabled: true },
 ];
 
@@ -62,6 +64,7 @@ function SelectionChipFixture() {
               metadata={`/ ${candidate.market}`}
               selected={selectedId === candidate.id}
               disabled={candidate.disabled}
+              isLoading={candidate.loading}
               onClick={() => {
                 setSelectedId(candidate.id);
                 setResult(`Selected ${candidate.code}`);

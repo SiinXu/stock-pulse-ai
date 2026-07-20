@@ -71,10 +71,19 @@ test.describe('shared SelectionChip foundation', () => {
     }
   });
 
-  test('retains focus, disabled, and dark-theme states', async ({ page }) => {
+  test('retains focus, disabled, loading, and both theme states', async ({ page }) => {
     await openFixture(page, 390, 667);
     const disabled = page.getByRole('button', { name: /PRIVATE Unavailable candidate/ });
     await expect(disabled).toBeDisabled();
+    const loading = page.getByRole('button', { name: /SYNCING Refreshing candidate data/ });
+    await expect(loading).toBeDisabled();
+    await expect(loading).toHaveAttribute('aria-busy', 'true');
+    await expect(loading.locator('[data-indicator="loading"]')).toBeVisible();
+
+    await page.evaluate(() => localStorage.setItem('theme', 'light'));
+    await page.reload();
+    await expect(page.locator('html')).toHaveClass(/(?:^|\s)light(?:\s|$)/);
+    await expectNoDocumentOverflow(page, 'light 390x667');
 
     const msft = page.getByRole('button', { name: /MSFT Microsoft Corporation/ });
     await msft.focus();
