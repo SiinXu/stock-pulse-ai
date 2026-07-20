@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [改进] 下沉运行流程与通知上下文契约：API 保留兼容重导出，Bot 在异步边界前生成不可变请求快照，核心服务不再依赖 API Schema 或 Bot DTO；上下文回复目标按平台验证并隔离凭据，拒绝的目标继续抑制静态广播。
 - [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
 - [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
 - [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
