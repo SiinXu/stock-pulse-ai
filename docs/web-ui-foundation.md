@@ -18,6 +18,7 @@ field-description, hit-target, boundary, empty-state, or alert behavior.
 | Primitive | Contract |
 | --- | --- |
 | `Button` | Requires an explicit intent, forwards the native button ref, and exposes semantic variant and size state. |
+| `SelectionChip` | Provides a compact text-led selection command that grows for multi-line content without caller-owned geometry. |
 | `IconButton` | Requires an accessible name, provides an optional tooltip, and separates its visible icon surface from its coarse-pointer hit target. |
 | `Input` | Forwards the native input ref, owns label/hint/error wiring, and uses a focusable coarse-pointer frame around the visible input. |
 | `Field` | Associates a label with one control, renders either an error or hint, and forwards its wrapper ref. |
@@ -67,6 +68,35 @@ the other container can be opened. The caller owns all visible
 and accessible strings; the Pattern owns no business copy or API request.
 Both advanced-filter forms contain their submit event so a portalled form
 composed inside `FilterBar` cannot also submit the outer primary-filter form.
+
+## Selection Control Semantics
+
+`SelectionChip` is the shared compact choice for text-led candidates whose
+labels may wrap, such as a code followed by a long display name and market.
+It remains a native non-submitting button, forwards its ref and native event
+attributes, owns a 36px minimum visible height, and grows naturally when its
+content needs another line. The coarse-pointer pseudo-element provides the
+44x44px effective target without forcing every single-line choice to show a
+44px background.
+
+Callers omit `selected` for one-shot selection or navigation commands. When a
+selection remains current after activation, callers supply `selected`; the
+primitive then exposes `aria-pressed`, stable selected/unselected icon space,
+and semantic selected styling. `SelectionChip` does not accept `className`,
+`style`, `type`, or caller-owned `aria-pressed`, so its height, padding,
+rounding, width and state cannot drift by page.
+
+The generic `label`, `description`, and `metadata` slots insert real text
+separators before applying visual spacing and semantic text tones. This keeps
+the accessible name readable when callers compose several data fragments;
+CSS margin or flex gap must not be the only separation between spoken values.
+
+This control is not an applied filter, status token, Tab, SegmentedControl
+item, or icon tool. Applied values that activate removal continue to use
+`FilterChip`; page sections and rows use their corresponding Pattern. The
+multi-line Decision Signals candidate Button remains the exact `UI-D01` /
+`TRACK-UI2` migration entry until that page track adopts `SelectionChip` and
+deletes its Button geometry allowance.
 
 ## DataTable Semantics
 
@@ -195,7 +225,7 @@ forwards focus to the native input. The visible background is not enlarged to
 
 ## Caller Constraints
 
-Button and IconButton callers must not use `className` to replace shared
+Button, IconButton, and SelectionChip callers must not use `className` to replace shared
 height, width, padding, radius, flex-basis, or flex-growth geometry. Input and
 Textarea callers must not replace shared height, padding, radius, or focus
 geometry; Input layout width belongs on `fieldClassName`. Typography,
@@ -213,6 +243,8 @@ The AST-backed production design guard checks:
   arbitrary geometry properties, against exact call-site exceptions.
 - Static Input, IconButton, and Textarea height, padding, radius, or icon-box
   overrides; Input wrapper width remains a Pattern/layout responsibility.
+- Static SelectionChip height, width, padding, radius, flex-basis, or
+  flex-growth overrides, including aliased and namespaced common imports.
 - Primary CTA gradient/shimmer rules already enforced by the repository.
 - The complete `Surface` level style map, including borderless L0/L1,
   border-only L2, and shared-shadow Overlay invariants.
@@ -235,7 +267,7 @@ item:
 
 | Removal item | Execution owner | Temporary reason |
 | --- | --- | --- |
-| `UI-D01` | `TRACK-UI2` | Replace the multiline Decision Signals candidate Button with the shared filter/pressable pattern. |
+| `UI-D01` | `TRACK-UI2` | Replace the multiline Decision Signals candidate Button with `SelectionChip`. |
 | `UI-P01` | `TRACK-UI2` | Move Portfolio flex/full-width layout ownership into the account and form patterns. |
 | `UI-R01` | `TRACK-UI1` | Remove Home and Market Review compatibility card classes during the report hierarchy migration. |
 | `UI-R02` | `TRACK-UI1` | Remove report/history compatibility card classes during route-level reading and trend migration. |
@@ -268,6 +300,9 @@ must re-evaluate and remove that compatibility entry when legacy cleanup lands.
   contained-scroll contracts. It does not migrate a business page. Each page
   track deletes its exact raw-table allowance in the same change that adopts
   the shared Pattern; the final migration deletes the legacy allowance list.
+- `UI-DEF-01` establishes `SelectionChip` from the explicit TRACK-UI2 deferred
+  input. It does not migrate Decision Signals. `UI-D01` deletes its exact
+  Button geometry allowance when that page adopts the shared control.
 - Existing page-local textarea implementations migrate through their owning
   page work items (`UI-C01` and `UI-S02`, both `TRACK-UI3`) before duplicate
   raw controls are deleted.

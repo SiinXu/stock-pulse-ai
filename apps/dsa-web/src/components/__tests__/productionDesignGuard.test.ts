@@ -86,7 +86,7 @@ const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
 ]);
 const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
 const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
-const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'Textarea'] as const;
+const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'SelectionChip', 'Textarea'] as const;
 const STATE_SURFACE_COMPONENT_NAMES = [
   'Surface',
   'Section',
@@ -1134,7 +1134,7 @@ function appendNonButtonControlVisualOverrideViolations(
   ));
   if (!controlName) return;
 
-  const overridePattern = controlName === 'IconButton'
+  const overridePattern = controlName === 'IconButton' || controlName === 'SelectionChip'
     ? BUTTON_VISUAL_OVERRIDE_PATTERN
     : FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN;
   const scan = classNameFragments(opening, sourceFile, initializers);
@@ -3047,10 +3047,11 @@ describe('production design guard', () => {
     ]);
   });
 
-  it('rejects shared field and IconButton geometry overrides without blocking layout width', () => {
+  it('rejects shared control geometry overrides without blocking field layout width', () => {
     const source = `
       <Input className="h-11 w-24 rounded-full px-4 text-center" />
       <IconButton aria-label="Delete" className="size-12 text-danger"><span>X</span></IconButton>
+      <SelectionChip label="Candidate" className="h-auto min-h-11 w-full rounded-lg py-1.5" />
       <Textarea className="min-h-40 rounded-xl" />
     `;
     const violations = findProductionDesignViolations('fixture.tsx', source);
@@ -3060,6 +3061,11 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'control-visual-override', token: 'Input:rounded-full' }),
       expect.objectContaining({ rule: 'control-visual-override', token: 'Input:px-4' }),
       expect.objectContaining({ rule: 'control-visual-override', token: 'IconButton:size-12' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'SelectionChip:h-auto' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'SelectionChip:min-h-11' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'SelectionChip:w-full' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'SelectionChip:rounded-lg' }),
+      expect.objectContaining({ rule: 'control-visual-override', token: 'SelectionChip:py-1.5' }),
       expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:min-h-40' }),
       expect.objectContaining({ rule: 'control-visual-override', token: 'Textarea:rounded-xl' }),
     ]));
