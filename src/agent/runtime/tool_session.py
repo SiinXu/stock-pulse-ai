@@ -43,6 +43,21 @@ from src.agent.tools.registry import ToolRegistry
 logger = logging.getLogger(__name__)
 
 
+class ExecutionFenceRejected(Exception):
+    """Internal signal carrying a structured execution-fence rejection."""
+
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.details = details
+
+
 class BoundToolSession:
     """Frozen per-execution tool session with fail-closed gates."""
 
@@ -190,8 +205,25 @@ class BoundToolSession:
 
     # ----- Execution -----
 
-    def execute(self, name: str, arguments: Any) -> Dict[str, Any]:
-        """Execute one allowed tool through the frozen session gates."""
+    def execute(
+        self,
+        name: str,
+        arguments: Any,
+        *,
+        dispatch_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        completion_guard: Optional[Callable[[Callable[[], None]], None]] = None,
+        on_dispatched: Optional[Callable[[], None]] = None,
+    ) -> Dict[str, Any]:
+        """Execute one allowed tool through the frozen session gates.
+
+        ``dispatch_guard`` may linearize the dispatch claim with an owning
+        execution's cancellation/deadline state. It runs under the session lock
+        immediately before the call is counted as dispatched, but must not run
+        the external tool itself. ``on_dispatched`` runs after the session and
+        execution locks are released but before the external tool starts.
+        ``completion_guard`` applies the same ordering when accepting the
+        returned result so late cancellation/deadline results remain audited.
+        """
         started_at = time.time()
         tool_name = name if isinstance(name, str) else ""
         cache_key = (
@@ -227,7 +259,33 @@ class BoundToolSession:
                         {"max_tool_calls": self._max_tool_calls},
                     )
                 else:
-                    self._dispatched_calls += 1
+                    dispatch_claimed = False
+
+                    def _claim_dispatch() -> None:
+                        nonlocal dispatch_claimed
+                        if dispatch_claimed:
+                            raise RuntimeError(
+                                "dispatch_guard claimed one tool call more than once"
+                            )
+                        dispatch_claimed = True
+                        self._dispatched_calls += 1
+
+                    if dispatch_guard is None:
+                        _claim_dispatch()
+                    else:
+                        dispatched_calls_before_guard = self._dispatched_calls
+                        try:
+                            dispatch_guard(_claim_dispatch)
+                        except ExecutionFenceRejected as exc:
+                            self._dispatched_calls = dispatched_calls_before_guard
+                            rejection = (exc.code, exc.message, exc.details)
+                        except BaseException:
+                            self._dispatched_calls = dispatched_calls_before_guard
+                            raise
+                        if rejection is None and not dispatch_claimed:
+                            raise RuntimeError(
+                                "dispatch_guard returned without claiming the tool call"
+                            )
             if rejection is not None:
                 return self._reject_locked(
                     tool_name=tool_name,
@@ -236,10 +294,37 @@ class BoundToolSession:
                     rejection=rejection,
                 )
 
+        if on_dispatched is not None:
+            on_dispatched()
         result = self._surface.execute_tool(tool_name, arguments, call_context)
 
         with self._lock:
-            if self._closed or self._cancel_requested():
+            completion_rejection = None
+            if completion_guard is not None:
+                completion_claimed = False
+
+                def _claim_completion() -> None:
+                    nonlocal completion_claimed
+                    if completion_claimed:
+                        raise RuntimeError(
+                            "completion_guard claimed one tool result more than once"
+                        )
+                    completion_claimed = True
+
+                try:
+                    completion_guard(_claim_completion)
+                except ExecutionFenceRejected as exc:
+                    completion_rejection = exc
+                if completion_rejection is None and not completion_claimed:
+                    raise RuntimeError(
+                        "completion_guard returned without claiming the tool result"
+                    )
+
+            if (
+                self._closed
+                or self._cancel_requested()
+                or completion_rejection is not None
+            ):
                 self._dropped_results += 1
                 fenced = build_tool_error_result(
                     tool_name=tool_name,
@@ -248,7 +333,14 @@ class BoundToolSession:
                     started_at=started_at,
                     context=call_context,
                     retriable=False,
-                    details={"fence": "session_terminal"},
+                    details={
+                        "fence": "session_terminal",
+                        "reason": (
+                            completion_rejection.code
+                            if completion_rejection is not None
+                            else "session_terminal"
+                        ),
+                    },
                     arguments=arguments,
                 )
                 self._audit_trail.append(fenced["audit"])

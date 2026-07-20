@@ -1,6 +1,6 @@
 # ADR-001: Agent Runtime 架构 - Native Only + vendor-neutral Runtime Contract
 
-- 状态: `Accepted / Amended by ADR-002`（2026-07-19 修订并执行 Native Only 裁决；同日 ADR-002 改判恢复实验 PydanticAI Runtime 为可选资产，D1 的“唯一可执行 Runtime”不再描述现状）
+- 状态: `Accepted / Amended by ADR-002`（2026-07-19 修订并执行 Native Only 裁决；同日 ADR-002 为测试/证据 POC 明确修订 D1，并有限覆盖 D5 的恢复禁令；D2/D3/D4 不变）
 - 首次批准: 2026-07-17
 - 最近修订: 2026-07-19
 - 决策者: Maintainer（SiinXu）
@@ -30,9 +30,10 @@ cross-runtime 测试和专用 CI，导致“唯一正式运行时”和实际维
 
 ## 2. Decision
 
-### D1: Native 是唯一可执行 Agent Runtime
+### D1: Native 是唯一生产 Agent Runtime（由 ADR-002 修订）
 
-当前只有 Native 可执行实现。生产调用路径与保留的合同一致性路径分别为：
+Native 是唯一生产装配；ADR-002 另恢复了仅供测试/证据 harness 显式构造的
+PydanticAI Single RUN POC。两条路径严格隔离：
 
 ```text
 Production requests
@@ -44,6 +45,7 @@ Production requests
 Contract and parity coverage
   vendor-neutral Runtime Contract and lifecycle
     -> NativeRuntimeAdapter -> the same Native implementations
+    -> explicit test/evidence construction -> PydanticAIRuntimeAdapter
 ```
 
 `NativeRuntimeAdapter` 是中立合同、生命周期和一致性测试的 Native 包装，不是
@@ -52,12 +54,15 @@ Contract and parity coverage
 
 具体约束：
 
-- 不保留第二套 Runtime Adapter、runtime selector、fallback 或内部实验注入点。
+- 实验 Adapter 与显式注入点只服务测试/证据，不进入生产 factory、config、env、
+  API、Web、Desktop 或 Bot，也不提供 runtime selector 或 fallback。
 - `AGENT_ARCH` 继续只选择 StockPulse 的 single/multi 业务架构，不选择 vendor runtime。
-- 默认依赖、Desktop、Docker 和 CI 均不安装或测试外部 Agent runtime 依赖。
-- `build_agent_executor()` 仍是生产装配入口；删除无生产调用方的
-  `build_agent_runtime()` 不构成公共 API 变更。
-- Native-only CI 同时断言外部依赖、实验模块和实验注入函数均不存在。
+- 默认依赖、Desktop 和 Docker 不安装外部 Agent runtime 依赖；专用
+  `pydanticai-installed` CI 只安装并验证精确锁定的实验依赖闭包。
+- `build_agent_executor()` 仍是生产装配入口；内部 `build_agent_runtime()` 存在但
+  始终返回 `NativeRuntimeAdapter`，且不接受实验 selector。
+- Native CI 断言默认环境不存在 `pydantic_ai`；安装态 CI 断言实验模块可导入、
+  依赖一致且约定的 conformance/live-handle 测试不 skip。
 
 ### D2: 保留中立 Contract 与 Native 安全资产
 
@@ -98,7 +103,7 @@ fixture。两个既有 degraded `success=true` 行为继续按 2026-07-17 裁决
 
 取消仍优先于 degraded success，取消执行不得产出伪成功。
 
-### D5: 未来框架必须重新提案
+### D5: 未来框架必须重新提案（由 ADR-002 有限覆盖）
 
 未来若评估任何外部 Agent 框架，必须从新的 ADR 和隔离证据开始，经本中立
 Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入点或 CI，也不得
@@ -110,37 +115,50 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 - Secret、prompt、reasoning、tool result 和原始异常不会泄漏；
 - 对单一配置、工具、Conversation、Usage 和 Provider trace 权威无侵入。
 
+ADR-002 是对本条的一次明确、有限覆盖：仅允许恢复 PydanticAI 2.12 的
+Single RUN 测试/证据 POC，不建立生产装配或用户 opt-in。维护者接受的恢复门槛是：
+中立 Contract 与冻结 conformance 子集继续通过；`start()` 提供可观察、可取消、
+可订阅和可等待的 live handle；可选依赖传递闭包精确锁定并由安装态 CI 执行
+`pip check`；Native 默认安装零 PydanticAI 依赖且无 factory/config/env selector；
+已收集的脱敏证据保持有效。真实 provider 收益、完整泄漏面、Desktop 多平台打包和
+双环境净增量仍未完成，因此继续阻断生产入口、默认 Runtime 或支持矩阵扩展。除该
+POC 外的新框架提案，以及把该 POC 提升为生产能力，仍须满足本条完整门槛并另立 ADR。
+
 ## 3. Consequences
 
 正面：
 
-- 代码、依赖、CI、文档与 `Native Only` 裁决一致；
-- 不再为不可执行实验路径承担升级、供应链和双 runtime conformance 成本；
-- Contract、BoundToolSession、生命周期、取消和脱敏收益继续服务 Native；
-- 36 个 replay fixture 和 Native isolation guard 继续提供确定性回归证据。
+- 生产代码、默认依赖和配置继续保持 Native-only，无隐式选择或 fallback；
+- 实验 POC 通过同一 Contract、BoundToolSession、生命周期、取消和脱敏边界执行；
+- 36 个 replay fixture、显式 8+3 conformance 范围、Native isolation guard 与安装态
+  CI 共同提供确定性回归证据；
+- 精确依赖闭包使当前 Python 3.11 实验安装兼容窗口可复现。
 
 成本与限制：
 
-- 历史 cross-runtime benchmark 不能作为当前可执行能力；仅保留为决策记录；
-- 若未来重新评估框架，需要新建适配实现和验证矩阵，不能复活历史耦合；
+- 双 Runtime 测试面、依赖升级和供应链门禁重新产生维护成本；
+- 当前可执行 conformance 只证明显式 8+3 fixture 边界，不等于真实 provider
+  benchmark、完整安全面、Desktop 打包或生产支持；
+- 历史 benchmark 数字仍只作为决策记录，不因测试恢复而升级证据等级；
 - 中立 Contract 与 `NativeRuntimeAdapter` 仍有维护和测试成本，但当前生产入口
   不经过 Adapter，因此不会增加每个生产请求的包装开销。
 
 ## 4. Compatibility and rollback
 
 - 公共 API、Schema、配置、数据库、Web/Desktop/Bot 行为不变。
-- 删除的 `build_agent_runtime()` 是无生产调用方的内部实验装配函数；生产入口
+- `build_agent_runtime()` 是内部 Native-only assembly seam；生产入口
   `build_agent_executor()` 和兼容别名 `build_executor` 保持不变。
-- 回滚应整体 revert 实施 Native Only 的提交；不得只恢复 Adapter 或 CI 的一部分，
-  以免重新形成未受支持的半套 runtime。
+- 回滚 ADR-002 POC 必须整体移除 Adapter、toolset、可选依赖、注入点、实验测试和
+  专用 CI；不得只回滚其中一部分。中立 Contract 与 Native 安全资产继续保留。
 
 ## 5. Verification
 
 - Native Contract、Adapter、lifecycle、tool session 和 session bridge 测试；
 - 36 个 replay fixture 的 compatibility suite；
 - Native 异常脱敏、长度边界和 fail-closed 回归；
-- 静态断言实验模块、依赖清单和注入函数不存在；
-- 默认依赖环境中的 Native import isolation；
+- 静态断言实验资产存在但只能由测试/证据显式构造，生产 factory 无 selector；
+- 默认依赖环境中的 Native import isolation，以及安装态 CI 的 PydanticAI import、
+  `pip check`、live-handle/cancel/event 回归和显式 cross-runtime conformance；
 - repository syntax、flake8、deterministic 和 offline gates。
 
 ## 6. Decision log
@@ -150,4 +168,4 @@ Contract 接入。不得直接恢复已删除的 Adapter、依赖清单、注入
 | 2026-07-17 | Accepted | 批准 Native 永久默认、中立 Contract、实验 Adapter POC 和 degraded 兼容语义 |
 | 2026-07-18 | Accepted | RF-07 因收益与 Desktop 证据不足裁决 `Native Only` |
 | 2026-07-19 | Accepted / Implemented | 删除实验 Adapter、依赖、注入点、cross-runtime 测试和专用 CI；保留并加固 Native 中立资产 |
-| 2026-07-19 | Amended | ADR-002 改判恢复实验 PydanticAI Runtime（`Continue Experimental`）：D1 的“唯一可执行 Runtime”与删除清单不再是现状；Native 永久默认、中立 Contract 与 D2/D3/D4/D5 语义不变 |
+| 2026-07-19 | Amended | ADR-002 恢复 PydanticAI Single RUN 测试/证据 POC：修订 D1，并按 ADR-002 记录的降低门槛有限覆盖 D5 的直接恢复禁令；Native 仍是唯一生产装配，D2/D3/D4 不变，生产化仍受 D5 完整门槛约束 |

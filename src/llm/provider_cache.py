@@ -8,7 +8,12 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
-from urllib.parse import urlparse
+
+from src.llm.provider_family import (
+    _infer_provider_family_from_api_base,
+    infer_provider_family,
+)
+from src.llm.usage import build_domain_hmac
 
 logger = logging.getLogger(__name__)
 
@@ -51,35 +56,6 @@ CostModel = Literal[
 ACTIVE_HINT_VERIFICATION_STATUSES = {"verified", "smoke_tested"}
 DIAGNOSTICS_LEVELS = {"off", "basic", "debug"}
 PROMPT_CACHE_TELEMETRY_DISABLED_ATTR = "prompt_cache_telemetry_disabled"
-
-_EXPLICIT_PROVIDER_FAMILY_ALIASES = {
-    "anthropic": "anthropic",
-    "gemini": "gemini",
-    "vertex_ai": "vertex_ai",
-    "deepseek": "deepseek",
-    "dashscope": "dashscope",
-    "qwen": "qwen",
-    "moonshot": "moonshot",
-    "kimi": "kimi",
-    "minimax": "minimax",
-    "openrouter": "openrouter",
-    "zhipu": "glm",
-    "bigmodel": "glm",
-    "glm": "glm",
-    "stepfun": "stepfun",
-    "litellm": "litellm_gateway",
-    "litellm_gateway": "litellm_gateway",
-}
-
-_API_BASE_HOST_FAMILY_SUFFIXES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
-    ("openrouter", ("openrouter.ai",)),
-    ("dashscope", ("dashscope.aliyuncs.com", "dashscope-intl.aliyuncs.com", "bailian.aliyuncs.com")),
-    ("moonshot", ("moonshot.cn",)),
-    ("minimax", ("minimax.chat", "minimax.io")),
-    ("deepseek", ("deepseek.com",)),
-    ("glm", ("bigmodel.cn", "z.ai")),
-    ("stepfun", ("stepfun.com", "stepfun.ai")),
-)
 
 
 class PromptCacheTelemetryFilteredUsage(dict):
@@ -443,68 +419,6 @@ def _model_pattern_matches(pattern: str, model: str) -> bool:
     return normalized_model == normalized_pattern
 
 
-def infer_provider_family(
-    *,
-    model: str = "",
-    provider: Optional[str] = None,
-    api_base: Optional[str] = None,
-) -> str:
-    normalized_model = (model or "").strip().lower()
-    normalized_provider = (provider or "").strip().lower()
-
-    if normalized_provider in _EXPLICIT_PROVIDER_FAMILY_ALIASES:
-        return _EXPLICIT_PROVIDER_FAMILY_ALIASES[normalized_provider]
-
-    model_family = _infer_provider_family_from_model(normalized_model)
-    if model_family:
-        return model_family
-
-    if normalized_provider == "openai":
-        return "openai" if _is_native_openai_model(normalized_model) else "openai_compatible"
-    api_base_family = _infer_provider_family_from_api_base(api_base)
-    if api_base_family:
-        return api_base_family
-    if normalized_model.startswith("openai/"):
-        return "openai" if _is_native_openai_model(normalized_model) else "openai_compatible"
-    if normalized_provider == "openai_compatible":
-        return "openai_compatible"
-    if "/" in normalized_model:
-        return normalized_model.split("/", 1)[0]
-    return normalized_provider or "unknown"
-
-
-def _infer_provider_family_from_model(normalized_model: str) -> Optional[str]:
-    if not normalized_model:
-        return None
-    if normalized_model.startswith("openai/~"):
-        return "openrouter"
-    if normalized_model.startswith("anthropic/"):
-        return "anthropic"
-    if normalized_model.startswith("gemini/"):
-        return "gemini"
-    if normalized_model.startswith("vertex_ai/"):
-        return "vertex_ai"
-    if normalized_model.startswith("step/"):
-        return "stepfun"
-    if _is_glm_model(normalized_model):
-        return "glm"
-
-    model_name = normalized_model.split("/", 1)[1] if normalized_model.startswith("openai/") else normalized_model
-    if model_name.startswith(("qwen", "qwq", "qvq")):
-        return "qwen"
-    if model_name.startswith("kimi"):
-        return "kimi"
-    if model_name.startswith("moonshot"):
-        return "moonshot"
-    if model_name.startswith("minimax"):
-        return "minimax"
-    if model_name.startswith("deepseek"):
-        return "deepseek"
-    if model_name.startswith("step"):
-        return "stepfun"
-    return None
-
-
 def apply_prompt_cache_hints(
     call_kwargs: Mapping[str, Any],
     route_context: ProviderCacheRouteContext,
@@ -634,8 +548,6 @@ def _apply_anthropic_system_cache_control(call_kwargs: Dict[str, Any]) -> bool:
 
 
 def _safe_hmac_token(value: Any, *, domain: str) -> Optional[str]:
-    from src.llm.usage import build_domain_hmac
-
     hmac_fields = build_domain_hmac(value, domain=domain)
     digest = hmac_fields.get("hmac")
     return str(digest) if digest else None
@@ -777,33 +689,3 @@ def _infer_cloud_platform(api_base: Optional[str], family: str) -> CloudPlatform
     if "azure" in text:
         return "azure"
     return "none"
-
-
-def _infer_provider_family_from_api_base(api_base: Optional[str]) -> Optional[str]:
-    host = _api_base_host(api_base)
-    if not host:
-        return None
-    for family, suffixes in _API_BASE_HOST_FAMILY_SUFFIXES:
-        if any(host == suffix or host.endswith(f".{suffix}") for suffix in suffixes):
-            return family
-    return None
-
-
-def _api_base_host(api_base: Optional[str]) -> str:
-    text = (api_base or "").strip().lower()
-    if not text:
-        return ""
-    parsed = urlparse(text if "://" in text else f"https://{text}")
-    return (parsed.hostname or "").strip(".")
-
-
-def _is_native_openai_model(normalized_model: str) -> bool:
-    model_name = normalized_model.split("/", 1)[1] if normalized_model.startswith("openai/") else normalized_model
-    return model_name.startswith(("gpt-", "o1", "o3", "o4", "chatgpt-", "gpt4"))
-
-
-def _is_glm_model(normalized_model: str) -> bool:
-    if not normalized_model:
-        return False
-    model_name = normalized_model.split("/", 1)[-1]
-    return model_name.startswith(("glm", "chatglm")) or "z-ai" in normalized_model or "zai-" in normalized_model

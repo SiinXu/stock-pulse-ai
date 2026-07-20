@@ -384,7 +384,9 @@ def build_agent_runtime(
     """Return the default runtime adapter behind the vendor-neutral contract.
 
     Thin assembly seam (AR-PY-01): always returns the native adapter and
-    does not change any default execution behaviour. Existing callers of
+    does not change any default execution behaviour. It intentionally has no
+    experimental runtime selector; the PydanticAI executable POC is constructed
+    directly only by tests and evidence harnesses. Existing callers of
     ``build_agent_executor`` are unaffected.
     """
     from src.agent.runtime.native_adapter import NativeRuntimeAdapter

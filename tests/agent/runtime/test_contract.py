@@ -160,6 +160,143 @@ def test_request_cancel_after_terminal_is_rejected():
     assert execution.cancel_requested is False
 
 
+def test_finish_resolved_commits_cancel_intent_under_the_state_lock():
+    execution = AgentExecution(make_context())
+    execution.start()
+    assert execution.request_cancel() is True
+
+    observed = []
+
+    def resolve(cancel_requested):
+        assert execution._lock.locked()
+        observed.append(cancel_requested)
+        return ExecutionState.CANCELLED, "cancelled", "cancelled"
+
+    assert execution.finish_resolved(resolve) is True
+    assert observed == [True]
+    assert execution.state is ExecutionState.CANCELLED
+    assert execution.result == "cancelled"
+    assert execution.request_cancel() is False
+
+
+def test_finish_resolved_linearizes_before_a_contending_cancel():
+    execution = AgentExecution(make_context())
+    execution.start()
+    resolver_entered = threading.Event()
+    release_resolver = threading.Event()
+    cancel_started = threading.Event()
+    cancel_done = threading.Event()
+    outcomes = {}
+
+    def resolve(cancel_requested):
+        resolver_entered.set()
+        assert release_resolver.wait(5)
+        assert cancel_requested is False
+        return ExecutionState.SUCCEEDED, "done", None
+
+    def finish():
+        outcomes["finish"] = execution.finish_resolved(resolve)
+
+    def cancel():
+        cancel_started.set()
+        outcomes["cancel"] = execution.request_cancel()
+        cancel_done.set()
+
+    finish_thread = threading.Thread(target=finish)
+    cancel_thread = threading.Thread(target=cancel)
+    finish_thread.start()
+    assert resolver_entered.wait(5)
+    cancel_thread.start()
+    assert cancel_started.wait(5)
+    assert cancel_done.wait(0.05) is False
+    release_resolver.set()
+    finish_thread.join(5)
+    cancel_thread.join(5)
+
+    assert outcomes == {"finish": True, "cancel": False}
+    assert execution.state is ExecutionState.SUCCEEDED
+
+
+def test_finish_resolved_audits_a_dropped_state_as_unresolved(caplog):
+    execution = AgentExecution(make_context())
+    execution.start()
+    execution.finish(ExecutionState.SUCCEEDED, result="winner")
+    resolver_called = []
+
+    def resolve(cancel_requested):
+        resolver_called.append(cancel_requested)
+        return ExecutionState.FAILED, None, "late"
+
+    assert execution.finish_resolved(resolve) is False
+
+    assert resolver_called == []
+    assert "current=succeeded attempted=unresolved" in caplog.text
+    assert execution.dropped_transitions == 1
+    assert execution.result == "winner"
+
+
+def test_dispatch_claim_is_rejected_after_accepted_cancel():
+    execution = AgentExecution(make_context())
+    execution.start()
+    claimed = []
+    assert execution.request_cancel() is True
+
+    blocked_by = execution.claim_operation(lambda: claimed.append(True))
+
+    assert blocked_by is ExecutionState.CANCELLED
+    assert claimed == []
+
+
+def test_dispatch_claim_linearizes_before_a_contending_cancel():
+    execution = AgentExecution(make_context())
+    execution.start()
+    claim_entered = threading.Event()
+    release_claim = threading.Event()
+    cancel_started = threading.Event()
+    cancel_done = threading.Event()
+    outcomes = {}
+
+    def claim():
+        claim_entered.set()
+        assert release_claim.wait(5)
+
+    def dispatch():
+        outcomes["dispatch"] = execution.claim_operation(claim)
+
+    def cancel():
+        cancel_started.set()
+        outcomes["cancel"] = execution.request_cancel()
+        cancel_done.set()
+
+    dispatch_thread = threading.Thread(target=dispatch)
+    cancel_thread = threading.Thread(target=cancel)
+    dispatch_thread.start()
+    assert claim_entered.wait(5)
+    cancel_thread.start()
+    assert cancel_started.wait(5)
+    assert cancel_done.wait(0.05) is False
+    release_claim.set()
+    dispatch_thread.join(5)
+    cancel_thread.join(5)
+
+    assert outcomes == {"dispatch": None, "cancel": True}
+    assert execution.cancel_requested is True
+
+
+def test_dispatch_claim_is_rejected_after_deadline():
+    execution = AgentExecution(make_context())
+    execution.start()
+    claimed = []
+
+    blocked_by = execution.claim_operation(
+        lambda: claimed.append(True),
+        deadline_monotonic=0.0,
+    )
+
+    assert blocked_by is ExecutionState.TIMED_OUT
+    assert claimed == []
+
+
 # ---------------------------------------------------------------------------
 # Handle delegation and runtime protocol
 # ---------------------------------------------------------------------------

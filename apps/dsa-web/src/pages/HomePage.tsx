@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BarChart3, Check, SlidersHorizontal, X } from 'lucide-react';
+import { BarChart3, Check, Menu, SlidersHorizontal, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { analysisApi, DuplicateTaskError } from '../api/analysis';
@@ -1480,16 +1480,15 @@ const HomePage: React.FC = () => {
         <header className="relative z-30 flex min-w-0 flex-shrink-0 items-center overflow-visible px-3 py-3 md:px-4 md:py-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 md:flex-row md:items-center">
             <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="-ml-1 inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground md:hidden"
+              <IconButton
+                variant="ghost"
+                size="comfortable"
+                className="-ml-1 md:hidden"
                 aria-label={t('home.historyButton')}
+                onClick={() => setSidebarOpen(true)}
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+                <Menu aria-hidden="true" />
+              </IconButton>
               <div className="relative min-w-0 flex-1">
                 <StockAutocomplete
                   id="home-stock-search"
@@ -1581,24 +1580,19 @@ const HomePage: React.FC = () => {
                 <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 {t('home.marketReview')}
               </Button>
-              <button
-                type="button"
-                onClick={() => handleSubmitAnalysis()}
-                disabled={!query || isAnalyzing}
-                className="btn-primary flex !min-h-9 !min-w-0 flex-1 basis-32 items-center justify-center gap-1.5 whitespace-nowrap !px-3 !py-1.5 !text-xs md:flex-none md:basis-auto"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    {t('home.analyzing')}
-                  </>
-                ) : (
-                  t('home.analyze')
-                )}
-              </button>
+              <div className="grid flex-1 basis-32 md:flex-none md:basis-auto">
+                <Button
+                  variant="primary"
+                  size="comfortable"
+                  className="whitespace-nowrap"
+                  disabled={!query || isAnalyzing}
+                  isLoading={isAnalyzing}
+                  loadingText={t('home.analyzing')}
+                  onClick={() => handleSubmitAnalysis()}
+                >
+                  {t('home.analyze')}
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -1622,14 +1616,14 @@ const HomePage: React.FC = () => {
                   ? t('home.duplicateTaskMessage', { stock: duplicateTask.stockCode })
                   : getParsedApiError(duplicateError, uiLanguage).message}
                 action={(
-                  <button
-                    type="button"
-                    onClick={dismissDuplicateBanner}
+                  <IconButton
+                    variant="ghost"
+                    size="compact"
                     aria-label={t('common.close')}
-                    className="-my-1 -mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg opacity-70 transition-colors hover:bg-warning/15 hover:opacity-100"
+                    onClick={dismissDuplicateBanner}
                   >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                    <X aria-hidden="true" />
+                  </IconButton>
                 )}
               />
             ) : null}
