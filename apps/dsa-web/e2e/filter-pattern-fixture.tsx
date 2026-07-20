@@ -121,7 +121,7 @@ function FilterPatternFixture() {
             applyDisabled={!filters.isDirty}
             advanced={(
               <AdvancedFilterSheet
-                triggerLabel={advancedCount > 0 ? `More filters (${advancedCount})` : 'More filters'}
+                triggerLabel="More filters"
                 triggerAriaLabel={advancedCount > 0
                   ? `More filters, ${advancedCount} active`
                   : 'More filters'}

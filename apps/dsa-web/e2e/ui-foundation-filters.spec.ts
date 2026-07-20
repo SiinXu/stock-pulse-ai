@@ -97,7 +97,10 @@ test.describe('shared Filter and Query foundation', () => {
     for (const viewport of VIEWPORTS) {
       await openFixture(page, viewport.width, viewport.height, '?market=us&stock=AAPL');
       await expectNoHorizontalOverflow(page, `${viewport.width}x${viewport.height}`);
-      await page.getByRole('button', { name: 'More filters, 1 active' }).click();
+      const advancedTrigger = page.getByRole('button', { name: 'More filters, 1 active' });
+      await expect(advancedTrigger).toContainText('More filters');
+      await expect(advancedTrigger).not.toContainText('(1)');
+      await advancedTrigger.click();
       const dialog = page.getByRole('dialog', { name: 'More filters' });
       await expect(dialog).toBeVisible();
       const box = await dialog.boundingBox();

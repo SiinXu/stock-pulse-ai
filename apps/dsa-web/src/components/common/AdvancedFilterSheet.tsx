@@ -15,6 +15,7 @@ function isDesktopFilterViewport(): boolean {
 }
 
 export interface AdvancedFilterSheetProps {
+  /** Visible label only; the Pattern renders activeCount separately. */
   triggerLabel: string;
   triggerAriaLabel: string;
   activeCount: number;
