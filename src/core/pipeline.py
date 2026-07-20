@@ -5009,6 +5009,7 @@ class StockAnalysisPipeline:
         delivery_reused_channels: set[str] = set()
         static_delivery_scope: Optional[Tuple[Any, ...]] = None
         static_delivery_confirmed = False
+        static_delivery_scope_owned = False
         static_scope_guards = ExitStack()
         render_stage = observe_pipeline_stage(
             "render",
@@ -5271,6 +5272,7 @@ class StockAnalysisPipeline:
                         )
                     if static_delivery_entered and not static_delivery_reentry:
                         stage_runner.mark_scope_started(static_delivery_scope)
+                        static_delivery_scope_owned = True
 
                 if not static_delivery_entered:
                     if send_context:
@@ -5688,6 +5690,7 @@ class StockAnalysisPipeline:
                     noise_finalized = True
                 if (
                     static_delivery_scope is not None
+                    and static_delivery_scope_owned
                     and not static_delivery_confirmed
                 ):
                     self._get_pipeline_stage_runner().clear_scope_started(
@@ -5858,6 +5861,7 @@ class StockAnalysisPipeline:
                     self.notifier.release_noise_control(noise_decision)
             if (
                 static_delivery_scope is not None
+                and static_delivery_scope_owned
                 and not static_delivery_confirmed
             ):
                 self._get_pipeline_stage_runner().clear_scope_started(
