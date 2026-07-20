@@ -38,7 +38,7 @@ import {
   type AlphaSiftStrategy,
 } from '../api/alphasift';
 import { formatParsedApiError, getParsedApiError, toApiErrorMessage, type ParsedApiError } from '../api/error';
-import { AppPage, Button, InlineAlert, Input, Select } from '../components/common';
+import { AppPage, Button, EmptyState, InlineAlert, Input, Select, Surface } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import { SCREENING_TEXT } from '../locales/screening';
@@ -994,10 +994,10 @@ const StockScreeningPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-border/70 bg-card/80 px-4 py-2 text-sm shadow-soft-card">
+        <Surface level="interactive" padding="sm" className="inline-flex w-fit items-center gap-2 text-sm">
           <span className={`h-2.5 w-2.5 rounded-full ${isScreeningEnabled ? 'bg-success' : 'bg-warning'}`} />
           <span className="font-medium text-secondary-text">{statusText}</span>
-        </div>
+        </Surface>
       </div>
 
       {!statusLoading && !enabled ? (
@@ -1037,7 +1037,7 @@ const StockScreeningPage: React.FC = () => {
 
       {error ? <InlineAlert variant="danger" title={text.callFailed} message={error} /> : null}
 
-      <section className="rounded-2xl border border-border/80 bg-card/95 p-4 shadow-soft-card">
+      <Surface as="section" level="interactive" padding="md">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning/10 text-warning shadow-soft-card">
@@ -1081,24 +1081,22 @@ const StockScreeningPage: React.FC = () => {
         </div>
 
         {hotspotError ? (
-          <p className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-            {hotspotError}
-          </p>
+          <InlineAlert variant="warning" className="mb-3" message={hotspotError} />
         ) : null}
 
         {!hotspotsExpanded ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-surface/70 px-4 py-3 text-sm text-secondary-text sm:flex-row sm:items-center sm:justify-between">
+          <Surface level="interactive" padding="sm" className="flex flex-col gap-2 text-sm text-secondary-text sm:flex-row sm:items-center sm:justify-between">
             <span>
               {hotspots.length > 0
                 ? formatUiText(text.cachedHotspots, { count: hotspots.length })
                 : text.hotspotsCollapsed}
             </span>
             <span className="text-xs">{text.liveDetailHint}</span>
-          </div>
+          </Surface>
         ) : hotspots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface/70 px-4 py-6 text-sm text-secondary-text">
+          <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
             {text.refreshDescription}
-          </div>
+          </Surface>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {hotspots.map((item, index) => {
@@ -1155,7 +1153,7 @@ const StockScreeningPage: React.FC = () => {
         )}
 
         {hotspotsExpanded && selectedHotspotTopic ? (
-          <div className="mt-4 rounded-xl border border-border/80 bg-surface/80 p-4">
+          <Surface level="interactive" padding="sm" className="mt-4">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-foreground">
@@ -1188,9 +1186,7 @@ const StockScreeningPage: React.FC = () => {
             </div>
 
             {hotspotDetailError ? (
-              <p className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                {hotspotDetailError}
-              </p>
+              <InlineAlert variant="warning" className="mb-3" message={hotspotDetailError} />
             ) : null}
 
             {hotspotDetail && ((hotspotDetail.missingFields || []).length > 0 || (hotspotDetail.sourceErrors || []).length > 0) ? (
@@ -1220,12 +1216,12 @@ const StockScreeningPage: React.FC = () => {
                     {getHotspotRouteItems(hotspotDetail).map((item, index) => (
                       <div key={`${item.title}-${index}`} className="relative pb-4 last:pb-0">
                         <span className="absolute -left-4 top-1 h-2.5 w-2.5 rounded-full border border-orange-400 bg-card" />
-                        <div className="rounded-lg border border-border/70 bg-card/80 p-3">
+                        <Surface level="interactive" padding="sm">
                           <p className="text-xs font-semibold text-orange-500">{getRouteTimeLabel(item, language, text)}</p>
                           <p className="mt-1 text-xs font-semibold text-foreground">{item.title}</p>
                           <p className="mt-1 text-xs leading-5 text-secondary-text">{item.description}</p>
                           {item.source ? <p className="mt-2 text-xs text-secondary-text">{formatUiText(text.source, { source: item.source })}</p> : null}
-                        </div>
+                        </Surface>
                       </div>
                     ))}
                   </div>
@@ -1234,7 +1230,7 @@ const StockScreeningPage: React.FC = () => {
                   <p className="mb-2 text-xs font-semibold text-secondary-text">{text.conceptStocks}</p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {(hotspotDetail.stocks || []).slice(0, 10).map((stock) => (
-                      <div key={`${stock.code || stock.name}`} className="rounded-lg border border-border/70 bg-card/80 p-3">
+                      <Surface key={`${stock.code || stock.name}`} level="interactive" padding="sm">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-xs font-semibold text-foreground">{stock.name || stock.code || '-'}</p>
@@ -1269,17 +1265,17 @@ const StockScreeningPage: React.FC = () => {
                             {stock.fallbackUsed ? ` · ${text.fallback}` : ''}
                           </p>
                         ) : null}
-                      </div>
+                      </Surface>
                     ))}
                   </div>
                 </div>
               </div>
             ) : null}
-          </div>
+          </Surface>
         ) : null}
-      </section>
+      </Surface>
 
-      <section className="rounded-2xl border border-primary/35 bg-card/95 p-4 shadow-soft-card">
+      <Surface as="section" level="interactive" padding="md">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-foreground">{text.selectStrategy}</h2>
@@ -1292,13 +1288,13 @@ const StockScreeningPage: React.FC = () => {
 
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {loadingStrategies && strategies.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
+            <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
               {text.loadingStrategies}
-            </div>
+            </Surface>
           ) : strategies.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-surface/70 p-4 text-sm text-secondary-text">
+            <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
               {strategyLoadError || text.strategiesUnavailable}
-            </div>
+            </Surface>
           ) : (
             <>
               {loadingStrategies ? (
@@ -1333,9 +1329,10 @@ const StockScreeningPage: React.FC = () => {
             </>
           )}
         </div>
-      </section>
+      </Surface>
 
-      <form className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card" onSubmit={(event) => void handleSubmit(event)} noValidate>
+      <Surface as="section" level="interactive" padding="md">
+        <form onSubmit={(event) => void handleSubmit(event)} noValidate>
         <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
           <SlidersHorizontal className="h-4 w-4 text-primary" />
           {text.parameters}
@@ -1372,22 +1369,24 @@ const StockScreeningPage: React.FC = () => {
             onChange={(event) => handleMaxResultsChange(event.target.value)}
           />
 
-          <Button
-            className="min-w-40"
-            variant="primary"
-            size="primary"
-            isLoading={loading}
-            loadingText={text.screening}
-            disabled={!isScreeningEnabled || loading}
-            type="submit"
-          >
-            <Play className="h-4 w-4" />
-            {text.run}
-          </Button>
+          <div className="grid min-w-40">
+            <Button
+              variant="primary"
+              size="primary"
+              isLoading={loading}
+              loadingText={text.screening}
+              disabled={!isScreeningEnabled || loading}
+              type="submit"
+            >
+              <Play className="h-4 w-4" />
+              {text.run}
+            </Button>
+          </div>
         </div>
-      </form>
+        </form>
+      </Surface>
 
-      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
+      <Surface as="section" level="interactive" padding="md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <span
@@ -1423,7 +1422,7 @@ const StockScreeningPage: React.FC = () => {
             </span>
           </div>
         </div>
-      </section>
+      </Surface>
 
       {screenMeta && alertMessages.length > 0 ? (
         <InlineAlert
@@ -1433,7 +1432,7 @@ const StockScreeningPage: React.FC = () => {
         />
       ) : null}
 
-      <section className="rounded-2xl border border-border bg-card/95 p-4 shadow-soft-card">
+      <Surface as="section" level="interactive" padding="md">
         <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="text-base font-semibold text-foreground">{text.results}</h2>
@@ -1448,12 +1447,9 @@ const StockScreeningPage: React.FC = () => {
         </div>
 
         {candidates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-surface/70 px-5 py-10 text-center">
-            <p className="text-sm font-medium text-foreground">{text.noResults}</p>
-            <p className="mt-2 text-sm text-secondary-text">{text.noResultsDescription}</p>
-          </div>
+          <EmptyState title={text.noResults} description={text.noResultsDescription} />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border">
+          <Surface level="interactive" padding="none" className="overflow-hidden">
             <table className="w-full min-w-216 border-collapse text-sm">
               <thead className="bg-surface text-left text-xs text-secondary-text">
                 <tr>
@@ -1553,10 +1549,10 @@ const StockScreeningPage: React.FC = () => {
                                   <div className="mt-2 grid grid-cols-2 gap-2">
                                     {factors.length > 0 ? (
                                       factors.map(([key, value]) => (
-                                        <div key={key} className="rounded-lg border border-border bg-card px-3 py-2">
+                                        <Surface key={key} level="interactive" padding="sm">
                                           <span className="block text-xs text-secondary-text">{key}</span>
                                           <span className="text-sm font-semibold text-foreground">{formatNumber(value)}</span>
-                                        </div>
+                                        </Surface>
                                       ))
                                     ) : (
                                       <span className="text-sm text-secondary-text">{text.noFactors}</span>
@@ -1611,9 +1607,9 @@ const StockScreeningPage: React.FC = () => {
                 })}
               </tbody>
             </table>
-          </div>
+          </Surface>
         )}
-      </section>
+      </Surface>
     </AppPage>
   );
 };
