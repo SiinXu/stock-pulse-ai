@@ -31,7 +31,18 @@ GET /api/v1/history/{record_id}/diagnostics
 - 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。部分渠道已经送达时，在 PIPE-02 提供幂等 fence 前 `retryable=false`，避免重试复制已成功通知。
 - 本地报告的 `render` 终态包含文件输出结果；报告内容生成成功但文件写入失败时仍记录为 failed。
 - `pipeline_stage_runs` 是 `context_snapshot.diagnostics` 的可选追加字段，不修改数据库 schema、API 必填字段、配置项或既有 Run Flow 事件。
-- PIPE-01 只增加行为保持的观测。阶段 Result 拆分、persist/dispatch 幂等 fence 与可执行重试策略由 PIPE-02 负责；在此之前 `persist` 与已部分送达的 `dispatch` 保守标为不可重试。
+
+### Pipeline 阶段 Result 与重试 fence
+
+PIPE-02 在观测契约之下增加内部 `PipelineStageResult[T]`。八个固定阶段统一返回 `stage / status / value / retryable / side_effect_committed / attempt / reused / error`，由 request-scoped stage runner 决定继续、重试或复用已提交副作用。该 Result 只用于后端编排，不新增 API 字段、数据库 schema 或配置项；`process_single_stock()`、`run()`、本地报告和通知入口的既有返回值保持不变。
+
+- `resolve`、`fetch`、`intelligence`、`context`、`analyze` 的未提交失败可以按 Result 的 `retryable` 重试；每次尝试保留明确 attempt。
+- legacy 与 Agent 路径共用一次性 `persist` stage。fence key 由 `query_id + code + report_type` 组成；未写入时仍可重试，一旦历史 ID 已确认，后续同 key 重入只返回 `reused=true`，不会再次写历史或再次提取 DecisionSignal。
+- `render` 与 `dispatch` 使用报告 route、report type、query/code identity 及 channel 组成 delivery key。同一 Pipeline 执行中，已确认成功的本地输出或通知渠道只执行一次；全部失败且没有确认副作用时仍可重试；部分送达会保留 degraded 结果并复用，避免重复已成功通知。
+- 同 key 的并发副作用由独立 key lock 串行化，不同股票或渠道仍可并发。异常保留在 Result 中并继续写入既有脱敏诊断，调用方需要维持原传播或 fail-open 语义。
+- 此处的 retry 指同一 Pipeline 执行/query 内的阶段重入。TaskExecution 的 parent/child retry 仍遵循 `docs/task-execution-contract.md`，拥有新的 task/query identity；Pipeline 不把跨任务重跑伪装成同一次 stage attempt。
+
+定向回归覆盖：可重试纯阶段第二次成功、同 key 并发只提交一次、persist 首次未写入后成功且后续不重复写、partial dispatch 重入不重复发送，以及外部分析结果 identity/通知返回值等价。
 
 ## 运行流实时增量
 
