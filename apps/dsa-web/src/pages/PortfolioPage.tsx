@@ -6,7 +6,7 @@ import { decisionSignalsApi } from '../api/decisionSignals';
 import { portfolioApi } from '../api/portfolio';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select, Surface } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, Checkbox, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, IconButton, InlineAlert, Input, Modal, Select, Surface } from '../components/common';
 import { PortfolioSignalSummary } from '../components/decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../utils/uiLocale';
@@ -1165,6 +1165,112 @@ const PortfolioPage: React.FC = () => {
       .join(getUiClauseSeparator(language))
     : null;
 
+  const positionColumns: DataTableColumn<FlatPosition>[] = [
+    {
+      id: 'account',
+      header: text.account,
+      cell: (row) => <span className="text-secondary">{row.accountName}</span>,
+    },
+    {
+      id: 'code',
+      header: text.code,
+      cell: (row) => <span className="font-mono text-foreground">{row.symbol}</span>,
+    },
+    {
+      id: 'quantity',
+      header: text.quantity,
+      align: 'end',
+      cell: (row) => <span className="text-foreground">{row.quantity.toFixed(2)}</span>,
+    },
+    {
+      id: 'avgCost',
+      header: text.avgCost,
+      align: 'end',
+      cell: (row) => <span className="text-foreground">{row.avgCost.toFixed(4)}</span>,
+    },
+    {
+      id: 'lastPrice',
+      header: text.lastPrice,
+      align: 'end',
+      cell: (row) => (
+        <div className="text-foreground">
+          <div>{formatPositionPrice(row)}</div>
+          <div className={`text-xs ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
+            {getPositionPriceLabel(row, language)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'marketValue',
+      header: text.marketValue,
+      align: 'end',
+      cell: (row) => <span className="text-foreground">{formatPositionMoney(row.marketValueBase, row, language)}</span>,
+    },
+    {
+      id: 'unrealizedPnl',
+      header: text.unrealizedPnl,
+      align: 'end',
+      cell: (row) => (
+        <span className={
+          hasPositionPrice(row)
+            ? row.unrealizedPnlBase >= 0 ? 'text-success' : 'text-danger'
+            : 'text-secondary'
+        }>
+          {formatPositionMoney(row.unrealizedPnlBase, row, language)}
+        </span>
+      ),
+    },
+    {
+      id: 'returnPct',
+      header: text.returnPct,
+      align: 'end',
+      cell: (row) => (
+        <span className={
+          hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
+            ? row.unrealizedPnlPct >= 0 ? 'text-success' : 'text-danger'
+            : 'text-secondary'
+        }>
+          {formatSignedPct(row.unrealizedPnlPct)}
+        </span>
+      ),
+    },
+    {
+      id: 'signal',
+      header: t('decisionSignals.portfolioColumn'),
+      align: 'end',
+      width: 'default',
+      cell: (row) => (
+        <PortfolioSignalSummary
+          item={signalByPositionKey.get(`${row.accountId}-${row.symbol}-${row.market}`)}
+          loading={portfolioSignalsLoading}
+        />
+      ),
+    },
+    {
+      id: 'action',
+      header: text.action,
+      align: 'end',
+      cell: (row) => {
+        const analyzing = positionAnalysisLoadingKey === `${row.accountId}-${row.symbol}-${row.market}`;
+        return (
+          <Button
+            type="button"
+            onClick={() => void handleAnalyzePosition(row)}
+            disabled={analyzing}
+            variant="secondary"
+            size="comfortable"
+            isLoading={analyzing}
+            loadingText={text.submitting}
+            className="text-xs"
+          >
+            {text.analyze}
+          </Button>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="portfolio-page min-h-dvh space-y-4 p-4 md:p-6">
       <section className="space-y-3">
@@ -1429,93 +1535,18 @@ const PortfolioPage: React.FC = () => {
               className="mb-3"
             />
           ) : null}
-          {positionRows.length === 0 ? (
-            <EmptyState
-              title={text.noPositionsTitle}
-              description={text.noPositionsDescription}
-              compact
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-216 w-full text-sm">
-                <thead className="text-xs text-secondary border-b border-white/10">
-                  <tr>
-                    <th className="text-left py-2 pr-2">{text.account}</th>
-                    <th className="text-left py-2 pr-2">{text.code}</th>
-                    <th className="text-right py-2 pr-2">{text.quantity}</th>
-                    <th className="text-right py-2 pr-2">{text.avgCost}</th>
-                    <th className="text-right py-2 pr-2">{text.lastPrice}</th>
-                    <th className="text-right py-2 pr-2">{text.marketValue}</th>
-                    <th className="text-right py-2 pr-3">{text.unrealizedPnl}</th>
-                    <th className="text-right py-2 pr-3">{text.returnPct}</th>
-                    <th className="min-w-[9rem] text-right py-2 pr-3">{t('decisionSignals.portfolioColumn')}</th>
-                    <th className="w-20 text-right py-2">{text.action}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {positionRows.map((row) => {
-                    const rowKey = `${row.accountId}-${row.symbol}-${row.market}`;
-                    const analyzing = positionAnalysisLoadingKey === rowKey;
-                    const signal = signalByPositionKey.get(rowKey);
-                    return (
-                    <tr key={rowKey} className="border-b border-white/5">
-                      <td className="py-2 pr-2 text-secondary">{row.accountName}</td>
-                      <td className="py-2 pr-2 font-mono text-foreground">{row.symbol}</td>
-                      <td className="py-2 pr-2 text-right">{row.quantity.toFixed(2)}</td>
-                      <td className="py-2 pr-2 text-right">{row.avgCost.toFixed(4)}</td>
-                      <td className="py-2 pr-2 text-right">
-                        <div>{formatPositionPrice(row)}</div>
-                        <div className={`text-xs ${hasPositionPrice(row) ? 'text-secondary' : 'text-warning'}`}>
-                          {getPositionPriceLabel(row, language)}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-2 text-right">{formatPositionMoney(row.marketValueBase, row, language)}</td>
-                      <td
-                        className={`py-2 pr-3 text-right ${
-                          hasPositionPrice(row)
-                            ? row.unrealizedPnlBase >= 0
-                              ? 'text-success'
-                              : 'text-danger'
-                            : 'text-secondary'
-                        }`}
-                      >
-                        {formatPositionMoney(row.unrealizedPnlBase, row, language)}
-                      </td>
-                      <td
-                        className={`py-2 pr-3 text-right ${
-                          hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
-                            ? row.unrealizedPnlPct >= 0
-                              ? 'text-success'
-                              : 'text-danger'
-                            : 'text-secondary'
-                        }`}
-                      >
-                        {formatSignedPct(row.unrealizedPnlPct)}
-                      </td>
-                      <td className="py-2 pr-3 text-right align-top">
-                        <PortfolioSignalSummary item={signal} loading={portfolioSignalsLoading} />
-                      </td>
-                      <td className="py-2 text-right">
-                        <Button
-                          type="button"
-                          onClick={() => void handleAnalyzePosition(row)}
-                          disabled={analyzing}
-                          variant="secondary"
-                          size="comfortable"
-                          isLoading={analyzing}
-                          loadingText={text.submitting}
-                          className="text-xs"
-                        >
-                          {text.analyze}
-                        </Button>
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable<FlatPosition>
+            caption={text.positionsTitle}
+            columns={positionColumns}
+            rows={positionRows}
+            getRowKey={(row) => `${row.accountId}-${row.symbol}-${row.market}`}
+            emptyState={{
+              title: text.noPositionsTitle,
+              description: text.noPositionsDescription,
+            }}
+            density="compact"
+            minWidth="wide"
+          />
         </Card>
 
         <Card padding="md">

@@ -245,7 +245,7 @@ const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
   {
     file: '../../pages/PortfolioPage.tsx',
     token: 'border-white/10',
-    count: 2,
+    count: 1,
     owner: 'TRACK-UI2',
     removeBy: 'UI-P01',
     replacement: 'border-subtle.',
@@ -253,7 +253,7 @@ const LEGACY_SURFACE_ALLOWANCES: readonly LegacySurfaceAllowance[] = [
   {
     file: '../../pages/PortfolioPage.tsx',
     token: 'border-white/5',
-    count: 4,
+    count: 3,
     owner: 'TRACK-UI2',
     removeBy: 'UI-P01',
     replacement: 'border-subtle.',
