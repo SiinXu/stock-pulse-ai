@@ -1,44 +1,30 @@
 import React, { useState } from 'react';
-import { Activity, BarChart3, Bell, BriefcaseBusiness, Gauge, Home, LogOut, MessageSquareQuote, PanelLeft, PanelRight, Search, Settings2 } from 'lucide-react';
+import { BarChart3, LogOut, PanelLeft, PanelRight, Search } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAgentChatStore } from '../../stores/agentChatStore';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { UiTextKey } from '../../i18n/uiText';
 import { cn } from '../../utils/cn';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { StatusDot } from '../common/StatusDot';
 import { SidebarProfile } from './SidebarProfile';
+import { APPLICATION_NAVIGATION_ITEMS } from './navigation';
 
 type SidebarNavProps = {
   collapsed?: boolean;
   onNavigate?: () => void;
   onToggleCollapse?: () => void;
   variant?: 'default' | 'rail';
+  focusKeyPrefix?: string;
 };
 
-type NavItem = {
-  key: string;
-  labelKey: UiTextKey;
-  to: string;
-  icon: React.ComponentType<{ className?: string }>;
-  exact?: boolean;
-  badge?: 'completion';
-};
-
-const NAV_ITEMS: NavItem[] = [
-  { key: 'home', labelKey: 'layout.nav.home', to: '/', icon: Home, exact: true },
-  { key: 'chat', labelKey: 'layout.nav.chat', to: '/chat', icon: MessageSquareQuote, badge: 'completion' },
-  { key: 'screening', labelKey: 'layout.nav.screening', to: '/screening', icon: Search },
-  { key: 'portfolio', labelKey: 'layout.nav.portfolio', to: '/portfolio', icon: BriefcaseBusiness },
-  { key: 'decision-signals', labelKey: 'layout.nav.decisionSignals', to: '/decision-signals', icon: Activity },
-  { key: 'backtest', labelKey: 'layout.nav.backtest', to: '/backtest', icon: BarChart3 },
-  { key: 'alerts', labelKey: 'layout.nav.alerts', to: '/alerts', icon: Bell },
-  { key: 'usage', labelKey: 'layout.nav.usage', to: '/usage', icon: Gauge },
-  { key: 'settings', labelKey: 'layout.nav.settings', to: '/settings', icon: Settings2 },
-];
-
-export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNavigate, onToggleCollapse, variant = 'default' }) => {
+export const SidebarNav: React.FC<SidebarNavProps> = ({
+  collapsed = false,
+  onNavigate,
+  onToggleCollapse,
+  variant = 'default',
+  focusKeyPrefix = 'shell-nav',
+}) => {
   const { authEnabled, logout } = useAuth();
   const { t } = useUiLanguage();
   const navigate = useNavigate();
@@ -49,7 +35,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
   };
   const completionBadge = useAgentChatStore((state) => state.completionBadge);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const navItems = NAV_ITEMS;
+  const navItems = APPLICATION_NAVIGATION_ITEMS;
   const isRail = variant === 'rail';
   const itemBaseClass = cn(
     'group relative flex h-[var(--nav-item-height)] w-full items-center overflow-hidden rounded-md border border-transparent text-sm leading-none text-secondary-text transition-all',
@@ -111,6 +97,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
           type="button"
           onClick={openSearch}
           aria-label={t('layout.search')}
+          data-route-focus-key={`${focusKeyPrefix}:search`}
           className="mb-3 flex h-11 w-11 items-center justify-center self-center rounded-lg border border-border bg-card text-muted-text transition-colors hover:bg-hover hover:text-foreground"
         >
           <Search className="h-4 w-4" />
@@ -121,6 +108,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
             type="button"
             onClick={openSearch}
             aria-label={t('layout.search')}
+            data-route-focus-key={`${focusKeyPrefix}:search`}
             className="mb-3 flex min-h-11 w-full items-center rounded-lg border border-border bg-card px-2.5 py-2 text-left shadow-soft-card transition-colors hover:bg-hover"
           >
             <span className="flex items-center gap-2 text-xs text-muted-text">
@@ -136,38 +124,39 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({ collapsed = false, onNav
         {navItems.map(({ key, labelKey, to, icon: Icon, exact, badge }) => {
           const label = t(labelKey);
           return (
-          <NavLink
-            key={key}
-            to={to}
-            end={exact}
-            onClick={onNavigate}
-            aria-label={label}
-            className={({ isActive }) =>
-              cn(
-                itemInteractiveClass,
-                isActive ? itemActiveClass : ''
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
-                {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
-                {badge === 'completion' && completionBadge ? (
-                  <StatusDot
-                    tone="info"
-                    data-testid="chat-completion-badge"
-                    className={cn(
-                      'absolute right-3 border-2 border-background shadow-soft-card',
-                      collapsed ? 'right-2 top-2' : ''
-                    )}
-                    aria-label={t('layout.newChatMessage')}
-                  />
-                ) : null}
-              </>
-            )}
-          </NavLink>
-        );
+            <NavLink
+              key={key}
+              to={to}
+              end={exact}
+              onClick={onNavigate}
+              aria-label={label}
+              data-route-focus-key={`${focusKeyPrefix}:${key}`}
+              className={({ isActive }) =>
+                cn(
+                  itemInteractiveClass,
+                  isActive ? itemActiveClass : ''
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className={cn(itemIconClass, isActive ? 'text-[var(--nav-icon-active)]' : 'text-current')} />
+                  {!collapsed ? <span className={itemLabelClass}>{label}</span> : null}
+                  {badge === 'completion' && completionBadge ? (
+                    <StatusDot
+                      tone="info"
+                      data-testid="chat-completion-badge"
+                      className={cn(
+                        'absolute right-3 border-2 border-background shadow-soft-card',
+                        collapsed ? 'right-2 top-2' : ''
+                      )}
+                      aria-label={t('layout.newChatMessage')}
+                    />
+                  ) : null}
+                </>
+              )}
+            </NavLink>
+          );
         })}
 
       </nav>

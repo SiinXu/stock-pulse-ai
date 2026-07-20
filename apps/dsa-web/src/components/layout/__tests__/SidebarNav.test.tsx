@@ -144,15 +144,43 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'StockPulse' }));
+    const profileTrigger = screen.getByRole('button', { name: 'StockPulse' });
+    expect(profileTrigger).toHaveAttribute('aria-haspopup', 'dialog');
+    fireEvent.click(profileTrigger);
+    const profileDialog = screen.getByRole('dialog', { name: 'StockPulse' });
     expect(mockThemeToggle).toHaveBeenCalledWith(
       expect.objectContaining({ menuLayout: 'horizontal', wrapperClassName: 'w-full' }),
     );
-    expect(screen.getByRole('button', { name: '切换主题' })).toBeInTheDocument();
-    const languageControl = screen.getByTestId('ui-language-selector');
+    expect(within(profileDialog).getByRole('button', { name: '切换主题' })).toBeInTheDocument();
+    const languageControl = within(profileDialog).getByTestId('ui-language-selector');
     expect(within(languageControl).getByRole('combobox', { name: '切换界面语言' })).toBeInTheDocument();
     fireEvent.click(within(languageControl).getByRole('combobox'));
     expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('renders stable, unique route focus markers from the navigation descriptor', () => {
+    render(
+      <MemoryRouter initialEntries={['/alerts']}>
+        <SidebarNav focusKeyPrefix="shell-nav-desktop" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('button', { name: '搜索' })).toHaveAttribute(
+      'data-route-focus-key',
+      'shell-nav-desktop:search',
+    );
+    expect(screen.getByRole('link', { name: '首页' })).toHaveAttribute(
+      'data-route-focus-key',
+      'shell-nav-desktop:home',
+    );
+    expect(screen.getByRole('link', { name: '告警' })).toHaveAttribute(
+      'data-route-focus-key',
+      'shell-nav-desktop:alerts',
+    );
+
+    const markers = Array.from(document.querySelectorAll('[data-route-focus-key]'))
+      .map((element) => element.getAttribute('data-route-focus-key'));
+    expect(new Set(markers).size).toBe(markers.length);
   });
 
   it('renders the alerts navigation item and marks it active', () => {
