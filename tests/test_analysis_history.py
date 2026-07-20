@@ -224,6 +224,20 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         db.get_analysis_history_paginated.assert_called_once()
         db.delete_analysis_history_records.assert_called_once_with([1])
 
+    def test_delete_history_by_code_endpoint_maps_repository_failure_to_500(self) -> None:
+        if delete_history_by_code is None:
+            self.skipTest("fastapi is not installed in this test environment")
+
+        db = MagicMock()
+        db.get_analysis_history_paginated.return_value = ([SimpleNamespace(id=1)], 1)
+        db.delete_analysis_history_records.return_value = 0
+
+        with self.assertRaises(Exception) as raised:
+            delete_history_by_code("600519", db_manager=db)
+
+        self.assertEqual(getattr(raised.exception, "status_code", None), 500)
+        self.assertEqual(raised.exception.detail.get("error"), "internal_error")
+
     def test_delete_history_by_code_endpoint_delegates_to_service(self) -> None:
         if delete_history_by_code is None:
             self.skipTest("fastapi is not installed in this test environment")
@@ -2007,8 +2021,8 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         self.assertIn("✅Safe", markdown)
         self.assertNotIn("🚨Safe", markdown)
 
-    def test_delete_analysis_history_records_also_cleans_backtests_and_decision_signals(self) -> None:
-        """删除历史记录时应一并清理关联回测结果和决策信号。"""
+    def test_delete_history_by_code_commits_backtest_and_decision_signal_cleanup(self) -> None:
+        """Deleting by code commits cleanup of linked backtests and signals."""
         record_id = self._save_history("query_delete_001")
         linked_signal_id = None
 
@@ -2072,7 +2086,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 status="active",
             ))
 
-        deleted = self.db.delete_analysis_history_records([record_id])
+        deleted = HistoryService(self.db).delete_history_by_code("600519")
         self.assertEqual(deleted, 1)
 
         with self.db.get_session() as session:
@@ -2123,7 +2137,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             ))
 
         with self.assertRaises(DatabaseError):
-            self.db.delete_analysis_history_records([record_id])
+            HistoryService(self.db).delete_history_by_code("600519")
 
         with self.db.get_session() as session:
             self.assertIsNotNone(
