@@ -13,6 +13,7 @@ import {
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
+import { RouteFocusCoordinator } from './components/routing';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { UiLanguageProvider, useUiLanguage } from './contexts/UiLanguageContext';
 import type { UiLanguage } from './i18n/uiLanguages';
@@ -88,7 +89,9 @@ const routes = [
   {
     element: (
       <AuthProvider>
-        <AppLayout />
+        <RouteFocusCoordinator>
+          <AppLayout />
+        </RouteFocusCoordinator>
       </AuthProvider>
     ),
     children: [
