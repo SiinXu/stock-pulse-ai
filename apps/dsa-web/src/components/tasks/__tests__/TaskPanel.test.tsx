@@ -178,6 +178,31 @@ describe('TaskPanel', () => {
     expect(screen.getByLabelText('任务状态：失败')).toBeInTheDocument();
   });
 
+  it('renders an interrupted task as a dismissible warning terminal state', () => {
+    const onDismiss = vi.fn();
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            status: 'interrupted',
+            progress: 100,
+            messageCode: 'task.interrupted',
+          },
+        ]}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    const statusBadge = screen.getByLabelText('任务状态：已中断');
+    expect(statusBadge).toHaveClass('text-warning');
+    expect(screen.getByText('任务已中断')).toBeInTheDocument();
+    expect(screen.queryByText('100%')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭 贵州茅台 任务' }));
+    expect(onDismiss).toHaveBeenCalledWith('task-1');
+  });
+
   it('does not render when there are no tasks at all', () => {
     const { container } = render(<TaskPanel tasks={[]} />);
     expect(container).toBeEmptyDOMElement();

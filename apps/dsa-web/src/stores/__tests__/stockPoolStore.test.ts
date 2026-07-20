@@ -1173,7 +1173,7 @@ describe('stockPoolStore', () => {
     await useStockPoolStore.getState().refreshActiveTasks();
 
     expect(analysisApi.getTasks).toHaveBeenCalledWith({
-      status: 'pending,processing,cancel_requested,completed,failed,cancelled',
+      status: 'pending,processing,cancel_requested,completed,failed,cancelled,interrupted',
       limit: 100,
     });
     expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
@@ -1205,6 +1205,26 @@ describe('stockPoolStore', () => {
       progress: 100,
       messageCode: 'task.analysis.completed',
     });
+  });
+
+  it('treats interrupted tasks as terminal for polling and retention filtering', async () => {
+    const interrupted = createTask({
+      taskId: 'task-interrupted',
+      status: 'interrupted',
+      progress: 100,
+      completedAt: '2020-01-01T00:00:00Z',
+      messageCode: 'task.interrupted',
+    });
+    useStockPoolStore.getState().syncTaskCreated(interrupted);
+
+    await useStockPoolStore.getState().pollKnownTasks();
+
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
+
+    vi.mocked(analysisApi.getTasks).mockResolvedValue(createTaskListResponse([interrupted]));
+    await useStockPoolStore.getState().refreshActiveTasks();
+
+    expect(useStockPoolStore.getState().activeTasks).toHaveLength(0);
   });
 
   it('recovers recent terminal tasks from the task-list snapshot', async () => {

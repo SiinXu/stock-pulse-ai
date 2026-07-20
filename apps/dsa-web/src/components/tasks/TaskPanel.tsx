@@ -23,11 +23,14 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
   const isCancelled = task.status === 'cancelled';
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
-  const isTerminal = isCompleted || isFailed || isCancelled;
+  const isInterrupted = task.status === 'interrupted';
+  const isTerminal = isCompleted || isFailed || isCancelled || isInterrupted;
   const statusLabel = isCompleted
     ? t('taskPanel.completed')
     : isFailed
       ? t('taskPanel.failed')
+      : isInterrupted
+        ? t('taskPanel.interrupted')
       : isCancelRequested
         ? t('taskPanel.cancelRequested')
         : isCancelled
@@ -37,12 +40,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
     ? 'success'
     : isFailed
       ? 'danger'
-      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
+      : isInterrupted || isCancelRequested ? 'warning' : isProcessing ? 'info' : 'default';
   const statusTone = isCompleted
     ? 'success'
     : isFailed
       ? 'danger'
-      : isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
+      : isInterrupted || isCancelRequested ? 'warning' : isProcessing ? 'info' : 'neutral';
   const progress = Math.max(0, Math.min(100, task.progress || 0));
   const traceId = (task.traceId || '').trim();
   const requestedPhaseLabel = getRequestedPhaseLabel(task.analysisPhase, language);
@@ -202,7 +205,10 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
     (t) => t.status === 'pending' || t.status === 'processing' || t.status === 'cancel_requested'
   );
   const terminalTasks = tasks.filter(
-    (t) => t.status === 'completed' || t.status === 'failed' || t.status === 'cancelled'
+    (t) => t.status === 'completed'
+      || t.status === 'failed'
+      || t.status === 'cancelled'
+      || t.status === 'interrupted'
   );
   const orderedTasks = [...activeTasks, ...terminalTasks];
 

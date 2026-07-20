@@ -180,7 +180,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     },
   ]],
   ['../tasks/TaskPanel.tsx', [{
-    line: 218,
+    line: 224,
     removeBy: 'UI-R03',
     tokens: ['dynamic:className'],
   }]],
