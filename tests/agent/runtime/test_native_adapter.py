@@ -216,7 +216,7 @@ def test_research_dispatch_builds_agent_and_maps_success():
     llm_adapter = object()
 
     with patch("src.agent.research.ResearchAgent", research_cls), patch(
-        "src.agent.factory.get_tool_registry", return_value=registry
+        "src.agent.runtime_assembly.get_tool_registry", return_value=registry
     ), patch("src.agent.llm_adapter.LLMToolAdapter", return_value=llm_adapter):
         adapter = NativeRuntimeAdapter(config=_research_config())
         handle = adapter.execute(
@@ -250,7 +250,7 @@ def test_research_timed_out_maps_to_timed_out_state():
     research_agent.research.return_value = result
 
     with patch("src.agent.research.ResearchAgent", return_value=research_agent), patch(
-        "src.agent.factory.get_tool_registry", return_value=object()
+        "src.agent.runtime_assembly.get_tool_registry", return_value=object()
     ), patch("src.agent.llm_adapter.LLMToolAdapter", return_value=object()):
         adapter = NativeRuntimeAdapter(config=_research_config())
         handle = adapter.execute(
@@ -269,7 +269,7 @@ def test_prebuilt_executor_short_circuits_factory():
     executor = FakeExecutor(run_result=make_result())
     adapter = NativeRuntimeAdapter(executor=executor)
 
-    with patch("src.agent.factory.build_agent_executor") as build_mock:
+    with patch("src.agent.runtime_assembly.build_agent_executor") as build_mock:
         adapter.execute(ExecutionContext(mode=ExecutionMode.RUN, prompt="task"))
 
     build_mock.assert_not_called()
@@ -280,7 +280,7 @@ def test_lazy_executor_is_built_once_and_reused():
     config = object()
 
     with patch(
-        "src.agent.factory.build_agent_executor", return_value=executor
+        "src.agent.runtime_assembly.build_agent_executor", return_value=executor
     ) as build_mock:
         adapter = NativeRuntimeAdapter(config=config, skills=["trend"])
         adapter.execute(ExecutionContext(mode=ExecutionMode.RUN, prompt="one"))
