@@ -453,7 +453,7 @@ const AlertsPage: React.FC = () => {
       >
         {editError ? <ApiErrorAlert error={editError} onDismiss={() => setEditError(null)} className="mb-4" /> : null}
         {editOpening && !editRule ? (
-          <p className="text-sm text-secondary-text">{t('common.loading')}...</p>
+          <Loading />
         ) : editRule ? (
           <AlertRuleForm
             key={editRule.id}
