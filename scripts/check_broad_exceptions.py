@@ -48,9 +48,12 @@ DIAGNOSTIC_TERMS = frozenset(
         "failures",
     }
 )
+FAILURE_RECORD_TERMS = DIAGNOSTIC_TERMS | {"degraded", "fallback"}
 IPC_OWNER_TERMS = frozenset({"channel", "conn", "connection", "ipc", "pipe"})
+IGNORED_AST_FIELDS = frozenset({"type_params"})
 _LEXICAL_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
 _LOCAL_HANDLER_BOUNDARIES = (*_LEXICAL_SCOPES, ast.ExceptHandler)
+_TOP_LEVEL_TERMINALS = (ast.Raise, ast.Return, ast.Break, ast.Continue)
 
 
 class BaselineError(ValueError):
@@ -292,24 +295,73 @@ def _is_safe_log_statement(statement: ast.stmt) -> bool:
     return call is not None and _is_safe_log_call(call)
 
 
+def _is_empty_record_value(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        return not bool(node.value)
+    if isinstance(node, (ast.Dict, ast.List, ast.Set, ast.Tuple)):
+        return not any(ast.iter_child_nodes(node))
+    return False
+
+
+def _value_has_failure_semantics(node: ast.AST) -> bool:
+    if _is_empty_record_value(node):
+        return False
+    if isinstance(node, ast.Name):
+        return bool(_name_terms(node.id) & FAILURE_RECORD_TERMS)
+    if isinstance(node, ast.Attribute):
+        return bool(_name_terms(node.attr) & FAILURE_RECORD_TERMS)
+    if isinstance(node, ast.Call):
+        return bool(_name_terms(_call_name(node)) & FAILURE_RECORD_TERMS)
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return bool(_name_terms(node.value) & FAILURE_RECORD_TERMS)
+    if isinstance(node, ast.Dict):
+        return any(
+            key is not None
+            and _value_has_failure_semantics(key)
+            and not _is_empty_record_value(value)
+            for key, value in zip(node.keys, node.values)
+        ) or any(_value_has_failure_semantics(value) for value in node.values)
+    if isinstance(node, (ast.List, ast.Set, ast.Tuple)):
+        return any(_value_has_failure_semantics(item) for item in node.elts)
+    return False
+
+
+def _keyword_records_failure(keyword: ast.keyword) -> bool:
+    return (
+        keyword.arg is not None
+        and bool(_name_terms(keyword.arg) & FAILURE_RECORD_TERMS)
+        and not _is_empty_record_value(keyword.value)
+    ) or _value_has_failure_semantics(keyword.value)
+
+
+def _call_records_failure(call: ast.Call) -> bool:
+    return (
+        bool(_name_terms(_call_name(call)) & FAILURE_RECORD_TERMS)
+        or any(_value_has_failure_semantics(argument) for argument in call.args)
+        or any(_keyword_records_failure(keyword) for keyword in call.keywords)
+    )
+
+
 def _is_ipc_send(call: ast.Call) -> bool:
     if (
         _call_name(call) != "send"
         or not isinstance(call.func, ast.Attribute)
     ):
         return False
-    return bool(
+    has_ipc_owner = bool(
         _name_terms(_attribute_owner_text(call.func.value)) & IPC_OWNER_TERMS
     )
+    return has_ipc_owner and _call_records_failure(call)
 
 
 def _is_structured_record_call(call: ast.Call) -> bool:
     name = _call_name(call)
-    return (
-        name.startswith("record_")
-        or name == "set_exception"
-        or _is_ipc_send(call)
-    )
+    if name.startswith("record_"):
+        return _call_records_failure(call)
+    if name == "set_exception":
+        values = [*call.args, *(keyword.value for keyword in call.keywords)]
+        return bool(values) and any(not _is_empty_record_value(value) for value in values)
+    return _is_ipc_send(call)
 
 
 def _target_has_diagnostic_term(target: ast.AST) -> bool:
@@ -332,9 +384,20 @@ def _target_has_diagnostic_term(target: ast.AST) -> bool:
 
 def _is_diagnostic_assignment(statement: ast.stmt) -> bool:
     if isinstance(statement, ast.Assign):
-        return any(_target_has_diagnostic_term(target) for target in statement.targets)
-    if isinstance(statement, (ast.AnnAssign, ast.AugAssign)):
-        return _target_has_diagnostic_term(statement.target)
+        return (
+            any(_target_has_diagnostic_term(target) for target in statement.targets)
+            and not _is_empty_record_value(statement.value)
+        )
+    if isinstance(statement, ast.AnnAssign):
+        return (
+            statement.value is not None
+            and _target_has_diagnostic_term(statement.target)
+            and not _is_empty_record_value(statement.value)
+        )
+    if isinstance(statement, ast.AugAssign):
+        return _target_has_diagnostic_term(
+            statement.target
+        ) and not _is_empty_record_value(statement.value)
     return False
 
 
@@ -350,10 +413,21 @@ def _has_reachable_recording_statement(statements: Sequence[ast.stmt]) -> bool:
     for statement in statements:
         if _is_recording_statement(statement) and not has_prior_fallback_escape:
             return True
+        if isinstance(statement, _TOP_LEVEL_TERMINALS):
+            return False
         statement_nodes = tuple(_walk_control_flow_nodes((statement,)))
         has_prior_fallback_escape = (
             has_prior_fallback_escape or _has_control_flow_escape(statement_nodes)
         )
+    return False
+
+
+def _has_reachable_safe_log(statements: Sequence[ast.stmt]) -> bool:
+    for statement in statements:
+        if _is_safe_log_statement(statement):
+            return True
+        if isinstance(statement, _TOP_LEVEL_TERMINALS):
+            return False
     return False
 
 
@@ -380,12 +454,16 @@ def _looks_like_typed_exception(node: ast.AST) -> bool:
 
 
 def _raise_kind(
+    owner: ast.Try | ast.TryStar,
     handler: ast.ExceptHandler,
     control_flow_nodes: Sequence[ast.AST],
 ) -> tuple[bool, bool]:
     if not handler.body or not isinstance(handler.body[-1], ast.Raise):
         return False, False
     if _has_control_flow_escape(control_flow_nodes):
+        return False, False
+    finalbody_nodes = tuple(_walk_control_flow_nodes(owner.finalbody))
+    if _has_control_flow_escape(finalbody_nodes):
         return False, False
     final_raise = handler.body[-1]
     if final_raise.exc is None:
@@ -396,26 +474,36 @@ def _raise_kind(
         and final_raise.exc.id == handler.name
     ):
         return True, False
-    has_direct_safe_log = any(
-        _is_safe_log_statement(statement)
-        for statement in handler.body[:-1]
-    )
+    has_direct_safe_log = _has_reachable_safe_log(handler.body[:-1])
     return False, has_direct_safe_log and _looks_like_typed_exception(final_raise.exc)
+
+
+def _stable_ast_dump(value: object) -> str:
+    if isinstance(value, ast.AST):
+        fields = (
+            f"{field}={_stable_ast_dump(field_value)}"
+            for field, field_value in ast.iter_fields(value)
+            if field not in IGNORED_AST_FIELDS
+        )
+        return f"{type(value).__name__}({','.join(fields)})"
+    if isinstance(value, list):
+        return f"[{','.join(_stable_ast_dump(item) for item in value)}]"
+    return repr(value)
 
 
 def _handler_digest(
     owner: ast.Try | ast.TryStar,
+    try_site_index: int,
     handler_index: int,
     handler: ast.ExceptHandler,
 ) -> str:
     payload = {
-        "handler": ast.dump(handler, include_attributes=False),
+        "finalbody": _stable_ast_dump(owner.finalbody),
+        "handler": _stable_ast_dump(handler),
         "handler_index": handler_index,
-        "protected_body": ast.dump(
-            ast.Module(body=owner.body, type_ignores=[]),
-            include_attributes=False,
-        ),
+        "protected_body": _stable_ast_dump(owner.body),
         "try_kind": type(owner).__name__,
+        "try_site_index": try_site_index,
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -428,6 +516,7 @@ class _HandlerVisitor(ast.NodeVisitor):
         self.comments = _comment_lines(source)
         self.handlers: list[BroadHandler] = []
         self._scope: list[str] = ["<module>"]
+        self._try_site_counts: dict[tuple[str, ...], int] = {}
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:  # noqa: N802
         self._scope.append(node.name)
@@ -452,6 +541,7 @@ class _HandlerVisitor(ast.NodeVisitor):
     def _record_handler(
         self,
         owner: ast.Try | ast.TryStar,
+        try_site_index: int,
         handler_index: int,
         node: ast.ExceptHandler,
     ) -> None:
@@ -463,7 +553,11 @@ class _HandlerVisitor(ast.NodeVisitor):
                 _is_safe_log_statement(statement) for statement in node.body
             )
             has_recording_evidence = _has_reachable_recording_statement(node.body)
-            propagates, maps_typed_error = _raise_kind(node, control_flow_nodes)
+            propagates, maps_typed_error = _raise_kind(
+                owner,
+                node,
+                control_flow_nodes,
+            )
             marker, marker_error = _marker_for_handler(node, self.comments)
             self.handlers.append(
                 BroadHandler(
@@ -475,7 +569,12 @@ class _HandlerVisitor(ast.NodeVisitor):
                     ),
                     scope=".".join(self._scope),
                     caught=caught,
-                    digest=_handler_digest(owner, handler_index, node),
+                    digest=_handler_digest(
+                        owner,
+                        try_site_index,
+                        handler_index,
+                        node,
+                    ),
                     marker=marker,
                     marker_error=marker_error,
                     catches_base_exception=("BaseException" in caught or "bare" in caught),
@@ -488,8 +587,11 @@ class _HandlerVisitor(ast.NodeVisitor):
             )
 
     def _visit_try(self, node: ast.Try | ast.TryStar) -> None:
+        scope = tuple(self._scope)
+        try_site_index = self._try_site_counts.get(scope, 0)
+        self._try_site_counts[scope] = try_site_index + 1
         for handler_index, handler in enumerate(node.handlers):
-            self._record_handler(node, handler_index, handler)
+            self._record_handler(node, try_site_index, handler_index, handler)
         self.generic_visit(node)
 
     def visit_Try(self, node: ast.Try) -> None:  # noqa: N802

@@ -4,11 +4,13 @@
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
 from scripts.check_broad_exceptions import (
     BaselineError,
+    _handler_digest,
     collect_violations,
     load_baseline,
     scan_repository,
@@ -203,6 +205,34 @@ def test_nested_handler_escape_is_not_treated_as_propagation(tmp_path: Path) -> 
     assert "new-broad-handler" in _rules(tmp_path, baseline)
 
 
+def test_finally_escape_cancels_raise_exemptions(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    _write_module(
+        tmp_path,
+        "class DomainError(Exception):\n"
+        "    pass\n"
+        "def propagate():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        raise\n"
+        "    finally:\n"
+        "        return None\n"
+        "def mapped():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        logger.error('mapped failure')\n"
+        "        raise DomainError()\n"
+        "    finally:\n"
+        "        return None\n",
+    )
+
+    violations = collect_violations(tmp_path, baseline)
+    assert sum(item.rule == "new-broad-handler" for item in violations) == 2
+
+
 def test_unlogged_typed_mapping_remains_legacy_debt(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
@@ -247,11 +277,18 @@ def test_typed_mapping_requires_a_direct_safe_log_and_exception_factory(
         "        object()\n"
         "    except Exception:\n"
         "        logger.error('mapped failure')\n"
-        "        raise logger.error('not an exception factory')\n",
+        "        raise logger.error('not an exception factory')\n"
+        "def unreachable_log():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        raise RuntimeError('first exit')\n"
+        "        logger.error('unreachable mapping')\n"
+        "        raise DomainError()\n",
     )
 
     violations = collect_violations(tmp_path, baseline)
-    assert sum(item.rule == "new-broad-handler" for item in violations) == 3
+    assert sum(item.rule == "new-broad-handler" for item in violations) == 4
 
 
 def test_logged_non_exception_raise_remains_legacy_debt(tmp_path: Path) -> None:
@@ -353,11 +390,35 @@ def test_fallback_record_must_be_direct_and_observable(tmp_path: Path) -> None:
         "        return source.fetch()\n"
         "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
         "        return source.cached()\n"
-        "        logger.error('unreachable fallback')\n",
+        "        logger.error('unreachable fallback')\n"
+        "def start_only(source):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        record_provider_run_started()\n"
+        "        return source.cached()\n"
+        "def success_ipc(source, child_conn):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        child_conn.send({'status': 'ok'})\n"
+        "        return source.cached()\n"
+        "def cleared_holder(source, state):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        state.last_error = None\n"
+        "        return source.cached()\n"
+        "def empty_future(source, future):\n"
+        "    try:\n"
+        "        return source.fetch()\n"
+        "    except Exception:  # broad-exception: fallback_recorded - fallback should be recorded.\n"
+        "        future.set_exception(None)\n"
+        "        return source.cached()\n",
     )
 
     violations = collect_violations(tmp_path, baseline)
-    assert sum(item.rule == "unrecorded-fallback" for item in violations) == 3
+    assert sum(item.rule == "unrecorded-fallback" for item in violations) == 7
 
 
 def test_outer_fingerprint_tracks_nested_handler_body_changes(tmp_path: Path) -> None:
@@ -449,6 +510,39 @@ def test_fingerprint_tracks_handler_order_within_a_try(tmp_path: Path) -> None:
     assert {"new-broad-handler", "stale-baseline-entry"} <= rules
 
 
+def test_fingerprint_distinguishes_identical_try_sites(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline)
+    module = _write_module(
+        tmp_path,
+        "def load():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        return 'first'\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        return 'second'\n",
+    )
+    entries = sorted(handler.baseline_entry for handler in scan_repository(tmp_path))
+    _write_baseline(
+        baseline,
+        legacy_handlers=[entry.as_json() for entry in entries],
+    )
+
+    module.write_text(
+        module.read_text(encoding="utf-8")
+        .replace("return 'first'", "return 'temporary'")
+        .replace("return 'second'", "return 'first'")
+        .replace("return 'temporary'", "return 'second'"),
+        encoding="utf-8",
+    )
+
+    rules = _rules(tmp_path, baseline)
+    assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+
+
 def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
@@ -456,11 +550,11 @@ def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
         tmp_path,
         "def load():\n"
         "    try:\n"
-        "        return primary()\n"
+        "        return work()\n"
         "    except Exception:\n"
         "        return None\n"
         "    try:\n"
-        "        return secondary()\n"
+        "        return work()\n"
         "    except ValueError:\n"
         "        return None\n",
     )
@@ -476,6 +570,26 @@ def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
 
     rules = _rules(tmp_path, baseline)
     assert {"new-broad-handler", "stale-baseline-entry"} <= rules
+
+
+def test_fingerprint_ignores_python_version_ast_metadata() -> None:
+    tree = ast.parse(
+        "try:\n"
+        "    def nested():\n"
+        "        return 1\n"
+        "except Exception:\n"
+        "    return_value = None\n"
+    )
+    owner = next(node for node in ast.walk(tree) if isinstance(node, ast.Try))
+    handler = owner.handlers[0]
+    before = _handler_digest(owner, 0, 0, handler)
+
+    nested = next(
+        node for node in ast.walk(owner) if isinstance(node, ast.FunctionDef)
+    )
+    nested.type_params = [ast.Name(id="T", ctx=ast.Load())]
+
+    assert _handler_digest(owner, 0, 0, handler) == before
 
 
 def test_baseline_fingerprint_ignores_line_only_changes_and_rejects_stale_debt(
