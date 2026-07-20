@@ -1374,20 +1374,20 @@ const PortfolioPage: React.FC = () => {
 
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalEquity}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY', language)}</p>
+          <p className="text-sm text-secondary">{text.totalEquity}</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY', language)}</p>
         </Card>
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalMarketValue}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY', language)}</p>
+          <p className="text-sm text-secondary">{text.totalMarketValue}</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY', language)}</p>
         </Card>
         <Card variant="gradient" padding="md">
-          <p className="text-xs text-secondary">{text.totalCash}</p>
-          <p className="mt-1 text-xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY', language)}</p>
+          <p className="text-sm text-secondary">{text.totalCash}</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY', language)}</p>
         </Card>
         <Card variant="gradient" padding="md">
           <div className="flex items-start justify-between gap-3">
-            <p className="text-xs text-secondary">{text.fxStatus}</p>
+            <p className="text-sm text-secondary">{text.fxStatus}</p>
             <Button
               type="button"
               variant="secondary"
