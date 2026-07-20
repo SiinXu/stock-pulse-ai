@@ -205,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [chore] 下沉 Agent runtime registry、skill prompt 与 executor 装配到 `src/agent/runtime_assembly.py` 叶子模块，`factory` 保留兼容重导出，Native Adapter 不再反向 import `factory`；纯结构调整、行为不变，并新增 AST 回归守护。
 - [改进] Web 自选/工作区面板（`HomeStockWorkspace`）的批量分析状态提示统一走语义 `InlineAlert`：移除手搓的 `variant→className` 映射（`statusClassName`）与 ad-hoc 状态 `<div>`，改用共享 `InlineAlert`（compact，`danger`/`warning`/`success` 语义色并补 `role`/`aria-live`）；加载/空/错误态此前已用 `DashboardStateBlock`。自选头部 5 处 `bg-base/35` 半透明 tile 与共享 `glass-card` 面板属基础层玻璃视觉（跨轨复用），保持 cyan/purple/glow 干净并记 Deferred to UIUX。批量分析行为与文案不变。
 - [修复] 修正 Web 十语言交易动作、成交量/成交额/换手率、风险告警、认证与 API Key、错误和 AlphaSift 免责声明中的高风险语义漂移，并新增带来源、审查状态、code/display 边界和逐语言快照的 fail-closed i18n 审计守卫；八个翻译 bundle 均保持 `PENDING_NATIVE_REVIEW`。
+- [改进] Web 历史记录条目（`StockBarItem`）与持仓页（`PortfolioPage`）概览统计按 PR#35 恢复紧凑密度/排版：条目内边距 `p-2`→`p-1.5`、情绪指示由竖条恢复为圆点（`h-7 w-1`→`h-2 w-2`）、标题去 `tracking-tight`、meta 行距与时间戳字号收紧（`mt-1/gap-2`→`mt-0.5/gap-1`、`text-xs`→`text-[0.6875rem]`）；持仓概览三项统计数字 `text-xl`→`text-2xl`、标签 `text-xs`→`text-sm`。仅密度/排版微调，保留 `home-history-item` 卡片载体与 44px 删除触控目标，行为与数据不变。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
