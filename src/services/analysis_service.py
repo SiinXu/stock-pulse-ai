@@ -157,6 +157,7 @@ class AnalysisService:
             return self._build_analysis_response(result, query_id, report_type=rt.value)
             
         except Exception as exc:
+            # broad-exception: fallback_recorded - analysis fail-safe contract; records a sanitized last_error and safe log, then returns None for any pipeline failure.
             self.last_error = sanitize_exception_chain(exc)
             log_safe_exception(
                 logger,

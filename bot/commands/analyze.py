@@ -101,6 +101,7 @@ class AnalyzeCommand(BotCommand):
                 f"请等待当前分析完成后再试。"
             )
         except Exception as exc:
+            # broad-exception: fallback_recorded - bot command boundary must not leak a traceback; the failure is safe-logged and mapped to a stable public reply.
             log_safe_exception(
                 logger,
                 "[AnalyzeCommand] Analysis execution failed",
