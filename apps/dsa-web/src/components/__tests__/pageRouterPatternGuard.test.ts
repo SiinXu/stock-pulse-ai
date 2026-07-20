@@ -225,11 +225,15 @@ function findHistoryMutations(
   const { sourceFile, checker } = boundSource;
   const findings: SourceFinding[] = [];
   const reportedMethods = new Map<ts.CallExpression, Set<HistoryMethod>>();
-  const functionsBySymbol = new Map<ts.Symbol, ts.SignatureDeclaration>();
   const symbolIds = new Map<ts.Symbol, number>();
+  const functionNodeIds = new Map<ts.SignatureDeclaration, number>();
+  type ScanState = {
+    aliases: ReadonlyMap<ts.Symbol, AliasValue>;
+    functions: ReadonlyMap<ts.Symbol, ts.SignatureDeclaration>;
+  };
   const functionStateResults = new Map<
     ts.SignatureDeclaration,
-    Map<string, ReadonlyMap<ts.Symbol, AliasValue>>
+    Map<string, ScanState>
   >();
 
   const symbolFor = (identifier: ts.Identifier): ts.Symbol | undefined => (
@@ -247,42 +251,14 @@ function findHistoryMutations(
     }
     return current;
   };
-  const functionExpression = (expression: ts.Expression): ts.SignatureDeclaration | undefined => {
-    const current = unwrapExpression(expression);
-    return ts.isFunctionLike(current) ? current : undefined;
-  };
-  const registerFunction = (identifier: ts.Identifier, node: ts.SignatureDeclaration): void => {
-    const symbol = symbolFor(identifier);
-    if (symbol) functionsBySymbol.set(symbol, node);
-  };
-  const collectFunctions = (node: ts.Node): void => {
-    if (
-      (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
-      && node.name
-    ) {
-      registerFunction(node.name, node);
-    }
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const initializer = functionExpression(node.initializer);
-      if (initializer) registerFunction(node.name, initializer);
-    }
-    if (
-      ts.isBinaryExpression(node)
-      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isIdentifier(node.left)
-    ) {
-      const assignedFunction = functionExpression(node.right);
-      if (assignedFunction) registerFunction(node.left, assignedFunction);
-    }
-    ts.forEachChild(node, collectFunctions);
-  };
-  collectFunctions(sourceFile);
-
-  const calledFunction = (expression: ts.Expression): ts.SignatureDeclaration | undefined => {
+  const functionBinding = (
+    expression: ts.Expression,
+    functions: ReadonlyMap<ts.Symbol, ts.SignatureDeclaration>,
+  ): ts.SignatureDeclaration | undefined => {
     const current = unwrapExpression(expression);
     if (ts.isIdentifier(current)) {
       const symbol = symbolFor(current);
-      return symbol ? functionsBySymbol.get(symbol) : undefined;
+      return symbol ? functions.get(symbol) : undefined;
     }
     return ts.isFunctionLike(current) ? current : undefined;
   };
@@ -299,6 +275,26 @@ function findHistoryMutations(
       .map(([id, value]) => `${id}:${value ?? 'none'}`)
       .join('|')
   );
+  const functionStateKey = (
+    functions: ReadonlyMap<ts.Symbol, ts.SignatureDeclaration>,
+  ): string => (
+    Array.from(functions, ([symbol, node]) => {
+      let symbolId = symbolIds.get(symbol);
+      if (symbolId === undefined) {
+        symbolId = symbolIds.size;
+        symbolIds.set(symbol, symbolId);
+      }
+      let nodeId = functionNodeIds.get(node);
+      if (nodeId === undefined) {
+        nodeId = functionNodeIds.size;
+        functionNodeIds.set(node, nodeId);
+      }
+      return [symbolId, nodeId] as const;
+    })
+      .sort(([left], [right]) => left - right)
+      .map(([symbolId, nodeId]) => `${symbolId}:${nodeId}`)
+      .join('|')
+  );
   const propertyMethod = (name: ts.PropertyName | undefined): HistoryMethod | undefined => {
     if (!name) return undefined;
     const text = ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
@@ -310,16 +306,20 @@ function findHistoryMutations(
   function scanFunction(
     node: ts.SignatureDeclaration,
     aliases: ReadonlyMap<ts.Symbol, AliasValue>,
-  ): ReadonlyMap<ts.Symbol, AliasValue> {
-    const stateKey = aliasStateKey(aliases);
+    functions: ReadonlyMap<ts.Symbol, ts.SignatureDeclaration>,
+  ): ScanState {
+    const stateKey = `${aliasStateKey(aliases)}//${functionStateKey(functions)}`;
     const stateResults = functionStateResults.get(node) ?? new Map();
     const cached = stateResults.get(stateKey);
     if (cached) return cached;
 
-    const provisional = new Map(aliases);
+    const provisional = {
+      aliases: new Map(aliases),
+      functions: new Map(functions),
+    };
     stateResults.set(stateKey, provisional);
     functionStateResults.set(node, stateResults);
-    const result = scanScope(node, aliases);
+    const result = scanScope(node, aliases, functions);
     stateResults.set(stateKey, result);
     return result;
   }
@@ -327,8 +327,10 @@ function findHistoryMutations(
   function scanScope(
     scope: ts.Node,
     inheritedAliases: ReadonlyMap<ts.Symbol, AliasValue>,
-  ): Map<ts.Symbol, AliasValue> {
+    inheritedFunctions: ReadonlyMap<ts.Symbol, ts.SignatureDeclaration>,
+  ): ScanState {
     const aliases = new Map(inheritedAliases);
+    const functions = new Map(inheritedFunctions);
     const deferredFunctions: ts.SignatureDeclaration[] = [];
     const aliasFor = (identifier: ts.Identifier): HistoryMethod | undefined => {
       const symbol = symbolFor(identifier);
@@ -338,6 +340,36 @@ function findHistoryMutations(
       const symbol = symbolFor(identifier);
       if (symbol) aliases.set(symbol, method ?? null);
     };
+    const setFunction = (identifier: ts.Identifier, expression?: ts.Expression): void => {
+      const symbol = symbolFor(identifier);
+      if (!symbol) return;
+      const binding = expression ? functionBinding(expression, functions) : undefined;
+      if (binding) functions.set(symbol, binding);
+      else functions.delete(symbol);
+    };
+    const registerHoistedFunction = (
+      identifier: ts.Identifier,
+      node: ts.SignatureDeclaration,
+    ): void => {
+      const symbol = symbolFor(identifier);
+      if (symbol) functions.set(symbol, node);
+    };
+    const collectHoistedFunctions = (node: ts.Node): void => {
+      if (node !== scope && ts.isFunctionLike(node)) {
+        if (ts.isFunctionDeclaration(node) && node.name) {
+          registerHoistedFunction(node.name, node);
+        }
+        return;
+      }
+      ts.forEachChild(node, collectHoistedFunctions);
+    };
+    if (
+      (ts.isFunctionDeclaration(scope) || ts.isFunctionExpression(scope))
+      && scope.name
+    ) {
+      registerHoistedFunction(scope.name, scope);
+    }
+    collectHoistedFunctions(scope);
     const applyObjectAssignment = (object: ts.ObjectLiteralExpression): void => {
       for (const property of object.properties) {
         if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) {
@@ -353,6 +385,7 @@ function findHistoryMutations(
           node.name,
           node.initializer ? historyMethodReference(node.initializer, aliasFor) : undefined,
         );
+        setFunction(node.name, node.initializer);
       } else if (ts.isObjectBindingPattern(node.name)) {
         for (const element of node.name.elements) {
           if (!ts.isIdentifier(element.name)) continue;
@@ -372,16 +405,23 @@ function findHistoryMutations(
         const left = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
         if (ts.isIdentifier(left)) {
           setAlias(left, historyMethodReference(node.right, aliasFor));
+          setFunction(left, node.right);
         } else if (ts.isObjectLiteralExpression(left)) {
           applyObjectAssignment(left);
         }
       }
       if (ts.isCallExpression(node)) {
-        const invokedFunction = calledFunction(node.expression);
+        const invokedFunction = functionBinding(node.expression, functions);
         if (invokedFunction) {
-          const result = scanFunction(invokedFunction, aliases);
-          for (const [symbol, value] of result) {
+          const callerFunctionSymbols = Array.from(functions.keys());
+          const result = scanFunction(invokedFunction, aliases, functions);
+          for (const [symbol, value] of result.aliases) {
             if (aliases.has(symbol)) aliases.set(symbol, value);
+          }
+          for (const symbol of callerFunctionSymbols) {
+            const binding = result.functions.get(symbol);
+            if (binding) functions.set(symbol, binding);
+            else functions.delete(symbol);
           }
         }
         const method = historyMethodReference(node.expression, aliasFor);
@@ -403,12 +443,12 @@ function findHistoryMutations(
 
     visit(scope);
     for (const deferredFunction of deferredFunctions) {
-      scanFunction(deferredFunction, aliases);
+      scanFunction(deferredFunction, aliases, functions);
     }
-    return aliases;
+    return { aliases, functions };
   }
 
-  scanScope(sourceFile, new Map());
+  scanScope(sourceFile, new Map(), new Map());
   return findings.sort((left, right) => left.line - right.line || left.token.localeCompare(right.token));
 }
 
@@ -541,6 +581,24 @@ describe('page and Router pattern production guard', () => {
 
     expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
       { file: '../../pages/ExamplePage.tsx', line: 5, token: 'replaceState' },
+    ]);
+  });
+
+  it('uses the function binding active at each call site', () => {
+    const fixture = [
+      'let replace = () => undefined;',
+      'let configure = () => {',
+      '  replace = window.history.replaceState.bind(window.history);',
+      '};',
+      'configure();',
+      'configure = () => { replace = () => undefined; };',
+      'replace({}, "", "?configured=1");',
+      'configure();',
+      'replace({}, "", "?cleared=1");',
+    ].join('\n');
+
+    expect(findHistoryMutations('../../pages/ExamplePage.tsx', fixture)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 7, token: 'replaceState' },
     ]);
   });
 
