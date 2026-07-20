@@ -197,7 +197,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
   ['../tasks/TaskPanel.tsx', [{
     line: 218,
     removeBy: 'UI-R03',
-    tokens: ['home-panel-card', 'dynamic:className'],
+    tokens: ['dynamic:className'],
   }]],
 ]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
