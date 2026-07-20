@@ -14,6 +14,7 @@ These guard three invariants that a prior full-suite flake exposed:
 """
 from __future__ import annotations
 
+import ast
 import os
 import re
 import tempfile
@@ -155,6 +156,43 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
             os.environ.pop("ENV_FILE", None)
             restore_ambient_llm_env(saved_env)
             temp_dir.cleanup()
+
+
+class ImportCycleGuardTest(unittest.TestCase):
+    """Regression guard for the resolved config <-> provider_catalog cycle.
+
+    Provider-catalog static data was sunk into the leaf
+    ``provider_catalog_data``. ``src.config`` must depend on that leaf, never
+    back on ``provider_catalog`` (even via a function-level import, which the AST
+    scan below also catches), and the leaf must stay free of config coupling.
+    """
+
+    @staticmethod
+    def _module_import_targets(relative_path: str) -> set:
+        repo_root = Path(__file__).resolve().parents[1]
+        tree = ast.parse((repo_root / relative_path).read_text(encoding="utf-8"))
+        targets: set = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                targets.add(node.module)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    targets.add(alias.name)
+        return targets
+
+    def test_config_does_not_import_provider_catalog(self):
+        targets = self._module_import_targets("src/config.py")
+        self.assertNotIn("src.llm.provider_catalog", targets)
+        self.assertIn("src.llm.provider_catalog_data", targets)
+
+    def test_provider_catalog_data_leaf_is_dependency_free(self):
+        targets = self._module_import_targets("src/llm/provider_catalog_data.py")
+        for forbidden in (
+            "src.config",
+            "src.core.config_registry",
+            "src.llm.provider_catalog",
+        ):
+            self.assertNotIn(forbidden, targets)
 
 
 if __name__ == "__main__":
