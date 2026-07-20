@@ -86,6 +86,7 @@ import uuid
 from datetime import date, datetime, timezone, timedelta
 
 from src.webui_frontend import prepare_webui_frontend_assets
+from src.application_services import ApplicationServices, set_application_services
 from src.config import get_config, Config
 from src.logging_config import RelativePathFormatter, setup_logging
 from src.services.stock_list_parser import split_stock_list
@@ -1352,6 +1353,10 @@ def main() -> int:
             error_code="main_configuration_load_failed",
         )
         return 1
+
+    # Establish the application composition root at the CLI startup layer, once
+    # config is available and before config-dependent services are used.
+    set_application_services(ApplicationServices())
 
     # 配置日志（输出到控制台和文件）
     try:

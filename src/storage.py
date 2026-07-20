@@ -3538,8 +3538,16 @@ class DatabaseManager(metaclass=_DatabaseManagerMeta):
 
 # 便捷函数
 def get_db() -> DatabaseManager:
-    """获取数据库管理器实例的快捷方式"""
-    return DatabaseManager.get_instance()
+    """Return the process-wide DatabaseManager via the application composition root.
+
+    Delegating through the composition root keeps a single owner for the
+    instance and lets tests inject an isolated DatabaseManager. The default
+    root resolves to ``DatabaseManager.get_instance()``, so behaviour is
+    unchanged when nothing is injected.
+    """
+    from src.application_services import get_application_services
+
+    return get_application_services().database
 
 
 def persist_llm_usage(
