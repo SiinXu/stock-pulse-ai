@@ -140,7 +140,13 @@ export const Popover = ({
         dismiss();
         return;
       }
-      if (rootRef.current?.contains(target) || contentRef.current?.contains(target)) return;
+      if (
+        rootRef.current?.contains(target)
+        || contentRef.current?.contains(target)
+        || target.closest('[data-dialog-popup="true"]')
+      ) {
+        return;
+      }
       dismiss();
     };
     const handleKeyDown = (event: KeyboardEvent) => {

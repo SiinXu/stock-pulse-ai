@@ -84,4 +84,33 @@ describe('Popover', () => {
     expect(onModalClose).not.toHaveBeenCalled();
     await waitFor(() => expect(trigger).toHaveFocus());
   });
+
+  it('keeps a nested popup mounted while its option handles pointer selection', async () => {
+    const onSelect = vi.fn();
+    render(
+      <Popover
+        defaultOpen
+        contentRole="menu"
+        ariaLabel="Profile settings"
+        trigger={() => <button type="button">Profile</button>}
+      >
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Language options"
+          trigger={() => <button type="button">Language</button>}
+        >
+          <button type="button" role="menuitem" onClick={onSelect}>English</button>
+        </Popover>
+      </Popover>,
+    );
+
+    const outerMenu = await screen.findByRole('menu', { name: 'Profile settings' });
+    const option = await screen.findByRole('menuitem', { name: 'English' });
+    fireEvent.mouseDown(option);
+    fireEvent.click(option);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(outerMenu).toBeInTheDocument();
+  });
 });
