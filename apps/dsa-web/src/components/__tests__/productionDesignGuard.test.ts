@@ -108,18 +108,6 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
     removeBy: 'UI-D01',
     tokens: ['h-auto', 'min-h-11', 'rounded-lg', 'py-1.5'],
   }]],
-  ['../../pages/PortfolioPage.tsx', [
-    ...[1199, 1214, 1226, 1238, 1842, 1845].map((line) => ({
-      line,
-      removeBy: 'UI-P01',
-      tokens: ['flex-1'],
-    })),
-    ...[1673, 1710, 1754].map((line) => ({
-      line,
-      removeBy: 'UI-P01',
-      tokens: ['w-full'],
-    })),
-  ]],
   ['../../pages/StockScreeningPage.tsx', [{
     line: 1375,
     removeBy: 'UI-SCR01',
@@ -3196,12 +3184,12 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
       expect.objectContaining({ rule: 'button-visual-override', token: 'px-2' }),
     ]);
-    const duplicateExactCaller = `${'\n'.repeat(1198)}<Button variant="secondary" className="flex-1">First</Button><Button variant="secondary" className="flex-1">Second</Button>`;
+    const duplicateExactCaller = `${'\n'.repeat(1509)}<Button variant="secondary" className="min-h-11">First</Button><Button variant="secondary" className="min-h-11">Second</Button>`;
     expect(findProductionDesignViolations(
-      '../../pages/PortfolioPage.tsx',
+      '../../pages/DecisionSignalsPage.tsx',
       duplicateExactCaller,
     ).filter(({ rule }) => rule === 'button-visual-override')).toEqual([
-      expect.objectContaining({ rule: 'button-visual-override', token: 'flex-1' }),
+      expect.objectContaining({ rule: 'button-visual-override', token: 'min-h-11' }),
     ]);
     for (const allowances of [
       ...BUTTON_XL_ALLOWLIST.values(),
