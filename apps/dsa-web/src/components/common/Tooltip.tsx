@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, useCallback, useEffect, useId, useLayoutE
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
 import { getOverlayStyle } from './overlayZ';
+import { isTopmostPopupEscapeLayer, registerPopupEscapeLayer } from './useFixedPopup';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -18,8 +19,6 @@ type TooltipStyle = {
   left: number;
 };
 
-const tooltipStack: Array<React.RefObject<HTMLSpanElement | null>> = [];
-
 export const Tooltip: React.FC<TooltipProps> = ({
   content,
   children,
@@ -30,6 +29,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const escapeLayerTokenRef = useRef<object>({});
   const tooltipId = useId();
   const hasContent = Boolean(content);
   const [open, setOpen] = useState(false);
@@ -103,23 +103,25 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   useEffect(() => {
     if (!open || !hasContent) return undefined;
-    tooltipStack.push(tooltipRef);
+    const unregisterEscapeLayer = registerPopupEscapeLayer(
+      escapeLayerTokenRef.current,
+      'tooltip',
+    );
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key !== 'Escape'
-        || tooltipStack[tooltipStack.length - 1] !== tooltipRef
+        || !isTopmostPopupEscapeLayer(escapeLayerTokenRef.current)
       ) {
         return;
       }
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       setOpen(false);
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      const index = tooltipStack.lastIndexOf(tooltipRef);
-      if (index >= 0) tooltipStack.splice(index, 1);
+      unregisterEscapeLayer();
     };
   }, [hasContent, open]);
 
@@ -145,11 +147,10 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => {
-          const topmostTooltip = tooltipStack[tooltipStack.length - 1];
           if (
             open
             && event.key === 'Escape'
-            && (!topmostTooltip || topmostTooltip === tooltipRef)
+            && isTopmostPopupEscapeLayer(escapeLayerTokenRef.current)
           ) {
             event.preventDefault();
             event.stopPropagation();

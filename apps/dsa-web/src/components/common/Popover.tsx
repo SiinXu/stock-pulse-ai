@@ -4,9 +4,7 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
-import { useFixedPopup } from './useFixedPopup';
-
-const popoverStack: Array<React.RefObject<HTMLDivElement | null>> = [];
+import { isFixedPopupOwnedBy, useFixedPopup } from './useFixedPopup';
 
 interface PopoverRenderProps {
   open: boolean;
@@ -55,7 +53,13 @@ export const Popover = ({
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const [shouldRestoreFocus, setShouldRestoreFocus] = useState(false);
   const open = controlledOpen ?? internalOpen;
-  const { portalHost, popupStyle, prepareForOpen, resetPosition } = useFixedPopup({
+  const {
+    portalHost,
+    popupStyle,
+    prepareForOpen,
+    resetPosition,
+    isTopmostPopup,
+  } = useFixedPopup({
     isOpen: open,
     triggerRef: rootRef,
     popupRef: contentRef,
@@ -135,15 +139,6 @@ export const Popover = ({
   }, [contentRole, open, portalHost]);
 
   useEffect(() => {
-    if (!open || !portalHost) return undefined;
-    popoverStack.push(contentRef);
-    return () => {
-      const index = popoverStack.lastIndexOf(contentRef);
-      if (index >= 0) popoverStack.splice(index, 1);
-    };
-  }, [open, portalHost]);
-
-  useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: MouseEvent) => {
       const target = event.target;
@@ -154,7 +149,8 @@ export const Popover = ({
       if (
         rootRef.current?.contains(target)
         || contentRef.current?.contains(target)
-        || target.closest('[data-dialog-popup="true"]')
+        || (rootRef.current && isFixedPopupOwnedBy(rootRef.current, target))
+        || (contentRef.current && isFixedPopupOwnedBy(contentRef.current, target))
       ) {
         return;
       }
@@ -168,10 +164,10 @@ export const Popover = ({
         closeOnEscape
         && event.key === 'Escape'
         && !nestedPopupOpen
-        && popoverStack[popoverStack.length - 1] === contentRef
+        && isTopmostPopup()
       ) {
         event.preventDefault();
-        event.stopPropagation();
+        event.stopImmediatePropagation();
         close();
       }
     };
@@ -181,7 +177,7 @@ export const Popover = ({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [close, closeOnEscape, dismiss, open]);
+  }, [close, closeOnEscape, dismiss, isTopmostPopup, open]);
 
   const handleContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     onContentKeyDown?.(event);

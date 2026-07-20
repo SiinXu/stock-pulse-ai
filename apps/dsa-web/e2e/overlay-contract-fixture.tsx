@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/geist/index.css';
 import '../src/index.css';
 import '../src/App.css';
-import { ConfirmDialog, Drawer, Modal } from '../src/components/common';
+import { ConfirmDialog, Drawer, Modal, Popover } from '../src/components/common';
 import { SettingsHelpButton } from '../src/components/settings/SettingsHelpButton';
 import { ThemeProvider } from '../src/components/theme/ThemeProvider';
 import { UiLanguageProvider } from '../src/contexts/UiLanguageContext';
@@ -53,6 +53,41 @@ function OverlayContractFixture() {
     <main className="min-h-dvh bg-background p-4 text-foreground">
       <div className="flex flex-wrap items-center gap-3">
         <HelpButton title="Standalone help" />
+        <Popover
+          contentRole="menu"
+          ariaLabel="Fixture actions"
+          trigger={({ open, toggle }) => (
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={open}
+              className="min-h-11 rounded-full border border-border px-4 py-2"
+              data-testid="open-popover"
+              onClick={toggle}
+            >
+              Open actions
+            </button>
+          )}
+        >
+          <button type="button" role="menuitem">Fixture action</button>
+          <Popover
+            contentRole="menu"
+            ariaLabel="Nested fixture actions"
+            trigger={({ open, toggle }) => (
+              <button
+                type="button"
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={open}
+                onClick={toggle}
+              >
+                Open nested actions
+              </button>
+            )}
+          >
+            <HelpButton title="Nested help" />
+          </Popover>
+        </Popover>
         <button
           type="button"
           className="min-h-11 rounded-full border border-border px-4 py-2"

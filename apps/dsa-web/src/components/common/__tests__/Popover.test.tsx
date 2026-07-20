@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { OVERLAY_Z } from '../overlayZ';
 import { Popover } from '../Popover';
 import { Select } from '../Select';
+import { Tooltip } from '../Tooltip';
 
 describe('Popover', () => {
   it('opens from its trigger and closes on outside press', () => {
@@ -144,6 +145,7 @@ describe('Popover', () => {
   });
 
   it('keeps the parent menu open when a nested Select consumes Escape', async () => {
+    const onSelect = vi.fn();
     render(
       <UiLanguageProvider>
         <Popover
@@ -154,7 +156,7 @@ describe('Popover', () => {
         >
           <Select
             value="en"
-            onChange={() => undefined}
+            onChange={onSelect}
             options={[
               { value: 'en', label: 'English' },
               { value: 'zh', label: 'Chinese' },
@@ -174,5 +176,101 @@ describe('Popover', () => {
 
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(outerMenu).toBeInTheDocument();
+
+    fireEvent.click(selectTrigger);
+    const option = screen.getByRole('option', { name: 'Chinese' });
+    fireEvent.mouseDown(option);
+    fireEvent.click(option);
+    expect(onSelect).toHaveBeenCalledWith('zh');
+    expect(outerMenu).toBeInTheDocument();
+  });
+
+  it('lets a higher Tooltip consume Escape before an unrelated Popover', async () => {
+    render(
+      <>
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Profile settings"
+          trigger={() => <button type="button">Profile</button>}
+        >
+          <button type="button" role="menuitem">Account</button>
+        </Popover>
+        <Tooltip content="External guidance">
+          <button type="button">External help</button>
+        </Tooltip>
+      </>,
+    );
+
+    const outerMenu = await screen.findByRole('menu', { name: 'Profile settings' });
+    const menuItem = screen.getByRole('menuitem', { name: 'Account' });
+    const helpTrigger = screen.getByRole('button', { name: 'External help' });
+    fireEvent.mouseEnter(helpTrigger.parentElement as HTMLElement);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.keyDown(menuItem, { key: 'Escape' });
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(outerMenu).toBeInTheDocument();
+  });
+
+  it('dismisses on a pointer press inside an unrelated Tooltip trigger', async () => {
+    render(
+      <>
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Profile settings"
+          trigger={() => <button type="button">Profile</button>}
+        >
+          <button type="button" role="menuitem">Account</button>
+        </Popover>
+        <Tooltip content="External guidance">
+          <button type="button">External help</button>
+        </Tooltip>
+      </>,
+    );
+
+    await screen.findByRole('menu', { name: 'Profile settings' });
+    const helpTrigger = screen.getByRole('button', { name: 'External help' });
+    fireEvent.mouseEnter(helpTrigger.parentElement as HTMLElement);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.mouseDown(helpTrigger);
+
+    expect(screen.queryByRole('menu', { name: 'Profile settings' })).not.toBeInTheDocument();
+  });
+
+  it('keeps ancestor menus open when an owned nested popup contains a Tooltip trigger', async () => {
+    render(
+      <Popover
+        defaultOpen
+        contentRole="menu"
+        ariaLabel="Profile settings"
+        trigger={() => <button type="button">Profile</button>}
+      >
+        <Popover
+          defaultOpen
+          contentRole="menu"
+          ariaLabel="Language options"
+          trigger={() => <button type="button">Language</button>}
+        >
+          <Tooltip content="Language guidance">
+            <button type="button" role="menuitem">Language help</button>
+          </Tooltip>
+        </Popover>
+      </Popover>,
+    );
+
+    const outerMenu = await screen.findByRole('menu', { name: 'Profile settings' });
+    const innerMenu = await screen.findByRole('menu', { name: 'Language options' });
+    const helpTrigger = screen.getByRole('menuitem', { name: 'Language help' });
+    fireEvent.mouseEnter(helpTrigger.parentElement as HTMLElement);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    fireEvent.mouseDown(helpTrigger);
+
+    expect(outerMenu).toBeInTheDocument();
+    expect(innerMenu).toBeInTheDocument();
   });
 });

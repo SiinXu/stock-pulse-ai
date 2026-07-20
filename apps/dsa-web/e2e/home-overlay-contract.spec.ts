@@ -427,6 +427,46 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expectBodyOverflow(page, '');
   });
 
+  test('Tooltip and sibling Popover preserve topmost Escape and outside-press ownership', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    await page.getByTestId('open-popover').click();
+    const menu = page.getByRole('menu', { name: 'Fixture actions' });
+    const menuItem = page.getByRole('menuitem', { name: 'Fixture action' });
+    const helpTrigger = page.getByRole('button', { name: 'View Standalone help configuration help' });
+    await expect(menu).toBeVisible();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await expect(menuItem).toBeFocused();
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.getByRole('tooltip')).toHaveCount(0);
+    await expect(menu).toBeVisible();
+    await page.getByTestId('open-popover').hover();
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await helpTrigger.click();
+    await expect(menu).toHaveCount(0);
+  });
+
+  test('Tooltip interaction inside an owned nested Popover preserves both menus', async ({ page }) => {
+    await openOverlayFixture(page, 390);
+    await page.getByTestId('open-popover').click();
+    const outerMenu = page.getByRole('menu', { name: 'Fixture actions', exact: true });
+    await outerMenu.getByRole('menuitem', { name: 'Open nested actions' }).click();
+    const innerMenu = page.getByRole('menu', { name: 'Nested fixture actions', exact: true });
+    const helpTrigger = innerMenu.getByRole('button', {
+      name: 'View Nested help configuration help',
+    });
+    await helpTrigger.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+
+    await helpTrigger.click();
+
+    await expect(outerMenu).toBeVisible();
+    await expect(innerMenu).toBeVisible();
+  });
+
   test('Help over Modal closes without closing or isolating the modal', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
