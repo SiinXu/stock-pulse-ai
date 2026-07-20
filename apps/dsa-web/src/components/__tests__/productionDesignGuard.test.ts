@@ -182,53 +182,18 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     removeBy: 'UI-QA01',
     tokens: ['dynamic:className'],
   }]],
-  ['../report/AnalysisContextSummary.tsx', [{
-    line: 119,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/MarketReviewReportView.tsx', [474, 490, 635, 642, 650].map((line) => ({
-    line,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }))],
-  ['../report/ReportDetails.tsx', [{
-    line: 91,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/ReportDiagnostics.tsx', [{
-    line: 209,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
-  ['../report/ReportNews.tsx', [{
-    line: 60,
-    removeBy: 'UI-R02',
-    tokens: ['home-panel-card'],
-  }]],
   ['../report/ReportOverview.tsx', [
     ...[298, 321].map((line) => ({
       line,
       removeBy: 'UI-R01',
-      tokens: ['home-panel-card', 'home-insight-card'],
-    })),
-    ...[345, 363].map((line) => ({
-      line,
-      removeBy: 'UI-R01',
-      tokens: ['home-panel-card'],
+      tokens: ['home-insight-card'],
     })),
     {
       line: 382,
       removeBy: 'UI-R01',
-      tokens: ['home-panel-card', 'home-rail-card'],
+      tokens: ['home-rail-card'],
     },
   ]],
-  ['../report/ReportStrategy.tsx', [{
-    line: 72,
-    removeBy: 'UI-R01',
-    tokens: ['home-panel-card'],
-  }]],
   ['../tasks/TaskPanel.tsx', [{
     line: 218,
     removeBy: 'UI-R03',

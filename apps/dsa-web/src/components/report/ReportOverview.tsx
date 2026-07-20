@@ -299,7 +299,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               variant="bordered"
               padding="sm"
               hoverable
-              className="home-panel-card home-insight-card"
+              className="home-insight-card"
               style={{ ['--home-insight-tone' as string]: 'var(--home-strategy-buy)' }}
             >
               <div className="flex items-start gap-3">
@@ -322,7 +322,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               variant="bordered"
               padding="sm"
               hoverable
-              className="home-panel-card home-insight-card"
+              className="home-insight-card"
               style={{ ['--home-insight-tone' as string]: 'var(--home-strategy-take)' }}
             >
               <div className="flex items-start gap-3">
@@ -342,7 +342,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           </div>
 
           {preparedRelatedBoards.length > 0 && (
-            <Card variant="bordered" padding="sm" className="home-panel-card min-w-0 max-w-full text-left">
+            <Card variant="bordered" padding="sm" className="min-w-0 max-w-full text-left">
               <section aria-label={text.relatedBoards} className="min-w-0 max-w-full">
                 <div className="mb-3 flex min-w-0 items-baseline gap-2">
                   <span className="label-uppercase">{text.boardLinkage}</span>
@@ -360,7 +360,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
         {/* 右侧：情绪指标 / 自选操作 */}
         <div className="flex flex-col space-y-4">
           {watchlist && meta.reportType !== 'market_review' && (
-            <Card variant="bordered" padding="sm" className="home-panel-card">
+            <Card variant="bordered" padding="sm">
               <div className="text-center space-y-3">
                 <span className="label-uppercase">{t('report.watchlist')}</span>
                 <div className="text-xs text-muted-text font-mono">{meta.stockCode}</div>
@@ -379,7 +379,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
           )}
-          <Card variant="bordered" padding="md" className="home-panel-card home-rail-card !overflow-visible">
+          <Card variant="bordered" padding="md" className="home-rail-card !overflow-visible">
             <div className="text-center">
               <h3 className="mb-5 text-sm font-medium tracking-wide text-foreground">{text.marketSentiment}</h3>
               <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />
