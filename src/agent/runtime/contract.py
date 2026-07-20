@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -213,6 +214,59 @@ class AgentExecution:
             self._error = error
             return True
 
+    def finish_resolved(
+        self,
+        resolver: Callable[
+            [bool], Tuple[ExecutionState, Any, Optional[str]]
+        ],
+    ) -> bool:
+        """Resolve and commit one terminal transition under the state lock.
+
+        ``resolver`` receives the cancellation-intent snapshot while the same
+        lock that protects :meth:`request_cancel` remains held. This closes the
+        check-to-finish race for adapters that must apply cancellation or a
+        deadline at their final write fence. The resolver must be side-effect
+        free and must not call back into this execution.
+        """
+        with self._lock:
+            if self._state in TERMINAL_STATES:
+                return self._drop_locked("finish_resolved", None)
+            state, result, error = resolver(self._cancel_requested)
+            if state not in TERMINAL_STATES:
+                raise ValueError(
+                    f"finish_resolved() requires a terminal state, got: {state}"
+                )
+            self._state = state
+            self._result = result
+            self._error = error
+            return True
+
+    def claim_operation(
+        self,
+        claim: Callable[[], None],
+        *,
+        deadline_monotonic: Optional[float] = None,
+    ) -> Optional[ExecutionState]:
+        """Linearize one external operation against cancel and deadline state.
+
+        ``claim`` must only record a constant-time reservation or result
+        acceptance; it must not perform a potentially blocking external call.
+        A ``None`` return means the claim won. Otherwise the returned state
+        identifies the fence that won, and ``claim`` was not invoked.
+        """
+        with self._lock:
+            if self._state is not ExecutionState.RUNNING:
+                return self._state
+            if self._cancel_requested:
+                return ExecutionState.CANCELLED
+            if (
+                deadline_monotonic is not None
+                and time.monotonic() >= deadline_monotonic
+            ):
+                return ExecutionState.TIMED_OUT
+            claim()
+            return None
+
     def request_cancel(self) -> bool:
         """Record cancellation intent. No-op once terminal."""
         with self._lock:
@@ -221,14 +275,18 @@ class AgentExecution:
             self._cancel_requested = True
             return True
 
-    def _drop_locked(self, operation: str, attempted: ExecutionState) -> bool:
+    def _drop_locked(
+        self,
+        operation: str,
+        attempted: Optional[ExecutionState],
+    ) -> bool:
         self._dropped_transitions += 1
         logger.warning(
             "[Runtime] dropped late %s transition: execution_id=%s current=%s attempted=%s",
             operation,
             self._context.execution_id,
             self._state.value,
-            attempted.value,
+            attempted.value if attempted is not None else "unresolved",
         )
         return False
 

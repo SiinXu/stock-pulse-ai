@@ -102,6 +102,46 @@ def test_success_passthrough_matches_direct_surface_result():
     assert session.dispatched_calls == 1
 
 
+def test_dispatch_guard_cannot_skip_the_dispatch_claim():
+    calls = []
+    session = _session(_echo_registry(calls), max_tool_calls=1)
+
+    with pytest.raises(
+        RuntimeError,
+        match="dispatch_guard returned without claiming the tool call",
+    ):
+        session.execute(
+            "echo",
+            {"message": "must-not-run"},
+            dispatch_guard=lambda claim: None,
+        )
+
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
+def test_dispatch_guard_cannot_claim_one_call_twice():
+    calls = []
+    session = _session(_echo_registry(calls), max_tool_calls=1)
+
+    def _double_claim(claim):
+        claim()
+        claim()
+
+    with pytest.raises(
+        RuntimeError,
+        match="dispatch_guard claimed one tool call more than once",
+    ):
+        session.execute(
+            "echo",
+            {"message": "must-not-run"},
+            dispatch_guard=_double_claim,
+        )
+
+    assert calls == []
+    assert session.dispatched_calls == 0
+
+
 def test_session_audit_carries_execution_identity():
     session = _session(_echo_registry(), stage="intel", attempt=1)
     result = session.execute("echo", {"message": "hi"})

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
+- [改进] Web 新增统一的底部 Sheet 与 Toast 基础：筛选 Sheet 使用固定 header、单一滚动 body 和固定 footer，并复用 Dialog 的滚动锁、Escape、焦点循环与恢复；Toast 通过应用级 Provider、语义层级和保留 live region 在 Modal/Drawer/Sheet 打开时保持可见可读，设置与决策信号页不再维护私有高位 z-index。
 - [改进] Agent Runtime 按 ADR-002 恢复实验 PydanticAI Adapter、toolset、可选依赖清单与 `pydanticai-installed` 安装态 CI 门禁；cross-runtime conformance 改为显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；Native 保持永久默认、零 PydanticAI 依赖可运行、无 runtime fallback，且不新增用户设置或公开 API。
 - [新功能] Web Chat 新增显式“深度研究”模式：新增 typed `agentApi.research` 客户端与 Chat 内 Chat/深度研究模式开关，在同一页面就一个问题运行深度研究（问题 + 可选股票代码），同步执行、可取消（AbortController），错误/超时明确提示；结果含结论（Markdown 渲染）与子问题引用，并按会话持久化到 localStorage 实现刷新恢复（进行中的运行刷新后不可续跑，恢复为可重跑）；不新建 Research Hub。后端 research 为同步、无 task/SSE/会话落库，服务端持久化与乐观续跑记为 Non-goal。
 - [测试] 新增启动 DDL 守护回归测试：捕获 `DatabaseManager` 初始化期间的全部 `CREATE`/`ALTER`/`DROP`，断言它们只发生在 `metadata.create_all`（fresh baseline）或 `apply_pending_within_transaction`（已登记 migration）两个相位内，两相位之外的游离 schema DDL（重新引入的启动期 ensure）会被判失败；并断言已迁移库重启时不执行任何 DDL、`migration verify` 对 fresh 与 legacy 库均成功且解释到 target version。

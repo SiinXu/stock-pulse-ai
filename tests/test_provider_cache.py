@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import os
+import pathlib
 import subprocess
 import sys
 import textwrap
@@ -469,3 +471,58 @@ def test_filter_prompt_cache_telemetry_removes_provider_cache_fields_when_disabl
     assert "provider_usage_json" not in filtered
     assert "normalized_cache_read_tokens" not in filtered
     assert "cache_capability" not in filtered
+
+
+def _module_import_targets(relative_path: str) -> set[str]:
+    """Return every module name imported by a source file (module- or function-level)."""
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    tree = ast.parse((repo_root / relative_path).read_text(encoding="utf-8"))
+    targets: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            targets.add(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                targets.add(alias.name)
+    return targets
+
+
+def test_usage_does_not_import_provider_cache():
+    """Regression guard for the resolved llm.usage <-> provider_cache import cycle.
+
+    Provider-family inference was sunk into the leaf module ``provider_family``.
+    ``usage`` must depend on that leaf, never back on ``provider_cache`` (even via
+    a function-level import, which this AST scan also catches).
+    """
+    targets = _module_import_targets("src/llm/usage.py")
+    assert "src.llm.provider_cache" not in targets
+    assert "src.llm.provider_family" in targets
+
+
+def test_provider_family_is_leaf_for_llm_cycle():
+    targets = _module_import_targets("src/llm/provider_family.py")
+    assert not any(
+        name == "src.llm.usage" or name == "src.llm.provider_cache" for name in targets
+    )
+
+
+def test_llm_provider_modules_import_without_cycle():
+    """Importing either side first must not raise from a partially-initialized module."""
+    repo_root = pathlib.Path(__file__).resolve().parents[1]
+    for first in ("src.llm.usage", "src.llm.provider_cache"):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                f"import {first}; "
+                "from src.llm.provider_cache import infer_provider_family; "
+                "from src.llm.usage import build_domain_hmac; "
+                "print(infer_provider_family(model='openai/qwen-max'))",
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "qwen" in result.stdout

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping, Optional, Sequence
 
+from src.llm.provider_family import infer_provider_family
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -943,8 +944,6 @@ def _infer_provider(model: str, provider: Optional[str]) -> str:
     normalized_model = (model or "").strip().lower()
     normalized_provider = (provider or "").strip().lower()
     try:
-        from src.llm.provider_cache import infer_provider_family
-
         inferred = infer_provider_family(model=normalized_model, provider=normalized_provider)
         if inferred:
             return inferred

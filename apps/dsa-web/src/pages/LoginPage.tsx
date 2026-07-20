@@ -157,7 +157,6 @@ const LoginPage: React.FC = () => {
                   title={isFirstTime ? t('login.setupFailed') : t('login.validationFailed')}
                   message={isParsedApiError(error) ? localizeParsedApiError(error, language).message : error}
                   variant="error"
-                  className="!border-[var(--login-error-border)] !bg-[var(--login-error-bg)] !text-[var(--login-error-text)]"
                 />
               </motion.div>
             )}
