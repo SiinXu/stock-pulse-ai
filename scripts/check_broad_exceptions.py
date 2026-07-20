@@ -68,12 +68,16 @@ class BaselineError(ValueError):
 
 @dataclass(frozen=True, order=True)
 class BaselineEntry:
+    """Identify one unreviewed broad handler by structural fingerprint."""
+
     path: str
     scope: str
     caught: tuple[str, ...]
     digest: str
 
     def as_json(self) -> dict[str, object]:
+        """Render the entry in the checked-in baseline schema."""
+
         return {
             "path": self.path,
             "scope": self.scope,
@@ -84,12 +88,16 @@ class BaselineEntry:
 
 @dataclass(frozen=True)
 class Marker:
+    """Describe an explicit broad-handler classification and its reason."""
+
     category: str
     reason: str
 
 
 @dataclass(frozen=True)
 class BroadHandler:
+    """Hold the static facts collected for one broad exception handler."""
+
     path: str
     line: int
     header_end: int
@@ -107,6 +115,8 @@ class BroadHandler:
 
     @property
     def baseline_entry(self) -> BaselineEntry:
+        """Return the structural identity used by the legacy baseline."""
+
         return BaselineEntry(
             path=self.path,
             scope=self.scope,
@@ -117,30 +127,40 @@ class BroadHandler:
 
 @dataclass(frozen=True, order=True)
 class Violation:
+    """Represent one deterministic guard violation."""
+
     path: str
     line: int
     rule: str
     message: str
 
     def render(self) -> str:
+        """Render a stable command-line diagnostic."""
+
         location = self.path if self.line <= 0 else f"{self.path}:{self.line}"
         return f"{location}: {self.rule}: {self.message}"
 
 
 @dataclass(frozen=True)
 class Baseline:
+    """Contain deferred paths and frozen unreviewed handler identities."""
+
     deferred_files: Mapping[str, str]
     legacy_handlers: tuple[BaselineEntry, ...]
 
 
 @dataclass(frozen=True)
 class ParentLink:
+    """Describe a child's lexical position within its parent AST node."""
+
     parent: ast.AST
     field: str
     index: int | None
 
 
 def _iter_python_paths(root: Path) -> Iterator[Path]:
+    """Yield production Python files within the guard's ownership scope."""
+
     for relative_path in SCOPED_FILES:
         path = root / relative_path
         if path.is_file():
@@ -153,6 +173,8 @@ def _iter_python_paths(root: Path) -> Iterator[Path]:
 
 
 def _broad_exception_names(node: ast.AST | None) -> tuple[str, ...]:
+    """Return directly caught broad built-in exception names."""
+
     if node is None:
         return ("bare",)
     if isinstance(node, ast.Name) and node.id in {"Exception", "BaseException"}:
@@ -178,6 +200,8 @@ def _broad_exception_names(node: ast.AST | None) -> tuple[str, ...]:
 
 
 def _comment_lines(source: str) -> dict[int, list[str]]:
+    """Index source comments by their starting line."""
+
     comments: dict[int, list[str]] = {}
     try:
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
@@ -193,6 +217,8 @@ def _marker_for_handler(
     handler: ast.ExceptHandler,
     comments: Mapping[int, Sequence[str]],
 ) -> tuple[Marker | None, str | None]:
+    """Parse the single classification marker attached to a handler header."""
+
     first_body_line = handler.body[0].lineno if handler.body else handler.lineno
     header_end = max(handler.lineno, first_body_line - 1)
     candidates = [
@@ -224,10 +250,14 @@ def _marker_for_handler(
 
 
 def _walk_local_nodes(statements: Iterable[ast.stmt]) -> Iterator[ast.AST]:
+    """Walk handler-local nodes without entering nested lexical boundaries."""
+
     yield from _walk_nodes(statements, boundaries=_LOCAL_HANDLER_BOUNDARIES)
 
 
 def _walk_control_flow_nodes(statements: Iterable[ast.stmt]) -> Iterator[ast.AST]:
+    """Walk nodes relevant to handler control-flow classification."""
+
     yield from _walk_nodes(statements, boundaries=_LEXICAL_SCOPES)
 
 
@@ -236,6 +266,8 @@ def _walk_nodes(
     *,
     boundaries: tuple[type[ast.AST], ...],
 ) -> Iterator[ast.AST]:
+    """Walk statements depth-first without descending through boundaries."""
+
     stack: list[ast.AST] = list(reversed(tuple(statements)))
     while stack:
         node = stack.pop()
@@ -246,6 +278,8 @@ def _walk_nodes(
 
 
 def _call_name(call: ast.Call) -> str:
+    """Return the terminal name of a direct or attribute call."""
+
     if isinstance(call.func, ast.Name):
         return call.func.id
     if isinstance(call.func, ast.Attribute):
@@ -254,6 +288,8 @@ def _call_name(call: ast.Call) -> str:
 
 
 def _attribute_owner_text(node: ast.AST) -> str:
+    """Return a normalized dotted owner path for an attribute expression."""
+
     parts: list[str] = []
     current = node
     while isinstance(current, ast.Attribute):
@@ -265,6 +301,8 @@ def _attribute_owner_text(node: ast.AST) -> str:
 
 
 def _name_terms(value: str) -> set[str]:
+    """Split identifiers and labels into normalized semantic terms."""
+
     snake_case = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
     return {
         item
@@ -274,6 +312,8 @@ def _name_terms(value: str) -> set[str]:
 
 
 def _is_logger_owner(node: ast.AST) -> bool:
+    """Return whether an attribute owner is explicitly logger-shaped."""
+
     owner = _attribute_owner_text(node)
     if not owner:
         return False
@@ -286,6 +326,8 @@ def _is_logger_owner(node: ast.AST) -> bool:
 
 
 def _is_safe_log_call(call: ast.Call) -> bool:
+    """Return whether a call targets an accepted safe logging surface."""
+
     name = _call_name(call)
     if name in SAFE_LOG_FUNCTIONS:
         return True
@@ -295,6 +337,8 @@ def _is_safe_log_call(call: ast.Call) -> bool:
 
 
 def _direct_call(statement: ast.stmt) -> ast.Call | None:
+    """Extract a top-level call, including a directly awaited call."""
+
     if not isinstance(statement, ast.Expr):
         return None
     value = statement.value
@@ -304,11 +348,15 @@ def _direct_call(statement: ast.stmt) -> ast.Call | None:
 
 
 def _is_safe_log_statement(statement: ast.stmt) -> bool:
+    """Return whether a statement is a direct accepted logging call."""
+
     call = _direct_call(statement)
     return call is not None and _is_safe_log_call(call)
 
 
 def _is_empty_record_value(node: ast.AST) -> bool:
+    """Return whether a literal conveys no diagnostic information."""
+
     if isinstance(node, ast.Constant):
         return not bool(node.value)
     if isinstance(node, (ast.Dict, ast.List, ast.Set, ast.Tuple)):
@@ -317,6 +365,8 @@ def _is_empty_record_value(node: ast.AST) -> bool:
 
 
 def _value_has_failure_semantics(node: ast.AST) -> bool:
+    """Return whether a value explicitly describes failure or fallback."""
+
     if _is_empty_record_value(node):
         return False
     if isinstance(node, ast.Name):
@@ -345,6 +395,8 @@ def _value_has_failure_semantics(node: ast.AST) -> bool:
 
 
 def _is_negative_outcome(key: ast.AST, value: ast.AST) -> bool:
+    """Return whether a mapping entry explicitly records an unsuccessful result."""
+
     return (
         isinstance(key, ast.Constant)
         and isinstance(key.value, str)
@@ -355,6 +407,8 @@ def _is_negative_outcome(key: ast.AST, value: ast.AST) -> bool:
 
 
 def _keyword_records_failure(keyword: ast.keyword) -> bool:
+    """Return whether a call keyword carries failure-bearing evidence."""
+
     return (
         keyword.arg is not None
         and (
@@ -372,6 +426,8 @@ def _keyword_records_failure(keyword: ast.keyword) -> bool:
 
 
 def _call_records_failure(call: ast.Call) -> bool:
+    """Return whether a structured call contains failure-bearing evidence."""
+
     return (
         bool(_name_terms(_call_name(call)) & FAILURE_RECORD_TERMS)
         or any(_value_has_failure_semantics(argument) for argument in call.args)
@@ -380,6 +436,8 @@ def _call_records_failure(call: ast.Call) -> bool:
 
 
 def _is_ipc_send(call: ast.Call) -> bool:
+    """Return whether an IPC send directly records a failed outcome."""
+
     if (
         _call_name(call) != "send"
         or not isinstance(call.func, ast.Attribute)
@@ -392,6 +450,8 @@ def _is_ipc_send(call: ast.Call) -> bool:
 
 
 def _is_structured_record_call(call: ast.Call) -> bool:
+    """Return whether a call is an accepted authoritative failure record."""
+
     name = _call_name(call)
     if name.startswith("record_"):
         return _call_records_failure(call)
@@ -402,6 +462,8 @@ def _is_structured_record_call(call: ast.Call) -> bool:
 
 
 def _target_has_diagnostic_term(target: ast.AST) -> bool:
+    """Return whether an assignment target denotes diagnostic state."""
+
     if isinstance(target, ast.Attribute):
         return bool(_name_terms(target.attr) & DIAGNOSTIC_TERMS)
     if isinstance(target, ast.Subscript):
@@ -420,6 +482,8 @@ def _target_has_diagnostic_term(target: ast.AST) -> bool:
 
 
 def _is_diagnostic_assignment(statement: ast.stmt) -> bool:
+    """Return whether an assignment records a non-empty diagnostic value."""
+
     if isinstance(statement, ast.Assign):
         return (
             any(_target_has_diagnostic_term(target) for target in statement.targets)
@@ -439,6 +503,8 @@ def _is_diagnostic_assignment(statement: ast.stmt) -> bool:
 
 
 def _is_recording_statement(statement: ast.stmt) -> bool:
+    """Return whether a top-level statement records the caught failure."""
+
     call = _direct_call(statement)
     if call is not None:
         return _is_safe_log_call(call) or _is_structured_record_call(call)
@@ -446,6 +512,8 @@ def _is_recording_statement(statement: ast.stmt) -> bool:
 
 
 def _has_reachable_recording_statement(statements: Sequence[ast.stmt]) -> bool:
+    """Find direct recording evidence before any possible control-flow exit."""
+
     has_prior_fallback_escape = False
     for statement in statements:
         if _is_recording_statement(statement) and not has_prior_fallback_escape:
@@ -460,6 +528,8 @@ def _has_reachable_recording_statement(statements: Sequence[ast.stmt]) -> bool:
 
 
 def _has_reachable_safe_log(statements: Sequence[ast.stmt]) -> bool:
+    """Find a direct safe log before a top-level terminal statement."""
+
     for statement in statements:
         if _is_safe_log_statement(statement):
             return True
@@ -469,13 +539,22 @@ def _has_reachable_safe_log(statements: Sequence[ast.stmt]) -> bool:
 
 
 def _has_control_flow_escape(nodes: Sequence[ast.AST]) -> bool:
+    """Return whether nodes contain a handler control-flow escape."""
+
     return any(
         isinstance(node, (ast.Return, ast.Break, ast.Continue, ast.Yield, ast.YieldFrom))
         for node in nodes
     )
 
 
+def _finally_is_proven_non_replacing(statements: Sequence[ast.stmt]) -> bool:
+    """Return whether a finally body cannot suppress or replace an exception."""
+    return all(isinstance(statement, ast.Pass) for statement in statements)
+
+
 def _looks_like_typed_exception(node: ast.AST) -> bool:
+    """Return whether a raise value constructs a recognized typed exception."""
+
     if not isinstance(node, ast.Call):
         return False
     constructor = node.func
@@ -495,14 +574,13 @@ def _raise_kind(
     handler: ast.ExceptHandler,
     control_flow_nodes: Sequence[ast.AST],
 ) -> tuple[bool, bool]:
+    """Classify a final raise as propagation or a safely logged typed mapping."""
+
     if not handler.body or not isinstance(handler.body[-1], ast.Raise):
         return False, False
     if _has_control_flow_escape(control_flow_nodes):
         return False, False
-    finalbody_nodes = tuple(_walk_control_flow_nodes(owner.finalbody))
-    if _has_control_flow_escape(finalbody_nodes) or any(
-        isinstance(node, ast.Raise) for node in finalbody_nodes
-    ):
+    if not _finally_is_proven_non_replacing(owner.finalbody):
         return False, False
     final_raise = handler.body[-1]
     if final_raise.exc is None:
@@ -518,6 +596,8 @@ def _raise_kind(
 
 
 def _stable_ast_dump(value: object) -> str:
+    """Serialize AST values without Python-minor-version metadata."""
+
     if isinstance(value, ast.AST):
         fields = (
             f"{field}={_stable_ast_dump(field_value)}"
@@ -531,6 +611,8 @@ def _stable_ast_dump(value: object) -> str:
 
 
 def _build_parent_links(tree: ast.AST) -> dict[int, ParentLink]:
+    """Index each AST node's parent, field, and lexical list position."""
+
     links: dict[int, ParentLink] = {}
     for parent in ast.walk(tree):
         for field, value in ast.iter_fields(parent):
@@ -544,6 +626,8 @@ def _build_parent_links(tree: ast.AST) -> dict[int, ParentLink]:
 
 
 def _control_context(node: ast.AST) -> str:
+    """Serialize behavior-bearing context for an enclosing control-flow node."""
+
     if isinstance(node, (ast.If, ast.While)):
         return f"test={_stable_ast_dump(node.test)}"
     if isinstance(node, (ast.For, ast.AsyncFor)):
@@ -572,6 +656,8 @@ def _site_ancestry(
     node: ast.AST,
     parent_links: Mapping[int, ParentLink],
 ) -> tuple[dict[str, object], ...]:
+    """Build the lexical ancestry that identifies a try statement's site."""
+
     ancestry: list[dict[str, object]] = []
     current = node
     while link := parent_links.get(id(current)):
@@ -598,6 +684,8 @@ def _handler_digest(
     *,
     ancestry: Sequence[Mapping[str, object]] = (),
 ) -> str:
+    """Hash behavior-bearing handler and try-site structure."""
+
     payload = {
         "ancestry": list(ancestry),
         "finalbody": _stable_ast_dump(owner.finalbody),
@@ -614,12 +702,16 @@ def _handler_digest(
 
 
 class _HandlerVisitor(ast.NodeVisitor):
+    """Collect broad-handler facts while tracking lexical scope and try order."""
+
     def __init__(
         self,
         path: str,
         source: str,
         parent_links: Mapping[int, ParentLink],
     ) -> None:
+        """Initialize collection state for one source file."""
+
         self.path = path
         self.comments = _comment_lines(source)
         self.parent_links = parent_links
@@ -628,21 +720,29 @@ class _HandlerVisitor(ast.NodeVisitor):
         self._try_site_counts: dict[tuple[str, ...], int] = {}
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:  # noqa: N802
+        """Visit a class within its lexical scope."""
+
         self._scope.append(node.name)
         self.generic_visit(node)
         self._scope.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # noqa: N802
+        """Visit a function within its lexical scope."""
+
         self._scope.append(node.name)
         self.generic_visit(node)
         self._scope.pop()
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+        """Visit an async function within its lexical scope."""
+
         self._scope.append(node.name)
         self.generic_visit(node)
         self._scope.pop()
 
     def visit_Lambda(self, node: ast.Lambda) -> None:  # noqa: N802
+        """Visit a lambda within a line-qualified lexical scope."""
+
         self._scope.append(f"<lambda@{node.lineno}>")
         self.generic_visit(node)
         self._scope.pop()
@@ -654,6 +754,8 @@ class _HandlerVisitor(ast.NodeVisitor):
         handler_index: int,
         node: ast.ExceptHandler,
     ) -> None:
+        """Record one directly broad handler and its classification facts."""
+
         caught = _broad_exception_names(node.type)
         if caught:
             local_nodes = tuple(_walk_local_nodes(node.body))
@@ -697,6 +799,8 @@ class _HandlerVisitor(ast.NodeVisitor):
             )
 
     def _visit_try(self, node: ast.Try | ast.TryStar) -> None:
+        """Record handlers for one ordered try site and visit nested nodes."""
+
         scope = tuple(self._scope)
         try_site_index = self._try_site_counts.get(scope, 0)
         self._try_site_counts[scope] = try_site_index + 1
@@ -705,16 +809,24 @@ class _HandlerVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Try(self, node: ast.Try) -> None:  # noqa: N802
+        """Visit a standard try statement."""
+
         self._visit_try(node)
 
     def visit_TryStar(self, node: ast.TryStar) -> None:  # noqa: N802
+        """Visit an exception-group try statement."""
+
         self._visit_try(node)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:  # noqa: N802
+        """Visit handlers nested below the current try site."""
+
         self.generic_visit(node)
 
 
 def scan_file(path: Path, root: Path) -> tuple[BroadHandler, ...]:
+    """Scan one production file for directly broad handlers."""
+
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
     relative_path = path.relative_to(root).as_posix()
@@ -724,6 +836,8 @@ def scan_file(path: Path, root: Path) -> tuple[BroadHandler, ...]:
 
 
 def scan_repository(root: Path) -> tuple[BroadHandler, ...]:
+    """Scan every production Python file in deterministic order."""
+
     handlers: list[BroadHandler] = []
     for path in _iter_python_paths(root):
         handlers.extend(scan_file(path, root))
@@ -731,6 +845,8 @@ def scan_repository(root: Path) -> tuple[BroadHandler, ...]:
 
 
 def _parse_entry(raw: object, index: int) -> BaselineEntry:
+    """Validate and parse one legacy baseline entry."""
+
     if not isinstance(raw, dict):
         raise BaselineError(f"legacy_handlers[{index}] must be an object")
     if set(raw) != {"path", "scope", "caught", "digest"}:
@@ -761,6 +877,8 @@ def _parse_entry(raw: object, index: int) -> BaselineEntry:
 
 
 def load_baseline(path: Path) -> Baseline:
+    """Load and strictly validate the checked-in baseline document."""
+
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -801,6 +919,8 @@ def load_baseline(path: Path) -> Baseline:
 
 
 def _policy_violations(handler: BroadHandler) -> list[Violation]:
+    """Return marker and BaseException policy violations for a handler."""
+
     violations: list[Violation] = []
     if handler.marker_error:
         violations.append(
@@ -836,6 +956,8 @@ def _policy_violations(handler: BroadHandler) -> list[Violation]:
 
 
 def _is_reviewed(handler: BroadHandler) -> bool:
+    """Return whether a handler has an accepted explicit or structural review."""
+
     return bool(handler.marker or handler.propagates or handler.maps_typed_error)
 
 
@@ -844,6 +966,8 @@ def _validate_deferred_files(
     baseline: Baseline,
     handlers: Sequence[BroadHandler],
 ) -> list[Violation]:
+    """Reject deferred paths that are missing, out of scope, or stale."""
+
     violations: list[Violation] = []
     handler_paths = {handler.path for handler in handlers}
     scoped_paths = {
@@ -877,6 +1001,8 @@ def _orphan_marker_violations(
     handlers: Sequence[BroadHandler],
     deferred: set[str],
 ) -> list[Violation]:
+    """Find classification comments not attached to broad handler headers."""
+
     header_ranges: dict[str, list[tuple[int, int]]] = {}
     for handler in handlers:
         header_ranges.setdefault(handler.path, []).append(
@@ -908,6 +1034,8 @@ def _orphan_marker_violations(
 
 
 def collect_violations(root: Path, baseline_path: Path) -> tuple[Violation, ...]:
+    """Collect all policy and structural baseline violations."""
+
     try:
         baseline = load_baseline(baseline_path)
     except BaselineError as exc:
@@ -960,6 +1088,8 @@ def _serialize_baseline(
     deferred_files: Mapping[str, str],
     legacy_handlers: Sequence[BaselineEntry],
 ) -> str:
+    """Render the deterministic baseline JSON format."""
+
     lines = ["{", f'  "version": {BASELINE_VERSION},', '  "deferred_files": {']
     deferred_items = sorted(deferred_files.items())
     for index, (path, reason) in enumerate(deferred_items):
@@ -982,6 +1112,8 @@ def _serialize_baseline(
 
 
 def write_baseline(root: Path, baseline_path: Path) -> int:
+    """Shrink the baseline while refusing new or modified exception debt."""
+
     baseline = load_baseline(baseline_path)
     handlers = scan_repository(root)
     violations = _validate_deferred_files(root, baseline, handlers)
@@ -1023,6 +1155,8 @@ def write_baseline(root: Path, baseline_path: Path) -> int:
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse command-line options for checking or shrinking the baseline."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
@@ -1035,6 +1169,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the broad-handler guard and return a process exit status."""
+
     args = _parse_args(argv)
     root = args.root.resolve()
     baseline_path = args.baseline.resolve()

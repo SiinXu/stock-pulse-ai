@@ -28,6 +28,8 @@ def _write_baseline(
     deferred_files: dict[str, str] | None = None,
     legacy_handlers: list[dict[str, object]] | None = None,
 ) -> None:
+    """Write a minimal baseline fixture."""
+
     path.write_text(
         json.dumps(
             {
@@ -43,6 +45,8 @@ def _write_baseline(
 
 
 def _write_module(root: Path, source: str, relative_path: str = "src/example.py") -> Path:
+    """Write one production-scope module fixture."""
+
     path = root / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(source, encoding="utf-8")
@@ -50,14 +54,20 @@ def _write_module(root: Path, source: str, relative_path: str = "src/example.py"
 
 
 def _rules(root: Path, baseline: Path) -> set[str]:
+    """Return the emitted rule identifiers for a fixture repository."""
+
     return {violation.rule for violation in collect_violations(root, baseline)}
 
 
 def test_repository_broad_exception_guard() -> None:
+    """Keep the checked-in production tree aligned with its baseline."""
+
     assert collect_violations(ROOT, BASELINE) == ()
 
 
 def test_new_unclassified_handler_fails_closed(tmp_path: Path) -> None:
+    """Reject a newly introduced unclassified broad handler."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -73,6 +83,8 @@ def test_new_unclassified_handler_fails_closed(tmp_path: Path) -> None:
 
 
 def test_supported_classifications_are_explicit_and_recorded(tmp_path: Path) -> None:
+    """Accept supported markers when their required evidence is present."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -101,6 +113,8 @@ def test_supported_classifications_are_explicit_and_recorded(tmp_path: Path) -> 
 
 
 def test_invalid_category_and_unrecorded_fallback_are_rejected(tmp_path: Path) -> None:
+    """Reject unknown markers and fallbacks without recording evidence."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -123,6 +137,8 @@ def test_invalid_category_and_unrecorded_fallback_are_rejected(tmp_path: Path) -
 
 
 def test_orphan_marker_is_rejected_after_handler_is_narrowed(tmp_path: Path) -> None:
+    """Reject a marker left behind after its handler is narrowed."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -138,6 +154,8 @@ def test_orphan_marker_is_rejected_after_handler_is_narrowed(tmp_path: Path) -> 
 
 
 def test_base_exception_pass_requires_cleanup_reason(tmp_path: Path) -> None:
+    """Require explicit cleanup intent for BaseException pass handlers."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -162,6 +180,8 @@ def test_base_exception_pass_requires_cleanup_reason(tmp_path: Path) -> None:
 
 
 def test_propagation_and_logged_typed_mapping_need_no_baseline(tmp_path: Path) -> None:
+    """Accept deterministic propagation and safely logged typed mapping."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -175,18 +195,35 @@ def test_propagation_and_logged_typed_mapping_need_no_baseline(tmp_path: Path) -
         "        object()\n"
         "    except Exception:\n"
         "        raise\n"
+        "def propagate_with_noop_finally():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception:\n"
+        "        raise\n"
+        "    finally:\n"
+        "        pass\n"
         "def mapped():\n"
         "    try:\n"
         "        object()\n"
         "    except Exception as exc:\n"
         "        logger.error('mapped failure')\n"
-        "        raise DomainError() from exc\n",
+        "        raise DomainError() from exc\n"
+        "def mapped_with_noop_finally():\n"
+        "    try:\n"
+        "        object()\n"
+        "    except Exception as exc:\n"
+        "        logger.error('mapped failure')\n"
+        "        raise DomainError() from exc\n"
+        "    finally:\n"
+        "        pass\n",
     )
 
     assert collect_violations(tmp_path, baseline) == ()
 
 
 def test_nested_handler_escape_is_not_treated_as_propagation(tmp_path: Path) -> None:
+    """Reject propagation proofs with a nested handler escape."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -206,6 +243,8 @@ def test_nested_handler_escape_is_not_treated_as_propagation(tmp_path: Path) -> 
 
 
 def test_finally_escape_cancels_raise_exemptions(tmp_path: Path) -> None:
+    """Reject raise exemptions when finally can suppress or replace them."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -233,14 +272,31 @@ def test_finally_escape_cancels_raise_exemptions(tmp_path: Path) -> None:
         "    except Exception:\n"
         "        raise\n"
         "    finally:\n"
-        "        raise RuntimeError('replacement')\n",
+        "        raise RuntimeError('replacement')\n"
+        "def call_replaced():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        raise\n"
+        "    finally:\n"
+        "        replace_exception()\n"
+        "def mapped_call_replaced():\n"
+        "    try:\n"
+        "        work()\n"
+        "    except Exception:\n"
+        "        logger.error('mapped failure')\n"
+        "        raise DomainError()\n"
+        "    finally:\n"
+        "        replace_exception()\n",
     )
 
     violations = collect_violations(tmp_path, baseline)
-    assert sum(item.rule == "new-broad-handler" for item in violations) == 3
+    assert sum(item.rule == "new-broad-handler" for item in violations) == 5
 
 
 def test_unlogged_typed_mapping_remains_legacy_debt(tmp_path: Path) -> None:
+    """Keep unlogged typed mappings in the structural debt baseline."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -260,6 +316,8 @@ def test_unlogged_typed_mapping_remains_legacy_debt(tmp_path: Path) -> None:
 def test_typed_mapping_requires_a_direct_safe_log_and_exception_factory(
     tmp_path: Path,
 ) -> None:
+    """Require reachable safe logging and a recognized exception factory."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -299,6 +357,8 @@ def test_typed_mapping_requires_a_direct_safe_log_and_exception_factory(
 
 
 def test_logged_non_exception_raise_remains_legacy_debt(tmp_path: Path) -> None:
+    """Reject logged raises whose value is not an exception constructor."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -319,6 +379,8 @@ def test_logged_non_exception_raise_remains_legacy_debt(tmp_path: Path) -> None:
 
 
 def test_yield_before_final_raise_is_not_treated_as_propagation(tmp_path: Path) -> None:
+    """Reject propagation proofs that can yield before the final raise."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -335,6 +397,8 @@ def test_yield_before_final_raise_is_not_treated_as_propagation(tmp_path: Path) 
 
 
 def test_fallback_recorded_accepts_direct_structured_records(tmp_path: Path) -> None:
+    """Accept direct structured sinks that explicitly record failure."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -393,6 +457,8 @@ def test_fallback_recorded_accepts_direct_structured_records(tmp_path: Path) -> 
 
 
 def test_fallback_record_must_be_direct_and_observable(tmp_path: Path) -> None:
+    """Reject conditional, local-only, empty, or unreachable records."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -447,6 +513,8 @@ def test_fallback_record_must_be_direct_and_observable(tmp_path: Path) -> None:
 
 
 def test_outer_fingerprint_tracks_nested_handler_body_changes(tmp_path: Path) -> None:
+    """Fingerprint nested handler behavior inside a legacy outer handler."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -476,6 +544,8 @@ def test_outer_fingerprint_tracks_nested_handler_body_changes(tmp_path: Path) ->
 def test_fingerprint_tracks_protected_operations_and_refuses_replacement(
     tmp_path: Path,
 ) -> None:
+    """Churn fingerprints when the protected operation set changes."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -505,6 +575,8 @@ def test_fingerprint_tracks_protected_operations_and_refuses_replacement(
 
 
 def test_fingerprint_tracks_handler_order_within_a_try(tmp_path: Path) -> None:
+    """Distinguish ordered broad handlers within one try statement."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -536,6 +608,8 @@ def test_fingerprint_tracks_handler_order_within_a_try(tmp_path: Path) -> None:
 
 
 def test_fingerprint_tracks_sibling_handler_coverage(tmp_path: Path) -> None:
+    """Churn fingerprints when sibling handler coverage changes."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -564,6 +638,8 @@ def test_fingerprint_tracks_sibling_handler_coverage(tmp_path: Path) -> None:
 
 
 def test_fingerprint_distinguishes_identical_try_sites(tmp_path: Path) -> None:
+    """Distinguish structurally identical try statements in one scope."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -597,6 +673,8 @@ def test_fingerprint_distinguishes_identical_try_sites(tmp_path: Path) -> None:
 
 
 def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
+    """Churn fingerprints when a handler moves to another try site."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -626,6 +704,8 @@ def test_fingerprint_tracks_the_protected_try_site(tmp_path: Path) -> None:
 
 
 def test_fingerprint_tracks_enclosing_control_flow(tmp_path: Path) -> None:
+    """Include enclosing behavior-bearing control flow in site identity."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -653,6 +733,8 @@ def test_fingerprint_tracks_enclosing_control_flow(tmp_path: Path) -> None:
 
 
 def test_fingerprint_tracks_lexical_statement_position(tmp_path: Path) -> None:
+    """Include lexical statement position without relying on line numbers."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -682,6 +764,8 @@ def test_fingerprint_tracks_lexical_statement_position(tmp_path: Path) -> None:
 
 
 def test_fingerprint_ignores_python_version_ast_metadata() -> None:
+    """Ignore AST fields that vary across supported Python minor versions."""
+
     tree = ast.parse(
         "try:\n"
         "    def nested():\n"
@@ -704,6 +788,8 @@ def test_fingerprint_ignores_python_version_ast_metadata() -> None:
 def test_baseline_fingerprint_ignores_line_only_changes_and_rejects_stale_debt(
     tmp_path: Path,
 ) -> None:
+    """Ignore line movement while rejecting obsolete baseline debt."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     module = _write_module(
@@ -726,6 +812,8 @@ def test_baseline_fingerprint_ignores_line_only_changes_and_rejects_stale_debt(
 
 
 def test_baseline_writer_refuses_new_or_modified_debt(tmp_path: Path) -> None:
+    """Allow only debt removal when rewriting the baseline."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -753,6 +841,8 @@ def test_baseline_writer_refuses_new_or_modified_debt(tmp_path: Path) -> None:
 
 
 def test_tuple_and_bare_handlers_are_in_scope(tmp_path: Path) -> None:
+    """Detect broad exceptions nested in tuples and bare handlers."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -774,6 +864,8 @@ def test_tuple_and_bare_handlers_are_in_scope(tmp_path: Path) -> None:
 
 
 def test_exception_group_handlers_are_in_scope(tmp_path: Path) -> None:
+    """Detect broad exception-group handlers."""
+
     baseline = tmp_path / "baseline.json"
     _write_baseline(baseline)
     _write_module(
@@ -789,6 +881,8 @@ def test_exception_group_handlers_are_in_scope(tmp_path: Path) -> None:
 
 
 def test_deferred_files_require_live_handlers_and_reasons(tmp_path: Path) -> None:
+    """Validate deferred paths, live handlers, and non-empty reasons."""
+
     baseline = tmp_path / "baseline.json"
     _write_module(tmp_path, "value = 1\n")
     _write_baseline(
@@ -805,6 +899,8 @@ def test_deferred_files_require_live_handlers_and_reasons(tmp_path: Path) -> Non
 
 
 def test_baseline_loader_rejects_unsorted_entries(tmp_path: Path) -> None:
+    """Reject nondeterministically ordered baseline entries."""
+
     baseline = tmp_path / "baseline.json"
     entries = [
         {
