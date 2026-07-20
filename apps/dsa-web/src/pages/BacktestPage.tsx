@@ -4,7 +4,7 @@ import { Check, Minus, X } from 'lucide-react';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
-import { ApiErrorAlert, Badge, Button, Card, DatePicker, EmptyState, Input, Pagination, Select, StatusDot, Tooltip } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Card, DatePicker, EmptyState, Input, Loading, Pagination, Select, StatusDot, Tooltip } from '../components/common';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
 import {
@@ -708,9 +708,7 @@ const BacktestPage: React.FC = () => {
         <div className="flex max-h-[38vh] flex-col gap-3 overflow-y-auto lg:max-h-none lg:w-60 lg:flex-shrink-0">
           {performanceError ? <ApiErrorAlert error={performanceError} /> : null}
           {isLoadingPerf ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="backtest-spinner sm" />
-            </div>
+            <Loading />
           ) : overallPerf ? (
             <PerformanceCard metrics={overallPerf} title={text.overallPerformance} language={language} />
           ) : performanceError ? null : (
@@ -743,10 +741,7 @@ const BacktestPage: React.FC = () => {
             <ApiErrorAlert error={resultsError} className="mb-3" />
           ) : null}
           {isLoadingResults ? (
-            <div className="flex flex-col items-center justify-center h-64">
-              <div className="backtest-spinner md" />
-              <p className="mt-3 text-secondary-text text-sm">{text.loadingResults}</p>
-            </div>
+            <Loading label={text.loadingResults} className="h-64" />
           ) : results.length === 0 && !resultsError ? (
             <EmptyState
               title={text.noResultsTitle}
