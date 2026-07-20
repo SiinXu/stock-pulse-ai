@@ -75,6 +75,46 @@ describe('DataTable', () => {
     expect(screen.getByText('212.48')).toBeVisible();
   });
 
+  it('owns controlled detail-row geometry, identity, and accessible labels', () => {
+    const { rerender } = render(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={ROWS}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        isRowDetailVisible={(row) => row.id === 1}
+        renderRowDetail={(row) => <button type="button">Inspect {row.symbol}</button>}
+        getRowDetailId={(row) => `position-${row.id}-details`}
+        getRowDetailAriaLabel={(row) => `${row.symbol} position details`}
+      />,
+    );
+
+    const detailRow = screen.getByRole('row', { name: 'AAPL position details' });
+    expect(detailRow).toHaveAttribute('id', 'position-1-details');
+    expect(detailRow).toHaveAttribute('data-data-table-detail-row', 'true');
+    expect(detailRow).toHaveClass('bg-subtle-soft');
+    expect(within(detailRow).getByRole('cell')).toHaveAttribute('colspan', '2');
+    expect(within(detailRow).getByRole('button', { name: 'Inspect AAPL' })).toBeVisible();
+    expect(screen.queryByRole('row', { name: 'MSFT position details' })).not.toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={ROWS}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        isRowDetailVisible={() => false}
+        renderRowDetail={(row) => <span>{row.symbol} detail</span>}
+        getRowDetailId={(row) => `position-${row.id}-details`}
+        getRowDetailAriaLabel={(row) => `${row.symbol} position details`}
+      />,
+    );
+
+    expect(document.querySelector('[data-data-table-detail-row="true"]')).not.toBeInTheDocument();
+  });
+
   it('owns empty, loading, error, and retrying state surfaces without rendering a second table', () => {
     const { rerender } = render(
       <DataTable

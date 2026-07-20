@@ -815,7 +815,7 @@ describe('StockScreeningPage', () => {
   });
 
   it('restores strategy, market, and result count run parameters from the URL', async () => {
-    window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25');
+    window.history.pushState({}, '', '/screening?strategy=shrink_pullback&market=cn&count=25&source=report#details');
     getStrategies.mockResolvedValueOnce({
       enabled: true,
       strategies: [
@@ -854,7 +854,10 @@ describe('StockScreeningPage', () => {
         maxResults: 25,
       });
     });
-    expect(window.location.search).toBe('?strategy=shrink_pullback&count=25');
+    expect(navigate).toHaveBeenLastCalledWith(
+      '/screening?strategy=shrink_pullback&count=25&source=report#details',
+      { replace: true },
+    );
   });
 
   it('keeps the parameter modal open and focuses an invalid result count', async () => {
@@ -1117,7 +1120,23 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('本次 LLM 重排失败或未返回判断，当前展示的是本地因子评分结果。')).toBeInTheDocument();
     expect(screen.getByText('LLM 元数据未返回')).toBeInTheDocument();
     expect(screen.getAllByText('未返回（LLM 已降级）')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: /^(展开|收起)$/ })).toHaveClass('min-h-11', 'min-w-11');
+    expect(screen.getByRole('table', { name: '选股结果' })).toBeVisible();
+    expect(screen.getByRole('region', { name: '选股结果' })).toHaveAttribute('tabindex', '0');
+    const collapseButton = screen.getByRole('button', { name: '收起' });
+    const detailId = collapseButton.getAttribute('aria-controls');
+    expect(collapseButton).toHaveAttribute('data-control', 'button');
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    expect(detailId).toBeTruthy();
+    expect(screen.getByRole('row', { name: '平安银行 详情' })).toHaveAttribute('id', detailId);
+
+    fireEvent.click(collapseButton);
+    const expandButton = screen.getByRole('button', { name: '展开查看' });
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(detailId!)).not.toBeInTheDocument();
+
+    fireEvent.click(expandButton);
+    expect(screen.getByRole('button', { name: '收起' })).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById(detailId!)).toBeVisible();
   });
 
   it('localizes stable AlphaSift diagnostic codes without exposing internal codes', async () => {

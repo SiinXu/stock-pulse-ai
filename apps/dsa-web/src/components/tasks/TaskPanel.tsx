@@ -137,7 +137,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
 
       {!isTerminal ? (
         <div className="flex min-w-0 items-center gap-2">
-          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/8">
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-subtle">
             <div
               className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
               style={{ width: `${progress}%` }}

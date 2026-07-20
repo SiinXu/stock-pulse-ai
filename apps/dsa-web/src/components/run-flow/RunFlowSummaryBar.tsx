@@ -77,7 +77,7 @@ export const RunFlowSummaryBar: React.FC<RunFlowSummaryBarProps> = ({ snapshot }
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[28rem]">
           {items.map(({ key, icon: Icon, label, value }) => (
-            <div key={key} className="rounded-lg border border-subtle bg-surface/40 px-3 py-2">
+            <div key={key} className="rounded-lg border border-subtle bg-subtle-soft px-3 py-2">
               <div className="flex items-center gap-1.5 text-xs text-muted-text">
                 <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">{label}</span>

@@ -25,7 +25,6 @@ const PRIMARY_CTA_VARIANTS = new Set([
 type DesignRule =
   | 'button-shape'
   | 'button-size-contract'
-  | 'button-xl-allowlist'
   | 'button-visual-override'
   | 'button-icon-only'
   | 'control-visual-override'
@@ -67,23 +66,14 @@ const BUTTON_CANONICAL_SIZE_HEIGHTS = {
   comfortable: 'h-9',
   primary: 'h-10',
 } as const;
-const BUTTON_COMPAT_SIZE_HEIGHTS = {
-  xl: 'h-10',
-} as const;
-const BUTTON_LEGACY_SIZE_ALIASES = new Set(['xsm', 'sm', 'md', 'lg']);
+const BUTTON_LEGACY_SIZE_ALIASES = new Set(['xsm', 'sm', 'md', 'lg', 'xl']);
 const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
 type ExactButtonAllowance = {
   line: number;
-  removeBy: string;
+  owner: 'UIUX-HARNESS';
+  removeWhen: string;
   tokens: readonly string[];
 };
-const BUTTON_XL_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
-  ['../../pages/NotFoundPage.tsx', [{
-    line: 34,
-    removeBy: 'UI-QA01',
-    tokens: ['size="xl"'],
-  }]],
-]);
 const BUTTON_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|basis-|flex-(?:1|auto|initial|none|\[)|grow(?:-|$)|w-|min-w-|max-w-|\[(?:height|min-height|max-height|width|min-width|max-width|inline-size|min-inline-size|max-inline-size|block-size|min-block-size|max-block-size|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius|flex(?:-basis|-grow|-shrink)?):)/;
 const FIELD_CONTROL_VISUAL_OVERRIDE_PATTERN = /^(?:size-|h-|min-h-|max-h-|p(?:[trblxyse])?-|rounded(?:-|$)|\[(?:height|min-height|max-height|padding(?:-(?:top|right|bottom|left|inline(?:-start|-end)?|block(?:-start|-end)?))?|border-radius):)/;
 const NON_BUTTON_CONTROL_NAMES = ['Input', 'IconButton', 'SelectionChip', 'Textarea'] as const;
@@ -108,74 +98,88 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
     line,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS' as const,
+    removeWhen: 'ApiErrorAlert callers no longer need layout className pass-through after migration to external wrappers.',
     tokens: ['dynamic:className'],
   }))],
   ['../common/Card.tsx', [{
     line: 43,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'All Card consumers migrate to semantic Surface ownership and the compatibility adapter is deleted.',
     tokens: ['dynamic:className', 'style:dynamic:style'],
   }]],
   ['../common/EmptyState.tsx', [{
     line: 22,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'EmptyState callers no longer need layout className or native style pass-through after wrapper migration.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/InlineAlert.tsx', [{
     line: 26,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'InlineAlert callers no longer need layout className or native style pass-through after wrapper migration.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/Loading.tsx', [{
     line: 14,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'Loading callers no longer need layout className pass-through after wrapper migration.',
     tokens: ['dynamic:className'],
   }]],
   ['../common/Section.tsx', [{
     line: 42,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'Section callers no longer need layout className or native style pass-through after wrapper migration.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/SectionCard.tsx', [{
     line: 22,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'SectionCard consumers migrate to Section or Surface and the compatibility adapter is deleted.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../common/StatCard.tsx', [{
     line: 37,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'The design guard recognizes StatCard semantic tone maps and callers no longer need layout className pass-through.',
     tokens: ['dynamic:toneStyles[tone]', 'dynamic:className'],
   }]],
   ['../common/StatePanel.tsx', [{
     line: 67,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'StatePanel callers no longer need layout className or native style pass-through after wrapper migration.',
     tokens: ['dynamic:className', 'style:dynamic:style spread:props'],
   }]],
   ['../dashboard/DashboardStateBlock.tsx', [{
     line: 30,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'DashboardStateBlock callers no longer need layout className pass-through after wrapper migration.',
     tokens: ['dynamic:className'],
   }]],
   ['../settings/SettingsSectionCard.tsx', [{
     line: 23,
-    removeBy: 'UI-QA01',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'SettingsSectionCard consumers migrate to Section or Surface and the compatibility adapter is deleted.',
     tokens: ['dynamic:className'],
   }]],
   ['../report/ReportOverview.tsx', [
     ...[298, 321].map((line) => ({
       line,
-      removeBy: 'UI-R01',
+      owner: 'UIUX-HARNESS' as const,
+      removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-insight-card'],
     })),
     {
       line: 382,
-      removeBy: 'UI-R01',
+      owner: 'UIUX-HARNESS',
+      removeWhen: 'The report sentiment rail receives an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-rail-card'],
     },
   ]],
   ['../tasks/TaskPanel.tsx', [{
     line: 224,
-    removeBy: 'UI-R03',
+    owner: 'UIUX-HARNESS',
+    removeWhen: 'TaskPanel migrates from Card to Surface after every caller moves layout sizing to an external wrapper.',
     tokens: ['dynamic:className'],
   }]],
 ]);
@@ -949,7 +953,6 @@ function appendButtonSizeUsageViolations(
   source: string,
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
-  allowlistHits: string[],
   violations: DesignViolation[],
 ): void {
   if (!isSharedButtonOpening(opening, bindings)) return;
@@ -977,7 +980,7 @@ function appendButtonSizeUsageViolations(
     violations.push({
       file: filename,
       line: lineNumberAt(source, unresolved.getStart(opening.getSourceFile())),
-      rule: 'button-xl-allowlist',
+      rule: 'button-size-contract',
       token: 'size={dynamic}',
     });
   }
@@ -991,24 +994,9 @@ function appendButtonSizeUsageViolations(
       token: `size="${candidate}"`,
     });
   }
-  if (!candidates.includes('xl')) return;
-  if (consumeExactButtonAllowance(
-    'button-xl-allowlist',
-    BUTTON_XL_ALLOWLIST,
-    filename,
-    openingLine,
-    'size="xl"',
-    allowlistHits,
-  )) return;
-  violations.push({
-    file: filename,
-    line: openingLine,
-    rule: 'button-xl-allowlist',
-    token: 'size="xl"',
-  });
 }
 
-type ExactVisualAllowanceRule = 'button-xl-allowlist' | 'button-visual-override' | 'state-surface-visual-override';
+type ExactVisualAllowanceRule = 'button-visual-override' | 'state-surface-visual-override';
 
 function exactButtonAllowanceKey(
   rule: ExactVisualAllowanceRule,
@@ -2137,10 +2125,6 @@ function appendButtonSizeContractViolations(
       });
       continue;
     }
-    const compatibleHeight = BUTTON_COMPAT_SIZE_HEIGHTS[
-      size as keyof typeof BUTTON_COMPAT_SIZE_HEIGHTS
-    ];
-    if (compatibleHeight && heights.length === 1 && heights[0] === compatibleHeight) continue;
     violations.push({
       file: filename,
       line: lineNumberAt(source, entry.index),
@@ -2368,7 +2352,6 @@ function scanPrimaryCtasInBoundSource(
         source,
         node.openingElement,
         buttonBindings,
-        result.allowlistHits,
         result.violations,
       );
       appendButtonVisualOverrideViolations(
@@ -2425,7 +2408,6 @@ function scanPrimaryCtasInBoundSource(
         source,
         node,
         buttonBindings,
-        result.allowlistHits,
         result.violations,
       );
       appendButtonVisualOverrideViolations(
@@ -2894,6 +2876,9 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations('fixture.tsx', styleSource)).toContainEqual(
       expect.objectContaining({ rule: 'button-size-contract', token: 'xsm:legacy' }),
     );
+    expect(findProductionDesignViolations('fixture.tsx', styleSource)).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'xl:legacy' }),
+    );
     expect(findProductionDesignViolations(
       'fixture.tsx',
       'import { Button } from "../common"; <Button variant="secondary" size="sm">Run</Button>',
@@ -2928,23 +2913,9 @@ describe('production design guard', () => {
     );
   });
 
-  it('self-test rejects xl Button usage outside the exact migration allowlist', () => {
-    const source = `
-      import { Button } from '../common';
-      export const Example = () => <Button variant="primary" size="xl">Continue</Button>;
-    `;
-
-    expect(findProductionDesignViolations('fixture.tsx', source)).toContainEqual(
-      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
-    );
-    expect(findProductionDesignViolations('../../pages/NotFoundPage.tsx', source)).toContainEqual(
-      expect.objectContaining({ rule: 'button-xl-allowlist', token: 'size="xl"' }),
-    );
-  });
-
   it('fails closed for dynamic Button sizes and respects final JSX prop order', () => {
     const sizeViolations = (source: string) => findProductionDesignViolations('fixture.tsx', source)
-      .filter(({ rule }) => rule === 'button-xl-allowlist');
+      .filter(({ rule }) => rule === 'button-size-contract');
 
     expect(sizeViolations(
       'declare const props: ButtonProps; <Button variant="secondary" size="default" {...props}>Continue</Button>',
@@ -2960,10 +2931,8 @@ describe('production design guard', () => {
       'declare const props: ButtonProps; <Button variant="secondary" {...props} size="default">Continue</Button>',
     )).toEqual([]);
     expect(sizeViolations(
-      '<Button variant="secondary" size={dense ? "default" : "xl"}>Continue</Button>',
-    )).toEqual([
-      expect.objectContaining({ token: 'size="xl"' }),
-    ]);
+      '<Button variant="secondary" size={dense ? "default" : "comfortable"}>Continue</Button>',
+    )).toEqual([]);
   });
 
   it('self-test rejects caller-side Button visual overrides', () => {
@@ -3211,13 +3180,13 @@ describe('production design guard', () => {
       expect.objectContaining({ rule: 'button-visual-override', token: 'min-h-11' }),
     ]);
     for (const allowances of [
-      ...BUTTON_XL_ALLOWLIST.values(),
       ...BUTTON_VISUAL_OVERRIDE_ALLOWLIST.values(),
       ...STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST.values(),
     ]) {
-      for (const { line, removeBy, tokens } of allowances) {
+      for (const { line, owner, removeWhen, tokens } of allowances) {
         expect(line).toBeGreaterThan(0);
-        expect(removeBy).toMatch(/^UI-[A-Z0-9]+$/);
+        expect(owner).toBe('UIUX-HARNESS');
+        expect(removeWhen.trim().length).toBeGreaterThan(0);
         expect(tokens.length).toBeGreaterThan(0);
       }
     }
@@ -3628,7 +3597,7 @@ describe('production design guard', () => {
     expect(findProductionDesignViolations(
       'fixture.tsx',
       '<Button variant="primary" {...props} className="bg-card" style={{ background: \'var(--background)\' }}>Run</Button>',
-    ).filter(({ rule }) => rule !== 'button-xl-allowlist')).toEqual([]);
+    ).filter(({ rule }) => rule !== 'button-size-contract')).toEqual([]);
   });
 
   it('resolves direct const class expressions for primary callsites and shared styles', () => {
@@ -3831,7 +3800,6 @@ describe('production design guard', () => {
       .flatMap((scan) => scan.allowlistHits)
       .sort();
     const expectedAllowlistHits = [
-      ...exactButtonAllowanceKeys('button-xl-allowlist', BUTTON_XL_ALLOWLIST),
       ...exactButtonAllowanceKeys(
         'button-visual-override',
         BUTTON_VISUAL_OVERRIDE_ALLOWLIST,

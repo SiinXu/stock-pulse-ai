@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
+  Fragment,
   forwardRef,
   type ForwardedRef,
   type Key,
@@ -76,8 +77,24 @@ interface DataTableInteractiveRows<T> {
   isRowDisabled?: (row: T, index: number) => boolean;
 }
 
+interface DataTableWithoutRowDetails {
+  isRowDetailVisible?: never;
+  renderRowDetail?: never;
+  getRowDetailId?: never;
+  getRowDetailAriaLabel?: never;
+}
+
+interface DataTableWithRowDetails<T> {
+  isRowDetailVisible: (row: T, index: number) => boolean;
+  renderRowDetail: (row: T, index: number) => ReactNode;
+  getRowDetailId?: (row: T, index: number) => string;
+  getRowDetailAriaLabel?: (row: T, index: number) => string;
+}
+
 export type DataTableProps<T> = DataTableBaseProps<T> & (
   DataTableStaticRows | DataTableInteractiveRows<T>
+) & (
+  DataTableWithoutRowDetails | DataTableWithRowDetails<T>
 );
 
 const ALIGN_STYLES: Record<DataTableAlign, string> = {
@@ -166,6 +183,10 @@ function DataTableInner<T>({
   onRowActivate,
   getRowAriaLabel,
   isRowDisabled,
+  isRowDetailVisible,
+  renderRowDetail,
+  getRowDetailId,
+  getRowDetailAriaLabel,
 }: DataTableProps<T>, ref: ForwardedRef<HTMLTableElement>) {
   const effectiveState = status ?? (rows.length === 0
     ? { state: 'empty' as const, ...emptyState }
@@ -276,47 +297,62 @@ function DataTableInner<T>({
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((row, index) => {
+              const rowKey = getRowKey(row, index);
               const disabled = Boolean(isRowDisabled?.(row, index));
               const interactive = Boolean(onRowActivate);
+              const detailVisible = Boolean(isRowDetailVisible?.(row, index));
               return (
-                <tr
-                  key={getRowKey(row, index)}
-                  aria-label={getRowAriaLabel?.(row, index)}
-                  aria-disabled={interactive && disabled ? true : undefined}
-                  aria-keyshortcuts={interactive && !disabled ? 'Enter Space' : undefined}
-                  tabIndex={interactive && !disabled ? 0 : undefined}
-                  data-row-activatable={interactive || undefined}
-                  data-row-disabled={disabled || undefined}
-                  className={cn(
-                    'align-top transition-[background-color] duration-150 motion-reduce:transition-none',
-                    interactive && !disabled && 'cursor-pointer hover:bg-hover/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/55',
-                    disabled && 'opacity-55',
-                  )}
-                  onClick={(event) => activateFromMouse(event, row, index)}
-                  onKeyDown={(event) => activateFromKeyboard(event, row, index)}
-                >
-                  {columns.map((column) => {
-                    const align = column.align ?? 'start';
-                    const cellProps = {
-                      className: cn(
-                        CELL_PADDING_STYLES[density],
-                        ALIGN_STYLES[align],
-                        column.width && WIDTH_STYLES[column.width],
-                        column.nowrap && 'whitespace-nowrap',
-                        'text-secondary-text',
-                      ),
-                    };
-                    return column.rowHeader ? (
-                      <th key={column.id} scope="row" {...cellProps}>
-                        {column.cell(row, index)}
-                      </th>
-                    ) : (
-                      <td key={column.id} {...cellProps}>
-                        {column.cell(row, index)}
+                <Fragment key={rowKey}>
+                  <tr
+                    aria-label={getRowAriaLabel?.(row, index)}
+                    aria-disabled={interactive && disabled ? true : undefined}
+                    aria-keyshortcuts={interactive && !disabled ? 'Enter Space' : undefined}
+                    tabIndex={interactive && !disabled ? 0 : undefined}
+                    data-row-activatable={interactive || undefined}
+                    data-row-disabled={disabled || undefined}
+                    className={cn(
+                      'align-top transition-[background-color] duration-150 motion-reduce:transition-none',
+                      interactive && !disabled && 'cursor-pointer hover:bg-hover/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/55',
+                      disabled && 'opacity-55',
+                    )}
+                    onClick={(event) => activateFromMouse(event, row, index)}
+                    onKeyDown={(event) => activateFromKeyboard(event, row, index)}
+                  >
+                    {columns.map((column) => {
+                      const align = column.align ?? 'start';
+                      const cellProps = {
+                        className: cn(
+                          CELL_PADDING_STYLES[density],
+                          ALIGN_STYLES[align],
+                          column.width && WIDTH_STYLES[column.width],
+                          column.nowrap && 'whitespace-nowrap',
+                          'text-secondary-text',
+                        ),
+                      };
+                      return column.rowHeader ? (
+                        <th key={column.id} scope="row" {...cellProps}>
+                          {column.cell(row, index)}
+                        </th>
+                      ) : (
+                        <td key={column.id} {...cellProps}>
+                          {column.cell(row, index)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  {detailVisible && renderRowDetail ? (
+                    <tr
+                      id={getRowDetailId?.(row, index)}
+                      aria-label={getRowDetailAriaLabel?.(row, index)}
+                      data-data-table-detail-row="true"
+                      className="align-top bg-subtle-soft"
+                    >
+                      <td colSpan={columns.length} className={CELL_PADDING_STYLES[density]}>
+                        {renderRowDetail(row, index)}
                       </td>
-                    );
-                  })}
-                </tr>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
             })}
           </tbody>

@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, Minus, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
@@ -57,8 +58,8 @@ function getInitialBacktestFilters(search = typeof window === 'undefined' ? '' :
   };
 }
 
-function syncBacktestFiltersToUrl(filters: BacktestFilterSnapshot): void {
-  if (typeof window === 'undefined') return;
+function getBacktestFiltersLocation(filters: BacktestFilterSnapshot): string | null {
+  if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
   const values: Record<string, string | undefined> = {
     code: normalizeBacktestCode(filters.code),
@@ -72,7 +73,7 @@ function syncBacktestFiltersToUrl(filters: BacktestFilterSnapshot): void {
     if (value) url.searchParams.set(key, value);
     else url.searchParams.delete(key);
   });
-  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 // ============ Helpers ============
@@ -263,7 +264,7 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
         </span>
       </div>
       {phaseText ? (
-        <div className="mt-3 border-t border-white/10 pt-2 text-xs text-muted-text">
+        <div className="mt-3 border-t border-subtle pt-2 text-xs text-muted-text">
           {formatUiText(text.phaseDistribution, { text: phaseText })}
         </div>
       ) : null}
@@ -294,12 +295,17 @@ const RunSummary: React.FC<{ data: BacktestRunResponse; language: UiLanguage }> 
 // ============ Main Page ============
 
 const BacktestPage: React.FC = () => {
+  const navigate = useNavigate();
   const { language, t } = useUiLanguage();
   const text = BACKTEST_TEXT[language];
   const validationText = BACKTEST_VALIDATION_TEXT[language];
   const phaseFilterOptions = BACKTEST_PHASE_FILTER_OPTIONS[language];
   const actionLabels = buildDecisionActionLabelMap(t);
   const [initialFilters] = useState(() => getInitialBacktestFilters());
+  const syncBacktestFiltersToUrl = useCallback((filters: BacktestFilterSnapshot) => {
+    const location = getBacktestFiltersLocation(filters);
+    if (location) navigate(location, { replace: true });
+  }, [navigate]);
 
   // Set page title
   useEffect(() => {
@@ -666,7 +672,7 @@ const BacktestPage: React.FC = () => {
   return (
     <div className="min-h-full flex flex-col rounded-3xl bg-transparent">
       {/* Header */}
-      <header className="flex-shrink-0 border-b border-white/5 px-3 py-3 sm:px-4">
+      <header className="flex-shrink-0 border-b border-subtle px-3 py-3 sm:px-4">
         {/* Visually hidden: the header is a dense filter toolbar, but the page
             still needs an h1 landmark for assistive technology. */}
         <h1 className="sr-only">{text.pageTitle}</h1>

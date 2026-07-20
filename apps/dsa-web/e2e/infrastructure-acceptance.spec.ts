@@ -882,6 +882,36 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto('/screening');
     await expect(page.getByText('RESTORED', { exact: true }).first()).toBeVisible();
     expect(await page.evaluate((key) => sessionStorage.getItem(key), screeningTaskStorageKey)).toBeNull();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const resultsRegion = page.getByRole('region', { name: SCREENING_TEXT.zh.results });
+    const collapseCandidate = page.getByRole('button', { name: SCREENING_TEXT.zh.collapse });
+    const detailId = await collapseCandidate.getAttribute('aria-controls');
+    expect(detailId).toBeTruthy();
+    await expect(collapseCandidate).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`#${detailId}`)).toHaveAttribute(
+      'aria-label',
+      `RESTORED candidate ${SCREENING_TEXT.zh.details}`,
+    );
+    await collapseCandidate.focus();
+    await page.keyboard.press('Enter');
+    const expandCandidate = page.getByRole('button', { name: SCREENING_TEXT.zh.expand });
+    await expect(expandCandidate).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator(`#${detailId}`)).toHaveCount(0);
+    await expandCandidate.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator(`#${detailId}`)).toBeVisible();
+    const tableDimensions = await resultsRegion.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(tableDimensions.scrollWidth).toBeGreaterThan(tableDimensions.clientWidth);
+    expect(await resultsRegion.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+      return element.scrollLeft;
+    })).toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
     await page.getByRole('button', { name: '参数设置' }).click();
     const dialog = page.getByRole('dialog', { name: '参数设置' });
     await dialog.getByLabel('返回数量').press('Enter');

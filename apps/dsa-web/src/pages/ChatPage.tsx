@@ -6,7 +6,7 @@ import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { agentApi } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Switch, Tooltip, useClipboard } from '../components/common';
+import { ApiErrorAlert, Badge, Button, Checkbox, ConfirmDialog, Drawer, EmptyState, InlineAlert, ScrollArea, SearchInput, SegmentedControl, Surface, Switch, Tooltip, useClipboard } from '../components/common';
 import { DeepResearchPanel } from '../components/chat/DeepResearchPanel';
 import { getParsedApiError } from '../api/error';
 import type { SkillInfo } from '../api/agent';
@@ -922,7 +922,7 @@ const ChatPage: React.FC = () => {
 
   const sidebarContent = (
     <>
-      <div className="flex items-center justify-between border-b border-white/5 bg-white/2 p-3.5">
+      <div className="flex items-center justify-between border-b border-subtle bg-subtle-soft p-3.5">
         <h2 className="hidden text-sm font-semibold text-primary uppercase tracking-[0.2em] md:flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -933,7 +933,7 @@ const ChatPage: React.FC = () => {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-white/10 hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-text transition-all hover:bg-subtle-hover hover:text-foreground"
             aria-label={t('chat.newConversation')}
           >
             <svg
@@ -1057,7 +1057,7 @@ const ChatPage: React.FC = () => {
       className="flex h-[calc(100dvh-5rem)] w-full min-w-0 gap-4 overflow-hidden p-3 sm:h-[calc(100dvh-5.5rem)] lg:h-[calc(100dvh-2rem)]"
     >
       {/* Desktop sidebar */}
-      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-white/8 bg-card/82 shadow-soft-card md:flex">
+      <div className="hidden h-full w-64 flex-shrink-0 flex-col overflow-hidden rounded-3xl border border-subtle bg-card/82 shadow-soft-card md:flex">
         {sidebarContent}
       </div>
 
@@ -1250,11 +1250,11 @@ const ChatPage: React.FC = () => {
         </header>
 
         {chatMode === 'research' ? (
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-auto border border-white/6 bg-card/78 glass-card p-4 md:p-6">
+          <Surface level="interactive" className="z-10 flex min-h-0 flex-1 flex-col overflow-auto p-4 md:p-6">
             <DeepResearchPanel key={sessionId} sessionId={sessionId} />
-          </div>
+          </Surface>
         ) : null}
-        <div className={chatMode === 'research' ? 'hidden' : 'relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden border border-white/6 bg-card/78 glass-card'}>
+        <Surface level="canvas" className={chatMode === 'research' ? 'hidden' : 'z-10 flex min-h-0 flex-1 flex-col overflow-hidden'}>
           {/* Messages */}
           <ScrollArea
             className="relative z-10 flex-1"
@@ -1398,7 +1398,7 @@ const ChatPage: React.FC = () => {
                 <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
                   AI
                 </div>
-                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-white/6 bg-card/72 px-5 py-4">
+                <div className="min-w-50 max-w-[min(100%,48rem)] overflow-hidden rounded-2xl rounded-tl-sm border border-subtle bg-card/72 px-5 py-4">
                   <div className="flex items-center gap-2.5 text-sm text-secondary-text">
                     <div className="relative w-4 h-4 flex-shrink-0">
                       <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
@@ -1445,7 +1445,7 @@ const ChatPage: React.FC = () => {
           )}
 
           {/* Input area */}
-          <div className="border-t border-white/6 bg-card/88 p-4 md:p-6 relative z-20">
+          <div className="relative z-20 border-t border-subtle bg-card/88 p-4 md:p-6">
             <div className="space-y-3">
               {sessionError ? (
                 <ApiErrorAlert error={sessionError} />
@@ -1473,7 +1473,7 @@ const ChatPage: React.FC = () => {
                   message={t('chat.followUpLoadingMessage')}
                 />
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/6 bg-surface/25 px-3 py-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-subtle bg-subtle-soft px-3 py-2">
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-foreground">{t('chat.contextCompression')}</span>
                   <span className="ml-2 text-xs text-muted-text">{t('chat.contextCompressionDescription')}</span>
@@ -1640,7 +1640,7 @@ const ChatPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Surface>
       </div>
     </div>
   );
