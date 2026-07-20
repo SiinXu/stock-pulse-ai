@@ -11,7 +11,7 @@ import { createParsedApiError, getParsedApiError, type ParsedApiError } from '..
 import { analysisApi } from '../api/analysis';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, SearchableSelect, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, Button, ConfirmDialog, EmptyState, IconButton, Loading, SearchableSelect, Surface, TimePicker, ToastViewport, type SearchableSelectOption } from '../components/common';
 import {
   AuthSettingsCard,
   ChangePasswordCard,
@@ -624,7 +624,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
 
   if (isHidden) {
     return (
-      <div className="rounded-2xl border settings-border bg-card/90 px-4 py-3 shadow-soft-card">
+      <Surface level="interactive" className="px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-foreground">{t('settings.setupGuideHiddenTitle')}</p>
@@ -634,7 +634,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             {t('settings.setupGuideOpen')}
           </Button>
         </div>
-      </div>
+      </Surface>
     );
   }
 
@@ -645,7 +645,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
       contentBordered
     >
       <div data-testid="first-run-setup-card" className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border settings-border bg-background/35 px-4 py-4 md:flex-row md:items-start md:justify-between">
+        <Surface level="interactive" className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">
               {summaryTitle}
@@ -671,20 +671,19 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
               {t('settings.setupGuideHide')}
             </Button>
           </div>
-        </div>
+        </Surface>
 
         {error ? <ApiErrorAlert error={error} /> : null}
 
-        {isLoading && !status ? (
-          <p className="text-sm text-muted-text">{t('common.loading')}</p>
-        ) : null}
+        {isLoading && !status ? <Loading /> : null}
 
         {status ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {status.checks.map((check) => (
-              <div
+              <Surface
                 key={check.key}
-                className="rounded-2xl border settings-border bg-card/65 px-4 py-3"
+                level="interactive"
+                className="px-4 py-3"
               >
                 <div className="flex items-start gap-3">
                   {getSetupCheckIcon(check)}
@@ -701,7 +700,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                     ) : null}
                   </div>
                 </div>
-              </div>
+              </Surface>
             ))}
           </div>
         ) : null}
@@ -907,7 +906,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     >
       <div data-testid="scheduler-settings-card" className="space-y-4">
         <div className="grid grid-cols-1 gap-3">
-          <div className="space-y-4 rounded-2xl border settings-border bg-background/35 px-4 py-4">
+          <Surface level="interactive" className="space-y-4 px-4 py-4">
             <div className="flex min-h-11 items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">{t('settings.schedulerEnable')}</p>
@@ -1006,9 +1005,9 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 ) : null}
               </div>
             </div>
-          </div>
+          </Surface>
 
-          <div className="space-y-3 rounded-2xl border settings-border bg-background/35 px-4 py-4">
+          <Surface level="interactive" className="space-y-3 px-4 py-4">
             <div>
               <p className="text-sm font-semibold text-foreground">{t('settings.schedulerStatus')}</p>
               <p className="mt-1 text-xs leading-6 text-muted-text">
@@ -1071,7 +1070,7 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
                 {t('settings.schedulerRunNow')}
               </Button>
             </div>
-          </div>
+          </Surface>
         </div>
 
         {validationIssues.length ? (
