@@ -343,7 +343,6 @@
     {"path":"src/agent/executor.py","scope":"<module>.AgentExecutor._persist_provider_trace","caught":["Exception"],"digest":"2d3ab94ca2752ad3ca1fcd84b5cd088e6ec82da0f5836b9785ff7f9d1aab05a6"},
     {"path":"src/agent/executor.py","scope":"<module>.AgentExecutor._persist_provider_trace","caught":["Exception"],"digest":"9a730a8a8e2aed2b300b086a9033eaff496fbd2e1daa427b9c5d74ef0993ccf6"},
     {"path":"src/agent/executor.py","scope":"<module>.AgentExecutor.chat","caught":["Exception"],"digest":"e361ded3b8d2c823414dfe0d87c8bd35f38811e6812f35af3a33e648b9379ea4"},
-    {"path":"src/agent/factory.py","scope":"<module>.get_skill_manager","caught":["Exception"],"digest":"d479f9fbeef52bfbcba00fc83ebd8ac5220c2fbb5d2d9a7066102a6827f5368c"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>.LLMToolAdapter._register_custom_model_pricing","caught":["Exception"],"digest":"b7550f2441f9c1d34d9d2bbf4407f776c8a7e5306a6683acb1cffe7bbb8e6a83"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>.LLMToolAdapter.call_completion","caught":["Exception"],"digest":"9dd2145bbc45fa3575ed5ca14edeb66af804e017a52aee0ef6d34f6c4050b51b"},
     {"path":"src/agent/llm_adapter.py","scope":"<module>._object_to_dict","caught":["Exception"],"digest":"10d3242f857e368d9c74b812b40f81540e844c1b71893502d8201342595ddb19"},
