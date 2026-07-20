@@ -63,6 +63,9 @@ test.describe('semantic overlay foundation', () => {
     expect(Number(await toastRoot.evaluate((element) => getComputedStyle(element).zIndex))).toBeGreaterThan(
       Number(await page.locator('[data-overlay-root="sheet"]').evaluate((element) => getComputedStyle(element).zIndex)),
     );
+    const toastBox = await toastRoot.boundingBox();
+    expect(toastBox).not.toBeNull();
+    expect(toastBox!.y + toastBox!.height).toBeLessThanOrEqual(footerBox!.y);
 
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
