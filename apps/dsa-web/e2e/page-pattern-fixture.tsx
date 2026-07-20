@@ -91,7 +91,18 @@ function PatternPage({ routeId, title }: { routeId: string; title: string }) {
 
       <Toolbar
         aria-label="Workspace commands"
-        left={<Button variant="outline" size="compact">Refresh</Button>}
+        left={(
+          <>
+            <Button variant="outline" size="compact">Refresh</Button>
+            <Button
+              variant="outline"
+              size="compact"
+              onClick={() => void navigate({ search: '?view=compact' })}
+            >
+              Update URL state
+            </Button>
+          </>
+        )}
         right={<Button variant="secondary" size="compact">Export</Button>}
       />
 

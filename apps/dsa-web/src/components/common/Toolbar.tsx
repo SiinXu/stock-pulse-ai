@@ -3,7 +3,7 @@ import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface ToolbarProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'role'> {
-  'aria-label'?: string;
+  'aria-label': string;
   left?: React.ReactNode;
   right?: React.ReactNode;
 }

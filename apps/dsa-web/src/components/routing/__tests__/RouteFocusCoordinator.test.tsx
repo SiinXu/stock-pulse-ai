@@ -7,6 +7,7 @@ import {
   Link,
   Outlet,
   RouterProvider,
+  useLocation,
   useNavigate,
 } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -79,6 +80,39 @@ function DeferredPage() {
   );
 }
 
+function SamePathUrlStatePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <RegisteredPage routeId="same-path" title="Same path page">
+      <button
+        type="button"
+        data-route-focus-key="same-path:query"
+        onClick={() => void navigate('/same-path?view=pushed')}
+      >
+        Push query state
+      </button>
+      <button
+        type="button"
+        onClick={() => void navigate('/same-path?view=replaced', { replace: true })}
+      >
+        Replace query state
+      </button>
+      <output data-testid="same-path-search">{location.search}</output>
+    </RegisteredPage>
+  );
+}
+
+async function flushRouteFocusFrames(): Promise<void> {
+  await act(async () => {
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => resolve());
+      });
+    });
+  });
+}
+
 function renderRouter(initialPath = '/first', duplicateMarker = false) {
   const router = createMemoryRouter([
     {
@@ -92,6 +126,7 @@ function renderRouter(initialPath = '/first', duplicateMarker = false) {
         { path: '/replace', element: <ReplacePage /> },
         { path: '/second', element: <RegisteredPage routeId="second" title="Second page" /> },
         { path: '/deferred', element: <DeferredPage /> },
+        { path: '/same-path', element: <SamePathUrlStatePage /> },
       ],
     },
   ], { initialEntries: [initialPath] });
@@ -160,5 +195,41 @@ describe('RouteFocusCoordinator', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Open second page' }), { metaKey: true });
     expect(screen.getByRole('heading', { name: 'First page' })).not.toHaveFocus();
     expect(screen.queryByRole('heading', { name: 'Second page' })).not.toBeInTheDocument();
+  });
+
+  it('retains control focus for same-path PUSH and REPLACE URL-state updates', async () => {
+    renderRouter('/same-path?view=initial');
+    const pushControl = screen.getByRole('button', { name: 'Push query state' });
+    pushControl.focus();
+    fireEvent.click(pushControl);
+    expect(screen.getByTestId('same-path-search')).toHaveTextContent('?view=pushed');
+    await flushRouteFocusFrames();
+    expect(pushControl).toHaveFocus();
+
+    const replaceControl = screen.getByRole('button', { name: 'Replace query state' });
+    replaceControl.focus();
+    fireEvent.click(replaceControl);
+    expect(screen.getByTestId('same-path-search')).toHaveTextContent('?view=replaced');
+    await flushRouteFocusFrames();
+    expect(replaceControl).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Same path page' })).not.toHaveFocus();
+  });
+
+  it('restores a stable opener on same-path POP without using the H1 fallback', async () => {
+    const router = renderRouter('/same-path?view=initial');
+    const pushControl = screen.getByRole('button', { name: 'Push query state' });
+    pushControl.focus();
+    fireEvent.click(pushControl);
+    await flushRouteFocusFrames();
+
+    const replaceControl = screen.getByRole('button', { name: 'Replace query state' });
+    replaceControl.focus();
+    await act(async () => {
+      await router.navigate(-1);
+    });
+
+    expect(screen.getByTestId('same-path-search')).toHaveTextContent('?view=initial');
+    await waitFor(() => expect(pushControl).toHaveFocus());
+    expect(screen.getByRole('heading', { name: 'Same path page' })).not.toHaveFocus();
   });
 });
