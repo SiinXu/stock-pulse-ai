@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 - [测试] 新增 broad exception 分类门禁，以结构指纹冻结未审查存量，要求新增兜底路径明确标注 cleanup、optional_metadata 或 fallback_recorded，并禁止无说明的 BaseException pass。
+- [改进] Web 首页分析主流程的三处 ad-hoc 原生按钮迁移到冻结语义控件：移动端历史抽屉入口与重复任务横幅关闭改用 `IconButton`（视觉档位收敛，粗指针 44px 命中区不变），主“分析”CTA 改用 `Button` primary + `isLoading`/`loadingText`（移除 `btn-primary` 全局样式、`!important` 尺寸覆写与手写 spinner，满宽由 `grid` 包裹保留），可访问名、禁用/加载行为、策略菜单与响应式布局不变。
 - [chore] 解除 `decision_signal_service` 与 `decision_signal_extractor` 的 import 循环：将纯 payload 构建层（`build_decision_signal_payload_from_report` 及全部 helper）下沉到新的叶子模块 `src/services/decision_signal_payload.py`，service 与 extractor 均从叶子复用；service 不再反向 import extractor，行为不变，`build_decision_signal_payload_from_report` 仍可从 extractor 导入，另加 AST 回归守护。
 - [chore] 解除 `llm.usage` 与 `llm.provider_cache` 的 import 循环：将 provider-family 推断下沉到新的叶子模块 `src/llm/provider_family.py`，两侧改为模块级依赖该叶子并移除两处函数内延迟 import；纯结构调整，provider 推断行为不变，`infer_provider_family` 仍可从 `provider_cache` 导入，另加 AST + 运行时防回归测试。
 - [改进] Web 新增统一的底部 Sheet 与 Toast 基础：筛选 Sheet 使用固定 header、单一滚动 body 和固定 footer，并复用 Dialog 的滚动锁、Escape、焦点循环与恢复；Toast 通过应用级 Provider、语义层级和保留 live region 在 Modal/Drawer/Sheet 打开时保持可见可读，设置与决策信号页不再维护私有高位 z-index。
