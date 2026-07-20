@@ -2,6 +2,8 @@ import type React from 'react';
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import { getOverlayStyle } from './overlayZ';
+import { isTopmostPopupEscapeLayer, registerPopupEscapeLayer } from './useFixedPopup';
 
 interface TooltipProps {
   content: React.ReactNode;
@@ -27,7 +29,9 @@ export const Tooltip: React.FC<TooltipProps> = ({
 }) => {
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const escapeLayerTokenRef = useRef<object>({});
   const tooltipId = useId();
+  const hasContent = Boolean(content);
   const [open, setOpen] = useState(false);
   const [resolvedSide, setResolvedSide] = useState<'top' | 'bottom'>(side);
   const [style, setStyle] = useState<TooltipStyle>({ top: 0, left: 0 });
@@ -97,6 +101,30 @@ export const Tooltip: React.FC<TooltipProps> = ({
     };
   }, [open, updatePosition]);
 
+  useEffect(() => {
+    if (!open || !hasContent) return undefined;
+    const unregisterEscapeLayer = registerPopupEscapeLayer(
+      escapeLayerTokenRef.current,
+      'tooltip',
+    );
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape'
+        || !isTopmostPopupEscapeLayer(escapeLayerTokenRef.current)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      unregisterEscapeLayer();
+    };
+  }, [hasContent, open]);
+
   if (!content) {
     return <>{children}</>;
   }
@@ -119,7 +147,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onKeyDown={(event) => {
-          if (open && event.key === 'Escape') {
+          if (
+            open
+            && event.key === 'Escape'
+            && isTopmostPopupEscapeLayer(escapeLayerTokenRef.current)
+          ) {
             event.preventDefault();
             event.stopPropagation();
             setOpen(false);
@@ -138,13 +170,13 @@ export const Tooltip: React.FC<TooltipProps> = ({
               ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
-              style={{
+              style={getOverlayStyle('tooltip', {
                 position: 'fixed',
                 top: style.top,
                 left: style.left,
-              }}
+              })}
               className={cn(
-                'pointer-events-none z-[120] min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
+                'pointer-events-none min-w-max max-w-[18rem] rounded-xl border border-border/70 bg-elevated/95 px-3 py-1.5 text-xs leading-5 text-foreground shadow-xl backdrop-blur-sm',
                 resolvedSide === 'top' ? 'origin-bottom' : 'origin-top',
                 contentClassName,
               )}

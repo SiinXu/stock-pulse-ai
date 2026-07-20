@@ -2,7 +2,8 @@ import type React from 'react';
 import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { OVERLAY_Z } from './overlayZ';
+import { Button } from './Button';
+import { getOverlayStyle } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
 interface ConfirmDialogProps {
@@ -53,10 +54,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const dialog = (
     <div
       data-overlay-root="confirm"
-      // Confirmations sit above drawers/modals so a confirm opened from inside a
-      // drawer is never hidden (see OVERLAY_Z).
-      style={{ zIndex: OVERLAY_Z.confirm }}
-      className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all"
+      style={getOverlayStyle('confirmation')}
+      className="fixed inset-0 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm transition-all motion-reduce:transition-none"
       onClick={() => {
         if (!cancelDisabled) {
           onCancel();
@@ -71,7 +70,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         aria-labelledby={titleId}
         aria-describedby={messageId}
         tabIndex={-1}
-        className="mx-4 w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200 focus:outline-none"
+        data-overlay-dialog="true"
+        className="w-full max-w-sm rounded-xl border border-border/70 bg-elevated p-6 shadow-2xl animate-in fade-in zoom-in duration-200 focus:outline-none motion-reduce:animate-none"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id={titleId} className="mb-2 text-lg font-medium text-foreground">{title}</h3>
@@ -84,26 +84,22 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </p>
         ) : null}
         <div className="flex justify-end gap-3">
-          <button
-            type="button"
+          <Button
             onClick={onCancel}
             disabled={cancelDisabled}
-            className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-medium text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            variant="secondary"
+            size="comfortable"
           >
             {cancelText ?? t('common.cancel')}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition-all hover:brightness-110 ${
-              isDanger
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-foreground text-background'
-            } disabled:cursor-not-allowed disabled:opacity-60`}
+            variant={isDanger ? 'danger' : 'primary'}
+            size="comfortable"
           >
             {confirmText ?? t('common.confirm')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -4,7 +4,6 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
 import type { ReportLanguage } from '../../types/analysis';
 import { Drawer } from '../common/Drawer';
-import { OVERLAY_Z } from '../common/overlayZ';
 import { ReportMarkdownPanel } from './ReportMarkdownPanel';
 
 export interface ReportMarkdownProps {
@@ -40,9 +39,8 @@ export const ReportMarkdown: React.FC<ReportMarkdownProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       title={text.fullReport}
-      width="max-w-3xl"
-      zIndex={OVERLAY_Z.reportDrawer}
-      backdropClassName="bg-background/56 backdrop-blur-[2px]"
+      variant="detail"
+      size="wide"
     >
       <ReportMarkdownPanel
         recordId={recordId}

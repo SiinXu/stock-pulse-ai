@@ -19,9 +19,10 @@ export const SidebarProfile: React.FC<SidebarProfileProps> = ({ collapsed = fals
       rootClassName={cn('mt-2', collapsed ? 'self-center' : 'w-full')}
       contentRole="menu"
       ariaLabel={t('layout.appFallbackTitle')}
+      placement="top"
+      align="start"
       contentClassName={cn(
         'flex w-57 flex-col gap-2 bg-card px-1 pb-3 pt-1 shadow-soft-card-strong dark:bg-base',
-        collapsed ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2',
       )}
       trigger={({ open, toggle }) => (
         <button

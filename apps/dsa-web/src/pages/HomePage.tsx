@@ -8,7 +8,6 @@ import { historyApi } from '../api/history';
 import { agentApi, type SkillInfo } from '../api/agent';
 import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, Button, Checkbox, Drawer, EmptyState, IconButton, InlineAlert, Popover } from '../components/common';
-import { OVERLAY_Z } from '../components/common/overlayZ';
 import { DashboardStateBlock } from '../components/dashboard';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { StockHistoryTrendDrawer } from '../components/history';
@@ -1408,16 +1407,6 @@ const HomePage: React.FC = () => {
   const sidebarContent = useMemo(
     () => (
       <div className="flex min-h-0 h-full flex-col gap-3 overflow-hidden">
-        <div className="flex justify-end md:hidden">
-          <button
-            type="button"
-            onClick={closeSidebar}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-secondary-text transition-colors hover:bg-hover hover:text-foreground"
-            aria-label={t('common.closeDrawer')}
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
         {/* StockPulse keeps its task-dismiss interaction (onDismiss); the home
             watchlist workspace is the upstream feature, adapted to StockPulse
             design and wired to StockPulse's pending/selected record logic. */}
@@ -1454,7 +1443,6 @@ const HomePage: React.FC = () => {
     [
       activeTasks,
       batchAnalyzeStatus,
-      closeSidebar,
       handleAnalyzeWatchlist,
       handleDeleteStock,
       handleHistoryItemClick,
@@ -1471,7 +1459,6 @@ const HomePage: React.FC = () => {
       selectedReport?.meta.stockCode,
       sidebarWorkspaceTab,
       todayAnalysisItems,
-      t,
       watchlistAnalyzedTodayCount,
       watchlistRows,
       watchlistState.actionMessage,
@@ -1526,7 +1513,9 @@ const HomePage: React.FC = () => {
                   ariaLabelledBy="strategy-menu-button"
                   closeOnEscape={false}
                   onContentKeyDown={handleStrategyMenuKeyDown}
-                  contentClassName="right-0 top-10 z-[120] max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
+                  placement="bottom"
+                  align="end"
+                  contentClassName="max-h-80 w-[min(18rem,calc(100vw-1.5rem))] overflow-y-auto border-subtle p-1.5 text-sm text-foreground shadow-2xl"
                   trigger={({ open, toggle }) => (
                     <button
                       ref={strategyButtonRef}
@@ -1681,13 +1670,7 @@ const HomePage: React.FC = () => {
             isOpen={sidebarOpen}
             onClose={closeSidebar}
             title={t('home.historyButton')}
-            width="w-72"
-            zIndex={OVERLAY_Z.pageDrawer}
-            side="left"
-            backdropClassName="page-drawer-overlay"
-            panelClassName="dashboard-card !rounded-none !rounded-r-xl p-3 shadow-2xl"
-            contentClassName="min-h-0 overflow-hidden !p-0"
-            showHeader={false}
+            variant="navigation"
           >
             {sidebarContent}
           </Drawer>
@@ -1907,8 +1890,8 @@ const HomePage: React.FC = () => {
           isOpen={runFlowDrawer.open}
           onClose={closeRunFlowDrawer}
           title={t('runFlow.drawerTitle')}
-          width="max-w-[96vw]"
-          zIndex={OVERLAY_Z.runFlowDrawer}
+          variant="detail"
+          size="wide"
         >
           <RunFlowPanel
             key={`${runFlowDrawer.source.type}-${runFlowDrawer.source.type === 'task' ? runFlowDrawer.source.taskId : runFlowDrawer.source.recordId}`}

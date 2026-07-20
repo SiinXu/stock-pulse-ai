@@ -33,9 +33,25 @@ interface DialogA11yOptions {
   closeOnEscape?: boolean;
 }
 
+export function isDialogFocusableElement(element: HTMLElement): boolean {
+  if (
+    element.hidden
+    || element.closest('[hidden], [inert], [aria-hidden="true"]')
+  ) {
+    return false;
+  }
+  const style = window.getComputedStyle(element);
+  if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+    return false;
+  }
+  return element.getClientRects().length > 0
+    || element.offsetParent !== null
+    || element === document.activeElement;
+}
+
 function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => el.offsetParent !== null || el === document.activeElement,
+    isDialogFocusableElement,
   );
 }
 
@@ -86,7 +102,10 @@ function syncDocumentIsolation(): void {
       });
     }
 
-    if (topOverlayRoot && child.contains(topOverlayRoot)) {
+    if (
+      child.dataset.overlayPreserve === 'true'
+      || (topOverlayRoot && child.contains(topOverlayRoot))
+    ) {
       restoreIsolationState(child);
       return;
     }
@@ -135,19 +154,23 @@ export function useDialogA11y({
         return;
       }
       if (event.key === 'Escape') {
-        // An open popup widget (Select / autocomplete) keeps focus on its
-        // trigger with aria-expanded="true"; let it consume Escape to close
-        // the popup instead of dismissing the whole dialog.
         const target = event.target instanceof HTMLElement ? event.target : null;
+        // Popup focus can remain on its trigger or elsewhere in the dialog
+        // (for example, a pointer-opened Tooltip). Let any popup owned by this
+        // dialog consume Escape before the dialog itself.
+        const ownedPopupOpen = container?.querySelector(
+          '[data-dialog-popup="true"], [aria-haspopup][aria-expanded="true"]',
+        );
         if (
-          target?.closest('[aria-haspopup][aria-expanded="true"]')
+          ownedPopupOpen
+          || target?.closest('[aria-haspopup][aria-expanded="true"]')
           || target?.closest('[data-dialog-popup="true"]')
         ) {
           return;
         }
+        event.preventDefault();
+        event.stopPropagation();
         if (closeOnEscapeRef.current && onEscapeRef.current) {
-          event.preventDefault();
-          event.stopPropagation();
           onEscapeRef.current();
         }
         return;
