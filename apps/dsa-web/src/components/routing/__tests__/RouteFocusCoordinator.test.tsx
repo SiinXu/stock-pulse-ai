@@ -1,12 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useEffect, useRef, useState } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   createMemoryRouter,
   Link,
   Outlet,
   RouterProvider,
+  useBlocker,
   useLocation,
   useNavigate,
 } from 'react-router-dom';
@@ -39,19 +40,54 @@ function RegisteredPage({
   );
 }
 
-function FirstPage({ duplicateMarker = false }: { duplicateMarker?: boolean }) {
+type MarkerMode = 'normal' | 'duplicate' | 'missing' | 'stale' | 'unfocusable';
+
+function FirstPage({
+  markerMode,
+  blockNavigation,
+}: {
+  markerMode: () => MarkerMode;
+  blockNavigation: () => boolean;
+}) {
+  const blocker = useBlocker(blockNavigation());
+  const mode = markerMode();
+  const opener = mode === 'missing' ? (
+    <span>Second page opener removed</span>
+  ) : mode === 'unfocusable' ? (
+    <button type="button" data-route-focus-key="first:second" disabled>
+      Open second page
+    </button>
+  ) : (
+    <Link
+      to="/second"
+      data-route-focus-key={mode === 'stale' ? 'first:stale' : 'first:second'}
+      onClick={(event) => {
+        if (event.metaKey || event.ctrlKey) event.preventDefault();
+      }}
+    >
+      Open second page
+    </Link>
+  );
+
   return (
     <RegisteredPage routeId="first" title="First page">
+      {opener}
+      {mode === 'duplicate'
+        ? <Link to="/second" data-route-focus-key="first:second">Duplicate second link</Link>
+        : null}
       <Link
         to="/second"
-        data-route-focus-key="first:second"
-        onClick={(event) => {
-          if (event.metaKey || event.ctrlKey) event.preventDefault();
-        }}
+        data-route-focus-key="first:canceled"
+        onClick={(event) => event.preventDefault()}
       >
-        Open second page
+        Cancel second-page navigation
       </Link>
-      {duplicateMarker ? <Link to="/second" data-route-focus-key="first:second">Duplicate second link</Link> : null}
+      {blocker.state === 'blocked' ? (
+        <div role="dialog" aria-label="Unsaved changes">
+          <button type="button" onClick={() => blocker.proceed()}>Proceed</button>
+          <button type="button" onClick={() => blocker.reset()}>Stay</button>
+        </div>
+      ) : null}
     </RegisteredPage>
   );
 }
@@ -113,7 +149,11 @@ async function flushRouteFocusFrames(): Promise<void> {
   });
 }
 
-function renderRouter(initialPath = '/first', duplicateMarker = false) {
+function renderRouter(
+  initialPath = '/first',
+  markerMode: () => MarkerMode = () => 'normal',
+  blockNavigation: () => boolean = () => false,
+) {
   const router = createMemoryRouter([
     {
       element: (
@@ -122,8 +162,12 @@ function renderRouter(initialPath = '/first', duplicateMarker = false) {
         </RouteFocusCoordinator>
       ),
       children: [
-        { path: '/first', element: <FirstPage duplicateMarker={duplicateMarker} /> },
+        {
+          path: '/first',
+          element: <FirstPage markerMode={markerMode} blockNavigation={blockNavigation} />,
+        },
         { path: '/replace', element: <ReplacePage /> },
+        { path: '/previous', element: <RegisteredPage routeId="previous" title="Previous page" /> },
         { path: '/second', element: <RegisteredPage routeId="second" title="Second page" /> },
         { path: '/deferred', element: <DeferredPage /> },
         { path: '/same-path', element: <SamePathUrlStatePage /> },
@@ -159,6 +203,107 @@ describe('RouteFocusCoordinator', () => {
     await waitFor(() => expect(restoredOpener).toHaveFocus());
   });
 
+  it('preserves an entry opener through repeated Back and Forward POP navigation', async () => {
+    const router = renderRouter();
+    fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+  });
+
+  it('discards a canceled trigger before a later POP transition', async () => {
+    const router = renderRouter('/previous');
+    await act(async () => {
+      await router.navigate('/first');
+    });
+    fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+
+    fireEvent.click(screen.getByRole('link', { name: 'Cancel second-page navigation' }));
+    await act(async () => {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Previous page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+  });
+
+  it('retains the original trigger while useBlocker waits and later proceeds', async () => {
+    const router = renderRouter('/first', () => 'normal', () => true);
+    fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
+    expect(router.state.location.pathname).toBe('/first');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+    await act(async () => {
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Proceed' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Open second page' })).toHaveFocus());
+  });
+
+  it('discards the blocked trigger when useBlocker resets the transition', async () => {
+    let shouldBlock = true;
+    const router = renderRouter('/previous', () => 'normal', () => shouldBlock);
+    await act(async () => {
+      await router.navigate('/first');
+    });
+    fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unsaved changes' });
+
+    shouldBlock = false;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stay' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument());
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Previous page' })).toHaveFocus());
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'First page' })).toHaveFocus());
+  });
+
+  it('focuses the H1 when PUSH creates a new history key for the same URL', async () => {
+    const router = renderRouter();
+    const initialKey = router.state.location.key;
+
+    await act(async () => {
+      await router.navigate('/first');
+    });
+
+    expect(router.state.location.key).not.toBe(initialKey);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'First page' })).toHaveFocus());
+  });
+
   it('waits for route readiness before moving focus', async () => {
     const router = renderRouter();
     await act(async () => {
@@ -179,7 +324,7 @@ describe('RouteFocusCoordinator', () => {
   });
 
   it('fails closed to the H1 when a route-focus marker is duplicated', async () => {
-    const router = renderRouter('/first', true);
+    const router = renderRouter('/first', () => 'duplicate');
     fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
 
@@ -189,6 +334,23 @@ describe('RouteFocusCoordinator', () => {
     const firstHeading = await screen.findByRole('heading', { name: 'First page' });
     await waitFor(() => expect(firstHeading).toHaveFocus());
   });
+
+  it.each<MarkerMode>(['missing', 'stale', 'unfocusable'])(
+    'fails closed to the H1 when the saved opener becomes %s',
+    async (fallbackMode) => {
+      let markerMode: MarkerMode = 'normal';
+      const router = renderRouter('/first', () => markerMode);
+      fireEvent.click(screen.getByRole('link', { name: 'Open second page' }));
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Second page' })).toHaveFocus());
+
+      markerMode = fallbackMode;
+      await act(async () => {
+        await router.navigate(-1);
+      });
+
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'First page' })).toHaveFocus());
+    },
+  );
 
   it('does not treat modifier-click as a same-window transition', () => {
     renderRouter();

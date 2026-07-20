@@ -193,9 +193,11 @@ wait for a connected ready H1 before focusing it. Cross-path POP restores one
 unique, rendered, focusable trigger for that history entry; duplicate,
 missing, disabled, hidden, stale, or unsuccessfully focused triggers fail
 closed to the ready H1. Same-path query/hash updates retain the active control;
-same-path POP may restore a unique stable trigger but never falls back to the
-H1. Entries are bounded in memory and contain strings only, never DOM refs,
-URL state, browser history state, `localStorage`, or `sessionStorage`.
+an exact-URL PUSH with a new history key remains an independent H1 transition.
+Same-path POP may restore a unique stable trigger but never falls back to the
+H1. Blocked navigation retains its trigger until the Router proceeds or resets
+the transition. Entries are bounded in memory and contain strings only, never
+DOM refs, URL state, browser history state, `localStorage`, or `sessionStorage`.
 
 Business code must use React Router navigation APIs rather than direct
 `pushState` or `replaceState`. The production guard discovers calls through

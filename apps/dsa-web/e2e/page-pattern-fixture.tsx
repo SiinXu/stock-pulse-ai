@@ -30,7 +30,7 @@ import { UiLanguageProvider } from '../src/contexts/UiLanguageContext';
 
 const WORKSPACE_ITEMS: readonly WorkspaceNavItem[] = [
   { id: 'overview', label: 'Overview', to: '/e2e/page-pattern-fixture.html' },
-  { id: 'details', label: 'Detailed evidence', to: '/e2e/page-pattern-fixture.html/details' },
+  { id: 'details', label: 'Detailed evidence', to: '/e2e/page-pattern-details-fixture.html' },
 ];
 
 const TAB_ITEMS = [
@@ -154,12 +154,14 @@ function FixtureShell() {
 
 const router = createBrowserRouter([
   {
-    path: '/e2e/page-pattern-fixture.html',
     element: <FixtureShell />,
     children: [
-      { index: true, element: <PatternPage routeId="overview" title="Portfolio overview" /> },
       {
-        path: 'details',
+        path: '/e2e/page-pattern-fixture.html',
+        element: <PatternPage routeId="overview" title="Portfolio overview" />,
+      },
+      {
+        path: '/e2e/page-pattern-details-fixture.html',
         element: (
           <PatternPage
             routeId="details"
