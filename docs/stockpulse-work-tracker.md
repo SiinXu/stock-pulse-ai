@@ -2,7 +2,7 @@
 
 - 状态:`Living`(每个 AR 阶段合入/裁决后更新)
 - 日期:2026-07-19（RT-03 ADR 与运行时契约收敛）
-- 代码 baseline:`main@fd46f646`（RT-03 PR #60 最新合并基线）
+- 代码 baseline:`main@1ed45620`（RT-03 PR #60 merge）
 - 历史计划:`docs/architecture/pydanticai-runtime-development-plan.md`(`Historical / Superseded`)
 - 权威决策:`docs/architecture/ADR-001-agent-runtime.md`
 - 历史修复计划:`docs/architecture/pydanticai-runtime-recovery-plan.md`(`Historical / Completed` 计划生命周期；证据为 `Partial`)
@@ -80,4 +80,5 @@
 | 2026-07-18 | RF-07 裁决(本 PR):维护者裁决 `Native Only`;决策报告 `Draft` -> `Accepted`;AR-PY-06 -> Resolved(Native Only);RF-00～RF-07 修复计划收尾 |
 | 2026-07-19 | Native Only 实施：实验 Runtime 的 Adapter、toolset、可选依赖、注入点、cross-runtime tests 与 `pydanticai-installed` CI 删除；AR-PY-04 -> Retired / Removed，AR-PY-06 -> Implemented |
 | 2026-07-19 | RT-02 证据治理：conformance 历史范围冻结为 8+3 个精确 fixture ID，删除不可复现依赖数字，明确 leak scan 与未收集证据边界；AR-PY-05 校准为 Historical / Partial |
-| 2026-07-19 | RT-03 恢复实验 Runtime(ADR-002)：恢复 Adapter/toolset/可选依赖/实验测试/conformance 与 `pydanticai-installed` CI；精确锁定完整可选依赖闭包并执行 `pip check`；PydanticAI `start()` 实现 live handle 的观察/取消/订阅/等待契约；明确只允许测试/证据 harness 直接构造且无生产 selector；conformance 使用显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；AR-PY-04 -> Reinstated / Experimental，AR-PY-06 -> Resolved / Amended；AR-PY-05 保持 Historical / Partial |
+| 2026-07-19 | RT-03 恢复实验 Runtime(PR #60, ADR-002)：恢复 Adapter/toolset/可选依赖/实验测试/conformance 与 `pydanticai-installed` CI；conformance 使用显式 fixture ID 允许清单并对未知 `single_run` fixture fail closed；AR-PY-04 -> Reinstated / Experimental，AR-PY-06 -> Resolved / Amended；AR-PY-05 保持 Historical / Partial |
+| 2026-07-19 | BLOCKER-RT-03 review 收敛(本 PR)：PydanticAI `start()` 实现 live handle 的观察/取消/订阅/等待与 wire-response/tool-dispatch fence；完整可选依赖闭包精确锁定并执行 `pip check`；ADR-002 明确有限覆盖原恢复禁令，只允许测试/证据 harness 直接构造且无生产 selector；修复 PR #60 合并前未关闭的 runtime contract、决策与依赖证据缺口 |
