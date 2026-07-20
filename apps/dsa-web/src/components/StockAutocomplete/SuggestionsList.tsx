@@ -8,6 +8,7 @@ import { Badge } from '../common';
 import { cn } from '../../utils/cn';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { STOCK_SEARCH_TEXT } from '../../locales/stockSearch';
+import { getOverlayStyle } from '../common/overlayZ';
 
 export interface SuggestionsListProps {
   /** Suggestion list */
@@ -36,12 +37,13 @@ export function SuggestionsList({
   return (
     <ul
       id="suggestions-list"
-      className="z-[100] max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
-      style={{
+      data-dialog-popup="true"
+      className="max-h-60 overflow-auto rounded-b-lg rounded-t-none border-x border-b shadow-xl"
+      style={getOverlayStyle('popover', {
         ...style,
         backgroundColor: 'hsl(var(--card))',
         borderColor: 'hsl(var(--border))',
-      }}
+      })}
       role="listbox"
     >
       {suggestions.map((suggestion, index) => (

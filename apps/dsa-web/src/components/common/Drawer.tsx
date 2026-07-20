@@ -1,56 +1,60 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { cn } from '../../utils/cn';
-import { OVERLAY_Z } from './overlayZ';
+import { IconButton } from './IconButton';
+import { getOverlayStyle } from './overlayZ';
 import { useDialogA11y } from './useDialogA11y';
 
-interface DrawerProps {
+export type DetailDrawerSize = 'compact' | 'default' | 'wide';
+
+interface DrawerBaseProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   description?: string;
-  width?: string;
-  zIndex?: number;
-  side?: 'left' | 'right';
-  backdropClassName?: string;
-  rootClassName?: string;
-  panelClassName?: string;
-  contentClassName?: string;
-  showHeader?: boolean;
+  footer?: React.ReactNode;
   closeDisabled?: boolean;
 }
 
-/**
- * Side drawer component with terminal-inspired styling.
- */
+export type DrawerProps = DrawerBaseProps & (
+  | { variant: 'navigation'; size?: never }
+  | { variant: 'detail'; size?: DetailDrawerSize }
+);
+
+const DETAIL_DRAWER_SIZE_STYLES: Record<DetailDrawerSize, string> = {
+  compact: 'max-w-[30rem]',
+  default: 'max-w-xl',
+  wide: 'max-w-[40rem]',
+};
+
+/** Semantic navigation/detail drawer with fixed header, body, and optional footer. */
 export const Drawer: React.FC<DrawerProps> = ({
   isOpen,
   onClose,
   title,
   children,
   description,
-  width = 'max-w-2xl',
-  zIndex = OVERLAY_Z.drawer,
-  side = 'right',
-  backdropClassName,
-  rootClassName,
-  panelClassName,
-  contentClassName,
-  showHeader = true,
+  footer,
+  variant,
+  size = 'default',
   closeDisabled = false,
 }) => {
   const { t } = useUiLanguage();
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const isNavigation = variant === 'navigation';
+  const side = isNavigation ? 'left' : 'right';
+  const widthClass = isNavigation ? 'max-w-xs' : DETAIL_DRAWER_SIZE_STYLES[size];
+
   const handleClose = () => {
-    if (!closeDisabled) {
-      onClose();
-    }
+    if (!closeDisabled) onClose();
   };
 
   useDialogA11y({
@@ -62,26 +66,24 @@ export const Drawer: React.FC<DrawerProps> = ({
 
   if (!isOpen) return null;
 
-  const sidePositionClass = side === 'left' ? 'left-0 justify-start' : 'right-0 justify-end';
-  const borderClass = side === 'left' ? 'border-r' : 'border-l';
-
   return createPortal(
     <div
       data-overlay-root="drawer"
-      className={cn('fixed inset-0 overflow-hidden', rootClassName)}
-      style={{ zIndex }}
+      className="fixed inset-0 overflow-hidden"
+      style={getOverlayStyle('dialog')}
       role="presentation"
     >
-      {/* Backdrop */}
       <div
-        className={cn(
-          'absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300',
-          backdropClassName,
-        )}
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none"
         onClick={handleClose}
       />
-
-      <div className={cn('absolute inset-y-0 flex w-full', sidePositionClass, width)}>
+      <div
+        className={cn(
+          'absolute inset-y-0 flex w-full',
+          isNavigation ? 'left-0 justify-start' : 'right-0 justify-end',
+          widthClass,
+        )}
+      >
         <div
           ref={dialogRef}
           role="dialog"
@@ -89,42 +91,55 @@ export const Drawer: React.FC<DrawerProps> = ({
           aria-labelledby={titleId}
           aria-describedby={description ? descriptionId : undefined}
           tabIndex={-1}
+          data-overlay-dialog="true"
+          data-drawer-variant={variant}
+          data-drawer-side={side}
+          data-drawer-size={isNavigation ? undefined : size}
           className={cn(
-            'relative flex w-full flex-col bg-card focus:outline-none',
-            borderClass,
-            side === 'right' ? 'border-border/80' : 'border-border/70 shadow-2xl',
-            side === 'left' ? 'animate-slide-in-left' : 'animate-slide-in-right',
-            panelClassName,
+            'relative flex min-h-0 w-full flex-col bg-elevated shadow-2xl focus:outline-none',
+            isNavigation
+              ? 'animate-slide-in-left border-r border-border'
+              : 'animate-slide-in-right border-l border-border',
           )}
         >
-          {showHeader ? (
-            <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
-              <div>
-                <span className="label-uppercase">{t('common.detailView')}</span>
-                <h2 id={titleId} className="mt-1 text-lg font-semibold text-foreground">{title}</h2>
-                {description ? (
-                  <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={closeDisabled}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border/70 bg-card/80 text-secondary-text transition-colors hover:bg-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label={t('common.closeDrawer')}
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
+          <header
+            data-overlay-slot="header"
+            className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4"
+          >
+            <div className="min-w-0">
+              <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
+              {description ? (
+                <p id={descriptionId} className="mt-1 text-sm text-secondary-text">{description}</p>
+              ) : null}
             </div>
-          ) : (
-            <>
-              <h2 id={titleId} className="sr-only">{title}</h2>
-              {description ? <p id={descriptionId} className="sr-only">{description}</p> : null}
-            </>
-          )}
-          <div className={cn('flex-1 overflow-y-auto p-6', contentClassName)}>
+            <IconButton
+              variant="ghost"
+              size="default"
+              onClick={handleClose}
+              disabled={closeDisabled}
+              aria-label={t('common.closeDrawer')}
+              tooltip={false}
+            >
+              <X aria-hidden="true" />
+            </IconButton>
+          </header>
+          <div
+            data-overlay-slot="body"
+            className={cn(
+              'min-h-0 flex-1 overflow-y-auto',
+              isNavigation ? 'p-0' : 'p-5 sm:p-6',
+            )}
+          >
             {children}
           </div>
+          {footer ? (
+            <footer
+              data-overlay-slot="footer"
+              className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-elevated px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+            >
+              {footer}
+            </footer>
+          ) : null}
         </div>
       </div>
     </div>,

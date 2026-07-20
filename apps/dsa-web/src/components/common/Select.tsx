@@ -192,8 +192,9 @@ export const Select: React.FC<SelectProps> = ({
             ref={listRef}
             role="listbox"
             aria-labelledby={label ? resolvedId : undefined}
+            data-dialog-popup="true"
             style={popupStyle}
-            className="fixed z-50 max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
+            className="fixed max-h-60 w-max overflow-auto rounded-xl border border-border bg-elevated p-1 shadow-lg"
           >
             {options.map((option, index) => (
               <li

@@ -179,8 +179,9 @@ export const TimePicker = ({
           ref={popupRef}
           role="dialog"
           aria-label={resolvedAriaLabel}
+          data-dialog-popup="true"
           style={popupStyle}
-          className="fixed z-[100] w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
+          className="fixed w-56 overflow-hidden rounded-xl border border-border bg-elevated p-3 shadow-lg"
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();

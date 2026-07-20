@@ -187,6 +187,8 @@ export const DecisionSignalCreateDrawer: React.FC<DecisionSignalCreateDrawerProp
       onClose={onClose}
       title={t('decisionSignals.create.title')}
       description={t('decisionSignals.create.description')}
+      variant="detail"
+      size="wide"
       closeDisabled={submitting}
     >
       <form className="space-y-6" onSubmit={handleSubmit} noValidate>

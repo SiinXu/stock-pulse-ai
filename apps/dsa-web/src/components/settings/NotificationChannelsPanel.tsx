@@ -76,25 +76,27 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         })}
       </div>
 
-      <Modal
-        isOpen={Boolean(openChannel)}
-        onClose={() => setOpenChannelId(null)}
-        title={openChannel ? getNotificationChannelLabel(openChannel.id, language) : undefined}
-        className="max-w-2xl"
-      >
-        <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
-          {openChannelItems.map((item) => (
-            <SettingsField
-              key={item.key}
-              item={item}
-              value={item.value}
-              disabled={disabled}
-              onChange={onChange}
-              issues={issueByKey[item.key] || []}
-            />
-          ))}
-        </form>
-      </Modal>
+      {openChannel ? (
+        <Modal
+          isOpen
+          onClose={() => setOpenChannelId(null)}
+          title={getNotificationChannelLabel(openChannel.id, language)}
+          size="wide"
+        >
+          <form className="divide-y divide-transparent" onSubmit={(event) => event.preventDefault()}>
+            {openChannelItems.map((item) => (
+              <SettingsField
+                key={item.key}
+                item={item}
+                value={item.value}
+                disabled={disabled}
+                onChange={onChange}
+                issues={issueByKey[item.key] || []}
+              />
+            ))}
+          </form>
+        </Modal>
+      ) : null}
     </>
   );
 };
