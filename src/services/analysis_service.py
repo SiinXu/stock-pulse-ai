@@ -25,6 +25,7 @@ from src.report_language import (
 )
 from src.market_phase_summary import extract_market_phase_summary
 from src.schemas.decision_action import build_action_fields
+from src.schemas.request_context import AnalysisRequestContext
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     build_run_diagnostic_summary,
@@ -66,10 +67,11 @@ class AnalysisService:
         query_source: str = "api",
         portfolio_context: Optional[Dict[str, Any]] = None,
         report_language: Optional[str] = None,
+        request_context: Optional[AnalysisRequestContext] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         执行股票分析
-        
+
         Args:
             stock_code: 股票代码
             report_type: 报告类型 (simple/detailed)
@@ -77,6 +79,9 @@ class AnalysisService:
             query_id: 查询 ID（可选）
             send_notification: 是否发送通知（API 触发默认发送）
             analysis_phase: 请求的分析阶段覆盖（auto/premarket/intraday/postmarket）
+            request_context: Optional requester provenance and contextual reply
+                targets. Bot submissions carry it so the notifier can push the
+                result back to the originating conversation.
             
         Returns:
             分析结果字典，包含:
@@ -114,6 +119,7 @@ class AnalysisService:
             # 创建分析流水线
             pipeline = StockAnalysisPipeline(
                 config=config,
+                request_context=request_context,
                 query_id=query_id,
                 trace_id=effective_trace_id,
                 query_source=query_source or "api",

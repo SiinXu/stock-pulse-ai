@@ -82,31 +82,24 @@ class AnalyzeCommand(BotCommand):
         )
         
         try:
-            # 调用分析服务
-            from src.services.task_service import get_task_service
+            # 提交到统一任务执行权威：与 API/Web 共用同一 queue、Task ID、
+            # 去重键、状态枚举与错误分类，Bot 不再维护平行的任务生命周期。
+            from src.services.task_queue import get_task_queue, DuplicateTaskError
             from src.enums import ReportType
-            
-            service = get_task_service()
-            
-            # 提交异步分析任务
-            result = service.submit_analysis(
-                code=code,
-                report_type=ReportType.from_str(report_type),
+
+            task = get_task_queue().submit_task(
+                stock_code=code,
+                report_type=report_type,
+                query_source="bot",
                 request_context=to_analysis_request_context(message),
             )
-            
-            if result.get("success"):
-                task_id = result.get("task_id", "")
-                return BotResponse.markdown_response(
-                    f"✅ **分析任务已提交**\n\n"
-                    f"• 股票代码: `{code}`\n"
-                    f"• 报告类型: {ReportType.from_str(report_type).display_name}\n"
-                    f"• 任务 ID: `{task_id[:20]}...`\n\n"
-                    f"分析完成后将自动推送结果。"
-                )
-            else:
-                return BotResponse.error_response("提交分析任务失败，请稍后重试")
-                
+        except DuplicateTaskError:
+            # 统一权威按规范化股票代码去重；旧路径无去重，会重复触发并发分析。
+            return BotResponse.markdown_response(
+                f"⏳ **该股票正在分析中**\n\n"
+                f"• 股票代码: `{code}`\n\n"
+                f"请等待当前分析完成后再试。"
+            )
         except Exception as exc:
             log_safe_exception(
                 logger,
@@ -116,3 +109,12 @@ class AnalyzeCommand(BotCommand):
                 context={"stock_code": code, "report_type": report_type},
             )
             return BotResponse.error_response("分析失败，请稍后重试")
+
+        task_id = task.task_id or ""
+        return BotResponse.markdown_response(
+            f"✅ **分析任务已提交**\n\n"
+            f"• 股票代码: `{code}`\n"
+            f"• 报告类型: {ReportType.from_str(report_type).display_name}\n"
+            f"• 任务 ID: `{task_id[:20]}...`\n\n"
+            f"分析完成后将自动推送结果。"
+        )
