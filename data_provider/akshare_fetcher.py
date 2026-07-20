@@ -356,7 +356,7 @@ def _akshare_timeout_worker(conn, func, args, kwargs) -> None:
         except BaseException:
             try:
                 conn.send((False, RuntimeError(f"{type(exc).__name__}: {exc}")))
-            except BaseException:
+            except BaseException:  # broad-exception: cleanup - child IPC is unusable.
                 pass
     finally:
         conn.close()
