@@ -301,7 +301,6 @@
     {"path":"data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher.get_main_indices","caught":["Exception"],"digest":"fbf0ecd188a9690657589ea3d34a7cf834bea3debaf6d565c8e97138bf7d8832"},
     {"path":"data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher.get_realtime_quote","caught":["Exception"],"digest":"23d9ccd44f3143112a37bb567a0cdcd86ad4af438492ff9473b3bd06591507c7"},
     {"path":"data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher.get_realtime_quote","caught":["Exception"],"digest":"392c3bc8e47574a74642613877149e81daf8abafb5f86dab58f1cf4473ff7344"},
-    {"path":"data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher.get_realtime_quote","caught":["Exception"],"digest":"3e3f0985c21d3c5031321574949c2ea9618a6fecebb82b6d2e2f6a15b6a558cd"},
     {"path":"data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher.get_realtime_quote","caught":["Exception"],"digest":"5edc86d078ea97a79650479d39635463fee6f9bd186f453055ce435ec3217e4e"},
     {"path":"data_provider/yfinance_fundamental_adapter.py","scope":"<module>.YfinanceFundamentalAdapter.get_fundamental_bundle","caught":["Exception"],"digest":"01fe1be050480c3b983c782e0ee5e8998a7b8391bb7514bb81d4733539858ab7"},
     {"path":"data_provider/yfinance_fundamental_adapter.py","scope":"<module>.YfinanceFundamentalAdapter.get_fundamental_bundle","caught":["Exception"],"digest":"07836cedbd5e1a542c18352a1f2e6afebc0579eae725192114dfed9dbfa20e52"},
