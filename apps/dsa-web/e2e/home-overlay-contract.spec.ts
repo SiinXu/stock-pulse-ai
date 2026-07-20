@@ -481,6 +481,28 @@ test.describe('Settings Help shared tooltip contract', () => {
     await expectBodyOverflow(page, '');
   });
 
+  test('Detail Drawer exposes semantic slots and stays within its desktop width tier', async ({ page }) => {
+    await openOverlayFixture(page, 1280);
+    const opener = page.getByTestId('open-drawer');
+    await opener.click();
+    const drawer = page.getByRole('dialog', { name: 'Outer drawer' });
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toHaveAttribute('data-drawer-variant', 'detail');
+    await expect(drawer).toHaveAttribute('data-drawer-side', 'right');
+    await expect(drawer).toHaveAttribute('data-drawer-size', 'default');
+    await expect(drawer.locator('[data-overlay-slot="header"]')).toContainText('Outer drawer');
+    await expect(drawer.locator('[data-overlay-slot="body"]')).toContainText('Open confirmation');
+    await drawer.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const drawerBox = await drawer.boundingBox();
+    expect(drawerBox).not.toBeNull();
+    expect(Math.round(drawerBox!.width)).toBe(576);
+    await drawer.getByRole('button', { name: 'Close drawer' }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(opener).toBeFocused();
+  });
+
   test('ConfirmDialog above Help remains the only Escape target and restores Help focus', async ({ page }) => {
     await openOverlayFixture(page, 390);
     const opener = page.getByTestId('open-modal');
@@ -659,6 +681,15 @@ test.describe('Home URL-owned report and Run Flow contract', () => {
       '/?recordId=1&keep=yes&runFlow=task&runFlowTaskId=task-2',
     );
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
+    const runFlowDrawer = page.getByRole('dialog', { name: 'Run Flow' });
+    await expect(runFlowDrawer).toHaveAttribute('data-drawer-variant', 'detail');
+    await expect(runFlowDrawer).toHaveAttribute('data-drawer-size', 'wide');
+    await runFlowDrawer.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    const runFlowDrawerBox = await runFlowDrawer.boundingBox();
+    expect(runFlowDrawerBox).not.toBeNull();
+    expect(runFlowDrawerBox!.width).toBeLessThanOrEqual(640);
     await expect.poll(() => fixture.taskFlowRequests.filter((taskId) => taskId === 'task-2').length).toBeGreaterThanOrEqual(1);
 
     await page.reload();

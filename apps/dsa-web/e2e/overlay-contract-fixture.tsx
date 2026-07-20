@@ -83,6 +83,7 @@ function OverlayContractFixture() {
         isOpen={outerOverlay === 'drawer'}
         onClose={() => setOuterOverlay(null)}
         title="Outer drawer"
+        variant="detail"
       >
         <OverlayContents title="Drawer help" onOpenConfirm={() => setConfirmOpen(true)} />
       </Drawer>
