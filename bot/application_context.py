@@ -10,6 +10,9 @@ from src.notification_contracts import is_dingtalk_session_webhook_url
 from src.schemas.request_context import AnalysisRequestContext, NotificationReplyTarget
 
 
+_CONTEXTUAL_REPLY_PLATFORMS = frozenset(("dingtalk", "feishu", "telegram"))
+
+
 def _string_value(value: Any) -> str:
     if value is None:
         return ""
@@ -50,13 +53,14 @@ def to_analysis_request_context(message: BotMessage) -> AnalysisRequestContext:
     platform = _string_value(message.platform).lower()
     reply_targets = []
     dingtalk_candidate = _dingtalk_session_webhook_candidate(raw_data)
+    feishu_chat_id = _string_value(message.chat_id).strip()
 
     if platform == "dingtalk":
         if is_dingtalk_session_webhook_url(dingtalk_candidate):
             reply_targets.append(NotificationReplyTarget("dingtalk", dingtalk_candidate))
 
-    if platform == "feishu" and message.chat_id:
-        reply_targets.append(NotificationReplyTarget("feishu", _string_value(message.chat_id)))
+    if platform == "feishu" and feishu_chat_id:
+        reply_targets.append(NotificationReplyTarget("feishu", feishu_chat_id))
 
     if platform == "telegram":
         telegram_chat_id = _telegram_chat_id(message, raw_data)
@@ -72,5 +76,9 @@ def to_analysis_request_context(message: BotMessage) -> AnalysisRequestContext:
         requester_query=_string_value(message.content),
         reply_targets=tuple(reply_targets),
         # Preserve reply-only intent even when an untrusted address is rejected.
-        contextual_reply_only=bool(dingtalk_candidate) or bool(reply_targets),
+        contextual_reply_only=(
+            platform in _CONTEXTUAL_REPLY_PLATFORMS
+            or bool(dingtalk_candidate)
+            or bool(reply_targets)
+        ),
     )

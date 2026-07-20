@@ -52,6 +52,17 @@ class MarketCommand(BotCommand):
 
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
         """执行大盘复盘命令"""
+        try:
+            request_context = to_analysis_request_context(message)
+        except Exception as exc:
+            log_safe_exception(
+                logger,
+                "[MarketCommand] Invalid market review request context",
+                exc,
+                error_code="bot_market_request_context_invalid",
+            )
+            return BotResponse.error_response("大盘复盘请求无效，请稍后重试")
+
         config = self._get_config()
         lock_token = self._try_acquire_market_review_lock(config)
         if lock_token is None:
@@ -59,7 +70,7 @@ class MarketCommand(BotCommand):
 
         thread = threading.Thread(
             target=self._run_market_review,
-            args=(to_analysis_request_context(message), config, lock_token),
+            args=(request_context, config, lock_token),
             daemon=True,
         )
         try:

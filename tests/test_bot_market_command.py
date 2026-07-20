@@ -245,6 +245,31 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         release_market_review_lock.assert_called_once_with(lock_token)
         self.assertEqual(response.text, "❌ 错误：大盘复盘启动失败，已释放运行锁；请稍后重试")
 
+    def test_execute_snapshots_request_before_acquiring_market_lock(self) -> None:
+        """Any mapper failure must happen before the process-local lock is acquired."""
+        message = _make_message()
+        cmd = MarketCommand()
+
+        with patch(
+            "bot.commands.market.to_analysis_request_context",
+            side_effect=RuntimeError("invalid boundary payload"),
+        ), patch.object(cmd, "_get_config") as get_config, patch.object(
+            cmd,
+            "_try_acquire_market_review_lock",
+        ) as acquire_lock, patch.object(
+            cmd,
+            "_release_market_review_lock",
+        ) as release_lock, patch(
+            "bot.commands.market.threading.Thread"
+        ) as thread:
+            response = cmd.execute(message, [])
+
+        self.assertEqual(response.text, "❌ 错误：大盘复盘请求无效，请稍后重试")
+        get_config.assert_not_called()
+        acquire_lock.assert_not_called()
+        release_lock.assert_not_called()
+        thread.assert_not_called()
+
 
 
 if __name__ == "__main__":
