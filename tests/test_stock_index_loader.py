@@ -97,6 +97,33 @@ class TestStockIndexLoader(unittest.TestCase):
             self.assertIs(first, second)
             self.assertEqual(stock_index_loader.get_index_stock_name("000001"), "平安银行")
 
+    def test_stock_symbol_set_keeps_code_named_symbols_and_skips_inactive(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            index_path = Path(temp_dir) / "stocks.index.json"
+            index_path.write_text(
+                json.dumps(
+                    [
+                        ["IONQ", "IONQ", "IONQ", "IONQ", "IONQ", [], "US", "stock", True, 100],
+                        ["OLD", "OLD", "Old Corp", "old", "old", [], "US", "stock", False, 100],
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.object(
+                stock_index_loader,
+                "get_remote_stock_index_cache_path",
+                return_value=Path(temp_dir) / "missing.json",
+            ), patch.object(
+                stock_index_loader,
+                "get_stock_index_candidate_paths",
+                return_value=(index_path,),
+            ):
+                symbols = stock_index_loader.get_stock_symbol_index_set()
+
+            self.assertIn("IONQ", symbols)
+            self.assertNotIn("OLD", symbols)
+
     def test_get_index_stock_name_returns_none_when_index_missing(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             missing_path = Path(temp_dir) / "stocks.index.json"

@@ -79,6 +79,7 @@ class ConversationSession:
         from src.agent.stock_scope import resolve_stock_scope
 
         replayed: Dict[str, Any] = {}
+        history_has_stock_scope = False
         for message in messages:
             if not isinstance(message, dict) or message.get("role") != "user":
                 continue
@@ -87,6 +88,11 @@ class ConversationSession:
                 continue
             resolution = resolve_stock_scope(content, replayed)
             replayed = _select_market_context(resolution.effective_context)
+            scope = resolution.stock_scope
+            if scope is not None and (
+                scope.allowed_stock_codes or scope.mode in {"switch", "compare"}
+            ):
+                history_has_stock_scope = True
 
         with self._context_lock:
             cached = _select_market_context(self.context)
@@ -97,8 +103,10 @@ class ConversationSession:
                 replayed["stock_name"] = cached["stock_name"]
             if cached.get("report_language"):
                 replayed["report_language"] = cached["report_language"]
-        else:
+        elif not history_has_stock_scope:
             replayed.update(cached)
+        elif cached.get("report_language"):
+            replayed["report_language"] = cached["report_language"]
         self.update_market_context(replayed)
         return dict(replayed)
 

@@ -195,6 +195,11 @@ class TestExtractStockCode(unittest.TestCase):
         }
         self.assertTrue(expected_in_set.issubset(_COMMON_WORDS))
 
+    def test_non_chat_extractor_preserves_pre_m2_short_symbol_candidates(self):
+        for candidate in ("DOES", "VALUE", "BONDS", "DEBT", "YIELD", "RATES", "PEERS"):
+            with self.subTest(candidate=candidate):
+                self.assertEqual(_extract_stock_code(candidate), candidate)
+
 
 # ============================================================
 # Stock scope resolution
@@ -791,6 +796,26 @@ class TestOrchestratorModes(unittest.TestCase):
         chain = orch._build_agent_chain(ctx)
         names = [a.agent_name for a in chain]
         self.assertEqual(names, ["technical", "intel", "risk", "decision"])
+
+    def test_non_chat_chain_preserves_declared_tools_outside_registry(self):
+        from src.agent.orchestrator import AgentOrchestrator
+        from src.agent.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        orch = AgentOrchestrator(
+            tool_registry=registry,
+            llm_adapter=MagicMock(),
+            mode="standard",
+        )
+
+        chain = orch._build_agent_chain(
+            AgentContext(query="analyze VALUE", stock_code="VALUE")
+        )
+        technical = next(agent for agent in chain if agent.agent_name == "technical")
+        intel = next(agent for agent in chain if agent.agent_name == "intel")
+
+        self.assertIn("get_chip_distribution", technical.tool_names)
+        self.assertIn("get_capital_flow", intel.tool_names)
 
     def test_invalid_mode_falls_back_to_standard(self):
         orch = self._make_orchestrator("nonsense")

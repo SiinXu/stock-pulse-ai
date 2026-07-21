@@ -932,11 +932,6 @@ class AgentOrchestrator:
                 per_symbol_results
             )
 
-        successful = [
-            (stock_code, result)
-            for stock_code, result in per_symbol_results
-            if result.success and result.content
-        ]
         synthesis_succeeded = bool(
             loop_result is not None
             and loop_result.success
@@ -965,7 +960,7 @@ class AgentOrchestrator:
         if loop_result is not None and loop_result.model:
             models.append(loop_result.model)
         return OrchestratorResult(
-            success=bool(successful and content),
+            success=bool(content),
             content=content,
             tool_calls_log=[
                 call
@@ -988,7 +983,7 @@ class AgentOrchestrator:
                 )
             ),
             model=", ".join(dict.fromkeys(models)),
-            error=None if successful and content else AGENT_CHAT_FAILURE_MESSAGE,
+            error=None if content else AGENT_CHAT_FAILURE_MESSAGE,
             timed_out=(
                 any(result.timed_out for _, result in per_symbol_results)
                 or loop_result is None
@@ -1513,8 +1508,9 @@ class AgentOrchestrator:
         intel = self._prepare_agent(IntelAgent(**common_kwargs))
         risk = self._prepare_agent(RiskAgent(**common_kwargs))
         decision = self._prepare_agent(DecisionAgent(**common_kwargs))
-        for agent in (technical, intel, risk, decision):
-            self._trim_agent_tool_names(agent, tool_registry)
+        if tool_registry is not self.tool_registry:
+            for agent in (technical, intel, risk, decision):
+                self._trim_agent_tool_names(agent, tool_registry)
 
         if self.mode == "quick":
             return [technical, decision]
@@ -1556,7 +1552,8 @@ class AgentOrchestrator:
                     skill_id=skill_id,
                     **common_kwargs,
                 ))
-                self._trim_agent_tool_names(agent, tool_registry)
+                if tool_registry is not self.tool_registry:
+                    self._trim_agent_tool_names(agent, tool_registry)
                 agents.append(agent)
             return agents
         except Exception as exc:  # broad-exception: fallback_recorded - Optional Chat specialists are safe-logged and skipped.
@@ -2525,17 +2522,17 @@ class AgentOrchestrator:
         return merged[:500]
 
 
-# Common English words (short uppercase tokens) that should NOT be treated as
+# Common English words (2-5 uppercase letters) that should NOT be treated as
 # US stock tickers.  This set is checked by _extract_stock_code() and should
 # be kept at module level to avoid re-creating it on every call.
 _COMMON_WORDS: set[str] = {
     # Pronouns / articles / prepositions / conjunctions
-    "I", "AM", "AS", "AT", "BE", "BY", "DO", "GO", "HE", "IF", "IN",
+    "AM", "AS", "AT", "BE", "BY", "DO", "GO", "HE", "IF", "IN",
     "IS", "IT", "ME", "MY", "NO", "OF", "ON", "OR", "SO", "TO",
     "UP", "US", "WE",
     "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL",
     "CAN", "HAD", "HER", "WAS", "ONE", "OUR", "OUT", "HAS",
-    "HIS", "HOW", "ITS", "LET", "MAY", "NEW", "NOW", "OLD", "DOES",
+    "HIS", "HOW", "ITS", "LET", "MAY", "NEW", "NOW", "OLD",
     "SEE", "WAY", "WHO", "DID", "GET", "HIM", "USE", "SAY",
     "SHE", "TOO", "ANY", "WITH", "FROM", "THAT", "THAN",
     "THIS", "WHAT", "WHEN", "WILL", "JUST", "ALSO",
@@ -2548,10 +2545,9 @@ _COMMON_WORDS: set[str] = {
     "BUY", "SELL", "HOLD", "LONG", "PUT", "CALL",
     "ETF", "IPO", "RSI", "EPS", "PEG", "ROE", "ROA",
     "USA", "USD", "CNY", "HKD", "EUR", "GBP",
-    "STOCK", "TRADE", "PRICE", "INDEX", "FUND", "VALUE", "VALUATION",
+    "STOCK", "TRADE", "PRICE", "INDEX", "FUND",
     "HIGH", "LOW", "OPEN", "CLOSE", "STOP", "LOSS",
-    "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND", "BONDS",
-    "DEBT", "YIELD", "RATES", "PEERS",
+    "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND",
     "MACD", "VWAP", "BOLL", "KDJ",
     "TTM", "LTM", "NTM", "FWD", "YOY", "QOQ", "YTD",
     "EBIT", "EBITDA", "DCF", "CAGR", "FCF", "NAV", "AUM",

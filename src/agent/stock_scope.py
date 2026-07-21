@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set
 
-from src.data.stock_index_loader import get_stock_name_index_map
+from src.data.stock_index_loader import get_stock_symbol_index_set
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 
 
@@ -54,25 +54,21 @@ _LOWERCASE_SCAN_HINT_PATTERN = re.compile(
 )
 _ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
     r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
-    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9.])"
-)
-_ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN = re.compile(
-    r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9.])"
+    r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
 )
 _CJK_EXPLICIT_TICKER_PATTERN = re.compile(
     r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
-    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9.])"
+    r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
 )
 _EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
-    r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
+    r"(?<![A-Za-z0-9._/\\-])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
     r"(?:vs\.?|versus|和|与|跟)\s*"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
     re.IGNORECASE,
 )
 _ENGLISH_AND_COMPARE_PAIR_PATTERN = re.compile(
     r"\bcompare\s+([a-z]{1,5}(?:\.[a-z]{1,2})?)\s+and\s+"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
     re.IGNORECASE,
 )
 _ENGLISH_COMPARISON_LEFT_TOKEN = (
@@ -82,62 +78,39 @@ _ENGLISH_COMPARISON_LEFT_TOKEN = (
 )
 _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS = (
     re.compile(
-        r"(?<![a-zA-Z.])([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*"
+        r"(?<![A-Za-z0-9._/\\-])([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\s*"
         r"(?:vs\.?|versus|和|与|跟)"
     ),
     re.compile(
         r"(?:vs\.?|versus|和|与|跟)\s*"
-        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])"
+        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])"
     ),
     re.compile(
         r"(?i:\bcompar(?:e|ed))\s+"
-        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s+"
+        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)\s+"
         r"(?i:and|with)\b"
     ),
     re.compile(
         r"(?i:\bcompar(?:e|ed))\s+"
         + _ENGLISH_COMPARISON_LEFT_TOKEN
         + r"\s+(?i:and|with)\s+"
-        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
+        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
     ),
     re.compile(
         r"(?i:\bcompar(?:e|ed))\s+(?:(?i:it)\s+)?"
         r"(?i:and|with)\s+"
-        r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])",
+        r"([A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?)(?![A-Za-z0-9._/\\-])",
     ),
 )
-_EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS = (
-    re.compile(
-        r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
-        r"(?i:vs\.?|versus|和|与|跟)"
-    ),
-    re.compile(
-        r"(?i:vs\.?|versus|和|与|跟)\s*"
-        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])"
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+"
-        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\s+"
-        r"(?i:and|with)\b"
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+"
-        + _ENGLISH_COMPARISON_LEFT_TOKEN
-        + r"\s+(?i:and|with)\s+"
-        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
-    ),
-    re.compile(
-        r"(?i:\bcompar(?:e|ed))\s+(?:(?i:it)\s+)?"
-        r"(?i:and|with)\s+"
-        r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
-    ),
+_LOWERCASE_TICKER_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9._/\\-])([a-z]{1,5}(?:\.[a-z]{1,2})?)"
+    r"(?![A-Za-z0-9._/\\-])"
 )
-_LOWERCASE_TICKER_PATTERN = re.compile(r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])")
 _EXCHANGE_QUALIFIED_TOKEN_PATTERN = re.compile(
-    r"(?<![a-zA-Z0-9.])(?:"
+    r"(?<![A-Za-z0-9._/\\-])(?:"
     r"(?:SH|SZ|SS|BJ|HK)\.?\d+|"
     r"\d+\.(?:SH|SZ|SS|BJ|HK|US|T|KS|KQ|TW|TWO)"
-    r")(?![a-zA-Z0-9.])",
+    r")(?![A-Za-z0-9._/\\-])",
     re.IGNORECASE,
 )
 _EXCHANGE_TOKEN_CANDIDATES = {"SH", "SZ", "BJ", "HK", "SS"}
@@ -246,18 +219,55 @@ def _append_candidate(
         candidates.append(normalized)
 
 
-def _append_lowercase_slot_candidate(
+def _append_indexed_slot_candidate(
     candidates: List[str],
     candidate: str,
     text: str,
+    *,
+    explicit: bool = False,
 ) -> None:
-    """Accept lowercase symbols only with positive, reusable symbol evidence."""
+    """Accept non-uppercase symbols only with positive index evidence."""
     normalized = _normalize_stock_code(candidate)
     if not normalized:
         return
-    if "." not in candidate and normalized not in get_stock_name_index_map():
+    known_symbols = get_stock_symbol_index_set()
+    evidence_keys = {normalized}
+    if normalized.endswith(".US"):
+        evidence_keys.add(normalized[:-3])
+    if not evidence_keys.intersection(known_symbols):
         return
-    _append_candidate(candidates, candidate, text)
+    _append_candidate(
+        candidates,
+        candidate,
+        text,
+        explicit=(
+            explicit and normalized in _EXPLICIT_TICKER_COLLISIONS
+        ),
+    )
+
+
+def _append_explicit_slot_candidate(
+    candidates: List[str],
+    candidate: str,
+    text: str,
+    *,
+    explicit: bool,
+) -> None:
+    """Route non-uppercase slots through the index-backed evidence policy."""
+    if candidate.isupper():
+        _append_candidate(
+            candidates,
+            candidate,
+            text,
+            explicit=explicit,
+        )
+        return
+    _append_indexed_slot_candidate(
+        candidates,
+        candidate,
+        text,
+        explicit=explicit,
+    )
 
 
 def _is_explicit_command_slot(text: str, match: re.Match[str]) -> bool:
@@ -279,7 +289,6 @@ def _is_strong_compare_message(text: str) -> bool:
         match.span(1)
         for pattern in (
             _ENGLISH_EXPLICIT_TICKER_PATTERN,
-            _ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN,
             _CJK_EXPLICIT_TICKER_PATTERN,
         )
         for match in pattern.finditer(text)
@@ -323,11 +332,20 @@ def extract_stock_codes(text: str) -> List[str]:
 
     for pattern, flags in (
         (
-            r"(?<![a-zA-Z0-9.])(?:[03648]\d{5}|92\d{4})(?![a-zA-Z0-9.])",
+            r"(?<![A-Za-z0-9._/\\-])(?:[03648]\d{5}|92\d{4})"
+            r"(?![A-Za-z0-9._/\\-])",
             0,
         ),
-        (r"(?<![a-zA-Z0-9.])\d{5}(?![a-zA-Z0-9.])", 0),
-        (r"(?<![a-zA-Z.])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z0-9])", 0),
+        (
+            r"(?<![A-Za-z0-9._/\\-])\d{5}(?![A-Za-z0-9._/\\-])",
+            0,
+        ),
+        (
+            r"(?<![A-Za-z0-9._/\\-])"
+            r"([A-Z]{2,5}(?:\.[A-Z]{1,2})?)"
+            r"(?![A-Za-z0-9._/\\-])",
+            0,
+        ),
     ):
         for match in re.finditer(pattern, text, flags):
             if any(
@@ -336,25 +354,21 @@ def extract_stock_codes(text: str) -> List[str]:
             ):
                 continue
             raw = match.group(1) if match.lastindex else match.group(0)
-            _append_candidate(candidates, raw, text)
+            if match.lastindex:
+                _append_indexed_slot_candidate(candidates, raw, text)
+            else:
+                _append_candidate(candidates, raw, text)
 
     for match in _ENGLISH_EXPLICIT_TICKER_PATTERN.finditer(text):
-        _append_candidate(
+        _append_explicit_slot_candidate(
             candidates,
             match.group(1),
             text,
             explicit=_is_explicit_command_slot(text, match),
         )
 
-    for match in _ENGLISH_LOWERCASE_COMMAND_TICKER_PATTERN.finditer(text):
-        _append_lowercase_slot_candidate(
-            candidates,
-            match.group(1),
-            text,
-        )
-
     for match in _CJK_EXPLICIT_TICKER_PATTERN.finditer(text):
-        _append_candidate(
+        _append_explicit_slot_candidate(
             candidates,
             match.group(1),
             text,
@@ -367,10 +381,7 @@ def extract_stock_codes(text: str) -> List[str]:
     ):
         for match in pattern.finditer(text):
             for group_index, raw in enumerate(match.groups(), start=1):
-                if not raw.isupper():
-                    _append_lowercase_slot_candidate(candidates, raw, text)
-                    continue
-                _append_candidate(
+                _append_explicit_slot_candidate(
                     candidates,
                     raw,
                     text,
@@ -387,7 +398,7 @@ def extract_stock_codes(text: str) -> List[str]:
     for pattern in _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS:
         for match in pattern.finditer(text):
             raw = match.group(1)
-            _append_candidate(
+            _append_explicit_slot_candidate(
                 candidates,
                 raw,
                 text,
@@ -398,26 +409,14 @@ def extract_stock_codes(text: str) -> List[str]:
                 ),
             )
 
-    for pattern in _EXPLICIT_LOWERCASE_COMPARE_TICKER_PATTERNS:
-        for match in pattern.finditer(text):
-            _append_lowercase_slot_candidate(
-                candidates,
-                match.group(1),
-                text,
-            )
-
-    bare_lowercase_ticker = re.fullmatch(
-        r"[a-z]{1,5}(?:\.[a-z]{1,2})?",
+    bare_ticker = re.fullmatch(
+        r"[A-Za-z]{1,5}(?:\.[A-Za-z]{1,2})?",
         text.strip(),
     )
-    bare_uppercase_ticker = re.fullmatch(
-        r"[A-Z]{1,5}(?:\.[A-Z]{1,2})?",
-        text.strip(),
-    )
-    if bare_uppercase_ticker:
-        _append_candidate(
+    if bare_ticker:
+        _append_explicit_slot_candidate(
             candidates,
-            bare_uppercase_ticker.group(0),
+            bare_ticker.group(0),
             text,
             explicit=True,
         )
@@ -425,10 +424,10 @@ def extract_stock_codes(text: str) -> List[str]:
         _LOWERCASE_SCAN_HINT_PATTERN.search(text)
         or _WEAK_COMPARE_HINT_PATTERN.search(text)
         or _CHOICE_COMPARE_PATTERN.search(text)
-        or bare_lowercase_ticker
+        or (bare_ticker and not bare_ticker.group(0).isupper())
     ):
         for match in _LOWERCASE_TICKER_PATTERN.finditer(text):
-            _append_lowercase_slot_candidate(
+            _append_indexed_slot_candidate(
                 candidates,
                 match.group(1),
                 text,
