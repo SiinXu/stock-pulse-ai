@@ -386,7 +386,7 @@ class TestAgentExecutor(unittest.TestCase):
         self.assertEqual(captured["stock_scope"].expected_stock_code, "AAPL")
         self.assertEqual(captured["stock_scope"].allowed_stock_codes, {"AAPL"})
 
-    def test_chat_does_not_trust_exchange_token_from_public_context(self):
+    def test_chat_does_not_trust_invalid_code_from_public_context(self):
         registry = _make_registry_with_echo()
         adapter = _make_mock_adapter()
         adapter._config = MagicMock()
@@ -408,14 +408,17 @@ class TestAgentExecutor(unittest.TestCase):
                         executor.chat(
                             "继续看",
                             "session-1",
-                            context={"stock_code": "HK", "stock_name": "港股"},
+                            context={
+                                "stock_code": "NOT-A-SYMBOL",
+                                "stock_name": "invalid",
+                            },
                         )
 
         history_context = "\n".join(
             msg["content"] for msg in captured["messages"] if msg["role"] == "user"
         )
-        self.assertNotIn("股票代码: HK", history_context)
-        self.assertNotIn("股票名称: 港股", history_context)
+        self.assertNotIn("NOT-A-SYMBOL", history_context)
+        self.assertNotIn("股票名称: invalid", history_context)
         self.assertEqual(captured["stock_scope"].expected_stock_code, "")
         self.assertEqual(captured["stock_scope"].allowed_stock_codes, set())
 
@@ -917,11 +920,10 @@ class TestAgentExecutor(unittest.TestCase):
                 self.assertEqual(len(tool_messages), 1)
                 self.assertIn("stock_scope_violation", tool_messages[0]["content"])
 
-    def test_run_agent_loop_blocks_untrusted_context_denied_token(self):
+    def test_run_agent_loop_blocks_invalid_context_code(self):
         cases = [
-            ("继续看", "HK", "港股"),
-            ("继续看", "KDJ", "KDJ 指标"),
-            ("分析 MA 均线", "MA", "均线"),
+            ("继续看", "NOT-A-SYMBOL", "invalid"),
+            ("继续看", "TOO-LONG", "invalid"),
         ]
 
         for message, requested_code, stock_name in cases:

@@ -171,6 +171,22 @@ def _append_candidate(
         candidates.append(normalized)
 
 
+def _is_spaced_exchange_affix(
+    text: str,
+    candidate: str,
+    candidate_start: int,
+) -> bool:
+    """Identify exchange labels attached to a preceding numeric symbol."""
+    if candidate.strip().upper() not in _EXCHANGE_TOKEN_CANDIDATES:
+        return False
+    return bool(
+        re.search(
+            r"(?<!\d)\d{5,6}\s+$",
+            text[:candidate_start],
+        )
+    )
+
+
 def extract_stock_codes(text: str) -> List[str]:
     """Extract all explicit stock-code candidates from free text."""
     if not text:
@@ -222,12 +238,19 @@ def extract_stock_codes(text: str) -> List[str]:
         _ENGLISH_AND_COMPARE_PAIR_PATTERN,
     ):
         for match in pattern.finditer(text):
-            for raw in match.groups():
+            for group_index, raw in enumerate(match.groups(), start=1):
                 _append_candidate(
                     candidates,
                     raw,
                     text,
-                    explicit=raw.isupper(),
+                    explicit=(
+                        raw.isupper()
+                        and not _is_spaced_exchange_affix(
+                            text,
+                            raw,
+                            match.start(group_index),
+                        )
+                    ),
                 )
 
     for pattern in _EXPLICIT_SINGLE_TICKER_COMPARE_PATTERNS:

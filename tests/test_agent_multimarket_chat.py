@@ -111,6 +111,8 @@ def test_first_chat_turn_builds_cross_market_compare_scope() -> None:
         ("比较 F 和 00700.HK", {"F", "HK00700"}),
         ("compare 600519 and T", {"600519", "T"}),
         ("compare 600519 and t", {"600519", "T"}),
+        ("compare SH and AAPL", {"SH", "AAPL"}),
+        ("比较 BJ 和 AAPL", {"BJ", "AAPL"}),
     ],
 )
 def test_english_compare_connector_is_not_treated_as_a_ticker(
