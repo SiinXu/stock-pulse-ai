@@ -149,6 +149,7 @@ class _LLMDiagnostic:
 class SystemConfigService:
     """Service layer for reading, validating, and updating runtime configuration."""
 
+    _ENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     _GENERATION_BACKEND_STATUS_EXACT_KEYS = {
         "GENERATION_BACKEND",
         "GENERATION_FALLBACK_BACKEND",
@@ -2646,10 +2647,44 @@ class SystemConfigService:
         submitted_map: Dict[str, str] = {}
 
         for item in items:
-            key = item["key"].upper()
+            raw_key = item["key"]
+            key = raw_key.upper()
             value = item["value"]
+            if self._ENV_KEY_PATTERN.fullmatch(raw_key) is None:
+                issues.append(
+                    {
+                        "key": key,
+                        "code": "invalid_key",
+                        "severity": "error",
+                        "message": "Configuration keys must use canonical environment-variable syntax.",
+                        "expected": "[A-Za-z_][A-Za-z0-9_]*",
+                        "actual": "invalid format",
+                    }
+                )
+                continue
             submitted_map[key] = value
             field_schema = get_field_definition(key, value)
+            if key == "ADMIN_AUTH_ENABLED":
+                current_enabled = (saved_config_map.get(key) or "").strip().lower() in {
+                    "true",
+                    "1",
+                    "yes",
+                }
+                requested_enabled = value.strip().lower() in {"true", "1", "yes"}
+                if requested_enabled != current_enabled:
+                    issues.append(
+                        {
+                            "key": key,
+                            "code": "auth_settings_endpoint_required",
+                            "severity": "error",
+                            "message": (
+                                "ADMIN_AUTH_ENABLED can only be changed through "
+                                "/api/v1/auth/settings with current-password verification."
+                            ),
+                            "expected": "unchanged value or dedicated auth settings endpoint",
+                            "actual": value,
+                        }
+                    )
             is_sensitive = bool(field_schema.get("is_sensitive", False))
             submitted_is_masked = is_sensitive and (
                 value == mask_token or is_masked_secret_placeholder(value)

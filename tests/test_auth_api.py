@@ -427,9 +427,11 @@ class AuthApiTestCase(unittest.TestCase):
     def test_auth_settings_disable_clears_cookie_and_hides_password_state(self) -> None:
         with patch.object(auth, "_is_auth_enabled_from_env", side_effect=self._read_auth_enabled_from_env):
             auth.set_initial_password("passwd6")
+            session_cookie = auth.create_session()
+            self.assertTrue(auth.verify_session(session_cookie))
             response = asyncio.run(
                 auth_endpoint.auth_update_settings(
-                    self._build_request(),
+                    self._build_request(cookies={auth.COOKIE_NAME: session_cookie}),
                     auth_endpoint.AuthSettingsRequest(authEnabled=False, currentPassword="passwd6"),
                 )
             )
@@ -459,6 +461,32 @@ class AuthApiTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn(b'"error":"current_required"', response.body)
         self.assertIn("ADMIN_AUTH_ENABLED=true", self.env_path.read_text(encoding="utf-8"))
+
+    def test_auth_settings_disable_rejects_valid_session_without_current_password(self) -> None:
+        app = FastAPI()
+        app.include_router(auth_endpoint.router, prefix="/api/v1/auth")
+        app.add_middleware(AuthMiddleware)
+        auth.set_initial_password("passwd6")
+
+        with TestClient(app) as client:
+            login_response = client.post(
+                "/api/v1/auth/login",
+                json={"password": "passwd6"},
+            )
+            self.assertEqual(login_response.status_code, 200)
+            session_cookie = client.cookies.get(auth.COOKIE_NAME)
+            self.assertIsNotNone(session_cookie)
+            self.assertTrue(auth.verify_session(session_cookie))
+
+            response = client.post(
+                "/api/v1/auth/settings",
+                json={"authEnabled": False},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "current_required")
+        self.assertIn("ADMIN_AUTH_ENABLED=true", self.env_path.read_text(encoding="utf-8"))
+        self.assertTrue(auth.verify_session(session_cookie))
 
     def test_auth_settings_toggle_fails_when_secret_rotation_fails(self) -> None:
         with patch.object(auth, "_is_auth_enabled_from_env", side_effect=self._read_auth_enabled_from_env):
