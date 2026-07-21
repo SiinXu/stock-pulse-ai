@@ -33,6 +33,7 @@ def test_changelog_mentions_searxng_actions_variable_mapping() -> None:
     changelog = (ROOT_DIR / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert (
-        "- [修复] GitHub Actions 每日分析工作流读取 SearXNG 自建实例地址时"
-        "支持 Variables 优先、Secrets 回退，修复仅配置 Variables 时 URL 不生效的问题。"
+        "- [Fixed] GitHub Actions daily analysis workflow supports Variables priority "
+        "and Secrets fallback when reading SearXNG self-hosted instance address; "
+        "fixes the issue of URL not working when only Variables are configured."
     ) in changelog

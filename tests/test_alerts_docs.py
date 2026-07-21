@@ -329,16 +329,16 @@ def test_changelog_mentions_alert_p6_release_note() -> None:
     changelog = (PROJECT_ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
 
     assert "P6" in changelog
-    assert "自选股" in changelog
-    assert "持仓" in changelog
-    assert "账户联动规则" in changelog
+    assert "watchlist stocks" in changelog
+    assert "holdings" in changelog
+    assert "account linkage rules" in changelog
 
 
 def test_changelog_mentions_alert_p8_docs_closeout() -> None:
     changelog = (PROJECT_ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
 
-    assert "补齐告警中心 P8 文档与配置收口说明" in changelog
-    assert "GitHub Actions 与 Desktop 边界" in changelog
+    assert "Completed alarm center P8 documentation and configuration closure" in changelog
+    assert "GitHub Actions, and Desktop boundaries" in changelog
 
 
 def test_changelog_unreleased_keeps_flat_entries() -> None:
