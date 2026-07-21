@@ -336,11 +336,15 @@ def execute_runner_tool_call_via_session(
     if completion_guard is None:
         result = session.execute(name, arguments)
     else:
-        result = session.execute(
-            name,
-            arguments,
-            completion_guard=completion_guard,
-        )
+        token = _RUNNER_TOOL_COMPLETION_GUARD.set(None)
+        try:
+            result = session.execute(
+                name,
+                arguments,
+                completion_guard=completion_guard,
+            )
+        finally:
+            _RUNNER_TOOL_COMPLETION_GUARD.reset(token)
 
     res_str = result["result_text"]
     # A non-retriable cache hit is reported as a non-success skip, exactly like

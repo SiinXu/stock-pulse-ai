@@ -405,9 +405,10 @@ def _build_tool_loop_result(
 class _ToolCompletionFence:
     """Linearize one runner timeout against BoundToolSession completion."""
 
-    def __init__(self) -> None:
+    def __init__(self, timeout_seconds: float) -> None:
         self._lock = threading.Lock()
         self._timed_out = False
+        self._deadline_monotonic = time.monotonic() + timeout_seconds
 
     def mark_timed_out(self) -> None:
         """Close this dispatch against later completion claims."""
@@ -417,7 +418,7 @@ class _ToolCompletionFence:
     def claim_completion(self, claim: Callable[[], None]) -> None:
         """Accept completion only when the runner timeout has not won."""
         with self._lock:
-            if self._timed_out:
+            if self._timed_out or time.monotonic() >= self._deadline_monotonic:
                 raise ExecutionFenceRejected(
                     "tool_timeout",
                     "Tool result arrived after the runner timeout.",
@@ -879,7 +880,7 @@ def _execute_tools(
         if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0:
             pool = ThreadPoolExecutor(max_workers=1)
             ctx = contextvars.copy_context()
-            completion_fence = _ToolCompletionFence()
+            completion_fence = _ToolCompletionFence(tool_wait_timeout_seconds)
             try:
                 future = pool.submit(ctx.run, _exec_single, tc, completion_fence)
                 try:
@@ -943,7 +944,11 @@ def _execute_tools(
         try:
             futures = {}
             for tc in tool_calls:
-                completion_fence = _ToolCompletionFence()
+                completion_fence = (
+                    _ToolCompletionFence(tool_wait_timeout_seconds)
+                    if tool_wait_timeout_seconds and tool_wait_timeout_seconds > 0
+                    else None
+                )
                 future = pool.submit(
                     contextvars.copy_context().run,
                     _exec_single,
@@ -983,7 +988,8 @@ def _execute_tools(
             )
             for future, (tc_item, completion_fence) in futures.items():
                 if future in pending:
-                    completion_fence.mark_timed_out()
+                    if completion_fence is not None:
+                        completion_fence.mark_timed_out()
                     future.cancel()
                     log_runtime_guard_event(
                         logger,
