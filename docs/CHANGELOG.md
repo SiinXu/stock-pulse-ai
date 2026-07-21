@@ -252,6 +252,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Changed] Normalized A-share, Hong Kong, and US symbols across Bot analysis commands with explicit market labels and actionable unsupported-market guidance.
 - [Docs] Established an ADR registry and template, backfilled four implemented architecture decisions, and added a current component and data-flow overview.
 - [Changed] Split pipeline orchestration and persistence stages into focused modules while preserving the legacy facade and runtime behavior.
+- [Changed] Added bounded adaptive daily-provider ordering and structured health snapshot export without crossing configured priority or market capability boundaries.
 
 ## [3.26.3] - 2026-07-15
 

@@ -14,6 +14,7 @@
 3. 指数退避重试机制
 """
 
+import json
 import logging
 import os
 import random
@@ -43,6 +44,9 @@ _PROVIDER_CIRCUIT_ENABLED_DEFAULT = True
 _PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT = 3
 _PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT = 300.0
 _PROVIDER_HEALTH_WINDOW_SIZE_DEFAULT = 20
+_PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT = True
+_PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT = 3
+_PROVIDER_DAILY_HEALTH_SCHEMA_VERSION = "provider_daily_health_v1"
 
 
 def _read_bool_env(name: str, default: bool) -> bool:
@@ -685,6 +689,7 @@ class DataFetcherManager:
         "FinnhubFetcher": {"us"},
         "AlphaVantageFetcher": {"us"},
     }
+    _DAILY_MARKETS = frozenset({"cn", "hk", "us", "jp", "kr", "tw"})
     _daily_source_health = CircuitBreaker(
         failure_threshold=_PROVIDER_CIRCUIT_FAILURE_THRESHOLD_DEFAULT,
         cooldown_seconds=_PROVIDER_CIRCUIT_COOLDOWN_SECONDS_DEFAULT,
@@ -705,6 +710,7 @@ class DataFetcherManager:
             fetchers: 数据源列表（可选，默认按优先级自动创建）
         """
         self._configure_daily_source_health()
+        self._configure_daily_adaptive_priority()
         self._fetchers: List[BaseFetcher] = []
         self._fetchers_lock = RLock()
         self._fetchers_by_name: Dict[str, BaseFetcher] = {}
@@ -747,6 +753,10 @@ class DataFetcherManager:
             self._stock_name_cache_lock = RLock()
         if not hasattr(self, "_daily_data_cache"):
             self._daily_data_cache = None
+        if not hasattr(self, "_daily_adaptive_priority_enabled"):
+            self._daily_adaptive_priority_enabled = _PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT
+        if not hasattr(self, "_daily_adaptive_priority_min_samples"):
+            self._daily_adaptive_priority_min_samples = _PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT
 
     def _get_fetchers_snapshot(self) -> List[BaseFetcher]:
         self._ensure_concurrency_guards()
@@ -961,6 +971,114 @@ class DataFetcherManager:
             ),
         )
 
+    def _configure_daily_adaptive_priority(self) -> None:
+        self._daily_adaptive_priority_enabled = _read_bool_env(
+            "PROVIDER_ADAPTIVE_PRIORITY_ENABLED",
+            _PROVIDER_ADAPTIVE_PRIORITY_ENABLED_DEFAULT,
+        )
+        self._daily_adaptive_priority_min_samples = _read_positive_int_env(
+            "PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES",
+            _PROVIDER_ADAPTIVE_PRIORITY_MIN_SAMPLES_DEFAULT,
+        )
+
+    @staticmethod
+    def _daily_adaptive_sort_key(
+        snapshot: Dict[str, Any],
+        static_index: int,
+    ) -> Tuple[float, float, float, int]:
+        latency = snapshot.get("average_latency_ms")
+        return (
+            -float(snapshot.get("health_score", 0.0)),
+            -float(snapshot.get("success_rate", 0.0)),
+            float(latency) if latency is not None else float("inf"),
+            static_index,
+        )
+
+    def _order_daily_fetchers(
+        self,
+        fetchers: List[BaseFetcher],
+        market: str,
+    ) -> List[BaseFetcher]:
+        """Adapt contiguous eligible peers without crossing static or health anchors."""
+        self._ensure_concurrency_guards()
+        static_order = list(fetchers)
+        if not self._daily_adaptive_priority_enabled or len(static_order) < 2:
+            return static_order
+
+        snapshots: Dict[int, Dict[str, Any]] = {}
+        for static_index, fetcher in enumerate(static_order):
+            health_key = self._daily_health_key(fetcher, market)
+            snapshots[static_index] = self._daily_source_health.get_snapshot(health_key)[health_key]
+
+        selected_order = list(static_order)
+        eligible_count = 0
+        run_positions: List[int] = []
+
+        def rank_run() -> None:
+            if len(run_positions) < 2:
+                run_positions.clear()
+                return
+            ranked_positions = sorted(
+                run_positions,
+                key=lambda position: self._daily_adaptive_sort_key(
+                    snapshots[position],
+                    position,
+                ),
+            )
+            for target_position, ranked_position in zip(run_positions, ranked_positions):
+                selected_order[target_position] = static_order[ranked_position]
+            run_positions.clear()
+
+        for position, fetcher in enumerate(static_order):
+            snapshot = snapshots[position]
+            eligible = (
+                snapshot["state"] == CircuitBreaker.CLOSED
+                and snapshot["sample_count"]
+                >= self._daily_adaptive_priority_min_samples
+            )
+            if not eligible:
+                rank_run()
+                continue
+
+            if (
+                run_positions
+                and static_order[run_positions[-1]].priority != fetcher.priority
+            ):
+                rank_run()
+            run_positions.append(position)
+            eligible_count += 1
+        rank_run()
+
+        if selected_order != static_order:
+            health_summary = [
+                {
+                    "provider": sanitize_diagnostic_text(fetcher.name, max_length=120),
+                    "priority": fetcher.priority,
+                    "sample_count": snapshots[index]["sample_count"],
+                    "success_rate": snapshots[index]["success_rate"],
+                    "average_latency_ms": snapshots[index]["average_latency_ms"],
+                    "health_score": snapshots[index]["health_score"],
+                }
+                for index, fetcher in enumerate(static_order)
+            ]
+            logger.info(
+                "provider_priority event=adaptive_reorder data_type=daily_data market=%s "
+                "min_samples=%d eligible_count=%d static_order=%s selected_order=%s health=%s",
+                market,
+                self._daily_adaptive_priority_min_samples,
+                eligible_count,
+                ",".join(
+                    sanitize_diagnostic_text(fetcher.name, max_length=120)
+                    for fetcher in static_order
+                ),
+                ",".join(
+                    sanitize_diagnostic_text(fetcher.name, max_length=120)
+                    for fetcher in selected_order
+                ),
+                json.dumps(health_summary, sort_keys=True, separators=(",", ":")),
+            )
+        return selected_order
+
     @classmethod
     def _is_daily_source_available(
         cls,
@@ -1081,6 +1199,82 @@ class DataFetcherManager:
     def get_daily_source_health_snapshot(cls) -> Dict[str, Dict[str, Any]]:
         """Return the current process-local daily provider health snapshot."""
         return cls._daily_source_health.get_snapshot()
+
+    def get_daily_provider_health_report(
+        self,
+        market: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Return a JSON-serializable daily-provider health report for operators."""
+        self._ensure_concurrency_guards()
+        market_filter = str(market or "").strip().lower()
+        if market_filter and market_filter not in self._DAILY_MARKETS:
+            raise ValueError("market must be one of: cn, hk, us, jp, kr, tw")
+        fetchers_by_name = {
+            fetcher.name: fetcher
+            for fetcher in self._get_fetchers_snapshot()
+        }
+        providers: List[Dict[str, Any]] = []
+        for source, snapshot in self._daily_source_health.get_snapshot().items():
+            source_parts = source.split(":", 2)
+            if len(source_parts) != 3 or source_parts[0] != "daily_data":
+                continue
+            source_market, provider_name = source_parts[1], source_parts[2]
+            if market_filter and source_market != market_filter:
+                continue
+            fetcher = fetchers_by_name.get(provider_name)
+            supported_markets = self._DAILY_MARKET_FETCHER_SUPPORT.get(provider_name)
+            providers.append(
+                {
+                    "data_type": "daily_data",
+                    "market": source_market,
+                    "provider": sanitize_diagnostic_text(provider_name, max_length=120),
+                    "static_priority": getattr(fetcher, "priority", None),
+                    "supported_markets": (
+                        sorted(supported_markets)
+                        if supported_markets is not None
+                        else None
+                    ),
+                    **{
+                        key: value
+                        for key, value in snapshot.items()
+                        if key != "source"
+                    },
+                }
+            )
+
+        providers.sort(
+            key=lambda item: (
+                item["market"],
+                item["static_priority"] is None,
+                item["static_priority"] if item["static_priority"] is not None else 0,
+                item["provider"],
+            )
+        )
+        return {
+            "schema_version": _PROVIDER_DAILY_HEALTH_SCHEMA_VERSION,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "market": market_filter or "all",
+            "adaptive_priority": {
+                "enabled": self._daily_adaptive_priority_enabled,
+                "min_samples": self._daily_adaptive_priority_min_samples,
+                "boundary": "equal_static_priority_after_capability_filtering",
+            },
+            "provider_count": len(providers),
+            "providers": providers,
+        }
+
+    def log_daily_provider_health_report(
+        self,
+        market: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Write and return a structured, secret-free daily-provider health report."""
+        report = self.get_daily_provider_health_report(market=market)
+        logger.info(
+            "provider_health event=snapshot data_type=daily_data market=%s payload=%s",
+            report["market"],
+            json.dumps(report, sort_keys=True, separators=(",", ":")),
+        )
+        return report
 
     @classmethod
     def reset_daily_source_health(cls) -> None:
@@ -1661,6 +1855,8 @@ class DataFetcherManager:
         if market != "cn":
             fetchers = self._filter_daily_fetchers_for_market(fetchers, market)
         fetchers = self._filter_fetchers_by_capability(fetchers, capability="daily_data")
+        if not is_us:
+            fetchers = self._order_daily_fetchers(fetchers, market)
         total_fetchers = len(fetchers)
 
         if total_fetchers == 0:
