@@ -111,7 +111,7 @@ from src.core.stages.delivery import (
 from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.core.stages.persistence import (
     _PersistenceStageMixin,
-    _symbol_scope_lookup_values,
+    _symbol_scope_lookup_values as _persistence_symbol_scope_lookup_values,
 )
 from data_provider.us_index_mapping import is_us_stock_code
 logger = logging.getLogger(__name__)
@@ -187,8 +187,8 @@ _PIPELINE_COMPAT_EXPORTS = (
     timezone,
     TrendAnalysisResult,
     uuid,
+    _persistence_symbol_scope_lookup_values,
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
-    _symbol_scope_lookup_values,
 )
 
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
@@ -201,7 +201,7 @@ _DEFER_PIPELINE_DELIVERY_OBSERVATION: ContextVar[bool] = ContextVar(
 )
 
 
-class StockAnalysisPipeline:
+class StockAnalysisPipeline(_DeliveryStageMixin):
     """
     股票分析主流程调度器
     
@@ -345,20 +345,15 @@ class StockAnalysisPipeline:
             self.social_sentiment_service = None
 
 
-def _clone_stage_descriptor(descriptor: Any) -> Any:
-    """Clone a stage descriptor with the legacy facade as its globals."""
-
-    descriptor_type = None
-    function = descriptor
-    if isinstance(descriptor, staticmethod):
-        descriptor_type = staticmethod
-        function = descriptor.__func__
-    elif isinstance(descriptor, classmethod):
-        descriptor_type = classmethod
-        function = descriptor.__func__
+def _clone_function_with_facade_globals(
+    function: _FunctionType,
+    *,
+    qualname: str,
+) -> _FunctionType:
+    """Clone a Python function with the legacy facade as its globals."""
 
     if not isinstance(function, _FunctionType):
-        raise TypeError("Stage descriptor must wrap a Python function")
+        raise TypeError("Facade binding requires a Python function")
 
     rebound = _FunctionType(
         function.__code__,
@@ -374,10 +369,28 @@ def _clone_stage_descriptor(descriptor: Any) -> Any:
     rebound.__dict__.update(function.__dict__)
     rebound.__doc__ = function.__doc__
     rebound.__module__ = __name__
-    rebound.__qualname__ = f"{StockAnalysisPipeline.__qualname__}.{function.__name__}"
+    rebound.__qualname__ = qualname
     if hasattr(function, "__type_params__"):
         rebound.__type_params__ = function.__type_params__
+    return rebound
 
+
+def _clone_stage_descriptor(descriptor: Any) -> Any:
+    """Clone a stage descriptor with the legacy facade as its globals."""
+
+    descriptor_type = None
+    function = descriptor
+    if isinstance(descriptor, staticmethod):
+        descriptor_type = staticmethod
+        function = descriptor.__func__
+    elif isinstance(descriptor, classmethod):
+        descriptor_type = classmethod
+        function = descriptor.__func__
+
+    rebound = _clone_function_with_facade_globals(
+        function,
+        qualname=f"{StockAnalysisPipeline.__qualname__}.{function.__name__}",
+    )
     if descriptor_type is not None:
         return descriptor_type(rebound)
     return rebound
@@ -405,6 +418,10 @@ def _bind_stage_methods(stage_container: Any) -> Tuple[str, ...]:
     return tuple(bound_names)
 
 
+_symbol_scope_lookup_values = _clone_function_with_facade_globals(
+    _persistence_symbol_scope_lookup_values,
+    qualname=_persistence_symbol_scope_lookup_values.__qualname__,
+)
 _ANALYSIS_STAGE_METHOD_NAMES = _bind_stage_methods(_AnalysisStageMixin)
 _DELIVERY_STAGE_METHOD_NAMES = _bind_stage_methods(_DeliveryStageMixin)
 _PERSISTENCE_STAGE_METHOD_NAMES = _bind_stage_methods(_PersistenceStageMixin)

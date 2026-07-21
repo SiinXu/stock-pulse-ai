@@ -178,7 +178,7 @@ def test_pipeline_legacy_entry_point_exposes_remaining_stage_methods():
     pipeline_class = pipeline_module.StockAnalysisPipeline
     expected_methods = EXPECTED_PERSISTENCE_METHODS + EXPECTED_ORCHESTRATION_METHODS
 
-    assert pipeline_class.__bases__ == (object,)
+    assert pipeline_class.__bases__ == (pipeline_module._DeliveryStageMixin,)
     assert all(callable(getattr(pipeline_class, name)) for name in expected_methods)
 
 
@@ -262,6 +262,39 @@ def test_pipeline_extracted_descriptors_preserve_facade_contract():
             "_SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD"
         ]
     )
+
+
+def test_pipeline_symbol_scope_helper_resolves_legacy_facade_globals(monkeypatch):
+    """Assert that the moved helper retains legacy facade patch semantics."""
+
+    pipeline_module = importlib.import_module("src.core.pipeline")
+    helper = pipeline_module._symbol_scope_lookup_values
+    source_helper = pipeline_module._persistence_symbol_scope_lookup_values
+
+    assert helper.__globals__ is vars(pipeline_module)
+    assert helper.__code__ is source_helper.__code__
+    assert helper.__defaults__ == source_helper.__defaults__
+    assert helper.__kwdefaults__ == source_helper.__kwdefaults__
+    assert helper.__annotations__ == source_helper.__annotations__
+    assert helper.__closure__ == source_helper.__closure__
+    assert helper.__dict__ == source_helper.__dict__
+    assert helper.__doc__ == source_helper.__doc__
+    assert getattr(helper, "__type_params__", ()) == getattr(
+        source_helper,
+        "__type_params__",
+        (),
+    )
+    assert helper.__module__ == "src.core.pipeline"
+    assert helper.__name__ == "_symbol_scope_lookup_values"
+    assert helper.__qualname__ == "_symbol_scope_lookup_values"
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "normalize_stock_code",
+        lambda _code: "PATCHED",
+    )
+
+    assert helper("raw", "us") == ["PATCHED", "patched", "raw", "RAW"]
 
 
 def test_pipeline_analysis_methods_resolve_legacy_facade_globals(monkeypatch):
