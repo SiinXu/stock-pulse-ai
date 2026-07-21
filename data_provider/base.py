@@ -999,41 +999,55 @@ class DataFetcherManager:
         fetchers: List[BaseFetcher],
         market: str,
     ) -> List[BaseFetcher]:
-        """Adapt sufficiently sampled peers without crossing static priority tiers."""
+        """Adapt contiguous eligible peers without crossing static or health anchors."""
         self._ensure_concurrency_guards()
         static_order = list(fetchers)
         if not self._daily_adaptive_priority_enabled or len(static_order) < 2:
             return static_order
 
         snapshots: Dict[int, Dict[str, Any]] = {}
-        tier_positions: Dict[Any, List[int]] = {}
         for static_index, fetcher in enumerate(static_order):
             health_key = self._daily_health_key(fetcher, market)
             snapshots[static_index] = self._daily_source_health.get_snapshot(health_key)[health_key]
-            tier_positions.setdefault(fetcher.priority, []).append(static_index)
 
         selected_order = list(static_order)
         eligible_count = 0
-        for positions in tier_positions.values():
-            eligible_positions = [
-                position
-                for position in positions
-                if snapshots[position]["state"] == CircuitBreaker.CLOSED
-                and snapshots[position]["sample_count"]
-                >= self._daily_adaptive_priority_min_samples
-            ]
-            eligible_count += len(eligible_positions)
-            if len(eligible_positions) < 2:
-                continue
+        run_positions: List[int] = []
+
+        def rank_run() -> None:
+            if len(run_positions) < 2:
+                run_positions.clear()
+                return
             ranked_positions = sorted(
-                eligible_positions,
+                run_positions,
                 key=lambda position: self._daily_adaptive_sort_key(
                     snapshots[position],
                     position,
                 ),
             )
-            for target_position, ranked_position in zip(eligible_positions, ranked_positions):
+            for target_position, ranked_position in zip(run_positions, ranked_positions):
                 selected_order[target_position] = static_order[ranked_position]
+            run_positions.clear()
+
+        for position, fetcher in enumerate(static_order):
+            snapshot = snapshots[position]
+            eligible = (
+                snapshot["state"] == CircuitBreaker.CLOSED
+                and snapshot["sample_count"]
+                >= self._daily_adaptive_priority_min_samples
+            )
+            if not eligible:
+                rank_run()
+                continue
+
+            if (
+                run_positions
+                and static_order[run_positions[-1]].priority != fetcher.priority
+            ):
+                rank_run()
+            run_positions.append(position)
+            eligible_count += 1
+        rank_run()
 
         if selected_order != static_order:
             health_summary = [

@@ -181,41 +181,62 @@ def test_disabled_adaptive_priority_restores_static_order() -> None:
     assert healthy.calls == 0
 
 
-def test_sparse_health_samples_do_not_change_static_order() -> None:
+def test_sparse_provider_is_uncrossable_sampling_anchor() -> None:
     breaker = CircuitBreaker()
-    first = _Provider("FirstPeer", 1, _daily_frame())
-    second = _Provider("SecondPeer", 1, _daily_frame())
+    degraded = _Provider("DegradedPeer", 1, TimeoutError("provider down"))
+    sparse = _Provider("SparsePeer", 1, _daily_frame())
+    healthy = _Provider("HealthyPeer", 1, _daily_frame())
 
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         with patch.dict(os.environ, _adaptive_environment(min_samples=3), clear=False):
-            manager = DataFetcherManager(fetchers=[first, second])
+            manager = DataFetcherManager(fetchers=[degraded, sparse, healthy])
             _record_quality_failures(
                 breaker,
                 manager,
-                first,
+                degraded,
+                latency_ms=100,
+                count=3,
+            )
+            _record_successes(
+                breaker,
+                manager,
+                sparse,
                 latency_ms=100,
                 count=1,
             )
             _record_successes(
                 breaker,
                 manager,
-                second,
+                healthy,
                 latency_ms=100,
-                count=1,
+                count=3,
             )
 
-            ordered = manager._order_daily_fetchers([first, second], "cn")
+            ordered = manager._order_daily_fetchers(
+                [degraded, sparse, healthy],
+                "cn",
+            )
+            _, source = manager.get_daily_data("600519")
 
-    assert [provider.name for provider in ordered] == ["FirstPeer", "SecondPeer"]
+    assert [provider.name for provider in ordered] == [
+        "DegradedPeer",
+        "SparsePeer",
+        "HealthyPeer",
+    ]
+    assert source == "SparsePeer"
+    assert degraded.calls == 1
+    assert sparse.calls == 1
+    assert healthy.calls == 0
 
 
-def test_open_provider_keeps_static_position_for_half_open_recovery() -> None:
+def test_open_provider_is_uncrossable_half_open_recovery_anchor() -> None:
     clock = _Clock()
     breaker = CircuitBreaker(
         failure_threshold=2,
         cooldown_seconds=30,
         clock=clock,
     )
+    degraded = _Provider("DegradedPeer", 1, TimeoutError("provider down"))
     recovering = _Provider("RecoveringPeer", 1, _daily_frame())
     healthy = _Provider("HealthyPeer", 1, _daily_frame())
     environment = _adaptive_environment(min_samples=2)
@@ -229,7 +250,14 @@ def test_open_provider_keeps_static_position_for_half_open_recovery() -> None:
 
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         with patch.dict(os.environ, environment, clear=False):
-            manager = DataFetcherManager(fetchers=[recovering, healthy])
+            manager = DataFetcherManager(fetchers=[degraded, recovering, healthy])
+            _record_quality_failures(
+                breaker,
+                manager,
+                degraded,
+                latency_ms=100,
+                count=2,
+            )
             recovering_key = manager._daily_health_key(recovering, "cn")
             breaker.record_failure(recovering_key, latency_ms=100)
             breaker.record_failure(recovering_key, latency_ms=100)
@@ -242,15 +270,20 @@ def test_open_provider_keeps_static_position_for_half_open_recovery() -> None:
             )
 
             clock.advance(30)
-            ordered = manager._order_daily_fetchers([recovering, healthy], "cn")
+            ordered = manager._order_daily_fetchers(
+                [degraded, recovering, healthy],
+                "cn",
+            )
             _, source = manager.get_daily_data("600519")
 
     assert [provider.name for provider in ordered] == [
+        "DegradedPeer",
         "RecoveringPeer",
         "HealthyPeer",
     ]
     assert source == "RecoveringPeer"
     assert breaker.get_status()[recovering_key] == CircuitBreaker.CLOSED
+    assert degraded.calls == 1
     assert recovering.calls == 1
     assert healthy.calls == 0
 

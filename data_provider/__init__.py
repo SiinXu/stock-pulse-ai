@@ -27,9 +27,10 @@
 6. YfinanceFetcher (Priority 4) - 来自 yfinance 库
 7. LongbridgeFetcher (Priority 5) - 长桥 OpenAPI（美股/港股兜底）
 
-Runtime adaptive ordering can reorder sufficiently sampled providers only within
-the same numeric priority. Capability filters and explicit market routes remain
-hard boundaries; disabling adaptive ordering restores initialization order.
+Runtime adaptive ordering can reorder only contiguous, sufficiently sampled
+providers within the same numeric priority. Sparse and circuit-state providers,
+capability filters, and explicit market routes remain uncrossable boundaries;
+disabling adaptive ordering restores initialization order.
 """
 
 from .base import BaseFetcher, DataFetcherManager
