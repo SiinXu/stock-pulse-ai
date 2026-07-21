@@ -301,7 +301,11 @@ class BoundToolSession:
                 completion_rejection = self._claim_completion_locked(
                     completion_guard,
                 )
-                if completion_rejection is not None:
+                # Preserve a terminal fence that already won during dispatch.
+                if (
+                    completion_rejection is not None
+                    and completion_rejection.code != rejection[0]
+                ):
                     return self._drop_late_result_locked(
                         tool_name=tool_name,
                         arguments=arguments,
