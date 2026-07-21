@@ -90,7 +90,7 @@ class _ConfigRuntimeMethods:
     def refresh_stock_list(self) -> None:
         """
         热读取 STOCK_LIST 环境变量并更新配置中的自选股列表
-
+\x20\x20\x20\x20\x20\x20\x20\x20
         支持两种配置方式：
         1. .env 文件（本地开发、定时任务模式） - 修改后下次执行自动生效
         2. 系统环境变量（GitHub Actions、Docker） - 启动时固定，运行中不变
@@ -98,7 +98,7 @@ class _ConfigRuntimeMethods:
         # 优先从 .env 文件读取最新配置，这样即使在容器环境中修改了 .env 文件，
         # 也能获取到最新的股票列表配置
         env_file = os.getenv("ENV_FILE")
-        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent.parent / '.env')
+        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent / '.env')
         stock_list_str = ''
         if env_path.exists():
             # 直接从 .env 文件读取最新的配置

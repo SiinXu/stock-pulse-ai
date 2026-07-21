@@ -11,9 +11,12 @@ Responsibilities:
 """
 
 import json
+import importlib as _importlib
 import logging
 import os
 import re
+import sys as _sys
+import types as _types
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 from urllib.parse import unquote, urlparse
@@ -73,6 +76,18 @@ from src.llm.hermes import (
     route_has_hermes,
 )
 from src.scheduler import normalize_schedule_times
+from src.config_parts.binding import clone_function as _clone_config_function
+
+
+def _load_or_reload_config_part(module_name: str):
+    module = _sys.modules.get(module_name)
+    if module is None:
+        return _importlib.import_module(module_name)
+    return _importlib.reload(module)
+
+
+_config_defaults_module = _load_or_reload_config_part("src.config_parts.defaults")
+_config_parsers_module = _load_or_reload_config_part("src.config_parts.parsers")
 
 from src.config_parts.defaults import (
     AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE,
@@ -125,6 +140,17 @@ from src.config_parts.parsers import (
     resolve_unified_llm_temperature,
 )
 
+for _compat_name, _compat_value in tuple(globals().items()):
+    if (
+        isinstance(_compat_value, _types.FunctionType)
+        and _compat_value.__module__ == __name__
+        and _compat_value.__globals__ is not globals()
+    ):
+        globals()[_compat_name] = _clone_config_function(_compat_value, globals())
+
+del _compat_name, _compat_value
+_config_defaults_module._bind_config_facade(globals())
+
 logger = logging.getLogger(__name__)
 
 
@@ -173,7 +199,17 @@ def setup_env(override: bool = False):
         )
 
 
-from src.config_parts.model import Config
+for _config_part_name in (
+    "src.config_parts.loading",
+    "src.config_parts.llm",
+    "src.config_parts.runtime",
+    "src.config_parts.validation",
+):
+    _load_or_reload_config_part(_config_part_name)
+
+_config_model_module = _load_or_reload_config_part("src.config_parts.model")
+Config = _config_model_module.Config
+_config_model_module._bind_config_facade(globals())
 
 
 # === 便捷的配置访问函数 ===

@@ -58,7 +58,7 @@ if TYPE_CHECKING:
     from src.config_parts.model import Config
 
 
-def _call_setup_env() -> None:
+def setup_env() -> None:
     from src import config as config_module
 
     config_module.setup_env()
@@ -69,7 +69,7 @@ class _ConfigLoadingMethods:
     def _load_from_env(cls) -> 'Config':
         """
         从 .env 文件加载配置
-
+\x20\x20\x20\x20\x20\x20\x20\x20
         加载优先级：
         1. 大多数配置保持系统环境变量优先
         2. WebUI 可写的运行期关键键优先复用持久化 `.env`，但保留启动时显式进程环境变量的 override
@@ -79,7 +79,7 @@ class _ConfigLoadingMethods:
         preexisting_report_language = os.environ.get("REPORT_LANGUAGE")
 
         # 确保环境变量已加载
-        _call_setup_env()
+        setup_env()
 
         # === 智能代理配置 (关键修复) ===
         # 如果配置了代理，自动设置 NO_PROXY 以排除国内数据源，避免行情获取失败
@@ -1052,7 +1052,7 @@ class _ConfigLoadingMethods:
         if v in ('simple', 'full', 'brief'):
             return v
         import logging
-        logging.getLogger("src.config").warning(
+        logging.getLogger(__name__).warning(
             f"REPORT_TYPE '{value}' invalid, fallback to 'simple' (valid: simple/full/brief)"
         )
         return 'simple'
@@ -1061,7 +1061,7 @@ class _ConfigLoadingMethods:
     def _get_env_file_value(cls, key: str) -> Optional[str]:
         """Read one config key directly from the active `.env` file."""
         env_file = os.getenv("ENV_FILE")
-        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent.parent / ".env")
+        env_path = Path(env_file) if env_file else (Path(__file__).parent.parent / ".env")
         if not env_path.exists():
             return None
 
@@ -1070,7 +1070,7 @@ class _ConfigLoadingMethods:
         except Exception as exc:  # pragma: no cover - defensive branch
             # broad-exception: fallback_recorded - Read failure is logged as missing.
             log_safe_exception(
-                logging.getLogger("src.config"),
+                logging.getLogger(__name__),
                 "Environment file read failed",
                 exc,
                 error_code="environment_file_read_failed",
@@ -1166,8 +1166,8 @@ class _ConfigLoadingMethods:
             env_text = preexisting_env_value.strip()
             file_text = (file_value or "").strip()
             if file_text and env_text and env_text.lower() != file_text.lower():
-                env_file = os.getenv("ENV_FILE") or str(Path(__file__).parent.parent.parent / ".env")
-                logging.getLogger("src.config").warning(
+                env_file = os.getenv("ENV_FILE") or str(Path(__file__).parent.parent / ".env")
+                logging.getLogger(__name__).warning(
                     "REPORT_LANGUAGE environment value '%s' overrides %s ('%s')",
                     preexisting_env_value,
                     env_file,
@@ -1186,7 +1186,7 @@ class _ConfigLoadingMethods:
         normalized = normalize_report_language(value, default="zh")
         raw = (value or "").strip()
         if raw and not is_supported_report_language_value(raw):
-            logging.getLogger("src.config").warning(
+            logging.getLogger(__name__).warning(
                 "REPORT_LANGUAGE '%s' invalid, fallback to 'zh' (valid: zh/en)",
                 value,
             )
@@ -1198,7 +1198,7 @@ class _ConfigLoadingMethods:
         normalized = normalize_news_strategy_profile(value)
         raw = (value or "short").strip().lower()
         if raw != normalized:
-            logging.getLogger("src.config").warning(
+            logging.getLogger(__name__).warning(
                 "NEWS_STRATEGY_PROFILE '%s' invalid, fallback to 'short' "
                 "(valid: ultra_short/short/medium/long)",
                 value,
@@ -1233,7 +1233,7 @@ class _ConfigLoadingMethods:
             if normalized:
                 return ','.join(normalized)
 
-        logging.getLogger("src.config").warning(
+        logging.getLogger(__name__).warning(
             f"MARKET_REVIEW_REGION 配置值 '{value}' 无效，已回退为默认值 'cn'（合法值：cn / hk / us / jp / kr / both；支持逗号分隔有效值）"
         )
         return 'cn'
@@ -1245,7 +1245,7 @@ class _ConfigLoadingMethods:
         v = (value or 'green_up').strip().lower().replace('-', '_')
         if v in ('green_up', 'red_up'):
             return v
-        logging.getLogger("src.config").warning(
+        logging.getLogger(__name__).warning(
             "MARKET_REVIEW_COLOR_SCHEME 配置值 '%s' 无效，已回退为默认值 'green_up'（合法值：green_up / red_up）",
             value,
         )
@@ -1259,7 +1259,7 @@ class _ConfigLoadingMethods:
             return v
         if v:
             import logging
-            logging.getLogger("src.config").warning(
+            logging.getLogger(__name__).warning(
                 f"MD2IMG_ENGINE '{value}' invalid, fallback to 'wkhtmltoimage' "
                 "(valid: wkhtmltoimage | markdown-to-file)"
             )
@@ -1286,7 +1286,7 @@ class _ConfigLoadingMethods:
             # Token configured but no explicit priority override
             # Prepend tushare so the paid source is tried first
             import logging
-            logger = logging.getLogger("src.config")
+            logger = logging.getLogger(__name__)
             resolved = f'tushare,{default_priority}'
             logger.info(
                 f"TUSHARE_TOKEN detected, auto-injecting tushare into realtime priority: {resolved}"

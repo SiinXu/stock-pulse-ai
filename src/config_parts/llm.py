@@ -40,7 +40,7 @@ class _ConfigLLMMethods:
         Returns an empty list on any error (logged, never raises).
         """
         import logging
-        _logger = logging.getLogger("src.config")
+        _logger = logging.getLogger(__name__)
         try:
             import yaml
         except ImportError:
@@ -49,7 +49,7 @@ class _ConfigLLMMethods:
 
         path = Path(config_path)
         if not path.is_absolute():
-            path = Path(__file__).parent.parent.parent / path
+            path = Path(__file__).parent.parent / path
         if not path.exists():
             _logger.warning(f"LITELLM_CONFIG file not found: {path}")
             return []
@@ -107,7 +107,7 @@ class _ConfigLLMMethods:
             LLM_AIHUBMIX_ENABLED=true
         """
         import logging
-        _logger = logging.getLogger("src.config")
+        _logger = logging.getLogger(__name__)
 
         from src.llm.model_ref import canonicalize_connection_id
 

@@ -4,6 +4,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.config_parts import loading as _loading_module
+from src.config_parts import parsers as _parsers_module
+from src.config_parts.binding import clone_descriptor
 from src.config_parts.defaults import (
     AGENT_CONTEXT_COMPRESSION_DEFAULT_PROFILE,
     AGENT_MAX_STEPS_DEFAULT,
@@ -29,7 +32,7 @@ from src.llm.local_cli_backend import (
 class Config:
     """
     系统配置类 - 单例模式
-
+\x20\x20\x20\x20
     设计说明：
     - 使用 dataclass 简化配置属性定义
     - 所有配置项从环境变量读取，支持默认值
@@ -479,7 +482,7 @@ class Config:
     _BOOTSTRAP_RUNTIME_ENV_PRESENT_KEYS = frozenset()
 
     def __post_init__(self) -> None:
-        _log = logging.getLogger("src.config")
+        _log = logging.getLogger(__name__)
         if self.agent_arch not in self._VALID_AGENT_ARCH:
             _log.warning(
                 "Invalid AGENT_ARCH=%r, falling back to 'single'. Valid: %s",
@@ -517,7 +520,7 @@ class Config:
     def get_instance(cls) -> 'Config':
         """
         获取配置单例实例
-
+\x20\x20\x20\x20\x20\x20\x20\x20
         单例模式确保：
         1. 全局只有一个配置实例
         2. 配置只从环境变量加载一次
@@ -529,6 +532,53 @@ class Config:
 
 
 
+_CONFIG_METHOD_GROUPS = (
+    (_ConfigLoadingMethods, ("_load_from_env",)),
+    (
+        _ConfigLLMMethods,
+        (
+            "_parse_litellm_yaml",
+            "_parse_llm_channels",
+            "_parse_llm_channels_with_issues",
+            "_channels_to_model_list",
+            "_legacy_keys_to_model_list",
+        ),
+    ),
+    (
+        _ConfigLoadingMethods,
+        (
+            "_parse_stock_email_groups",
+            "_parse_report_type",
+            "_get_env_file_value",
+            "_resolve_env_value",
+            "_capture_bootstrap_runtime_env_overrides",
+            "_has_bootstrap_runtime_env_override",
+            "_had_bootstrap_runtime_env_key",
+            "_resolve_report_language_env_value",
+            "_parse_report_language",
+            "_parse_news_strategy_profile",
+            "get_effective_news_window_days",
+            "_parse_market_review_region",
+            "_parse_market_review_color_scheme",
+            "_parse_md2img_engine",
+            "_resolve_realtime_source_priority",
+        ),
+    ),
+    (
+        _ConfigRuntimeMethods,
+        (
+            "reset_instance",
+            "has_searxng_enabled",
+            "has_search_capability_enabled",
+            "is_agent_available",
+            "refresh_stock_list",
+        ),
+    ),
+    (_ConfigValidationMethods, ("validate_structured", "validate")),
+    (_ConfigRuntimeMethods, ("get_db_url",)),
+)
+
+
 def _install_config_methods(method_group: type, method_names: Tuple[str, ...]) -> None:
     for method_name in method_names:
         descriptor = vars(method_group)[method_name]
@@ -538,52 +588,11 @@ def _install_config_methods(method_group: type, method_names: Tuple[str, ...]) -
         setattr(Config, method_name, descriptor)
 
 
-_install_config_methods(_ConfigLoadingMethods, ("_load_from_env",))
-_install_config_methods(
-    _ConfigLLMMethods,
-    (
-        "_parse_litellm_yaml",
-        "_parse_llm_channels",
-        "_parse_llm_channels_with_issues",
-        "_channels_to_model_list",
-        "_legacy_keys_to_model_list",
-    ),
-)
-_install_config_methods(
-    _ConfigLoadingMethods,
-    (
-        "_parse_stock_email_groups",
-        "_parse_report_type",
-        "_get_env_file_value",
-        "_resolve_env_value",
-        "_capture_bootstrap_runtime_env_overrides",
-        "_has_bootstrap_runtime_env_override",
-        "_had_bootstrap_runtime_env_key",
-        "_resolve_report_language_env_value",
-        "_parse_report_language",
-        "_parse_news_strategy_profile",
-        "get_effective_news_window_days",
-        "_parse_market_review_region",
-        "_parse_market_review_color_scheme",
-        "_parse_md2img_engine",
-        "_resolve_realtime_source_priority",
-    ),
-)
-_install_config_methods(
-    _ConfigRuntimeMethods,
-    (
-        "reset_instance",
-        "has_searxng_enabled",
-        "has_search_capability_enabled",
-        "is_agent_available",
-        "refresh_stock_list",
-    ),
-)
-_install_config_methods(
-    _ConfigValidationMethods,
-    ("validate_structured", "validate"),
-)
-_install_config_methods(_ConfigRuntimeMethods, ("get_db_url",))
+_loading_module.Config = Config
+_parsers_module.Config = Config
+
+for _method_group, _method_names in _CONFIG_METHOD_GROUPS:
+    _install_config_methods(_method_group, _method_names)
 
 Config.__module__ = "src.config"
 for _method_name in ("__init__", "__repr__", "__eq__", "__post_init__", "get_instance"):
@@ -593,3 +602,21 @@ for _method_name in ("__init__", "__repr__", "__eq__", "__post_init__", "get_ins
     _function.__qualname__ = f"Config.{_method_name}"
 
 del _descriptor, _function, _method_name
+
+
+def _bind_config_facade(facade_globals: Dict[str, Any]) -> None:
+    """Bind public Config methods to the original facade global namespace."""
+    for method_group, method_names in _CONFIG_METHOD_GROUPS:
+        for method_name in method_names:
+            descriptor = clone_descriptor(vars(method_group)[method_name], facade_globals)
+            function = descriptor.__func__ if isinstance(descriptor, classmethod) else descriptor
+            function.__module__ = "src.config"
+            function.__qualname__ = f"Config.{method_name}"
+            setattr(Config, method_name, descriptor)
+
+    for method_name in ("__init__", "__eq__", "__post_init__", "get_instance"):
+        descriptor = clone_descriptor(vars(Config)[method_name], facade_globals)
+        function = descriptor.__func__ if isinstance(descriptor, classmethod) else descriptor
+        function.__module__ = "src.config"
+        function.__qualname__ = f"Config.{method_name}"
+        setattr(Config, method_name, descriptor)

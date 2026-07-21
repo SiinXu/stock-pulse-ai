@@ -1,5 +1,10 @@
 """Compatibility guards for the public ``src.config`` facade."""
 
+import subprocess
+import sys
+from typing import get_type_hints
+from unittest.mock import patch
+
 import src.config as config_module
 from src.config import Config
 
@@ -131,3 +136,79 @@ def test_config_class_identity_and_method_ownership_are_stable():
         method = getattr(Config, method_name)
         assert method.__module__ == "src.config"
         assert method.__qualname__ == f"Config.{method_name}"
+
+
+def test_moved_callables_resolve_types_and_globals_through_facade():
+    assert get_type_hints(config_module.get_effective_agent_primary_model)["config"] is Config
+    assert get_type_hints(config_module.get_effective_agent_models_to_try)["config"] is Config
+    assert get_type_hints(Config._load_from_env)["return"] is Config
+    assert config_module.parse_env_bool.__globals__ is config_module.__dict__
+    assert Config.__init__.__globals__ is config_module.__dict__
+    assert Config.__eq__.__globals__ is config_module.__dict__
+    assert Config._parse_llm_channels_with_issues.__globals__ is config_module.__dict__
+
+
+def test_config_method_observes_facade_dependency_patches():
+    env = {
+        "LLM_OPENAI_API_KEY": "test-key-12345678",
+        "LLM_OPENAI_MODELS": "gpt-test",
+        "LLM_OPENAI_PROTOCOL": "openai",
+        "LLM_OPENAI_BASE_URL": "https://example.invalid/v1",
+    }
+    with patch.dict(config_module.os.environ, env, clear=True):
+        with patch.object(
+            config_module,
+            "get_provider_ids",
+            return_value=(),
+        ) as get_provider_ids:
+            channels, issues, blocks_legacy, blocked_routes = (
+                Config._parse_llm_channels_with_issues("openai")
+            )
+
+    get_provider_ids.assert_called_once_with()
+    assert channels[0]["provider_id"] == "custom"
+    assert issues == []
+    assert blocks_legacy is False
+    assert blocked_routes == []
+
+
+def test_exported_dataclass_method_metadata_is_stable():
+    for value in (config_module.ConfigIssue, config_module.AgentContextCompressionPreset):
+        assert value.__module__ == "src.config"
+        for method_name in ("__init__", "__repr__", "__eq__"):
+            assert getattr(value, method_name).__module__ == "src.config"
+
+    facade_owned_methods = {
+        config_module.ConfigIssue: ("__init__", "__eq__", "__str__"),
+        config_module.AgentContextCompressionPreset: (
+            "__init__",
+            "__eq__",
+            "__hash__",
+            "__setattr__",
+            "__delattr__",
+        ),
+    }
+    for value, method_names in facade_owned_methods.items():
+        for method_name in method_names:
+            assert getattr(value, method_name).__globals__ is config_module.__dict__
+
+
+def test_config_reload_recreates_public_definitions_and_singleton():
+    script = """
+import importlib
+import src.config as config
+
+old_config = config.Config
+old_issue = config.ConfigIssue
+old_preset = config.AgentContextCompressionPreset
+old_parser = config.parse_env_bool
+config.Config._instance = config.Config()
+
+reloaded = importlib.reload(config)
+assert reloaded.Config is not old_config
+assert reloaded.ConfigIssue is not old_issue
+assert reloaded.AgentContextCompressionPreset is not old_preset
+assert reloaded.parse_env_bool is not old_parser
+assert reloaded.Config._instance is None
+"""
+    subprocess.run([sys.executable, "-c", script], check=True)

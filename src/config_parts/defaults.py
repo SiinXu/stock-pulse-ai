@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 from urllib.parse import unquote, urlparse
 
+from src.config_parts.binding import clone_descriptor
+
 logger = logging.getLogger("src.config")
 
 DEFAULT_ALPHASIFT_INSTALL_SPEC = (
@@ -141,4 +143,50 @@ for _compat_name, _compat_value in tuple(globals().items()):
     if getattr(_compat_value, "__module__", None) == __name__:
         _compat_value.__module__ = "src.config"
 
+for _compat_class in (ConfigIssue, AgentContextCompressionPreset):
+    for _compat_descriptor in vars(_compat_class).values():
+        if isinstance(_compat_descriptor, (classmethod, staticmethod)):
+            _compat_functions = (_compat_descriptor.__func__,)
+        elif isinstance(_compat_descriptor, property):
+            _compat_functions = tuple(
+                function
+                for function in (
+                    _compat_descriptor.fget,
+                    _compat_descriptor.fset,
+                    _compat_descriptor.fdel,
+                )
+                if function is not None
+            )
+        elif callable(_compat_descriptor):
+            _compat_functions = (_compat_descriptor,)
+        else:
+            _compat_functions = ()
+        for _compat_function in _compat_functions:
+            if getattr(_compat_function, "__module__", None) == __name__:
+                _compat_function.__module__ = "src.config"
+
 del _compat_name, _compat_value
+del _compat_class, _compat_descriptor, _compat_function, _compat_functions
+
+
+def _bind_config_facade(facade_globals: Dict[str, object]) -> None:
+    """Bind facade-owned dataclass methods to the original global namespace."""
+    for compat_class in (ConfigIssue, AgentContextCompressionPreset):
+        for method_name, descriptor in tuple(vars(compat_class).items()):
+            if isinstance(descriptor, (classmethod, staticmethod)):
+                function = descriptor.__func__
+            elif callable(descriptor):
+                function = descriptor
+            else:
+                continue
+            if getattr(function, "__globals__", None) is not globals():
+                continue
+            cloned_descriptor = clone_descriptor(descriptor, facade_globals)
+            cloned_function = (
+                cloned_descriptor.__func__
+                if isinstance(cloned_descriptor, (classmethod, staticmethod))
+                else cloned_descriptor
+            )
+            cloned_function.__module__ = "src.config"
+            cloned_function.__qualname__ = f"{compat_class.__name__}.{method_name}"
+            setattr(compat_class, method_name, cloned_descriptor)
