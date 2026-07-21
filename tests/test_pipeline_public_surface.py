@@ -53,6 +53,45 @@ EXPECTED_DELIVERY_METHODS = (
     "_generate_aggregate_report",
 )
 
+EXPECTED_ANALYSIS_METHODS = (
+    "analyze_stock",
+    "_enhance_context",
+    "_attach_belong_boards_to_fundamental_context",
+    "_attach_concept_rankings_to_fundamental_context",
+    "_get_concept_rankings_for_market",
+    "_build_market_structure_context",
+    "_ensure_agent_history",
+    "_analyze_with_agent",
+    "_load_agent_analysis_context",
+    "_get_analysis_context_with_market_fallback",
+    "_build_analysis_context_from_daily_df",
+    "_is_daily_market_context_enabled",
+    "_load_daily_market_context",
+    "_get_daily_market_context_service_lock",
+    "_coerce_daily_market_context_date",
+    "_attach_daily_market_context",
+    "_agent_result_to_analysis_result",
+    "_refresh_decision_action_for_final_result",
+    "_agent_dashboard_value",
+    "_extract_advice_text_from_dict",
+    "_is_agent_placeholder_text",
+    "_is_agent_field_missing",
+    "_trend_score_fallback",
+    "_trend_label_fallback",
+    "_trend_signal_fallback",
+    "_trend_decision_fallback",
+    "_mark_trend_fallback_source",
+    "_summary_fallback_from_result",
+    "_backfill_agent_dashboard_fields",
+    "_stop_loss_fallback_from_trend",
+    "_apply_trend_fallback",
+    "_is_placeholder_stock_name",
+    "_safe_int",
+    "_describe_volume_ratio",
+    "_compute_ma_status",
+    "_augment_historical_with_realtime",
+)
+
 
 def test_pipeline_public_exports_match_pre_split_snapshot():
     """Assert that the facade exports exactly the pre-split public names."""
@@ -74,3 +113,13 @@ def test_pipeline_legacy_entry_point_exposes_delivery_methods():
 
     assert pipeline_class.__module__ == "src.core.pipeline"
     assert all(callable(getattr(pipeline_class, name)) for name in EXPECTED_DELIVERY_METHODS)
+
+
+def test_pipeline_legacy_entry_point_exposes_analysis_methods():
+    """Assert that analysis methods remain available from the legacy class."""
+
+    pipeline_module = importlib.import_module("src.core.pipeline")
+    pipeline_class = pipeline_module.StockAnalysisPipeline
+
+    assert pipeline_class.__module__ == "src.core.pipeline"
+    assert all(callable(getattr(pipeline_class, name)) for name in EXPECTED_ANALYSIS_METHODS)

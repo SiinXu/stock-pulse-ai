@@ -241,6 +241,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Fixed] Required current-password reauthentication before disabling administrator authentication and blocked generic configuration or non-canonical key aliases from changing the auth toggle.
 - [Changed] Split pipeline delivery, rendering, and dispatch stages into a focused module while preserving the `src.core.pipeline` compatibility surface.
 - [Changed] Added configurable daily-provider health scoring, serialized circuit admission, redacted failover metadata, and half-open recovery without changing market capability boundaries.
+- [Changed] Split pipeline analysis, context assembly, and result normalization into a focused stage module while preserving the legacy entry point.
 <!-- New entry format: - [Type] Description (Type: Added/Changed/Fixed/Docs/Tests/Chore) -->
 <!-- Append each entry as one line at the end of this section; do not add category headings. -->
 
