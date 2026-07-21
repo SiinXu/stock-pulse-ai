@@ -6,13 +6,14 @@ import fs from 'node:fs';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { productionDesignGuardFixtures } from './fixtures/productionDesignGuardFixtures';
+import {
+  isProductionSourcePath as isProductionSource,
+  productionCssSources,
+  productionTsxSources,
+} from './productionSourceInventory';
 
-const productionComponents = import.meta.glob('../../**/*.tsx', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
-const productionStylePaths = import.meta.glob('../../**/*.css');
+const productionComponents = productionTsxSources;
+const productionStylePaths = productionCssSources;
 const productionStyles: Record<string, string> = {
   '../../App.css': fs.readFileSync('src/App.css', 'utf8'),
   '../../index.css': fs.readFileSync('src/index.css', 'utf8'),
@@ -100,7 +101,9 @@ const STATE_SURFACE_COMPONENT_NAMES = [
 ] as const;
 const STATE_SURFACE_VISUAL_OVERRIDE_PATTERN = /^(?:bg-|border(?:-|$)|rounded(?:-|$)|shadow(?:-|$)|ring(?:-|$)|backdrop-|[a-zA-Z0-9_-]*(?:surface|card)[a-zA-Z0-9_-]*|\[(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|border-radius|box-shadow):)/;
 const STATE_SURFACE_INLINE_STYLE_PROPERTY_PATTERN = /^(?:background(?:-[a-z-]+)?|border(?:-[a-z-]+)?|box-shadow)$/;
+const MAX_BUTTON_VISUAL_OVERRIDE_ALLOWANCES = 0;
 const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([]);
+const MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES = 16;
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../common/ApiErrorAlert.tsx', [47, 59].map((line) => ({
     line,
@@ -208,6 +211,7 @@ const CSS_BLUR_PATTERN = /\b(?:backdrop-filter|filter)\s*:\s*blur\(\s*(\d+(?:\.\
 const OVERLAY_Z_UTILITY_PATTERN = /(?:\bz-\[[^\]\r\n]+\]|\bz-(?:[5-9]\d|[1-9]\d{2,})\b)/g;
 const INLINE_Z_INDEX_PATTERN = /\bzIndex\s*(?::|=)\s*(?:\{\s*)?([^\s,}\r\n]+)/g;
 const NEAR_VIEWPORT_PANEL_PATTERN = /\b(?:max-)?w-\[(?:9\d|100)vw\]/g;
+const MAX_NEAR_VIEWPORT_PANEL_ALLOWANCES = 1;
 // Owner-ruled (TRACK-UI4 L-04): the shared Modal `fullscreen` size restores PR#35's
 // near-fullscreen RunFlow overlay (`max-w-[96vw]`); scoped to the shared Modal primitive.
 const NEAR_VIEWPORT_PANEL_ALLOWLIST = new Map<string, readonly string[]>([
@@ -219,16 +223,6 @@ const CSS_RADIUS_DECLARATION_PATTERN = /\bborder-radius\s*:\s*([^;{}\r\n]+)/i;
 const BUTTON_SELECTOR_PATTERN = /\bbutton\b|\.[\w-]*(?:button|btn)[\w-]*/i;
 const PILL_RADIUS_PATTERN = /^(?:9999px|50%|var\(--(?:radius-)?(?:pill|full)\))$/i;
 const CLASS_LIKE_TOKEN_PATTERN = /(?<![a-zA-Z0-9_-])([a-zA-Z][a-zA-Z0-9_]*(?:-[a-zA-Z0-9_]+)+)(?![a-zA-Z0-9_-])/g;
-
-function isProductionSource(filename: string): boolean {
-  return !filename.includes('/__tests__/')
-    && !filename.includes('/__fixtures__/')
-    && !filename.includes('/fixtures/')
-    && !filename.includes('/generated/')
-    && !filename.includes('/stories/')
-    && !/\.(?:test|spec)\.(?:css|tsx)$/.test(filename)
-    && !/\.(?:story|stories|generated)\.(?:css|tsx)$/.test(filename);
-}
 
 function lineNumberAt(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -2813,6 +2807,19 @@ describe('production design guard', () => {
     expect(indexStyles?.[1]).toContain('.badge');
     const productionCssPaths = Object.keys(productionStylePaths).filter(isProductionSource).sort();
     expect(Object.keys(productionStyles).sort()).toEqual(productionCssPaths);
+  });
+
+  it('ratchets existing visual override and near-viewport allowances', () => {
+    const allowanceCount = (allowlist: ReadonlyMap<string, readonly unknown[]>): number => (
+      Array.from(allowlist.values()).reduce((total, entries) => total + entries.length, 0)
+    );
+
+    expect(allowanceCount(BUTTON_VISUAL_OVERRIDE_ALLOWLIST))
+      .toBeLessThanOrEqual(MAX_BUTTON_VISUAL_OVERRIDE_ALLOWANCES);
+    expect(allowanceCount(STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST))
+      .toBeLessThanOrEqual(MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES);
+    expect(allowanceCount(NEAR_VIEWPORT_PANEL_ALLOWLIST))
+      .toBeLessThanOrEqual(MAX_NEAR_VIEWPORT_PANEL_ALLOWANCES);
   });
 
   it('self-test detects a pill button shape', () => {
