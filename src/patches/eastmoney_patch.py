@@ -45,57 +45,57 @@ _patch_sign = PatchSign()
 
 def _get_nid(user_agent):
     """
-    获取东方财富的 NID 授权令牌
+    Get the NID authorization token from Eastmoney.
 
     Args:
-        user_agent (str): 用户代理字符串，用于模拟不同的浏览器访问
+        user_agent (str): User agent string, used to simulate different browser access
 
     Returns:
-        str: 返回获取到的 NID 授权令牌，如果获取失败则返回 None
+        str: Returns the obtained NID authorization token, if retrieval fails, return None
 
-    功能说明:
-        该函数通过向东方财富的授权接口发送请求来获取 NID 令牌，
-        用于后续的数据访问授权。函数实现了缓存机制来避免频繁请求。
+    Function description:
+        This function obtains the NID token by sending requests to Eastmoney's authorized interface.
+        Used for subsequent data access authorization. The function implements a caching mechanism to avoid frequent requests.
     """
     now = time.time()
-    # 检查缓存是否有效，避免重复请求
+    # Check if the cache is valid, to avoid repeated requests
     if _cache.data and now < _cache.expire_at:
         return _cache.data
-    # 使用线程锁确保并发安全
+    # Use thread lock to ensure concurrency safety
     with _cache.lock:
         try:
             def generate_uuid_md5():
                 """
-                生成 UUID 并对其进行 MD5 哈希处理
-                :return: MD5 哈希值（32位十六进制字符串）
+                Generate UUID and perform MD5 hashing on it
+                :return: MD5 hash value (32-bit hexadecimal string)
                 """
-                # 生成 UUID
+                # Generate UUID
                 unique_id = str(uuid.uuid4())
-                # 对 UUID 进行 MD5 哈希
+                # Perform MD5 hash on UUIDs
                 md5_hash = hashlib.md5(unique_id.encode('utf-8')).hexdigest()
                 return md5_hash
 
             def generate_st_nvi():
                 """
-                生成 st_nvi 值的方法
-                :return: 返回生成的 st_nvi 值
+                Method for generating st_nvi value
+                :return: Returns the generated st_nvi value
                 """
-                HASH_LENGTH = 4  # 截取哈希值的前几位
+                HASH_LENGTH = 4  # Extract the first few digits of the hash value
 
                 def generate_random_string(length=21):
                     """
-                    生成指定长度的随机字符串
-                    :param length: 字符串长度，默认为 21
-                    :return: 随机字符串
+                    Generate a random string of the specified length
+                    :param length: String length, default is 21
+                    :return: Random string
                     """
                     charset = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict"
                     return ''.join(secrets.choice(charset) for _ in range(length))
 
                 def sha256(input_str):
                     """
-                    计算 SHA-256 哈希值
-                    :param input_str: 输入字符串
-                    :return: 哈希值（十六进制）
+                    Calculate SHA-256 hash value
+                    :param input_str: Input string
+                    :return: Hash value (hexadecimal)
                     """
                     return hashlib.sha256(input_str.encode('utf-8')).hexdigest()
 
@@ -104,7 +104,7 @@ def _get_nid(user_agent):
                 return random_str + hash_prefix
 
             url = "https://anonflow2.eastmoney.com/backend/api/webreport"
-            # 随机选择屏幕分辨率，增加请求的真实性
+            # Randomly select screen resolution to increase request realism
             screen_resolution = random.choice(['1920X1080', '2560X1440', '3840X2160'])
             payload = json.dumps({
                 "osPlatform": "Windows",
@@ -125,9 +125,9 @@ def _get_nid(user_agent):
                 'Cookie': f'st_nvi={generate_st_nvi()}',
                 'Content-Type': 'application/json'
             }
-            # 增加超时，防止无限等待
+            # Increase timeout to prevent indefinite waiting
             response = requests.request("POST", url, headers=headers, data=payload, timeout=30)
-            response.raise_for_status()  # 对 4xx/5xx 响应抛出 HTTPError
+            response.raise_for_status()  # Raise HTTPError for 4xx/5xx responses
 
             data = response.json()
             nid = data['data']['nid']
@@ -144,7 +144,7 @@ def _get_nid(user_agent):
                 level=logging.WARNING,
             )
             _cache.data = None
-            # 该接口请求失败时，方案可能已失效，后续大概率会继续失败，因无法成功获取，下次会继续请求，设置较长过期时间，可避免频繁请求
+            # If this interface request fails, the scheme may be invalid. Subsequent failures are likely to continue, as it cannot successfully obtain the token, it will continue to request next time, set a longer expiration time to avoid frequent requests.
             _cache.expire_at = now + 5 * 60
             return None
         except (KeyError, json.JSONDecodeError) as exc:
@@ -156,7 +156,7 @@ def _get_nid(user_agent):
                 level=logging.WARNING,
             )
             _cache.data = None
-            # 该接口请求失败时，方案可能已失效，后续大概率会继续失败，因无法成功获取，下次会继续请求，设置较长过期时间，可避免频繁请求
+            # If this interface request fails, the scheme may be invalid. Subsequent failures are likely to continue, as it cannot successfully obtain the token, it will continue to request next time, set a longer expiration time to avoid frequent requests.
             _cache.expire_at = now + 5 * 60
             return None
 
@@ -166,7 +166,7 @@ def eastmoney_patch():
         return
 
     def patched_request(self, method, url, **kwargs):
-        # 排除非目标域名
+        # Exclude non-target domains
         is_target = any(
             d in (url or "")
             for d in [
@@ -177,20 +177,20 @@ def eastmoney_patch():
         )
         if not is_target:
             return original_request(self, method, url, **kwargs)
-        # 获取一个随机的 User-Agent
+        # Get a random User-Agent
         user_agent = ua.random
-        # 处理 Headers：确保不破坏业务代码传入的 headers
+        # Handle Headers: Ensure they don't break business code-passed headers
         headers = kwargs.get("headers", {})
         headers["User-Agent"] = user_agent
         nid = _get_nid(user_agent)
         if nid:
             headers["Cookie"] = f"nid18={nid}"
         kwargs["headers"] = headers
-        # 随机休眠，降低被封风险
+        # Random sleep, reduce risk of being blocked
         sleep_time = random.uniform(1, 4)
         time.sleep(sleep_time)
         return original_request(self, method, url, **kwargs)
 
-    # 全局替换 Session 的 request 入口
+    # Replaces Session request entry globally
     requests.Session.request = patched_request
     _patch_sign.set_patch(True)

@@ -79,7 +79,7 @@ export interface ReportMeta {
   createdAt: string;
   currentPrice?: number;
   changePct?: number;
-  modelUsed?: string;  // 历史元数据快照，仅用于展示，不用于运行时模型选择
+  modelUsed?: string;  // Historical metadata snapshot, used only for presentation, not for runtime model selection
   marketPhaseSummary?: MarketPhaseSummary | null;
 }
 
@@ -540,7 +540,7 @@ export interface HistoryItem {
   changePct?: number;
   volumeRatio?: number;
   turnoverRate?: number;
-  modelUsed?: string;  // 历史元数据快照，仅用于列表展示，不影响运行时调用与路由
+  modelUsed?: string;  // Historical metadata snapshot, used only for list display, does not affect runtime calls and routing
   marketPhaseSummary?: MarketPhaseSummary | null;
   createdAt: string;
 }

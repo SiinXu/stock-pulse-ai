@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-股票分析命令
+Stock Analysis Command
 ===================================
 
-分析指定股票，调用 AI 生成分析报告。
+Analyze a specified stock and call AI to generate an analysis report.
 """
 
 import re
@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 
 class AnalyzeCommand(BotCommand):
     """
-    股票分析命令
+    Stock Analysis Command
     
-    分析指定股票代码，生成 AI 分析报告并推送。
+    Analyze specified stock code, generate AI analysis report and push.
     
-    用法：
-        /analyze 600519       - 分析贵州茅台（精简报告）
-        /analyze 600519 full  - 分析并生成完整报告
+    Usage:
+        /analyze 600519       - analyze Guizhou Moutai(Concise report)
+        /analyze 600519 full  - analyze and generate a complete report
     """
     
     @property
@@ -48,16 +48,16 @@ class AnalyzeCommand(BotCommand):
         return "/analyze <股票代码> [full]"
     
     def validate_args(self, args: List[str]) -> Optional[str]:
-        """验证参数"""
+        """Validate parameters"""
         if not args:
             return "请输入股票代码"
         
         code = args[0].upper()
 
-        # 验证股票代码格式
-        # A股：6位数字
-        # 港股：HK+5位数字
-        # 美股：1-5个大写字母+.+2个后缀字母
+        # Verification Stock Code Format
+        # A-shares: 6 digits
+        # Hong Kong stocks: HK+5 digits
+        # U.S. stocks: 1-5 uppercase letters+.+2 suffix letters
         is_a_stock = re.match(r'^\d{6}$', code)
         is_hk_stock = re.match(r'^HK\d{5}$', code)
         is_us_stock = re.match(r'^[A-Z]{1,5}(\.[A-Z]{1,2})?$', code)
@@ -68,10 +68,10 @@ class AnalyzeCommand(BotCommand):
         return None
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """执行分析命令"""
+        """Execute analysis command"""
         code = resolve_index_stock_code_for_analysis(args[0])
         
-        # 检查是否需要完整报告（默认精简，传 full/完整/详细 切换）
+        # Check if a full report is required (defaults to brief, pass full/complete/detailed to switch)
         report_type = "simple"
         if len(args) > 1 and args[1].lower() in ["full", "完整", "详细"]:
             report_type = "full"
@@ -82,8 +82,8 @@ class AnalyzeCommand(BotCommand):
         )
         
         try:
-            # 提交到统一任务执行权威：与 API/Web 共用同一 queue、Task ID、
-            # 去重键、状态枚举与错误分类，Bot 不再维护平行的任务生命周期。
+            # Submit to the unified task execution authority: same queue, Task ID with API/Web
+            # Deduplication keys, status enumeration and error classification, Bot no longer maintains parallel task lifecycles.
             from src.services.task_queue import get_task_queue, DuplicateTaskError
             from src.enums import ReportType
 
@@ -94,7 +94,7 @@ class AnalyzeCommand(BotCommand):
                 request_context=to_analysis_request_context(message),
             )
         except DuplicateTaskError:
-            # 统一权威按规范化股票代码去重；旧路径无去重，会重复触发并发分析。
+            # Unified authoritative deduplication by normalized stock code; old path without deduplication will trigger concurrent analysis.
             return BotResponse.markdown_response(
                 f"⏳ **该股票正在分析中**\n\n"
                 f"• 股票代码: `{code}`\n\n"

@@ -252,7 +252,7 @@ class SessionMessagesResponse(BaseModel):
 
 @router.get("/chat/sessions", response_model=SessionsResponse)
 async def list_chat_sessions(limit: int = 50, user_id: Optional[str] = None):
-    """获取聊天会话列表
+    """Get chat session list
 
     Args:
         limit: Maximum number of sessions to return.
@@ -277,7 +277,7 @@ async def list_chat_sessions(limit: int = 50, user_id: Optional[str] = None):
     response_model_exclude_none=True,
 )
 async def get_chat_session_messages(session_id: str, limit: int = 100):
-    """获取单个会话的完整消息"""
+    """Get the complete message for a single session"""
     from src.storage import get_db
     messages = get_db().get_conversation_messages(session_id, limit=limit)
     return SessionMessagesResponse(session_id=session_id, messages=messages)
@@ -285,7 +285,7 @@ async def get_chat_session_messages(session_id: str, limit: int = 100):
 
 @router.delete("/chat/sessions/{session_id}")
 async def delete_chat_session(session_id: str):
-    """删除指定会话"""
+    """Delete specified session"""
     from src.storage import get_db
     count = get_db().delete_conversation_session(session_id)
     return {"deleted": count}

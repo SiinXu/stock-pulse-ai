@@ -15,7 +15,7 @@ export interface StockIndexItem {
   canonicalCode: string;
   /** Display code: 600519 */
   displayCode: string;
-  /** Chinese name: 贵州茅台 */
+  /** Chinese name: Guizhou Moutai */
   nameZh: string;
   /** English name: Kweichow Moutai */
   nameEn?: string;
@@ -23,7 +23,7 @@ export interface StockIndexItem {
   pinyinFull?: string;
   /** Pinyin abbreviation: gzmt */
   pinyinAbbr?: string;
-  /** Aliases: ["茅台"] */
+  /** Aliases: ["Maotai"] */
   aliases?: string[];
   /** Market */
   market: Market;

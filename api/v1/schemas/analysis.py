@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-分析相关模型
+Related analysis models.
 ===================================
 
-职责：
-1. 定义分析请求和响应模型
-2. 定义任务状态模型
-3. 定义异步任务队列相关模型
+Responsibilities:
+1. Define the analysis request and response model
+2. Define the task status model
+3. Define models related to the asynchronous task queue
 """
 
 from typing import Optional, List, Any, Dict, Literal
@@ -132,7 +132,7 @@ class MarketReviewAccepted(BaseModel):
 
 
 class AnalysisResultResponse(BaseModel):
-    """分析结果响应模型"""
+    """Response model for analysis results."""
     
     query_id: str = Field(..., description="分析记录唯一标识")
     trace_id: Optional[str] = Field(None, description="诊断 trace ID")
@@ -159,7 +159,7 @@ class AnalysisResultResponse(BaseModel):
 
 
 class TaskAccepted(BaseModel):
-    """异步任务接受响应"""
+    """Accept response for asynchronous tasks"""
     
     task_id: str = Field(..., description="任务 ID，用于查询状态")
     trace_id: Optional[str] = Field(None, description="诊断 trace ID")
@@ -184,7 +184,7 @@ class TaskAccepted(BaseModel):
 
 
 class BatchTaskAcceptedItem(BaseModel):
-    """批量异步任务中的单个成功提交项。"""
+    """A single successful submission item in batch asynchronous tasks"""
 
     task_id: str = Field(..., description="任务 ID，用于查询状态")
     trace_id: Optional[str] = Field(None, description="诊断 trace ID")
@@ -211,7 +211,7 @@ class BatchTaskAcceptedItem(BaseModel):
 
 
 class BatchDuplicateTaskItem(BaseModel):
-    """批量异步任务中的重复提交项。"""
+    """Duplicate submission items in batch asynchronous tasks"""
 
     stock_code: str = Field(..., description="股票代码")
     existing_task_id: str = Field(..., description="已存在的任务 ID")
@@ -227,7 +227,7 @@ class BatchDuplicateTaskItem(BaseModel):
 
 
 class BatchTaskAcceptedResponse(BaseModel):
-    """批量异步任务接受响应。"""
+    """Batch asynchronous task receives response"""
 
     accepted: List[BatchTaskAcceptedItem] = Field(default_factory=list, description="成功提交的任务列表")
     duplicates: List[BatchDuplicateTaskItem] = Field(default_factory=list, description="重复而跳过的任务列表")
@@ -372,7 +372,7 @@ class TaskInfo(BaseModel):
 
 
 class TaskListResponse(BaseModel):
-    """任务列表响应模型"""
+    """Task List Response Model"""
     
     total: int = Field(..., description="任务总数")
     pending: int = Field(..., description="等待中的任务数")
@@ -390,7 +390,7 @@ class TaskListResponse(BaseModel):
 
 
 class DuplicateTaskErrorResponse(BaseModel):
-    """重复任务错误响应模型"""
+    """Error response model for repeated tasks."""
     
     error: str = Field("duplicate_task", description="错误类型")
     message: str = Field(..., description="错误信息")

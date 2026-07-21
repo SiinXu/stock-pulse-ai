@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Issue #234 盘中实时技术指标的单元测试。
+Unit test for intraday real-time technical indicators in Issue #234.
 
-覆盖范围：
-- _augment_historical_with_realtime：追加/更新逻辑和防护条件
-- _compute_ma_status：均线排列文案
-- _enhance_context：使用 realtime + trend_result 覆盖 today
+Coverage range:
+- _augment_historical_with_realtime: Append/Update logic and protection conditions?
+- _compute_ma_status: Moving Average Arrangement Text
+- _enhance_context: Use realtime + trend_result cover today
 """
 
 import os
@@ -49,7 +49,7 @@ def _make_realtime_quote(
 
 
 def _make_historical_df(days: int = 25, last_date: date = None) -> pd.DataFrame:
-    """构造历史 OHLCV DataFrame。"""
+    """Construct a historical OHLCV DataFrame."""
     if last_date is None:
         last_date = date.today() - timedelta(days=1)
     dates = [last_date - timedelta(days=i) for i in range(days - 1, -1, -1)]
@@ -76,7 +76,7 @@ def _make_historical_df(days: int = 25, last_date: date = None) -> pd.DataFrame:
 
 
 class TestAugmentHistoricalWithRealtime(unittest.TestCase):
-    """_augment_historical_with_realtime 的测试。"""
+    """_augment_historical_with_realtime Test."""
 
     def setUp(self) -> None:
         self._db_path = os.path.join(
@@ -125,8 +125,8 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
         self, _mock_market, _mock_open, mock_now
     ) -> None:
         today = date.today()
-        # 固定市场时钟为 UTC 当日，使 pipeline 的 market_today 等于 date.today()，
-        # 不受 get_market_now 通常使用的市场时区影响（例如 CST=UTC+8）。
+        # Set the market clock to UTC daily, so that pipeline's market_today equals date.today(),
+        # Not Applicable get_market_now The usual market time zone impact(For example CST=UTC+8).
         mock_now.return_value = datetime(
             today.year, today.month, today.day, 10, 0, tzinfo=timezone.utc
         )
@@ -145,8 +145,8 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
         self, _mock_market, _mock_open, mock_now
     ) -> None:
         today = date.today()
-        # 固定市场时钟为当日，使 last_date >= market_today，从而更新最后一行而不是追加。
-        # 这可以避免 CI 在 CST 收盘后运行时出现日期边界偏移。
+        # Set the market clock to today, so that last_date >= market_today, thus updating the last row instead of appending.
+        # This can avoid CI encountering date boundary offsets after CST closing times.
         mock_now.return_value = datetime(
             today.year, today.month, today.day, 10, 0, tzinfo=timezone.utc
         )
@@ -159,7 +159,7 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
 
 
 class TestComputeMaStatus(unittest.TestCase):
-    """_compute_ma_status 的测试。"""
+    """_compute_ma_status Test."""
 
     def test_bullish_alignment(self) -> None:
         status = StockAnalysisPipeline._compute_ma_status(11, 10, 9.5, 9)
@@ -175,7 +175,7 @@ class TestComputeMaStatus(unittest.TestCase):
 
 
 class TestEnhanceContextRealtimeOverride(unittest.TestCase):
-    """_enhance_context 使用实时行情和趋势结果覆盖 today 的测试。"""
+    """_enhance_context uses real-time quotes and trend results to cover today's test."""
 
     def setUp(self) -> None:
         self._db_path = os.path.join(
@@ -194,8 +194,8 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         self, _mock_market, mock_now
     ) -> None:
         today = date.today()
-        # 固定市场时钟，使 _enhance_context 设置 enhanced['date'] == date.today().isoformat()，
-        # 不受 get_market_now 通常使用的市场时区影响（例如 CST=UTC+8）。
+        # Fixed market clock, setting _enhance_context to enhanced['date'] == date.today().isoformat(),
+        # Not Applicable get_market_now The usual market time zone impact(For example CST=UTC+8).
         mock_now.return_value = datetime(
             today.year, today.month, today.day, 10, 0, tzinfo=timezone.utc
         )
@@ -412,10 +412,10 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         self.assertEqual(enhanced["today"]["close"], 15.0)
 
     def test_today_not_overridden_when_trend_ma_zero(self) -> None:
-        """StockTrendAnalyzer 因数据不足提前返回 ma5=0.0 时，不应覆盖 today。"""
+        """Do not override today's value when StockTrendAnalyzer returns early with ma5=0.0 due to insufficient data."""
         context = {"code": "600519", "today": {"close": 15.0, "ma5": 14.8}}
         quote = _make_realtime_quote(price=15.72)
-        trend = TrendAnalysisResult(code="600519")  # 默认 ma5=ma10=ma20=0.0
+        trend = TrendAnalysisResult(code="600519")  # Default ma5=ma10=ma20=0.0
         enhanced = self.pipeline._enhance_context(
             context, quote, None, trend, "贵州茅台"
         )

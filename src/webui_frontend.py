@@ -36,7 +36,7 @@ _BUILD_INPUT_DIRS = ("src", "public")
 
 
 def _is_truthy_env(var_name: str, default: str = "true") -> bool:
-    """解析常见的环境变量真值/假值表达（大小写不敏感）。"""
+    """Parse common environment variables (case-insensitive true/false expressions)."""
     value = os.getenv(var_name, default).strip().lower()
     return value not in _FALSEY_ENV_VALUES
 
@@ -139,10 +139,10 @@ def _manual_build_command(frontend_dir: Path) -> str:
 
 
 def _has_static_assets(static_dir: Path) -> bool:
-    """检查 static/assets/ 是否存在且包含 CSS/JS 文件。
+    """Check if static/assets/ exists and includes CSS/JS files.
 
-    index.html 存在但 assets/ 为空或缺失时，浏览器无法加载样式与脚本，
-    会导致页面元素异常放大、布局错乱（纯裸 HTML 渲染）。
+    index.html exists but assets/ is empty or missing, the browser cannot load styles and scripts,
+    Causes page elements to enlarge abnormally and layout errors (pure raw HTML rendering).
     """
     assets_dir = static_dir / "assets"
     if not assets_dir.is_dir():
@@ -157,7 +157,7 @@ def _has_static_assets(static_dir: Path) -> bool:
 
 
 def _warn_if_assets_missing(artifact_index: Path, frontend_dir: Path) -> None:
-    """当 index.html 存在但 assets/ 缺失时，发出页面显示异常警告。"""
+    """Emit a page display error warning when index.html exists but assets/ is missing."""
     static_dir = artifact_index.parent
     assets_dir = static_dir / "assets"
     if not _has_static_assets(static_dir):

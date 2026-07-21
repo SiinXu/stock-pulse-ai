@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 异步任务队列
+A-shares Watchlist Analysis System - Asynchronous task queue
 ===================================
 
-职责：
-1. 管理异步分析任务的生命周期
-2. 防止相同股票代码重复提交
-3. 提供 SSE 事件广播机制
-4. 任务完成后持久化到数据库
+Responsibilities:
+1. Manage the lifecycle of asynchronous analysis tasks
+2. Prevent duplicate submission of the same stock code.
+3. Provides SSE event broadcasting mechanism
+4. Persistence to Database After Task Completion
 """
 
 from __future__ import annotations
@@ -253,9 +253,9 @@ class TaskInfo:
 
 class DuplicateTaskError(Exception):
     """
-    重复提交异常
+    Repeated submission exception.
     
-    当股票已在分析中时抛出此异常
+    Throw this exception when the stock is already in analysis
     """
     def __init__(self, stock_code: str, existing_task_id: str):
         self.stock_code = stock_code
@@ -416,15 +416,15 @@ class _QueueTaskEventStream:
 
 class AnalysisTaskQueue:
     """
-    异步分析任务队列
+    Asynchronous analysis task queue
     
-    单例模式，全局唯一实例
+    Singleton pattern, global unique instance
     
-    特性：
-    1. 防止相同股票代码重复提交
-    2. 线程池执行分析任务
-    3. SSE 事件广播机制
-    4. 任务完成后自动持久化
+    Features:
+    1. Prevent duplicate submission of the same stock code.
+    2. ThreadPool executes tasks
+    3. SSE Event Broadcasting Mechanism
+    4. Automatic Persistence After Task Completion
     """
     
     _instance: Optional['AnalysisTaskQueue'] = None
@@ -438,14 +438,14 @@ class AnalysisTaskQueue:
         return cls._instance
     
     def __init__(self, max_workers: int = 3):
-        # 防止重复初始化
+        # Prevent repeated initialization.
         if hasattr(self, '_initialized') and self._initialized:
             return
         
         self._max_workers = max_workers
         self._executor: Optional[ThreadPoolExecutor] = None
         
-        # 核心数据结构
+        # Core Data Structure
         self._tasks: Dict[str, TaskInfo] = {}           # task_id -> TaskInfo
         self._analyzing_stocks: Dict[str, str] = {}     # dedupe_key -> task_id
         self._futures: Dict[str, Future] = {}           # task_id -> Future
@@ -464,10 +464,10 @@ class AnalysisTaskQueue:
         self._event_stream_queue_size = 256
         self._shutdown = False
         
-        # 线程安全锁
+        # Thread-safe lock
         self._data_lock = threading.RLock()
         
-        # 任务历史保留数量（内存中）
+        # Task Historical Retention Quantity (In Memory)
         self._max_history = 100
         self._max_flow_events_per_task = 200
         
@@ -476,7 +476,7 @@ class AnalysisTaskQueue:
     
     @property
     def executor(self) -> ThreadPoolExecutor:
-        """懒加载线程池"""
+        """Lazy-load thread pool"""
         if self._shutdown:
             raise TaskQueueShutdownError()
         if self._executor is None:
@@ -688,17 +688,17 @@ class AnalysisTaskQueue:
             logger.info("[TaskQueue] 最大并发已更新: %s -> %s", previous, target)
         return "applied"
     
-    # ========== 任务提交与查询 ==========
+    # ========== Task Submission and Query ==========
     
     def is_analyzing(self, stock_code: str) -> bool:
         """
-        检查股票是否正在分析中
+        Check if the stock is currently being analyzed
         
         Args:
-            stock_code: 股票代码
+            stock_code: stock code
             
         Returns:
-            True 表示正在分析中
+            True indicates that it is under analysis
         """
         dedupe_key = _dedupe_stock_code_key(stock_code)
         with self._data_lock:
@@ -706,13 +706,13 @@ class AnalysisTaskQueue:
     
     def get_analyzing_task_id(self, stock_code: str) -> Optional[str]:
         """
-        获取正在分析该股票的任务 ID
+        Get the task ID currently analyzing this stock
         
         Args:
-            stock_code: 股票代码
+            stock_code: stock code
             
         Returns:
-            任务 ID，如果没有则返回 None
+            Task ID, if none returns None
         """
         dedupe_key = _dedupe_stock_code_key(stock_code)
         with self._data_lock:
@@ -1306,19 +1306,19 @@ class AnalysisTaskQueue:
         return accepted
 
     def _rollback_submitted_tasks_locked(self, task_ids: List[str]) -> None:
-        """回滚当前批次已创建但尚未稳定返回给调用方的任务。"""
+        """Rollback the current batch tasks that were created but not yet stabilized for the caller."""
         for task_id in task_ids:
             self._rollback_task_locked(task_id)
     
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """
-        获取任务信息
+        Get task information
         
         Args:
-            task_id: 任务 ID
+            task_id: Task ID
             
         Returns:
-            TaskInfo 或 None
+            TaskInfo Or None
         """
         with self._data_lock:
             task = self._tasks.get(task_id)
@@ -1364,10 +1364,10 @@ class AnalysisTaskQueue:
     
     def list_pending_tasks(self) -> List[TaskInfo]:
         """
-        获取所有进行中的任务（pending + processing）
+        Get all pending + processing tasks
         
         Returns:
-            任务列表（副本）
+            Task List (Copy)
         """
         with self._data_lock:
             return [
@@ -1377,13 +1377,13 @@ class AnalysisTaskQueue:
     
     def list_all_tasks(self, limit: int = 50) -> List[TaskInfo]:
         """
-        获取所有任务（按创建时间倒序）
+        Get all tasks (by creation time descending)
         
         Args:
-            limit: 返回数量限制
+            limit: return limit
             
         Returns:
-            任务列表（副本）
+            Task List (Copy)
         """
         with self._data_lock:
             tasks = sorted(
@@ -1395,10 +1395,10 @@ class AnalysisTaskQueue:
     
     def get_task_stats(self) -> Dict[str, int]:
         """
-        获取任务统计信息
+        Get task statistics
         
         Returns:
-            统计信息字典
+            Dictionary of statistical information
         """
         with self._data_lock:
             stats = {
@@ -1867,14 +1867,14 @@ class AnalysisTaskQueue:
         self._cleanup_old_tasks()
 
 
-# ========== 便捷函数 ==========
+# ========== Convenience Functions ==========
 
 def get_task_queue() -> AnalysisTaskQueue:
     """
-    获取任务队列单例
+    Get the singleton task queue
     
     Returns:
-        AnalysisTaskQueue 实例
+        AnalysisTaskQueue instance
     """
     queue = AnalysisTaskQueue()
     try:

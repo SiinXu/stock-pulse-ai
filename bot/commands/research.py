@@ -4,8 +4,8 @@ Research command — deep research on a stock or market topic.
 
 Usage:
     /research 600519                        -> Deep research on Kweichow Moutai
-    /research 600519 近期业绩风险            -> Focused research with specific question
-    /research 新能源板块前景分析              -> Topic-based research
+    /research 600519 Recent performance risk            -> Focused research with specific question
+    /research New Energy Sector Outlook Analysis              -> Topic-based research
 """
 
 import logging
@@ -31,8 +31,8 @@ class ResearchCommand(BotCommand):
 
     Usage:
         /research 600519                    -> Deep research on a stock
-        /research 600519 业绩风险分析        -> Focused question
-        /research 新能源板块 发展前景         -> Sector research
+        /research 600519 Performance risk analysis        -> Focused question
+        /research New Energy Sector Development prospects         -> Sector research
     """
 
     @property

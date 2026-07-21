@@ -1,4 +1,4 @@
-# 忽略 Python 缓存
+# Ignore Python cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -9,7 +9,7 @@ __pycache__/
 .coverage
 htmlcov/
 
-# 忽略虚拟环境
+# Ignore virtual environment
 venv/
 .venv/
 env/
@@ -18,13 +18,13 @@ env/
 !.env.example
 .env.local
 
-# 忽略 IDE
+# Ignore IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# 忽略本地仓库、CI 元数据和运行产物
+# Ignore local repository, CI metadata, and build artifacts
 .git/
 .github/
 .claude/reviews/
@@ -33,7 +33,7 @@ logs/
 reports/
 *.log
 
-# 忽略测试和文档
+# Ignore tests and documentation
 tests/
 test_*.py
 *_test.py
@@ -41,7 +41,7 @@ docs/
 *.md
 !README.md
 
-# 忽略不参与 Docker 镜像构建的前端/桌面端产物
+# Ignore frontend/desktop products that do not participate in Docker image builds
 apps/dsa-desktop/
 node_modules/
 dist/

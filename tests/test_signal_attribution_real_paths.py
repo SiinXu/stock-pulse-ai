@@ -4,7 +4,7 @@
 import sys
 import os
 
-# 确保项目根目录在 sys.path
+# Ensure the project root directory is in sys.path
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
@@ -12,12 +12,12 @@ if PROJECT_ROOT not in sys.path:
 from src.utils.data_processing import normalize_signal_attribution_values, normalize_dashboard_signal_attribution
 from src.schemas.report_schema import Dashboard, SignalAttribution
 
-# AnalysisResult 在 analyzer.py 中定义
+# AnalysisResult In analyzer.py Define
 from src.analyzer import AnalysisResult
 
 
 class TestNormalizeSignalAttribution:
-    """测试归一化函数（接在 _parse_response 之前执行）"""
+    """Test normalization function (executed before _parse_response)"""
 
     def test_string_percentage_conversion(self):
         d = {"technical_indicators": "70%", "news_sentiment": "0%", "fundamentals": "15%", "market_conditions": "15%"}
@@ -45,13 +45,13 @@ class TestNormalizeSignalAttribution:
     def test_partial_none_no_normalization(self):
         d = {"technical_indicators": 70, "news_sentiment": None, "fundamentals": 30, "market_conditions": None}
         normalize_signal_attribution_values(d)
-        # 只有两个有效值，不归一化
+        # Only two valid values, no normalization.
         assert d["technical_indicators"] == 70
         assert d["news_sentiment"] is None
 
 
 class TestNormalizeDashboardSignalAttribution:
-    """测试 dashboard 级别的归一化（直接在 dashboard dict 上操作）"""
+    """Test dashboard-level normalization (directly operating on the dashboard dict)."""
 
     def test_inplace_normalization(self):
         dashboard = {
@@ -68,26 +68,26 @@ class TestNormalizeDashboardSignalAttribution:
 
     def test_no_signal_attribution_key(self):
         dashboard = {"core_conclusion": {}}
-        normalize_dashboard_signal_attribution(dashboard)  # 不应报错
+        normalize_dashboard_signal_attribution(dashboard)  # Should not error
         assert "signal_attribution" not in dashboard
 
     def test_signal_attribution_none(self):
         dashboard = {"signal_attribution": None}
-        normalize_dashboard_signal_attribution(dashboard)  # 不应报错
+        normalize_dashboard_signal_attribution(dashboard)  # Should not error
 
 
 class TestParseResponseIntegration:
     """
-    测试 _parse_response 能正确解析 signal_attribution。
-    由于 _parse_response 是实例方法且依赖很多配置，这里用集成测试验证归一化函数被正确调用。
+    Test `_parse_response` can correctly parse signal_attribution.
+    Because `_parse_response` is an instance method and depends on many configurations, we use integration testing to verify that the normalization function is called correctly.
     """
 
     def test_normalization_called_in_parse_response(self):
         """
-        验证：如果 LLM 返回字符串百分比，归一化后变成 int。
-        通过直接测试 _parse_response 的归一化调用来验证。
+        Verification: If the LLM returns a string percentage, normalize it to an integer.
+        Verify the normalization call of `_parse_response` through direct testing.
         """
-        # 模拟 LLM 返回的 data dict
+        # Simulate LLM returned data dict
         data = {
             "sentiment_score": 50,
             "trend_prediction": "震荡",
@@ -106,7 +106,7 @@ class TestParseResponseIntegration:
                 }
             },
         }
-        # 手动调用归一化（模拟 _parse_response 的行为）
+        # Manually call normalization (simulates the behavior of _parse_response)
         normalize_dashboard_signal_attribution(data.get("dashboard"))
         sa = data["dashboard"]["signal_attribution"]
         assert sa["technical_indicators"] == 70
@@ -114,10 +114,10 @@ class TestParseResponseIntegration:
 
 
 class TestHistoryServiceDisplay:
-    """测试 HistoryService._generate_single_stock_markdown 能展示 signal_attribution"""
+    """Test HistoryService._generate_single_stock_markdown can display signal_attribution"""
 
     def test_signal_attribution_in_markdown(self):
-        """验证 markdown 报告包含信号归因段落"""
+        """Verify markdown report contains signal attribution paragraphs"""
         from src.services.history_service import HistoryService
 
         result = AnalysisResult(
@@ -138,7 +138,7 @@ class TestHistoryServiceDisplay:
             },
         )
 
-        # 创建一个 mock record
+        # Create a mock record
         class MockRecord:
             created_at = None
 
@@ -147,7 +147,7 @@ class TestHistoryServiceDisplay:
         assert "70%" in markdown or "70%" in markdown
 
     def test_no_signal_attribution_no_section(self):
-        """验证没有 signal_attribution 时不显示段落"""
+        """Do not display paragraphs when signal_attribution is not present"""
         from src.services.history_service import HistoryService
 
         result = AnalysisResult(

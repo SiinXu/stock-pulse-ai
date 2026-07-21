@@ -1,43 +1,43 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-美股指数与股票代码工具
+Tool for U.S. stock index and code mapping
 ===================================
 
-提供：
-1. 美股指数代码映射（如 SPX -> ^GSPC）
-2. 美股股票代码识别（AAPL、TSLA 等）
+Provides:
+1. U.S. stocks index mapping (e.g., SPX -> ^GSPC)
+2. Recognition of U.S. stocks codes (AAPL, TSLA, etc.)
 
-美股指数在 Yahoo Finance 中需使用 ^ 前缀，与股票代码不同。
+U.S. stocks indices in Yahoo Finance require the '^' prefix, which is different from stock codes.
 """
 
 import re
 
-# 美股代码正则：1-5 个大写字母，可选 .X 后缀（如 BRK.B）
+# U.S. Stock code regex: 1-5 uppercase letters, optional .X suffix (e.g., BRK.B)
 _US_STOCK_PATTERN = re.compile(r'^[A-Z]{1,5}(\.[A-Z])?$')
 
 
-# 用户输入 -> (Yahoo Finance 符号, 中文名称)
+# User input -> (Yahoo Finance symbol, Chinese name)
 US_INDEX_MAPPING = {
-    # 标普 500
+    # S&P 500
     'SPX': ('^GSPC', '标普500指数'),
     '^GSPC': ('^GSPC', '标普500指数'),
     'GSPC': ('^GSPC', '标普500指数'),
-    # 道琼斯工业平均指数
+    # Dow Jones Industrial Average.
     'DJI': ('^DJI', '道琼斯工业指数'),
     '^DJI': ('^DJI', '道琼斯工业指数'),
     'DJIA': ('^DJI', '道琼斯工业指数'),
-    # 纳斯达克综合指数
+    # NASDAQ Composite Index
     'IXIC': ('^IXIC', '纳斯达克综合指数'),
     '^IXIC': ('^IXIC', '纳斯达克综合指数'),
     'NASDAQ': ('^IXIC', '纳斯达克综合指数'),
-    # 纳斯达克 100
+    # NASDAQ 100
     'NDX': ('^NDX', '纳斯达克100指数'),
     '^NDX': ('^NDX', '纳斯达克100指数'),
-    # VIX 波动率指数
+    # VIX volatility index
     'VIX': ('^VIX', 'VIX恐慌指数'),
     '^VIX': ('^VIX', 'VIX恐慌指数'),
-    # 罗素 2000
+    # Dow Jones 2000
     'RUT': ('^RUT', '罗素2000指数'),
     '^RUT': ('^RUT', '罗素2000指数'),
 }
@@ -45,13 +45,13 @@ US_INDEX_MAPPING = {
 
 def is_us_index_code(code: str) -> bool:
     """
-    判断代码是否为美股指数符号。
+    Determine if the code is a U.S. stock index symbol.
 
     Args:
-        code: 股票/指数代码，如 'SPX', 'DJI'
+        code: stock/index code, such as 'SPX', 'DJI'
 
     Returns:
-        True 表示是已知美股指数符号，否则 False
+        True indicates a known US stock index symbol, otherwise False
 
     Examples:
         >>> is_us_index_code('SPX')
@@ -64,16 +64,16 @@ def is_us_index_code(code: str) -> bool:
 
 def is_us_stock_code(code: str) -> bool:
     """
-    判断代码是否为美股股票符号（排除美股指数）。
+    Determine if the code is a U.S. stock symbol (excluding U.S. indices).
 
-    美股股票代码为 1-5 个大写字母，可选 .X 后缀如 BRK.B。
-    美股指数（SPX、DJI 等）明确排除。
+    U.S. stocks codes are 1-5 uppercase letters, optionally followed by '.X' like BRK.B.
+    U.S. stocks indices (SPX, DJI, etc.) are explicitly excluded.
 
     Args:
-        code: 股票代码，如 'AAPL', 'TSLA', 'BRK.B'
+        code: Stock Code, If 'AAPL', 'TSLA', 'BRK.B'
 
     Returns:
-        True 表示是美股股票符号，否则 False
+        True indicates whether it is a U.S. stock symbol, otherwise False
 
     Examples:
         >>> is_us_stock_code('AAPL')
@@ -88,7 +88,7 @@ def is_us_stock_code(code: str) -> bool:
         False
     """
     normalized = (code or '').strip().upper()
-    # 美股指数不是股票
+    # U.S. stock indices are not stocks
     if normalized in US_INDEX_MAPPING:
         return False
     return bool(_US_STOCK_PATTERN.match(normalized))
@@ -96,17 +96,17 @@ def is_us_stock_code(code: str) -> bool:
 
 def get_us_index_yf_symbol(code: str) -> tuple:
     """
-    获取美股指数的 Yahoo Finance 符号与中文名称。
+    Get Yahoo Finance symbol and Chinese name for US stock indices.
 
     Args:
-        code: 用户输入，如 'SPX', '^GSPC', 'DJI'
+        code: User input, If 'SPX', '^GSPC', 'DJI'
 
     Returns:
-        (yf_symbol, chinese_name) 元组，未找到时返回 (None, None)。
+        (yf_symbol, chinese_name) Tuple, Return when not found? (None, None).
 
     Examples:
         >>> get_us_index_yf_symbol('SPX')
-        ('^GSPC', '标普500指数')
+        ('^GSPC', 'S&P 500 Index')
         >>> get_us_index_yf_symbol('AAPL')
         (None, None)
     """

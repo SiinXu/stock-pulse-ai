@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-实时行情统一类型定义 & 熔断机制
+Unified type definition & circuit breaker mechanism for real-time quotes
 ===================================
 
-设计目标：
-1. 统一各数据源的实时行情返回结构
-2. 实现熔断/冷却机制，避免连续失败时反复请求
-3. 支持多数据源故障切换
+Design goals:
+1. Unified real-time quote data return structure from all data sources.
+2. Implement circuit breaker/cooling mechanism to avoid repeated requests when continuously failing
+3. Supports multi-data source failover
 
-使用方式：
-- 所有 Fetcher 的 get_realtime_quote() 统一返回 UnifiedRealtimeQuote
-- CircuitBreaker 管理各数据源的熔断状态
+Usage:
+- All Fetcher's get_realtime_quote() uniformly return UnifiedRealtimeQuote
+- CircuitBreaker manages the circuit break status for each data source
 """
 
 import logging
@@ -27,41 +27,41 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================
-# 通用类型转换工具函数
+# Generic Type Conversion Utility Function
 # ============================================
-# 设计说明：
-# 各数据源返回的原始数据类型不一致（str/float/int/NaN），
-# 使用这些函数统一转换，避免在各 Fetcher 中重复定义。
+# Design specifications:
+# The raw data types returned by each data source are inconsistent (str/float/int/NaN),
+# Use these functions to unify the conversion, avoiding duplication in each Fetcher.
 
 def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
     """
-    安全转换为浮点数
+    Safely convert to float.
     
-    处理场景：
-    - None / 空字符串 → default
+    Process scenario:
+    - None / Empty string → default
     - pandas NaN / numpy NaN → default
-    - 数值字符串 → float
-    - 已是数值 → float
+    - Convert numeric string to float
+    - Already numeric → float
     
     Args:
-        val: 待转换的值
-        default: 转换失败时的默认值
+        val: Value to be converted
+        default: default value when conversion fails
         
     Returns:
-        转换后的浮点数，或默认值
+        Converted float, or default value
     """
     try:
         if val is None:
             return default
         
-        # 处理字符串
+        # Process string
         if isinstance(val, str):
             val = val.strip()
             if val == "" or val == "-" or val == "--":
                 return default
         
-        # 处理 pandas/numpy NaN
-        # 使用 math.isnan 而不是 pd.isna，避免强制依赖 pandas
+        # Handle pandas/numpy NaN values
+        # Use math.isnan instead of pd.isna, avoid forced dependency on pandas
         import math
         try:
             if math.isnan(float(val)):
@@ -76,16 +76,16 @@ def safe_float(val: Any, default: Optional[float] = None) -> Optional[float]:
 
 def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
     """
-    安全转换为整数
+    Safely convert to integer
     
-    先转换为 float，再取整，处理 "123.0" 这类情况
+    Convert to float first, then truncate, handle cases like "123.0"
     
     Args:
-        val: 待转换的值
-        default: 转换失败时的默认值
+        val: Value to be converted
+        default: default value when conversion fails
         
     Returns:
-        转换后的整数，或默认值
+        Converted integer, or default value
     """
     f_val = safe_float(val, default=None)
     if f_val is not None:
@@ -94,82 +94,82 @@ def safe_int(val: Any, default: Optional[int] = None) -> Optional[int]:
 
 
 class RealtimeSource(Enum):
-    """实时行情数据源"""
-    EFINANCE = "efinance"           # 东方财富（efinance库）
-    AKSHARE_EM = "akshare_em"       # 东方财富（akshare库）
-    AKSHARE_SINA = "akshare_sina"   # 新浪财经
-    AKSHARE_QQ = "akshare_qq"       # 腾讯财经
+    """Real-time quote data source"""
+    EFINANCE = "efinance"           # Eastmoney (Eastmoney library)
+    AKSHARE_EM = "akshare_em"       # Eastmoney (akshare library)
+    AKSHARE_SINA = "akshare_sina"   # Sina Finance
+    AKSHARE_QQ = "akshare_qq"       # Tencent Finance.
     TUSHARE = "tushare"             # Tushare Pro
     TICKFLOW = "tickflow"           # TickFlow
-    TENCENT = "tencent"             # 腾讯直连
-    SINA = "sina"                   # 新浪直连
-    STOOQ = "stooq"                 # Stooq 美股兜底
-    LONGBRIDGE = "longbridge"       # 长桥（美股/港股兜底）
-    FALLBACK = "fallback"           # 降级兜底
+    TENCENT = "tencent"             # Direct connection to Tencent.
+    SINA = "sina"                   # Sina direct connection
+    STOOQ = "stooq"                 # Stooq U.S. stocks fallback
+    LONGBRIDGE = "longbridge"       # Longbridge (U.S. stocks/Hong Kong stocks fallback)
+    FALLBACK = "fallback"           # Fallback to degraded mode.
 
 
 @dataclass
 class UnifiedRealtimeQuote:
     """
-    统一实时行情数据结构
+    Unified real-time market data structure.
     
-    设计原则：
-    - 各数据源返回的字段可能不同，缺失字段用 None 表示
-    - 主流程使用 getattr(quote, field, None) 获取，保证兼容性
-    - source 字段标记数据来源，便于调试
+    Design principles:
+    - The fields returned by each data source may be different, with missing fields represented by None
+    - Main Process uses getattr(quote, field, None) to get, ensuring compatibility.
+    - source field indicates data source for debugging
     """
     code: str
     name: str = ""
     source: RealtimeSource = RealtimeSource.FALLBACK
 
-    # === 数据质量元数据（由 DataFetcherManager 统一补齐）===
-    fetched_at: Optional[str] = None             # 本系统获取时间（ISO 8601 datetime）
-    provider_timestamp: Optional[str] = None     # Provider 真实行情时间（ISO 8601 datetime）
-    is_stale: Optional[bool] = None              # provider_timestamp 超过最小 TTL 阈值时为 True
-    stale_seconds: Optional[int] = None          # provider_timestamp 距 fetched_at 的秒数
-    fallback_from: Optional[str] = None          # 整源 fallback 的失败首选源 token
-    market: Optional[str] = None                 # 市场标签（cn/hk/us/jp/kr/tw）
-    currency: Optional[str] = None               # 报价币种（JPY/KRW/TWD/USD/HKD/CNY 等）
+    # === Data Quality Metadata (Unified supplemented by DataFetcherManager) ===
+    fetched_at: Optional[str] = None             # System acquisition timestamp (ISO 8601 datetime)
+    provider_timestamp: Optional[str] = None     # Provider Real-time market data(ISO 8601 datetime)
+    is_stale: Optional[bool] = None              # provider_timestamp Exceeds minimum TTL Threshold value is for True
+    stale_seconds: Optional[int] = None          # provider_timestamp Distance fetched_at Seconds
+    fallback_from: Optional[str] = None          # Fallback source token for the primary source
+    market: Optional[str] = None                 # Market Tags (cn/hk/us/jp/kr/tw)
+    currency: Optional[str] = None               # Quote currency (JPY/KRW/TWD/USD/HKD/CNY etc.)
     data_quality: Optional[str] = None           # ok/partial/unavailable
-    missing_fields: Optional[list[str]] = None   # provider 缺失的关键字段
+    missing_fields: Optional[list[str]] = None   # provider missing key fields
     
-    # === 核心价格数据（几乎所有源都有）===
-    price: Optional[float] = None           # 最新价
-    change_pct: Optional[float] = None      # 涨跌幅(%)
-    change_amount: Optional[float] = None   # 涨跌额
+    # === Core Price Data (Almost All Sources Have It) ===
+    price: Optional[float] = None           # Latest price
+    change_pct: Optional[float] = None      # Percentage change
+    change_amount: Optional[float] = None   # Change in value
     
-    # === 量价指标（部分源可能缺失）===
-    volume: Optional[int] = None            # 成交量（股，与历史日线口径一致）
-    amount: Optional[float] = None          # 成交额（元）
-    volume_ratio: Optional[float] = None    # 量比
-    turnover_rate: Optional[float] = None   # 换手率(%)
-    amplitude: Optional[float] = None       # 振幅(%)
+    # === Quantitative and Price Indicators (Some sources may be missing) ===
+    volume: Optional[int] = None            # Volume (shares, consistent with historical daily line scale)
+    amount: Optional[float] = None          # trading value (yuan)
+    volume_ratio: Optional[float] = None    # volume ratio
+    turnover_rate: Optional[float] = None   # Turnover Rate (%)
+    amplitude: Optional[float] = None       # Amplitude (%)
     
-    # === 价格区间 ===
-    open_price: Optional[float] = None      # 开盘价
-    high: Optional[float] = None            # 最高价
-    low: Optional[float] = None             # 最低价
-    pre_close: Optional[float] = None       # 昨收价
+    # === Price Range ===
+    open_price: Optional[float] = None      # Opening price
+    high: Optional[float] = None            # Highest price
+    low: Optional[float] = None             # Lowest price
+    pre_close: Optional[float] = None       # Yesterday's closing price
     
-    # === 估值指标（仅东财等全量接口有）===
-    pe_ratio: Optional[float] = None        # 市盈率(动态)
-    pb_ratio: Optional[float] = None        # 市净率
-    total_mv: Optional[float] = None        # 总市值(元)
-    circ_mv: Optional[float] = None         # 流通市值(元)
+    # === Valuation Metrics (only available with full interfaces like Eastmoney) ===
+    pe_ratio: Optional[float] = None        # Dynamic Price-to-Earnings Ratio
+    pb_ratio: Optional[float] = None        # Price-to-Book Ratio
+    total_mv: Optional[float] = None        # Total market capitalization (yuan)
+    circ_mv: Optional[float] = None         # Circulating market capitalization (yuan)
     
-    # === 其他指标 ===
-    change_60d: Optional[float] = None      # 60日涨跌幅(%)
-    high_52w: Optional[float] = None        # 52周最高
-    low_52w: Optional[float] = None         # 52周最低
+    # === Other Indicators ===
+    change_60d: Optional[float] = None      # 60-day percentage change (%)
+    high_52w: Optional[float] = None        # Highest price in 52 weeks
+    low_52w: Optional[float] = None         # 52 weeks low
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典（过滤 None 值）"""
+        """Convert to Dictionary (filter None values)"""
         result = {
             'code': self.code,
             'name': self.name,
             'source': self.source.value,
         }
-        # 只添加非 None 的字段
+        # Add only non-null fields.
         optional_fields = [
             'fetched_at', 'provider_timestamp', 'is_stale', 'stale_seconds',
             'fallback_from', 'market', 'currency', 'data_quality', 'missing_fields',
@@ -186,40 +186,40 @@ class UnifiedRealtimeQuote:
         return result
     
     def has_basic_data(self) -> bool:
-        """检查是否有基本的价格数据"""
+        """Check if basic price data is available."""
         return self.price is not None and self.price > 0
     
     def has_volume_data(self) -> bool:
-        """检查是否有量价数据"""
+        """Check if volume and price data is available."""
         return self.volume_ratio is not None or self.turnover_rate is not None
 
 
 @dataclass
 class ChipDistribution:
     """
-    筹码分布数据
+    Chip distribution data
     
-    反映持仓成本分布和获利情况
+    Reflects the distribution of holding costs and profit figures
     """
     code: str
     date: str = ""
     source: str = "akshare"
     
-    # 获利情况
-    profit_ratio: float = 0.0     # 获利比例(0-1)
-    avg_cost: float = 0.0         # 平均成本
+    # Profit situation
+    profit_ratio: float = 0.0     # Profit ratio (0-1)
+    avg_cost: float = 0.0         # Average Cost
     
-    # 筹码集中度
-    cost_90_low: float = 0.0      # 90%筹码成本下限
-    cost_90_high: float = 0.0     # 90%筹码成本上限
-    concentration_90: float = 0.0  # 90%筹码集中度（越小越集中）
+    # Chip concentration
+    cost_90_low: float = 0.0      # 90% chip cost lower limit
+    cost_90_high: float = 0.0     # 90% chip cost upper limit
+    concentration_90: float = 0.0  # 90% chip concentration (smaller is more concentrated)
     
-    cost_70_low: float = 0.0      # 70%筹码成本下限
-    cost_70_high: float = 0.0     # 70%筹码成本上限
-    concentration_70: float = 0.0  # 70%筹码集中度
+    cost_70_low: float = 0.0      # 70% chip cost lower limit
+    cost_70_high: float = 0.0     # 70% chip cost upper limit
+    concentration_70: float = 0.0  # 70% chip concentration
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """Convert to Dictionary"""
         return {
             'code': self.code,
             'date': self.date,
@@ -234,17 +234,17 @@ class ChipDistribution:
     
     def get_chip_status(self, current_price: float) -> str:
         """
-        获取筹码状态描述
+        Get holding status description
         
         Args:
-            current_price: 当前股价
+            current_price: Current stock price
             
         Returns:
-            筹码状态描述
+            Chip status description
         """
         status_parts = []
         
-        # 获利比例分析
+        # Profit ratio analysis
         if self.profit_ratio >= 0.9:
             status_parts.append("获利盘极高(获利盘>90%)")
         elif self.profit_ratio >= 0.7:
@@ -258,7 +258,7 @@ class ChipDistribution:
         else:
             status_parts.append("套牢盘极高(套牢盘>90%)")
         
-        # 筹码集中度分析 (90%集中度 < 10% 表示集中)
+        # Chip concentration analysis (90% concentration < 10% indicates concentration)
         if self.concentration_90 < 0.08:
             status_parts.append("筹码高度集中")
         elif self.concentration_90 < 0.15:
@@ -268,7 +268,7 @@ class ChipDistribution:
         else:
             status_parts.append("筹码较分散")
         
-        # 成本与现价关系
+        # Relationship between cost and current price
         if current_price > 0 and self.avg_cost > 0:
             cost_diff = (current_price - self.avg_cost) / self.avg_cost * 100
             if cost_diff > 20:
@@ -285,41 +285,41 @@ class ChipDistribution:
 
 class CircuitBreaker:
     """
-    熔断器 - 管理数据源的熔断/冷却状态
+    Circuit Breaker - Manage data source throttling/cooling status
     
-    策略：
-    - 连续失败 N 次后进入熔断状态
-    - 熔断期间跳过该数据源
-    - 冷却时间后自动恢复半开状态
-    - 半开状态下单次成功则完全恢复，失败则继续熔断
+    Strategy:
+    - Enter a circuit break state after failing N times consecutively.
+    - Skip this data source during the circuit breaker period
+    - Restore half-open state automatically after cooling time
+    - Order succeeds once in half-open state, then fully recovers; failure continues to trigger a circuit breaker
     
-    状态机：
-    CLOSED（正常） --失败N次--> OPEN（熔断）--冷却时间到--> HALF_OPEN（半开）
-    HALF_OPEN --成功--> CLOSED
-    HALF_OPEN --失败--> OPEN
+    Status machine:
+    CLOSED (normal) --failure N times--> OPEN (circuit break) --cooling time expired--> HALF_OPEN (half-open)
+    HALF_OPEN --Success--> CLOSED
+    HALF_OPEN --Failure--> OPEN
     """
     
-    # 状态常量
-    CLOSED = "closed"      # 正常状态
-    OPEN = "open"          # 熔断状态（不可用）
-    HALF_OPEN = "half_open"  # 半开状态（试探性请求）
+    # Status constants
+    CLOSED = "closed"      # Normal state
+    OPEN = "open"          # Circuit breaker status (unavailable)
+    HALF_OPEN = "half_open"  # Half-open state (probe request)
     
     def __init__(
         self,
-        failure_threshold: int = 3,       # 连续失败次数阈值
-        cooldown_seconds: float = 300.0,  # 冷却时间（秒），默认5分钟
-        half_open_max_calls: int = 1      # 半开状态最大尝试次数
+        failure_threshold: int = 3,       # Consecutive failure threshold
+        cooldown_seconds: float = 300.0,  # Cooling time (seconds), default 5 minutes
+        half_open_max_calls: int = 1      # Maximum attempt times for half-open state
     ):
         self.failure_threshold = failure_threshold
         self.cooldown_seconds = cooldown_seconds
         self.half_open_max_calls = half_open_max_calls
         
-        # 各数据源状态 {source_name: {state, failures, last_failure_time, half_open_calls}}
+        # Data source status {source_name: {state, failures, last_failure_time, half_open_calls}}
         self._states: Dict[str, Dict[str, Any]] = {}
         self._lock = RLock()
     
     def _get_state_locked(self, source: str) -> Dict[str, Any]:
-        """获取或初始化数据源状态（调用方需持有锁）。"""
+        """Get or initialize data source status (caller must hold lock)."""
         if source not in self._states:
             self._states[source] = {
                 'state': self.CLOSED,
@@ -331,10 +331,10 @@ class CircuitBreaker:
     
     def is_available(self, source: str) -> bool:
         """
-        检查数据源是否可用
+        Check if the data source is available
         
-        返回 True 表示可以尝试请求
-        返回 False 表示应跳过该数据源
+        Return True if the request can be attempted
+        Return False to skip this data source
         """
         with self._lock:
             state = self._get_state_locked(source)
@@ -344,10 +344,10 @@ class CircuitBreaker:
                 return True
 
             if state['state'] == self.OPEN:
-                # 检查冷却时间
+                # Check cooldown time
                 time_since_failure = current_time - state['last_failure_time']
                 if time_since_failure >= self.cooldown_seconds:
-                    # 冷却完成，进入半开状态（不预占名额，由 HALF_OPEN 分支统一管理）
+                    # Cooling complete, entering half-open state (does not preempt quota, managed by HALF_OPEN branch)
                     state['state'] = self.HALF_OPEN
                     state['half_open_calls'] = 0
                     state['last_failure_time'] = current_time
@@ -362,9 +362,9 @@ class CircuitBreaker:
                 if state['half_open_calls'] < self.half_open_max_calls:
                     state['half_open_calls'] += 1
                     return True
-                # 所有探测名额已用完；若冷却时间再次到期仍未收到
-                # record_success/record_failure 回调，重置名额允许重新探测，
-                # 避免永久卡在 HALF_OPEN。
+                # All probe slots are full; if the cooldown time does not receive it again when it expires
+                # record_success/record_failure Callback, Reset quota allows re-detection,
+                # Avoid getting permanently stuck in HALF_OPEN.
                 time_since_failure = current_time - state['last_failure_time']
                 if time_since_failure >= self.cooldown_seconds:
                     state['half_open_calls'] = 1
@@ -376,10 +376,10 @@ class CircuitBreaker:
             return True
     
     def record_inconclusive(self, source: str) -> None:
-        """记录不确定的探测结果（如返回 None）。
+        """Record uncertain detection results (such as returning None).
 
-        仅影响 HALF_OPEN 状态：将其转回 OPEN 以便冷却后重新探测。
-        CLOSED 状态下为空操作，不影响失败计数。
+        Only affects HALF_OPEN state: converts it back to OPEN to allow cooldown detection.
+        If in CLOSED state, it's an empty operation and does not affect failure counts.
         """
         with self._lock:
             state = self._get_state_locked(source)
@@ -390,21 +390,21 @@ class CircuitBreaker:
                 logger.info(f"[熔断器] {source} 半开探测结果不确定，重新进入冷却")
 
     def record_success(self, source: str) -> None:
-        """记录成功请求"""
+        """Record successful request"""
         with self._lock:
             state = self._get_state_locked(source)
 
             if state['state'] == self.HALF_OPEN:
-                # 半开状态下成功，完全恢复
+                # Success in half-open state, fully recovers
                 logger.info(f"[熔断器] {source} 半开状态请求成功，恢复正常")
 
-            # 重置状态
+            # Reset state
             state['state'] = self.CLOSED
             state['failures'] = 0
             state['half_open_calls'] = 0
     
     def record_failure(self, source: str, error: Optional[str] = None) -> None:
-        """记录失败请求"""
+        """Record failed requests"""
         with self._lock:
             state = self._get_state_locked(source)
             current_time = time.time()
@@ -413,12 +413,12 @@ class CircuitBreaker:
             state['last_failure_time'] = current_time
 
             if state['state'] == self.HALF_OPEN:
-                # 半开状态下失败，继续熔断
+                # Failure continues to trigger a circuit breaker in half-open state
                 state['state'] = self.OPEN
                 state['half_open_calls'] = 0
                 logger.warning(f"[熔断器] {source} 半开状态请求失败，继续熔断 {self.cooldown_seconds}s")
             elif state['failures'] >= self.failure_threshold:
-                # 达到阈值，进入熔断
+                # Reached threshold, entering circuit break.
                 state['state'] = self.OPEN
                 logger.warning(f"[熔断器] {source} 连续失败 {state['failures']} 次，进入熔断状态 "
                               f"(冷却 {self.cooldown_seconds}s)")
@@ -430,12 +430,12 @@ class CircuitBreaker:
                     )
     
     def get_status(self) -> Dict[str, str]:
-        """获取所有数据源状态"""
+        """Get the status of all data sources"""
         with self._lock:
             return {source: info['state'] for source, info in self._states.items()}
     
     def reset(self, source: Optional[str] = None) -> None:
-        """重置熔断器状态"""
+        """Reset circuit breaker status"""
         with self._lock:
             if source:
                 if source in self._states:
@@ -444,26 +444,26 @@ class CircuitBreaker:
                 self._states.clear()
 
 
-# 全局熔断器实例（实时行情专用）
+# Global circuit breaker instance(Real-time quote dedicated)
 _realtime_circuit_breaker = CircuitBreaker(
-    failure_threshold=3,      # 连续失败3次熔断
-    cooldown_seconds=300.0,   # 冷却5分钟
+    failure_threshold=3,      # Enter a circuit break state after 3 consecutive failures
+    cooldown_seconds=300.0,   # Cooling for 5 minutes
     half_open_max_calls=1
 )
 
-# 筹码接口熔断器（更保守的策略，因为该接口更不稳定）
+# Chip interface circuit breaker (more conservative strategy because this interface is more unstable)
 _chip_circuit_breaker = CircuitBreaker(
-    failure_threshold=2,      # 连续失败2次熔断
-    cooldown_seconds=600.0,   # 冷却10分钟
+    failure_threshold=2,      # Enter a circuit break state after 2 consecutive failures.
+    cooldown_seconds=600.0,   # Cooling for 10 minutes
     half_open_max_calls=1
 )
 
 
 def get_realtime_circuit_breaker() -> CircuitBreaker:
-    """获取实时行情熔断器"""
+    """Get real-time quote circuit breaker"""
     return _realtime_circuit_breaker
 
 
 def get_chip_circuit_breaker() -> CircuitBreaker:
-    """获取筹码接口熔断器"""
+    """Get holding interface circuit breaker"""
     return _chip_circuit_breaker

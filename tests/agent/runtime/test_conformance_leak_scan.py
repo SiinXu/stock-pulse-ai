@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Leak-scan for the experimental runtime's failure surface (RF-06b / RF-06).
 
-RF-06's verification list requires a "secret / prompt / reasoning / 完整工具
-结果 / 原始异常泄漏扫描". This is the offline, deterministic slice of that
+RF-06's verification list requires a "secret / prompt / reasoning / complete tool
+Result / Raw anomaly leakage scan". This is the offline, deterministic slice of that
 requirement for the experimental PydanticAI runtime: it proves the adapter's
 user-facing failure surface routes through StockPulse's ``sanitize_agent_
 diagnostic`` — redacting API keys, credentialed URLs and bearer tokens and

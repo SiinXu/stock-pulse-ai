@@ -170,13 +170,13 @@ describe('searchStocks', () => {
   });
 
   test('active 优先于 inactive', () => {
-    // 600000 是不活跃的，600519 是活跃的
+    // 600000 is inactive, 600519 is active
     const results = searchStocks('600', mockIndex);
     const activeResults = results.filter(r => {
       const item = mockIndex.find(i => i.canonicalCode === r.canonicalCode);
       return item?.active;
     });
-    // 活跃股票应该排在前面
+    // Active stocks should be at the top.
     if (results.length > 1) {
       expect(activeResults.length).toBeGreaterThan(0);
     }
@@ -321,7 +321,7 @@ describe('searchStocks', () => {
     test('alias match', () => {
       const results = searchStocks('银', mockIndex);
       expect(results.length).toBeGreaterThan(0);
-      // Should match 平安银行 and 浦发银行
+      // Should match PingAn Bank and Pufa Bank
       const banks = results.filter(r => r.nameZh.includes('银行'));
       expect(banks.length).toBeGreaterThan(0);
     });
@@ -481,7 +481,7 @@ describe('searchStocks', () => {
 
     test('alias field match', () => {
       const results = searchStocks('茅台', mockIndex);
-      // Should match 贵州茅台
+      // Should match Guizhou Moutai
       expect(results.length).toBeGreaterThan(0);
     });
   });

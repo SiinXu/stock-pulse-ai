@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Markdown 转图片工具模块
+Markdown to image conversion module
 ===================================
 
-将 Markdown 转为 PNG 图片（用于不支持 Markdown 的通知渠道）。
-支持 wkhtmltoimage (imgkit) 与 markdown-to-file (m2f)，后者对 emoji 支持更好 (Issue #455)。
+Convert Markdown to PNG images (for notification channels that don't support Markdown).
+Supports wkhtmltoimage (imgkit) and markdown-to-file (m2f), with m2f offering better emoji support (Issue #455).
 
 Security note: imgkit passes HTML to wkhtmltoimage via stdin, not argv, so
 command injection from content is not applicable. Output is rasterized to PNG

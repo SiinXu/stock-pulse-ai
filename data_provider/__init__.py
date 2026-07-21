@@ -1,33 +1,33 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-数据源策略层 - 包初始化
+Data source strategy layer - package initialization
 ===================================
 
-本包实现策略模式管理多个数据源，实现：
-1. 统一的数据获取接口
-2. 自动故障切换
-3. 防封禁流控策略
+This package implements strategy pattern management for multiple data sources, achieving:
+1. Provide a unified data retrieval interface
+2. Automatic failover
+3. Anti-ban control strategy
 
-数据源优先级（动态调整）：
-【配置了 TUSHARE_TOKEN 时】
-1. TushareFetcher (Priority 0) - 🔥 最高优先级（动态提升）
-2. EfinanceFetcher (Priority 0) - 同优先级
-3. AkshareFetcher (Priority 1) - 来自 akshare 库
-4. PytdxFetcher (Priority 2) - 来自 pytdx 库（通达信）
-5. BaostockFetcher (Priority 3) - 来自 baostock 库
-6. YfinanceFetcher (Priority 4) - 来自 yfinance 库
+Data source priority (dynamically adjusted):
+[Configured TUSHARE_TOKEN Time]
+1. TushareFetcher (Priority 0) - 🔥 Highest priority?(Dynamic scaling)
+2. EfinanceFetcher (Priority 0) - Same priority
+3. AkshareFetcher (Priority 1) - From? akshare library
+4. PytdxFetcher (Priority 2) - from the pytdx library (Toutuantun)
+5. BaostockFetcher (Priority 3) - From? baostock library
+6. YfinanceFetcher (Priority 4) - From? yfinance library
 
-【未配置 TUSHARE_TOKEN 时】
-1. EfinanceFetcher (Priority 0) - 最高优先级，来自 efinance 库
-2. AkshareFetcher (Priority 1) - 来自 akshare 库
-3. PytdxFetcher (Priority 2) - 来自 pytdx 库（通达信）
-4. TushareFetcher (Priority 2) - 来自 tushare 库（不可用）
-5. BaostockFetcher (Priority 3) - 来自 baostock 库
-6. YfinanceFetcher (Priority 4) - 来自 yfinance 库
-7. LongbridgeFetcher (Priority 5) - 长桥 OpenAPI（美股/港股兜底）
+[Not configured? TUSHARE_TOKEN Time]
+1. EfinanceFetcher (Priority 0) - Highest priority, from the efinance library
+2. AkshareFetcher (Priority 1) - From? akshare library
+3. PytdxFetcher (Priority 2) - from the pytdx library (Toutuantun)
+4. TushareFetcher (Priority 2) - From the tushare library (unavailable)
+5. BaostockFetcher (Priority 3) - From? baostock library
+6. YfinanceFetcher (Priority 4) - From? yfinance library
+7. LongbridgeFetcher (Priority 5) - Longbridge OpenAPI (U.S./Hong Kong stocks fallback).
 
-提示：优先级数字越小越优先，同优先级按初始化顺序排列
+Tip: Lower priority numbers have higher priority; same priority is sorted by initialization order.
 """
 
 from .base import BaseFetcher, DataFetcherManager

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-通知发送层模块
+Notification Sending Layer Module
 ===================================
 
-提供各种通知发送服务
+Provides various notification sending services
 """
 
 from .astrbot_sender import AstrbotSender

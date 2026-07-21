@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""BoundToolSession -> PydanticAI toolset bridge (AR-PY-04, 方案 B).
+"""BoundToolSession -> PydanticAI toolset bridge (AR-PY-04, Plan B).
 
 The single bridge point between StockPulse's execution-bound tool surface
 (AR-PY-02 ``BoundToolSession``) and PydanticAI. Every tool the PydanticAI

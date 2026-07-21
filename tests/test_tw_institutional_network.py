@@ -11,7 +11,7 @@ Each test is self-contained (one raw fetch + the fetcher, in the same test) so a
 rename is caught LOUD and a narrow connectivity window cannot split-skip two corroborating
 tests. Drift fails LOUD; a transport error, non-trading day, or transient blip skips QUIET
 so the cron is not noisy. A 200 that is NOT JSON (maintenance page / URL migration) is
-DRIFT, not a blip, so it fails — never skipped. Both feeds are public 政府開放資料, no creds.
+DRIFT, not a blip, so it fails — never skipped. Both feeds are public Government open data, no creds.
 
 For the richer human-readable cross-check, see tests/tw_institutional_live_smoke.py.
 """
@@ -134,7 +134,7 @@ class TestTwInstitutionalLiveNetwork(unittest.TestCase):
         rec = _fetch_with_retry(TwInstitutionalFetcher(), "5483.TWO")
         if rec is None:
             # row present in the raw feed but the fetcher returned None => parse/date drift
-            # (e.g. a 民國 date-format change _parse_tpex_row can't convert) -> FAIL, not soft-skip.
+            # (e.g. a Minguo date-format change _parse_tpex_row can't convert) -> FAIL, not soft-skip.
             if raw is not None:
                 self.fail("5483 is present in the raw TPEx feed but the fetcher returned None after "
                           "retries — parse/date drift (e.g. a 民國 date-format change)")

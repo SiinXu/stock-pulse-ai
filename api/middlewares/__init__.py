@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-API 中间件模块初始化
+API middleware module initialization
 ===================================
 
-职责：
-1. 导出所有中间件
+Responsibilities:
+1. Export all middlewares
 """
 
 from api.middlewares.error_handler import ErrorHandlerMiddleware

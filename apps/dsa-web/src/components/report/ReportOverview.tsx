@@ -147,7 +147,7 @@ const buildPreparedRelatedBoards = (
 };
 
 /**
- * 报告概览区组件 - 终端风格
+ * Report overview component - terminal style
  */
 export const ReportOverview: React.FC<ReportOverviewProps> = ({
   meta,
@@ -236,11 +236,11 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* 主信息区 - 两列布局 */}
+      {/* Main Info Area - Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-        {/* 左侧：股票信息与结论 */}
+        {/* Left side: Stock information and conclusions */}
         <div className="lg:col-span-2 space-y-5">
-          {/* 股票头部 */}
+          {/* Stock Header */}
           <Card variant="gradient" padding="md" className="home-report-hero">
             <div className="flex items-start justify-between mb-5">
               <div className="flex-1">
@@ -248,7 +248,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
                   <h2 className="text-heading-2 font-bold leading-tight text-foreground">
                     {meta.stockName || meta.stockCode}
                   </h2>
-                  {/* 价格和涨跌幅 */}
+                  {/* Price and percentage change */}
                   {meta.currentPrice != null && (
                     <div className="flex items-baseline gap-2">
                       <span className="text-xl font-bold font-mono" style={getPriceChangeStyle(meta.changePct)}>
@@ -284,7 +284,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </div>
 
-            {/* 关键结论 */}
+            {/* Key conclusion */}
             <div className="home-divider border-t pt-5">
               <span className="label-uppercase">{text.keyInsights}</span>
               <p className="mt-2 max-w-[62ch] whitespace-pre-wrap text-left text-base leading-7 text-foreground">
@@ -294,7 +294,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            {/* 操作建议 */}
+            {/* Trading Recommendations */}
             <Card
               variant="bordered"
               padding="sm"
@@ -317,7 +317,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
 
-            {/* 趋势预测 */}
+            {/* Trend prediction */}
             <Card
               variant="bordered"
               padding="sm"
@@ -357,7 +357,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           )}
         </div>
 
-        {/* 右侧：情绪指标 / 自选操作 */}
+        {/* Right side: Sentiment indicators / Watchlist actions */}
         <div className="flex flex-col space-y-4">
           {watchlist && meta.reportType !== 'market_review' && (
             <Card variant="bordered" padding="sm">

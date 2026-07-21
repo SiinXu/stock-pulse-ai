@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Pushover 发送提醒服务
+Pushover Send Notification Service
 
-职责：
-1. 通过 Pushover API 发送 Pushover 消息
+Responsibilities:
+1. Send Pushover messages via Pushover API
 """
 import logging
 from typing import Optional
@@ -22,10 +22,10 @@ class PushoverSender:
     
     def __init__(self, config: Config):
         """
-        初始化 Pushover 配置
+        Initialize Pushover configuration
 
         Args:
-            config: 配置对象
+            config: Configuration object
         """
         self._pushover_config = {
             'user_key': getattr(config, 'pushover_user_key', None),
@@ -33,7 +33,7 @@ class PushoverSender:
         }
         
     def _is_pushover_configured(self) -> bool:
-        """检查 Pushover 配置是否完整"""
+        """Verify Pushover configuration is complete"""
         return bool(self._pushover_config['user_key'] and self._pushover_config['api_token'])
 
     def send_to_pushover(
@@ -44,29 +44,29 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        推送消息到 Pushover
+        Push message to Pushover
         
-        Pushover API 格式：
+        Pushover API Format:
         POST https://api.pushover.net/1/messages.json
         {
-            "token": "应用 API Token",
-            "user": "用户 Key",
-            "message": "消息内容",
-            "title": "标题（可选）"
+            "token": "Apply API Token",
+            "user": "User Key",
+            "message": "Message content",
+            "title": "Title(Optional)"
         }
         
-        Pushover 特点：
-        - 支持 iOS/Android/桌面多平台推送
-        - 消息限制 1024 字符
-        - 支持优先级设置
-        - 支持 HTML 格式
+        Pushover Features:
+        - Supports multi-platform push on iOS/Android/desktop
+        - Message limited to 1024 characters
+        - Supports priority settings.
+        - Supports HTML format
         
         Args:
-            content: 消息内容（Markdown 格式，会转为纯文本）
-            title: 消息标题（可选，默认为"股票分析报告"）
+            content: Message content (Markdown format, converted to plain text)
+            title: Message title (optional, defaults to "Stock Analysis Report")
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         if not self._is_pushover_configured():
             logger.warning("Pushover 配置不完整，跳过推送")
@@ -75,25 +75,25 @@ class PushoverSender:
         user_key = self._pushover_config['user_key']
         api_token = self._pushover_config['api_token']
         
-        # Pushover API 端点
+        # Pushover API Endpoint
         api_url = "https://api.pushover.net/1/messages.json"
         
-        # 处理消息标题
+        # Process message titles
         if title is None:
             date_str = datetime.now().strftime('%Y-%m-%d')
             title = f"📈 股票分析报告 - {date_str}"
         
-        # Pushover 消息限制 1024 字符
+        # Pushover Message Limit 1024 Characters
         max_length = 1024
         
-        # 转换 Markdown 为纯文本（Pushover 支持 HTML，但纯文本更通用）
+        # Convert Markdown to plain text (Pushover supports HTML, but plain text is more universal)
         plain_content = markdown_to_plain_text(content)
         
         if len(plain_content) <= max_length:
-            # 单条消息发送
+            # Single message sending
             return self._send_pushover_message(api_url, user_key, api_token, plain_content, title, timeout_seconds=timeout_seconds)
         else:
-            # 分段发送长消息
+            # Segment long messages
             return self._send_pushover_chunked(
                 api_url,
                 user_key,
@@ -116,15 +116,15 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        发送单条 Pushover 消息
+        Send single Pushover message
         
         Args:
-            api_url: Pushover API 端点
-            user_key: 用户 Key
-            api_token: 应用 API Token
-            message: 消息内容
-            title: 消息标题
-            priority: 优先级 (-2 ~ 2，默认 0)
+            api_url: Pushover API Endpoint
+            user_key: User Key
+            api_token: Apply API Token
+            message: Message content
+            title: message title
+            priority: priority (-2 ~ 2, default 0)
         """
         try:
             payload = {
@@ -172,13 +172,13 @@ class PushoverSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        分段发送长 Pushover 消息
+        Segment long Pushover messages
         
-        按段落分割，确保每段不超过最大长度
+        Split by paragraphs, ensuring each paragraph does not exceed the maximum length.
         """
         import time
         
-        # 按段落（分隔线或双换行）分割
+        # Split by paragraphs (lines or double newlines).
         if "────────" in content:
             sections = content.split("────────")
             separator = "────────"
@@ -191,14 +191,14 @@ class PushoverSender:
         current_length = 0
         
         for section in sections:
-            # 计算添加这个 section 后的实际长度
-            # join() 只在元素之间放置分隔符，不是每个元素后面
-            # 所以：第一个元素不需要分隔符，后续元素需要一个分隔符连接
+            # Calculate the actual length after adding this section
+            # join() only places delimiters between elements, not after each element
+            # So: the first element does not need a delimiter, subsequent elements require a delimiter to connect.
             if current_chunk:
-                # 已有元素，添加新元素需要：当前长度 + 分隔符 + 新 section
+                # Existing elements, adding a new element requires: current length + separator + new section
                 new_length = current_length + len(separator) + len(section)
             else:
-                # 第一个元素，不需要分隔符
+                # First element, no delimiter.
                 new_length = len(section)
             
             if new_length > max_length:
@@ -219,7 +219,7 @@ class PushoverSender:
         logger.info(f"Pushover 分批发送：共 {total_chunks} 批")
         
         for i, chunk in enumerate(chunks):
-            # 添加分页标记到标题
+            # Add pagination markers to titles
             chunk_title = f"{title} ({i+1}/{total_chunks})" if total_chunks > 1 else title
             
             if self._send_pushover_message(
@@ -235,7 +235,7 @@ class PushoverSender:
             else:
                 logger.error(f"Pushover 第 {i+1}/{total_chunks} 批发送失败")
             
-            # 批次间隔，避免触发频率限制
+            # Batch interval to avoid rate limits
             if i < total_chunks - 1:
                 time.sleep(1)
 

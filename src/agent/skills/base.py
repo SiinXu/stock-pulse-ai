@@ -4,7 +4,7 @@ Trading skill base classes and SkillManager.
 
 Skills are pluggable trading analysis modules defined in **natural language**
 (YAML files). Each skill describes a common or custom trading pattern
-(e.g., 龙头策略, 缩量回踩, 均线金叉) used for analysis and push notifications.
+(e.g., leading-stock strategy, Low Volume Rebound, moving average golden cross) used for analysis and push notifications.
 
 Users can write custom skills by creating a YAML file — no Python code needed.
 The built-in YAML files still live under ``strategies/`` for compatibility.
@@ -35,10 +35,10 @@ class Skill:
 
     Attributes:
         name: Unique strategy identifier (e.g., "dragon_head").
-        display_name: Human-readable name (e.g., "龙头策略").
+        display_name: Human-readable name (e.g., "leading-stock strategy").
         description: Brief description of when to apply this strategy.
         instructions: Detailed natural language instructions injected into the system prompt.
-        category: Skill category — "trend" (趋势), "pattern" (形态), "reversal" (反转), "framework" (框架).
+        category: Skill category — "trend" (trend), "pattern" (pattern), "reversal" (reversal), "framework" (framework).
         core_rules: List of core trading rule numbers this strategy relates to (1-7).
         required_tools: List of tool names this skill depends on.
         allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.

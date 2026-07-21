@@ -57,7 +57,7 @@ class ChatCommand(BotCommand):
     Chat command handler.
     
     Usage: /chat <message>
-    Example: /chat 帮我分析一下茅台最近的走势
+    Example: /chat help me analyze the recent trend of Moutai
     """
     
     @property

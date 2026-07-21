@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-Bot Webhook 处理器
+Bot Webhook processor
 ===================================
 
-处理各平台的 Webhook 回调，分发到命令处理器。
+Handle webhooks from various platforms, forwarding to command handlers.
 """
 
 import asyncio
@@ -23,21 +23,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# 平台实例缓存
+# Platform instance cache
 _platform_instances: Dict[str, 'BotPlatform'] = {}
 
 
 def get_platform(platform_name: str) -> Optional['BotPlatform']:
     """
-    获取平台适配器实例
+    Get platform adapter instance
 
-    使用缓存避免重复创建。
+    Use caching to avoid creating repeatedly.
 
     Args:
-        platform_name: 平台名称
+        platform_name: platform name
 
     Returns:
-        平台适配器实例，或 None
+        Platform adapter instance, or None
     """
     if platform_name not in _platform_instances:
         platform_class = ALL_PLATFORMS.get(platform_name)
@@ -57,22 +57,22 @@ def handle_webhook(
     query_params: Optional[Dict[str, list]] = None
 ) -> WebhookResponse:
     """
-    处理 Webhook 请求
+    Handle webhook requests
 
-    这是所有平台 Webhook 的统一入口。
+    This is the unified entry point for all platform Webhooks.
 
     Args:
-        platform_name: 平台名称 (feishu, dingtalk, wecom, telegram)
-        headers: HTTP 请求头
-        body: 请求体原始字节
-        query_params: URL 查询参数（用于某些平台的验证）
+        platform_name: platform name (feishu, dingtalk, wecom, telegram)
+        headers: HTTP request headers
+        body: Raw bytes of the request body
+        query_params: URL query parameters (for verification in some platforms)
 
     Returns:
-        WebhookResponse 响应对象
+        WebhookResponse Response Object
     """
     logger.info("[BotHandler] Received webhook request: platform=%s", platform_name)
 
-    # 检查机器人功能是否启用
+    # Check if the robot function is enabled
     from src.config import get_config
     config = get_config()
 
@@ -80,12 +80,12 @@ def handle_webhook(
         logger.info("[BotHandler] Bot integration is disabled")
         return WebhookResponse.success()
 
-    # 获取平台适配器
+    # Get platform adapter
     platform = get_platform(platform_name)
     if not platform:
         return WebhookResponse.error(f"Unknown platform: {platform_name}", 400)
 
-    # 解析 JSON 数据
+    # Parse JSON data
     try:
         data = json.loads(body.decode('utf-8')) if body else {}
     except json.JSONDecodeError as exc:
@@ -101,15 +101,15 @@ def handle_webhook(
 
     logger.debug("[BotHandler] Parsed webhook payload: body_bytes=%d", len(body))
 
-    # 处理 Webhook
+    # Handle webhooks
     message, immediate_response = platform.handle_webhook(headers, body, data)
 
-    # 如果是验证/错误响应且没有消息需要处理，直接返回
+    # If it's a validation/error response and there is no message to process, return directly
     if immediate_response and not message:
         logger.info("[BotHandler] Returning immediate verification response")
         return immediate_response
 
-    # 延迟响应（如 Discord type 5）：立即返回 ACK，后台处理命令
+    # Delayed response (like Discord type 5): Immediately return ACK and handle command in the background
     if immediate_response and message:
         logger.info(
             "[BotHandler] Returning deferred acknowledgement and dispatching in background"
@@ -133,7 +133,7 @@ def handle_webhook(
         threading.Thread(target=_deferred_dispatch, daemon=True).start()
         return immediate_response
 
-    # 如果没有消息需要处理，返回空响应
+    # If no messages need to be processed, return an empty response.
     if not message:
         logger.debug("[BotHandler] Webhook did not contain a processable message")
         return WebhookResponse.success()
@@ -144,11 +144,11 @@ def handle_webhook(
         len(message.content),
     )
 
-    # 分发到命令处理器
+    # Forward to command processor
     dispatcher = get_dispatcher()
     response = dispatcher.dispatch(message)
 
-    # 格式化响应
+    # Format the response
     if response.text:
         webhook_response = platform.format_response(response, message)
         return webhook_response
@@ -248,20 +248,20 @@ async def handle_webhook_async(
 
 
 def handle_feishu_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """处理飞书 Webhook"""
+    """Handle Feishu Webhook"""
     return handle_webhook('feishu', headers, body)
 
 
 def handle_dingtalk_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """处理钉钉 Webhook"""
+    """Handle DingTalk Webhook"""
     return handle_webhook('dingtalk', headers, body)
 
 
 def handle_wecom_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """处理企业微信 Webhook"""
+    """Handle WeCom webhooks"""
     return handle_webhook('wecom', headers, body)
 
 
 def handle_telegram_webhook(headers: Dict[str, str], body: bytes) -> WebhookResponse:
-    """处理 Telegram Webhook"""
+    """Handle Telegram Webhooks"""
     return handle_webhook('telegram', headers, body)

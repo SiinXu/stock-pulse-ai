@@ -80,7 +80,7 @@ def _make_spot_df():
 
 
 class TestHKRealtimeFallback(unittest.TestCase):
-    """stock_hk_spot_em 失败时应 fallback 到 stock_hk_spot。"""
+    """stock_hk_spot_em Failure when should fallback To stock_hk_spot."""
 
     def setUp(self):
         self.fetcher = AkshareFetcher()
@@ -90,7 +90,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_success_returns_quote_with_name(self, mock_cb):
-        """stock_hk_spot_em 成功时直接返回含名称的 quote。"""
+        """When stock_hk_spot_em succeeds, directly return the quote with its name."""
         mock_cb.return_value = _DummyCircuitBreaker()
         ak_mock = MagicMock()
         ak_mock.stock_hk_spot_em.return_value = _make_spot_em_df()
@@ -104,7 +104,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_failure_falls_back_to_spot(self, mock_cb):
-        """stock_hk_spot_em 抛异常时应 fallback 到 stock_hk_spot 并返回名称。"""
+        """When stock_hk_spot_em throws an exception, fallback to stock_hk_spot and return the name."""
         mock_cb.return_value = _DummyCircuitBreaker()
         ak_mock = MagicMock()
         ak_mock.stock_hk_spot_em.side_effect = Exception("接口异常：数据源不可用")
@@ -120,7 +120,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_both_fail_returns_none(self, mock_cb):
-        """stock_hk_spot_em 和 stock_hk_spot 都失败时返回 None，不抛异常。"""
+        """When both stock_hk_spot_em and stock_hk_spot fail, return None, do not raise exceptions."""
         mock_cb.return_value = _DummyCircuitBreaker()
         ak_mock = MagicMock()
         ak_mock.stock_hk_spot_em.side_effect = Exception("东方财富接口超时")
@@ -133,7 +133,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_returns_empty_df_falls_back_to_spot(self, mock_cb):
-        """stock_hk_spot_em 返回空 DataFrame 时应 fallback 到 stock_hk_spot。"""
+        """When stock_hk_spot_em returns an empty DataFrame, fallback to stock_hk_spot."""
         mock_cb.return_value = _DummyCircuitBreaker()
         ak_mock = MagicMock()
         ak_mock.stock_hk_spot_em.return_value = pd.DataFrame(columns=['代码', '名称', '最新价'])
@@ -147,7 +147,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
     @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_circuit_breaker_open_returns_none(self, mock_cb):
-        """熔断状态下直接返回 None。"""
+        """Return None directly in the circuit breaker state."""
         cb = _DummyCircuitBreaker()
         cb.is_available = lambda source: False
         mock_cb.return_value = cb

@@ -38,7 +38,7 @@ test.describe('ReportMarkdown component', () => {
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "complete analysis report" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
@@ -87,7 +87,7 @@ test.describe('ReportMarkdown component', () => {
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "complete analysis report" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 
@@ -135,7 +135,7 @@ test.describe('ReportMarkdown component', () => {
     // Wait for main content to load
     await expect(page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeVisible({ timeout: 10_000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "complete analysis report" button to open the markdown drawer
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
@@ -175,7 +175,7 @@ test.describe('ReportMarkdown component', () => {
     const detailedReportButton = page.getByRole('button', { name: '完整分析报告' });
     await expect(detailedReportButton).toBeEnabled({ timeout: 3000 });
 
-    // Click the "完整分析报告" button to open the markdown drawer
+    // Click the "complete analysis report" button to open the markdown drawer
     await expect(detailedReportButton).toBeVisible({ timeout: 5000 });
     await detailedReportButton.click();
 

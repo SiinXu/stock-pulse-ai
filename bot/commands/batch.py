@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-批量分析命令
+Bulk analysis command
 ===================================
 
-批量分析自选股列表中的所有股票。
+Bulk analysis of all stocks in the watchlist.
 """
 
 import logging
@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 
 class BatchCommand(BotCommand):
     """
-    批量分析命令
+    Bulk analysis command
     
-    批量分析配置中的自选股列表，生成汇总报告。
+    Bulk analysis of the watchlist stocks configured in the list, generating a summary report.
     
-    用法：
-        /batch      - 分析所有自选股
-        /batch 3    - 只分析前3只
+    Usage:
+        /batch      - analyze all watchlist stocks
+        /batch 3    - Only analyze before 3 Only
     """
     
     @property
@@ -50,11 +50,11 @@ class BatchCommand(BotCommand):
     
     @property
     def admin_only(self) -> bool:
-        """批量分析需要管理员权限（防止滥用）"""
-        return False  # 可以根据需要设为 True
+        """Bulk analysis requires administrator permissions (to prevent abuse)"""
+        return False  # Can be set to True as needed.
     
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """执行批量分析命令"""
+        """Execute batch analysis command"""
         from src.config import get_config
         
         config = get_config()
@@ -67,7 +67,7 @@ class BatchCommand(BotCommand):
                 "自选股列表为空，请先配置 STOCK_LIST"
             )
         
-        # 解析数量参数
+        # Parse quantity parameters
         limit = None
         if args:
             try:
@@ -77,7 +77,7 @@ class BatchCommand(BotCommand):
             except ValueError:
                 return BotResponse.error_response(f"无效的数量: {args[0]}")
         
-        # 限制分析数量
+        # Limit analysis quantity
         if limit:
             stock_list = stock_list[:limit]
         
@@ -86,7 +86,7 @@ class BatchCommand(BotCommand):
             len(stock_list),
         )
         
-        # 在后台线程中执行分析
+        # Execute analysis in a background thread.
         thread = threading.Thread(
             target=self._run_batch_analysis,
             args=(stock_list, to_analysis_request_context(message)),
@@ -107,14 +107,14 @@ class BatchCommand(BotCommand):
         stock_list: List[str],
         request_context: AnalysisRequestContext,
     ) -> None:
-        """后台执行批量分析"""
+        """Perform batch analysis in the background."""
         try:
             from src.config import get_config
             from main import StockAnalysisPipeline
             
             config = get_config()
             
-            # 创建分析管道
+            # Create an analysis pipeline
             pipeline = StockAnalysisPipeline(
                 config=config,
                 request_context=request_context,
@@ -122,7 +122,7 @@ class BatchCommand(BotCommand):
                 query_source="bot"
             )
             
-            # 执行分析（会自动推送汇总报告）
+            # Execute analysis (automatically push summary report)
             results = pipeline.run(
                 stock_codes=stock_list,
                 dry_run=False,

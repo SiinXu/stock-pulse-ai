@@ -10,7 +10,7 @@ from typing import Optional
 
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
-from src.formatters import chunk_content_by_max_bytes  # <-- 引入项目内置的切片器
+from src.formatters import chunk_content_by_max_bytes  # <-- Import built-in slicer
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,11 @@ class DingtalkSender:
         self.secret = config.dingtalk_secret
 
     def send_to_dingtalk(self, content: str, title: str = "", timeout_seconds: int = 10) -> bool:
-        """发送 Markdown 消息到钉钉群 (Send DingTalk Markdown message)"""
+        """Send Markdown message to DingTalk group (Send DingTalk Markdown message)"""
         if not self.webhook_url:
             return False
 
-        # 1. 签名逻辑 (Security Signature)
+        # 1. Security Signature logic
         if self.secret:
             timestamp = str(round(time.time() * 1000))
             secret_enc = self.secret.encode('utf-8')
@@ -40,11 +40,11 @@ class DingtalkSender:
         else:
             url = self.webhook_url
 
-        # 2. 限制标题长度，防止极端长标题吃掉过多 JSON 字节预算
+        # 2. Limit title length to prevent extremely long titles from consuming excessive JSON byte budget
         safe_title = (title[:100] + "...") if title and len(title) > 100 else title
 
-        # 3. 切片逻辑 (Chunking for DingTalk's 20,000 byte limit)
-        # 预留 1000 bytes 的安全预算，用于 JSON 结构、标题和分页后缀的额外开销
+        # 3. Chunking logic (for DingTalk's 20,000 byte limit)
+        # Reserve 1000 bytes of security budget for JSON structure, titles and pagination suffixes overhead
         safe_max_bytes = 19000
         chunks = chunk_content_by_max_bytes(content, max_bytes=safe_max_bytes)
         all_success = True
@@ -65,7 +65,7 @@ class DingtalkSender:
             }
             headers = {'Content-Type': 'application/json'}
 
-            # 4. 发送请求
+            # 4. Send request
             try:
                 response = requests.post(url, json=payload, headers=headers, timeout=timeout_seconds)
                 response.raise_for_status()

@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-LongbridgeFetcher - 长桥兜底数据源 (Priority 5)
+LongbridgeFetcher - Changqiao fallback data source (Priority 5)
 ===================================
 
-数据来源：长桥 OpenAPI (https://open.longbridge.com)
-特点：覆盖美股 + 港股，可计算量比/换手率/PE 等 yfinance 缺失字段
-定位：美股/港股最后兜底数据源
+Data source: Longbridge OpenAPI (https://open.longbridge.com)
+Characteristics: Covers US stocks + Hong Kong stocks, can calculate volume ratio/turnover rate/PE etc. yfinance missing fields
+Last-resort data source for U.S./Hong Kong stocks.
 
-关键策略：
-1. 组合 quote + static_info 接口计算 turnover_rate / pe_ratio / total_mv
-2. 通过 history_candlesticks 计算 volume_ratio（近5日均量比）
-3. 懒加载 QuoteContext，首次调用时才建立连接
-4. static_info 进程内短缓存，减少重复请求（默认 24h，可调；见 LONGBRIDGE_STATIC_INFO_TTL_SECONDS）
+Key strategy:
+1. Combine quote + static_info interface calculates turnover_rate / pe_ratio / total_mv
+2. Calculate volume_ratio (5-day average volume ratio) using history_candlesticks
+3. Lazy-load QuoteContext, establish connection only on the first call
+4. static_info in-process short cache to reduce redundant requests (default 24h, adjustable; see LONGBRIDGE_STATIC_INFO_TTL_SECONDS)
 
-凭证：优先使用 `LONGBRIDGE_OAUTH_CLIENT_ID` + SDK token 缓存（OAuth 2.0）；
-Legacy API Key 三件套（`LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN`）仍兼容。
-可选：`LONGBRIDGE_STATIC_INFO_TTL_SECONDS`；SDK `language` 取自 `REPORT_LANGUAGE`，`log_path` 为 `{LOG_DIR}/longbridge_sdk.log`；
-`LONGBRIDGE_HTTP_URL` / `LONGBRIDGE_QUOTE_WS_URL` / `LONGBRIDGE_TRADE_WS_URL` / `LONGBRIDGE_REGION` （见官方文档默认值）。
+Use `LONGBRIDGE_OAUTH_CLIENT_ID` + SDK token cache (OAuth 2.0) preferentially;
+Legacy API Key Three-Piece Set(`LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN`)Still compatible.
+Optional: `LONGBRIDGE_STATIC_INFO_TTL_SECONDS`; SDK `language` is taken from `REPORT_LANGUAGE`, `log_path` is `{LOG_DIR}/longbridge_sdk.log`;
+`LONGBRIDGE_HTTP_URL` / `LONGBRIDGE_QUOTE_WS_URL` / `LONGBRIDGE_TRADE_WS_URL` / `LONGBRIDGE_REGION` (refer to the default values in the official documentation).
 """
 
 import base64
@@ -455,12 +455,12 @@ def _to_longbridge_symbol(stock_code: str) -> Optional[str]:
 
 class LongbridgeFetcher(BaseFetcher):
     """
-    长桥 OpenAPI 数据源实现
+    Longbridge OpenAPI data source implementation
 
-    优先级: 5（最低，作为美股/港股最后兜底）
-    数据来源: Longbridge OpenAPI
+    Priority: 5 (lowest, as the fallback for US stocks/Hong Kong stocks).
+    Data source: Longbridge OpenAPI
 
-    通过组合多个 API 计算 yfinance 缺失的指标:
+    Calculate missing indicators for yfinance by combining multiple APIs:
     - turnover_rate = volume / circulating_shares * 100
     - volume_ratio = today_volume / avg_5day_volume
     - pe_ratio = price / eps_ttm

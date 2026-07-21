@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-PushPlus 发送提醒服务
+PushPlus sends reminder services
 
-职责：
-1. 通过 PushPlus API 发送 PushPlus 消息
+Responsibilities:
+1. Send PushPlus messages via PushPlus API
 """
 import logging
 import time
@@ -23,10 +23,10 @@ class PushplusSender:
     
     def __init__(self, config: Config):
         """
-        初始化 PushPlus 配置
+        Initialize PushPlus configuration
 
         Args:
-            config: 配置对象
+            config: Configuration object
         """
         self._pushplus_token = getattr(config, 'pushplus_token', None)
         self._pushplus_topic = getattr(config, 'pushplus_topic', None)
@@ -40,28 +40,28 @@ class PushplusSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        推送消息到 PushPlus
+        Push message to PushPlus
 
-        PushPlus API 格式：
+        PushPlus API format:
         POST http://www.pushplus.plus/send
         {
-            "token": "用户令牌",
-            "title": "消息标题",
-            "content": "消息内容",
+            "token": "User token",
+            "title": "Message title",
+            "content": "Message content",
             "template": "html/txt/json/markdown"
         }
 
-        PushPlus 特点：
-        - 国内推送服务，免费额度充足
-        - 支持微信公众号推送
-        - 支持多种消息格式
+        PushPlus Features:
+        - Domestic push service, free quota sufficient
+        - Supports WeChat public account push
+        - Supports multiple message formats
 
         Args:
-            content: 消息内容（Markdown 格式）
-            title: 消息标题（可选）
+            content: Message content in Markdown format
+            title: Message title (optional)
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         if not self._pushplus_token:
             logger.warning("PushPlus Token 未配置，跳过推送")
@@ -132,7 +132,7 @@ class PushplusSender:
         return False
 
     def _send_pushplus_chunked(self, api_url: str, content: str, title: str, max_bytes: int) -> bool:
-        """分批发送长 PushPlus 消息，给 JSON payload 预留空间。"""
+        """Batch send long PushPlus messages, reserving space in the JSON payload."""
         budget = max(1000, max_bytes - 1500)
         chunks = chunk_content_by_max_bytes(content, budget, add_page_marker=True)
         total_chunks = len(chunks)

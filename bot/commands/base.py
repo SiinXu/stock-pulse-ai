@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-命令基类
+Command base class
 ===================================
 
-定义命令处理器的抽象基类，所有命令都必须继承此类。
+Define the abstract base class of command processors. All commands must inherit from this class.
 """
 
 import asyncio
@@ -16,11 +16,11 @@ from bot.models import BotMessage, BotResponse
 
 class BotCommand(ABC):
     """
-    命令处理器抽象基类
+    Command processor abstract base class
 
-    所有命令都必须继承此类并实现抽象方法。
+    All commands must inherit this class and implement the abstract method.
 
-    使用示例：
+    Using example:
         class MyCommand(BotCommand):
             @property
             def name(self) -> str:
@@ -28,27 +28,27 @@ class BotCommand(ABC):
 
             @property
             def aliases(self) -> List[str]:
-                return ["mc", "我的命令"]
+                return ["mc", "my command"]
 
             @property
             def description(self) -> str:
-                return "这是我的命令"
+                return "this is my command"
 
             @property
             def usage(self) -> str:
-                return "/mycommand [参数]"
+                return "/mycommand [Parameters]"
 
             def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
-                return BotResponse.text_response("命令执行成功")
+                return BotResponse.text_response("Command Execution Success")
     """
 
     @property
     @abstractmethod
     def name(self) -> str:
         """
-        命令名称（不含前缀）
+        Command name (without prefix)
 
-        例如 "analyze"，用户输入 "/analyze" 触发
+        For example: "analyze" , user input "/analyze" triggers
         """
         pass
 
@@ -56,81 +56,81 @@ class BotCommand(ABC):
     @abstractmethod
     def aliases(self) -> List[str]:
         """
-        命令别名列表
+        Command aliases list
 
-        例如 ["a", "分析"]，用户输入 "/a" 或 "分析" 也能触发
+        For example: ["a", "analysis"] , user input "/a" or "analysis" can also trigger
         """
         pass
 
     @property
     @abstractmethod
     def description(self) -> str:
-        """命令描述（用于帮助信息）"""
+        """Command description (for help information)"""
         pass
 
     @property
     @abstractmethod
     def usage(self) -> str:
         """
-        使用说明（用于帮助信息）
+        Usage instructions (for help information)
 
-        例如 "/analyze <股票代码>"
+        For example: "/analyze <stock code>"
         """
         pass
 
     @property
     def hidden(self) -> bool:
         """
-        是否在帮助列表中隐藏
+        Is it hidden in the help list?
 
-        默认 False，设为 True 则不显示在 /help 列表中
+        Default is False, set to True to not display in /help list
         """
         return False
 
     @property
     def admin_only(self) -> bool:
         """
-        是否仅管理员可用
+        Only available for administrators
 
-        默认 False，设为 True 则需要管理员权限
+        Default is False, set to True requires administrator permissions
         """
         return False
 
     @abstractmethod
     def execute(self, message: BotMessage, args: List[str]) -> BotResponse:
         """
-        执行命令
+        Execute command
 
         Args:
-            message: 原始消息对象
-            args: 命令参数列表（已分割）
+            message: Original message object
+            args: Command parameter list (split)
 
         Returns:
-            BotResponse 响应对象
+            BotResponse response object
         """
         pass
 
     async def execute_async(self, message: BotMessage, args: List[str]) -> BotResponse:
-        """异步执行命令。
+        """Execute command asynchronously.
 
-        默认将同步 `execute()` 下沉到线程池，避免在异步分发链路中阻塞事件循环。
+        Default to threadpool execute() for syncing `execute()` to avoid blocking event loop in asynchronous distribution links.
         """
         return await asyncio.to_thread(self.execute, message, args)
 
     def validate_args(self, args: List[str]) -> Optional[str]:
         """
-        验证参数
+        Validate parameters
 
-        子类可重写此方法进行参数校验。
+        Subclasses can override this method to perform parameter validation.
 
         Args:
-            args: 命令参数列表
+            args: Command parameter list
 
         Returns:
-            如果参数有效返回 None，否则返回错误信息
+            If parameters are valid, return None; otherwise, return an error message.
         """
         return None
 
     def get_help_text(self) -> str:
-        """获取帮助文本"""
+        """Get help text"""
         return f"**{self.name}** - {self.description}\n用法: `{self.usage}`"

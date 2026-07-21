@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Anspire Search 搜索引擎测试套件
+Anspire search-engine test suite
 
-测试覆盖范围:
-1. 配置加载测试 - 验证 anspire_api_keys 是否正确从环境变量加载
-2. 服务初始化测试 - 验证 SearchService 是否正确初始化 AnspireSearchProvider
-3. API 调用测试 - 实际调用 Anspire API 验证返回结果
-4. 故障转移测试 - 验证无效 Key 时的错误处理和降级机制
-5. 搜索功能测试 - 测试股票新闻搜索和通用搜索功能
+Test coverage range:
+1. Configuration load test - verify that anspire_api_keys are correctly loaded from environment variables
+2. Service initialization test - Verify that AnspireSearchProvider is correctly initialized via SearchService.
+3. API call testing - actual calling of Anspire API to verify the returned results
+4. Failover test - error handling and fallback mechanism when invalid Key is verified
+5. Search functionality testing - Test stock news search and general search functions
 
-运行方式:
+Running options:
 ```bash
 # Windows PowerShell
 $env:ANSPIRE_API_KEYS="your_test_api_key"
@@ -33,7 +33,7 @@ import pytest
 from dotenv import load_dotenv
 load_dotenv()
 
-# 添加项目根目录到 Python 路径，解决模块导入问题
+# Add project root directory to Python path, solve module import issues
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -55,7 +55,7 @@ from src.search_service import (
 
 
 class _FakeResponse:
-    """模拟 HTTP 响应对象"""
+    """Simulate HTTP response object"""
     def __init__(self, status_code=200, json_data=None, text="", headers=None):
         self.status_code = status_code
         self._json_data = json_data or {}
@@ -70,33 +70,33 @@ class TestAnspireConfigLoading(unittest.TestCase):
     """Test Anspire configuration loading from environment variables."""
     
     def setUp(self):
-        """保存并清除环境变量（不操作 .env 文件）"""
-        # ✅ 保存原始值，测试后恢复
+        """Save and clear environment variables (don't operate .env file)"""
+        # ✅ Save original values, restore after testing
         self._original_anspire_keys = os.environ.get('ANSPIRE_API_KEYS')
         
-        # 清除环境变量
+        # Clear environment variables
         if 'ANSPIRE_API_KEYS' in os.environ:
             del os.environ['ANSPIRE_API_KEYS']
         
-        # 重置 Config 单例
+        # Reset Config singleton.
         Config._Config__instance = None
         reset_search_service()
 
     def tearDown(self):
-        """恢复原始环境变量"""
-        # ✅ 恢复原始值
+        """Restore original environment variables"""
+        # ✅ Restore original values
         if self._original_anspire_keys is not None:
             os.environ['ANSPIRE_API_KEYS'] = self._original_anspire_keys
         elif 'ANSPIRE_API_KEYS' in os.environ:
             del os.environ['ANSPIRE_API_KEYS']
         
-        # 重置 Config 单例
+        # Reset Config singleton.
         Config._Config__instance = None
         reset_search_service()
 
     def test_anspire_keys_loaded_from_env(self):
         """Test that ANSPIRE_API_KEYS is correctly parsed from environment."""
-        # ✅ 使用 patch.dict 临时设置，测试后自动恢复
+        # ✅ Use patch.dict for temporary setting, automatically restore after testing
         with patch.dict(os.environ, {'ANSPIRE_API_KEYS': 'key1,key2,key3'}):
             config = Config._load_from_env()
             
@@ -130,24 +130,24 @@ class TestAnspireConfigLoading(unittest.TestCase):
 
 
 class TestAnspireSearchProvider(unittest.TestCase):
-    """Anspire Search Provider 单元测试"""
+    """Anspire Search Provider Unit test"""
     
     def setUp(self):
-        """测试前准备"""
-        # ✅ 使用明确的测试占位符，不是真实密钥形态
+        """Test pre-preparation"""
+        # ✅ Use explicit test placeholders instead of real key forms
         self.test_api_key = "sk-test-anspire-placeholder-key-12345"
         self.provider = AnspireSearchProvider([self.test_api_key])
-        # 保存原始 requests 模块
+        # Save the original requests module
         self._original_requests = sys.modules.get('requests')
     
     def tearDown(self):
-        """测试后清理"""
-        # 恢复原始 requests 模块
+        """Clean up after testing"""
+        # Restore original requests module
         if self._original_requests is not None:
             sys.modules['requests'] = self._original_requests
     
     def test_provider_initialization(self):
-        """测试 Provider 初始化"""
+        """Test Provider initialization"""
         provider = AnspireSearchProvider(["key1", "key2"])
         self.assertEqual(provider.name, "Anspire")
         if hasattr(provider, 'api_keys'):
@@ -157,21 +157,21 @@ class TestAnspireSearchProvider(unittest.TestCase):
         self.assertTrue(provider.is_available)
     
     def test_provider_name(self):
-        """测试 Provider 名称"""
+        """Test Provider name"""
         self.assertEqual(self.provider.name, "Anspire")
     
     def test_provider_availability(self):
-        """测试 Provider 可用性检测"""
-        # 有 API Key 时应可用
+        """Test Provider availability detection"""
+        # Should be available when API Key is present
         provider_with_keys = AnspireSearchProvider(["key1"])
         self.assertTrue(provider_with_keys.is_available)
         
-        # 无 API Key 时不可用
+        # Not usable without API Key
         provider_without_keys = AnspireSearchProvider([])
         self.assertFalse(provider_without_keys.is_available)
     
     def test_extract_domain(self):
-        """测试域名提取功能"""
+        """Test domain extraction function"""
         test_cases = [
             ("https://www.example.com/article", "example.com"),
             ("https://finance.sina.com.cn/stock/", "finance.sina.com.cn"),
@@ -186,8 +186,8 @@ class TestAnspireSearchProvider(unittest.TestCase):
     
     @patch('src.search_service.requests')
     def test_search_success_response(self, mock_requests):
-        """测试成功响应处理"""
-        # 设置 mock exceptions
+        """Test successful response handling"""
+        # Configure mock exceptions
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -218,27 +218,27 @@ class TestAnspireSearchProvider(unittest.TestCase):
         
         response = self.provider.search("贵州茅台 股票新闻", max_results=5, days=7)
         
-        # 验证结果
+        # Verification Result
         self.assertTrue(response.success)
         self.assertEqual(response.provider, "Anspire")
         self.assertEqual(len(response.results), 2)
         self.assertEqual(response.results[0].title, "贵州茅台今日股价上涨")
-        # 假设 source 是从 url 提取的域名
+        # Assume source is extracted domain from URL
         self.assertEqual(response.results[0].source, "finance.sina.com.cn")
         
-        # 验证 API 调用参数
+        # Validate API call parameters
         mock_requests.get.assert_called_once()
         call_args = mock_requests.get.call_args
-        # 检查 URL 是否包含 anspire 相关域名 (具体 URL 需根据实际实现调整)
+        # Check if the URL contains anspire related domains (specific URLs need to be adjusted based on actual implementation)
         # self.assertIn("plugin.anspire.cn", call_args[0][0]) 
         self.assertIn("Authorization", call_args[1]["headers"])
-        # 验证使用 params 而非 json
+        # Verify using params instead of json
         self.assertIn("params", call_args[1])
         self.assertNotIn("json", call_args[1])
     
     @patch('src.search_service.requests')
     def test_search_invalid_api_key(self, mock_requests):
-        """测试无效 API Key 的错误处理"""
+        """Invalid API Key error handling"""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -262,7 +262,7 @@ class TestAnspireSearchProvider(unittest.TestCase):
     
     @patch('src.search_service.requests')
     def test_search_timeout_error(self, mock_requests):
-        """测试超时错误处理"""
+        """Timeout error handling."""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -278,12 +278,12 @@ class TestAnspireSearchProvider(unittest.TestCase):
         self.assertFalse(response.success)
         self.assertEqual(response.provider, "Anspire")
         self.assertEqual(len(response.results), 0)
-        # 错误消息检查
+        # Error message check
         self.assertTrue("超时" in response.error_message or "Timeout" in response.error_message)
     
     @patch('src.search_service.requests')
     def test_search_network_error(self, mock_requests):
-        """测试网络错误处理"""
+        """Test network error handling"""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -303,7 +303,7 @@ class TestAnspireSearchProvider(unittest.TestCase):
     
     @patch('src.search_service.requests')
     def test_search_empty_results(self, mock_requests):
-        """测试空结果处理"""
+        """Test handling of empty results"""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -325,14 +325,14 @@ class TestAnspireSearchProvider(unittest.TestCase):
     
     @patch('src.search_service.requests')
     def test_search_content_truncation(self, mock_requests):
-        """测试长内容截断功能"""
+        """Test long content truncation functionality"""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
         except ImportError:
             mock_requests.exceptions = MagicMock()
         
-        long_content = "这是一段非常长的内容，" * 100  # 超过 500 字符
+        long_content = "这是一段非常长的内容，" * 100  # Exceeding 500 characters
         
         fake_response = _FakeResponse(
             status_code=200,
@@ -353,14 +353,14 @@ class TestAnspireSearchProvider(unittest.TestCase):
         
         self.assertTrue(response.success)
         self.assertEqual(len(response.results), 1)
-        # 验证内容被截断到 500 字符以内
+        # Validate that content is truncated to no more than 500 characters
         if response.results[0].snippet:
             self.assertLessEqual(len(response.results[0].snippet), 503)  # 500 + "..."
             self.assertTrue(response.results[0].snippet.endswith("..."))
     
     @patch('src.search_service.requests')
     def test_search_time_range(self, mock_requests):
-        """测试时间范围参数"""
+        """Test time range parameter"""
         try:
             import requests as real_requests
             mock_requests.exceptions = real_requests.exceptions
@@ -370,29 +370,29 @@ class TestAnspireSearchProvider(unittest.TestCase):
         fake_response = _FakeResponse(status_code=200, json_data={"code": 200, "results": []})
         mock_requests.get = MagicMock(return_value=fake_response)
         
-        # 测试 7 天范围
+        # Test 7-day range
         self.provider.search("测试", max_results=3, days=7)
         
-        # 验证时间参数
+        # Validation time parameters
         call_args = mock_requests.get.call_args
         if call_args and len(call_args) > 1 and 'params' in call_args[1]:
             params = call_args[1]["params"]
                 
-            # 验证时间参数存在 (具体字段名取决于实现)
-            # 这里假设使用了 FromTime/ToTime 或类似字段，若无则跳过具体字段检查
+            # Validation time parameters exist (specific field names depend on implementation)
+            # Here, we assume that FromTime/ToTime or similar fields have been used; if not, skip specific field checks
             # self.assertIn("FromTime", params)
             # self.assertIn("ToTime", params)
 
 
 class TestAnspireSearchService(unittest.TestCase):
-    """SearchService 中 Anspire 集成测试"""
+    """SearchService in Anspire Integration testing"""
     
     def setUp(self):
         Config._Config__instance = None
         reset_search_service()
 
     def test_search_service_with_anspire(self):
-        """测试 SearchService 正确初始化 Anspire Provider"""
+        """Test SearchService correctly initializes Anspire Provider"""
         service = SearchService(
             anspire_keys=["test_key"],
             bocha_keys=[],
@@ -410,7 +410,7 @@ class TestAnspireSearchService(unittest.TestCase):
         self.assertEqual(first_provider.name, "Anspire")
     
     def test_search_service_without_anspire(self):
-        """测试未配置 Anspire 时的行为"""
+        """Test behavior when Anspire is not configured"""
         service = SearchService(
             anspire_keys=[],
             tavily_keys=["tavily_key"],
@@ -420,12 +420,12 @@ class TestAnspireSearchService(unittest.TestCase):
             news_strategy_profile="short"
         )
         
-        # 验证没有 Anspire Provider
+        # No Anspire Provider
         anspire_providers = [p for p in service._providers if isinstance(p, AnspireSearchProvider)]
         self.assertEqual(len(anspire_providers), 0)
     
     def test_search_service_priority(self):
-        """测试 Anspire 优先级"""
+        """Test Anspire priority"""
         service = SearchService(
             anspire_keys=["anspire_key"],
             bocha_keys=["bocha_key"],
@@ -439,25 +439,25 @@ class TestAnspireSearchService(unittest.TestCase):
 
 
 class TestAnspireIntegration(unittest.TestCase):
-    """Anspire 集成测试（需要真实 API Key）"""
+    """Anspire integration testing (requires a real API Key)"""
     
     @classmethod
     def setUpClass(cls):
         """Check if API Key is configured and valid."""
         cls.api_keys = [k.strip() for k in os.getenv('ANSPIRE_API_KEYS', '').split(',') if k.strip()]
         cls.has_api_key = len(cls.api_keys) > 0
-        cls.has_valid_api_key = False  # 标记是否有有效的 API Key
+        cls.has_valid_api_key = False  # Check for valid API Key
         
         if cls.has_api_key:
             reset_search_service()
             cls.service = get_search_service()
             
-            # 验证 API Key 是否有效
+            # Validate API Key validity
             try:
-                # 查找 Anspire provider
+                # Find Anspire provider
                 for provider in cls.service._providers:
                     if isinstance(provider, AnspireSearchProvider):
-                        # 执行一次简单的搜索验证
+                        # Execute a simple search validation
                         test_response = provider.search("测试", max_results=1)
                         if test_response.success:
                             cls.has_valid_api_key = True
@@ -466,7 +466,7 @@ class TestAnspireIntegration(unittest.TestCase):
                 cls.has_valid_api_key = False
 
     def setUp(self):
-        """在每次测试前检查 API Key 是否有效"""
+        """Check if the API Key is valid before each test."""
         if not os.environ.get("ANSPIRE_API_KEYS"):
             self.skipTest("未设置 ANSPIRE_API_KEYS 环境变量，跳过集成测试")
         if not getattr(self.__class__, 'has_valid_api_key', False):
@@ -474,12 +474,12 @@ class TestAnspireIntegration(unittest.TestCase):
 
     @pytest.mark.network
     def test_real_api_call_stock_news(self):
-        """真实 API 调用测试 - 股票新闻搜索"""
-        # 确保服务已重置
+        """Real API call test - Stock news search"""
+        # Ensure the service has been reset
         reset_search_service()
         service = get_search_service()
         
-        # 验证 Anspire 已配置
+        # Verify Anspire configuration
         anspire_provider = None
         for provider in service._providers:
             if isinstance(provider, AnspireSearchProvider):
@@ -489,7 +489,7 @@ class TestAnspireIntegration(unittest.TestCase):
         if not anspire_provider:
             self.skipTest("Anspire Provider 未初始化")
         
-        # 测试 A 股搜索
+        # Test A-shares search
         response = service.search_stock_news("600519", "贵州茅台", max_results=3)
         
         print(f"\n=== Anspire 真实 API 测试结果 ===")
@@ -498,21 +498,21 @@ class TestAnspireIntegration(unittest.TestCase):
         print(f"结果数量：{len(response.results)}")
         print(f"耗时：{response.search_time:.2f}s")
         
-        # 基本验证
+        # Basic validation
         self.assertTrue(response.success, f"搜索失败：{response.error_message}")
         self.assertEqual(response.provider, "Anspire")
         self.assertGreater(len(response.results), 0, "应至少返回一条结果")
         
-        # 验证结果格式
+        # Verification Result Format
         for result in response.results:
             self.assertIsNotNone(result.title)
             self.assertIsNotNone(result.url)
-            # snippet 可能为空，视具体实现而定
+            # snippet may be empty, depending on the specific implementation
             # self.assertIsNotNone(result.snippet)
     
     @pytest.mark.network
     def test_real_api_call_general_search(self):
-        """真实 API 调用测试 - 通用搜索"""
+        """Real API Call Test - Generic Search"""
         reset_search_service()
         service = get_search_service()
         
@@ -525,7 +525,7 @@ class TestAnspireIntegration(unittest.TestCase):
         if not anspire_provider:
             self.skipTest("Anspire Provider 未初始化")
         
-        # 测试通用搜索
+        # General search test.
         response = anspire_provider.search("人工智能最新发展", max_results=5, days=7)
         
         print(f"\n=== Anspire 通用搜索结果 ===")
@@ -537,11 +537,11 @@ class TestAnspireIntegration(unittest.TestCase):
 
 
 def run_manual_test():
-    """手动测试函数（用于快速验证）"""
+    """Manually test the function (for quick verification)"""
     import logging
     from src.config import get_config
     
-    # 配置日志
+    # Configure logging
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s | %(levelname)-8s | %(message)s'
@@ -551,7 +551,7 @@ def run_manual_test():
     print("Anspire Search 快速测试")
     print("=" * 60)
     
-    # 检查配置
+    # Check configuration
     config = get_config()
     if not config.anspire_api_keys:
         print("\n❌ 未检测到 Anspire API Keys")
@@ -562,7 +562,7 @@ def run_manual_test():
     
     print(f"\n✅ 已配置 {len(config.anspire_api_keys)} 个 Anspire API Key")
     
-    # 创建服务
+    # Create service
     service = SearchService(
         anspire_keys=config.anspire_api_keys,
         bocha_keys=config.bocha_api_keys,
@@ -572,7 +572,7 @@ def run_manual_test():
         news_strategy_profile="short"
     )
     
-    # 验证 Provider
+    # Validate Provider
     anspire_provider = service._providers[0] if service._providers else None
     if not anspire_provider or not isinstance(anspire_provider, AnspireSearchProvider):
         print("\n❌ Anspire Provider 未正确初始化")
@@ -585,7 +585,7 @@ def run_manual_test():
     elif hasattr(anspire_provider, '_api_keys'):
         print(f"   API Keys 数量：{len(anspire_provider._api_keys)}")
     
-    # 执行测试搜索
+    # Execute test search
     print("\n" + "=" * 60)
     print("执行测试搜索：贵州茅台 (600519)")
     print("=" * 60)
@@ -619,26 +619,26 @@ def run_manual_test():
 
 
 if __name__ == "__main__":
-    # 如果设置了环境变量，运行完整测试
+    # If environment variables are set, run full tests.
     if os.environ.get("ANSPIRE_API_KEYS"):
         print("检测到 ANSPIRE_API_KEYS 环境变量，运行完整测试套件...")
         unittest.main(verbosity=2)
     else:
-        # 否则只运行单元测试，跳过集成测试
+        # Otherwise, only run unit tests, skip integration tests
         print("未设置 ANSPIRE_API_KEYS 环境变量，仅运行单元测试（跳过集成测试）...")
         print("如需运行完整测试，请设置环境变量:")
         print("  Windows PowerShell: $env:ANSPIRE_API_KEYS=\"your_api_key\"")
         print("  Linux/Mac: export ANSPIRE_API_KEYS=\"your_api_key\"")
         print()
         
-        # 运行单元测试
+        # Run unit tests
         suite = unittest.TestLoader().loadTestsFromTestCase(TestAnspireConfigLoading)
         suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestAnspireSearchProvider))
         suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestAnspireSearchService))
         runner = unittest.TextTestRunner(verbosity=2)
         runner.run(suite)
         
-        # 提供手动测试选项
+        # Provides manual testing options
         print("\n" + "=" * 60)
         choice = input("是否运行手动测试（需要有效的 API Key）? (y/n): ").strip().lower()
         if choice == 'y':

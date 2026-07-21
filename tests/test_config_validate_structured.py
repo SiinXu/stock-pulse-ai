@@ -345,7 +345,7 @@ class TestValidateStructuredLLM:
         """LLM_CHANNELS populated via llm_model_list must NOT trigger an error.
 
         This is the primary regression guard: a user who only configures
-        LLM_CHANNELS (no legacy *_API_KEY) should not see 'AI 功能不可用'.
+        LLM_CHANNELS (no legacy *_API_KEY) should not see 'AI Function unavailable'.
         """
         channel_model_list = [
             {"model_name": "openai/gpt-4o-mini", "litellm_params": {"api_key": "sk-chan", "api_base": "https://aihubmix.com/v1"}},

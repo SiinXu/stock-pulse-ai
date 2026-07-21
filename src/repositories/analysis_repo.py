@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-分析历史数据访问层
+Analyze historical data access layer
 ===================================
 
-职责：
-1. 封装分析历史数据的数据库操作
-2. 提供 CRUD 接口
+Responsibilities:
+1. Encapsulate database operations for analyzing historical data.
+2. Provide CRUD interfaces
 """
 
 import logging
@@ -23,29 +23,29 @@ _DELETE_BY_CODE_BATCH_SIZE = 10_000
 
 class AnalysisRepository:
     """
-    分析历史数据访问层
+    Analyze historical data access layer
     
-    封装 AnalysisHistory 表的数据库操作
+    Encapsulate database operations for AnalysisHistory table
     """
     
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         """
-        初始化数据访问层
+        Initialize the data access layer
         
         Args:
-            db_manager: 数据库管理器（可选，默认使用单例）
+            db_manager: database manager (optional, uses singleton by default)
         """
         self.db = db_manager or DatabaseManager.get_instance()
     
     def get_by_query_id(self, query_id: str) -> Optional[AnalysisHistory]:
         """
-        根据 query_id 获取分析记录
+        Retrieve the analysis record based on query_id
         
         Args:
-            query_id: 查询 ID
+            query_id: query ID
             
         Returns:
-            AnalysisHistory 对象，不存在返回 None
+            AnalysisHistory object, Return if Not Exists None
         """
         try:
             records = self.db.get_analysis_history(query_id=query_id, limit=1)
@@ -67,15 +67,15 @@ class AnalysisRepository:
         limit: int = 50
     ) -> List[AnalysisHistory]:
         """
-        获取分析记录列表
+        Get the list of analysis records
         
         Args:
-            code: 股票代码筛选
-            days: 时间范围（天）
-            limit: 返回数量限制
+            code: stock code filtering
+            days: time range (days)
+            limit: return limit
             
         Returns:
-            AnalysisHistory 对象列表
+            AnalysisHistory object list
         """
         try:
             return self.db.get_analysis_history(
@@ -102,17 +102,17 @@ class AnalysisRepository:
         context_snapshot: Optional[Dict[str, Any]] = None
     ) -> int:
         """
-        保存分析结果
+        Save the analysis result
         
         Args:
-            result: 分析结果对象
-            query_id: 查询 ID
-            report_type: 报告类型
-            news_content: 新闻内容
-            context_snapshot: 上下文快照
+            result: analysis result object
+            query_id: query ID
+            report_type: report type
+            news_content: News Content
+            context_snapshot: Context Snapshot
             
         Returns:
-            新保存的 AnalysisHistory.id；保存失败返回 0。
+            ID of the saved AnalysisHistory row, or 0 on failure
         """
         try:
             return self.db.save_analysis_history(
@@ -134,14 +134,14 @@ class AnalysisRepository:
     
     def count_by_code(self, code: str, days: int = 30) -> int:
         """
-        统计指定股票的分析记录数
+        Count the analysis records for a specified stock.
         
         Args:
-            code: 股票代码
-            days: 时间范围（天）
+            code: stock code
+            days: time range (days)
             
         Returns:
-            记录数量
+            Record the quantity
         """
         try:
             records = self.db.get_analysis_history(code=code, days=days, limit=1000)

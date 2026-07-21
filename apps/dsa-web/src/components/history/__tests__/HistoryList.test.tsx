@@ -285,7 +285,7 @@ describe('HistoryList', () => {
       />,
     );
 
-    // '贵州茅台股票股份有限公司' (12 Chinese chars) should be truncated to '贵州茅台股票股份.' (8 chars + dot)
+    // 'Guizhou Moutai Stock Co., Ltd.' (12 Chinese chars) should be truncated to 'Guizhou Moutai Stock.' (8 chars + dot)
     expect(screen.getByText('贵州茅台股票股份.')).toBeInTheDocument();
     expect(screen.queryByText('贵州茅台股票股份有限公司')).not.toBeInTheDocument();
     expect(

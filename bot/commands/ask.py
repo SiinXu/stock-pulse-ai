@@ -4,9 +4,9 @@ Ask command - analyze one or more stocks using Agent skills.
 
 Usage:
     /ask 600519                        -> Analyze with default skill
-    /ask 600519 用缠论分析              -> Parse skill from message
+    /ask 600519 Use Chan Theory              -> Parse skill from message
     /ask 600519 chan_theory             -> Specify skill id directly
-    /ask 600519,000858 波浪理论         -> Multi-stock comparison with skill overlay
+    /ask 600519,000858 Elliott Wave Theory         -> Multi-stock comparison with skill overlay
 """
 
 import logging

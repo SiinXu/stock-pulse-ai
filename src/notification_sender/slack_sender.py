@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Slack 发送提醒服务
+Slack sending reminder service
 
-职责：
-1. 通过 Slack Bot API 或 Incoming Webhook 发送 Slack 消息
-   （同时配置时优先使用 Bot API，确保文本与图片发送到同一频道）
+Responsibilities:
+1. Send Slack messages via Slack Bot API or Incoming Webhook
+   (When configuring simultaneously, prioritize the Bot API to ensure text and images are sent to the same channel)
 """
 import logging
 import json
@@ -18,9 +18,9 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
-# Slack Block Kit 中单个 section block 的 text 字段上限为 3000 字符
+# Slack Block Kit single section block text field limit is 3000 characters
 _BLOCK_TEXT_LIMIT = 3000
-# Slack chat.postMessage / Webhook 的 text 字段上限约 40000 字符，保守取 39000
+# Slack chat.postMessage / Webhook text field limit is approximately 40000 characters, conservatively set to 39000
 _TEXT_LIMIT = 39000
 
 
@@ -28,10 +28,10 @@ class SlackSender:
 
     def __init__(self, config: Config):
         """
-        初始化 Slack 配置
+        Initialize Slack configuration
 
         Args:
-            config: 配置对象
+            config: Configuration object
         """
         self._slack_webhook_url = getattr(config, 'slack_webhook_url', None)
         self._slack_bot_token = getattr(config, 'slack_bot_token', None)
@@ -40,27 +40,27 @@ class SlackSender:
 
     @property
     def _use_bot(self) -> bool:
-        """Bot 配置完整时优先走 Bot API，保证文本和图片使用同一传输通道。"""
+        """Prioritize Bot API when the bot configuration is complete to ensure text and images use the same transmission channel."""
         return bool(self._slack_bot_token and self._slack_channel_id)
 
     def _is_slack_configured(self) -> bool:
-        """检查 Slack 配置是否完整（支持 Webhook 或 Bot API）"""
+        """Verify Slack configuration is complete (supports Webhook or Bot API)"""
         return self._use_bot or bool(self._slack_webhook_url)
 
     def send_to_slack(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        推送消息到 Slack（支持 Webhook 和 Bot API）
+        Push message to Slack (supports Webhook and Bot API)
 
-        传输优先级与 _send_slack_image() 保持一致：Bot > Webhook，
-        避免文本走 Webhook、图片走 Bot 导致消息落入不同频道。
+        The send priority is consistent with _send_slack_image(): Bot > Webhook,
+        Prevent messages from falling into different channels when Webhooks send text and Bots send images.
 
         Args:
-            content: Markdown 格式的消息内容
+            content: Markdown Message content format
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
-        # 按字节分块，避免单条消息超限
+        # Divide bytes into blocks to avoid single messages exceeding the limit.
         try:
             chunks = chunk_content_by_max_bytes(content, _TEXT_LIMIT, add_page_marker=True)
         except Exception as exc:
@@ -72,11 +72,11 @@ class SlackSender:
             )
             chunks = [content]
 
-        # 优先使用 Bot API（与 _send_slack_image 保持一致）
+        # Prioritize using Bot API (_send_slack_image consistent)
         if self._use_bot:
             return all(self._send_slack_bot(chunk, timeout_seconds=timeout_seconds) for chunk in chunks)
 
-        # 其次使用 Webhook
+        # Then use Webhook.
         if self._slack_webhook_url:
             return all(self._send_slack_webhook(chunk, timeout_seconds=timeout_seconds) for chunk in chunks)
 
@@ -85,12 +85,12 @@ class SlackSender:
 
     def _build_blocks(self, content: str) -> list:
         """
-        将内容构建为 Slack Block Kit 格式
+        Construct content as Slack Block Kit format
 
-        如果内容超过单个 section block 限制，会自动拆分为多个 block。
+        If content exceeds the single section block limit, it will be automatically split into multiple blocks.
         """
         blocks = []
-        # 按 block text 上限拆分
+        # Shard by block text limit.
         pos = 0
         while pos < len(content):
             segment = content[pos:pos + _BLOCK_TEXT_LIMIT]
@@ -106,13 +106,13 @@ class SlackSender:
 
     def _send_slack_webhook(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        使用 Incoming Webhook 发送消息到 Slack
+        Use Incoming Webhook to send messages to Slack
 
         Args:
-            content: 消息内容
+            content: Message content
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         try:
             payload = {
@@ -142,13 +142,13 @@ class SlackSender:
 
     def _send_slack_bot(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        使用 Bot API (chat.postMessage) 发送消息到 Slack
+        Use the Bot API (chat.postMessage) to send messages to Slack
 
         Args:
-            content: 消息内容
+            content: Message content
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         try:
             headers = {
@@ -183,23 +183,23 @@ class SlackSender:
 
     def _send_slack_image(self, image_bytes: bytes, fallback_content: str = "") -> bool:
         """
-        发送图片到 Slack
+        Send image to Slack
 
-        Bot 模式下使用 files.getUploadURLExternal + files.completeUploadExternal
-        (Slack 新版文件上传 API)；Webhook 模式下回退为文本。
+        Bot Using pattern files.getUploadURLExternal + files.completeUploadExternal
+        (Slack New Version File Upload API); Webhook Rollback to text in pattern mode.
 
         Args:
-            image_bytes: PNG 图片字节
-            fallback_content: 图片发送失败时的回退文本
+            image_bytes: PNG Image Bytes
+            fallback_content: Fallback text when image sending fails
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
-        # Bot 模式：使用新版文件上传 API
+        # Bot mode: Using the new file upload API
         if self._use_bot:
             headers = {'Authorization': f'Bearer {self._slack_bot_token}'}
             try:
-                # Step 1: 获取上传 URL
+                # Step 1: Get upload URL
                 resp1 = requests.post(
                     'https://slack.com/api/files.getUploadURLExternal',
                     headers=headers,
@@ -217,7 +217,7 @@ class SlackSender:
                 upload_url = result1['upload_url']
                 file_id = result1['file_id']
 
-                # Step 2: 上传文件内容（raw body，不能用 multipart）
+                # Step 2: Upload File Content(raw body, Cannot Use multipart)
                 resp2 = requests.post(
                     upload_url,
                     data=image_bytes,
@@ -228,7 +228,7 @@ class SlackSender:
                     logger.error("Slack 文件上传失败: HTTP %s", resp2.status_code)
                     raise RuntimeError(f"HTTP {resp2.status_code}")
 
-                # Step 3: 完成上传并分享到频道
+                # Step 3: Complete Upload and Share to Channel
                 resp3 = requests.post(
                     'https://slack.com/api/files.completeUploadExternal',
                     headers={**headers, 'Content-Type': 'application/json'},
@@ -251,7 +251,7 @@ class SlackSender:
                     error_code="slack_bot_image_delivery_failed",
                 )
 
-        # Webhook 模式或 Bot 上传失败：回退为文本
+        # Webhook Mode or Bot Upload Failed: Fallback to Text
         if fallback_content:
             logger.info("Slack 图片不支持或失败，回退为文本发送")
             return self.send_to_slack(fallback_content)

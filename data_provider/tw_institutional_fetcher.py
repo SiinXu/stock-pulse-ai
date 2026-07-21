@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""TwInstitutionalFetcher — Taiwan 三大法人 (institutional-investor) daily net buy/sell.
+"""TwInstitutionalFetcher — Taiwan institutional investors (institutional-investor) daily net buy/sell.
 
 Data-layer only, ``tw``-only, strictly additive. This module is a self-contained
 data-access building block: it fetches, parses, caches and fail-opens. It is NOT
@@ -7,19 +7,19 @@ wired into the analysis report / Web / scoring path — that is a deliberate
 follow-up (per #1777). It does not touch the existing A-share / HK / US / JP / KR
 flows in ``data_provider/base.py``.
 
-Sources (政府開放資料, 政府資料開放授權條款第 1 版 / OGDL v1, commercial-safe, no key):
-  - 上市 TWSE T86 「三大法人買賣超日報」 (per-stock), legacy RWD JSON endpoint
+Sources (Government Open Data, Government Data Open Authorization Agreement Version 1 / OGDL v1, commercial-safe, no key):
+  - Listed Stocks TWSE T86 「Daily report of institutional investors」 (per-stock), legacy RWD JSON endpoint
     https://www.twse.com.tw/rwd/zh/fund/T86?response=json&date=YYYYMMDD&selectType=ALLBUT0999
-    (date is 西元 ``YYYYMMDD``; numeric values are comma-formatted strings)
-  - 上櫃 TPEx ``tpex_3insti_daily_trading``, OpenAPI
+    (date is Gregorian ``YYYYMMDD``; numeric values are comma-formatted strings)
+  - OTC-listed-listed-listed TPEx ``tpex_3insti_daily_trading``, OpenAPI
     https://www.tpex.org.tw/openapi/v1/tpex_3insti_daily_trading
-    (date is 民國 ``1150626``; numeric values are plain integer strings)
+    (date is Minguo ``1150626``; numeric values are plain integer strings)
 
 Fail-open contract: any network error, rate-limit, empty response, unexpected
 shape or missing field returns ``None`` (no data) — it never raises into the
 caller, so the analysis main flow is never interrupted.
 
-Units are **shares (股)**, not lots (張). Buy/sell-net signs are preserved
+Units are **shares (Stocks)**, not lots (Zhang). Buy/sell-net signs are preserved
 (negative = net sell).
 """
 
@@ -46,8 +46,8 @@ _UA = (
 
 # TWSE T86 core column NAMES. Read by name (not a fixed index) so a TWSE column
 # rename / reorder fails open instead of silently shipping misaligned numbers.
-# foreign = 外陸資 (NOT incl 外資自營商): foreign-dealer sits outside the 外資
-# category in the official 三大法人 total.
+# foreign = Overseas Investment (NOT incl Foreign Broker-Dealer): foreign-dealer sits outside the Foreign Investment
+# category in the official institutional investors total.
 _T86_CODE = "證券代號"
 _T86_FOREIGN = "外陸資買賣超股數(不含外資自營商)"
 _T86_TRUST = "投信買賣超股數"
@@ -89,10 +89,10 @@ def _to_int(value: Any) -> Optional[int]:
 
 
 def minguo_to_ad(date_str: Any) -> Optional[str]:
-    """Convert a TPEx 民國 date ``YYYMMDD`` (e.g. ``1150626``) to 西元 ``YYYYMMDD``.
+    """Convert a TPEx Minguo date ``YYYMMDD`` (e.g. ``1150626``) to Gregorian ``YYYYMMDD``.
 
-    ``1150626`` -> ``20260626`` (民國 115 + 1911 = 西元 2026). Returns ``None`` for
-    anything that is not a 7-digit 民國 date, so a format change fails open.
+    ``1150626`` -> ``20260626`` (Minguo 115 + 1911 = Gregorian 2026). Returns ``None`` for
+    anything that is not a 7-digit Minguo date, so a format change fails open.
     """
     text = str(date_str).strip()
     if not (text.isdigit() and len(text) == 7):
@@ -101,7 +101,7 @@ def minguo_to_ad(date_str: Any) -> Optional[str]:
 
 
 class TwInstitutionalFetcher:
-    """Fetch Taiwan per-stock 三大法人 net buy/sell, ``.TW`` (上市) / ``.TWO`` (上櫃) only."""
+    """Fetch Taiwan per-stock institutional investors net buy/sell, ``.TW`` (Listed) / ``.TWO`` (OTC-listed-listed-listed) only."""
 
     name = "TwInstitutionalFetcher"
 
@@ -135,11 +135,11 @@ class TwInstitutionalFetcher:
     def get_institutional_net(
         self, stock_code: str, date: Optional[str] = None
     ) -> Optional[dict]:
-        """Return the normalized 三大法人 record for one TW stock, or ``None``.
+        """Return the normalized institutional investors record for one TW stock, or ``None``.
 
         ``stock_code`` must carry an explicit ``.TW`` / ``.TWO`` suffix; a bare or
-        non-TW code returns ``None`` (not applicable). ``date`` (西元 ``YYYYMMDD``)
-        only applies to 上市/T86; 上櫃/TPEx OpenAPI serves the latest trading day.
+        non-TW code returns ``None`` (not applicable). ``date`` (Gregorian ``YYYYMMDD``)
+        only applies to listed/T86; OTC-listed-listed-listed-listed/TPEx OpenAPI serves the latest trading day.
         Fail-open: any error returns ``None``.
         """
         market = self._market_of(stock_code)
@@ -163,7 +163,7 @@ class TwInstitutionalFetcher:
         record = table.get(base)
         # TPEx OpenAPI serves only the LATEST trading day (no date param). If a caller
         # asked for a specific date, never silently return a different-day record --
-        # fail open (None) so a date-mismatched 上櫃 figure can't reach a report.
+        # fail open (None) so a date-mismatched OTC-listed-listed-listed-listed figure can't reach a report.
         if record is not None and date and market == "tpex":
             requested = self._norm_ad_date(date)
             if requested and record.get("date") != requested:
@@ -280,7 +280,7 @@ class TwInstitutionalFetcher:
         resp.raise_for_status()
         return resp.json()
 
-    # ------------------------------------------------------------- TWSE T86 (上市)
+    # ------------------------------------------------------------- TWSE T86 (Listed)
     def _fetch_twse(self, ad_date: Optional[str]) -> Dict[str, dict]:
         params = {"response": "json", "selectType": "ALLBUT0999"}
         if ad_date:
@@ -332,7 +332,7 @@ class TwInstitutionalFetcher:
         code = str(row[idx[_T86_CODE]]).strip()
         if not code:
             return None
-        foreign = _to_int(row[idx[_T86_FOREIGN]])  # 外陸資 (ex 外資自營商)
+        foreign = _to_int(row[idx[_T86_FOREIGN]])  # Foreign assets (ex foreign proprietary traders)
         trust = _to_int(row[idx[_T86_TRUST]])
         dealer = _to_int(row[idx[_T86_DEALER]])
         total = _to_int(row[idx[_T86_TOTAL]])
@@ -344,7 +344,7 @@ class TwInstitutionalFetcher:
             code, ad_date, "上市", "TWSE-T86", foreign, trust, dealer, total
         )
 
-    # -------------------------------------------------------------- TPEx (上櫃)
+    # -------------------------------------------------------------- TPEx (Over-the-Counter)
     def _fetch_tpex(self) -> Dict[str, dict]:
         payload = self._get_json(_TPEX_URL)
         if not isinstance(payload, list) or not payload:
@@ -364,7 +364,7 @@ class TwInstitutionalFetcher:
         if not code:
             return None
         ad_date = minguo_to_ad(raw.get("Date", ""))
-        if ad_date is None:  # 民國 date unconvertible -> no attributable day -> fail-open
+        if ad_date is None:  # Minguo date unconvertible -> no attributable day -> fail-open
             return None
         foreign = _to_int(raw.get(_TPEX_FOREIGN_EXCL))  # dealer-excluded foreign
         trust = _to_int(raw.get(_TPEX_TRUST))

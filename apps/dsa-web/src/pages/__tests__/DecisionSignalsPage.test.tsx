@@ -20,7 +20,7 @@ import type {
 import type { StockIndexItem } from '../../types/stockIndex';
 import DecisionSignalsPage from '../DecisionSignalsPage';
 
-// jsdom 未实现 scrollIntoView，而 Select 打开下拉时会调用它保持活动项可见。
+// jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
 }
@@ -388,7 +388,7 @@ function getStockContextModal() {
 }
 
 // Scoped to the modal body so it returns only the input, not the dialog itself
-// (which now carries an aria-labelledby with the same "当前股票" name).
+// (which now carries an aria-labelledby with the same "Current stock" name).
 function getStockContextInput() {
   return within(getStockContextModal()).getByLabelText('当前股票');
 }

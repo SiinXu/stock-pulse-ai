@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Translated developer comments and Python docstrings across the codebase into English.
 - [Changed] Added unified Web page and Router patterns with `AppPage`, `WorkspacePage`, `ResponsiveRail`, `PageHeader`, `Toolbar`, `Tabs`, `TabPanel`, `SummaryStrip`, and `WorkspaceNavigation`, plus focus restoration and guards against duplicate navigation primitives.
 - [Changed] Formalized the shared Surface migration contract around `canvas`, `section`, `interactive`, and `overlay`, removed unused card styles, and added stable token-count guards with dual-theme and nine-viewport fixtures.
 - [Changed] Added fail-open diagnostics for Pipeline `resolve`, `fetch`, `intelligence`, `context`, `analyze`, `persist`, `render`, and `dispatch` stages, including redacted summaries, traces, timing, status, degradation, and retryability.

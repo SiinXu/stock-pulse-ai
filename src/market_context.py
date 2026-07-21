@@ -157,7 +157,7 @@ def get_market_role(stock_code: Optional[str], lang: str = "zh") -> str:
         lang: 'zh' or 'en'.
 
     Returns:
-        Role string like 'A 股投资分析' or 'US stock investment analysis'.
+        Role string like 'A-shares Investment analysis' or 'US stock investment analysis'.
     """
     market = detect_market(stock_code)
     lang_key = "en" if lang in ("en", "ko") else "zh"

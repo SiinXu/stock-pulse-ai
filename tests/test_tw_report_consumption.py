@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """v2.1 tw report-consumption tests.
 
-Covers the last-mile that makes the merged 三大法人 (institutional-flows) data actually
+Covers the last-mile that makes the merged institutional investors (institutional-flows) data actually
 usable in a tw report: currency labelling (TWD, not RMB), rendering the institution
 block into the report, injecting it into the LLM prompt, and fetch availability on the
 first/only stock. Fully offline (no network / no LLM).
@@ -26,7 +26,7 @@ from src.notification import NotificationService
 from src.report_language import get_report_labels
 from src.analyzer import GeminiAnalyzer
 
-# real 2330.TW 三大法人 net figures (shares)
+# real 2330.TW institutional investors net figures (shares)
 _INST_REC = {
     "foreign_net": -1912490, "trust_net": -89595, "dealer_net": 652455,
     "total_net": -862914, "unit": "shares", "date": "20260630", "source": "TWSE-T86",
@@ -34,7 +34,7 @@ _INST_REC = {
 
 
 class TestTwCurrencyLabel(unittest.TestCase):
-    """Point D: TWD amounts must not silently render as the A-share default 元 (RMB)."""
+    """Point D: TWD amounts must not silently render as the A-share default yuan (RMB)."""
 
     def test_twd_amount_labeled_new_taiwan_dollar_not_rmb(self):
         twd = NotificationService._format_amount_cn(1_134_103_440_000.0, "TWD")
@@ -51,12 +51,12 @@ class TestTwCurrencyLabel(unittest.TestCase):
         self.assertEqual(NotificationService._format_amount_cn(1e8, "CNY"), "1.00 亿元")
         self.assertIn("美元", NotificationService._format_amount_cn(1e8, "USD"))
         self.assertIn("港元", NotificationService._format_amount_cn(1e8, "HKD"))
-        # unknown currency still falls back to 元 (unchanged behaviour)
+        # unknown currency still falls back to yuan (unchanged behaviour)
         self.assertIn("元", NotificationService._format_amount_cn(1e8, "ZZZ"))
 
 
 class TestTwInstitutionRender(unittest.TestCase):
-    """Point A: 三大法人 renders into the report only for a tw stock with data."""
+    """Point A: institutional investors renders into the report only for a tw stock with data."""
 
     def _render(self, status, data):
         svc = NotificationService.__new__(NotificationService)  # methods use no instance state
@@ -108,7 +108,7 @@ class TestTwInstitutionRender(unittest.TestCase):
 
 
 class TestTwInstitutionPrompt(unittest.TestCase):
-    """Point B: 三大法人 is injected into the LLM analysis prompt for a tw stock with data."""
+    """Point B: institutional investors is injected into the LLM analysis prompt for a tw stock with data."""
 
     def _prompt(self, fundamental_context):
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):

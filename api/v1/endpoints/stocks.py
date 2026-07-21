@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-股票数据接口
+Stock Data API
 ===================================
 
-职责：
-1. POST /api/v1/stocks/extract-from-image 从图片提取股票代码
-2. POST /api/v1/stocks/parse-import 解析 CSV/Excel/剪贴板
-3. GET /api/v1/stocks/{code}/quote 实时行情接口
-4. GET /api/v1/stocks/{code}/history 历史行情接口
+Responsibilities:
+1. POST /api/v1/stocks/extract-from-image Extract stock code from image
+2. POST /api/v1/stocks/parse-import parse CSV/Excel/Clipboard
+3. GET /api/v1/stocks/{code}/quote real-time market data interface
+4. GET /api/v1/stocks/{code}/history historical data interface
 """
 
 import logging
@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 须在 /{stock_code} 路由之前定义
+# Must be defined before /{stock_code}
 ALLOWED_MIME_STR = ", ".join(ALLOWED_MIME)
 
 
@@ -135,9 +135,9 @@ def extract_from_image(
     include_raw: bool = Query(False, description="是否在结果中包含原始 LLM 响应"),
 ) -> ExtractFromImageResponse:
     """
-    从上传的图片中提取股票代码（使用 Vision LLM）。
+    Extract stock code from uploaded image (using Vision LLM)
 
-    表单字段请使用 file 上传图片。优先级：Gemini / Anthropic / OpenAI（首个可用）。
+    Use file upload images for form fields. Priority: Gemini / Anthropic / OpenAI (first available).
     """
     if not file or not file.filename:
         raise HTTPException(
@@ -156,7 +156,7 @@ def extract_from_image(
         )
 
     try:
-        # 先读取限定大小，再检查是否还有剩余（语义清晰：超出则拒绝）
+        # Read limited size, then check if there is still remaining (semantic clarity: reject if exceeded)
         data = file.file.read(MAX_SIZE_BYTES)
         if file.file.read(1):
             raise HTTPException(
@@ -222,11 +222,11 @@ def extract_from_image(
 )
 async def parse_import(request: Request) -> ExtractFromImageResponse:
     """
-    解析 CSV/Excel 文件或剪贴板文本。
+    Parse CSV/Excel files or clipboard text.
 
-    - multipart/form-data + file: 上传文件
-    - application/json + {"text": "..."}: 粘贴文本
-    - 优先使用 file，若同时提供则忽略 text
+    - multipart/form-data + file: Upload File
+    - application/json + {"text": "..."}: Paste text
+    - Prioritize using file, ignore text if both provided
     """
     content_type = (request.headers.get("content-type") or "").lower()
 
@@ -461,23 +461,23 @@ def remove_from_watchlist(
 )
 def get_stock_quote(stock_code: str) -> StockQuote:
     """
-    获取股票实时行情
+    Get real-time stock quotes
     
-    获取指定股票的最新行情数据
+    Get the latest market data for a specified stock
     
     Args:
-        stock_code: 股票代码（如 600519、00700、AAPL）
+        stock_code: Stock Code(If 600519, 00700, AAPL)
         
     Returns:
-        StockQuote: 实时行情数据
+        StockQuote: Real-time market data
         
     Raises:
-        HTTPException: 404 - 股票不存在
+        HTTPException: 404 when the stock does not exist
     """
     try:
         service = StockService()
         
-        # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        # Use `def` instead of `async def`; FastAPI automatically executes in a thread pool.
         result = service.get_realtime_quote(stock_code)
         
         if result is None:
@@ -540,29 +540,29 @@ def get_stock_history(
     days: int = Query(30, ge=1, le=365, description="获取天数")
 ) -> StockHistoryResponse:
     """
-    获取股票历史行情
+    Get historical stock quotes
     
-    获取指定股票的历史 K 线数据
+    Get historical K-line data for a specified stock
     
     Args:
-        stock_code: 股票代码
-        period: K 线周期 (daily/weekly/monthly)
-        days: 获取天数
+        stock_code: stock code
+        period: K Line cycle (daily/weekly/monthly)
+        days: number of days to fetch
         
     Returns:
-        StockHistoryResponse: 历史行情数据
+        StockHistoryResponse: historical market data
     """
     try:
         service = StockService()
         
-        # 使用 def 而非 async def，FastAPI 自动在线程池中执行
+        # Use `def` instead of `async def`; FastAPI automatically executes in a thread pool.
         result = service.get_history_data(
             stock_code=stock_code,
             period=period,
             days=days
         )
         
-        # 转换为响应模型
+        # Convert to Response Model
         data = [
             KLineData(
                 date=item.get("date"),
@@ -585,7 +585,7 @@ def get_stock_history(
         )
     
     except ValueError as e:
-        # period 参数不支持的错误（如 weekly/monthly）
+        # period Parameter not supported error(If weekly/monthly)
         raise HTTPException(
             status_code=422,
             detail={

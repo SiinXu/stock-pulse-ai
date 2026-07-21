@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Discord 发送提醒服务
+Discord reminder service
 
-职责：
-1. 通过 webhook 或 Discord bot API 发送 Discord 消息
+Responsibilities:
+1. Send Discord messages via webhook or Discord bot API
 """
 import logging
 import time
@@ -28,10 +28,10 @@ class DiscordSender:
     
     def __init__(self, config: Config):
         """
-        初始化 Discord 配置
+        Initialize Discord configuration
 
         Args:
-            config: 配置对象
+            config: Configuration object
         """
         self._discord_config = {
             'bot_token': getattr(config, 'discord_bot_token', None),
@@ -52,26 +52,26 @@ class DiscordSender:
         return max(MIN_MAX_WORDS, min(configured, DISCORD_MAX_CONTENT_LENGTH))
     
     def _is_discord_configured(self) -> bool:
-        """检查 Discord 配置是否完整（支持 Bot 或 Webhook）"""
-        # 只要配置了 Webhook 或完整的 Bot Token+Channel，即视为可用
+        """Verify Discord configuration is complete (supports Bot or Webhook)"""
+        # If the Webhook or complete Bot Token+Channel is configured, it's considered available.
         bot_ok = bool(self._discord_config['bot_token'] and self._discord_config['channel_id'])
         webhook_ok = bool(self._discord_config['webhook_url'])
         return bot_ok or webhook_ok
     
     def send_to_discord(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        推送消息到 Discord（支持 Webhook 和 Bot API）
+        Push message to Discord (supports Webhook and Bot API)
         
         Args:
-            content: Markdown 格式的消息内容
+            content: Markdown Message content format
             
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
-        # 分割内容，避免单条消息超过 Discord 限制
+        # Split content to avoid a single message exceeding Discord limits
         chunks = self._split_discord_content(content)
 
-        # 优先使用 Webhook（配置简单，权限低）
+        # Prioritize using Webhook (simple configuration, low permissions)
         if self._discord_config['webhook_url']:
             return self._send_discord_chunks(
                 chunks,
@@ -80,7 +80,7 @@ class DiscordSender:
                 timeout_seconds=timeout_seconds,
             )
 
-        # 其次使用 Bot API（权限高，需要 channel_id）
+        # Then use Bot API (high permission, requires channel_id).
         if self._discord_config['bot_token'] and self._discord_config['channel_id']:
             return self._send_discord_chunks(
                 chunks,
@@ -93,7 +93,7 @@ class DiscordSender:
         return False
 
     def _split_discord_content(self, content: str) -> list[str]:
-        """按 Discord content 上限拆分消息。"""
+        """Split Discord content limit messages."""
         try:
             chunks = chunk_content_by_max_words(content, self._discord_max_words)
             if len(chunks) > 1:
@@ -124,7 +124,7 @@ class DiscordSender:
         *,
         timeout_seconds: Optional[float] = None,
     ) -> bool:
-        """逐片发送 Discord 消息；失败片不应阻断后续片尝试。"""
+        """Send Discord messages slice by slice; failed slices should not block subsequent slice attempts."""
         total_chunks = len(chunks)
         success_count = 0
 
@@ -147,15 +147,15 @@ class DiscordSender:
   
     def _send_discord_webhook(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        使用 Webhook 发送消息到 Discord
+        Use Webhook to send messages to Discord
         
-        Discord Webhook 支持 Markdown 格式
+        Markdown format supported by Discord webhooks
         
         Args:
-            content: Markdown 格式的消息内容
+            content: Markdown Message content format
             
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         payload = {
             'content': content,
@@ -174,13 +174,13 @@ class DiscordSender:
     
     def _send_discord_bot(self, content: str, *, timeout_seconds: Optional[float] = None) -> bool:
         """
-        使用 Bot API 发送消息到 Discord
+        Use Bot API to send messages to Discord
         
         Args:
-            content: Markdown 格式的消息内容
+            content: Markdown Message content format
             
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         headers = {
             'Authorization': f'Bot {self._discord_config["bot_token"]}',
@@ -209,7 +209,7 @@ class DiscordSender:
         timeout_seconds: Optional[float] = None,
         channel_name: str,
     ) -> bool:
-        """发送单条 Discord 消息，并复用 Telegram 的有限重试思路处理 429/5xx。"""
+        """Send single Discord message, and reuse Telegram's limited retry logic for handling 429/5xx errors."""
         request_kwargs = {
             'json': payload,
             'timeout': timeout_seconds or 10,

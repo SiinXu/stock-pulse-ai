@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-分析服务层
+Analysis service layer.
 ===================================
 
-职责：
-1. 封装股票分析逻辑
-2. 调用 analyzer 和 pipeline 执行分析
-3. 保存分析结果到数据库
+Responsibilities:
+1. Encapsulate stock analysis logic.
+2. Call analyzer and pipeline to execute analysis
+3. Save the analysis result to the database
 """
 
 import logging
@@ -43,13 +43,13 @@ logger = logging.getLogger(__name__)
 
 class AnalysisService:
     """
-    分析服务
+    Analysis service.
     
-    封装股票分析相关的业务逻辑
+    Encapsulate business logic related to stock analysis.
     """
     
     def __init__(self):
-        """初始化分析服务"""
+        """Initialize analysis service"""
         self.repo = AnalysisRepository()
         self.last_error: Optional[str] = None
     
@@ -70,33 +70,33 @@ class AnalysisService:
         request_context: Optional[AnalysisRequestContext] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        执行股票分析
+        Execute stock analysis
 
         Args:
-            stock_code: 股票代码
-            report_type: 报告类型 (simple/detailed)
-            force_refresh: 是否强制刷新
-            query_id: 查询 ID（可选）
-            send_notification: 是否发送通知（API 触发默认发送）
-            analysis_phase: 请求的分析阶段覆盖（auto/premarket/intraday/postmarket）
+            stock_code: stock code
+            report_type: Report type (simple/detailed)
+            force_refresh: Force refresh?
+            query_id: optional query ID
+            send_notification: Whether to send notifications (API trigger defaults to sending)
+            analysis_phase: Analysis stage coverage for the request(auto/premarket/intraday/postmarket)
             request_context: Optional requester provenance and contextual reply
                 targets. Bot submissions carry it so the notifier can push the
                 result back to the originating conversation.
             
         Returns:
-            分析结果字典，包含:
-            - stock_code: 股票代码
-            - stock_name: 股票名称
-            - report: 分析报告
+            Analysis results dictionary, containing:
+            - stock_code: stock code
+            - stock_name: Stock name
+            - report: analysis report
         """
         try:
             self.last_error = None
-            # 导入分析相关模块
+            # Import analysis related modules
             from src.config import get_config
             from src.core.pipeline import StockAnalysisPipeline
             from src.enums import ReportType
             
-            # 生成 query_id
+            # Generate query_id
             if query_id is None:
                 query_id = uuid.uuid4().hex
             effective_trace_id = trace_id or query_id
@@ -109,14 +109,14 @@ class AnalysisService:
                     trigger_source=query_source or "api",
                 )
             
-            # 获取配置
+            # Get configuration
             config = get_config()
             normalized_report_language = normalize_report_language(report_language, default="")
             if normalized_report_language:
                 config = copy.copy(config)
                 config.report_language = normalized_report_language
             
-            # 创建分析流水线
+            # Create an analysis pipeline
             pipeline = StockAnalysisPipeline(
                 config=config,
                 request_context=request_context,
@@ -129,10 +129,10 @@ class AnalysisService:
                 portfolio_context=portfolio_context,
             )
             
-            # 确定报告类型 (API: simple/detailed/full/brief -> ReportType)
+            # Determine report type (API: simple/detailed/full/brief -> ReportType)
             rt = ReportType.from_str(report_type)
             
-            # 执行分析
+            # Execute analysis
             result = pipeline.process_single_stock(
                 code=stock_code,
                 skip_analysis=False,
@@ -153,7 +153,7 @@ class AnalysisService:
                 logger.warning(f"分析股票 {stock_code} 未成功完成: {self.last_error}")
                 return None
             
-            # 构建响应
+            # Build the response
             return self._build_analysis_response(result, query_id, report_type=rt.value)
             
         except Exception as exc:
@@ -177,22 +177,22 @@ class AnalysisService:
         report_type: str = "detailed",
     ) -> Dict[str, Any]:
         """
-        构建分析响应
+        Build the analysis response
         
         Args:
-            result: AnalysisResult 对象
-            query_id: 查询 ID
-            report_type: 归一化后的报告类型
+            result: AnalysisResult object
+            query_id: query ID
+            report_type: normalized report type
             
         Returns:
-            格式化的响应字典
+            Formatted response dictionary
         """
-        # 获取狙击点位
+        # Get target price levels
         sniper_points = {}
         if hasattr(result, 'get_sniper_points'):
             sniper_points = result.get_sniper_points() or {}
         
-        # 计算情绪标签
+        # Calculate Sentiment Labels
         report_language = normalize_report_language(getattr(result, "report_language", "zh"))
         sentiment_label = get_sentiment_label(result.sentiment_score, report_language)
         stock_name = get_localized_stock_name(getattr(result, "name", None), result.code, report_language)
@@ -226,7 +226,7 @@ class AnalysisService:
             stock_code=result.code,
         )
         
-        # 构建报告结构
+        # Build report structure
         report = {
             "meta": {
                 "query_id": query_id,

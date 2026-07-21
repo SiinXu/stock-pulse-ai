@@ -1,22 +1,22 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 环境验证测试
+A-shares Watchlist Analysis System - Environment validation test
 ===================================
 
-用于验证 .env 配置是否正确，包括：
-1. 配置加载测试
-2. 数据库查看
-3. 数据源测试
-4. LLM 调用测试
-5. 通知推送测试
+Validates if .env configuration is correct, including:
+1. Configuration load test
+2. Database viewing
+3. Data source testing
+4. LLM call testing.
+5. Notification Push Test
 
-使用方法：
-    python scripts/check_env.py              # 运行所有测试
-    python scripts/check_env.py --db         # 仅查看数据库
-    python scripts/check_env.py --llm        # 仅测试 LLM
-    python scripts/check_env.py --fetch      # 仅测试数据获取
-    python scripts/check_env.py --notify     # 仅测试通知
+Method:
+    python scripts/check_env.py              # Run all tests
+    python scripts/check_env.py --db         # Only view the database
+    python scripts/check_env.py --llm        # Only test LLM
+    python scripts/check_env.py --fetch      # Only test data retrieval
+    python scripts/check_env.py --notify     # Only test notifications
 
 """
 import os
@@ -64,7 +64,7 @@ def configure_console_encoding():
         _reconfigure_output_stream(stream)
 
 
-# 配置日志
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)-8s | %(message)s',
@@ -74,19 +74,19 @@ logger = logging.getLogger(__name__)
 
 
 def print_header(title: str):
-    """打印标题"""
+    """Print the title"""
     print("\n" + "=" * 60)
     print(f"  {title}")
     print("=" * 60)
 
 
 def print_section(title: str):
-    """打印小节"""
+    """Print sector"""
     print(f"\n--- {title} ---")
 
 
 def check_config():
-    """测试配置加载"""
+    """Configuration loading test"""
     print_header("1. 配置加载测试")
     
     from src.config import get_config
@@ -123,7 +123,7 @@ def check_config():
 
 
 def view_database():
-    """查看数据库内容"""
+    """View database content"""
     print_header("2. 数据库内容查看")
     
     from src.storage import get_db
@@ -134,10 +134,10 @@ def view_database():
     print_section("数据库连接")
     print(f"  ✓ 连接成功")
     
-    # 使用独立的 session 查询
+    # Query using an independent session
     session = db.get_session()
     try:
-        # 统计信息
+        # Statistical information
         result = session.execute(text("""
             SELECT 
                 code,
@@ -160,7 +160,7 @@ def view_database():
         else:
             print("  暂无数据")
         
-        # 查询今日数据
+        # Query today's data
         today = date.today()
         result = session.execute(text("""
             SELECT code, date, open, high, low, close, pct_chg, volume, ma5, ma10, ma20, volume_ratio
@@ -181,7 +181,7 @@ def view_database():
         else:
             print("  今日暂无数据")
         
-        # 查询最近10条数据
+        # Query the most recent 10 records
         result = session.execute(text("""
             SELECT code, date, close, pct_chg, volume, data_source
             FROM stock_daily 
@@ -204,7 +204,7 @@ def view_database():
 
 
 def check_data_fetch(stock_code: str = "600519"):
-    """测试数据获取"""
+    """Testing data retrieval"""
     print_header("3. 数据获取测试")
     
     from data_provider import DataFetcherManager
@@ -239,7 +239,7 @@ def check_data_fetch(stock_code: str = "600519"):
 
 
 def check_llm():
-    """测试 LLM 调用"""
+    """Test LLM call"""
     print_header("4. LLM (Gemini) 调用测试")
     
     from src.analyzer import GeminiAnalyzer
@@ -252,7 +252,7 @@ def check_llm():
     print(f"  主模型: {config.gemini_model}")
     print(f"  备选模型: {config.gemini_model_fallback}")
     
-    # 检查网络连接
+    # Check network connection
     print_section("网络连接检查")
     try:
         import socket
@@ -274,7 +274,7 @@ def check_llm():
         print(f"  ✗ 模型初始化失败（请检查 API Key）")
         return False
     
-    # 构造测试上下文
+    # Construct test context
     test_context = {
         'code': '600519',
         'date': date.today().isoformat(),
@@ -326,7 +326,7 @@ def check_llm():
         print(f"\n  ✗ API 调用失败 (耗时: {elapsed:.2f}秒)")
         print(f"  错误: {e}")
         
-        # 提供更详细的错误提示
+        # Provides more detailed error prompts
         error_str = str(e).lower()
         if 'timeout' in error_str or 'unavailable' in error_str:
             print(f"\n  诊断: 网络超时，可能原因:")
@@ -342,7 +342,7 @@ def check_llm():
 
 
 def check_notification():
-    """测试通知推送"""
+    """Notification push test."""
     print_header("5. 通知推送测试")
     
     from src.notification import NotificationService
@@ -389,7 +389,7 @@ def check_notification():
 
 
 def run_all_tests():
-    """运行所有测试"""
+    """Run all tests"""
     print("\n" + "🚀" * 20)
     print("  A股自选股智能分析系统 - 环境验证")
     print("  " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
@@ -397,27 +397,27 @@ def run_all_tests():
     
     results = {}
     
-    # 1. 配置测试
+    # 1. Configuration test
     try:
         results['配置加载'] = check_config()
     except Exception as e:
         print(f"  ✗ 配置测试失败: {e}")
         results['配置加载'] = False
     
-    # 2. 数据库查看
+    # 2. Database viewing
     try:
         results['数据库'] = view_database()
     except Exception as e:
         print(f"  ✗ 数据库测试失败: {e}")
         results['数据库'] = False
     
-    # 3. 数据获取（跳过，避免太慢）
-    # results['数据获取'] = check_data_fetch()
+    # 3. Data fetching (skip to avoid being too slow)
+    # results['Data Acquisition'] = check_data_fetch()
     
-    # 4. LLM 测试（可选）
-    # results['LLM调用'] = check_llm()
+    # 4. LLM testing (optional).
+    # results['LLM Call'] = check_llm()
     
-    # 汇总
+    # Aggregate
     print_header("测试结果汇总")
     for name, passed in results.items():
         status = "✓ 通过" if passed else "✗ 失败"
@@ -429,7 +429,7 @@ def run_all_tests():
 
 
 def query_stock_data(stock_code: str, days: int = 10):
-    """查询指定股票的数据"""
+    """Query data for a specified stock"""
     print_header(f"查询股票数据: {stock_code}")
     
     from src.storage import get_db
@@ -480,12 +480,12 @@ def main():
     
     args = parser.parse_args()
     
-    # 如果没有指定任何参数，运行基础测试
+    # If no parameters are specified, run basic tests.
     if not any([args.db, args.llm, args.fetch, args.notify, args.config, args.stock, args.all]):
         run_all_tests()
         return 0
     
-    # 根据参数运行指定测试
+    # Run specified test based on parameters:
     if args.config:
         check_config()
     

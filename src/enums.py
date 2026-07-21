@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-枚举类型定义
+Enum type definition
 ===================================
 
-集中管理系统中使用的枚举类型，提供类型安全和代码可读性。
+Enumeration type used in the centralized management system, providing type safety and code readability.
 """
 
 from enum import Enum
@@ -12,25 +12,25 @@ from enum import Enum
 
 class ReportType(str, Enum):
     """
-    报告类型枚举
+    Report type enumeration
 
-    用于 API 触发分析时选择推送的报告格式。
-    继承 str 使其可以直接与字符串比较和序列化。
+    Select the report format to push when triggering API analysis.
+    Inherit str to allow direct comparison and serialization with strings.
     """
-    SIMPLE = "simple"  # 精简报告：使用 generate_single_stock_report
-    FULL = "full"      # 完整报告：使用 generate_dashboard_report
-    BRIEF = "brief"    # 简洁模式：3-5 句话概括，适合移动端/推送
+    SIMPLE = "simple"  # Simplified report: using generate_single_stock_report
+    FULL = "full"      # Full report: using generate_dashboard_report
+    BRIEF = "brief"    # Concise mode: 3-5 sentences summary, suitable for mobile/push
 
     @classmethod
     def from_str(cls, value: str) -> "ReportType":
         """
-        从字符串安全地转换为枚举值
+        Safely convert to enum values from string.
         
         Args:
-            value: 字符串值
+            value: String value
             
         Returns:
-            对应的枚举值，无效输入返回默认值 SIMPLE
+            Corresponding enum value, invalid input returns default value SIMPLE
         """
         try:
             normalized = value.lower().strip()
@@ -42,7 +42,7 @@ class ReportType(str, Enum):
     
     @property
     def display_name(self) -> str:
-        """获取用于显示的名称"""
+        """Get the display name"""
         return {
             ReportType.SIMPLE: "精简报告",
             ReportType.FULL: "完整报告",

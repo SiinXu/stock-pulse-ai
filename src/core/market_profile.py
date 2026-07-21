@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-大盘复盘市场区域配置
+Main Market Review Market Region Configuration
 
-定义各市场区域的指数、新闻搜索词、Prompt 提示等元数据，
-供 MarketAnalyzer 按 region 切换 A 股/港股/美股/日韩复盘行为。
+Define metadata for each market region, including indices, news search terms, and prompts.
+Used by MarketAnalyzer to switch between A-shares, Hong Kong stocks, U.S. stocks, Japanese and Korean market reviews.
 """
 
 from dataclasses import dataclass
@@ -12,18 +12,18 @@ from typing import List
 
 @dataclass
 class MarketProfile:
-    """大盘复盘市场区域配置"""
+    """Main Market Review Market Region Configuration"""
 
     region: str  # "cn" | "hk" | "us" | "jp" | "kr"
-    # 用于判断整体走势的指数代码，cn 用上证 000001，us 用标普 SPX
+    # Index code for judging overall trend, cn Use Shanghai Composite Index 000001, us Use S&P SPX
     mood_index_code: str
-    # 新闻搜索关键词
+    # News search keywords
     news_queries: List[str]
-    # 指数点评 Prompt 提示语
+    # Index review prompt
     prompt_index_hint: str
-    # 市场概况是否包含涨跌家数、涨停跌停（A 股有，美股无）
+    # Does the market overview include the number of rising and falling stocks, as well as limit-up and limit-down stocks (A-shares do, U.S. stocks do not)?
     has_market_stats: bool
-    # 市场概况是否包含板块涨跌（A 股有，美股暂无）
+    # Does the market overview include sector gains and losses (A-shares do, U.S. stocks currently do not)?
     has_sector_rankings: bool
 
 
@@ -94,7 +94,7 @@ KR_PROFILE = MarketProfile(
 
 
 def get_profile(region: str) -> MarketProfile:
-    """根据 region 返回对应的 MarketProfile"""
+    """Return the corresponding MarketProfile based on region"""
     if region == "us":
         return US_PROFILE
     if region == "hk":

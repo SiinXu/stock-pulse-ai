@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Telegram 发送提醒服务
+Telegram reminder service
 
-职责：
-1. 通过 Telegram Bot API 发送 文本消息
-2. 通过 Telegram Bot API 发送 图片消息
+Responsibilities:
+1. Send text messages via Telegram Bot API
+2. Send image messages via Telegram Bot API
 """
 import logging
 from typing import Optional
@@ -23,10 +23,10 @@ class TelegramSender:
 
     def __init__(self, config: Config):
         """
-        初始化 Telegram 配置
+        Initialize Telegram configuration
 
         Args:
-            config: 配置对象
+            config: Configuration object
         """
         self._telegram_config = {
             'bot_token': getattr(config, 'telegram_bot_token', None),
@@ -35,7 +35,7 @@ class TelegramSender:
         }
 
     def _is_telegram_configured(self) -> bool:
-        """检查 Telegram 配置是否完整"""
+        """Verify Telegram configuration is complete"""
         return bool(self._telegram_config['bot_token'] and self._telegram_config['chat_id'])
 
     def send_to_telegram(
@@ -47,21 +47,21 @@ class TelegramSender:
         timeout_seconds: Optional[float] = None,
     ) -> bool:
         """
-        推送消息到 Telegram 机器人
+        Push messages to Telegram bot
 
-        Telegram Bot API 格式：
+        Telegram Bot API format:
         POST https://api.telegram.org/bot<token>/sendMessage
         {
             "chat_id": "xxx",
-            "text": "消息内容",
+            "text": "Message content",
             "parse_mode": "Markdown"
         }
 
         Args:
-            content: 消息内容（Markdown 格式）
+            content: Message content in Markdown format
 
         Returns:
-            是否发送成功
+            Whether sent successfully
         """
         target_chat_id = chat_id if chat_id is not None else self._telegram_config.get("chat_id")
         target_message_thread_id = (
@@ -79,16 +79,16 @@ class TelegramSender:
         message_thread_id = target_message_thread_id
 
         try:
-            # Telegram API 端点
+            # Telegram API Endpoint
             api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
 
-            # Telegram 消息最大长度 4096 字符
+            # Telegram message maximum length 4096 characters
             max_length = 4096
 
             telegram_content = self._convert_to_telegram_markdown(content)
 
             if len(telegram_content) <= max_length:
-                # 单条消息发送
+                # Single message sending
                 return self._send_telegram_message(
                     api_url,
                     chat_id,
@@ -97,7 +97,7 @@ class TelegramSender:
                     timeout_seconds=timeout_seconds,
                 )
             else:
-                # 按 Markdown 转义后的最终 payload 分段，避免转义字符使请求超限
+                # Segment based on the final payload after Markdown escaping to avoid exceeding limits due to escape characters
                 return self._send_telegram_chunked(
                     api_url,
                     chat_id,
@@ -282,8 +282,8 @@ class TelegramSender:
         *,
         timeout_seconds: Optional[float] = None,
     ) -> bool:
-        """按已转换的 Telegram Markdown payload 分段发送长消息。"""
-        # 按段落分割
+        """Segment long messages based on converted Telegram Markdown payload."""
+        # Segment by paragraph.
         sections = content.split("\n---\n")
         delimiter = "\n---\n"
         delimiter_length = len(delimiter)
@@ -324,7 +324,7 @@ class TelegramSender:
 
         for section in sections:
             if len(section) > max_length:
-                # 单段超限时强制切片，避免依赖“\\n---\\n”边界导致的整段超长发送
+                # Force segment cut based on single-segment breach, Avoid dependency"\\n---\\n"Long send caused by boundary
                 if not _flush_chunk():
                     return False
                 for long_chunk in _split_long_section(section, max_length):
@@ -354,7 +354,7 @@ class TelegramSender:
             current_chunk.append(section)
             current_length += additional_length
 
-        # 发送最后一块
+        # Send the last piece
         if not _flush_chunk():
             return False
 
@@ -390,19 +390,19 @@ class TelegramSender:
 
     def _convert_to_telegram_markdown(self, text: str) -> str:
         """
-        将标准 Markdown 转换为 Telegram 支持的格式
+        Convert standard Markdown to Telegram-supported format
 
-        Telegram Markdown 限制：
-        - 不支持 # 标题
-        - 使用 *bold* 而非 **bold**
-        - 使用 _italic_
+        Telegram Markdown Limit:
+        - Does not support # Title
+        - Use *bold* instead of **bold**
+        - Use _italic_
         """
         result = text
 
-        # 移除 # 标题标记（Telegram 不支持）
+        # Remove # header tags (Telegram does not support)
         result = re.sub(r'^#{1,6}\s+', '', result, flags=re.MULTILINE)
 
-        # 转换 **bold** 为 *bold*
+        # Convert **bold** to *bold*
         result = re.sub(r'\*\*(.+?)\*\*', r'*\1*', result)
 
         # Escape special characters for Telegram Markdown, but preserve link syntax [text](url)
