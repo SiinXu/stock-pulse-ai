@@ -46,7 +46,7 @@ import {
   parseModelAccessFieldKey,
   type ChannelFieldSuffix,
   type ModelAccessFieldFocusRequest,
-} from './modelAccessFieldKey';
+} from '../../utils/modelAccessFieldKey';
 import { encodeModelRef, isModelRef } from '../../utils/modelRef';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { getUiColon, getUiListSeparator } from '../../utils/uiLocale';

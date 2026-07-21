@@ -639,7 +639,7 @@ describe('page and Router pattern production guard', () => {
 
   it('keeps route-focus metadata memory-only and outside public target input', () => {
     const coordinator = productionTypeScriptSources['../routing/RouteFocusCoordinator.tsx'];
-    const context = productionTypeScriptSources['../routing/routeFocusContext.ts'];
+    const context = productionTypeScriptSources['../../contexts/routeFocusContext.ts'];
     expect(coordinator).toBeDefined();
     expect(context).toBeDefined();
     expect(coordinator).not.toMatch(/(?:local|session)Storage/);

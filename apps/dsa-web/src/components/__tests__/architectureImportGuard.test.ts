@@ -41,25 +41,9 @@ const NON_VIEW_ROOTS = new Set([
   'utils',
 ]);
 const UI_ROOTS = new Set(['components', 'pages', 'playground']);
-const MAX_ARCHITECTURE_IMPORT_ALLOWANCES = 4;
+const MAX_ARCHITECTURE_IMPORT_ALLOWANCES = 1;
 
 const ARCHITECTURE_IMPORT_ALLOWANCES: readonly ArchitectureImportAllowance[] = [
-  {
-    source: 'hooks/useRouteFocusTarget.ts',
-    target: 'components/routing/routeFocusContext.ts',
-    kind: 'import',
-    rule: 'non-view-to-ui',
-    owner: 'Track W2',
-    removeWhen: 'W2c moves the route-focus context contract to neutral context ownership.',
-  },
-  {
-    source: 'hooks/useRouteFocusTarget.ts',
-    target: 'components/routing/routeFocusContext.ts',
-    kind: 'export',
-    rule: 'non-view-to-ui',
-    owner: 'Track W2',
-    removeWhen: 'W2c moves the RouteFocusTarget type to neutral context ownership.',
-  },
   {
     source: 'hooks/useSystemConfig.ts',
     target: 'components/settings/settingsSubCategories.ts',
@@ -67,14 +51,6 @@ const ARCHITECTURE_IMPORT_ALLOWANCES: readonly ArchitectureImportAllowance[] = [
     rule: 'non-view-to-ui',
     owner: 'Track W2',
     removeWhen: 'A dedicated Settings contract slice extracts the cohesive subcategory policy from presentation ownership.',
-  },
-  {
-    source: 'utils/connectionSchemaAuthority.ts',
-    target: 'components/settings/modelAccessFieldKey.ts',
-    kind: 'import',
-    rule: 'non-view-to-ui',
-    owner: 'Track W2',
-    removeWhen: 'W2c moves the model-access field-key contract to neutral utility ownership.',
   },
 ];
 

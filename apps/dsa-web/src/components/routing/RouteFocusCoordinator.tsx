@@ -13,7 +13,7 @@ import {
   RouteFocusRegistrationContext,
   type RouteFocusRegistration,
   type RouteFocusTarget,
-} from './routeFocusContext';
+} from '../../contexts/routeFocusContext';
 
 type RouteFocusEntry = {
   locationKey: string;
