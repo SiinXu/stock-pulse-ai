@@ -3,18 +3,7 @@
 /// <reference types="vite/client" />
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-
-const productionTs = import.meta.glob('../../**/*.ts', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
-const productionTsx = import.meta.glob('../../**/*.tsx', {
-  eager: true,
-  import: 'default',
-  query: '?raw',
-}) as Record<string, string>;
-const productionSources = { ...productionTs, ...productionTsx };
+import { productionTypeScriptSources } from './productionSourceInventory';
 
 const PAGE_PATTERN_OWNERS = new Map<string, string>([
   ['AppPage', '../common/AppPage.tsx'],
@@ -37,13 +26,6 @@ type SourceFinding = {
   line: number;
   token: string;
 };
-
-function isProductionSource(filename: string): boolean {
-  return !filename.includes('/__tests__/')
-    && !filename.includes('/fixtures/')
-    && !filename.includes('/generated/')
-    && !/\.(?:test|spec)\.[jt]sx?$/.test(filename);
-}
 
 function parseSource(filename: string, source: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -453,13 +435,12 @@ describe('page and Router pattern production guard', () => {
   });
 
   it('keeps every page and Router Pattern in its declared owner', () => {
-    const violations = Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename))
+    const violations = Object.entries(productionTypeScriptSources)
       .flatMap(([filename, source]) => findPatternOwnershipViolations(filename, source));
     expect(violations).toEqual([]);
 
     for (const [symbol, owner] of PAGE_PATTERN_OWNERS) {
-      const source = productionSources[owner];
+      const source = productionTypeScriptSources[owner];
       expect(source, `${owner} must remain in the production scan`).toBeDefined();
       expect(source).toMatch(new RegExp(`(?:const|function)\\s+${symbol}\\b`));
     }
@@ -646,8 +627,7 @@ describe('page and Router pattern production guard', () => {
   });
 
   it('rejects every direct production history mutation', () => {
-    const productionEntries = Object.entries(productionSources)
-      .filter(([filename]) => isProductionSource(filename));
+    const productionEntries = Object.entries(productionTypeScriptSources);
     const boundSources = createBoundSourceFiles(productionEntries);
     const actual = productionEntries.flatMap(([filename, source]) => {
       const boundSource = boundSources.get(filename);
@@ -658,8 +638,8 @@ describe('page and Router pattern production guard', () => {
   });
 
   it('keeps route-focus metadata memory-only and outside public target input', () => {
-    const coordinator = productionSources['../routing/RouteFocusCoordinator.tsx'];
-    const context = productionSources['../routing/routeFocusContext.ts'];
+    const coordinator = productionTypeScriptSources['../routing/RouteFocusCoordinator.tsx'];
+    const context = productionTypeScriptSources['../routing/routeFocusContext.ts'];
     expect(coordinator).toBeDefined();
     expect(context).toBeDefined();
     expect(coordinator).not.toMatch(/(?:local|session)Storage/);
