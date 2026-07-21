@@ -407,15 +407,7 @@ class CircuitBreaker:
                 0.0,
                 self.cooldown_seconds - (now - state["last_failure_time"]),
             )
-        available = (
-            not self.enabled
-            or state["state"] == self.CLOSED
-            or (state["state"] == self.OPEN and cooldown_remaining <= 0.0)
-            or (
-                state["state"] == self.HALF_OPEN
-                and state["half_open_calls"] < self.half_open_max_calls
-            )
-        )
+        available = self._can_attempt_locked(state, now)
         return {
             "source": source,
             "state": state["state"],
@@ -438,6 +430,25 @@ class CircuitBreaker:
             "last_failure_time": state["last_failure_time"] or None,
             "last_success_time": state["last_success_time"] or None,
         }
+
+    def _can_attempt_locked(self, state: Dict[str, Any], now: float) -> bool:
+        if not self.enabled or state["state"] == self.CLOSED:
+            return True
+        elapsed = now - state["last_failure_time"]
+        if state["state"] == self.OPEN:
+            return elapsed >= self.cooldown_seconds
+        if state["state"] == self.HALF_OPEN:
+            return (
+                state["half_open_calls"] < self.half_open_max_calls
+                or elapsed >= self.cooldown_seconds
+            )
+        return True
+
+    def can_attempt(self, source: str) -> bool:
+        """Peek at admission without transitioning state or reserving a half-open probe."""
+        with self._lock:
+            state = self._get_state_locked(source)
+            return self._can_attempt_locked(state, self._clock())
 
     def is_available(self, source: str) -> bool:
         """Return whether a request may enter the source, reserving half-open probes."""
@@ -512,6 +523,20 @@ class CircuitBreaker:
                     source,
                 )
 
+            state["state"] = self.CLOSED
+            state["failures"] = 0
+            state["half_open_calls"] = 0
+
+    def record_quality_failure(
+        self,
+        source: str,
+        latency_ms: Optional[float] = None,
+    ) -> None:
+        """Record unusable data without incrementing the circuit failure streak."""
+        with self._lock:
+            state = self._get_state_locked(source)
+            self._record_observation_locked(state, success=False, latency_ms=latency_ms)
+            state["last_failure_time"] = self._clock()
             state["state"] = self.CLOSED
             state["failures"] = 0
             state["half_open_calls"] = 0

@@ -114,7 +114,9 @@ flowchart LR
 - `state` / `cooldown_remaining_seconds`：`closed`、`open`、`half_open` 与剩余冷却时间；
 - `health_score`：成功率占 70%、延迟占 20%、连续失败恢复度占 10% 的 0-100 分。
 
-维护者可在进程内调用 `DataFetcherManager.get_daily_source_health_snapshot()` 读取脱敏快照。单源异常、`fallback_to`、熔断跳过和最终成功源同时写入既有 `provider_runs` 诊断；报告摘要因此会把“前置源失败但替代源成功”标为 degraded，而不会中断整轮分析。快照和 circuit 日志只记录稳定 provider/market/error code，不保存第三方异常原文、token 或连接凭据。
+provider 返回空表或 `None` 时，本次结果会计入健康窗口的质量失败，确保 `error_rate` 与 fallback 诊断一致；但它不会增加连续异常次数或打开熔断，保持既有“空结果仍可在下一请求重试”的语义。延迟只统计拿到 provider 专属锁后的真实调用时间，不把本地并发排队时间误算为上游耗时。
+
+维护者可在进程内调用 `DataFetcherManager.get_daily_source_health_snapshot()` 读取脱敏快照。单源异常、下一实际可尝试的 `fallback_to`、熔断跳过和最终成功源同时写入既有 `provider_runs` 诊断；报告摘要因此会把“前置源失败但替代源成功”标为 degraded，而不会中断整轮分析。快照和 circuit 日志只记录稳定 provider/market/error code，不保存第三方异常原文、token 或连接凭据；provider 异常摘要在写日志、聚合错误和运行诊断前统一经过中央脱敏工具。
 
 ## AlphaSift 选股与热点链路
 
