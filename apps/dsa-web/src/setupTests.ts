@@ -52,6 +52,22 @@ Object.defineProperty(globalThis, 'IntersectionObserver', {
   value: IntersectionObserverMock,
 });
 
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 const hasLocalStorage = (() => {
   try {
     return typeof globalThis.localStorage?.getItem === 'function'

@@ -233,6 +233,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] Web 应用外壳收敛 Router 焦点与响应式基础契约：`RouteFocusCoordinator` 对临时 Drawer route 的空、缺失或重复 persistent opener alias 统一 fail closed，compact 导航 Tooltip wrapper 禁止 flex 压缩以守住 44px 路由目标；同步撤回无生产 consumer 的 `ResponsiveRail` tablet Drawer API、fixture 与文档声明，避免基础层提前扩张。
 - [改进] Web 登录页恢复 24px 背景网格与两处径向主题光层，根画布继续使用专属 `--login-bg-main` token，并移除品牌与认证标题的紧缩字距；认证、传输状态、i18n、响应式和可访问行为不变。
 - [改进] Web UIUX 最终审计完成：共享 `DataTable` 新增受控 detail-row 契约并迁移 AlphaSift 十列结果表，保留默认展开且补齐 `aria-expanded`/`aria-controls`；Backtest、Decision Signals 与 Screening 查询更新统一改走 React Router replace；剩余 `glass-card`、raw white-alpha 和无效 `bg-surface` 消费全部迁到语义 Surface/token 后删除兼容 CSS 与 surface allowlist；raw-table 债改用稳定文件/token/计数及具体移除前提，过期 `removeBy` 清零，NotFound 改用 `primary` Button 并删除 `xl` 兼容档。
+- [新功能] Web 正式构建新增受现有认证保护且不进入产品导航的 `/playground` 组件工作台，覆盖 `src/components` 全部导出可视组件及交互场景，以独立 iframe、四种确定性 fixture profile、禁止透传的内存 Mock API、深链视口/主题/语言控制和无敏感载荷请求日志隔离真实业务数据。
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

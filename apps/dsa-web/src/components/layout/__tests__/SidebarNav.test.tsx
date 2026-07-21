@@ -281,6 +281,16 @@ describe('SidebarNav', () => {
     expect(signalsLink).toHaveClass('font-medium');
   });
 
+  it('does not expose the component playground in product navigation', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <SidebarNav />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelector('a[href="/playground"]')).toBeNull();
+  });
+
   it('opens the logout confirmation and confirms logout', async () => {
     render(
       <MemoryRouter initialEntries={['/chat']}>
