@@ -256,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [Docs] Documented foundation pipeline and product layer boundaries, contribution placement, upstream-compatible fix porting policy, and dual-license provenance.
 - [Added] Added a least-privilege `/claim` workflow with a one-open-issue limit and existing-assignment protection.
 - [Chore] Split the oversized system configuration service into focused private modules while preserving its public facade.
+- [Changed] Split analyzer result-processing helpers into a focused internal module while preserving the legacy facade and runtime behavior.
 
 ## [3.26.3] - 2026-07-15
 
