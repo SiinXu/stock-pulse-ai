@@ -2498,7 +2498,7 @@ class AgentOrchestrator:
         return merged[:500]
 
 
-# Common English words (2-5 uppercase letters) that should NOT be treated as
+# Common English words (short uppercase tokens) that should NOT be treated as
 # US stock tickers.  This set is checked by _extract_stock_code() and should
 # be kept at module level to avoid re-creating it on every call.
 _COMMON_WORDS: set[str] = {
@@ -2521,7 +2521,7 @@ _COMMON_WORDS: set[str] = {
     "BUY", "SELL", "HOLD", "LONG", "PUT", "CALL",
     "ETF", "IPO", "RSI", "EPS", "PEG", "ROE", "ROA",
     "USA", "USD", "CNY", "HKD", "EUR", "GBP",
-    "STOCK", "TRADE", "PRICE", "INDEX", "FUND", "RATES",
+    "STOCK", "TRADE", "PRICE", "INDEX", "FUND",
     "HIGH", "LOW", "OPEN", "CLOSE", "STOP", "LOSS",
     "TREND", "BULL", "BEAR", "RISK", "CASH", "BOND",
     "MACD", "VWAP", "BOLL", "KDJ",

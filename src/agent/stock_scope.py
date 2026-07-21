@@ -39,15 +39,17 @@ _SWITCH_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _LOWERCASE_SCAN_HINT_PATTERN = re.compile(r"换成|改看|分析|看看|研究|诊断")
-_ENGLISH_SWITCH_TICKER_PATTERN = re.compile(
-    r"\b(?:analy[sz]e|switch\s+to|switch|look\s+at|review)\s+"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\b",
-    re.IGNORECASE,
+_ENGLISH_EXPLICIT_TICKER_PATTERN = re.compile(
+    r"(?i:^\s*(?:analy[sz]e|switch(?:\s+to)?|look\s+at|review)\s+)"
+    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*[.!?]?\s*$"
 )
-_CJK_SWITCH_TICKER_PATTERN = re.compile(
-    r"(?:换成|改看|分析|看看|研究|诊断)\s*"
-    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)(?![a-zA-Z0-9])",
-    re.IGNORECASE,
+_ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN = re.compile(
+    r"(?i:^\s*switch\s+to\s+)"
+    r"([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*[.!?]?\s*$"
+)
+_CJK_EXPLICIT_TICKER_PATTERN = re.compile(
+    r"^\s*(?:换成|改看|分析|看看|研究|诊断)\s*"
+    r"([A-Z]{1,5}(?:\.[A-Z]{1,2})?)\s*[，。!?！？]?\s*$"
 )
 _EXPLICIT_COMPARE_PAIR_PATTERN = re.compile(
     r"(?<![a-zA-Z.])([a-z]{1,5}(?:\.[a-z]{1,2})?)\s*"
@@ -85,6 +87,7 @@ _ALWAYS_DENIED_TICKER_CANDIDATES = {
     "SMA",
     "VWAP",
 }
+_EXPLICIT_INDICATOR_TICKER_CANDIDATES = {"RSI"}
 _CONTEXTUAL_INDICATOR_TOKENS = {"MA"}
 _INDICATOR_CONTEXT_PATTERN = re.compile(
     r"指标|均线|移动平均|排列|多头|空头|金叉|死叉|支撑|压力|MA\d|SMA|EMA",
@@ -134,10 +137,6 @@ def _is_denied_candidate(
     allow_reserved_token: bool = False,
 ) -> bool:
     token = candidate.strip().upper()
-    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
-        return True
-    if token in _CONTEXTUAL_INDICATOR_TOKENS and _INDICATOR_CONTEXT_PATTERN.search(text or ""):
-        return True
     if (
         not allow_reserved_token
         and (
@@ -146,8 +145,16 @@ def _is_denied_candidate(
         )
     ):
         return True
+    indicator_context = bool(_INDICATOR_CONTEXT_PATTERN.search(text or ""))
+    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
+        if token not in _EXPLICIT_INDICATOR_TICKER_CANDIDATES or indicator_context:
+            return True
+    if token in _CONTEXTUAL_INDICATOR_TOKENS and indicator_context:
+        return True
     if allow_common_word:
         return False
+    if token in _ALWAYS_DENIED_TICKER_CANDIDATES:
+        return True
     try:
         from src.agent.orchestrator import _COMMON_WORDS
 
@@ -199,23 +206,29 @@ def extract_stock_codes(text: str) -> List[str]:
             raw = match.group(1) if match.lastindex else match.group(0)
             _append_candidate(candidates, raw, text)
 
-    for match in _ENGLISH_SWITCH_TICKER_PATTERN.finditer(text):
-        raw = match.group(1)
+    for match in _ENGLISH_EXPLICIT_TICKER_PATTERN.finditer(text):
         _append_candidate(
             candidates,
-            raw,
+            match.group(1),
             text,
-            explicit=raw.isupper(),
+            explicit=True,
             allow_reserved_token=True,
         )
 
-    for match in _CJK_SWITCH_TICKER_PATTERN.finditer(text):
-        raw = match.group(1)
+    for match in _ENGLISH_LOWERCASE_SWITCH_TICKER_PATTERN.finditer(text):
         _append_candidate(
             candidates,
-            raw,
+            match.group(1),
             text,
-            explicit=raw.isupper(),
+            allow_reserved_token=True,
+        )
+
+    for match in _CJK_EXPLICIT_TICKER_PATTERN.finditer(text):
+        _append_candidate(
+            candidates,
+            match.group(1),
+            text,
+            explicit=True,
             allow_reserved_token=True,
         )
 

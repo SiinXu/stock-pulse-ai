@@ -75,6 +75,7 @@ def test_shared_canonicalizer_records_format_only_fallback(caplog) -> None:
         ("analyze SH", "SH", "us"),
         ("analyze BJ", "BJ", "us"),
         ("analyze VS", "VS", "us"),
+        ("analyze RSI", "RSI", "us"),
         ("aapl", "AAPL", "us"),
     ],
 )
@@ -189,6 +190,9 @@ def test_english_analysis_topic_keeps_the_active_symbol() -> None:
         "look at this",
         "switch to it",
         "Review rates",
+        "review debt",
+        "review yield",
+        "review value",
     ],
 )
 def test_lowercase_switch_slot_common_words_do_not_become_tickers(
@@ -196,6 +200,34 @@ def test_lowercase_switch_slot_common_words_do_not_become_tickers(
 ) -> None:
     resolution = resolve_stock_scope(
         message,
+        {"stock_code": "AAPL", "stock_name": "Apple"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "AAPL",
+        "stock_name": "Apple",
+    }
+    assert resolution.stock_scope.mode == "maintain"
+    assert resolution.stock_scope.allowed_stock_codes == {"AAPL"}
+
+
+def test_trusted_active_indicator_named_ticker_is_preserved() -> None:
+    resolution = resolve_stock_scope(
+        "continue with the valuation",
+        {"stock_code": "RSI", "stock_name": "Rush Street Interactive"},
+    )
+
+    assert resolution.effective_context == {
+        "stock_code": "RSI",
+        "stock_name": "Rush Street Interactive",
+    }
+    assert resolution.stock_scope.mode == "maintain"
+    assert resolution.stock_scope.allowed_stock_codes == {"RSI"}
+
+
+def test_indicator_token_in_free_text_does_not_switch_the_active_symbol() -> None:
+    resolution = resolve_stock_scope(
+        "what is RSI telling us?",
         {"stock_code": "AAPL", "stock_name": "Apple"},
     )
 
