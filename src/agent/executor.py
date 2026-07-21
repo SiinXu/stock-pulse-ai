@@ -17,11 +17,17 @@ same implementation.
 import json
 import logging
 import uuid
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.config import get_config
-from src.agent.chat_context import build_agent_chat_context_bundle
+from src.agent.chat_context import (
+    build_agent_chat_context_bundle,
+    build_agent_chat_chip_instruction,
+    build_agent_chat_market_context,
+    build_agent_chat_tool_registry,
+)
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import (
@@ -44,6 +50,10 @@ from src.services.daily_market_context import format_daily_market_context_prompt
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
+_CHAT_TOOL_REGISTRY: ContextVar[Optional[ToolRegistry]] = ContextVar(
+    "agent_chat_tool_registry",
+    default=None,
+)
 
 
 # ============================================================
@@ -401,7 +411,7 @@ LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT = """你是一位专注于趋势交易的{mark
 
 **第二阶段 · 技术与筹码**（等第一阶段结果返回后再执行）
 - 调用 `analyze_trend` 获取 MA/MACD/RSI 等技术指标
-- 调用 `get_chip_distribution` 获取筹码分布结构
+- {chip_distribution_instruction}
 
 **第三阶段 · 情报搜索**（等前两阶段完成后再执行）
 - 调用 `search_stock_news` 搜索最新新闻公告、减持、业绩预告等风险信号
@@ -438,7 +448,7 @@ CHAT_SYSTEM_PROMPT = """你是一位{market_role}投资分析 Agent，拥有数�
 
 **第二阶段 · 技术与筹码**（等第一阶段结果返回后再执行）
 - 调用 `analyze_trend` 获取 MA/MACD/RSI 等技术指标
-- 调用 `get_chip_distribution` 获取筹码分布结构
+- {chip_distribution_instruction}
 
 **第三阶段 · 情报搜索**（等前两阶段完成后再执行）
 - 调用 `search_stock_news` 搜索最新新闻公告、减持、业绩预告等风险信号
@@ -613,7 +623,11 @@ class AgentExecutor:
         """
         from src.agent.conversation import conversation_manager
 
-        scope_resolution = resolve_stock_scope(message, context)
+        session = conversation_manager.get_or_create(session_id)
+        stored_context = session.get_market_context()
+        resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
+        resolution_context.update(context or {})
+        scope_resolution = resolve_stock_scope(message, resolution_context)
         context = scope_resolution.effective_context
 
         # Build system prompt with skills
@@ -624,27 +638,34 @@ class AgentExecutor:
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
         report_language = normalize_report_language((context or {}).get("report_language", "zh"))
-        stock_code = (context or {}).get("stock_code", "")
-        market_role = get_market_role(stock_code, report_language)
-        market_guidelines = get_market_guidelines(stock_code, report_language)
+        market_context = build_agent_chat_market_context(
+            context,
+            scope_resolution.stock_scope,
+            report_language,
+        )
         prompt_template = (
             LEGACY_DEFAULT_CHAT_SYSTEM_PROMPT
             if self.use_legacy_default_prompt
             else CHAT_SYSTEM_PROMPT
         )
         system_prompt = prompt_template.format(
-            market_role=market_role,
-            market_guidelines=market_guidelines,
+            market_role=market_context.market_role,
+            market_guidelines=market_context.market_guidelines,
+            chip_distribution_instruction=build_agent_chat_chip_instruction(
+                market_context
+            ),
             default_skill_policy_section=default_skill_policy_section,
             skills_section=skills_section,
             language_section=_build_language_section(report_language, chat_mode=True),
         )
 
-        # Build tool declarations in OpenAI format (litellm handles all providers)
-        tool_decls = self.tool_registry.to_openai_tools()
+        chat_tool_registry = build_agent_chat_tool_registry(
+            self.tool_registry,
+            market_context,
+        )
+        tool_decls = chat_tool_registry.to_openai_tools()
 
         # Get conversation history
-        conversation_manager.get_or_create(session_id)
         config = getattr(self.llm_adapter, "_config", None) or get_config()
         bundle = build_agent_chat_context_bundle(session_id, self.llm_adapter, config)
 
@@ -655,8 +676,21 @@ class AgentExecutor:
         messages.extend(bundle.context_messages)
 
         # Inject previous analysis context if provided (data reuse from report follow-up)
+        context_parts = []
+        if market_context.prompt_section:
+            context_parts.append(market_context.prompt_section)
+        has_historical_context = any(
+            (context or {}).get(key)
+            for key in (
+                "previous_price",
+                "previous_change_pct",
+                "previous_analysis_summary",
+                "previous_strategy",
+                "daily_market_context",
+                "market_structure_context",
+            )
+        )
         if context:
-            context_parts = []
             if context.get("stock_code"):
                 context_parts.append(f"股票代码: {context['stock_code']}")
             if context.get("stock_name"):
@@ -685,10 +719,16 @@ class AgentExecutor:
             )
             if market_structure_section:
                 context_parts.append(market_structure_section.strip())
-            if context_parts:
-                context_msg = "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts)
-                messages.append({"role": "user", "content": context_msg})
-                messages.append({"role": "assistant", "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"})
+        if context_parts:
+            if has_historical_context:
+                context_label = "[系统提供的历史分析上下文，可供参考对比]"
+                acknowledgement = "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？"
+            else:
+                context_label = "[系统提供的本轮股票与市场上下文]"
+                acknowledgement = "好的，我会按本轮股票与市场上下文回答。"
+            context_msg = context_label + "\n" + "\n".join(context_parts)
+            messages.append({"role": "user", "content": context_msg})
+            messages.append({"role": "assistant", "content": acknowledgement})
 
         messages.append({"role": "user", "content": message})
         baseline_len = len(messages)
@@ -696,17 +736,26 @@ class AgentExecutor:
 
         # Persist the user turn immediately so the session appears in history during processing
         user_message_id = conversation_manager.add_message(session_id, "user", message)
+        session.update_market_context(
+            context,
+            anchor_user_message_id=user_message_id,
+        )
 
         try:
-            result = self._run_loop(
-                messages,
-                tool_decls,
-                parse_dashboard=False,
-                progress_callback=progress_callback,
-                stock_scope=scope_resolution.stock_scope,
-                cancelled_check=cancelled_check,
-            )
+            registry_token = _CHAT_TOOL_REGISTRY.set(chat_tool_registry)
+            try:
+                result = self._run_loop(
+                    messages,
+                    tool_decls,
+                    parse_dashboard=False,
+                    progress_callback=progress_callback,
+                    stock_scope=scope_resolution.stock_scope,
+                    cancelled_check=cancelled_check,
+                )
+            finally:
+                _CHAT_TOOL_REGISTRY.reset(registry_token)
         except Exception as exc:
+            # broad-exception: fallback_recorded - Safe log and failure sentinel preserve the Chat boundary.
             log_safe_exception(
                 logger,
                 "Agent chat execution raised",
@@ -857,9 +906,14 @@ class AgentExecutor:
         post-processing removes a reserved model-authored field. Free-form
         mode always preserves the raw text.
         """
+        chat_tool_registry = _CHAT_TOOL_REGISTRY.get()
         loop_result = run_agent_loop(
             messages=messages,
-            tool_registry=self.tool_registry,
+            tool_registry=(
+                chat_tool_registry
+                if chat_tool_registry is not None
+                else self.tool_registry
+            ),
             llm_adapter=self.llm_adapter,
             max_steps=self.max_steps,
             progress_callback=progress_callback,

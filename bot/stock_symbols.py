@@ -5,11 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.market_context import detect_market
 from src.services.stock_code_utils import (
+    canonicalize_analysis_stock_code,
     normalize_code,
-    resolve_index_stock_code_for_analysis,
 )
 
 
@@ -78,12 +77,7 @@ def parse_bot_stock_symbol(value: str) -> BotStockSymbol:
             f"{_SUPPORTED_FORMATS_MESSAGE}"
         )
 
-    # Five-digit HK inputs are valid but the shared queue/provider identity uses
-    # the explicit HK prefix. Other markets retain their normal shared resolver.
-    input_market = detect_market(normalized)
-    analysis_input = f"HK{normalized}" if input_market == "hk" else raw
-    resolved = resolve_index_stock_code_for_analysis(analysis_input)
-    code = canonical_stock_code(normalize_stock_code(resolved))
+    code = canonicalize_analysis_stock_code(raw)
     if not code:
         raise BotStockSymbolError(
             f"无法识别股票代码 / Unrecognized stock symbol: `{raw.upper()}`.\n"

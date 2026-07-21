@@ -36,7 +36,11 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from src.agent.chat_context import build_visible_chat_history
+from src.agent.chat_context import (
+    build_agent_chat_market_context,
+    build_agent_chat_tool_registry,
+    build_visible_chat_history,
+)
 from src.agent.dashboard_payload import sanitize_agent_dashboard_payload
 from src.agent.disagreement import build_agent_disagreement_summary
 from src.agent.llm_adapter import LLMToolAdapter
@@ -61,7 +65,7 @@ from src.agent.risk_override import (
     build_risk_override_application,
     build_risk_override_plan,
 )
-from src.agent.runner import parse_dashboard_json
+from src.agent.runner import parse_dashboard_json, run_agent_loop
 from src.agent.runtime.contract import ExecutionState
 from src.agent.runtime_facts import (
     AgentRuntimeFacts,
@@ -76,7 +80,7 @@ from src.agent.runtime.guards import (
     StageFailurePolicy,
     log_runtime_guard_event,
 )
-from src.agent.stock_scope import resolve_stock_scope
+from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.stream_events import stream_event
 from src.agent.tools.registry import ToolRegistry
 from src.config import AGENT_MAX_STEPS_DEFAULT, get_config
@@ -564,30 +568,74 @@ class AgentOrchestrator:
         from src.agent.executor import AgentResult
         from src.agent.conversation import conversation_manager
 
-        scope_resolution = resolve_stock_scope(message, context)
-        ctx = self._build_context(message, scope_resolution.effective_context)
-        ctx.session_id = session_id
-        ctx.meta["response_mode"] = "chat"
-        if scope_resolution.stock_scope is not None:
-            ctx.meta["stock_scope"] = scope_resolution.stock_scope
+        session = conversation_manager.get_or_create(session_id)
+        stored_context = session.get_market_context()
+        resolution_context = dict(stored_context) if isinstance(stored_context, dict) else {}
+        resolution_context.update(context or {})
+        scope_resolution = resolve_stock_scope(message, resolution_context)
 
-        conversation_manager.get_or_create(session_id)
         config = self.config or getattr(self.llm_adapter, "_config", None) or get_config()
         history = build_visible_chat_history(session_id, self.llm_adapter, config)
-        if history:
-            ctx.meta["conversation_history"] = history
+        report_language = normalize_report_language(
+            scope_resolution.effective_context.get("report_language", "zh")
+        )
+        market_context = build_agent_chat_market_context(
+            scope_resolution.effective_context,
+            scope_resolution.stock_scope,
+            report_language,
+            per_symbol_tool_scopes=bool(
+                scope_resolution.stock_scope is not None
+                and scope_resolution.stock_scope.mode == "compare"
+                and len(scope_resolution.stock_scope.allowed_stock_codes) > 1
+            ),
+        )
 
         # Persist user turn
-        conversation_manager.add_message(session_id, "user", message)
+        user_message_id = conversation_manager.add_message(
+            session_id,
+            "user",
+            message,
+        )
+        session.update_market_context(
+            scope_resolution.effective_context,
+            anchor_user_message_id=user_message_id,
+        )
 
         try:
-            orch_result = self._execute_pipeline(
-                ctx,
-                parse_dashboard=False,
-                progress_callback=progress_callback,
-                cancelled_check=cancelled_check,
-            )
+            stock_scope = scope_resolution.stock_scope
+            if (
+                stock_scope is not None
+                and stock_scope.mode == "compare"
+                and len(stock_scope.allowed_stock_codes) > 1
+            ):
+                orch_result = self._execute_multi_symbol_chat(
+                    message=message,
+                    session_id=session_id,
+                    context=scope_resolution.effective_context,
+                    stock_scope=stock_scope,
+                    history=history,
+                    market_context=market_context,
+                    report_language=report_language,
+                    progress_callback=progress_callback,
+                    cancelled_check=cancelled_check,
+                )
+            else:
+                ctx = self._build_chat_pipeline_context(
+                    message=message,
+                    session_id=session_id,
+                    context=scope_resolution.effective_context,
+                    stock_scope=stock_scope,
+                    history=history,
+                    market_context=market_context,
+                )
+                orch_result = self._execute_pipeline(
+                    ctx,
+                    parse_dashboard=False,
+                    progress_callback=progress_callback,
+                    cancelled_check=cancelled_check,
+                )
         except Exception as exc:
+            # broad-exception: fallback_recorded - Safe log and failure sentinel preserve the Chat boundary.
             log_safe_exception(
                 logger,
                 "Agent orchestrator chat raised",
@@ -645,6 +693,350 @@ class AgentOrchestrator:
             timed_out=orch_result.timed_out,
         )
 
+    def _build_chat_pipeline_context(
+        self,
+        *,
+        message: str,
+        session_id: str,
+        context: Dict[str, Any],
+        stock_scope: Optional[StockScope],
+        history: List[Dict[str, Any]],
+        market_context: Any,
+    ) -> AgentContext:
+        """Build one Chat-only pipeline context with an isolated market surface."""
+        ctx = self._build_context(message, context)
+        if stock_scope is not None:
+            # Chat scope resolution is authoritative; legacy dashboard extraction
+            # must not reinterpret a rejected token from the original message.
+            ctx.stock_code = context.get("stock_code", "")
+            ctx.stock_name = context.get("stock_name", "")
+        ctx.session_id = session_id
+        ctx.meta["response_mode"] = "chat"
+        ctx.meta["agent_chat_market_context"] = market_context
+        if stock_scope is not None:
+            ctx.meta["stock_scope"] = stock_scope
+
+        scoped_history = list(history)
+        if market_context.prompt_section:
+            scoped_history.insert(
+                0,
+                {"role": "user", "content": market_context.prompt_section},
+            )
+        if scoped_history:
+            ctx.meta["conversation_history"] = scoped_history
+        return ctx
+
+    @staticmethod
+    def _build_multi_symbol_cancelled_result(
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
+        *,
+        error: Optional[str] = None,
+    ) -> OrchestratorResult:
+        """Discard partial comparison content while retaining audit metadata."""
+        models = [result.model for _, result in per_symbol_results if result.model]
+        return OrchestratorResult(
+            success=False,
+            content="",
+            tool_calls_log=[
+                call
+                for _, result in per_symbol_results
+                for call in result.tool_calls_log
+            ],
+            total_steps=sum(
+                result.total_steps for _, result in per_symbol_results
+            ),
+            total_tokens=sum(
+                result.total_tokens for _, result in per_symbol_results
+            ),
+            provider=next(
+                (result.provider for _, result in per_symbol_results if result.provider),
+                "",
+            ),
+            model=", ".join(dict.fromkeys(models)),
+            error=error or "Pipeline cancelled",
+            cancelled=True,
+        )
+
+    def _execute_multi_symbol_chat(
+        self,
+        *,
+        message: str,
+        session_id: str,
+        context: Dict[str, Any],
+        stock_scope: StockScope,
+        history: List[Dict[str, Any]],
+        market_context: Any,
+        report_language: str,
+        progress_callback: Optional[Callable],
+        cancelled_check: Optional[Callable[[], bool]],
+    ) -> OrchestratorResult:
+        """Run one guarded specialist pipeline per comparison symbol."""
+        allowed = set(stock_scope.allowed_stock_codes)
+        stock_codes = [
+            code for code in market_context.stock_codes if code in allowed
+        ]
+        per_symbol_results: List[tuple[str, OrchestratorResult]] = []
+        timeout_seconds = self._get_timeout_seconds()
+        deadline = (
+            time.monotonic() + timeout_seconds
+            if timeout_seconds > 0
+            else None
+        )
+
+        for stock_code in stock_codes:
+            if cancelled_check is not None and cancelled_check():
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results
+                )
+            remaining_timeout = (
+                max(0.0, deadline - time.monotonic())
+                if deadline is not None
+                else None
+            )
+            if remaining_timeout is not None and remaining_timeout <= 0:
+                per_symbol_results.extend(
+                    (
+                        pending_code,
+                        OrchestratorResult(
+                            success=False,
+                            error="Comparison timeout exhausted before analysis.",
+                            timed_out=True,
+                        ),
+                    )
+                    for pending_code in stock_codes[len(per_symbol_results):]
+                )
+                return self._synthesize_multi_symbol_chat(
+                    message=message,
+                    market_context=market_context,
+                    report_language=report_language,
+                    per_symbol_results=per_symbol_results,
+                    cancelled_check=cancelled_check,
+                    timeout_seconds=0,
+                )
+            symbol_resolution = resolve_stock_scope(f"analyze {stock_code}", context)
+            symbol_scope = StockScope(
+                expected_stock_code=stock_code,
+                allowed_stock_codes={stock_code},
+                mode="switch",
+            )
+            symbol_context = dict(symbol_resolution.effective_context)
+            symbol_context["stock_code"] = stock_code
+            symbol_context["stock_name"] = ""
+            symbol_market_context = build_agent_chat_market_context(
+                symbol_context,
+                symbol_scope,
+                report_language,
+            )
+            ctx = self._build_chat_pipeline_context(
+                message=(
+                    f"Analyze {stock_code} as one isolated leg of a later comparison. "
+                    "Return a standalone evidence-based analysis for this symbol only."
+                ),
+                session_id=session_id,
+                context=symbol_context,
+                stock_scope=symbol_scope,
+                history=history,
+                market_context=symbol_market_context,
+            )
+            ctx.meta["comparison_stock_codes"] = list(stock_codes)
+            result = self._execute_pipeline(
+                ctx,
+                parse_dashboard=False,
+                progress_callback=progress_callback,
+                cancelled_check=cancelled_check,
+                timeout_seconds=remaining_timeout,
+            )
+            per_symbol_results.append((stock_code, result))
+            if result.cancelled:
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results,
+                    error=result.error,
+                )
+            if cancelled_check is not None and cancelled_check():
+                return self._build_multi_symbol_cancelled_result(
+                    per_symbol_results
+                )
+
+        remaining_timeout = (
+            max(0.0, deadline - time.monotonic())
+            if deadline is not None
+            else None
+        )
+        return self._synthesize_multi_symbol_chat(
+            message=message,
+            market_context=market_context,
+            report_language=report_language,
+            per_symbol_results=per_symbol_results,
+            cancelled_check=cancelled_check,
+            timeout_seconds=remaining_timeout,
+        )
+
+    def _synthesize_multi_symbol_chat(
+        self,
+        *,
+        message: str,
+        market_context: Any,
+        report_language: str,
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
+        cancelled_check: Optional[Callable[[], bool]],
+        timeout_seconds: Optional[float],
+    ) -> OrchestratorResult:
+        """Synthesize isolated per-symbol evidence without exposing tools."""
+        if cancelled_check is not None and cancelled_check():
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results
+            )
+
+        language = normalize_report_language(report_language)
+        if language in {"en", "ko"}:
+            system_prompt = (
+                "You synthesize cross-market stock comparisons. Use only the supplied "
+                "per-symbol analyses, compare like-for-like evidence, preserve currency "
+                "and timezone differences, and state every missing-data limitation."
+            )
+        else:
+            system_prompt = (
+                "你负责综合跨市场股票比较。只能使用给定的逐标的分析，必须按同口径比较，"
+                "保留币种与时区差异，并明确说明所有数据缺口。"
+            )
+
+        evidence = []
+        for stock_code, result in per_symbol_results:
+            evidence.append({
+                "stock_code": stock_code,
+                "status": "available" if result.success and result.content else "unavailable",
+                "analysis": result.content if result.success else "",
+                "diagnostic": (
+                    "" if result.success else sanitize_agent_diagnostic(result.error)
+                ),
+            })
+        user_prompt = "\n\n".join(
+            [
+                market_context.prompt_section,
+                f"Original comparison request:\n{message}",
+                "Per-symbol analysis evidence:\n"
+                + json.dumps(evidence, ensure_ascii=False, default=str),
+            ]
+        )
+        synthesis_messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        loop_result = None
+        if timeout_seconds is None or timeout_seconds > 0:
+            loop_result = run_agent_loop(
+                messages=synthesis_messages,
+                tool_registry=ToolRegistry(),
+                llm_adapter=self.llm_adapter,
+                max_steps=1,
+                max_wall_clock_seconds=timeout_seconds,
+                emit_stage_events=False,
+                cancelled_check=cancelled_check,
+                runtime_guard_policy=self.runtime_guard_policy,
+            )
+        if loop_result is not None and loop_result.cancelled:
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results,
+                error=loop_result.error,
+            )
+        if cancelled_check is not None and cancelled_check():
+            return self._build_multi_symbol_cancelled_result(
+                per_symbol_results
+            )
+
+        synthesis_succeeded = bool(
+            loop_result is not None
+            and loop_result.success
+            and loop_result.content
+        )
+        content = (
+            loop_result.content
+            if synthesis_succeeded
+            else self._build_multi_symbol_fallback(per_symbol_results, language)
+        )
+        if not synthesis_succeeded:
+            logger.warning(
+                "Multi-symbol Chat synthesis degraded: diagnostic=%s",
+                (
+                    "comparison_timeout"
+                    if loop_result is None
+                    else sanitize_agent_diagnostic(loop_result.error)
+                ),
+            )
+
+        models = [
+            result.model
+            for _, result in per_symbol_results
+            if result.model
+        ]
+        if loop_result is not None and loop_result.model:
+            models.append(loop_result.model)
+        return OrchestratorResult(
+            success=bool(content),
+            content=content,
+            tool_calls_log=[
+                call
+                for _, result in per_symbol_results
+                for call in result.tool_calls_log
+            ],
+            total_steps=(
+                sum(result.total_steps for _, result in per_symbol_results)
+                + (loop_result.total_steps if loop_result is not None else 0)
+            ),
+            total_tokens=(
+                sum(result.total_tokens for _, result in per_symbol_results)
+                + (loop_result.total_tokens if loop_result is not None else 0)
+            ),
+            provider=(
+                (loop_result.provider if loop_result is not None else "")
+                or next(
+                    (result.provider for _, result in per_symbol_results if result.provider),
+                    "",
+                )
+            ),
+            model=", ".join(dict.fromkeys(models)),
+            error=None if content else AGENT_CHAT_FAILURE_MESSAGE,
+            timed_out=(
+                any(result.timed_out for _, result in per_symbol_results)
+                or loop_result is None
+                or bool(loop_result is not None and loop_result.timed_out)
+            ),
+        )
+
+    @staticmethod
+    def _build_multi_symbol_fallback(
+        per_symbol_results: List[tuple[str, OrchestratorResult]],
+        report_language: str,
+    ) -> str:
+        """Return an explicit per-symbol fallback when synthesis is unavailable."""
+        if not per_symbol_results:
+            return ""
+        heading = (
+            "Cross-market synthesis was unavailable; per-symbol analyses follow."
+            if report_language in {"en", "ko"}
+            else "跨市场综合暂不可用，以下为逐标的分析。"
+        )
+        sections = [heading]
+        for stock_code, result in per_symbol_results:
+            if result.success and result.content:
+                body = result.content
+            else:
+                diagnostic = sanitize_agent_diagnostic(
+                    result.error
+                    or (
+                        "Analysis timed out."
+                        if result.timed_out
+                        else AGENT_CHAT_FAILURE_MESSAGE
+                    )
+                )
+                body = (
+                    f"Unavailable: {diagnostic}"
+                    if report_language in {"en", "ko"}
+                    else f"不可用：{diagnostic}"
+                )
+            sections.append(f"## {stock_code}\n{body}")
+        return "\n\n".join(sections)
+
     # -----------------------------------------------------------------
     # Pipeline execution
     # -----------------------------------------------------------------
@@ -655,13 +1047,18 @@ class AgentOrchestrator:
         parse_dashboard: bool = True,
         progress_callback: Optional[Callable] = None,
         cancelled_check: Optional[Callable[[], bool]] = None,
+        timeout_seconds: Optional[float] = None,
     ) -> OrchestratorResult:
         """Run the agent pipeline according to ``self.mode``."""
         stats = AgentRunStats()
         all_tool_calls: List[Dict[str, Any]] = []
         models_used: List[str] = []
         t0 = time.time()
-        timeout_s = self._get_timeout_seconds()
+        timeout_s = (
+            self._get_timeout_seconds()
+            if timeout_seconds is None
+            else max(0.0, float(timeout_seconds))
+        )
 
         agents = self._build_agent_chain(ctx)
         specialist_agents_inserted = False
@@ -1086,6 +1483,22 @@ class AgentOrchestrator:
     # Agent chain construction
     # -----------------------------------------------------------------
 
+    def _tool_registry_for_context(self, ctx: AgentContext) -> ToolRegistry:
+        """Resolve a request-local Chat registry without mutating shared state."""
+        market_context = ctx.meta.get("agent_chat_market_context")
+        if ctx.meta.get("response_mode") != "chat" or market_context is None:
+            return self.tool_registry
+        return build_agent_chat_tool_registry(self.tool_registry, market_context)
+
+    @staticmethod
+    def _trim_agent_tool_names(agent: Any, tool_registry: ToolRegistry) -> None:
+        """Keep a child agent's declared subset inside the request-local surface."""
+        tool_names = getattr(agent, "tool_names", None)
+        if tool_names is not None:
+            agent.tool_names = [
+                name for name in tool_names if tool_registry.get(name) is not None
+            ]
+
     def _build_agent_chain(self, ctx: AgentContext) -> list:
         """Instantiate the ordered agent list based on ``self.mode``."""
         from src.agent.agents.technical_agent import TechnicalAgent
@@ -1095,8 +1508,9 @@ class AgentOrchestrator:
 
         self._skill_agent_names = set()
 
+        tool_registry = self._tool_registry_for_context(ctx)
         common_kwargs = dict(
-            tool_registry=self.tool_registry,
+            tool_registry=tool_registry,
             llm_adapter=self.llm_adapter,
             skill_instructions=self.skill_instructions,
             technical_skill_policy=self.technical_skill_policy,
@@ -1106,6 +1520,9 @@ class AgentOrchestrator:
         intel = self._prepare_agent(IntelAgent(**common_kwargs))
         risk = self._prepare_agent(RiskAgent(**common_kwargs))
         decision = self._prepare_agent(DecisionAgent(**common_kwargs))
+        if tool_registry is not self.tool_registry:
+            for agent in (technical, intel, risk, decision):
+                self._trim_agent_tool_names(agent, tool_registry)
 
         if self.mode == "quick":
             return [technical, decision]
@@ -1128,8 +1545,9 @@ class AgentOrchestrator:
         """
         try:
             from src.agent.skills.router import SkillRouter
+            tool_registry = self._tool_registry_for_context(ctx)
             common_kwargs = dict(
-                tool_registry=self.tool_registry,
+                tool_registry=tool_registry,
                 llm_adapter=self.llm_adapter,
                 skill_instructions=self.skill_instructions,
                 technical_skill_policy=self.technical_skill_policy,
@@ -1146,9 +1564,11 @@ class AgentOrchestrator:
                     skill_id=skill_id,
                     **common_kwargs,
                 ))
+                if tool_registry is not self.tool_registry:
+                    self._trim_agent_tool_names(agent, tool_registry)
                 agents.append(agent)
             return agents
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Optional Chat specialists are safe-logged and skipped.
             log_safe_exception(
                 logger,
                 "[Orchestrator] failed to build skill agents",

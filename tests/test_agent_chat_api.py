@@ -9,11 +9,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 from api.app import create_app
+from src.agent.chat_context import build_agent_chat_market_context
+from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
 from src.agent.public_contract import (
     AGENT_CHAT_FAILED,
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
 )
+from src.agent.runtime.guards import RuntimeGuardPolicy
+from src.agent.stock_scope import resolve_stock_scope
+from src.agent.tools.registry import ToolRegistry
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -23,6 +28,39 @@ SENSITIVE_PROVIDER_ERROR = (
     "x-api-key: super-secret credential=super-secret at "
     "https://private.example/v1/chat?token=super-secret"
 )
+
+
+def _build_all_unavailable_comparison_result() -> OrchestratorResult:
+    orchestrator = AgentOrchestrator(
+        tool_registry=ToolRegistry(),
+        llm_adapter=MagicMock(),
+        config=SimpleNamespace(agent_orchestrator_timeout_s=60),
+        runtime_guard_policy=RuntimeGuardPolicy(),
+    )
+    scope = resolve_stock_scope("compare AAPL and HK00700", None).stock_scope
+    market_context = build_agent_chat_market_context(
+        {},
+        scope,
+        "en",
+        per_symbol_tool_scopes=True,
+    )
+    return orchestrator._synthesize_multi_symbol_chat(
+        message="compare AAPL and HK00700",
+        market_context=market_context,
+        report_language="en",
+        per_symbol_results=[
+            (
+                "AAPL",
+                OrchestratorResult(success=False, error="US quote unavailable"),
+            ),
+            (
+                "HK00700",
+                OrchestratorResult(success=False, error="HK quote unavailable"),
+            ),
+        ],
+        cancelled_check=None,
+        timeout_seconds=0,
+    )
 
 
 def teardown_function() -> None:
@@ -173,6 +211,35 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
     assert "private.example" not in caplog.text
 
 
+def test_agent_chat_returns_actual_all_unavailable_comparison_fallback(
+    tmp_path: Path,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = _build_all_unavailable_comparison_result()
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat",
+                    json={
+                        "message": "compare AAPL and HK00700",
+                        "session_id": "all-unavailable-rest",
+                    },
+                )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["error"] is None
+    assert "## AAPL" in payload["content"]
+    assert "US quote unavailable" in payload["content"]
+    assert "## HK00700" in payload["content"]
+    assert "HK quote unavailable" in payload["content"]
+
+
 def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) -> None:
     config = SimpleNamespace(
         is_agent_available=lambda: True,
@@ -315,6 +382,34 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
     assert "private.example" not in response.text
     assert "super-secret" not in caplog.text
     assert "private.example" not in caplog.text
+
+
+def test_agent_chat_stream_returns_actual_all_unavailable_comparison_fallback(
+    tmp_path: Path,
+) -> None:
+    executor = MagicMock()
+    executor.chat.return_value = _build_all_unavailable_comparison_result()
+    config = SimpleNamespace(is_agent_available=lambda: True)
+
+    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+                client = TestClient(create_app(static_dir=tmp_path / "static"))
+                response = client.post(
+                    "/api/v1/agent/chat/stream",
+                    json={
+                        "message": "compare AAPL and HK00700",
+                        "session_id": "all-unavailable-stream",
+                    },
+                )
+
+    assert response.status_code == 200
+    assert '"type": "done"' in response.text
+    assert '"success": true' in response.text
+    assert "## AAPL" in response.text
+    assert "US quote unavailable" in response.text
+    assert "## HK00700" in response.text
+    assert "HK quote unavailable" in response.text
 
 
 def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: Path) -> None:

@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 if TYPE_CHECKING:
     from src.agent.llm_adapter import LLMToolAdapter
+    from src.agent.tools.registry import ToolRegistry
     from src.config import Config
 
 from src.config import (
@@ -27,6 +28,9 @@ from src.agent.provider_trace import (
     trace_model_matches,
 )
 from src.agent.runtime.lifecycle import get_default_usage_recorder
+from src.market_context import detect_market, get_market_guidelines, get_market_role
+from src.report_language import normalize_report_language
+from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from src.storage import get_db
 from src.utils.sanitize import log_safe_exception
 
@@ -35,6 +39,12 @@ logger = logging.getLogger(__name__)
 VISIBLE_ROLES = {"user", "assistant"}
 SUMMARY_USER_PREFIX = "[系统生成的历史对话摘要，仅供延续本会话]"
 SUMMARY_LLM_TIMEOUT_SECONDS = 20
+A_SHARE_ONLY_CHAT_TOOLS = frozenset({
+    "get_capital_flow",
+    "get_chip_distribution",
+    "get_sector_rankings",
+})
+MARKET_INDEX_CHAT_REGIONS = frozenset({"cn", "hk", "us"})
 
 SUMMARY_SYSTEM_PROMPT = """你是股票问答系统的会话压缩器，只能总结已经出现过的用户可见对话内容。
 
@@ -76,6 +86,280 @@ class AgentChatContextBundle:
 
     context_messages: List[Dict[str, Any]]
     diagnostics: Dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AgentChatMarketContext:
+    """Deterministic market identity and prompt context for one chat turn."""
+
+    stock_codes: Tuple[str, ...]
+    markets: Tuple[str, ...]
+    market_role: str
+    market_guidelines: str
+    prompt_section: str
+    disabled_tool_names: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _MarketPromptFacts:
+    currency: str
+    timezone: str
+    fields_zh: str
+    fields_en: str
+
+
+_CHAT_MARKET_FACTS: Dict[str, _MarketPromptFacts] = {
+    "cn": _MarketPromptFacts(
+        "CNY",
+        "Asia/Shanghai",
+        "涨跌停、T+1、北向资金、融资融券与交易所公告",
+        "daily price limits, T+1, Northbound flows, margin data, and exchange filings",
+    ),
+    "hk": _MarketPromptFacts(
+        "HKD",
+        "Asia/Hong_Kong",
+        "港交所交易时段、每手股数、南向资金、HKD 流动性与公司公告",
+        "HKEX sessions, board lots, Southbound flows, HKD liquidity, and company filings",
+    ),
+    "us": _MarketPromptFacts(
+        "USD",
+        "America/New_York",
+        "常规/盘前/盘后价格、熔断、财报、美元汇率、美联储与 SEC 公告",
+        "regular/pre/after-hours prices, circuit breakers, earnings, USD FX, Fed policy, and SEC filings",
+    ),
+    "jp": _MarketPromptFacts(
+        "JPY",
+        "Asia/Tokyo",
+        "日元汇率、日本央行政策、公司治理与交易所公告",
+        "JPY FX, BOJ policy, corporate governance, and exchange filings",
+    ),
+    "kr": _MarketPromptFacts(
+        "KRW",
+        "Asia/Seoul",
+        "韩元汇率、韩国央行政策、KOSPI/KOSDAQ 制度与公司公告",
+        "KRW FX, Bank of Korea policy, KOSPI/KOSDAQ rules, and company filings",
+    ),
+    "tw": _MarketPromptFacts(
+        "TWD",
+        "Asia/Taipei",
+        "新台币汇率、三大法人、融资融券、当冲与 TWSE/TPEx 公告",
+        "TWD FX, institutional flows, margin/day trading, and TWSE/TPEx filings",
+    ),
+}
+
+
+def build_agent_chat_market_context(
+    context: Optional[Dict[str, Any]],
+    stock_scope: Any = None,
+    report_language: str = "zh",
+    *,
+    per_symbol_tool_scopes: bool = False,
+) -> AgentChatMarketContext:
+    """Build market-aware role, rules, and model-visible current-turn facts."""
+    stock_codes: List[str] = []
+
+    def append_code(value: Any) -> None:
+        if not isinstance(value, str):
+            return
+        canonical = canonicalize_analysis_stock_code(value)
+        if canonical and canonical not in stock_codes:
+            stock_codes.append(canonical)
+
+    append_code((context or {}).get("stock_code"))
+    for code in sorted(getattr(stock_scope, "allowed_stock_codes", set()) or set()):
+        append_code(code)
+
+    if not stock_codes:
+        return AgentChatMarketContext(
+            stock_codes=(),
+            markets=(),
+            market_role=get_market_role(None, report_language),
+            market_guidelines=get_market_guidelines(None, report_language),
+            prompt_section="",
+            disabled_tool_names=(),
+        )
+
+    markets = tuple(dict.fromkeys(detect_market(code) for code in stock_codes))
+    disabled_tool_names = (
+        tuple(sorted(A_SHARE_ONLY_CHAT_TOOLS))
+        if not per_symbol_tool_scopes and any(market != "cn" for market in markets)
+        else ()
+    )
+    language = normalize_report_language(report_language)
+    language_key = "en" if language in {"en", "ko"} else "zh"
+
+    if len(markets) == 1:
+        market_role = get_market_role(stock_codes[0], report_language)
+        market_guidelines = get_market_guidelines(stock_codes[0], report_language)
+    else:
+        market_role = "cross-market" if language_key == "en" else "跨市场"
+        market_guidelines = _build_cross_market_guidelines(
+            stock_codes,
+            report_language=report_language,
+            language_key=language_key,
+        )
+
+    return AgentChatMarketContext(
+        stock_codes=tuple(stock_codes),
+        markets=markets,
+        market_role=market_role,
+        market_guidelines=market_guidelines,
+        prompt_section=_build_market_prompt_section(
+            stock_codes,
+            language_key,
+            disabled_tool_names,
+        ),
+        disabled_tool_names=disabled_tool_names,
+    )
+
+
+def build_agent_chat_tool_registry(
+    tool_registry: "ToolRegistry",
+    market_context: AgentChatMarketContext,
+) -> "ToolRegistry":
+    """Return the deterministic market-compatible tool surface for Chat."""
+    disabled = set(market_context.disabled_tool_names)
+    markets = tuple(market_context.markets)
+    if not disabled and not markets:
+        return tool_registry
+
+    from src.agent.tools.registry import ToolRegistry
+
+    filtered = ToolRegistry()
+    for tool_def in tool_registry.list_tools():
+        if tool_def.name in disabled:
+            continue
+        if tool_def.name == "get_market_indices" and markets:
+            if len(markets) != 1 or markets[0] not in MARKET_INDEX_CHAT_REGIONS:
+                continue
+            tool_def = _bind_market_indices_tool(tool_def, markets[0])
+        filtered.register(tool_def)
+    return filtered
+
+
+def _bind_market_indices_tool(tool_def: Any, market: str) -> Any:
+    """Bind market-index declarations and dispatch to the current Chat market."""
+    parameters = [
+        replace(parameter, default=market, enum=[market])
+        if parameter.name == "region"
+        else parameter
+        for parameter in tool_def.parameters
+    ]
+    original_handler = tool_def.handler
+
+    def bound_handler(region: str = market) -> Any:
+        del region
+        return original_handler(region=market)
+
+    return replace(
+        tool_def,
+        parameters=parameters,
+        handler=bound_handler,
+    )
+
+
+def build_agent_chat_chip_instruction(
+    market_context: AgentChatMarketContext,
+) -> str:
+    """Build the market-conditional chip-distribution workflow step."""
+    if "get_chip_distribution" in market_context.disabled_tool_names:
+        return (
+            "当前市场不支持 `get_chip_distribution`；本轮不暴露该工具，"
+            "不得调用或用 A 股筹码数据替代"
+        )
+    return "调用 `get_chip_distribution` 获取筹码分布结构"
+
+
+def _market_facts(market: str) -> _MarketPromptFacts:
+    return _CHAT_MARKET_FACTS.get(
+        market,
+        _MarketPromptFacts(
+            "tool-provided",
+            "tool-provided",
+            "仅使用工具明确返回的市场字段",
+            "only market fields explicitly returned by tools",
+        ),
+    )
+
+
+def _build_cross_market_guidelines(
+    stock_codes: Sequence[str],
+    *,
+    report_language: str,
+    language_key: str,
+) -> str:
+    blocks: List[str] = []
+    seen_markets: set[str] = set()
+    for code in stock_codes:
+        market = detect_market(code)
+        if market in seen_markets:
+            continue
+        seen_markets.add(market)
+        display = get_market_role(code, report_language)
+        blocks.append(f"### {display}\n{get_market_guidelines(code, report_language)}")
+
+    if language_key == "en":
+        intro = (
+            "- This turn covers multiple markets. Apply each market's rules and "
+            "market-specific fields separately.\n"
+            "- Never substitute China A-share assumptions for missing Hong Kong, US, "
+            "or other market data. State partial support explicitly."
+        )
+    else:
+        intro = (
+            "- 本轮涉及多个市场，必须分别应用各市场的交易规则与专属字段。\n"
+            "- 港股、美股或其他市场数据缺失时，不得套用 A 股默认值；必须明确说明支持边界。"
+        )
+    return "\n\n".join([intro, *blocks])
+
+
+def _build_market_prompt_section(
+    stock_codes: Sequence[str],
+    language_key: str,
+    disabled_tool_names: Sequence[str],
+) -> str:
+    if language_key == "en":
+        lines = ["## Current-Turn Market Context (System Generated)"]
+        for code in stock_codes:
+            market = detect_market(code)
+            facts = _market_facts(market)
+            lines.append(
+                f"- Canonical symbol `{code}`: {get_market_role(code, 'en')} ({market.upper()}); "
+                f"quote currency {facts.currency}; trading timezone {facts.timezone}; "
+                f"market-specific fields: {facts.fields_en}."
+            )
+        lines.extend(
+            [
+                "- Use the canonical symbol above for every stock-scoped tool call.",
+                "- If a provider or tool omits a market or field, state that limitation and continue with available evidence; never fabricate or fill it with A-share defaults.",
+            ]
+        )
+        if disabled_tool_names:
+            rendered = " and ".join(f"`{name}`" for name in disabled_tool_names)
+            lines.append(
+                f"- Market capability boundary: {rendered} are unavailable and are not exposed for this turn."
+            )
+        return "\n".join(lines)
+
+    lines = ["## 本轮市场上下文（系统生成）"]
+    for code in stock_codes:
+        market = detect_market(code)
+        facts = _market_facts(market)
+        lines.append(
+            f"- 规范代码 `{code}`：{get_market_role(code, 'zh')}（{market.upper()}）；计价货币 "
+            f"{facts.currency}；交易时区 {facts.timezone}；市场专属字段："
+            f"{facts.fields_zh}。"
+        )
+    lines.extend(
+        [
+            "- 每次股票范围工具调用必须使用上述规范代码。",
+            "- 若 provider 或工具缺少某市场/字段，必须明确说明限制并基于已有证据继续；不得编造或用 A 股默认值补齐。",
+        ]
+    )
+    if disabled_tool_names:
+        rendered = "、".join(f"`{name}`" for name in disabled_tool_names)
+        lines.append(f"- 市场能力边界：{rendered} 当前不可用，本轮不暴露这些工具。")
+    return "\n".join(lines)
 
 
 def build_summary_message(summary_text: str) -> Dict[str, str]:
